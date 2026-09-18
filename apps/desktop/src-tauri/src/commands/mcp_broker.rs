@@ -18,6 +18,7 @@ use tokio::sync::{watch, Mutex as AsyncMutex};
 
 type Client = mcp::Connection;
 pub mod batch;
+pub mod relevance;
 pub mod results;
 const MAX_TOOLS: usize = 1024;
 const MAX_CATALOG_BYTES: usize = 2_000_000;
@@ -45,6 +46,18 @@ pub struct BrokerUsage {
     pub connection_wait_ms: Option<u64>,
     #[serde(default)]
     pub tool_elapsed_ms: Option<u64>,
+    #[serde(default)]
+    pub selection_requests: Option<u64>,
+    #[serde(default)]
+    pub row_selection_requests: Option<u64>,
+    #[serde(default)]
+    pub selection_fallbacks: Option<u64>,
+    #[serde(default)]
+    pub truncated_selections: Option<u64>,
+    #[serde(default)]
+    pub result_queries: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relevance_selections: Option<Vec<Value>>,
 }
 
 impl BrokerUsage {
@@ -53,6 +66,8 @@ impl BrokerUsage {
             && self.calls >= old.calls
             && self.failures >= old.failures
             && self.schema_bytes_returned >= old.schema_bytes_returned
+            && self.relevance_selections.as_ref().map_or(0, Vec::len)
+                >= old.relevance_selections.as_ref().map_or(0, Vec::len)
             && [
                 (self.result_reads, old.result_reads),
                 (self.result_bytes_received, old.result_bytes_received),
@@ -60,9 +75,21 @@ impl BrokerUsage {
                 (self.batches, old.batches),
                 (self.connection_wait_ms, old.connection_wait_ms),
                 (self.tool_elapsed_ms, old.tool_elapsed_ms),
+                (self.selection_requests, old.selection_requests),
+                (self.row_selection_requests, old.row_selection_requests),
+                (self.selection_fallbacks, old.selection_fallbacks),
+                (self.truncated_selections, old.truncated_selections),
+                (self.result_queries, old.result_queries),
             ]
             .into_iter()
             .all(|(current, previous)| current.unwrap_or(0) >= previous.unwrap_or(0))
+    }
+
+    fn selection(&mut self, stats: results::SelectionStats) {
+        *self.selection_requests.get_or_insert(0) += stats.requests;
+        *self.row_selection_requests.get_or_insert(0) += stats.row_requests;
+        *self.selection_fallbacks.get_or_insert(0) += stats.fallbacks;
+        *self.truncated_selections.get_or_insert(0) += stats.truncated;
     }
 }
 
@@ -248,6 +275,11 @@ impl Broker {
                     batches: Some(0),
                     connection_wait_ms: Some(0),
                     tool_elapsed_ms: Some(0),
+                    selection_requests: Some(0),
+                    row_selection_requests: Some(0),
+                    selection_fallbacks: Some(0),
+                    truncated_selections: Some(0),
+                    result_queries: Some(0),
                     ..BrokerUsage::default()
                 },
                 results: VecDeque::new(),
@@ -327,7 +359,7 @@ impl Broker {
         run: &str,
         input: ExecuteInput,
     ) -> Result<(CallToolResult, BrokerUsage), String> {
-        self.execute_with_policy(run, input, true).await
+        self.execute_with_policy(run, input, true, true).await
     }
 
     pub async fn execute(
@@ -335,7 +367,39 @@ impl Broker {
         run: &str,
         input: ExecuteInput,
     ) -> Result<(CallToolResult, BrokerUsage), String> {
-        self.execute_with_policy(run, input, false).await
+        self.execute_with_policy(run, input, false, true).await
+    }
+
+    async fn capture_result(&self, run: &str, result: &CallToolResult) -> Result<String, String> {
+        let attempt = self.attempt(run)?;
+        let mut catalog = attempt.catalog.lock().await;
+        if *attempt.closed.borrow() {
+            return Err("This attempt has ended.".into());
+        }
+        results::capture(result, &mut catalog.results)
+    }
+
+    async fn record_delivery(
+        &self,
+        run: &str,
+        result: &CallToolResult,
+        selection: Option<Value>,
+    ) -> Result<BrokerUsage, String> {
+        let attempt = self.attempt(run)?;
+        let mut catalog = attempt.catalog.lock().await;
+        if *attempt.closed.borrow() {
+            return Err("This attempt has ended.".into());
+        }
+        *catalog.usage.result_bytes_returned.get_or_insert(0) +=
+            serde_json::to_vec(result).map_err(|e| e.to_string())?.len() as u64;
+        if let Some(selection) = selection {
+            catalog
+                .usage
+                .relevance_selections
+                .get_or_insert_with(Vec::new)
+                .push(selection);
+        }
+        Ok(catalog.usage.clone())
     }
 
     pub async fn read_result(
@@ -343,16 +407,51 @@ impl Broker {
         run: &str,
         input: results::ReadInput,
     ) -> Result<(CallToolResult, BrokerUsage), String> {
+        if input.output.is_some()
+            && !std::env::var("JACKALOPE_RESULT_QUERIES").is_ok_and(|value| value == "on")
+        {
+            return Err("Captured-result queries are not enabled.".into());
+        }
         let attempt = self.attempt(run)?;
         let mut catalog = attempt.catalog.lock().await;
         if *attempt.closed.borrow() {
             return Err("This attempt has ended.".into());
         }
         let result = results::read(&catalog.results, &input)?;
+        if let Some(output) = &input.output {
+            *catalog.usage.result_queries.get_or_insert(0) += 1;
+            let encoded = serde_json::to_value(&result).map_err(|e| e.to_string())?;
+            let data: Value = serde_json::from_str(
+                encoded["content"][0]["text"]
+                    .as_str()
+                    .ok_or("Missing query response")?,
+            )
+            .map_err(|e| e.to_string())?;
+            catalog.usage.selection(results::SelectionStats {
+                requests: 1,
+                row_requests: u64::from(output.rows.is_some()),
+                truncated: u64::from(data["truncated"] == true),
+                fallbacks: 0,
+            });
+        }
         *catalog.usage.result_reads.get_or_insert(0) += 1;
         *catalog.usage.result_bytes_returned.get_or_insert(0) +=
             serde_json::to_vec(&result).map_or(0, |value| value.len()) as u64;
         Ok((result, catalog.usage.clone()))
+    }
+
+    pub(crate) async fn captured_json(
+        &self,
+        run: &str,
+        handle: &str,
+        pointer: Option<&str>,
+    ) -> Result<Value, String> {
+        let attempt = self.attempt(run)?;
+        let catalog = attempt.catalog.lock().await;
+        if *attempt.closed.borrow() {
+            return Err("This attempt has ended.".into());
+        }
+        results::captured_json(&catalog.results, handle, pointer)
     }
 
     async fn execute_with_policy(
@@ -360,6 +459,7 @@ impl Broker {
         run: &str,
         input: ExecuteInput,
         read_only: bool,
+        deliver: bool,
     ) -> Result<(CallToolResult, BrokerUsage), String> {
         if let Some(output) = &input.output {
             output.validate()?;
@@ -379,7 +479,7 @@ impl Broker {
         }
         tokio::select! {
             _ = closed.changed() => Err("The attempt ended; an in-flight tool may already have taken effect. Do not retry blindly.".into()),
-            result = execute_catalog(&attempt, input, read_only) => result,
+            result = execute_catalog(&attempt, input, read_only, deliver) => result,
         }
     }
 }
@@ -527,6 +627,7 @@ async fn execute_catalog(
     attempt: &Attempt,
     input: ExecuteInput,
     read_only: bool,
+    deliver: bool,
 ) -> Result<(CallToolResult, BrokerUsage), String> {
     let catalog = attempt.catalog.lock().await;
     let lease = catalog
@@ -598,7 +699,9 @@ async fn execute_catalog(
     *catalog.usage.connection_wait_ms.get_or_insert(0) += wait_ms;
     *catalog.usage.tool_elapsed_ms.get_or_insert(0) += started.elapsed().as_millis() as u64;
     // Older upstream revisions omit this field; our downstream revision requires it.
-    result.result_type = Some(rmcp::model::ResultType::COMPLETE);
+    if result.result_type.is_none() {
+        result.result_type = Some(rmcp::model::ResultType::COMPLETE);
+    }
     catalog.usage.calls += 1;
     if result.is_error == Some(true) {
         catalog.usage.failures += 1;
@@ -608,13 +711,18 @@ async fn execute_catalog(
     }
     *catalog.usage.result_bytes_received.get_or_insert(0) +=
         serde_json::to_vec(&result).map_or(0, |value| value.len()) as u64;
+    if !deliver {
+        return Ok((result, catalog.usage.clone()));
+    }
     let selection = if std::env::var("JACKALOPE_RESULT_SELECTION").is_ok_and(|value| value == "off")
     {
         None
     } else {
         input.output.as_ref()
     };
-    result = results::select(result, selection, &mut catalog.results);
+    let (selected, stats) = results::select_measured(result, selection, &mut catalog.results);
+    result = selected;
+    catalog.usage.selection(stats);
     *catalog.usage.result_bytes_returned.get_or_insert(0) +=
         serde_json::to_vec(&result).map_or(0, |value| value.len()) as u64;
     Ok((result, catalog.usage.clone()))

@@ -15,6 +15,17 @@ pub(super) fn has_api_key(binding: &AccountBinding) -> Result<bool, String> {
     credentials::read(binding).map(|key| key.is_some())
 }
 
+pub(super) fn api_key_name(binding: &AccountBinding) -> Result<Option<String>, String> {
+    credentials::read(binding).map(|key| key.map(|key| key.name))
+}
+
+pub(super) fn api_provider(binding: &AccountBinding) -> Result<Option<&'static str>, String> {
+    if binding.profile_id.is_none() || binding.adapter != "opencode" {
+        return Ok(None);
+    }
+    api_key_name(binding).map(|name| name.and_then(|name| credentials::provider(&name)))
+}
+
 static PROFILE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -767,6 +778,7 @@ pub fn credential_env_vars(adapter: &str) -> &'static [&'static str] {
         "gemini" | "antigravity" => &[
             "GEMINI_API_KEY",
             "GOOGLE_API_KEY",
+            "GOOGLE_GENERATIVE_AI_API_KEY",
             "GOOGLE_APPLICATION_CREDENTIALS",
             "GOOGLE_GENAI_USE_VERTEXAI",
             "GOOGLE_GENAI_USE_GCA",
@@ -779,6 +791,7 @@ pub fn credential_env_vars(adapter: &str) -> &'static [&'static str] {
             "CLAUDE_CODE_OAUTH_TOKEN",
             "GEMINI_API_KEY",
             "GOOGLE_API_KEY",
+            "GOOGLE_GENERATIVE_AI_API_KEY",
             "GOOGLE_APPLICATION_CREDENTIALS",
             "XAI_API_KEY",
             "GROK_API_KEY",

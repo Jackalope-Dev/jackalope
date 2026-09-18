@@ -3,6 +3,7 @@ use crate::commands::{
     process_control::ProcessTree,
     tasks::{self, TaskRun, TaskRuntime},
 };
+mod fixture_mcp;
 use serde_json::Value;
 use std::{
     io::{BufRead, BufReader, Write},
@@ -31,7 +32,16 @@ pub(super) fn run(
         return Err("Account is disabled".into());
     }
     let mut cmd = Command::new(executable);
+    let mut fixture_config = if adapter == "antigravity" && spec["fixtureMcp"].is_object() {
+        Some(fixture_mcp::FixtureConfig::install(
+            repo,
+            &spec["fixtureMcp"],
+        )?)
+    } else {
+        None
+    };
     cmd.env_remove("JACKALOPE_QUALITY_SPEC");
+    cmd.env_remove("JACKALOPE_JEV_TEST_KEY");
     agent_profiles::apply_binding(&mut cmd, &binding)?;
     let effort = serde_json::from_value(spec["effort"].clone()).map_err(|e| e.to_string())?;
     if adapter == "codex" {
@@ -56,8 +66,12 @@ pub(super) fn run(
         if let Some(check) = spec["check"].as_str() {
             cmd.args(["--allowedTools", &format!("Bash({check})")]);
         }
+    } else if adapter == "antigravity" {
+        tasks::antigravity::configure(&mut cmd, &repo.to_string_lossy(), None);
+    } else if adapter == "opencode" {
+        cmd.args(["run", "--format", "json"]);
     } else {
-        return Err("Direct trials support Codex and Claude".into());
+        return Err("Direct trials support Codex, Claude, OpenCode and Antigravity tasks".into());
     }
     let reasoning_effort = tasks::effort::configure(&mut cmd, &adapter, effort);
     if let Some(servers) = spec["fixtureMcp"].as_object() {
@@ -65,6 +79,9 @@ pub(super) fn run(
             for value in crate::commands::mcp::codex_overrides(servers)? {
                 cmd.args(["-c", &value]);
             }
+        } else if adapter == "opencode" {
+            let config = crate::commands::mcp::opencode_config(servers, &cmd)?;
+            cmd.env("OPENCODE_CONFIG_CONTENT", config);
         } else if adapter == "claude" {
             cmd.args([
                 "--mcp-config",
@@ -124,7 +141,11 @@ pub(super) fn run(
         }
     };
     let mut stdin = child.stdin.take().unwrap();
-    let input = prompt.as_bytes().to_vec();
+    let input = if adapter == "antigravity" {
+        format!("{}\n", serde_json::json!({"event":"user","message":{"content":format!("Working directory: {}\n\n{prompt}", repo.display())}})).into_bytes()
+    } else {
+        prompt.as_bytes().to_vec()
+    };
     let writer = std::thread::spawn(move || stdin.write_all(&input));
     let stdout = child.stdout.take().unwrap();
     let stderr = child.stderr.take().unwrap();
@@ -132,10 +153,18 @@ pub(super) fn run(
     let log_path = repo.parent().unwrap().join("direct.jsonl");
     let reader = std::thread::spawn(move || -> Result<(), String> {
         let mut log = std::fs::File::create(log_path).map_err(|e| e.to_string())?;
+        let mut stream = tasks::antigravity::Stream::default();
         for line in BufReader::new(stdout).lines() {
             let line = line.map_err(|e| e.to_string())?;
             writeln!(log, "{line}").map_err(|e| e.to_string())?;
-            tasks::consume_adapter_event(&mut state.lock().unwrap(), &line, &adapter);
+            if adapter == "antigravity" {
+                stream.consume(&mut state.lock().unwrap(), &line);
+            } else {
+                tasks::consume_adapter_event(&mut state.lock().unwrap(), &line, &adapter);
+            }
+        }
+        if adapter == "antigravity" {
+            stream.finish(&mut state.lock().unwrap());
         }
         Ok(())
     });
@@ -165,6 +194,11 @@ pub(super) fn run(
     let read = reader.join();
     let diagnostics = diagnostics.join();
     let mut result = run.lock().unwrap().clone();
+    if let Some(config) = &mut fixture_config {
+        if let Err(error) = config.finish() {
+            result.error = Some(error);
+        }
+    }
     result.exit_code = status.as_ref().ok().and_then(|s| s.code());
     let io_ok = matches!(written, Ok(Ok(()))) && matches!(read, Ok(Ok(())));
     result.status = if stopped {

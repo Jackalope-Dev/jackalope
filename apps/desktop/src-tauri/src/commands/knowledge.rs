@@ -44,6 +44,8 @@ pub struct KnowledgeEntry {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextSelection {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jev_preparation: Option<super::decisions::agent_questions::Input>,
     #[serde(default)]
     pub advance_workflow: bool,
     #[serde(default)]
@@ -60,6 +62,10 @@ pub struct ContextSelection {
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextReceipt {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jev_preparation: Option<super::decisions::agent_questions::Input>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jev_preparation_result: Option<serde_json::Value>,
     #[serde(default)]
     pub reasons: std::collections::BTreeMap<String, String>,
     pub entries: Vec<KnowledgeEntry>,

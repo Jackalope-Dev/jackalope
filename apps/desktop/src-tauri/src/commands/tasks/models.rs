@@ -215,6 +215,8 @@ pub struct Runner {
 impl TaskRun {
     pub(in crate::commands) fn summary(&self) -> Self {
         let mut context_receipt = self.context_receipt.clone();
+        context_receipt.jev_preparation = None;
+        context_receipt.jev_preparation_result = None;
         for entry in &mut context_receipt.entries {
             entry.content.clear();
             if let Some(source) = &mut entry.automatic {

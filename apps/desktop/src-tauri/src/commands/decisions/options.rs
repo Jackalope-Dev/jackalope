@@ -36,6 +36,7 @@ pub struct Options {
     pub objective: Objective,
     pub context_selection: bool,
     pub tool_discovery: bool,
+    pub agent_questions: bool,
     pub failure_triage: bool,
     pub requirement_coverage: bool,
     pub review_prioritization: bool,
@@ -200,6 +201,7 @@ mod tests {
         assert_eq!(options.objective, Objective::Quality);
         assert!(
             !options.context_selection
+                && !options.agent_questions
                 && !options.monitor_filtering
                 && !options.assignment_matching
         );

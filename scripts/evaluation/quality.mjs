@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { release } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assemblePrompt } from '../../apps/desktop/src/lib/skills/context-assembler.ts';
@@ -9,9 +10,15 @@ import { effortPrompt } from '../../apps/desktop/src/lib/task-effort.ts';
 import { runUsageBreakdown } from '../../apps/desktop/src/lib/usage-breakdown.ts';
 import { aggregateAttempts } from './attempts.mjs';
 import { experimentEnvironment, experimentOptions, variantOrder } from './experiments.mjs';
+import {
+  historyExperimentEnvironment,
+  historyExperimentIdentity,
+  historyExperimentReceipt,
+} from './history-experiment.mjs';
 import { qualityCases } from './quality-cases.mjs';
 import { qualitySummary } from './quality-metrics.mjs';
-import { requireEvaluationPass } from './readiness.mjs';
+import { providerStopReason, requireEvaluationPass } from './readiness.mjs';
+import { checkScope } from './scope.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const args = process.argv.slice(2);
@@ -35,6 +42,13 @@ if (
           c.followups.length > 5 ||
           c.followups.some((prompt) => typeof prompt !== 'string' || !prompt.trim()))) ||
       typeof c.oracle !== 'string' ||
+      (c.allowedFiles !== undefined &&
+        (!Array.isArray(c.allowedFiles) ||
+          c.allowedFiles.some(
+            (name) =>
+              typeof name !== 'string' ||
+              /(^[A-Za-z]:|^[/\\]|(^|[/\\])\.\.?([/\\]|$)|(^|[/\\])\.git([/\\]|$))/.test(name),
+          ))) ||
       !c.files ||
       Object.entries(c.files).some(
         ([name, content]) =>
@@ -52,13 +66,14 @@ const selected = value(
 ).split(',');
 const variants = value('--variants', 'before,after').split(',');
 const compactPrompts = args.includes('--compact-prompts');
+const stopOnFailure = args.includes('--stop-on-failure');
 const experiments = experimentOptions(args, variants);
 const orderSeed = value('--order-seed', null);
 const experimental = args.some((arg) =>
   variants.some(
     (v) =>
       arg.startsWith(`--${v}-`) &&
-      /-(workflow|task-approach|tool-surface|named-read|result-selection|repo-map|context-reuse|source-context|batch-read|execution-profile|verification-flow|context-read|analysis-cache|dispatch-plan|jev-assistance|failure-triage)=/.test(
+      /-(workflow|task-approach|tool-surface|named-read|result-selection|result-queries|result-preview|initial-tools|repo-map|context-reuse|source-context|batch-read|execution-profile|verification-flow|context-read|context-pruning|history-compaction|analysis-cache|dispatch-plan|jev-assistance|jev-questions|jev-preparation|failure-triage)=/.test(
         arg,
       ),
   ),
@@ -133,9 +148,10 @@ if (
   !Number.isInteger(tokens) ||
   tokens < 1000 ||
   tokens > 1000000 ||
-  !['codex', 'claude'].includes(agent)
+  !['codex', 'claude', 'antigravity', 'opencode'].includes(agent)
 )
   throw new Error('Invalid quality evaluation options.');
+const historyIdentity = await historyExperimentIdentity(agent, experiments);
 if (!args.includes('--execute')) {
   if (value('--save-prompts', null)) {
     if (experimental)
@@ -212,14 +228,28 @@ if (!args.includes('--execute')) {
     ),
   );
   const cliVersion =
-    spawnSync(agent, ['--version'], { encoding: 'utf8', windowsHide: true }).stdout?.trim() ?? null;
+    spawnSync(agent === 'antigravity' ? 'agy' : agent, ['--version'], {
+      encoding: 'utf8',
+      windowsHide: true,
+    }).stdout?.trim() ?? null;
+  const environment = {
+    runnerNode: process.version,
+    fixtureNode:
+      spawnSync('node', ['--version'], { encoding: 'utf8', windowsHide: true }).stdout?.trim() ??
+      null,
+    platform: process.platform,
+    architecture: process.arch,
+    osRelease: release(),
+  };
   const comparisonPath = path.join(output, 'comparison.json');
   const plan = {
     cases: selected,
     variants,
     repeat,
     compactPrompts,
+    ...(stopOnFailure ? { stopOnFailure: true } : {}),
     ...(experimental ? { experiments } : {}),
+    ...(historyIdentity ? { historyCompaction: historyIdentity } : {}),
     ...(orderSeed !== null ? { orderSeed } : {}),
     ...(Object.values(models).some((m) => m !== model) ? { models } : {}),
     suiteSha256: createHash('sha256')
@@ -244,6 +274,7 @@ if (!args.includes('--execute')) {
       saved.baselineRevision !== baseline.revision ||
       saved.model !== model ||
       saved.cliVersion !== cliVersion ||
+      (saved.environment && JSON.stringify(saved.environment) !== JSON.stringify(environment)) ||
       saved.seconds !== seconds ||
       saved.tokens !== tokens ||
       (saved.controlPromptsHash ?? null) !== controlPromptsHash ||
@@ -269,7 +300,7 @@ if (!args.includes('--execute')) {
     const summary = qualitySummary(trials, Object.keys(binaries));
     await writeFile(
       `${comparisonPath}.tmp`,
-      `${JSON.stringify({ version: 1, plan, baselineRevision: baseline.revision, controlPromptsHash, controlPromptsRevision: controlPrompts?.revision ?? null, executableHashes, cliVersion, agent, model, efforts, speeds, seconds, tokens, trials, interruptions, activeTrial, stopReason, summary, limitations: 'Authored disposable tasks, not human acceptance or a direct-GUI comparison. Direct uses the installed CLI with matched model and base permissions, without Jackalope injection. Effort requests are pinned when set; other provider configuration and caching are inherited. Include failures; missing usage remains unknown. Summary covers completed trial receipts; separately retained crash interruptions can leave total experiment usage unknown.' }, null, 2)}\n`,
+      `${JSON.stringify({ version: 1, plan, baselineRevision: baseline.revision, controlPromptsHash, controlPromptsRevision: controlPrompts?.revision ?? null, executableHashes, cliVersion, environment: saved && !saved.environment ? null : environment, agent, model, efforts, speeds, seconds, tokens, trials, interruptions, activeTrial, stopReason, summary, limitations: 'Authored disposable tasks, not human acceptance or a direct-GUI comparison. Direct uses the installed CLI with matched model and base permissions, without Jackalope injection. Effort requests are pinned when set; other provider configuration and caching are inherited. Include failures; missing usage remains unknown. Summary covers completed trial receipts; separately retained crash interruptions can leave total experiment usage unknown.' }, null, 2)}\n`,
     );
     await rename(`${comparisonPath}.tmp`, comparisonPath);
   };
@@ -358,6 +389,10 @@ if (!args.includes('--execute')) {
         }
         if (completed) continue;
         await writeFile(specPath, `${JSON.stringify(spec, null, 2)}\n`);
+        const historyReceiptPath = specPath.replace(/\.json$/, '.history.jsonl');
+        const historyMode = experiments[variant]['history-compaction'];
+        const historyEnv = historyExperimentEnvironment(historyMode, historyReceiptPath);
+        if (historyMode !== 'off') await writeFile(historyReceiptPath, '', { mode: 0o600 });
         activeTrial = { case: id, variant, repetition, startedAt: new Date().toISOString() };
         await checkpoint();
         console.log(`Quality: ${id}, ${variant}, repetition ${repetition}`);
@@ -380,6 +415,7 @@ if (!args.includes('--execute')) {
                 JACKALOPE_CONTEXT_EXPERIMENT:
                   compactPrompts && variant === 'after' ? 'compact' : 'off',
                 ...experimentEnvironment(experiments[variant]),
+                ...historyEnv,
               },
               stdio: ['ignore', 'pipe', 'pipe'],
             },
@@ -427,7 +463,18 @@ if (!args.includes('--execute')) {
           error = String(cause);
         }
         const run = report?.run;
-        const { runs, usage, efficiency } = aggregateAttempts(report);
+        const scope = await checkScope(fixture, run?.workspace);
+        const {
+          runs,
+          usage,
+          efficiency,
+          agentUsage,
+          agentReportedCostUsd,
+          helperUsages,
+          helperUsage,
+          helperCostUsd,
+          helperAccountingComplete,
+        } = aggregateAttempts(report);
         const budgetExceeded = report
           ? report.budgetStopped === true ||
             report.elapsedMs >= seconds * 1000 ||
@@ -437,6 +484,7 @@ if (!args.includes('--execute')) {
           case: id,
           model: models[variant],
           experiments: experiments[variant],
+          historyCompaction: await historyExperimentReceipt(historyMode, historyReceiptPath),
           source: fixture.source ?? null,
           variant,
           repetition,
@@ -446,6 +494,7 @@ if (!args.includes('--execute')) {
           error,
           oraclePassed:
             execution.code === 0 &&
+            scope.passed !== false &&
             budgetExceeded === false &&
             (!(fixture.toolFixture || fixture.toolFixtures?.length) ||
               report?.fixtureToolCalls > 0) &&
@@ -461,6 +510,7 @@ if (!args.includes('--execute')) {
             run?.status === 'review' &&
             report?.oracle?.success === true,
           behavioralOraclePassed: report?.oracle?.success === true,
+          scope,
           budgetStopped: report?.budgetStopped ?? null,
           budgetExceeded,
           profileFingerprint: run?.accountBinding
@@ -484,11 +534,17 @@ if (!args.includes('--execute')) {
           mcpUsage: run?.mcpUsage ?? null,
           fixtureToolCalls: report?.fixtureToolCalls ?? null,
           stages: run?.stages ?? [],
-          usageBreakdown: runs.length ? runUsageBreakdown(runs) : null,
+          usageBreakdown: runs.length ? runUsageBreakdown(runs, helperUsages) : null,
+          agentUsage,
+          agentReportedCostUsd,
+          helperUsage,
+          helperCostUsd,
+          helperAccountingComplete,
           attempts: runs.length,
           accepted: null,
           status: run?.status ?? null,
           launchError: report?.launchError ?? null,
+          quotaFailure: runs.some((run) => run.quotaFailure) || false,
           elapsedMs: report?.elapsedMs ?? null,
           promptBytes: report?.promptBytes ?? null,
           input: usage?.input ?? null,
@@ -499,8 +555,13 @@ if (!args.includes('--execute')) {
           answeredQuestions: run?.prompts?.filter((p) => p.status === 'answered').length ?? 0,
         });
         activeTrial = null;
+        stopReason = providerStopReason(runs);
+        if (!stopReason && stopOnFailure && !trials.at(-1).oraclePassed)
+          stopReason =
+            'Stopped after a failed trial as requested. The remaining matrix is incomplete; retain all attempts.';
         await checkpoint();
         console.log(JSON.stringify(trials.at(-1)));
+        if (stopReason) break pairs;
       }
     }
   console.log(`Quality comparison: ${path.join(output, 'comparison.json')}`);

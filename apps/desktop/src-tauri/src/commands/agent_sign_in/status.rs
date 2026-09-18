@@ -142,6 +142,12 @@ async fn check(binding: AccountBinding) -> Result<AccountStatus, String> {
             )
         });
     }
+    if binding.profile_id.is_some()
+        && binding.adapter == "opencode"
+        && agent_profiles::has_api_key(&binding)?
+    {
+        return Ok(status("configured", None, "A provider API key is saved for OpenCode. Select a model from that provider; credential validity, model access and billing are checked when a task starts."));
+    }
     if binding.profile_id.is_some() && matches!(binding.adapter.as_str(), "antigravity" | "aider") {
         return Ok(if agent_profiles::has_api_key(&binding)? {
             status(

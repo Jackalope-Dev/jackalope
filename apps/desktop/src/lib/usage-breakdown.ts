@@ -13,7 +13,7 @@ function total(usages: RunUsage[]) {
   };
 }
 
-export function runUsageBreakdown(runs: TaskRun[]) {
+export function runUsageBreakdown(runs: TaskRun[], helpers: RunUsage[] = []) {
   const routing: RunUsage[] = [];
   const execution: RunUsage[] = [];
   const retries: RunUsage[] = [];
@@ -27,7 +27,8 @@ export function runUsageBreakdown(runs: TaskRun[]) {
     routing: total(routing),
     execution: total(execution),
     quotaRetries: total(retries),
-    total: total([...routing, ...execution, ...retries]),
+    helpers: total(helpers),
+    total: total([...routing, ...execution, ...retries, ...helpers]),
     verificationTokens: null,
     limitations:
       'Cached input is included in input. Execution includes agent verification and internal retries; providers do not expose a reliable token split for those stages. Separate continuation attempts must all be supplied. Byte counts are not tokens or quota.',

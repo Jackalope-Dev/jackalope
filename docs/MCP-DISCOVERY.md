@@ -169,6 +169,33 @@ row outputs include source indices and pagination. Complete selected results rem
 recoverable through `read_tool_result` for the latest sixteen selections in the attempt.
 Batching never authorizes a mutable operation or retries one automatically.
 
+`JACKALOPE_RESULT_QUERIES=on` independently enables local queries over a captured
+result through `read_tool_result.output`. It accepts the same row selection as the
+initial read, without another upstream call. Row pages contain complete JSON rows
+and a matching-row `nextOffset`; large individual rows require narrower columns or
+a larger output budget. Truncated previews include bounded, partial array paths to
+help form a query. Missing paths fail explicitly, and raw character reads still
+recover the original. Attempt usage distinguishes selections, row queries,
+fallbacks, truncation and snapshot queries so repeated expansion remains measurable.
+Selected responses expose the same payload as text and `structuredContent` for
+programmatic consumers. HTTP help describes row-query inputs, selected-row paths
+and captured-result queries when the experiment is enabled.
+
+With queries enabled, `JACKALOPE_RESULT_PREVIEW=on` additionally captures text/JSON
+results larger than 16 KB when no output selection was requested, returning an
+explicitly truncated 2,000-character preview and partial array paths. The full
+original stays queryable through its handle; previews never establish all matching
+records. Errors and non-text content remain intact, and explicit selections take
+precedence. Both experiments are off by default and require end-to-end evaluation.
+Lean HTTP tasks receive compact help with full browser, desktop and coordination
+contracts available through `GET /v1/help?full=true`.
+
+`JACKALOPE_INITIAL_TOOLS=small` can provide a complete small catalog and its handles
+in launch context, avoiding a separate agent discovery call. It has a three-second
+initialization budget and a four-tool, 6 KB limit. Partial, failed or larger catalogs
+retain ordinary discovery. Metadata remains untrusted and each call still validates
+the live schema and permissions. Include initialization and prompt bytes in comparisons.
+
 Settings → Decisions includes an off-by-default Jev tool-discovery experiment.
 In Jev mode it can promote strongly relevant tools for ambiguous searches using
 the query, at most 4,000 task characters and 32 descriptions capped at 1,200
@@ -181,6 +208,48 @@ ordering. Decision receipts record usage separately from agent execution, and
 search responses include the receipt reference and elapsed decision time. Include
 that overhead when comparing complete workflows. Downstream savings require live
 task evidence; relevance scores alone do not establish correctness or savings.
+
+The separate agent-questions option exposes `ask_jev` only for connected Jev scopes.
+It accepts `{state, questions, sources?}`. Jev sees the task objective and acceptance
+requirements as `task`, the supplied state as `input`, and native reads as `sources`.
+For example:
+
+```json
+{
+  "state": {"focus": "build failures"},
+  "sources": {"report": {"kind": "file", "path": "report.md", "startLine": 1, "lines": 80}},
+  "questions": {
+    "dependency": {"type": "noul", "instructions": "Does `sources.report.text` describe a missing dependency?"}
+  }
+}
+```
+
+A source can instead use `{"kind":"tool_result","resultHandle":"...","jsonPointer":"/structuredContent/items"}`.
+This reads the original captured response without reexecuting the upstream tool.
+Expired handles, another attempt's handles, missing pointers and oversized evidence
+fail explicitly. Batch independent questions sharing evidence; use a later request
+only when it needs an earlier answer. Unknown or uncertain answers require inspection,
+not automatic exclusion. See [usage and routing](USAGE-AND-ROUTING.md) for limits,
+accounting and the opt-in policy.
+
+With `JACKALOPE_CONTEXT_PRUNING=on` and connected, enabled Jev agent questions,
+`read_relevant_tool` (`POST /v1/tools/read-relevant`) can assess a large read-only
+response before agent delivery. Supply `{handle, arguments, pointer, query,
+keepIndices?}`; the array pointer is relative to `structuredContent`. It accepts
+8–32 rows in 16–80 KB of complete structured evidence, with text content that
+exactly mirrors that evidence. Errors, media, additional text, partial results,
+unsupported shapes and failed assessments retain the original response. Exact
+predicates should use local row selection instead.
+
+Each row is scored against the complete task, acceptance requirements and read
+purpose. Only unrelated probabilities of at least 0.95 permit removal; pinned
+rows, explicit error rows, malformed scores and uncertainty are retained. Metadata
+outside the array stays intact. A selection receipt supplies original source
+indices, a hash, the decision record and a recovery handle in the attempt's
+latest-16 snapshot buffer. Assessment uses the shared eight-request Jev limit and
+records helper usage separately; broker byte accounting measures actual delivery.
+This opt-in experiment does not modify provider session history or establish
+completeness, quality equivalence or net savings.
 
 Ordinary native tests cover stdio and authenticated HTTP discovery, pagination,
 small schema responses, execution handles, changed definitions, allow/deny lists,

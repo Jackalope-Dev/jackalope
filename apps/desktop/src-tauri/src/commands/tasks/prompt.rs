@@ -14,6 +14,9 @@ pub(super) fn policy_hash() -> String {
             "JACKALOPE_ANALYSIS_CACHE",
             "JACKALOPE_DISPATCH_PLAN",
             "JACKALOPE_BATCH_READ",
+            "JACKALOPE_RESULT_QUERIES",
+            "JACKALOPE_RESULT_PREVIEW",
+            "JACKALOPE_INITIAL_TOOLS",
             "JACKALOPE_TOOL_SURFACE",
             "JACKALOPE_NAMED_READ",
             "JACKALOPE_SOURCE_CONTEXT",
@@ -77,6 +80,20 @@ mod tests {
     use super::*;
 
     #[test]
+    fn initial_tools_require_a_complete_small_successful_catalog() {
+        let mut catalog = serde_json::json!({"tools":[{"tool":{"name":"read"},"handle":"a"}],"total":1,"errors":[],"nextOffset":null});
+        assert!(small_tool_catalog(&catalog).is_some());
+        catalog["total"] = serde_json::json!(2);
+        assert!(small_tool_catalog(&catalog).is_none());
+        catalog["total"] = serde_json::json!(1);
+        catalog["errors"] = serde_json::json!([{"server":"failed"}]);
+        assert!(small_tool_catalog(&catalog).is_none());
+        catalog["errors"] = serde_json::json!([]);
+        catalog["tools"][0]["description"] = serde_json::json!("x".repeat(6000));
+        assert!(small_tool_catalog(&catalog).is_none());
+    }
+
+    #[test]
     fn only_known_native_sessions_with_the_same_policy_receive_delta_guidance() {
         let mut old = super::super::TaskRun::default();
         let full = compact_preamble(None, "codex");
@@ -92,4 +109,17 @@ mod tests {
         old.efficiency.prompt_policy_hash = Some("older-policy".into());
         assert_eq!(compact_preamble(Some(&old), "codex"), full);
     }
+}
+pub(super) fn small_tool_catalog(catalog: &serde_json::Value) -> Option<String> {
+    let tools = catalog["tools"].as_array()?;
+    if tools.is_empty()
+        || tools.len() > 4
+        || catalog["total"].as_u64()? != tools.len() as u64
+        || !catalog["errors"].as_array()?.is_empty()
+        || !catalog["nextOffset"].is_null()
+    {
+        return None;
+    }
+    let text = serde_json::to_string(tools).ok()?;
+    (text.len() <= 6000).then_some(text)
 }

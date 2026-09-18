@@ -1,3 +1,9 @@
+export function providerStopReason(runs) {
+  return runs.some((run) => run.quotaFailure)
+    ? 'Provider quota stopped the comparison. Remaining trials were not launched; retain the incomplete pair and all reported usage.'
+    : null;
+}
+
 export function evaluationReadiness(trials, expected) {
   const failures = [];
   for (const request of expected) {

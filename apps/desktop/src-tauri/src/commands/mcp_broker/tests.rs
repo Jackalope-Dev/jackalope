@@ -1,5 +1,51 @@
 use super::*;
 
+#[tokio::test]
+async fn deferred_delivery_accounts_actual_bytes_and_preserves_attempt_boundary() {
+    let root = folder();
+    let broker = Broker::default();
+    broker
+        .prepare("selection", vec![fixture(SERVER)], root.clone(), None)
+        .unwrap();
+    let (found, _) = broker.search("selection", search("tool_19")).await.unwrap();
+    let handle = found["tools"][0]["handle"].as_str().unwrap();
+    let (original, usage) = broker
+        .execute_with_policy("selection", execute(handle), true, false)
+        .await
+        .unwrap();
+    assert_eq!(usage.calls, 1);
+    assert!(usage.result_bytes_received.unwrap() > 0);
+    assert_eq!(usage.result_bytes_returned, Some(0));
+    let captured = broker.capture_result("selection", &original).await.unwrap();
+    assert_eq!(
+        broker
+            .captured_json("selection", &captured, None)
+            .await
+            .unwrap(),
+        serde_json::to_value(&original).unwrap()
+    );
+    let delivered = CallToolResult::structured(json!({"selected":true}));
+    let usage = broker
+        .record_delivery("selection", &delivered, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        usage.result_bytes_returned,
+        Some(serde_json::to_vec(&delivered).unwrap().len() as u64)
+    );
+    assert_eq!(usage.calls, 1);
+    broker.close("selection");
+    assert!(broker
+        .record_delivery("selection", &delivered, None)
+        .await
+        .is_err());
+    assert!(broker
+        .captured_json("selection", &captured, None)
+        .await
+        .is_err());
+    remove_fixture(root).await;
+}
+
 #[test]
 fn delayed_call_receipts_cannot_erase_completed_batch_accounting() {
     let call = BrokerUsage {
@@ -9,11 +55,19 @@ fn delayed_call_receipts_cannot_erase_completed_batch_accounting() {
     };
     let batch = BrokerUsage {
         batches: Some(1),
+        selection_requests: Some(2),
+        row_selection_requests: Some(2),
+        result_queries: Some(1),
         result_bytes_returned: Some(250),
         ..call.clone()
     };
     assert!(batch.supersedes(&call));
     assert!(!call.supersedes(&batch));
+    let stale_query = BrokerUsage {
+        result_queries: Some(0),
+        ..batch.clone()
+    };
+    assert!(!stale_query.supersedes(&batch));
     let refreshed = BrokerUsage {
         catalog_tools: 0,
         catalog_bytes: 0,

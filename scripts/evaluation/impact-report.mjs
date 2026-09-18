@@ -91,9 +91,18 @@ export function impactReport(
           !review.notes?.trim())
       )
         throw new Error('Invalid independent review.');
-      const estimatedCostUsd = pricedUsage(row, pricing[row.model ?? comparison.model]);
-      const modelCostBounds = pricedBounds(row, pricing[row.model ?? comparison.model]);
-      const helperCostUsd = row.helperCostUsd ?? (protocol.includesHelpers ? null : 0);
+      const modelUsage = Object.hasOwn(row, 'agentUsage') ? row.agentUsage : row;
+      const estimatedCostUsd = modelUsage
+        ? pricedUsage(modelUsage, pricing[row.model ?? comparison.model])
+        : null;
+      const modelCostBounds = modelUsage
+        ? pricedBounds(modelUsage, pricing[row.model ?? comparison.model])
+        : null;
+      const helperCostUsd = Object.hasOwn(row, 'helperCostUsd')
+        ? row.helperCostUsd
+        : protocol.includesHelpers
+          ? null
+          : 0;
       const fallbackCostUsd =
         row.fallbackCostUsd ?? (protocol.includesExternalFallbacks ? null : 0);
       const correctionCostUsd =
@@ -275,6 +284,8 @@ export function impactReport(
         : null;
   }
   const publicationBlockers = [];
+  if (rows.some((row) => row.helperAccountingComplete === false))
+    publicationBlockers.push('Helper accounting was not captured for every trial.');
   if (!complete) publicationBlockers.push('The planned paired matrix or accounting is incomplete.');
   if (cases.length < 50 || families.length < 20)
     publicationBlockers.push(

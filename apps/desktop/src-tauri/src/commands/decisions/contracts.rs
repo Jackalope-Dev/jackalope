@@ -41,6 +41,8 @@ pub enum DecisionKind {
     TaskStrategy,
     ContextSelection,
     ToolDiscovery,
+    AgentQuestions,
+    TaskPreparation,
     TaskReview,
     MonitorRelevance,
     AssignmentMatching,

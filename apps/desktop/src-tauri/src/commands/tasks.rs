@@ -1,4 +1,4 @@
-mod antigravity;
+pub(super) mod antigravity;
 mod delegation;
 pub(crate) mod dispatch_plan;
 mod efficiency;

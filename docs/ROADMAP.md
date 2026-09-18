@@ -13,6 +13,7 @@ aligned with this guide when capabilities or priorities change.
 - Projects, saved tasks, chat sessions and reviewed plans with isolated Git worktrees.
   Follow-ups, previews, recorded checks and guarded integration keep work reviewable.
 - Provider accounts, model/effort choices, capacity-aware routing and usage reporting.
+  OpenCode accepts protected provider keys, including DeepSeek, alongside CLI sign-in.
   Decisions can use local rules, an agent or optional Jev assistance. Jev supports
   repository/model evidence, cost objectives and opt-in context, result, monitor and
   assignment assistance; live calibration and installed acceptance remain open.
@@ -50,8 +51,11 @@ evaluation suites; the public benchmark methodology keeps their scope explicit.
 Source-attributed repair fixtures and separate workflow, source preparation, tool and continuation
 experiments support screening. Human review exports and complete-attempt cost
 accounting support independent confirmation before broader product claims.
-Read-only batches, conditional source reads, syntax reuse, lean launches, bounded
-delegation planning and shadow Jev assistance remain opt-in evaluation capabilities.
+Read-only batches, captured-result queries, conditional source reads, syntax reuse, lean launches, bounded
+delegation planning, agent-callable typed Jev questions with native evidence reads,
+explicit Jev question contracts prepared before worker launch,
+recoverable Jev relevance selection before large tool-result delivery,
+and shadow Jev assistance remain opt-in evaluation capabilities.
 
 Durable incremental history saves, concurrent loading, changed-record UI updates
 and background rich rendering are implemented. Local [performance fixtures](PERFORMANCE.md)

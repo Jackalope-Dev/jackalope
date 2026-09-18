@@ -82,9 +82,15 @@ release dates.
   Screen available-tool exposure, exact read-only lookup, explicit source preparation
   and task-scoped/final-phase guidance
   independently; freeze promising settings before new held-out confirmation.
-  Compare bounded multi-connection batches, ordinary-task launch/final checks,
+  Compare bounded multi-connection batches, captured-result queries, ordinary-task launch/final checks,
   repeated source ranges, dirty-file syntax reuse and delegation admission costs.
   Label shadow Jev false negatives independently before enabling new suppression.
+  Compare opt-in agent Jev questions with agent-only judgments, including direct
+  evidence reads, request overhead, all helper costs and uncertain-answer fallbacks.
+  Screen explicit prelaunch question contracts separately from freeform tasks; use
+  matched direct, Jackalope-only and Jev arms with equivalent supplied evidence.
+  Screen large-result Jev relevance reads against the same native tools and local
+  selectors; independently check necessary-row retention and include helper overhead.
   Require independent original-patch acceptance for quality claims. Counterbalanced
   review-time and correction measurements are separate prerequisites for claiming faster review.
 
@@ -120,6 +126,7 @@ release dates.
   establish real execution.
 - [ ] Validate OpenCode direct MCP, Grok model discovery and Antigravity quota refresh with
   installed profiles; retain explicit CLI/version boundaries from the capability boundaries.
+  Include DeepSeek key import, protected named-account execution and model selection.
 - [ ] Extend Grok/Antigravity permission protocols and scoped MCP delivery without
   weakening process ownership, usage accounting or saved-session compatibility.
 - [ ] Add isolated Antigravity subscription accounts only when its CLI supports

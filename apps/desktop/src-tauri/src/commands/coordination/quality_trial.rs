@@ -1,6 +1,7 @@
 use super::*;
 use serde_json::{json, Value};
 use std::{path::Component, time::Instant};
+mod jev_fixture;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "Runs one installed-agent benchmark in a disposable workspace; requires JACKALOPE_QUALITY_SPEC"]
@@ -42,6 +43,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
         super::evaluation_trial::git(&repo, &args)?;
     }
     let runtime = TaskRuntime::with_test_access(root.join("profile/history"))?;
+    let _jev = jev_fixture::Fixture::configure(&runtime)?;
     let service = Coordinator::new(root.join("profile/coordination"), runtime.clone())?;
     let mut owner = Owner(runtime.clone(), service.clone(), None);
     let direct = spec["variant"] == "direct";
@@ -69,11 +71,8 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
         std::fs::write(&source, serde_json::to_vec(fixture)?)?;
         let server_path = root.join(format!("tool-server-{index}.cjs"));
         let counter = root.join("tool-calls.txt");
-        std::fs::write(
-            &server_path,
-            r#"const fs=require('node:fs'), data=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));require('readline').createInterface({input:process.stdin}).on('line',line=>{const q=JSON.parse(line);const send=result=>console.log(JSON.stringify({jsonrpc:'2.0',id:q.id,result}));if(q.method==='initialize')send({protocolVersion:'2025-11-25',capabilities:{tools:{}},serverInfo:{name:'result-fixture',version:'1'}});if(q.method==='tools/list')send({tools:[{name:'fixture_report',description:'Return this service report in structuredContent.report.',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{}}}]});if(q.method==='tools/call'){fs.appendFileSync(process.argv[3],'call\n');setTimeout(()=>send({content:[{type:'text',text:JSON.stringify(data)}],structuredContent:data,isError:false}),Math.min(1000,Math.max(0,Number(data.delayMs)||0)));}});"#,
-        )?;
-        let config = json!({"command":"node","args":[server_path,source,counter]});
+        std::fs::write(&server_path, include_str!("quality_server.cjs"))?;
+        let config = json!({"command":"node","args":[server_path,source,counter,root.join(format!("tool-requests-{index}.jsonl"))]});
         if !spec["fixtureMcp"].is_object() {
             spec["fixtureMcp"] = json!({});
         }
@@ -130,7 +129,8 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                 "id":id,"projectId":project_id,"projectName":"Quality benchmark",
                 "projectPath":repo,"agent":spec["agent"],"model":spec["model"],
                 "isolated":true,"targetBranch":"main","connectionIds":fixture_ids,
-                "contextSelection":{"memoryOff":true,"outcomes":spec["outcomes"].as_array().cloned().unwrap_or_default()},"prompt":spec["prompt"],
+                "contextSelection":{"memoryOff":true,"outcomes":spec["outcomes"].as_array().cloned().unwrap_or_default(),
+                    "jevPreparation":if std::env::var("JACKALOPE_JEV_PREPARATION").is_ok_and(|value| value == "on") { spec["jevPreparation"].clone() } else { Value::Null }},"prompt":spec["prompt"],
                 "verifyCommand":spec["check"],"autoVerify":true,"effort":spec["effort"],"codexSpeed":spec["codexSpeed"]
             }))?)
             .err()
@@ -221,7 +221,16 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
             .ok()
             .map(|text| text.lines().count() as u64)
     });
-    let report = json!({"version":1,"case":spec["id"],"variant":spec["variant"],"fixtureToolCalls":tool_calls,
+    let decisions = crate::commands::decisions::evaluation::records(&runtime)?
+        .into_iter()
+        .filter(|record| {
+            record
+                .run_id
+                .as_ref()
+                .is_some_and(|id| attempt_ids.contains(id))
+        })
+        .collect::<Vec<_>>();
+    let report = json!({"version":2,"decisionRecords":decisions,"case":spec["id"],"variant":spec["variant"],"fixtureToolCalls":tool_calls,
         "agent":spec["agent"],"model":spec["model"],"elapsedMs":elapsed,
         "budgetStopped":stopped,"launchError":launch_error,"oracle":oracle,
         "promptBytes":if direct { spec["prompt"].as_str().map(str::len) } else if followups.is_empty() { input.as_ref().map(Vec::len) } else { Some(attempts.iter().map(|r| r.efficiency.launch_prompt_bytes as usize).sum()) },"run":run,"attempts":if followups.is_empty() {None} else {Some(&attempts)},"agentVerification":agent_verification,

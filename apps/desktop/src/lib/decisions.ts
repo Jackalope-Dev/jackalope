@@ -7,6 +7,8 @@ export type DecisionKind =
   | 'task_strategy'
   | 'context_selection'
   | 'tool_discovery'
+  | 'agent_questions'
+  | 'task_preparation'
   | 'task_review'
   | 'monitor_relevance'
   | 'assignment_matching';
@@ -48,6 +50,8 @@ export const decisionLabels: Record<DecisionKind, string> = {
   task_strategy: 'Task strategy',
   context_selection: 'Context selection',
   tool_discovery: 'Tool discovery',
+  agent_questions: 'Agent questions',
+  task_preparation: 'Task preparation',
   task_review: 'Result assessment',
   monitor_relevance: 'Monitor relevance',
   assignment_matching: 'Assignment matching',
@@ -69,6 +73,7 @@ export interface DecisionOptions {
   objective: 'quality' | 'balanced' | 'economical';
   contextSelection: boolean;
   toolDiscovery: boolean;
+  agentQuestions: boolean;
   failureTriage: boolean;
   requirementCoverage: boolean;
   reviewPrioritization: boolean;
@@ -105,4 +110,5 @@ export interface DecisionRecord {
     }
   >;
   accountedElsewhere: boolean;
+  elapsedMs?: number | null;
 }

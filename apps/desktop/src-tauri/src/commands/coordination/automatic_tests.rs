@@ -70,6 +70,33 @@ fn headers(id: &str) -> HeaderMap {
 }
 
 #[tokio::test]
+async fn jev_questions_require_the_attempt_credential_and_explicit_opt_in() {
+    let f = Fixture::new();
+    f.running("reader-run");
+    let input = || {
+        Json(serde_json::from_value(json!({"state":{"ready":true},"questions":{"ready":{"type":"noul","instructions":"Is input.ready true?"}}})).unwrap())
+    };
+    assert!(
+        bridge_jev_questions(WebState(f.service.clone()), HeaderMap::new(), input())
+            .await
+            .is_err()
+    );
+    assert!(
+        bridge_jev_questions(WebState(f.service.clone()), headers("foreign-run"), input())
+            .await
+            .is_err()
+    );
+    assert!(
+        bridge_jev_questions(WebState(f.service.clone()), headers("reader-run"), input())
+            .await
+            .is_err()
+    );
+    assert!(crate::commands::decisions::evaluation::records(&f.runtime)
+        .unwrap()
+        .is_empty());
+}
+
+#[tokio::test]
 async fn help_and_verification_output_require_the_current_attempt_credential() {
     let f = Fixture::new();
     f.running("reader-run");
@@ -93,8 +120,16 @@ async fn help_and_verification_output_require_the_current_attempt_credential() {
             limit: None,
         })
     };
-    assert!(bridge_help(state(), headers("reader-run")).await.is_ok());
-    assert!(bridge_help(state(), headers("invalid")).await.is_err());
+    assert!(
+        bridge_help(state(), headers("reader-run"), Query(HelpQuery::default()))
+            .await
+            .is_ok()
+    );
+    assert!(
+        bridge_help(state(), headers("invalid"), Query(HelpQuery::default()))
+            .await
+            .is_err()
+    );
     assert_eq!(
         bridge_verification_output(state(), headers("reader-run"), input())
             .await
@@ -109,7 +144,9 @@ async fn help_and_verification_output_require_the_current_attempt_credential() {
     );
     let mut browser = headers("reader-run");
     browser.insert("origin", "https://example.invalid".parse().unwrap());
-    assert!(bridge_help(state(), browser).await.is_err());
+    assert!(bridge_help(state(), browser, Query(HelpQuery::default()))
+        .await
+        .is_err());
     f.runtime
         .update("reader-run", |run| run.status = "review".into());
     assert!(

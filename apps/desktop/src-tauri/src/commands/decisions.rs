@@ -1,4 +1,5 @@
 use super::tasks::TaskRuntime;
+pub mod agent_questions;
 pub mod assistance;
 #[cfg(test)]
 mod assistance_trial;

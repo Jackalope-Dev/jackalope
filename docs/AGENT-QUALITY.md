@@ -5,6 +5,36 @@ result with fewer retries and reasonable total usage. Prompt size alone is not a
 quality score, and passing synthetic tasks does not establish superiority over a
 provider's own GUI.
 
+Quality receipts include native decision records for every attempt. Aggregation
+adds nonduplicated helper usage to agent usage, excludes routing records already
+accounted elsewhere and preserves unknown reports. Agent and helper token totals
+stay separate for pricing: Jev tokens must not be priced at the worker model's rate.
+Older receipts without helper accounting are marked incomplete. Cached assessments
+charge only their original evaluation. Native request elapsed time is recorded
+separately from complete task duration; do not add overlapping timings together.
+
+`--after-jev-questions=on` enables agent questions only in that disposable benchmark
+profile. It requires `JACKALOPE_JEV_TEST_KEY` in the parent process environment;
+the worker does not inherit this variable. The test key uses protected native
+storage and is removed on ordinary trial cleanup. Never put a key in suite JSON,
+commands saved to source, or published receipts. The ignored native
+`installed_agent_questions_trial` accepts `JACKALOPE_JEV_QUESTIONS_SPEC` for bounded
+tool-only measurements; these omit worker execution and cannot establish task savings.
+
+`--after-jev-preparation=on` applies a suite case's explicit `jevPreparation` contract
+before worker launch using the same disposable profile safeguards. Include that
+contract and its evidence in files available to every arm, with equivalent task
+instructions; candidate-only expert annotations would confound the comparison.
+Measure complete elapsed time and helper usage, retain failures, and distinguish
+authored workflow preprocessing from autonomous freeform task performance.
+
+`--after-context-pruning=on` enables experimental Jev selection inside read-only
+tool delivery, using the same protected test profile and helper accounting. Give
+every arm identical raw prompts, source data and recovery access. Freeze necessary
+row labels independently of the answer oracle; stop on any necessary-row omission
+even when the worker recovers a correct answer. Count helper tokens, native tool
+overhead and full task duration. Source byte reductions alone are not agent savings.
+
 ## Prompt and output contracts
 
 - Fresh worker launches ask the lead to assess delegation after
@@ -73,6 +103,23 @@ provider's own GUI.
   continue, with unresolved blockers reported.
 
 ## Repeatable comparison
+
+`scripts/evaluation/opencode-history-plugin.mjs` provides an evaluation-only
+`experimental.chat.messages.transform` control. Load its absolute file URL through
+OpenCode's process-local plugin configuration, set `JACKALOPE_HISTORY_COMPACTION=deduplicate`
+and provide an absolute `JACKALOPE_HISTORY_COMPACTION_RECEIPT` JSONL path. It replaces
+later identical successful read/grep/glob outputs with references to the first
+complete result. Different arguments, output, title or metadata remain independent;
+errors, attachments and already compacted or truncated results are preserved.
+Receipts contain hashes, call IDs and byte counts, not source text. Receipt-write
+failure leaves the request untouched. This is not a desktop default or Jev semantic
+pruning; byte reductions do not establish token, cost, speed or quality improvements.
+Use `--after-history-compaction=deduplicate` with `--agent=opencode` to attach this
+plugin only to the candidate process. The runner pins both implementation hashes
+and retains zero-replacement invocations; missing hook receipts do not prove a
+transform ran. Keep all variants on the same CLI, provider account and model.
+OpenCode output totals include separately reported reasoning tokens; CLI cost
+estimates are retained separately from independently priced API-equivalent costs.
 
 `pnpm evaluate:quality` prints the plan without running an agent. The cases cover an
 exact spelling edit, design-token substitutions with unchanged geometry, and a
@@ -168,6 +215,11 @@ The quality runner accepts per-variant `--after-workflow=final`,
 `--control-result-selection=off`, `--after-repo-map=off` and
 `--after-context-reuse=on` and `--after-source-context=on` switches; replace `after`
 with `control` as needed.
+`--after-result-queries=on` enables queries over captured MCP responses;
+`--after-result-preview=on` additionally bounds large unselected responses while
+keeping the complete source recoverable. Preview requires result queries and
+result selection. `--after-initial-tools=small` measures eager delivery of a
+complete bounded catalog. Keep these controls explicit in saved comparisons.
 Defaults retain existing behavior. The final-workflow experiment changes only
 version-two debugging guidance. Scoped task-approach guidance limits call-site
 investigation to code changes while preserving applicable instructions and checks;
@@ -175,7 +227,10 @@ it is opt-in for Balanced tasks. Saved
 version-two and compact version-three prompts
 remain reproducible. Context reuse independently tests established native sessions
 with the same policy hash; missing sessions or changed policies receive full guidance.
-Changing model or experiment configuration invalidates resume. `--order-seed=<id>`
+Changing model or experiment configuration invalidates resume.
+New comparisons record runner/fixture Node versions and the OS and reject resume
+when a recorded environment changes. Older comparisons keep this metadata unknown.
+`--order-seed=<id>`
 randomizes the initial paired order per task and rotates subsequent repetitions.
 `--control-model` and `--after-model` permit explicit model comparisons; changing
 models is a different experiment from a same-model harness comparison.
@@ -326,7 +381,7 @@ The evaluation runner supports four variants:
 - `control`: `--control` executable (defaults to `--after`) and current frontend
   prompts with an explicitly chosen effort.
 - `after`: current native executable and prompts with an explicitly chosen effort.
-- `direct`: installed Codex/Claude CLI, raw task instructions, same explicit model
+- `direct`: installed Codex/Claude/OpenCode/Antigravity CLI, raw task instructions, same explicit model
   and base permission policy, without Jackalope guidance or its MCP bridge.
 
 Direct uses the same initial fixture in a disposable Git checkout. Jackalope uses
@@ -442,6 +497,9 @@ user setting or proof of a faster workflow.
 | Setting | Behavior |
 | --- | --- |
 | `JACKALOPE_BATCH_READ=on` | Exposes bounded read-only batches across selected connections, with recoverable local row filtering, projection and counts. |
+| `JACKALOPE_RESULT_QUERIES=on` | Exposes exact queries over captured tool results, complete JSON row pages, bounded path hints and explicit selection guidance. Records row selection, fallback, truncation and expansion counters. |
+| `JACKALOPE_RESULT_PREVIEW=on` | With result queries enabled, captures large unselected text/JSON responses locally and returns explicit previews with recoverable originals. Errors and non-text responses remain intact. |
+| `JACKALOPE_INITIAL_TOOLS=small` | Attempts discovery for up to three seconds before launch. Supplies a complete catalog only when it has at most four tools and 6 KB of metadata; other catalogs retain on-demand discovery. Initialization time and broker searches remain in the measurements. |
 | `JACKALOPE_EXECUTION_PROFILE=lean` | Shortens ordinary-task native instructions and defers optional coordination schemas. Managed assignments retain full ownership instructions. |
 | `JACKALOPE_VERIFICATION_FLOW=final` | Ordinary tasks with automatic checks rely on the existing final snapshot-bound check instead of a mandatory in-agent check call. Explicit repository/user checks still apply; failed checks remain visible and managed repairs retain their existing limits. |
 | `JACKALOPE_CONTEXT_READ=on` | Exposes bounded source ranges and ranked symbol locations. Previously read block hashes can omit unchanged text; callers must retain that text in context. Explicitly requested blocks are not reranked away. |
@@ -463,6 +521,33 @@ and cannot establish end-to-end savings. `optimization-cases.mjs` supplies separ
 authored repairs and a multi-service investigation for matched installed-agent pilots.
 Multiple `toolFixtures` give both native controls and Jackalope the same independent
 service data. Keep these screening cases separate from held-out confirmation.
+
+`node scripts/evaluation/retrieval-cases.mjs suite.json pilot` generates screening
+cases; `held-out` generates twelve separate cases across four structured retrieval
+families. Both arms receive the same seeded opaque IDs, values and service payloads;
+independent exact-output oracles remain outside the agent workspace. These authored
+fixtures measure structured tool retrieval, not general coding or production task
+quality. Freeze configuration before confirmation, retain every attempted run and
+report provider, model, source sizes, order, failures and cached usage separately.
+Custom suites with `allowedFiles` also receive an independent file-scope check:
+protected fixture files must remain exact, and extra files, directories or symbolic
+links fail the trial even when the behavioral oracle passes.
+Recorded provider quota failures stop the runner immediately, retaining the failed
+attempt and any incomplete pair. Resume only after provider capacity is available;
+do not count an incomplete comparison as a savings result.
+For capability screening, `--stop-on-failure` also stops immediately after any
+failed trial and records the unfinished matrix. Keep this option in the frozen plan;
+do not mix an early-stopped screen with a completed confirmation study.
+
+Direct controls support Codex, Claude Code, OpenCode and Antigravity (`agy`).
+Antigravity shares the production stream parser and inherits its CLI permissions;
+permission denials, missing terminal results and absent usage remain failures or
+unknown measurements. Antigravity tool fixtures use a temporary workspace-local
+MCP config containing only the disposable fixture definitions. Existing configs
+are never overwritten; changed generated configs fail and remain for inspection.
+This test setup does not enable direct project MCP delivery in the product.
+Pin a model returned by `agy models`; record the CLI version and actual
+reasoning-effort field rather than assuming a requested effort was applied.
 
 For the bounded discovery experiment, generate a suite with
 `node scripts/evaluation/discovery-cases.mjs <suite.json>`. Set

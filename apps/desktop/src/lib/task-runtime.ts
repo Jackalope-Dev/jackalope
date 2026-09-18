@@ -36,6 +36,8 @@ export interface TaskRun {
     launchPromptBytes: number;
     promptPolicyHash?: string | null;
     launches: number;
+    jevQuestionCalls?: number | null;
+    jevQuestions?: number | null;
     verificationCalls: number;
     verificationFailures: number;
     verificationReuses?: number | null;

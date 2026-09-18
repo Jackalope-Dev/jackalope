@@ -20,6 +20,11 @@ import { InlineNotice } from '../ui/InlineNotice';
 
 const helpers = [
   [
+    'agentQuestions',
+    'Experiment with agent questions',
+    'Let agents ask Jev batched choices, scores and yes/no questions using task evidence, selected file excerpts or captured tool results. Up to eight requests per attempt. Sends that evidence to TypeSafe; savings are unproven.',
+  ],
+  [
     'toolDiscovery',
     'Experiment with tool discovery',
     'Rank bounded descriptions when local search misses or returns too many tools. Sends the search and task brief to Jev; savings are unproven. Small local result sets and exact names avoid a call.',

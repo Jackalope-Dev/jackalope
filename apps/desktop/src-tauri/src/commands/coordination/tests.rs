@@ -1,6 +1,28 @@
 use super::*;
 
 #[test]
+fn lean_help_keeps_tool_recovery_and_full_contracts_discoverable() {
+    let full = help_response(false, true);
+    let lean = help_response(true, true);
+    assert!(lean.to_string().len() < full.to_string().len() / 2);
+    for contract in [
+        "/v1/help?full=true",
+        "never switch transports",
+        "agreement gates",
+        "/v1/user-prompt/poll",
+        "elapsed time is not an answer",
+    ] {
+        assert!(lean["instructions"].as_str().unwrap().contains(contract));
+    }
+    assert_eq!(lean["verification"], full["verification"]);
+    assert_eq!(lean["discovery"], full["discovery"]);
+    assert!(lean["discovery"]
+        .as_str()
+        .unwrap()
+        .contains("structuredContent.selected.rows"));
+}
+
+#[test]
 fn unreadable_queue_keeps_the_app_available_without_overwriting_assignments() {
     let folder = std::env::temp_dir().join(format!("jackalope-queue-recovery-{}", Uuid::new_v4()));
     let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();

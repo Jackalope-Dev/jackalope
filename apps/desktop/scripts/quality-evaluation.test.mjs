@@ -8,10 +8,22 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { qualityCases } from '../../../scripts/evaluation/quality-cases.mjs';
 import { qualitySummary } from '../../../scripts/evaluation/quality-metrics.mjs';
-import { evaluationReadiness } from '../../../scripts/evaluation/readiness.mjs';
+import { evaluationReadiness, providerStopReason } from '../../../scripts/evaluation/readiness.mjs';
 import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
 import { resolveTaskGuidelines } from '../src/lib/skills/task-context.ts';
 import { effortPrompt } from '../src/lib/task-effort.ts';
+
+test('provider quota stops further evaluations without disguising ordinary failures', () => {
+  assert.equal(providerStopReason([]), null);
+  assert.equal(
+    providerStopReason([{ status: 'failed', error: 'check failed', quotaFailure: null }]),
+    null,
+  );
+  assert.match(
+    providerStopReason([{ quotaFailure: { modelOnly: false } }, { status: 'review' }]),
+    /Remaining trials were not launched/,
+  );
+});
 
 test('prompt baselines pin effort and selected cases without launching providers', () => {
   const output = mkdtempSync(path.join(tmpdir(), 'jackalope-prompt-baseline-'));

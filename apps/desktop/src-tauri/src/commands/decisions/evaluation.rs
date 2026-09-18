@@ -31,6 +31,8 @@ pub struct Record {
     pub answers: Value,
     pub accounted_elsewhere: bool,
     #[serde(default)]
+    pub elapsed_ms: Option<u64>,
+    #[serde(default)]
     pub evidence: Value,
 }
 
@@ -122,8 +124,15 @@ pub async fn evaluate(
     }
     runtime.access.ensure()?;
     jev::check_request_size(payload)?;
-    let key = jev::key_for_routing(runtime, project)?.ok_or("Jev is disconnected.")?;
     let decision_options = super::options::options(runtime, project)?;
+    if matches!(
+        kind,
+        DecisionKind::AgentQuestions | DecisionKind::TaskPreparation
+    ) && !decision_options.agent_questions
+    {
+        return Ok(None);
+    }
+    let key = jev::key_for_routing(runtime, project)?.ok_or("Jev is disconnected.")?;
     let hash = context::fingerprint(
         &json!({"payload":payload,"policy":policy,"revision":revision,"kind":kind,
         "options":decision_options,"project":project,"accountedElsewhere":accounted_elsewhere}),
@@ -155,6 +164,7 @@ pub async fn evaluate(
         input_hash: hash,
         answers: json!({}),
         accounted_elsewhere,
+        elapsed_ms: None,
         evidence: json!({"candidates":payload["state"]["workers"].as_array().map(|workers|workers.iter().map(|w|json!({"id":w["id"],"agent":w["agent"],"adapter":w["adapter"],"model":w["model"]})).collect::<Vec<_>>()),
             "sourceHead":payload["state"]["taskContext"]["repository"]["sourceHead"],"objective":decision_options.objective,"assistance":payload["state"]["assistance"]}),
         decision: DecisionReceipt {
@@ -178,6 +188,7 @@ pub async fn evaluate(
         &file,
         &serde_json::to_vec(&record).map_err(|e| e.to_string())?,
     )?;
+    let started = Instant::now();
     if canceled() {
         record.decision.model_call_attempted = false;
         record.decision.usage = Usage {
@@ -216,6 +227,7 @@ pub async fn evaluate(
             usage: record.decision.usage.clone(),
         });
     }
+    record.elapsed_ms = Some(started.elapsed().as_millis().try_into().unwrap_or(u64::MAX));
     let still_authorized = super::policy(runtime, project).is_ok_and(|current| {
         current.mode == DecisionMode::Jev && current.revision == policy.revision
     }) && super::options::options(runtime, project).is_ok_and(|current| {
@@ -258,32 +270,35 @@ pub async fn evaluate(
 
 #[tauri::command]
 pub async fn decision_history(runtime: State<'_, TaskRuntime>) -> Result<Vec<Record>, String> {
-    let directory = settings::directory(&runtime).join("decisions");
-    tauri::async_runtime::spawn_blocking(move || {
-        if !directory.exists() {
-            return Ok(vec![]);
+    let runtime = runtime.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || records(&runtime))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+pub(crate) fn records(runtime: &TaskRuntime) -> Result<Vec<Record>, String> {
+    let directory = settings::directory(runtime).join("decisions");
+    if !directory.exists() {
+        return Ok(vec![]);
+    }
+    let mut records = Vec::new();
+    for entry in std::fs::read_dir(directory).map_err(|e| e.to_string())? {
+        let path = entry.map_err(|e| e.to_string())?.path();
+        if path.extension().is_none_or(|s| s != "json")
+            || path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .is_none_or(|s| uuid::Uuid::parse_str(s).is_err())
+        {
+            continue;
         }
-        let mut records = Vec::new();
-        for entry in std::fs::read_dir(directory).map_err(|e| e.to_string())? {
-            let path = entry.map_err(|e| e.to_string())?.path();
-            if path.extension().is_none_or(|s| s != "json")
-                || path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .is_none_or(|s| uuid::Uuid::parse_str(s).is_err())
-            {
-                continue;
-            }
-            let record =
-                serde_json::from_slice(&history::read_bounded(&path, 512_000)?).map_err(|_| {
-                    "Decision history is unreadable; original records are preserved.".to_string()
-                })?;
-            records.push(record);
-        }
-        Ok(records)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+        let record =
+            serde_json::from_slice(&history::read_bounded(&path, 512_000)?).map_err(|_| {
+                "Decision history is unreadable; original records are preserved.".to_string()
+            })?;
+        records.push(record);
+    }
+    Ok(records)
 }
 
 #[cfg(test)]

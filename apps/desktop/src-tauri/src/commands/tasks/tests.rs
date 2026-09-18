@@ -89,6 +89,12 @@ fn opencode_stream_tracks_results_sessions_errors_and_deduplicated_step_usage() 
     assert!(run.usage.reported);
     consume_event(
         &mut run,
+        r#"{"type":"step_finish","part":{"id":"part_reasoning","tokens":{"input":14823,"output":224,"reasoning":8,"cache":{"read":1664,"write":0}},"cost":0.001}}"#,
+    );
+    assert_eq!((run.usage.input, run.usage.output), (16502, 236));
+    assert_eq!(run.usage_observations.last().unwrap().output, 232);
+    consume_event(
+        &mut run,
         r#"{"type":"error","error":{"name":"APIError","data":{"message":"Provider unavailable"}}}"#,
     );
     assert_eq!(run.error.as_deref(), Some("Provider unavailable"));
@@ -154,6 +160,8 @@ fn live_tool_activity_is_concrete_bounded_and_provider_independent() {
 #[test]
 fn active_summaries_keep_only_three_short_activity_previews() {
     let mut run = sample("claude");
+    run.context_receipt.jev_preparation_result =
+        Some(serde_json::json!({"answers":{"large":"private advice"}}));
     run.activity = vec![
         "old".into(),
         "Reading src/a.rs\nprivate full output".into(),
@@ -162,6 +170,8 @@ fn active_summaries_keep_only_three_short_activity_previews() {
     ];
     let summary = run.summary();
     assert!(summary.details_omitted);
+    assert!(summary.context_receipt.jev_preparation_result.is_none());
+    assert!(run.context_receipt.jev_preparation_result.is_some());
     assert_eq!(summary.activity.len(), 3);
     assert_eq!(summary.activity[0], "Reading src/a.rs");
     assert_eq!(summary.activity[2].len(), 240);
@@ -183,6 +193,10 @@ fn antigravity_stream_keeps_attempt_usage_and_requires_a_terminal_result() {
         (30, 7, 20)
     );
     assert!(run.result.is_empty());
+    let tool = r#"{"event":"step_update","step_update":{"conversation_id":"conversation-1","step_index":9,"step_type":"tool","tool_name":"view_file","state":"ACTIVE"}}"#;
+    stream.consume(&mut run, tool);
+    stream.consume(&mut run, &tool.replace("ACTIVE", "DONE"));
+    assert_eq!(run.efficiency.tool_calls.get("view_file"), Some(&1));
     stream.consume(&mut run, r#"{"event":"result","result":{"conversation_id":"conversation-1","status":"SUCCESS","response":"Done","usage":{"input_tokens":1000,"output_tokens":200}}}"#);
     stream.finish(&mut run);
     assert!(run.error.is_none(), "{:?}", run.error);

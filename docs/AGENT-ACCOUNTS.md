@@ -1,5 +1,13 @@
 # Agent accounts
 
+Agents → Connect an API provider offers DeepSeek, OpenRouter, OpenAI, Anthropic,
+Google Gemini, xAI, Groq and Mistral key entry directly in Jackalope. These accounts
+use the installed OpenCode runner for agent execution. Setup stores a protected
+key and discovers that provider's models. Optionally select the new account and
+model as the default for future OpenCode tasks; existing runs stay pinned.
+Canceling unfinished setup removes its pending account. CLI sign-in remains
+available for providers and authentication methods outside this key-only catalog.
+
 Agents → Configuration puts account setup before technical agent settings. Add a
 named Work, Personal or Ungrouped account and complete the provider prompts in the
 embedded sign-in panel. Provider authorization may open the browser. New accounts
@@ -24,7 +32,7 @@ from the project selector without leaving project settings.
 | Codex | `codex login` in the embedded terminal | `account/read` through an isolated app-server; ChatGPT email when reported; API keys shown as configured |
 | Claude Code | `claude auth login` in the embedded terminal | `claude auth status`; identity when reported |
 | Grok | `grok login` in the embedded terminal | ACP `_x.ai/auth/info`; identity when reported |
-| OpenCode | `opencode auth login` in the embedded terminal | Provider identity and credential validity remain unavailable in Jackalope |
+| OpenCode | Provider sign-in in the embedded terminal, or a provider API key | Saved Jackalope keys are configured; provider identity, validity and credit remain unverified |
 | Kimi Code | `kimi login` in its managed profile | ACP authentication; membership quota when available |
 | Antigravity | Existing subscription sign-in or named Gemini API-key profile | Isolated subscription profiles remain unsupported |
 
@@ -63,6 +71,19 @@ that saved profile instead of silently falling back to another account.
 
 ## Device-owned API keys
 
+For DeepSeek, select OpenCode → Provider API key, create a named account and choose
+DeepSeek in the provider selector. Then select an available `deepseek/…` model in
+that account's model settings. Existing OpenCode provider sign-ins remain available.
+The installed CLI supplies model discovery; Jackalope does not pin a DeepSeek model
+or treat catalog visibility as proof of access. Follow the provider's
+[OpenCode compatibility guidance](https://api-docs.deepseek.com/quick_start/agent_integrations/opencode/).
+
+Environment discovery recognizes `DEEPSEEK_API_KEY` and imports it into a separate
+OpenCode account only when selected. New OpenCode key imports use protected device
+storage. Legacy profile `.env` keys remain readable. Saved keys are injected into
+the bound agent process and are not returned to the renderer; a configured account
+still requires a successful provider request to establish access and available credit.
+
 Jackalope-owned keys use Windows DPAPI, macOS Keychain or Linux Secret Service.
 Missing or locked credential services fail explicitly; there is no plaintext fallback.
 Jev keys are entered in a transient password field, passed once through native IPC,
@@ -83,3 +104,9 @@ Automated regression coverage and isolated native trials are described in
 [CONTRIBUTING.md](../CONTRIBUTING.md) and [SELF-DEVELOPMENT.md](SELF-DEVELOPMENT.md).
 Record detailed local receipts privately. Fixtures and source builds do not prove
 installed-app acceptance.
+
+With the desktop Vite server running, use `scripts/verification/verify-agent-accounts.mjs`
+and `scripts/verification/verify-provider-connections.mjs` for isolated browser
+fixtures covering keyboard/focus, themes, setup cancellation and model selection.
+`JACKALOPE_PREVIEW_URL` overrides their local preview address. These fixtures use
+fake IPC and never establish live credential validity or provider availability.

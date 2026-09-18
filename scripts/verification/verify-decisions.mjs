@@ -20,6 +20,8 @@ const assistance = {
   options: {
     objective: 'quality',
     contextSelection: false,
+    toolDiscovery: false,
+    agentQuestions: false,
     failureTriage: false,
     requirementCoverage: false,
     reviewPrioritization: false,
@@ -137,6 +139,10 @@ try {
   const jev = page.getByRole('radio', { name: /Jev-assisted/ });
   const local = page.getByRole('radio', { name: /Local rules/ });
   await agent.waitFor();
+  await page.waitForFunction(() => {
+    const input = document.querySelector('input[value=agent]');
+    return input && !input.matches(':disabled');
+  });
   await agent.focus();
   await page.keyboard.press('ArrowDown');
   await page.waitForFunction(() => document.querySelector('input[value=jev]')?.checked);
@@ -195,6 +201,11 @@ try {
   const contextHelper = page.getByRole('checkbox', { name: /^Select relevant context/ });
   assert.equal(await contextHelper.isChecked(), false);
   await contextHelper.check();
+  const agentQuestions = page.getByRole('checkbox', { name: /^Experiment with agent questions/ });
+  assert.equal(await agentQuestions.isChecked(), false);
+  await agentQuestions.focus();
+  await page.keyboard.press('Space');
+  assert.equal(await agentQuestions.isChecked(), true);
   assert.equal(assistanceProjects.alpha, undefined);
   await page.getByRole('combobox', { name: 'Routing goal' }).click();
   await page.getByRole('option', { name: 'Balanced', exact: true }).click();
@@ -216,6 +227,7 @@ try {
   await page.getByRole('button', { name: 'Save decision assistance', exact: true }).click();
   await page.getByText('Decision assistance saved.', { exact: true }).waitFor();
   assert.equal(assistanceProjects.alpha.contextSelection, true);
+  assert.equal(assistanceProjects.alpha.agentQuestions, true);
   assert.equal(assistanceProjects.alpha.objective, 'balanced');
   assert.deepEqual(assistanceProjects.alpha.models[0].efforts, ['medium', 'high']);
   assert.equal(assistanceProjects.alpha.failureTriage, false);
@@ -253,9 +265,11 @@ try {
     [...document.querySelectorAll('input[type=checkbox]')].some((node) => node.checked),
   );
   assert.equal(await contextHelper.isChecked(), true);
+  assert.equal(await agentQuestions.isChecked(), true);
   await page.getByRole('button', { name: 'Use app assistance defaults' }).click();
   await page.getByText('Inheriting app assistance defaults.', { exact: true }).waitFor();
   assert.equal(await contextHelper.isChecked(), false);
+  assert.equal(await agentQuestions.isChecked(), false);
   assert.equal(assistanceProjects.alpha, undefined);
   await page.setViewportSize({ width: 1280, height: 840 });
   await page.goto(`${url}/?project=beta`);

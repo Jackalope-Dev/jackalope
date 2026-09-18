@@ -62,6 +62,9 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   [provider-specific capabilities](AGENT-SUPPORT.md).
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded
   quota handoff. Explicit assignments and continuation identities remain pinned.
+  The Agents page connects API providers directly, including DeepSeek and OpenRouter,
+  using protected OpenCode account keys and discovered models. It also supports local
+  key import alongside provider CLI sign-in. Saved keys do not prove model access.
   Capacity discovery shares bounded concurrent refreshes. Equivalent explicit
   agent/model choices select an account without an extra model call.
   Jackalope Decisions offers local rules, agent-powered or optional Jev-assisted
@@ -148,9 +151,16 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   context. Source-attributed repair fixtures, multi-turn accounting, model-price
   bounds and randomized human review exports support screening before confirmation.
   Screening can stop between matched repetitions while retaining interrupted attempts.
-  Further opt-in controls cover read-only batches, a lean ordinary-task launch,
+  Further opt-in controls cover read-only batches, captured-result row queries, a lean ordinary-task launch,
   final native checks, conditional source ranges, content-keyed syntax reuse,
-  bounded delegation planning and shadow Jev assistance. Connection execution no
+  bounded delegation planning and shadow Jev assistance. Opt-in agent questions
+  expose typed Jev batches with native file/captured-result evidence and separate
+  usage accounting. Explicit task contracts can prepare file-backed Jev batches before
+  worker launch; ordinary tasks do not infer these contracts. Their end-to-end savings
+  require calibration. Experimental Jev relevance reads can filter large structured
+  results before delivery while retaining uncertainty and recoverable originals;
+  net savings and necessary-evidence retention need independent task measurement.
+  Connection execution no
   longer holds the shared broker catalog lock during network calls. These changes
   have separate local and installed-agent screening paths; general savings remain unproven.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.

@@ -2,21 +2,11 @@ import { Checkbox, Input } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { type AgentProfile, saveAgentProfileKey } from '../../lib/agent-profiles';
+import { apiProviders } from '../../lib/api-providers';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
-
-const providers = [
-  ['OPENAI_API_KEY', 'OpenAI'],
-  ['ANTHROPIC_API_KEY', 'Anthropic'],
-  ['GEMINI_API_KEY', 'Google Gemini'],
-  ['OPENROUTER_API_KEY', 'OpenRouter'],
-  ['DEEPSEEK_API_KEY', 'DeepSeek'],
-  ['XAI_API_KEY', 'xAI'],
-  ['GROQ_API_KEY', 'Groq'],
-  ['MISTRAL_API_KEY', 'Mistral'],
-] as const;
 
 export function AgentKeySignIn({
   agentId,
@@ -77,7 +67,9 @@ export function AgentKeySignIn({
           <Dialog.Description className="task-muted mt-2">
             {antigravity
               ? 'Separate Antigravity accounts use Gemini API keys, with separate API billing. Google subscription logins still use the existing CLI account.'
-              : 'Connect a provider API key for this account. Each account keeps its own credentials and provider billing.'}
+              : agentId === 'opencode'
+                ? 'Connect DeepSeek or another provider through OpenCode. After saving, select a model from that provider. Saving a key does not verify model access or available credit.'
+                : 'Connect a provider API key for this account. Each account keeps its own credentials and provider billing.'}
           </Dialog.Description>
           <form
             className="grid gap-4 mt-4"
@@ -104,9 +96,9 @@ export function AgentKeySignIn({
                 onValueChange={setProvider}
                 disabled={busy}
               >
-                {providers.map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
+                {apiProviders.map((provider) => (
+                  <SelectItem key={provider.key} value={provider.key}>
+                    {provider.name}
                   </SelectItem>
                 ))}
               </Select>

@@ -273,7 +273,7 @@ fn consume_opencode_event(run: &mut TaskRun, event: &Value, kind: &str) {
             let input = num(tokens, "input")
                 .saturating_add(read)
                 .saturating_add(write);
-            let output = num(tokens, "output");
+            let output = num(tokens, "output").saturating_add(num(tokens, "reasoning"));
             run.usage_observations.push(UsageObservation {
                 message_id: id.into(),
                 parent_tool_use_id: None,

@@ -13,6 +13,8 @@ import {
   optimizationCases,
   toolInvestigationCase,
 } from '../../../scripts/evaluation/optimization-cases.mjs';
+import { retrievalSuite } from '../../../scripts/evaluation/retrieval-cases.mjs';
+import { checkScope } from '../../../scripts/evaluation/scope.mjs';
 
 test('shadow screening retains unavailable decisions and exposes missed relevant evidence', () => {
   const records = [
@@ -85,11 +87,81 @@ test('optimization oracles reject broken fixtures and accept independent referen
 
 test('optimization controls are explicit and independently reproducible', () => {
   const options = experimentOptions(
-    ['--after-batch-read=on', '--after-verification-flow=final', '--after-execution-profile=lean'],
+    [
+      '--after-batch-read=on',
+      '--after-result-queries=on',
+      '--after-result-preview=on',
+      '--after-verification-flow=final',
+      '--after-execution-profile=lean',
+      '--after-jev-preparation=on',
+    ],
     ['control', 'after'],
   );
   assert.equal(options.control['batch-read'], 'off');
+  assert.equal(options.control['jev-preparation'], 'off');
+  assert.equal(experimentEnvironment(options.after).JACKALOPE_JEV_PREPARATION, 'on');
   assert.equal(options.control['execution-profile'], 'standard');
+  assert.equal(options.control['result-queries'], 'off');
+  assert.equal(options.control['result-preview'], 'off');
+  assert.equal(experimentEnvironment(options.after).JACKALOPE_RESULT_QUERIES, 'on');
+  assert.equal(experimentEnvironment(options.after).JACKALOPE_RESULT_PREVIEW, 'on');
   assert.equal(experimentEnvironment(options.after).JACKALOPE_VERIFICATION_FLOW, 'final');
   assert.throws(() => experimentOptions(['--after-jev-assistance=skip'], ['after']));
+});
+
+test('retrieval suites have disjoint seeds and exact independently checked oracles', async () => {
+  const pilot = retrievalSuite('pilot').cases;
+  const held = retrievalSuite().cases;
+  assert.deepEqual(retrievalSuite(), retrievalSuite());
+  assert.ok(held.every((item) => !pilot.some((p) => p.source.seed === item.source.seed)));
+  const fields = {
+    incidents: ['active', 'severity', 'critical', 'affected'],
+    products: ['available', 'region', 'west', 'quantity'],
+    jobs: ['finished', 'conclusion', 'failure', 'duration'],
+    tickets: ['open', 'priority', 'urgent', 'customer'],
+  };
+  for (const fixture of [...pilot, ...held]) {
+    const root = await mkdtemp(join(tmpdir(), 'jackalope-retrieval-'));
+    try {
+      const expected = [];
+      for (const { report } of fixture.toolFixtures) {
+        const name = Object.keys(report)[0];
+        const [flag, state, match, column] = fields[name];
+        for (const row of report[name])
+          if (row[flag] === true && row[state] === match)
+            expected.push({ id: row.id, [column]: row[column] });
+      }
+      expected.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      const run = () =>
+        spawnSync(process.execPath, ['-e', fixture.oracle, '--', 'oracle', root], {
+          encoding: 'utf8',
+          windowsHide: true,
+        });
+      await writeFile(join(root, 'answer.json'), JSON.stringify(expected));
+      assert.equal(run().status, 0, fixture.id);
+      const wrong = expected.length ? expected.slice(1) : [{ id: 'invented' }];
+      await writeFile(join(root, 'answer.json'), JSON.stringify(wrong));
+      assert.notEqual(run().status, 0, fixture.id);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test('custom suites reject test edits and extra artifacts independently of their behavioral oracle', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'jackalope-scope-'));
+  const fixture = { files: { 'check.mjs': 'original' }, allowedFiles: ['answer.json'] };
+  try {
+    await writeFile(join(root, 'check.mjs'), 'original');
+    await writeFile(join(root, 'answer.json'), '[]');
+    assert.equal((await checkScope(fixture, root)).passed, true);
+    await writeFile(join(root, 'check.mjs'), 'bypassed');
+    assert.equal((await checkScope(fixture, root)).passed, false);
+    await writeFile(join(root, 'check.mjs'), 'original');
+    await writeFile(join(root, 'extra.txt'), 'unexpected');
+    assert.equal((await checkScope(fixture, root)).passed, false);
+    assert.equal((await checkScope(fixture, undefined)).passed, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

@@ -115,6 +115,25 @@ fn bridge_error(status: StatusCode) -> ErrorData {
 #[tool_router]
 impl CoordinationTools {
     #[tool(
+        description = "Ask Jev independent typed questions over task evidence. Batch choice (known options), score (2-10 rubric levels), and noul (yes/no probability) in one request. Each instruction must reference input or named sources explicitly; IDs are not model context. Named source files or captured result handles are read natively, without copying their text through the agent. Use for substantial semantic judgments, not exact filters, arithmetic, code generation or multi-step reasoning. Returns probabilities, source provenance, usage and timing. Requires enabled agent questions and connected Jev mode. Uncertainty is not evidence of irrelevance; advice never grants permission or replaces verification.",
+        annotations(read_only_hint = true, open_world_hint = true)
+    )]
+    async fn ask_jev(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::decisions::agent_questions::Input>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let run = self
+            .service
+            .authorized_run(&request_headers(&context)?)
+            .map_err(bridge_error)?;
+        super::decisions::agent_questions::ask(&self.service.runtime, &run, input)
+            .await
+            .map(CallToolResult::structured)
+            .map_err(|error| ErrorData::invalid_request(error, None))
+    }
+
+    #[tool(
         description = "Assess whether two or three independent workers justify delegation. Validates disjoint write scopes, bounded briefs, explicit estimated overhead and an aggregate token admission budget. Returns focused briefs only when admitted. Estimates are not measured savings; this tool neither launches workers nor grants permission.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
@@ -351,6 +370,28 @@ impl CoordinationTools {
     }
 
     #[tool(
+        description = "Experimental Jev relevance selection before receiving a large read-only result. Supply the discovered handle, arguments, complete read purpose and array pointer relative to structuredContent. Only high-confidence irrelevant rows are omitted; original rows are recoverable with read_tool_result. Prefer local output.rows for exact predicates. Unsupported results and failures return the original. Jev usage is charged and recorded.",
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            open_world_hint = true
+        )
+    )]
+    async fn read_relevant_tool(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::mcp_broker::relevance::Input>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let run = self
+            .service
+            .authorized_run(&request_headers(&context)?)
+            .map_err(bridge_error)?;
+        super::mcp_broker::relevance::read(&self.service.runtime, &run, input)
+            .await
+            .map_err(|e| ErrorData::invalid_request(e, None))
+    }
+
+    #[tool(
         description = "Batch one to eight independent read-only calls by discovered handle or exact name/server with known arguments. Different connections overlap with bounded concurrency. Use output.rows for local exact filtering, projection and counts. Results retain input order and individual errors; selected originals remain recoverable. Does not authorize writes.",
         annotations(
             read_only_hint = true,
@@ -413,7 +454,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Read a selected tool result by resultHandle, offset and limit without executing the tool again. Returns captured JSON text with nextOffset. Handles are scoped to this attempt and its latest four selected results.",
+        description = "Read a selected tool result by resultHandle, offset and limit without executing the tool again. Returns captured JSON text with nextOffset. Handles are scoped to this attempt and its latest sixteen selected results.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn read_tool_result(
@@ -883,15 +924,25 @@ impl ServerHandler for CoordinationTools {
             .authorized_run(&headers)
             .map_err(bridge_error)?;
         let mut tools = self.tool_router.list_all();
+        if !super::decisions::agent_questions::available(&self.service.runtime, &run.project_id) {
+            tools.retain(|tool| tool.name != "ask_jev");
+        }
+        if !super::mcp_broker::relevance::available(&self.service.runtime, &run.project_id) {
+            tools.retain(|tool| tool.name != "read_relevant_tool");
+        }
         if !std::env::var("JACKALOPE_DISPATCH_PLAN").is_ok_and(|value| value == "on") {
             tools.retain(|tool| tool.name != "plan_delegation");
         }
         if !std::env::var("JACKALOPE_CONTEXT_READ").is_ok_and(|value| value == "on") {
             tools.retain(|tool| tool.name != "read_context");
         }
-        if !std::env::var("JACKALOPE_BATCH_READ").is_ok_and(|value| value == "on") {
+        let batch = std::env::var("JACKALOPE_BATCH_READ").is_ok_and(|value| value == "on");
+        let queries = std::env::var("JACKALOPE_RESULT_QUERIES").is_ok_and(|value| value == "on");
+        if !batch {
             tools.retain(|tool| tool.name != "read_tools");
-            for tool in &mut tools {
+        }
+        for tool in &mut tools {
+            if !batch && !queries {
                 if matches!(
                     tool.name.as_ref(),
                     "read_tool" | "execute_tool" | "read_named_tool"
@@ -901,6 +952,21 @@ impl ServerHandler for CoordinationTools {
                     if let serde_json::Value::Object(schema) = schema {
                         tool.input_schema = std::sync::Arc::new(schema);
                     }
+                }
+            }
+            if tool.name == "read_tool_result" {
+                if queries {
+                    tool.description = Some("Query captured JSON without reexecuting the remote tool: {resultHandle,output:{rows:{pointer:'/structuredContent/items',whereEquals:{'/status':'open'},columns:['/id']}}}. Row paths are relative RFC 6901 pointers. Repeat output.rows.offset with selected.nextOffset for more complete JSON rows. Missing paths produce an error; never infer omitted data. Without output, reads original JSON by character offset/limit. Handles last for this attempt and its latest sixteen selected results.".into());
+                } else {
+                    let mut schema = (*tool.input_schema).clone();
+                    if let Some(properties) = schema
+                        .get_mut("properties")
+                        .and_then(serde_json::Value::as_object_mut)
+                    {
+                        properties.remove("output");
+                    }
+                    schema.remove("$defs");
+                    tool.input_schema = std::sync::Arc::new(schema);
                 }
             }
         }
@@ -938,8 +1004,8 @@ impl ServerHandler for CoordinationTools {
 
 fn available_tool(name: &str, discovery: bool, check: Option<&str>) -> bool {
     match name {
-        "search_tools" | "read_tool" | "read_named_tool" | "read_tools" | "read_tool_result"
-        | "execute_tool" => discovery,
+        "search_tools" | "read_tool" | "read_relevant_tool" | "read_named_tool" | "read_tools"
+        | "read_tool_result" | "execute_tool" => discovery,
         "computer_verify" => check.is_some_and(|value| !value.trim().is_empty()),
         _ => true,
     }

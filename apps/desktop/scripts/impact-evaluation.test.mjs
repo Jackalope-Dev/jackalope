@@ -70,6 +70,47 @@ test('continuation comparisons charge every attempt and retain missing accountin
   );
 });
 
+test('Jev helper receipts are charged once and unknown usage never becomes free', () => {
+  const usage = { reported: true, input: 100, output: 10, cacheRead: 50, cacheWrite: 0 };
+  const helper = {
+    id: 'helper',
+    runId: 'run',
+    accountedElsewhere: false,
+    decision: {
+      usage: { ...usage, input: 50, output: 0, cacheRead: 0, estimatedCostUsd: 0.0000021 },
+    },
+  };
+  const report = {
+    run: { id: 'run', usage },
+    decisionRecords: [
+      helper,
+      helper,
+      { ...helper, id: 'routing', accountedElsewhere: true },
+      { ...helper, id: 'foreign', runId: 'other' },
+    ],
+  };
+  const aggregate = aggregateAttempts(report);
+  assert.equal(aggregate.agentUsage.input, 100);
+  assert.equal(aggregate.usage.input, 150);
+  assert.equal(aggregate.helperCostUsd, 0.0000021);
+  assert.equal(aggregate.helperAccountingComplete, true);
+  assert.equal(aggregate.agentReportedCostUsd, null);
+  assert.equal(
+    aggregateAttempts({
+      attempts: [
+        { id: 'failed', usage: { ...usage, estimatedCostUsd: 0.01 } },
+        { id: 'retry', usage: { ...usage, estimatedCostUsd: 0.02 } },
+      ],
+    }).agentReportedCostUsd,
+    0.03,
+  );
+  assert.equal(aggregate.helperUsages.length, 1);
+  helper.decision.usage = { reported: false, estimatedCostUsd: null };
+  assert.equal(aggregateAttempts(report).usage, null);
+  assert.equal(aggregateAttempts(report).helperCostUsd, null);
+  assert.equal(aggregateAttempts({ run: report.run }).helperAccountingComplete, false);
+});
+
 test('experiment ordering balances repeated pairs and rejects unknown switch values', () => {
   const a = variantOrder(['control', 'after'], 'task', 1, 'frozen');
   assert.deepEqual(variantOrder(['control', 'after'], 'task', 2, 'frozen'), [...a].reverse());
@@ -189,6 +230,31 @@ test('impact reports retain failed costs and refuse marketing claims on tiny rep
   });
   assert.equal(withHelpers.totals.after.totalCostBoundsUsd, null);
   assert.ok(withHelpers.publication.blockers.some((text) => text.includes('Helper')));
+  const separatePrices = {
+    ...comparison,
+    trials: comparison.trials.map((row) => ({
+      ...row,
+      input: 150,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      agentUsage: { input: 100, output: 0, cacheRead: 0, cacheWrite: 0 },
+      helperCostUsd: 0.0000021,
+      helperAccountingComplete: true,
+    })),
+  };
+  const priceOptions = {
+    pricing: {
+      undefined: { source: 'fixture', date: '2026-09-17', input: 1, cachedInput: 0.1, output: 2 },
+    },
+  };
+  assert.ok(
+    Math.abs(
+      impactReport(separatePrices, priceOptions).totals.after.totalCostBoundsUsd.low - 0.0003063,
+    ) < 1e-12,
+  );
+  separatePrices.trials[0].helperCostUsd = null;
+  assert.equal(impactReport(separatePrices, priceOptions).totals.control.totalCostBoundsUsd, null);
   const wrongPlan = { ...comparison, plan: { cases: ['a', 'b', 'unrun'], repeat: 1 } };
   assert.equal(impactReport(wrongPlan).complete, false);
   const wrongRepetition = {

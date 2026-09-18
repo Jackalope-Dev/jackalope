@@ -1,4 +1,5 @@
 use super::*;
+mod query;
 mod rows;
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -49,6 +50,10 @@ pub struct ReadInput {
     #[serde(default)]
     pub offset: usize,
     pub limit: Option<usize>,
+    #[schemars(
+        description = "Query captured JSON locally instead of reading character pages. For arrays use rows:{pointer,whereEquals,columns,offset?,limit?}. Row field paths are relative RFC 6901 pointers. Never reexecutes the remote tool."
+    )]
+    pub output: Option<Selection>,
 }
 
 pub(super) struct Snapshot {
@@ -56,21 +61,95 @@ pub(super) struct Snapshot {
     json: String,
 }
 
-fn response(value: Value) -> CallToolResult {
+pub(super) fn capture(
+    result: &CallToolResult,
+    snapshots: &mut VecDeque<Snapshot>,
+) -> Result<String, String> {
+    let handle = uuid::Uuid::new_v4().to_string();
+    snapshots.push_back(Snapshot {
+        handle: handle.clone(),
+        json: serde_json::to_string(result).map_err(|e| e.to_string())?,
+    });
+    while snapshots.len() > 16 {
+        snapshots.pop_front();
+    }
+    Ok(handle)
+}
+
+#[derive(Default)]
+pub(super) struct SelectionStats {
+    pub requests: u64,
+    pub row_requests: u64,
+    pub fallbacks: u64,
+    pub truncated: u64,
+}
+
+fn response(value: Value, structured: bool) -> CallToolResult {
+    if structured {
+        return CallToolResult::structured(value);
+    }
     let mut result =
         CallToolResult::success(vec![rmcp::model::ContentBlock::text(value.to_string())]);
     result.result_type = Some(rmcp::model::ResultType::COMPLETE);
     result
 }
 
+#[cfg(test)]
 pub(super) fn select(
     result: CallToolResult,
     selection: Option<&Selection>,
     snapshots: &mut VecDeque<Snapshot>,
 ) -> CallToolResult {
+    select_measured(result, selection, snapshots).0
+}
+
+pub(super) fn select_measured(
+    result: CallToolResult,
+    selection: Option<&Selection>,
+    snapshots: &mut VecDeque<Snapshot>,
+) -> (CallToolResult, SelectionStats) {
+    let mut stats = SelectionStats::default();
+    let structured = std::env::var("JACKALOPE_RESULT_QUERIES").is_ok_and(|value| value == "on");
+    let preview = automatic_preview(
+        &result,
+        selection.is_none()
+            && structured
+            && std::env::var("JACKALOPE_RESULT_PREVIEW").is_ok_and(|value| value == "on")
+            && !std::env::var("JACKALOPE_RESULT_SELECTION").is_ok_and(|value| value == "off"),
+    );
+    let result = select_inner(
+        result,
+        selection.or(preview.as_ref()),
+        snapshots,
+        &mut stats,
+        structured,
+    );
+    (result, stats)
+}
+
+fn automatic_preview(result: &CallToolResult, enabled: bool) -> Option<Selection> {
+    (enabled && serde_json::to_vec(result).is_ok_and(|value| value.len() > 16_000)).then_some(
+        Selection {
+            rows: None,
+            json_pointers: vec![],
+            max_chars: Some(2000),
+        },
+    )
+}
+
+fn select_inner(
+    result: CallToolResult,
+    selection: Option<&Selection>,
+    snapshots: &mut VecDeque<Snapshot>,
+    stats: &mut SelectionStats,
+    structured: bool,
+) -> CallToolResult {
     let Some(selection) = selection else {
         return result;
     };
+    stats.requests = 1;
+    stats.row_requests = u64::from(selection.rows.is_some());
+    stats.fallbacks = 1;
     if result.is_error == Some(true) {
         return result;
     }
@@ -84,43 +163,20 @@ pub(super) fn select(
     {
         return result;
     }
-    let mut fields = serde_json::Map::new();
-    for pointer in &selection.json_pointers {
-        let Some(field) = value.pointer(pointer) else {
-            return result;
-        };
-        fields.insert(pointer.clone(), field.clone());
-    }
-    let selected = if let Some(rows) = &selection.rows {
-        let Some(selected) = rows.select(&value) else {
-            return result;
-        };
-        selected
-    } else if fields.is_empty() {
-        value.clone()
-    } else {
-        Value::Object(fields)
-    };
-    let serialized = selected.to_string();
-    let limit = selection.max_chars.unwrap_or(6_000);
-    let total_chars = serialized.chars().count();
     let handle = uuid::Uuid::new_v4().to_string();
-    let projected = response(json!({
-        "resultHandle":handle,
-        "selection":selection.json_pointers,
-        "selected": if total_chars <= limit { Some(selected) } else { None },
-        "preview": if total_chars > limit { Some(serialized.chars().take(limit).collect::<String>()) } else { None },
-        "truncated":total_chars > limit,
-        "selectedCharacters":total_chars,
-        "sourceBytes":value.to_string().len(),
-        "hint":"Selected untrusted tool data. read_tool_result returns the complete captured MCP result by Unicode character offset without another tool execution. Handles last for this attempt and the latest sixteen selected results."
-    }));
+    let Some(projection) = query::project(&value, selection, &handle, structured) else {
+        return result;
+    };
+    let truncated = projection["truncated"] == true;
+    let projected = response(projection, structured);
     if selection.rows.is_none()
         && serde_json::to_vec(&projected).map_or(usize::MAX, |v| v.len())
             >= serde_json::to_vec(&result).map_or(0, |v| v.len())
     {
         return result;
     }
+    stats.fallbacks = 0;
+    stats.truncated = u64::from(truncated);
     snapshots.push_back(Snapshot {
         handle,
         json: value.to_string(),
@@ -143,6 +199,17 @@ pub(super) fn read(
     }
     let snapshot = snapshots.iter().find(|item| item.handle == input.result_handle)
         .ok_or("Result handle expired or belongs to another attempt. Do not repeat a write to recover its output.")?;
+    if let Some(selection) = &input.output {
+        selection.validate()?;
+        if input.offset != 0 || input.limit.is_some() {
+            return Err("Use output.rows.offset/limit for row queries; do not combine a query with character paging.".into());
+        }
+        let value: Value =
+            serde_json::from_str(&snapshot.json).map_err(|_| "Captured JSON is unavailable.")?;
+        let projected = query::project(&value, selection, &input.result_handle, true)
+            .ok_or("The requested array or fields are absent. Inspect available source paths; missing evidence must not be treated as irrelevant.")?;
+        return Ok(response(projected, true));
+    }
     let total = snapshot.json.chars().count();
     if input.offset > total {
         return Err("Offset exceeds the captured result.".into());
@@ -156,12 +223,110 @@ pub(super) fn read(
     let next = input.offset + text.chars().count();
     Ok(response(
         json!({"resultHandle":input.result_handle,"text":text,"offset":input.offset,"totalCharacters":total,"nextOffset":if next < total {Some(next)} else {None}}),
+        false,
     ))
+}
+
+pub(super) fn captured_json(
+    snapshots: &VecDeque<Snapshot>,
+    handle: &str,
+    pointer: Option<&str>,
+) -> Result<Value, String> {
+    if handle.is_empty()
+        || handle.len() > 80
+        || pointer.is_some_and(|p| !p.starts_with('/') || p.len() > 512)
+    {
+        return Err(
+            "Use this attempt's result handle and an optional bounded RFC 6901 pointer.".into(),
+        );
+    }
+    let snapshot = snapshots
+        .iter()
+        .find(|item| item.handle == handle)
+        .ok_or("Captured result expired or belongs to another attempt; no remote call was made.")?;
+    let value: Value =
+        serde_json::from_str(&snapshot.json).map_err(|_| "Captured JSON unavailable.")?;
+    let value = match pointer {
+        Some(pointer) => value
+            .pointer(pointer)
+            .cloned()
+            .ok_or("Captured result path is absent; missing evidence is not irrelevant.")?,
+        None => value,
+    };
+    if value.to_string().len() > 96_000 {
+        return Err("Captured evidence exceeds 96 KB. Select a narrower JSON pointer.".into());
+    }
+    Ok(value)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn jev_sources_read_original_snapshots_and_fail_closed_on_missing_evidence() {
+        let original = CallToolResult::structured(
+            json!({"visible":"small", "evidence":[1,2,3], "large":"x".repeat(96_001)}),
+        );
+        let selection: Selection =
+            serde_json::from_value(json!({"jsonPointers":["/structuredContent/visible"]})).unwrap();
+        let mut snapshots = VecDeque::new();
+        select(original, Some(&selection), &mut snapshots);
+        let handle = snapshots[0].handle.clone();
+        assert_eq!(
+            captured_json(&snapshots, &handle, Some("/structuredContent/evidence")).unwrap(),
+            json!([1, 2, 3])
+        );
+        assert!(captured_json(&snapshots, &handle, None)
+            .unwrap_err()
+            .contains("96 KB"));
+        assert!(captured_json(&snapshots, &handle, Some("/missing")).is_err());
+        assert!(captured_json(&snapshots, &handle, Some("invalid")).is_err());
+        assert!(captured_json(&VecDeque::new(), &handle, None).is_err());
+        snapshots.clear();
+        assert!(captured_json(&snapshots, &handle, None)
+            .unwrap_err()
+            .contains("expired"));
+    }
+
+    #[test]
+    fn selection_metrics_distinguish_fallbacks_from_actual_projection() {
+        let original = CallToolResult::structured(
+            json!({"items":[{"id":1,"ready":true,"noise":"x".repeat(2000)}]}),
+        );
+        let selection = |pointer: &str| {
+            serde_json::from_value::<Selection>(
+                json!({"rows":{"pointer":pointer,"columns":["/id"]}}),
+            )
+            .unwrap()
+        };
+        let mut snapshots = VecDeque::new();
+        let (_, stats) = select_measured(
+            original.clone(),
+            Some(&selection("/absent")),
+            &mut snapshots,
+        );
+        assert_eq!(
+            (stats.requests, stats.row_requests, stats.fallbacks),
+            (1, 1, 1)
+        );
+        assert!(snapshots.is_empty());
+        let (_, stats) = select_measured(
+            original,
+            Some(&selection("/structuredContent/items")),
+            &mut snapshots,
+        );
+        assert_eq!(
+            (
+                stats.requests,
+                stats.row_requests,
+                stats.fallbacks,
+                stats.truncated
+            ),
+            (1, 1, 0, 0)
+        );
+        assert_eq!(snapshots.len(), 1);
+    }
 
     #[test]
     fn selection_is_lossless_retrievable_and_smaller_without_reexecution() {
@@ -185,6 +350,7 @@ mod tests {
                     result_handle: handle.clone(),
                     offset,
                     limit: Some(997),
+                    output: None,
                 },
             )
             .unwrap();
@@ -206,7 +372,8 @@ mod tests {
             &ReadInput {
                 result_handle: handle,
                 offset: 0,
-                limit: None
+                limit: None,
+                output: None,
             }
         )
         .is_err());

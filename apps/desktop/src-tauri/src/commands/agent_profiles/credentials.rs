@@ -11,18 +11,22 @@ pub(super) struct ApiKey {
 fn allowed(agent: &str, name: &str) -> bool {
     match agent {
         "antigravity" => name == "GEMINI_API_KEY",
-        "aider" => [
-            "OPENAI_API_KEY",
-            "ANTHROPIC_API_KEY",
-            "GEMINI_API_KEY",
-            "OPENROUTER_API_KEY",
-            "DEEPSEEK_API_KEY",
-            "XAI_API_KEY",
-            "GROQ_API_KEY",
-            "MISTRAL_API_KEY",
-        ]
-        .contains(&name),
+        "aider" | "opencode" => provider(name).is_some(),
         _ => false,
+    }
+}
+
+pub(super) fn provider(name: &str) -> Option<&'static str> {
+    match name {
+        "OPENAI_API_KEY" => Some("openai"),
+        "ANTHROPIC_API_KEY" => Some("anthropic"),
+        "GEMINI_API_KEY" => Some("google"),
+        "OPENROUTER_API_KEY" => Some("openrouter"),
+        "DEEPSEEK_API_KEY" => Some("deepseek"),
+        "XAI_API_KEY" => Some("xai"),
+        "GROQ_API_KEY" => Some("groq"),
+        "MISTRAL_API_KEY" => Some("mistral"),
+        _ => None,
     }
 }
 
@@ -100,4 +104,72 @@ pub fn agent_profile_save_key(
     .map_err(|_| "Could not prepare the API key.")?;
     let path = binding.directory.join("api-key.bin");
     crate::commands::account_storage::write(&path, &bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn opencode_accepts_supported_provider_keys_without_accepting_runtime_overrides() {
+        assert!(allowed("opencode", "DEEPSEEK_API_KEY"));
+        assert!(allowed("opencode", "OPENAI_API_KEY"));
+        assert!(!allowed("opencode", "OPENCODE_CONFIG_CONTENT"));
+        assert!(!allowed("claude", "DEEPSEEK_API_KEY"));
+        assert!(!allowed("antigravity", "DEEPSEEK_API_KEY"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn protected_deepseek_key_reaches_only_the_bound_opencode_process() {
+        let directory =
+            std::env::temp_dir().join(format!("jackalope-deepseek-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let binding = AccountBinding {
+            adapter: "opencode".into(),
+            profile_id: Some("fixture".into()),
+            label: "Fixture".into(),
+            directory: directory.clone(),
+        };
+        let path = directory.join("api-key.bin");
+        let key = ApiKey {
+            name: "DEEPSEEK_API_KEY".into(),
+            value: "fixture-not-a-real-provider-key".into(),
+        };
+        crate::commands::account_storage::write(&path, &serde_json::to_vec(&key).unwrap()).unwrap();
+        let saved = std::fs::read(&path).unwrap();
+        assert!(!saved
+            .windows(key.value.len())
+            .any(|window| window == key.value.as_bytes()));
+        let mut command = std::process::Command::new("not-executed");
+        super::super::apply_binding(&mut command, &binding).unwrap();
+        assert_eq!(
+            command
+                .get_envs()
+                .find(|(name, _)| *name == "DEEPSEEK_API_KEY")
+                .unwrap()
+                .1
+                .unwrap(),
+            key.value.as_str()
+        );
+        assert_eq!(
+            super::super::api_key_name(&binding).unwrap().as_deref(),
+            Some("DEEPSEEK_API_KEY")
+        );
+        assert!(!directory.join(".env").exists());
+        assert_eq!(
+            super::super::api_provider(&binding).unwrap(),
+            Some("deepseek")
+        );
+        assert_eq!(
+            command
+                .get_envs()
+                .find(|(name, _)| *name == "GOOGLE_GENERATIVE_AI_API_KEY")
+                .unwrap()
+                .1,
+            None
+        );
+        crate::commands::account_storage::remove(&path).unwrap();
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 }

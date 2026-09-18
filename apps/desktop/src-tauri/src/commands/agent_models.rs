@@ -157,8 +157,11 @@ async fn read_catalog(
     }
     if adapter == "opencode" {
         let mut command = Command::new(executable);
+        command.arg("models");
+        if let Some(provider) = agent_profiles::api_provider(binding)? {
+            command.arg(provider);
+        }
         command
-            .args(["models"])
             .current_dir(std::env::temp_dir())
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
