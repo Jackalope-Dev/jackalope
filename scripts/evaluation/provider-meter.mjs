@@ -53,6 +53,8 @@ export async function startProviderMeter({
       messageCount: null,
       messageBytes: null,
       reportedModel: null,
+      reasoningEffort: null,
+      thinking: null,
     };
     records.push(record);
     const start = performance.now(),
@@ -79,6 +81,20 @@ export async function startProviderMeter({
       record.toolSchemaBytes = Buffer.byteLength(JSON.stringify(parsed.tools ?? []));
       record.messageCount = Array.isArray(parsed.messages) ? parsed.messages.length : null;
       record.messageBytes = Buffer.byteLength(JSON.stringify(parsed.messages ?? []));
+      record.reasoningEffort = [
+        'none',
+        'minimal',
+        'low',
+        'medium',
+        'high',
+        'xhigh',
+        'max',
+      ].includes(parsed.reasoning_effort)
+        ? parsed.reasoning_effort
+        : null;
+      record.thinking = ['enabled', 'disabled'].includes(parsed.thinking?.type)
+        ? parsed.thinking.type
+        : null;
       const result = await fetchImpl(`${upstream}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },

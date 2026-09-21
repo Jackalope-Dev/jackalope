@@ -141,7 +141,7 @@ representative benefit and installed-platform acceptance remain open.
   agent sign-in guidance and save-and-check results. Full AllMCPs search and custom
   connections remain available; live publisher/account acceptance remains open.
   Task-owned Chromium sessions and scoped desktop-window grants.
-- Codex/Claude effort requests, focused isolated-task coordination, verification
+- Codex/Claude effort requests and advertised OpenCode provider variants, focused isolated-task coordination, verification
   timeout alignment, usage attribution
   and direct-CLI quality comparisons with separate routing evaluation gates. See
   [agent quality](AGENT-QUALITY.md); automatic escalation and learned routing
@@ -192,6 +192,11 @@ representative benefit and installed-platform acceptance remain open.
   An external Harbor adapter runs prepared Git repositories through the same native
   task path with separate upstream grading and optional request metering. Its initial
   payload targets Linux x86_64/OpenCode; broader provider and benchmark acceptance remain open.
+  OpenCode tasks use an authenticated owned server for recoverable permission prompts,
+  structured questions, exact-session continuation and child-session usage. Scope,
+  native-read and provider-effort ablations retain matched permission policies and
+  independent accounting; cross-platform installed acceptance and representative
+  improvement claims remain open.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.
   Project setup includes project, agents, decisions, behavior, appearance and an optional
   first task. Theme editors open directly; existing saved app/project choices remain compatible.

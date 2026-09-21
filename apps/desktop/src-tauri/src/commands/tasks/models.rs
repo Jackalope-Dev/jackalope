@@ -15,6 +15,8 @@ pub struct Usage {
 #[serde(rename_all = "camelCase")]
 pub struct UsageObservation {
     pub message_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
     pub parent_tool_use_id: Option<String>,
     pub model: Option<String>,
     pub input: u64,

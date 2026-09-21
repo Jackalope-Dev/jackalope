@@ -2,12 +2,15 @@ use sha2::{Digest, Sha256};
 
 const CORE: &str = "Jackalope task context: Use the assigned workspace; preserve user intent, existing work and repository instructions. Leave changes uncommitted; do not merge, push or delete the workspace. Permission denials prohibit retries or bypasses; continue independent authorized work. Use the supplied question tool for blocking decisions and retrieve the answer. Report the outcome, changed files, checks actually performed and unresolved issues. End with: Commit message: <imperative summary of actual changes>.\n";
 
+pub(super) const SCOPE_GUIDANCE: &str = "\nSeparate required outcomes from suggested implementation options. Choose the smallest complete change that meets the requirements and preserves existing contracts. Add persistence, new abstractions, dependency changes or unrelated defaults only when the task requires them. Inspect existing regression coverage; do not weaken tests to fit a patch. Read relevant symbols/ranges first, expanding to callers and full files when needed. Select checks that cover the changed behavior and its dependents, plus every user/repository-required check. A necessary early reproduction is useful; repeated unchanged full builds are not. Before finishing, inspect the final diff for scope and compatibility regressions and state any unverified requirements.\n";
+
 pub(super) fn policy_hash() -> String {
     Sha256::digest(format!(
-        "{}:{}:{}",
+        "{}:{}:{}:{}",
         crate::commands::experiments::fingerprint(),
         compact_preamble(None, ""),
-        lean_preamble()
+        lean_preamble(),
+        SCOPE_GUIDANCE
     ))
     .iter()
     .map(|byte| format!("{byte:02x}"))

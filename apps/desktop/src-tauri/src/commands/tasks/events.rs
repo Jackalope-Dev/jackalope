@@ -57,6 +57,7 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
         if let Some(id) = message["id"].as_str().filter(|id| id.len() <= 200) {
             if usage["input_tokens"].is_u64() && usage["output_tokens"].is_u64() {
                 let observation = UsageObservation {
+                    session_id: None,
                     message_id: id.to_string(),
                     parent_tool_use_id: child.map(str::to_string),
                     model: message["model"].as_str().map(str::to_string),
@@ -275,6 +276,7 @@ fn consume_opencode_event(run: &mut TaskRun, event: &Value, kind: &str) {
                 .saturating_add(write);
             let output = num(tokens, "output").saturating_add(num(tokens, "reasoning"));
             run.usage_observations.push(UsageObservation {
+                session_id: None,
                 message_id: id.into(),
                 parent_tool_use_id: None,
                 model: run.model.clone(),

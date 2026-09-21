@@ -1,12 +1,19 @@
 import argparse
 import hashlib
 import json
+import os
 import pathlib
 import re
 import shutil
 import subprocess
 import sys
 import tarfile
+
+RUNTIME_FILES = (
+    'scripts/evaluation/harbor-run.mjs', 'scripts/evaluation/attempts.mjs',
+    'scripts/evaluation/experiments.mjs', 'scripts/evaluation/provider-meter.mjs',
+    'apps/desktop/src/lib/task-effort.ts', 'apps/desktop/src-tauri/src/commands/experiments.json',
+)
 
 
 def digest(path):
@@ -19,15 +26,30 @@ def source_hashes(source):
     return {name: digest(source / name) for name in sorted(set(filter(None, files))) if (source / name).is_file()}
 
 
+def verify_build(binary, manifest):
+    expected = digest(manifest)
+    result = subprocess.run(
+        [str(binary), '--exact', 'commands::coordination::quality_trial::evaluation_build_provenance',
+         '--ignored', '--nocapture'],
+        env={**os.environ, 'JACKALOPE_EXPECTED_SOURCE_SHA256': expected},
+        capture_output=True, text=True, timeout=30,
+    )
+    if result.returncode or f'JACKALOPE_EVALUATION_BUILD_SHA256={expected}' not in result.stdout.splitlines():
+        raise ValueError('Native binary has no matching compiled source fingerprint; freeze and rebuild with JACKALOPE_EVALUATION_SOURCE_SHA256.')
+
+
 def package(source, binary, node, opencode, manifest, destination):
     if sys.platform != 'linux':
         raise ValueError('The current Harbor payload targets Linux containers.')
     if destination.exists():
         raise ValueError('Use a new output directory; existing receipts are never overwritten.')
     frozen = json.loads(manifest.read_text())
-    native = lambda files: {name: value for name, value in files.items() if name.startswith(('apps/desktop/src-tauri/', 'patches/'))}
-    if native(source_hashes(source)) != native(frozen):
-        raise ValueError('Native source changed since the build snapshot; freeze and rebuild.')
+    product = lambda files: {name: value for name, value in files.items() if name.startswith((
+        'apps/desktop/src-tauri/', 'patches/', 'apps/desktop/src/lib/skills/',
+    )) or name in RUNTIME_FILES}
+    if product(source_hashes(source)) != product(frozen):
+        raise ValueError('Native or prompt source changed since the build snapshot; freeze and rebuild.')
+    verify_build(binary, manifest)
     destination.mkdir(parents=True)
     payload = destination / 'payload'
     (payload / 'bin').mkdir(parents=True)
@@ -52,12 +74,7 @@ def package(source, binary, node, opencode, manifest, destination):
     for name, binary_path in [('node', node), ('opencode', opencode)]:
         shutil.copyfile(binary_path, payload / 'bin' / name)
         (payload / 'bin' / name).chmod(0o755)
-    files = [
-        'scripts/evaluation/harbor-run.mjs', 'scripts/evaluation/attempts.mjs',
-        'scripts/evaluation/experiments.mjs', 'scripts/evaluation/provider-meter.mjs',
-        'apps/desktop/src/lib/task-effort.ts', 'apps/desktop/src-tauri/src/commands/experiments.json',
-    ]
-    for name in files:
+    for name in RUNTIME_FILES:
         target = payload / 'source' / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source / name, target)
@@ -84,9 +101,10 @@ if __name__ == '__main__':
             json.dump(source_hashes(source), stream, indent=2)
         sys.exit(0)
     parser = argparse.ArgumentParser(description='Package a prebuilt native test runner for private Harbor evaluations.')
+    parser.add_argument('--source', type=pathlib.Path, default=source)
     for name in ['binary', 'node', 'opencode', 'source-manifest', 'output']:
         parser.add_argument('--' + name, type=pathlib.Path, required=True)
     args = parser.parse_args()
-    package(source, args.binary.resolve(strict=True),
+    package(args.source.resolve(strict=True), args.binary.resolve(strict=True),
             args.node.resolve(strict=True), args.opencode.resolve(strict=True),
             args.source_manifest.resolve(strict=True), args.output.resolve())

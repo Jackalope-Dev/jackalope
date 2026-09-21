@@ -22,6 +22,7 @@ class JackalopeOptions(AgentOptions):
     tokens: int = Field(default=2_000_000, ge=1000, le=10_000_000)
     provider_meter: Literal["deepseek"] | None = None
     jev_questions: bool = False
+    experiments: dict[str, str] = Field(default_factory=dict)
 
 
 class JackalopeAgent(BaseAgent):
@@ -50,12 +51,19 @@ class JackalopeAgent(BaseAgent):
         )
         if result.return_code:
             raise RuntimeError(f"Payload setup failed: {result.stderr}")
-        result = await environment.exec("pwd -P", timeout_sec=10)
+        result = await environment.exec(
+            "mkdir -p /opt/jackalope-eval/agent-bin && ln -s /opt/jackalope-eval/bin/"
+            + shlex.quote(self.options.agent) + " /opt/jackalope-eval/agent-bin/" + shlex.quote(self.options.agent),
+            timeout_sec=30,
+        )
+        if result.return_code:
+            raise RuntimeError('Could not expose the agent without shadowing the project toolchain.')
+        result = await environment.exec("pwd -P", timeout_sec=30)
         self.workspace = (result.stdout or "").strip()
         if result.return_code or not self.workspace.startswith("/") or self.workspace == "/":
             raise ValueError("Task must provide a repository working directory below the filesystem root.")
         result = await environment.exec(
-            "git rev-parse --show-toplevel", cwd=self.workspace, timeout_sec=10
+            "git rev-parse --show-toplevel", cwd=self.workspace, timeout_sec=30
         )
         if result.return_code:
             raise ValueError("Pilot adapter requires a prepared Git repository; it does not rewrite task fixtures.")
@@ -63,10 +71,13 @@ class JackalopeAgent(BaseAgent):
             raise ValueError("Task working directory must be its repository root.")
         result = await environment.exec(
             "git switch -c jackalope-evaluation && "
+            "git config user.name 'Evaluation fixture' && "
+            "git config user.email 'evaluation@example.invalid' && "
+            "git config commit.gpgsign false && "
             "git config jackalope.commitPolicy "
-            + shlex.quote(json.dumps({"attribution": "user", "cleanupAfterMerge": False, "autoCheckpoint": False})),
+            + shlex.quote(json.dumps({"attribution": "user", "name": "Evaluation fixture", "email": "evaluation@example.invalid", "cleanupAfterMerge": False, "autoCheckpoint": False})),
             cwd=self.workspace,
-            timeout_sec=10,
+            timeout_sec=30,
         )
         if result.return_code:
             raise RuntimeError(f"Could not prepare matching evaluation branches: {result.stderr}")
@@ -79,17 +90,59 @@ class JackalopeAgent(BaseAgent):
         if result.return_code:
             raise RuntimeError(f"Runner preflight failed: {result.stderr}")
         (self.logs_dir / "runner-versions.txt").write_text(result.stdout or "")
+        if self.options.agent == 'opencode':
+            # OpenCode lazily installs search dependencies; complete that before restricted inference.
+            result = await environment.exec(
+                'export PATH=/opt/jackalope-eval/agent-bin:$PATH; '
+                'opencode debug rg search JACKALOPE_EVALUATION_PREFLIGHT_NO_MATCH >/dev/null',
+                cwd=self.workspace,
+                env={'XDG_CACHE_HOME': str(self.environment_logs_dir / 'provider-profile/cache'),
+                     'XDG_CONFIG_HOME': str(self.environment_logs_dir / 'provider-profile/config'),
+                     'XDG_DATA_HOME': str(self.environment_logs_dir / 'provider-profile/data'),
+                     'XDG_STATE_HOME': str(self.environment_logs_dir / 'provider-profile/state'),
+                     'OPENCODE_DISABLE_AUTOUPDATE': 'true',
+                     'OPENCODE_DISABLE_PROJECT_CONFIG': 'true'},
+                timeout_sec=120,
+            )
+            if result.return_code:
+                raise RuntimeError('OpenCode search prerequisite failed before inference.')
+            plugin = '/opt/jackalope-eval/dependency-preflight.mjs'
+            result = await environment.exec(
+                "printf '%s\\n' 'export default async () => ({})' > " + shlex.quote(plugin)
+                + '; export PATH=/opt/jackalope-eval/agent-bin:$PATH; opencode debug agent build >/dev/null',
+                cwd=self.workspace,
+                env={'XDG_CACHE_HOME': str(self.environment_logs_dir / 'provider-profile/cache'),
+                     'XDG_CONFIG_HOME': str(self.environment_logs_dir / 'provider-profile/config'),
+                     'XDG_DATA_HOME': str(self.environment_logs_dir / 'provider-profile/data'),
+                     'XDG_STATE_HOME': str(self.environment_logs_dir / 'provider-profile/state'),
+                     'OPENCODE_DISABLE_AUTOUPDATE': 'true',
+                     'OPENCODE_DISABLE_PROJECT_CONFIG': 'true',
+                     'OPENCODE_CONFIG_CONTENT': json.dumps({'model': self.model_name,
+                         'plugin': ['file://' + plugin]})},
+                timeout_sec=120,
+            )
+            if result.return_code:
+                raise RuntimeError('OpenCode plugin prerequisites failed before inference.')
 
     async def run(self, instruction: str, environment: BaseEnvironment, context: AgentContext) -> None:
         if environment.network_policy.network_mode.value != 'allowlist':
             raise ValueError('Repository scoring requires an agent-phase network allowlist excluding published solutions.')
-        probe = await environment.exec('command -v curl', timeout_sec=5)
+        inference_hosts = {'api.deepseek.com', 'api.openai.com', 'api.anthropic.com',
+                           'generativelanguage.googleapis.com'}
+        if self.options.jev_questions:
+            inference_hosts.add('api.typesafe.ai')
+        allowed_hosts = set(environment.network_policy.allowed_hosts or [])
+        if not allowed_hosts or not allowed_hosts <= inference_hosts:
+            raise ValueError('Agent-phase egress must contain only supported inference API hosts; prepare dependencies before execution.')
+        probe = await environment.exec('command -v curl', timeout_sec=30)
         if probe.return_code:
             raise ValueError('Source-access validation requires curl in the task environment.')
-        for host in ['github.com', 'api.github.com', 'raw.githubusercontent.com']:
+        source_hosts = ['github.com', 'api.github.com', 'raw.githubusercontent.com',
+                        'proxy.golang.org', 'registry.npmjs.org', 'pypi.org']
+        for host in source_hosts:
             probe = await environment.exec(
                 'curl --silent --insecure --connect-timeout 2 --max-time 4 --output /dev/null https://' + host,
-                timeout_sec=6,
+                timeout_sec=30,
             )
             if probe.return_code == 0:
                 raise ValueError('Published solution host remains reachable: ' + host)
@@ -97,6 +150,7 @@ class JackalopeAgent(BaseAgent):
             'networkMode': environment.network_policy.network_mode.value,
             'allowedHosts': environment.network_policy.allowed_hosts,
             'githubBlocked': True,
+            'blockedSourceProbes': source_hosts,
         }))
         config = {
             "id": self.session_id,
@@ -109,6 +163,7 @@ class JackalopeAgent(BaseAgent):
             "tokens": self.options.tokens,
             "providerMeter": self.options.provider_meter,
             "jevQuestions": self.options.jev_questions,
+            "experiments": self.options.experiments,
         }
         with tempfile.TemporaryDirectory(prefix="jackalope-harbor-") as directory:
             request = Path(directory) / "request.json"
@@ -124,7 +179,7 @@ class JackalopeAgent(BaseAgent):
             env["JACKALOPE_JEV_TEST_KEY"] = os.environ["JACKALOPE_JEV_TEST_KEY"]
         log_dir = str(self.environment_logs_dir)
         result = await environment.exec(
-            "export PATH=/opt/jackalope-eval/bin:$PATH; "
+            "export PATH=/opt/jackalope-eval/agent-bin:$PATH; "
             "/opt/jackalope-eval/bin/node /opt/jackalope-eval/source/scripts/evaluation/harbor-run.mjs "
             "/tmp/jackalope-evaluation-request.json " + shlex.quote(log_dir),
             cwd=self.workspace,

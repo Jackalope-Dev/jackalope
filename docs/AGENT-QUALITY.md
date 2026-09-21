@@ -197,14 +197,20 @@ Before building the native test executable, freeze its working source:
 
 ```sh
 python3 scripts/evaluation/harbor-package.py freeze /private/eval/source.json
+export JACKALOPE_EVALUATION_SOURCE_SHA256="$(sha256sum /private/eval/source.json | cut -d ' ' -f1)"
 cargo test --locked --lib --manifest-path apps/desktop/src-tauri/Cargo.toml --no-run
 python3 scripts/evaluation/harbor-package.py --source-manifest /private/eval/source.json \
   --binary /absolute/native-test-executable --node /absolute/node \
   --opencode /absolute/opencode --output /private/eval/package
 ```
 
-The package records source, binary and payload hashes and refuses changed native
-source or an existing output directory. Set `PYTHONPATH` to `scripts/evaluation`
+The package records source, binary and payload hashes and checks the source fingerprint
+compiled into the test binary. It rejects a missing or mismatched fingerprint,
+changed native, product-prompt or packaged runtime source, or an existing output directory.
+Select the executable from the current Cargo build output; shared target directories
+can retain older executables with different names. Use `--source` with a preserved Git snapshot
+when the working checkout has moved on; do not pair an old binary with new product
+prompts. Set `PYTHONPATH` to `scripts/evaluation`
 and configure Harbor's agent `import_path` as `harbor_agent:JackalopeAgent`, with an
 explicit `model_name` and `kwargs`: `payload`, `payload_sha256`, `variant`
 (`direct` or `jackalope`), `agent`, `seconds`, `tokens`, and optional
@@ -218,6 +224,32 @@ unchanged during setup. Task-provided MCP servers and skills are currently rejec
 instead of silently omitted. Upstream verifiers run separately after agent execution;
 no gold patch, oracle or generated fixture enters the agent request. A matching
 `JACKALOPE_EXTERNAL_WORKSPACE` explicitly authorizes the test-only in-place mode.
+Only the agent executable is added to the worker's `PATH`. The evaluation launcher
+uses its private Node by absolute path so repository commands retain the prepared
+image's runtime and native-module compatibility.
+
+Repository scoring requires an enforced agent-phase network allowlist. Permit only
+the required inference API endpoints; prepare dependencies during setup. Package
+mirrors can expose newer releases containing a solution, so they must also be blocked
+during execution. The adapter rejects hosts outside its supported inference APIs
+and checks that source hosts and common package mirrors are unreachable before
+inference; configure the upstream environment's network policy to enforce this,
+not only agent tool permissions. Validate that direct connections cannot bypass a
+proxy. A host whose container runtime cannot enforce the policy must use a supported
+isolated network implementation or fail setup. Setup and verification policies can
+differ from the agent phase. Preserve these overrides with the run's provenance.
+Audit traces for answer retrieval; a published-patch fetch invalidates the attempt.
+Source probes keep a four-second network deadline inside a thirty-second container
+command budget. A transport timeout aborts setup; it never proves that a source
+host is blocked. Retain the failure separately from scored model attempts.
+With the pinned Harbor environment active, run `python -m unittest discover -s
+scripts/evaluation -p harbor_agent_test.py` to check source-access rejection and
+request/usage preservation.
+
+OpenCode search and plugin SDK dependencies are initialized during setup in the
+same isolated profile used for inference, including for the direct control. The
+preflight discovers tools without invoking a model. Record setup time separately;
+never open package registries during scored execution to repair missing dependencies.
 
 DeepSeek credentials come from the parent process environment, never job arguments
 or saved configuration. Metering gives the worker a temporary proxy token and retains
@@ -225,6 +257,9 @@ all provider request usage without request/response content. Optional `jev_quest
 requires a privately supplied test key and functioning protected credential storage;
 ordinary runs require no Jev key. Retain native receipts, provider accounting and
 Harbor results, including setup failures and timeouts. Keep unknown costs unknown.
+Provider receipts are persisted before optional OpenCode session export, so an
+incomplete transcript does not discard independent usage. Keep transcript failures
+visible when assessing how confidently a result can be explained.
 
 Pin dataset revisions, images, clients, payload and task selection before execution.
 Validate unmodified failures and reference-solution passes before scoring a task.
@@ -423,7 +458,12 @@ New captured tasks send Quick/Balanced/Thorough as low/medium/high model effort
 requests to Codex and Claude, in addition to the task approach instructions.
 The flags apply only to the launched process. Providers can reject unsupported
 models or constrain effort; the saved receipt records what Jackalope requested,
-not a provider confirmation. Other adapters retain their configured model effort.
+not a provider confirmation. OpenCode's server transport requests only enabled
+variants advertised by the selected provider/model. Quick/Balanced/Thorough select
+low/medium/high when supported; DeepSeek Balanced uses high because its medium
+setting maps to high. Unknown variants retain the provider default. Other adapters
+retain their configured model effort. Independent provider receipts record outbound
+reasoning and thinking fields when available; a variant name alone is not confirmation.
 Legacy requests without an effort retain the CLI default. Continuations inherit
 the saved effort unless a caller explicitly supplies another level. Quality-based
 automatic model switching and effort escalation are not enabled.
@@ -588,6 +628,10 @@ user setting or proof of a faster workflow.
 
 | Setting | Behavior |
 | --- | --- |
+| `JACKALOPE_OPENCODE_TRANSPORT=cli` | Reproduces the earlier headless JSON transport for evaluation. Ordinary OpenCode tasks use an authenticated task-owned server and explicit permission replies. External unattended comparisons reject requests in both arms; user-mediated recovery is a separate outcome. |
+| `JACKALOPE_SCOPE_GUARD=off` | Removes the shared guidance to distinguish required outcomes from suggestions, preserve regression contracts, inspect bounded source first and select relevant plus mandatory checks. The guidance is normally included across adapters. |
+| `JACKALOPE_PROVIDER_EFFORT=off` or `low` | Preserves OpenCode provider defaults or requests its advertised low variant independently of task-approach text. Neither is automatic quality-based effort selection. Compare against normal effort with the same model and prompt. |
+| `JACKALOPE_NATIVE_TOOLS=bounded` | Available only in native test binaries. Attaches a process-local OpenCode read hook that defaults otherwise unspecified reads to 120 lines. Explicit ranges remain intact, and a receipt must persist before changing the request. Ordinary desktop builds do not contain this hook; it is a development ablation, not a user setting. |
 | `JACKALOPE_RESULT_QUERIES=on` | Exposes exact queries over captured tool results, complete JSON row pages, bounded path hints and explicit selection guidance. Records row selection, fallback, truncation and expansion counters. |
 | `JACKALOPE_RESULT_PREVIEW=on` | With result queries enabled, captures large unselected text/JSON responses locally and returns explicit previews with recoverable originals. Errors and non-text responses remain intact. |
 | `JACKALOPE_INITIAL_TOOLS=small` | Attempts discovery for up to three seconds before launch. Supplies a complete catalog only when it has at most four tools and 6 KB of metadata; other catalogs retain on-demand discovery. Initialization time and broker searches remain in the measurements. |

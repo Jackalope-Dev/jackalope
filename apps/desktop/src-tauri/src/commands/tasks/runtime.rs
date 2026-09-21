@@ -462,6 +462,7 @@ impl TaskRuntime {
         }
         let _runner_lease = crate::commands::managed_runtime::acquire(&executable)?;
         let mut cmd = command(executable);
+        let mut opencode_connection = None;
         if let Some(binding) = &req.account_binding {
             if !self
                 .policy()?
@@ -521,13 +522,19 @@ impl TaskRuntime {
                 previous.as_ref().and_then(|old| old.session_id.as_deref()),
             );
         } else if adapter == "opencode" {
-            cmd.args(["run", "--format", "json"]);
             if let Some(ref old) = previous {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
                 crate::commands::verification::ensure_idle(&old.workspace)?;
-                cmd.args(["--session", old.session_id.as_deref().unwrap()]);
+            }
+            if crate::commands::experiments::is("JACKALOPE_OPENCODE_TRANSPORT", "cli") {
+                cmd.args(["run", "--format", "json"]);
+                if let Some(ref old) = previous {
+                    cmd.args(["--session", old.session_id.as_deref().unwrap()]);
+                } else {
+                    cmd.args(["--title", &format!("Jackalope task {id}")]);
+                }
             } else {
-                cmd.args(["--title", &format!("Jackalope task {id}")]);
+                opencode_connection = Some(super::opencode::Connection::configure(&mut cmd)?);
             }
         } else if adapter == "grok" {
             cmd.args([
@@ -562,7 +569,7 @@ impl TaskRuntime {
             run.requested_service_tier = tier;
         })?;
         if let Some(model) = &selected_model {
-            if adapter != "kimi" {
+            if adapter != "kimi" && opencode_connection.is_none() {
                 cmd.args(["--model", model]);
             }
             self.update_checked(id, |run| run.model = Some(model.clone()))?;
@@ -703,6 +710,9 @@ impl TaskRuntime {
             .map(|r| r.contract.clone())
             .unwrap_or_default();
         input.push_str(&contract.text());
+        if !crate::commands::experiments::is("JACKALOPE_SCOPE_GUARD", "off") {
+            input.push_str(super::prompt::SCOPE_GUIDANCE);
+        }
         let launch_context = self
             .inner
             .lock()
@@ -802,6 +812,10 @@ impl TaskRuntime {
             let config = crate::commands::mcp::opencode_config(&project_mcp, &cmd)?;
             cmd.env("OPENCODE_CONFIG_CONTENT", config);
         }
+        #[cfg(test)]
+        if adapter == "opencode" {
+            super::opencode::configure_tools(&mut cmd, &self.directory, id)?;
+        }
         self.update_checked(id, |run| {
             run.efficiency.execution_profile = Some(if lean { "lean" } else { "standard" }.into());
             run.efficiency.verification_flow =
@@ -820,7 +834,11 @@ impl TaskRuntime {
         }
         cmd.current_dir(&workspace)
             .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
+            .stdout(if opencode_connection.is_some() {
+                Stdio::null()
+            } else {
+                Stdio::piped()
+            })
             .stderr(Stdio::piped());
         let mut inner = self.inner.lock().unwrap();
         if inner.canceled.contains(id) {
@@ -842,6 +860,9 @@ impl TaskRuntime {
             );
         }
         let launched = std::time::Instant::now();
+        if let Some(connection) = &mut opencode_connection {
+            connection.release_port();
+        }
         let spawned = spawn_agent(&mut cmd, &req.agent);
         let spawn_elapsed = launched.elapsed();
         let (mut child, spawn_attempts) = spawned?;
@@ -854,7 +875,13 @@ impl TaskRuntime {
             }
         };
         let mut stdin = child.stdin.take().ok_or("Missing agent input")?;
-        let stdout = child.stdout.take().ok_or("Missing agent output")?;
+        let stdout = child.stdout.take();
+        if stdout.is_none() && opencode_connection.is_none() {
+            tree.terminate();
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("Missing agent output".into());
+        }
         let stderr = child.stderr.take().ok_or("Missing agent diagnostics")?;
         let process = Arc::new(Mutex::new(child));
         inner.processes.insert(id.into(), process.clone());
@@ -874,7 +901,8 @@ impl TaskRuntime {
                 );
             }
         })?;
-        let input_result = if adapter == "grok" || adapter == "kimi" {
+        let server_transport = opencode_connection.is_some();
+        let input_result = if adapter == "grok" || adapter == "kimi" || server_transport {
             Ok(())
         } else {
             stdin.write_all(input.as_bytes())
@@ -893,7 +921,27 @@ impl TaskRuntime {
         let usage_probe = Arc::new(Mutex::new(None));
         let reader_probe = usage_probe.clone();
         let acp_workspace = workspace.clone();
+        let task_effort = req.effort;
         let reader = std::thread::spawn(move || {
+            if let Some(connection) = opencode_connection {
+                match connection.drive(
+                    &runtime,
+                    &event_id,
+                    &acp_workspace,
+                    resumed_session.as_deref(),
+                    selected_model.as_deref(),
+                    task_effort,
+                    &input,
+                    launched,
+                ) {
+                    Ok(()) => reader_success.store(true, std::sync::atomic::Ordering::SeqCst),
+                    Err(error) => runtime.update(&event_id, |run| {
+                        run.error.get_or_insert(error);
+                    }),
+                }
+                return;
+            }
+            let stdout = stdout.unwrap();
             if output_adapter == "kimi" {
                 let result = kimi::drive_with_servers(
                     BufReader::new(stdout),
@@ -995,7 +1043,7 @@ impl TaskRuntime {
             {
                 break exit;
             }
-            if adapter == "kimi" && reader.is_finished() {
+            if (adapter == "kimi" || server_transport) && reader.is_finished() {
                 tree.terminate();
                 let mut child = process.lock().unwrap();
                 let _ = child.kill();
@@ -1010,7 +1058,7 @@ impl TaskRuntime {
                     let _ = process.lock().unwrap().kill();
                 }
             }
-            if matches!(adapter.as_str(), "antigravity" | "kimi" | "gemini")
+            if (matches!(adapter.as_str(), "antigravity" | "kimi" | "gemini") || server_transport)
                 && !timed_out
                 && started.elapsed() > antigravity::TIMEOUT
             {
@@ -1045,7 +1093,7 @@ impl TaskRuntime {
             });
         }
         // ACP completion is the turn receipt; its persistent server is stopped by the owner.
-        let success = if adapter == "kimi" {
+        let success = if adapter == "kimi" || server_transport {
             acp_success.load(std::sync::atomic::Ordering::SeqCst) && !timed_out
         } else {
             exit.success()

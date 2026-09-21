@@ -606,6 +606,7 @@ if (!args.includes('--execute')) {
           efficiency,
           mcpUsage: run?.mcpUsage ?? null,
           fixtureToolCalls: report?.fixtureToolCalls ?? null,
+          nativeToolReceipts: report?.nativeToolReceipts ?? [],
           stages: run?.stages ?? [],
           usageBreakdown: runs.length ? runUsageBreakdown(runs, helperUsages) : null,
           agentUsage,

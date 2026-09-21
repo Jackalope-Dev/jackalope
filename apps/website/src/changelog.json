@@ -1,5 +1,17 @@
 [
   {
+    "id": "opencode-task-permissions",
+    "date": "2026-09-18",
+    "status": "In development",
+    "title": "Answer OpenCode requests within the task",
+    "description": "OpenCode tasks can ask for a specific permission or structured answer and continue through the existing task question flow.",
+    "items": [
+      "Approve an action once or deny it while retaining task and session history.",
+      "Continue the original session, stop owned processes, and include reported child-session usage."
+    ],
+    "note": "In development. Installed cross-platform acceptance remains in progress."
+  },
+  {
     "id": "flexible-task-workspaces",
     "date": "2026-09-18",
     "status": "In development",

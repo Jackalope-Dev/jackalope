@@ -90,6 +90,10 @@ release dates.
   Use the Harbor adapter for pinned external repository tasks, validate upstream
   graders and compare matched native/Jackalope runs before expanding to other harnesses.
   Extend container payload/provider coverage and independently confirm any pilot signal.
+  Confirm OpenCode server permissions, paginated continuation, child usage and process
+  cleanup in installed Windows/macOS/Linux apps. Evaluate scope guidance, bounded
+  native reads and provider effort separately and combined;
+  retain only supported benefits and use untouched tasks for confirmation.
 - [ ] Validate [local setup](LOCAL-AI.md) with real models in the packaged app:
   hardware/memory requirements, current installers, download cancellation/resume,
   account selection and continued tasks. Check macOS/Linux and enterprise configuration.

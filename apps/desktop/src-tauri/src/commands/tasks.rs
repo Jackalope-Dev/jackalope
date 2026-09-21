@@ -11,6 +11,7 @@ mod journal;
 mod journal_tests;
 pub(super) mod kimi;
 mod models;
+mod opencode;
 #[cfg(test)]
 mod performance;
 pub(super) mod preparation;

@@ -58,6 +58,10 @@ Focused task guidance and retrievable compact verification output are implemente
 baseline; broader provider comparisons and independent acceptance remain in progress.
 External container benchmarks can exercise the native task path with unchanged
 upstream grading; representative benefits still require matched confirmation.
+OpenCode's task-owned server connects permission prompts and structured questions
+to task review while retaining session ownership and usage. Provider-advertised
+effort requests and source-read experiments have separate validation; installed
+cross-platform acceptance and repeatable quality or efficiency gains remain open.
 
 Codex speed controls, fresh context for changed workspaces, dependency-priority
 dispatch and CPU-based check capacity are implemented. Execution timings and offline

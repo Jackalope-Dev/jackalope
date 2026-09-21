@@ -30,9 +30,16 @@ account binding, process stop and saved history. Ordinary tests cover permission
 failures, questions, verification, integration and corrupt history; they do not
 establish provider-specific interactive tool or installed-package acceptance.
 
-OpenCode's JSON adapter handles text, tool activity, session IDs, errors and
-per-step usage. Duplicate step IDs do not double-count usage. A nonzero exit,
-reported error or empty result cannot become a successful review state.
+OpenCode tasks use a task-owned, authenticated loopback server and its event API.
+Permission requests appear in the existing task question flow with **Allow once**
+and **Deny**; no answer, denial or an unrecognized answer grants no permission.
+Structured questions retain their choices and descriptions. Stop terminates the
+owned server/process tree. Continuation requires the original idle session and
+workspace; paginated root and child history excludes previous-turn usage. Restored
+and new owned child sessions retain permission handling and contribute new usage
+without replacing the root session. Duplicate message IDs
+do not double-count usage. A new completed assistant response is required for review;
+server termination, errors and incomplete turns cannot manufacture success.
 Model IDs use OpenCode's `provider/model` format. Provider configuration and
 credential validity remain OpenCode's responsibility; no credentials is not
 equivalent to no available model.
@@ -173,11 +180,12 @@ give Jackalope control of the model's conversation history or built-in tools.
 | Execution control | Current scope |
 | --- | --- |
 | Task instructions, selected context, workspace ownership and final saved checks | Shared task runtime across native adapters. Required user/repository checks still apply. |
-| Model reasoning effort | Native flags for Codex and Claude Code. Other adapters retain provider defaults; an effort instruction is not evidence that a provider setting changed. |
+| Model reasoning effort | Native flags for Codex and Claude Code. OpenCode requests only enabled low/medium/high variants advertised for the selected provider/model; DeepSeek Balanced requests high. Unsupported variants and absent effort preserve provider defaults. Requested effort is not proof of provider behavior. |
 | Exact result selection and recovery | Shared broker for selected on-demand connections. Codex, Claude, OpenCode and Kimi use native MCP; Grok, Antigravity and Gemini use the HTTP bridge. Explicit selections retain the captured original. These do not intercept the agent's own shell or file tools. |
 | Optional browser, desktop and coordination schemas loaded during execution | Opt-in lean OpenCode discovery, using MCP list-changed notifications. Other adapters retain existing catalogs until client refresh and permission behavior are verified. |
 | Source-range reads and delegation planning | Experimental native MCP tools for Codex, Claude, OpenCode and Kimi; no equivalent new HTTP endpoints are supplied. |
 | Native history rewriting | The evaluation-only OpenCode plugin can deduplicate exact read results. It is not installed by ordinary task launches or implemented across all adapters. |
+| Native source-read limits | OpenCode-only native test binaries can bound unspecified reads for evaluation. Explicit ranges and permission checks remain native. Ordinary desktop builds do not attach this hook or intercept native file reads. |
 
 Ordinary tasks use concise launch instructions and hide unavailable tool schemas
 by default. Static MCP clients retain coordination tools; dynamic loading remains

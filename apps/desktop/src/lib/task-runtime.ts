@@ -163,6 +163,7 @@ export interface TaskRun {
   usageObservations?: {
     messageId: string;
     parentToolUseId: string | null;
+    sessionId?: string | null;
     model: string | null;
     input: number;
     output: number;

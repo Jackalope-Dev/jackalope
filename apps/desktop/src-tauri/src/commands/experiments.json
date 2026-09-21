@@ -1,6 +1,26 @@
 {
   "version": 1,
   "fields": {
+    "scope-guard": {
+      "values": ["on", "off"],
+      "default": "on",
+      "environment": "JACKALOPE_SCOPE_GUARD"
+    },
+    "native-tools": {
+      "values": ["off", "bounded"],
+      "default": "off",
+      "environment": "JACKALOPE_NATIVE_TOOLS"
+    },
+    "opencode-transport": {
+      "values": ["server", "cli"],
+      "default": "server",
+      "environment": "JACKALOPE_OPENCODE_TRANSPORT"
+    },
+    "provider-effort": {
+      "values": ["on", "off", "low"],
+      "default": "on",
+      "environment": "JACKALOPE_PROVIDER_EFFORT"
+    },
     "learning": {
       "values": ["off", "local", "jev"],
       "default": "off",

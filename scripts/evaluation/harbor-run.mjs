@@ -6,10 +6,13 @@ import { assemblePrompt } from '../../apps/desktop/src/lib/skills/context-assemb
 import { resolveTaskGuidelines } from '../../apps/desktop/src/lib/skills/task-context.ts';
 import { effortPrompt } from '../../apps/desktop/src/lib/task-effort.ts';
 import { aggregateAttempts, reconcileProviderUsage } from './attempts.mjs';
-import { experimentEnvironment } from './experiments.mjs';
+import { experimentEnvironment, validateExperiments } from './experiments.mjs';
 import { prepareProviderMeter } from './provider-meter.mjs';
 
 export function externalSpec(input) {
+  validateExperiments(input.experiments ?? {});
+  if (input.variant === 'direct' && Object.keys(input.experiments ?? {}).length)
+    throw new Error('Native direct comparisons cannot include Jackalope experiments.');
   if (
     !['direct', 'jackalope'].includes(input.variant) ||
     !['codex', 'claude', 'opencode', 'antigravity'].includes(input.agent) ||
@@ -52,6 +55,7 @@ export function externalSpec(input) {
     seconds: input.seconds,
     tokens: input.tokens,
     learningMode: 'local',
+    permissionPolicy: 'reject',
   };
 }
 
@@ -74,7 +78,7 @@ export async function runExternal(inputPath, output, binary) {
     execution = await new Promise((resolve, reject) => {
       const env = {
         ...(meter?.env ?? process.env),
-        ...experimentEnvironment({}),
+        ...experimentEnvironment(input.experiments ?? {}),
         JACKALOPE_QUALITY_SPEC: specPath,
         JACKALOPE_EXTERNAL_WORKSPACE: spec.externalWorkspace,
         JACKALOPE_JEV_QUESTIONS: input.jevQuestions ? 'on' : 'off',
@@ -143,6 +147,8 @@ export async function runExternal(inputPath, output, binary) {
     accountingComplete: reconciled.nativeComplete,
     helperCostUsd: accounting.helperCostUsd,
     efficiency: accounting.efficiency,
+    nativeToolReceipts: receipt?.nativeToolReceipts ?? [],
+    experiments: input.experiments ?? {},
     accepted: null,
     limitations:
       'External verifier owns grading. First attempt in a fresh container, current-directory execution through production runtime. No UI assessment, managed plan, worktree merge, human acceptance or correction-time measurement. Reported token budgets are delayed, not billing caps.',

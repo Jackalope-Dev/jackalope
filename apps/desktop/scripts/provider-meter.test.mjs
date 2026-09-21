@@ -80,6 +80,8 @@ test('provider meter counts auxiliary requests and caches without persisting req
       headers: { Authorization: `Bearer ${meter.token}` },
       body: JSON.stringify({
         model: 'test',
+        reasoning_effort: i === 0 ? 'low' : 'private-unsupported-value',
+        thinking: { type: i === 0 ? 'enabled' : 'private-unsupported-value' },
         messages: [{ role: 'user', content: 'private-prompt' }],
       }),
     });
@@ -90,6 +92,10 @@ test('provider meter counts auxiliary requests and caches without persisting req
   assert.equal(report.complete, true);
   assert.equal(report.requests[0].messageCount, 1);
   assert.equal(report.requests[0].toolCount, 0);
+  assert.equal(report.requests[0].reasoningEffort, 'low');
+  assert.equal(report.requests[0].thinking, 'enabled');
+  assert.equal(report.requests[1].reasoningEffort, null);
+  assert.equal(report.requests[1].thinking, null);
   assert.deepEqual(report.usage, { input: 30, output: 12, cacheRead: 18, cacheWrite: 0 });
   assert(!JSON.stringify(report).includes('private-'));
 });

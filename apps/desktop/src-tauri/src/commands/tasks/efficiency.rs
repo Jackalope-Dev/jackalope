@@ -214,6 +214,14 @@ impl Efficiency {
     }
 
     pub fn observe(&mut self, event: &serde_json::Value, adapter: &str, workspace: &str) {
+        if adapter == "opencode" && event["type"] == "tool_use" {
+            let part = &event["part"];
+            let id = part["callID"].as_str().or_else(|| part["id"].as_str());
+            if let (Some(id), Some(name)) = (id, part["tool"].as_str()) {
+                self.tool(id, name);
+                self.touched(&part["state"]["input"], workspace);
+            }
+        }
         if adapter == "antigravity" && event["event"] == "step_update" {
             let step = &event["step_update"];
             if step["step_type"] == "tool" {
@@ -389,6 +397,32 @@ mod tests {
         assert!(!saved.contains("seen_tools"));
         let restored: Efficiency = serde_json::from_str("{}").unwrap();
         assert_eq!(restored.launches, 0);
+    }
+
+    #[test]
+    fn opencode_counts_calls_once_across_stream_updates_and_bounds_paths() {
+        let mut metrics = Efficiency::default();
+        let mut event = serde_json::json!({"type":"tool_use","part":{
+            "id":"part-1","callID":"call-1","tool":"read",
+            "state":{"status":"running","input":{"filePath":"/work/src/a.rs","content":"never store"}}
+        }});
+        metrics.observe(&event, "opencode", "/work");
+        event["part"]["state"]["status"] = "completed".into();
+        metrics.observe(&event, "opencode", "/work");
+        event["part"].as_object_mut().unwrap().remove("callID");
+        event["part"]["id"] = "part-2".into();
+        event["part"]["state"]["input"]["filePath"] = "/private/outside.rs".into();
+        metrics.observe(&event, "opencode", "/work");
+        event["part"].as_object_mut().unwrap().remove("id");
+        metrics.observe(&event, "opencode", "/work");
+        assert_eq!(metrics.tool_calls["read"], 2);
+        assert_eq!(
+            metrics.touched_paths.iter().cloned().collect::<Vec<_>>(),
+            ["src/a.rs"]
+        );
+        let saved = serde_json::to_string(&metrics).unwrap();
+        assert!(!saved.contains("never store"));
+        assert!(!saved.contains("outside.rs"));
     }
 
     #[test]

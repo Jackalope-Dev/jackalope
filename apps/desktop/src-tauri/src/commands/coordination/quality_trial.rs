@@ -5,6 +5,18 @@ mod jev_fixture;
 mod learning;
 mod workspace;
 
+#[test]
+#[ignore = "Checks the source fingerprint compiled into a private evaluation binary"]
+fn evaluation_build_provenance() {
+    let expected = std::env::var("JACKALOPE_EXPECTED_SOURCE_SHA256").unwrap();
+    assert!(expected.len() == 64 && expected.bytes().all(|b| b.is_ascii_hexdigit()));
+    assert_eq!(
+        option_env!("JACKALOPE_EVALUATION_SOURCE_SHA256"),
+        Some(expected.as_str())
+    );
+    println!("JACKALOPE_EVALUATION_BUILD_SHA256={expected}");
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "Runs one installed-agent benchmark in a disposable workspace; requires JACKALOPE_QUALITY_SPEC"]
 async fn installed_quality_trial() {
@@ -121,6 +133,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|r| r.as_ref().ok())
         .is_some_and(|r| r.1);
     let mut stop_at = None;
+    let mut permission_decisions = Vec::new();
     if !direct && launch_error.is_none() {
         loop {
             let runs = runtime.integration_runs()?;
@@ -135,6 +148,17 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                     .map(super::quality_direct::observed_tokens)
                     .fold(0u64, u64::saturating_add)
                     >= tokens;
+            if external && spec["permissionPolicy"] == "reject" {
+                for prompt in run.prompts.iter().filter(|p| {
+                    p.status == "pending"
+                        && p.question
+                            .starts_with("OpenCode requests permission for this action:")
+                        && p.options == ["Allow once", "Deny"]
+                }) {
+                    runtime.respond_prompt(&run.id, &prompt.id, "Deny")?;
+                    permission_decisions.push(json!({"promptId":prompt.id,"decision":"reject","source":"matched unattended benchmark policy"}));
+                }
+            }
             if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
                 stopped |= budget_exceeded;
                 if run.status == "review" && !stopped && next_followup < followups.len() {
@@ -215,7 +239,20 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                 .is_some_and(|id| attempt_ids.contains(id))
         })
         .collect::<Vec<_>>();
-    let report = json!({"version":2,"externalWorkspace":external,"decisionRecords":decisions,"case":spec["id"],"variant":spec["variant"],"fixtureToolCalls":tool_calls,
+    let native_tool_receipts: Vec<Value> = attempt_ids
+        .iter()
+        .flat_map(|id| {
+            std::fs::read_to_string(
+                root.join("profile/history")
+                    .join(format!("{id}.native-tools.jsonl")),
+            )
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| serde_json::from_str(line).ok())
+            .collect::<Vec<_>>()
+        })
+        .collect();
+    let report = json!({"version":2,"externalWorkspace":external,"permissionDecisions":permission_decisions,"decisionRecords":decisions,"nativeToolReceipts":native_tool_receipts,"case":spec["id"],"variant":spec["variant"],"fixtureToolCalls":tool_calls,
         "agent":spec["agent"],"model":spec["model"],"elapsedMs":elapsed,
         "budgetStopped":stopped,"launchError":launch_error,"oracle":oracle,
         "promptBytes":if direct { spec["prompt"].as_str().map(str::len) } else if followups.is_empty() { input.as_ref().map(Vec::len) } else { Some(attempts.iter().map(|r| r.efficiency.launch_prompt_bytes as usize).sum()) },"run":run,"attempts":if followups.is_empty() {None} else {Some(&attempts)},"agentVerification":agent_verification,

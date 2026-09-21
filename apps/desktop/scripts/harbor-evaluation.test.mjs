@@ -26,6 +26,8 @@ test('external comparison preserves the original native task and uses production
   assert.equal(jackalope.effort, direct.effort);
   assert.equal(jackalope.seconds, direct.seconds);
   assert.equal(jackalope.tokens, direct.tokens);
+  assert.equal(direct.permissionPolicy, 'reject');
+  assert.equal(jackalope.permissionPolicy, direct.permissionPolicy);
   assert.equal(jackalope.learningMode, 'local');
   assert.equal(jackalope.oracle, undefined);
   assert.equal(jackalope.files, undefined);
@@ -45,7 +47,17 @@ test('external comparisons reject unbounded or unmatched execution settings', ()
     { tokens: 10_000_001 },
     { instruction: '' },
     { jevQuestions: true },
+    { experiments: { 'native-tools': 'bounded' } },
+    { variant: 'jackalope', experiments: { 'native-tools': 'unknown' } },
+    { variant: 'jackalope', experiments: { unknown: 'on' } },
   ])
     assert.throws(() => externalSpec({ ...input, ...changes }));
   assert.doesNotThrow(() => externalSpec({ ...input, variant: 'jackalope', jevQuestions: true }));
+  assert.doesNotThrow(() =>
+    externalSpec({
+      ...input,
+      variant: 'jackalope',
+      experiments: { 'native-tools': 'bounded', 'provider-effort': 'low' },
+    }),
+  );
 });
