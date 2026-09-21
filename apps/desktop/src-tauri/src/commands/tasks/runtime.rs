@@ -713,13 +713,14 @@ impl TaskRuntime {
         if !crate::commands::experiments::is("JACKALOPE_SCOPE_GUARD", "off") {
             input.push_str(super::prompt::SCOPE_GUIDANCE);
         }
+        let host_parallelism = std::thread::available_parallelism().ok();
         let launch_context = self
             .inner
             .lock()
             .unwrap()
             .runs
             .get(id)
-            .map(super::efficiency::launch_context)
+            .map(|run| super::efficiency::launch_context(run, host_parallelism))
             .unwrap_or_default();
         input.push_str(&launch_context);
         let native_mcp = req.coordination.is_some()

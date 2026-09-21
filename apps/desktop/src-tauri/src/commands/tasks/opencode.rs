@@ -53,6 +53,22 @@ pub(super) struct Connection {
 
 impl Connection {
     pub fn configure(command: &mut Command) -> Result<Self, String> {
+        let mut config: Value = serde_json::from_str(&crate::commands::mcp::opencode_config(
+            &serde_json::Map::new(),
+            command,
+        )?)
+        .map_err(|_| "Invalid OpenCode configuration.")?;
+        if config
+            .get("experimental")
+            .is_some_and(|value| !value.is_object())
+        {
+            return Err("OpenCode experimental configuration must be an object.".into());
+        }
+        if config.get("experimental").is_none() {
+            config["experimental"] = json!({});
+        }
+        config["experimental"]["continue_loop_on_deny"] = json!(true);
+        command.env("OPENCODE_CONFIG_CONTENT", config.to_string());
         let listener = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
             .map_err(|e| e.to_string())?;
         let port = listener.local_addr().map_err(|e| e.to_string())?.port();
@@ -197,6 +213,7 @@ impl Connection {
                 )
                 .await?;
                 let mut frames = Frames::default();
+                let mut denials = Denials::default();
                 loop {
                     let chunk = events
                         .chunk()
@@ -209,8 +226,14 @@ impl Connection {
                         if matches!(kind, "permission.asked" | "question.asked")
                             && stream.owns(properties["sessionID"].as_str())
                         {
-                            api.answer(runtime, run_id, properties, kind == "permission.asked")
-                                .await?;
+                            api.answer(
+                                runtime,
+                                run_id,
+                                properties,
+                                kind == "permission.asked",
+                                &mut denials,
+                            )
+                            .await?;
                             continue;
                         }
                         if !stream.relevant(&event) {
@@ -365,7 +388,9 @@ impl Api<'_> {
         route: &str,
         body: Option<Value>,
     ) -> Result<Value, String> {
-        let timeout = if route == "/session"
+        let timeout = if route == "/global/health" {
+            1
+        } else if route == "/session"
             || route
                 .strip_prefix("/session/")
                 .is_some_and(|tail| !tail.contains('/'))
@@ -468,6 +493,7 @@ impl Api<'_> {
         run_id: &str,
         request: &Value,
         permission: bool,
+        denials: &mut Denials,
     ) -> Result<(), String> {
         let id = valid_id(
             request["id"]
@@ -481,6 +507,16 @@ impl Api<'_> {
             );
             if text.len() > 6000 {
                 return Err("OpenCode's permission request is too large to review safely. The action was not approved.".into());
+            }
+            let scopes = Denials::scopes(request)?;
+            if scopes.iter().any(|scope| denials.scopes.contains(scope)) {
+                self.json(
+                    Method::POST,
+                    &format!("/permission/{id}/reply"),
+                    Some(json!({"reply":"reject"})),
+                )
+                .await?;
+                return Err("OpenCode requested a previously denied permission scope. The action was rejected and the attempt stopped.".into());
             }
             let answer = wait_for_answer(
                 runtime,
@@ -497,8 +533,14 @@ impl Api<'_> {
                 Some(json!({"reply":if allow {"once"} else {"reject"}})),
             )
             .await?;
-            if !allow {
-                return Err("OpenCode permission was denied or unanswered. Review the saved action before continuing.".into());
+            if answer.as_deref() == Some("Deny") {
+                denials.scopes.extend(scopes);
+                denials.count += 1;
+                if denials.count >= 8 {
+                    return Err("OpenCode reached the limit of denied actions for this attempt. Review the saved requests before continuing.".into());
+                }
+            } else if !allow {
+                return Err("OpenCode permission was unanswered or the answer was not recognized. The action was rejected and the attempt stopped.".into());
             }
         } else {
             let questions = request["questions"]
@@ -578,6 +620,34 @@ impl Api<'_> {
             .await?;
         }
         Ok(())
+    }
+}
+
+#[derive(Default)]
+struct Denials {
+    scopes: HashSet<(String, String)>,
+    count: usize,
+}
+
+impl Denials {
+    fn scopes(request: &Value) -> Result<Vec<(String, String)>, String> {
+        let permission = request["permission"]
+            .as_str()
+            .filter(|value| !value.is_empty())
+            .ok_or("Invalid OpenCode permission name.")?;
+        request["patterns"]
+            .as_array()
+            .filter(|patterns| !patterns.is_empty())
+            .ok_or("Missing OpenCode permission patterns.")?
+            .iter()
+            .map(|pattern| {
+                pattern
+                    .as_str()
+                    .filter(|value| !value.is_empty())
+                    .map(|pattern| (permission.to_owned(), pattern.to_owned()))
+                    .ok_or_else(|| "Invalid OpenCode permission pattern.".into())
+            })
+            .collect()
     }
 }
 

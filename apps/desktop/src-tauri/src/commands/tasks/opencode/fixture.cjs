@@ -14,6 +14,8 @@ const oldChild = {
 const auth = `Basic ${Buffer.from(`jackalope:${process.env.OPENCODE_SERVER_PASSWORD}`).toString('base64')}`;
 let events;
 let askQuestion = false;
+let denialMode = '';
+let denials = 0;
 const messages = fs.existsSync('fixture-messages.json')
   ? JSON.parse(fs.readFileSync('fixture-messages.json'))
   : Array.from({ length: 17 }, (_, index) => ({
@@ -43,7 +45,14 @@ const server = http.createServer((req, res) => {
       res.setHeader('content-type', 'application/json');
       res.end(JSON.stringify(value));
     };
-    if (route === '/global/health') return reply({ healthy: true });
+    if (route === '/global/health') {
+      fs.appendFileSync('health-probes.txt', 'x');
+      if (fs.existsSync('stall-first-health')) {
+        fs.unlinkSync('stall-first-health');
+        return;
+      }
+      return reply({ healthy: true });
+    }
     if (route === '/session' || route === `/session/${sessionID}`)
       return reply({ id: sessionID, directory: process.cwd() });
     if (route === '/session/status') return reply({});
@@ -76,6 +85,13 @@ const server = http.createServer((req, res) => {
       }
       res.writeHead(204).end();
       askQuestion = body.parts.some((part) => part.text?.includes('Question fixture'));
+      denialMode = ['Continue', 'Repeat', 'Limit'].find((mode) =>
+        body.parts.some((part) => part.text?.includes(`${mode} fixture`)),
+      );
+      if (
+        JSON.parse(process.env.OPENCODE_CONFIG_CONTENT).experimental.continue_loop_on_deny !== true
+      )
+        throw new Error('Missing native continuation setting');
       if (resumed) emit('message.updated', { info: oldChild });
       emit('permission.asked', {
         id: 'per_fixture',
@@ -89,7 +105,24 @@ const server = http.createServer((req, res) => {
     if (route === '/permission/per_fixture/reply' || route === '/question/que_fixture/reply') {
       reply(true);
       if (route.includes('/permission/')) {
-        if (body.reply !== 'once') return;
+        if (body.reply !== 'once') {
+          denials++;
+          if (denialMode === 'Repeat' || denialMode === 'Limit') {
+            emit('permission.asked', {
+              id: 'per_fixture',
+              sessionID,
+              permission: 'bash',
+              patterns:
+                denialMode === 'Repeat'
+                  ? ['different action', 'fixture action']
+                  : [`fixture action ${denials}`],
+              metadata: { command: 'different metadata' },
+            });
+            return;
+          }
+          if (denialMode !== 'Continue') return;
+          fs.appendFileSync('independent.txt', 'x');
+        }
         if (askQuestion) {
           emit('question.asked', {
             id: 'que_fixture',
@@ -109,7 +142,8 @@ const server = http.createServer((req, res) => {
           return;
         }
       } else if (JSON.stringify(body.answers) !== '[["One","Two"]]') return;
-      fs.appendFileSync('authorized.txt', 'x');
+      if (body.reply === 'once' || route.includes('/question/'))
+        fs.appendFileSync('authorized.txt', 'x');
       const info = {
         id: `msg_${messages.length}`,
         sessionID,

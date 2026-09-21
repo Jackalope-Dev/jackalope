@@ -5,6 +5,14 @@ result with fewer retries and reasonable total usage. Prompt size alone is not a
 quality score, and passing synthetic tasks does not establish superiority over a
 provider's own GUI.
 
+Run `node scripts/verification/verify-opencode-denials.mjs <absolute-native-test-binary>`
+with the supported OpenCode executable on `PATH` to exercise permission continuation
+against the real CLI and a local scripted provider. It checks independent work after
+denial, repeated requests, access through another native tool and saved permission
+rules. Disposable profiles and repositories keep the protocol fixture separate from
+user settings. The fixture records no real inference or task performance measurements;
+live outcome comparisons still need the paired evaluation protocol below.
+
 Quality receipts include native decision records for every attempt. Aggregation
 adds nonduplicated helper usage to agent usage, excludes routing records already
 accounted elsewhere and preserves unknown reports. Agent and helper token totals
@@ -65,6 +73,13 @@ tool-only measurements; these omit worker execution and cannot establish task sa
 - Workers batch independent reads/searches where supported, reuse established
   context and keep progress concise. Repository-required checks remain mandatory;
   changes, failures and unresolved concerns justify additional verification.
+- Shared launch context recommends serial ad hoc checks when the native host's
+  available-parallelism estimate is one. Unknown or larger estimates add no
+  guidance. Saved commands and explicit user/repository instructions take
+  precedence; containers and remote execution need their own resource checks.
+  This advisory uses Rust's [portable parallelism estimate](https://doc.rust-lang.org/std/thread/fn.available_parallelism.html),
+  which can miss quotas or affinity restrictions. It does not change tool arguments,
+  environment variables, test selection or verification results.
 - Repository maps rank file paths and bounded Tree-sitter declarations, include
   related test names and task-referenced file locations, and remain limited to
   6 KB. The compact experiment caps this at 3 KB when the request explicitly names one or two indexed files.

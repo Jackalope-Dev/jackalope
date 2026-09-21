@@ -33,6 +33,13 @@ establish provider-specific interactive tool or installed-package acceptance.
 OpenCode tasks use a task-owned, authenticated loopback server and its event API.
 Permission requests appear in the existing task question flow with **Allow once**
 and **Deny**; no answer, denial or an unrecognized answer grants no permission.
+An explicit **Deny** rejects the action while permitting independent work to continue.
+The task-owned server enables OpenCode's native `continue_loop_on_deny` setting;
+saved tool permission rules remain in force. A repeated request containing the same
+denied permission name and pattern stops the attempt without asking again, including
+requests from owned child sessions. Eight denied requests also stop the attempt.
+This guard compares provider-reported scopes, not semantic equivalence between commands.
+Unanswered and unrecognized responses stop the attempt after rejecting the action.
 Structured questions retain their choices and descriptions. Stop terminates the
 owned server/process tree. Continuation requires the original idle session and
 workspace; paginated root and child history excludes previous-turn usage. Restored

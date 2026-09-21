@@ -1,6 +1,37 @@
 use super::*;
 
 #[test]
+fn continuation_configuration_preserves_provider_and_permission_settings() {
+    let mut command = Command::new("opencode");
+    let original = json!({
+        "model":"custom/worker",
+        "permission":{"external_directory":"deny"},
+        "experimental":{"batch_tool":true},
+        "provider":{"custom":{"options":{"baseURL":"https://example.invalid"}}}
+    });
+    command.env("OPENCODE_CONFIG_CONTENT", original.to_string());
+    let _connection = Connection::configure(&mut command).unwrap();
+    let config: Value = serde_json::from_str(
+        command
+            .get_envs()
+            .find(|(key, _)| *key == "OPENCODE_CONFIG_CONTENT")
+            .unwrap()
+            .1
+            .unwrap()
+            .to_str()
+            .unwrap(),
+    )
+    .unwrap();
+    for key in ["model", "permission", "provider"] {
+        assert_eq!(config[key], original[key]);
+    }
+    assert_eq!(config["experimental"]["batch_tool"], true);
+    assert_eq!(config["experimental"]["continue_loop_on_deny"], true);
+    command.env("OPENCODE_CONFIG_CONTENT", r#"{"experimental":false}"#);
+    assert!(Connection::configure(&mut command).is_err());
+}
+
+#[test]
 fn sse_frames_preserve_fragmented_unicode_and_reject_oversized_events() {
     let mut frames = Frames::default();
     let source = "data: {\"type\":\"message\",\"text\":\"雪\"}\r\n\r\n: ping\n\ndata: {\"type\":\"idle\"}\n\n";
@@ -174,6 +205,7 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
         path
     };
     std::fs::write(folder.join("fixture.cjs"), include_str!("fixture.cjs")).unwrap();
+    std::fs::write(folder.join("stall-first-health"), "").unwrap();
     let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.custom_agents.push(CustomAgent {
@@ -185,12 +217,18 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
     std::fs::create_dir_all(runtime.policy_path().parent().unwrap()).unwrap();
     std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
     let mut request:RunRequest=serde_json::from_value(json!({"id":"opencode-fixture-first","projectId":"fixture","projectName":"Fixture","projectPath":root,"agent":"opencode-fixture","isolated":false,"prompt":"Fixture task","autoVerify":false,"model":"fixture/worker","effort":"quick"})).unwrap();
-    for attempt in 0..6 {
-        if attempt == 5 {
-            request.prompt = "Question fixture".into();
+    for attempt in 0..8 {
+        request.prompt = match attempt {
+            2 => "Continue fixture",
+            5 => "Question fixture",
+            6 => "Repeat fixture",
+            7 => "Limit fixture",
+            _ => "Fixture task",
         }
+        .into();
         runtime.start(request.clone()).unwrap();
-        let deadline = std::time::Instant::now() + Duration::from_secs(20);
+        let deadline =
+            std::time::Instant::now() + Duration::from_secs(if attempt == 0 { 10 } else { 20 });
         let completed = loop {
             let run = runtime
                 .integration_runs()
@@ -210,7 +248,7 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
                             &run.id,
                             &prompt.id,
                             match attempt {
-                                2 => "Deny",
+                                2 | 6 | 7 => "Deny",
                                 3 => "yes",
                                 _ if prompt.input_type == "multiChoice" => {
                                     assert!(prompt.question.contains("First detail"));
@@ -231,7 +269,7 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
         assert_eq!(
             completed.status,
             match attempt {
-                0 | 1 | 5 => "review",
+                0 | 1 | 2 | 5 => "review",
                 4 => "stopped",
                 _ => "failed",
             },
@@ -239,10 +277,32 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
             completed.error
         );
         assert_eq!(completed.session_id.as_deref(), Some("ses_fixture"));
-        if matches!(attempt, 0 | 1 | 5) {
+        if attempt == 0 {
+            assert_eq!(
+                std::fs::read_to_string(folder.join("health-probes.txt")).unwrap(),
+                "xx"
+            );
+        }
+        if matches!(attempt, 0 | 1 | 2 | 5) {
             assert_eq!(completed.result, "Fixture complete");
             assert_eq!(completed.usage.input, 15);
             assert_eq!(completed.reasoning_effort.as_deref(), Some("low"));
+        }
+        if attempt == 6 {
+            assert_eq!(completed.prompts.len(), 1);
+            assert!(completed
+                .error
+                .as_deref()
+                .unwrap()
+                .contains("previously denied"));
+        }
+        if attempt == 7 {
+            assert_eq!(completed.prompts.len(), 8);
+            assert!(completed
+                .error
+                .as_deref()
+                .unwrap()
+                .contains("limit of denied actions"));
         }
         assert!(runtime.inner.lock().unwrap().processes.is_empty());
         request.previous_run_id = Some(request.id.clone());
@@ -252,6 +312,10 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
         std::fs::read_to_string(folder.join("authorized.txt")).unwrap(),
         "xxx"
     );
+    assert_eq!(
+        std::fs::read_to_string(folder.join("independent.txt")).unwrap(),
+        "x"
+    );
     let deadline = std::time::Instant::now() + Duration::from_secs(10);
     while Arc::strong_count(&runtime._owner) > 1 {
         assert!(std::time::Instant::now() < deadline);
@@ -259,7 +323,7 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
     }
     drop(runtime);
     let runtime = TaskRuntime::new(folder.join("history")).unwrap();
-    assert_eq!(runtime.integration_runs().unwrap().len(), 6);
+    assert_eq!(runtime.integration_runs().unwrap().len(), 8);
     drop(runtime);
     std::fs::remove_dir_all(folder).unwrap();
 }
