@@ -7,10 +7,18 @@ use std::{
     },
 };
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager, State,
+    AppHandle, Emitter, Listener, Manager, State,
 };
+use tauri_plugin_autostart::ManagerExt as _;
+
+use crate::commands::tasks::TaskRuntime;
+
+const RECENT_TASKS_LIMIT: usize = 5;
+const TASK_MENU_PREFIX: &str = "tray-task:";
+#[cfg(target_os = "macos")]
+const TRAY_ICON_TEMPLATE: &[u8] = include_bytes!("../icons/tray-icon-template.png");
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -92,10 +100,14 @@ impl WindowBehavior {
 pub struct DesktopSettings {
     close_to_tray: bool,
     tray_available: bool,
+    launch_at_login: bool,
 }
 
 #[tauri::command]
-pub fn desktop_settings(behavior: State<'_, WindowBehavior>) -> Result<DesktopSettings, String> {
+pub fn desktop_settings(
+    app: AppHandle,
+    behavior: State<'_, WindowBehavior>,
+) -> Result<DesktopSettings, String> {
     Ok(DesktopSettings {
         close_to_tray: behavior
             .preferences
@@ -103,6 +115,7 @@ pub fn desktop_settings(behavior: State<'_, WindowBehavior>) -> Result<DesktopSe
             .map_err(|e| e.to_string())?
             .close_to_tray,
         tray_available: behavior.tray_available.load(Ordering::Relaxed),
+        launch_at_login: app.autolaunch().is_enabled().unwrap_or(false),
     })
 }
 
@@ -114,6 +127,17 @@ pub fn desktop_set_close_to_tray(
     behavior.save(enabled)
 }
 
+#[tauri::command]
+pub fn desktop_set_launch_at_login(enabled: bool, app: AppHandle) -> Result<(), String> {
+    let manager = app.autolaunch();
+    let result = if enabled {
+        manager.enable()
+    } else {
+        manager.disable()
+    };
+    result.map_err(|e| e.to_string())
+}
+
 pub(crate) fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -122,18 +146,93 @@ pub(crate) fn show_main_window(app: &tauri::AppHandle) {
     }
 }
 
-pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
+/// Builds the tray's menu fresh from current task state: Open/New Task/
+/// Settings up top, a Recent Tasks submenu, then Quit. Called once at
+/// startup and again whenever `task-state-changed` fires, so the submenu
+/// and the returned awaiting-review count (used for the dock badge) never
+/// go stale while the tray is open.
+fn build_tray_menu(app: &AppHandle) -> tauri::Result<(Menu<tauri::Wry>, usize)> {
     let open = MenuItem::with_id(app, "tray-open", "Open Jackalope", true, None::<&str>)?;
+    let new_task = MenuItem::with_id(app, "tray-new-task", "New Task", true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "tray-settings", "Settings…", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "tray-quit", "Quit Jackalope", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &quit])?;
+    let separator_top = PredefinedMenuItem::separator(app)?;
+    let separator_bottom = PredefinedMenuItem::separator(app)?;
+
+    let (recent, awaiting_review) = app
+        .try_state::<TaskRuntime>()
+        .map(|runtime| runtime.tray_summary(RECENT_TASKS_LIMIT))
+        .unwrap_or_default();
+
+    let recent_menu = Submenu::new(app, "Recent Tasks", !recent.is_empty())?;
+    for task in &recent {
+        let item = MenuItem::with_id(
+            app,
+            format!("{TASK_MENU_PREFIX}{}", task.id),
+            &task.label,
+            true,
+            None::<&str>,
+        )?;
+        recent_menu.append(&item)?;
+    }
+
+    let menu = Menu::with_items(
+        app,
+        &[
+            &open,
+            &new_task,
+            &settings,
+            &separator_top,
+            &recent_menu,
+            &separator_bottom,
+            &quit,
+        ],
+    )?;
+    Ok((menu, awaiting_review))
+}
+
+/// Rebuilds the tray menu and dock badge from current task state. Registered
+/// against `task-state-changed`; the initial build happens inline in
+/// `setup_tray` since the tray doesn't exist yet to attach a menu to.
+fn refresh_tray(app: &AppHandle) {
+    let Ok((menu, awaiting_review)) = build_tray_menu(app) else {
+        return;
+    };
+    if let Some(tray) = app.tray_by_id("jackalope") {
+        let _ = tray.set_menu(Some(menu));
+    }
+    if let Some(window) = app.get_webview_window("main") {
+        let count = (awaiting_review > 0).then_some(awaiting_review as i64);
+        let _ = window.set_badge_count(count);
+    }
+}
+
+pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
+    let (menu, awaiting_review) = build_tray_menu(app.handle())?;
     let mut tray = TrayIconBuilder::with_id("jackalope")
         .tooltip("Jackalope")
         .menu(&menu)
         .show_menu_on_left_click(cfg!(target_os = "linux"))
-        .on_menu_event(|app, event| match event.id.as_ref() {
-            "tray-open" => show_main_window(app),
-            "tray-quit" => app.exit(0),
-            _ => {}
+        .on_menu_event(|app, event| {
+            let id = event.id.as_ref();
+            match id {
+                "tray-open" => show_main_window(app),
+                "tray-new-task" => {
+                    show_main_window(app);
+                    let _ = app.emit("jackalope-tray-new-task", ());
+                }
+                "tray-settings" => {
+                    show_main_window(app);
+                    let _ = app.emit("jackalope-tray-settings", ());
+                }
+                "tray-quit" => app.exit(0),
+                _ => {
+                    if let Some(task_id) = id.strip_prefix(TASK_MENU_PREFIX) {
+                        show_main_window(app);
+                        let _ = app.emit("jackalope-tray-open-task", task_id.to_string());
+                    }
+                }
+            }
         })
         .on_tray_icon_event(|tray, event| {
             if matches!(
@@ -147,10 +246,28 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
                 show_main_window(tray.app_handle());
             }
         });
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(icon) = tauri::image::Image::from_bytes(TRAY_ICON_TEMPLATE) {
+            tray = tray.icon(icon);
+        }
+        tray = tray.icon_as_template(true);
+    }
+    #[cfg(not(target_os = "macos"))]
     if let Some(icon) = app.default_window_icon() {
         tray = tray.icon(icon.clone());
     }
     tray.build(app)?;
+
+    if let Some(window) = app.get_webview_window("main") {
+        let count = (awaiting_review > 0).then_some(awaiting_review as i64);
+        let _ = window.set_badge_count(count);
+    }
+    let app_handle = app.handle().clone();
+    app.listen("task-state-changed", move |_event| {
+        refresh_tray(&app_handle);
+    });
+
     #[cfg(not(target_os = "linux"))]
     app.state::<WindowBehavior>()
         .tray_available

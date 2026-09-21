@@ -15,7 +15,10 @@ use commands::tasks::*;
 use commands::{git::*, pty::*, system::*};
 use state::AppState;
 use tauri::Manager;
-use window_behavior::{desktop_set_close_to_tray, desktop_settings, setup_tray, WindowBehavior};
+use window_behavior::{
+    desktop_set_close_to_tray, desktop_set_launch_at_login, desktop_settings, setup_tray,
+    WindowBehavior,
+};
 
 pub fn run() {
     commands::platform::initialize_environment();
@@ -33,6 +36,10 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .manage(AppState::default())
         .manage(SignInService::default())
         .manage(commands::local_ai::LocalAi::default())
@@ -136,6 +143,7 @@ pub fn run() {
             commands::codebase_watch::codebase_watch,
             commands::codebase_watch::codebase_unwatch,
             desktop_set_close_to_tray,
+            desktop_set_launch_at_login,
             app_reset,
             app_finish_reset,
             git_list_worktrees,

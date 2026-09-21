@@ -206,6 +206,40 @@ export function Shell({
     setComposerFocus((value) => value + 1);
   }, []);
   const { projects, activeProjectId, selectProject } = useProjectStore();
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    let disposed = false;
+    const stops: Array<() => void> = [];
+    void listen('jackalope-tray-new-task', () => focusComposer()).then((unlisten) => {
+      if (disposed) unlisten();
+      else stops.push(unlisten);
+    });
+    void listen('jackalope-tray-settings', () => {
+      window.dispatchEvent(new CustomEvent('jackalope:open-settings', { detail: 'General' }));
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else stops.push(unlisten);
+    });
+    void listen<string>('jackalope-tray-open-task', ({ payload: taskId }) => {
+      const run = useExecutionStore.getState().runs.find((item) => item.id === taskId);
+      if (!run) return;
+      selectProject(run.projectId);
+      if (run.liveSessionId) {
+        useLiveSessionStore.getState().select(run.liveSessionId);
+        setActiveTab('live-sessions');
+      } else {
+        useExecutionStore.getState().select(run.id);
+        setActiveTab('kanban');
+      }
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else stops.push(unlisten);
+    });
+    return () => {
+      disposed = true;
+      for (const stop of stops) stop();
+    };
+  }, [focusComposer, selectProject]);
   const switchProject = (id: string) => {
     if (id === activeProjectId) return;
     const project = projects.find((item) => item.id === id);
