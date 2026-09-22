@@ -25,6 +25,7 @@ function fixture(t) {
   git('init', '--quiet');
   git('config', 'core.autocrlf', 'false');
   copyFileSync(new URL('../.gitattributes', import.meta.url), join(root, '.gitattributes'));
+  copyFileSync(new URL('../.gitignore', import.meta.url), join(root, '.gitignore'));
   copyFileSync(new URL('../biome.json', import.meta.url), join(root, 'biome.json'));
   copyFileSync(new URL('../lefthook.yml', import.meta.url), join(root, 'lefthook.yml'));
   mkdirSync(join(root, 'scripts'));

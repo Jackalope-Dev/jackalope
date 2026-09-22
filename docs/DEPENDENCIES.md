@@ -377,6 +377,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | atk | 0.18.2 | MIT |
 | atk-sys | 0.18.2 | MIT |
 | atomic-waker | 1.1.2 | Apache-2.0 OR MIT |
+| auto-launch | 0.5.0 | MIT |
 | autocfg | 1.5.1 | Apache-2.0 OR MIT |
 | aws-lc-rs | 1.18.1 | ISC AND (Apache-2.0 OR ISC) |
 | aws-lc-sys | 0.45.0 | ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0) |
@@ -401,6 +402,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | bumpalo | 3.20.3 | MIT OR Apache-2.0 |
 | bytemuck | 1.25.2 | Zlib OR Apache-2.0 OR MIT |
 | byteorder | 1.5.0 | Unlicense OR MIT |
+| byteorder-lite | 0.1.0 | Unlicense OR MIT |
 | bytes | 1.12.1 | MIT |
 | cairo-rs | 0.18.5 | MIT |
 | cairo-sys-rs | 0.18.2 | MIT |
@@ -465,7 +467,9 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | derive_more-impl | 2.1.1 | MIT |
 | digest | 0.10.7 | MIT OR Apache-2.0 |
 | digest | 0.11.3 | MIT OR Apache-2.0 |
+| dirs | 4.0.0 | MIT OR Apache-2.0 |
 | dirs | 6.0.0 | MIT OR Apache-2.0 |
+| dirs-sys | 0.3.7 | MIT OR Apache-2.0 |
 | dirs-sys | 0.5.0 | MIT OR Apache-2.0 |
 | dispatch2 | 0.3.1 | Zlib OR Apache-2.0 OR MIT |
 | displaydoc | 0.2.7 | MIT OR Apache-2.0 |
@@ -624,6 +628,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | idna | 1.1.0 | MIT OR Apache-2.0 |
 | idna_adapter | 1.2.2 | Apache-2.0 OR MIT |
 | ignore | 0.4.33 | Unlicense OR MIT |
+| image | 0.25.10 | MIT OR Apache-2.0 |
 | indexmap | 1.9.3 | Apache-2.0 OR MIT |
 | indexmap | 2.14.1 | Apache-2.0 OR MIT |
 | infer | 0.19.0 | MIT |
@@ -679,6 +684,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | miniz_oxide | 0.8.9 | MIT OR Zlib OR Apache-2.0 |
 | miniz_oxide | 0.9.1 | MIT OR Zlib OR Apache-2.0 |
 | mio | 1.2.3 | MIT |
+| moxcms | 0.8.1 | BSD-3-Clause OR Apache-2.0 |
 | muda | 0.19.3 | Apache-2.0 OR MIT |
 | ndk | 0.9.0 | MIT OR Apache-2.0 |
 | ndk-sys | 0.6.0+11769913 | MIT OR Apache-2.0 |
@@ -769,6 +775,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 |
 | process-wrap | 9.1.0 | Apache-2.0 OR MIT |
 | prodash | 31.0.0 | MIT |
+| pxfm | 0.1.30 | BSD-3-Clause OR Apache-2.0 |
 | quick-xml | 0.41.0 | MIT |
 | quinn | 0.11.11 | MIT OR Apache-2.0 |
 | quinn-proto | 0.11.17 | MIT OR Apache-2.0 |
@@ -784,6 +791,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | rand_pcg | 0.10.2 | MIT OR Apache-2.0 |
 | raw-window-handle | 0.6.2 | MIT OR Apache-2.0 OR Zlib |
 | redox_syscall | 0.5.18 | MIT |
+| redox_users | 0.4.6 | MIT |
 | redox_users | 0.5.2 | MIT |
 | ref-cast | 1.0.27 | MIT OR Apache-2.0 |
 | ref-cast-impl | 1.0.27 | MIT OR Apache-2.0 |
@@ -887,6 +895,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | tauri-codegen | 2.6.3 | Apache-2.0 OR MIT |
 | tauri-macros | 2.6.3 | Apache-2.0 OR MIT |
 | tauri-plugin | 2.6.3 | Apache-2.0 OR MIT |
+| tauri-plugin-autostart | 2.5.1 | Apache-2.0 OR MIT |
 | tauri-plugin-dialog | 2.7.3 | Apache-2.0 OR MIT |
 | tauri-plugin-fs | 2.5.2 | Apache-2.0 OR MIT |
 | tauri-plugin-shell | 2.3.6 | Apache-2.0 OR MIT |

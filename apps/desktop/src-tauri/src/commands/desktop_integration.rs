@@ -135,15 +135,7 @@ pub fn desktop_zoom(window: tauri::WebviewWindow, zoom: f64) -> Result<(), Strin
 #[tauri::command]
 pub fn desktop_unread_badge(app: tauri::AppHandle, count: u32) -> Result<(), String> {
     #[cfg(target_os = "macos")]
-    if let Some(window) = app.get_webview_window("main") {
-        window
-            .set_badge_count(if count == 0 {
-                None
-            } else {
-                Some(i64::from(count.min(999)))
-            })
-            .map_err(|e| e.to_string())?;
-    }
+    crate::window_behavior::set_unread_badge(&app, count)?;
     #[cfg(not(target_os = "macos"))]
     let _ = (app, count);
     Ok(())

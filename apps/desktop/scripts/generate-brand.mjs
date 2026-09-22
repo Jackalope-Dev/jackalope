@@ -19,3 +19,16 @@ const icon = svg.replace(
   '<rect x="25" y="-3" width="128" height="128" rx="26" fill="#1d1a18"/><g fill=',
 );
 writeFileSync(new URL('../src-tauri/icons/source-icon.svg', import.meta.url), icon);
+
+// macOS menu bar icon: a plain black silhouette, no background. macOS treats
+// the fill color as irrelevant and recolors from the alpha channel alone
+// once tray-icon-template.png is loaded with `icon_as_template`, but the SVG
+// source stays solid black for anyone previewing it directly. Regenerate the
+// PNG after editing this with `swift scripts/render-tray-icon.swift` (macOS
+// only — there's no cross-platform rasterizer in this pipeline). Don't use
+// `qlmanage -t`: it looks like it preserves transparency but actually
+// flattens onto opaque white, so the icon renders as a blank square.
+const trayIcon = svg
+  .replace('fill="#f3f4f6"', 'fill="#000000"')
+  .replace('<title>Jackalope</title>', '');
+writeFileSync(new URL('../src-tauri/icons/tray-icon-template.svg', import.meta.url), trayIcon);

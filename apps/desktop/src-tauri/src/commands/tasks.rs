@@ -36,7 +36,7 @@ pub use project_setup::*;
 use runners::discover_runner;
 pub(super) use runners::executable;
 pub(super) use runners::BUILTIN_AGENTS;
-pub use snapshots::task_changes;
+pub use snapshots::{task_changes, TaskHighlight};
 
 use super::history::{quarantine, HistoryRecovery, HistoryRecoveryEntry};
 use chrono::Utc;
