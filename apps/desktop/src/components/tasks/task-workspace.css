@@ -214,7 +214,6 @@ select option {
 }
 .task-error {
   padding: 14px 16px;
-  border-left: 2px solid var(--color-accent);
   border-radius: 3px;
   background: var(--color-accent-subtle);
   font-size: var(--text-xs);

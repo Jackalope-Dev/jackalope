@@ -397,10 +397,9 @@
   color: var(--color-text-primary);
 }
 .mcp-detail-notice {
-  border-left: 3px solid var(--color-warning);
   padding: 12px 16px;
   background: var(--color-surface-sunken);
-  border-radius: 0 10px 10px 0;
+  border-radius: 10px;
 }
 .mcp-detail-notice > * + * {
   margin-top: 10px;

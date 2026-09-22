@@ -99,7 +99,6 @@
 }
 .codebase-files > button[aria-pressed="true"] {
   background: var(--color-accent-subtle);
-  box-shadow: inset 3px 0 var(--color-accent);
 }
 .codebase-cycle-label {
   color: var(--color-warning);

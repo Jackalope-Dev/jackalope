@@ -365,7 +365,6 @@
   align-items: flex-start;
   gap: 8px;
   color: var(--color-text-primary);
-  border-left: 3px solid var(--color-accent);
   padding: 10px 14px;
   background: var(--color-surface);
 }

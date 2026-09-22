@@ -84,12 +84,11 @@
   overflow-wrap: anywhere;
   cursor: pointer;
 }
-.work-topic-list button:hover,
-.work-topic-list button[aria-pressed="true"] {
+.work-topic-list button:hover {
   background: var(--color-surface-hover);
 }
 .work-topic-list button[aria-pressed="true"] {
-  box-shadow: inset 3px 0 var(--color-accent);
+  background: var(--color-accent-subtle);
 }
 .work-topic-list button:focus-visible {
   outline: 2px solid var(--color-accent);
