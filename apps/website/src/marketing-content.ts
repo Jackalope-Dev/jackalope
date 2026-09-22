@@ -283,7 +283,7 @@ export const marketingPages: MarketingPage[] = [
         paragraphs: [
           'Kimi Code uses the kimi CLI for tasks, automatic routing, and Ask Jackalope, with account profiles, model selection, continuation, and in-task permission choices. Authenticated installed-app acceptance remains open.',
           'Antigravity uses the agy CLI for worker tasks. Its named profiles use Gemini API keys with separate API billing; they do not create isolated subscription sign-ins. Use its existing subscription login only with that shared-login limitation in mind.',
-          'Gemini CLI runs worker tasks with saved-session continuation. File edits are automatically approved; shell and HTTP tools require its own CLI permission policy. Account quota is unknown, and it does not coordinate routing or Ask Jackalope. Aider and Goose offer account setup in the catalog but do not have native task execution adapters. Hermes and other unlisted agents are not supported task runners. Use the roadmap to follow planned support rather than assuming a configured executable can run as another agent.',
+          'Gemini CLI runs worker tasks with saved-session continuation. File edits are automatically approved; shell and HTTP tools require its own CLI permission policy. Account quota is unknown, and it does not coordinate routing or Ask Jackalope. Hermes and other unlisted agents are not supported task runners. Use the roadmap to follow planned support rather than assuming a configured executable can run as another agent.',
         ],
         links: [
           {

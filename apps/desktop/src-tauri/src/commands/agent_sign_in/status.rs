@@ -120,15 +120,11 @@ async fn check(binding: AccountBinding) -> Result<AccountStatus, String> {
         client.close().await;
         return result;
     }
-    if binding.profile_id.is_some() && matches!(binding.adapter.as_str(), "gemini" | "goose") {
-        let files: &[&str] = if binding.adapter == "gemini" {
-            &[
-                ".gemini/oauth_creds.json",
-                ".gemini/gemini-credentials.json",
-            ]
-        } else {
-            &["config/config.yaml"]
-        };
+    if binding.profile_id.is_some() && binding.adapter == "gemini" {
+        let files = [
+            ".gemini/oauth_creds.json",
+            ".gemini/gemini-credentials.json",
+        ];
         let configured = files
             .iter()
             .any(|file| binding.directory.join(file).is_file());
@@ -148,7 +144,7 @@ async fn check(binding: AccountBinding) -> Result<AccountStatus, String> {
     {
         return Ok(status("configured", None, "A provider API key is saved for OpenCode. Select a model from that provider; credential validity, model access and billing are checked when a task starts."));
     }
-    if binding.profile_id.is_some() && matches!(binding.adapter.as_str(), "antigravity" | "aider") {
+    if binding.profile_id.is_some() && binding.adapter == "antigravity" {
         return Ok(if agent_profiles::has_api_key(&binding)? {
             status(
                 "configured",

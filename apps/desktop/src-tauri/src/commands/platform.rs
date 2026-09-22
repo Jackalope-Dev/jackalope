@@ -25,6 +25,19 @@ pub fn find_on_path(name: &str) -> Option<PathBuf> {
         .find(|path| is_executable(path))
 }
 
+/// The directories the user's login shell searches, as recovered at startup.
+/// The process PATH is widened with common tool directories, so it cannot
+/// answer whether a command will be found when the user types it.
+#[cfg(unix)]
+static LOGIN_PATH: std::sync::OnceLock<Vec<PathBuf>> = std::sync::OnceLock::new();
+
+/// Whether `directory` is on the user's login-shell PATH. `None` when that
+/// PATH could not be recovered.
+#[cfg(unix)]
+pub fn on_login_path(directory: &Path) -> Option<bool> {
+    Some(LOGIN_PATH.get()?.iter().any(|entry| entry == directory))
+}
+
 #[cfg(unix)]
 fn path_from_shell(output: &str) -> Option<&str> {
     output
@@ -62,6 +75,7 @@ pub fn initialize_environment() {
         if let Ok(result) = super::process_control::run(command, Duration::from_secs(3)) {
             if result.success && !result.truncated {
                 if let Some(path) = path_from_shell(&result.stdout) {
+                    let _ = LOGIN_PATH.set(std::env::split_paths(path).collect());
                     directories.extend(std::env::split_paths(path));
                 }
             }

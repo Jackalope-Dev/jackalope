@@ -671,3 +671,30 @@ it('returns bounded invitation progress to the connected desktop without exposin
   expect(JSON.stringify(body)).not.toContain(invitedSecret);
   expect((await call('/v1/desktop/referrals')).status).toBe(401);
 });
+it('counts one device slot per machine however often that machine reconnects', async () => {
+  const owner = await member();
+  async function connect(deviceKey?: string) {
+    const secret = randomToken();
+    const started = await call('/v1/desktop/start', 'POST', {
+      challenge: await tokenHash(secret),
+      ...(deviceKey ? { deviceKey } : {}),
+    });
+    expect(started.status).toBe(201);
+    const { verification } = await started.json<{ verification: string }>();
+    await approve(owner.session, verification);
+    return call('/v1/desktop/exchange', 'POST', undefined, secret);
+  }
+  const laptop = randomToken();
+  for (let attempt = 0; attempt < 12; attempt++) expect((await connect(laptop)).status).toBe(200);
+  for (let machine = 0; machine < 9; machine++)
+    expect((await connect(randomToken())).status).toBe(200);
+  // Ten machines are connected, so a new one is refused whether or not it sends a key…
+  expect((await connect(randomToken())).status).toBe(409);
+  expect((await connect()).status).toBe(409);
+  // …while a machine that already holds a slot can still reconnect.
+  expect((await connect(laptop)).status).toBe(200);
+  expect(
+    (await call('/v1/desktop/start', 'POST', { challenge: randomToken(), deviceKey: 'not-a-key' }))
+      .status,
+  ).toBe(400);
+});

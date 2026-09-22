@@ -5,7 +5,7 @@ use super::*;
 const RECENT_TOUCHED_ATTEMPTS: usize = 3;
 const RECENT_TOUCHED_PATHS: usize = 60;
 
-/// Adapters with a native task protocol. Others (Aider, Goose) fail explicitly at launch.
+/// Adapters with a native task protocol. Others fail explicitly at launch.
 pub(super) const EXECUTABLE_ADAPTERS: &[&str] = &[
     "codex",
     "claude",
@@ -1307,6 +1307,22 @@ impl TaskRuntime {
     }
     pub fn profiles_root(&self) -> PathBuf {
         self.directory.join("agent-profiles")
+    }
+    pub fn preferences_directory(&self) -> PathBuf {
+        self.directory.join("preferences")
+    }
+    /// Fires whenever any task record changes. The desktop turns this into a
+    /// window event; the CLI host waits on it directly to stream work to an
+    /// attached terminal without polling.
+    pub fn subscribe(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.writer.subscribe()
+    }
+    /// The current change counter, paired with `subscribe` so a client can say
+    /// what it has already seen.
+    pub fn revision(&self) -> u64 {
+        self.writer
+            .revision
+            .load(std::sync::atomic::Ordering::SeqCst)
     }
     /// Describe a fresh attempt at the same work as `id`. The retry keeps the task's
     /// settings and agreed outcome, starts no agent session from the old attempt, and is

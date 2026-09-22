@@ -2,6 +2,26 @@ pub mod commands;
 pub mod state;
 mod window_behavior;
 
+/// Shared with the `jackalope` binary from one source file so the two ends of
+/// the CLI protocol cannot drift apart.
+#[path = "cli/protocol.rs"]
+pub mod cli_protocol;
+
+#[cfg(test)]
+mod cli_protocol_tests {
+    /// The CLI resolves the default profile without loading Tauri's config, so
+    /// its copy of the bundle identifier has to track the real one.
+    #[test]
+    fn identifier_matches_the_bundle_configuration() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(
+            config["identifier"].as_str(),
+            Some(super::cli_protocol::IDENTIFIER)
+        );
+    }
+}
+
 use commands::agent_policy::*;
 use commands::agent_profiles::*;
 use commands::agent_sign_in::*;
@@ -20,7 +40,68 @@ use window_behavior::{
     WindowBehavior,
 };
 
-pub fn run() {
+/// How this process was started. A headless host owns the profile and serves
+/// CLI clients without showing a window; launching the app again promotes that
+/// same process rather than starting a second one, which the exclusive profile
+/// lock would refuse anyway.
+#[derive(Clone, Copy, Default)]
+pub struct Launch {
+    pub headless: bool,
+}
+
+/// Everything needed to build the main window after startup. Held as managed
+/// state so a headless host can raise its window on demand instead of only at
+/// setup time.
+pub(crate) struct MainWindow {
+    profile: Option<std::path::PathBuf>,
+    directory: std::path::PathBuf,
+    resetting: bool,
+}
+
+impl MainWindow {
+    fn build<M: tauri::Manager<tauri::Wry>>(
+        &self,
+        manager: &M,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut window =
+            tauri::WebviewWindowBuilder::from_config(manager, &manager.config().app.windows[0])?;
+        #[cfg(target_os = "macos")]
+        {
+            window = window
+                .decorations(true)
+                .title_bar_style(tauri::TitleBarStyle::Overlay)
+                .hidden_title(true);
+        }
+        if let Some(profile) = &self.profile {
+            window = window.data_directory(profile.join("webview"));
+        }
+        if self.resetting {
+            let token = std::fs::read_to_string(self.directory.join(RESET_MARKER))?;
+            let token = serde_json::to_string(&token)?;
+            window = window.initialization_script(format!("if (localStorage.getItem('jackalope-reset-receipt') !== {token}) {{ for (const key of Object.keys(localStorage)) {{ if (key.startsWith('jackalope-')) localStorage.removeItem(key); }} sessionStorage.clear(); localStorage.setItem('jackalope-reset-receipt', {token}); }} window.__JACKALOPE_RESET__ = true;"));
+        }
+        window.build()?;
+        Ok(())
+    }
+
+    /// Raises the main window, building it first when a headless host has none.
+    pub(crate) fn show(&self, app: &tauri::AppHandle) -> Result<(), String> {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+            return Ok(());
+        }
+        self.build(app).map_err(|error| error.to_string())?;
+        // A headless host runs as an accessory with no Dock icon; showing its
+        // first window makes it an ordinary foreground app again.
+        #[cfg(target_os = "macos")]
+        let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
+        Ok(())
+    }
+}
+
+pub fn run(launch: Launch) {
     commands::platform::initialize_environment();
     let mut context = tauri::generate_context!();
     context.config_mut().app.windows[0].user_agent =
@@ -66,17 +147,36 @@ pub fn run() {
             app.manage(helper);
             let preferences = directory.join("preferences");
             std::fs::create_dir_all(&preferences)?;
-            app.manage(commands::account::AccountService::new(preferences.join("account.bin"), runtime.access.clone()));
+            app.manage(commands::account::AccountService::new(
+                preferences.join("account.bin"),
+                runtime.access.clone(),
+            ));
             commands::account::launch_refresh(app.handle().clone());
             app.manage(WindowBehavior::load(preferences.join("desktop.json")));
-            app.manage(commands::desktop_integration::DesktopIntegration::load(preferences.join("awake.json")));
-            app.manage(commands::notifications::Notifications::load(preferences.join("notifications.json")));
-            app.manage(commands::community::Community::load(preferences.join("community.json")));
+            app.manage(commands::desktop_integration::DesktopIntegration::load(
+                preferences.join("awake.json"),
+            ));
+            app.manage(commands::notifications::Notifications::load(
+                preferences.join("notifications.json"),
+            ));
+            app.manage(commands::community::Community::load(
+                preferences.join("community.json"),
+            ));
             let coordinator = Coordinator::new(directory.join("coordination"), runtime.clone())?;
             coordinator.launch();
-            let sessions = commands::live_sessions::LiveSessions::new(directory.join("live-sessions/sessions.json"), runtime.clone(), coordinator.clone());
+            let sessions = commands::live_sessions::LiveSessions::new(
+                directory.join("live-sessions/sessions.json"),
+                runtime.clone(),
+                coordinator.clone(),
+            );
             sessions.launch(app.handle().clone());
-            let remote = commands::remote::RemoteAccess::new(preferences.join("remote-access.bin"), runtime.clone(), coordinator.clone(), sessions.clone(), app.handle().clone());
+            let remote = commands::remote::RemoteAccess::new(
+                preferences.join("remote-access.bin"),
+                runtime.clone(),
+                coordinator.clone(),
+                sessions.clone(),
+                app.handle().clone(),
+            );
             remote.launch();
             app.manage(remote);
             app.manage(sessions);
@@ -86,16 +186,27 @@ pub fn run() {
             app.manage(runtime);
             app.manage(coordinator);
             commands::desktop_integration::launch(app.handle().clone());
-            let mut window = tauri::WebviewWindowBuilder::from_config(app, &app.config().app.windows[0])?;
-            #[cfg(target_os = "macos")]
-            { window = window.decorations(true).title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true); }
-            if let Some(profile) = &profile { window = window.data_directory(profile.join("webview")); }
-            if resetting {
-                let token = std::fs::read_to_string(directory.join(RESET_MARKER))?;
-                let token = serde_json::to_string(&token)?;
-                window = window.initialization_script(format!("if (localStorage.getItem('jackalope-reset-receipt') !== {token}) {{ for (const key of Object.keys(localStorage)) {{ if (key.startsWith('jackalope-')) localStorage.removeItem(key); }} sessionStorage.clear(); localStorage.setItem('jackalope-reset-receipt', {token}); }} window.__JACKALOPE_RESET__ = true;"));
+            let main_window = MainWindow {
+                profile: profile.clone(),
+                directory: directory.clone(),
+                resetting,
+            };
+            if launch.headless {
+                // No window, and on macOS no Dock icon, until someone asks for one.
+                #[cfg(target_os = "macos")]
+                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            } else {
+                main_window.build(app)?;
             }
-            window.build()?;
+            app.manage(main_window);
+            commands::cli_install::launch(preferences.clone());
+            // The CLI is a convenience; losing it must not stop the app.
+            match commands::cli_host::launch(app.handle().clone(), &preferences, !launch.headless) {
+                Ok(host) => {
+                    app.manage(host);
+                }
+                Err(error) => eprintln!("The jackalope command cannot reach this app: {error}"),
+            }
             #[cfg(target_os = "macos")]
             window_behavior::setup_app_menu(app)?;
             commands::notifications::launch(app.handle().clone());
@@ -166,6 +277,10 @@ pub fn run() {
             app_finish_reset,
             git_list_worktrees,
             commands::worktree_usage::git_worktree_usage,
+            commands::commit_review::git_working_changes,
+            commands::commit_review::git_working_file_diff,
+            commands::commit_review::git_generate_commit_message,
+            commands::commit_review::git_commit_changes,
             git_create_worktree,
             commands::worktree_cleanup::git_cleanup_worktree,
             commands::worktree_cleanup::git_archive_worktree,
@@ -215,6 +330,10 @@ pub fn run() {
             task_read_context,
             commands::repo_todos::repo_todos_read,
             commands::repo_todos::repo_todos_save,
+            commands::cli_install::cli_install_status,
+            commands::cli_install::cli_install_system,
+            commands::project_registry::project_registry_list,
+            commands::project_registry::project_registry_save,
             task_pick_project,
             task_validate_project,
             task_project_directory,
@@ -330,17 +449,29 @@ pub fn run() {
         .expect("error while building jackalope application")
         .run(|app, event| {
             #[cfg(target_os = "macos")]
-            if matches!(event, tauri::RunEvent::Reopen { has_visible_windows: false, .. }) {
+            if matches!(
+                event,
+                tauri::RunEvent::Reopen {
+                    has_visible_windows: false,
+                    ..
+                }
+            ) {
                 window_behavior::show_main_window(app);
             }
             if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
-                app.state::<commands::desktop_integration::DesktopIntegration>().shutdown();
+                if let Some(host) = app.try_state::<commands::cli_host::CliHost>() {
+                    host.shutdown();
+                }
+                app.state::<commands::desktop_integration::DesktopIntegration>()
+                    .shutdown();
                 app.state::<commands::helper::Helper>().stop();
                 app.state::<commands::remote::RemoteAccess>().shutdown();
                 commands::remote::close_tunnels();
                 app.state::<Scheduler>().shutdown();
-                app.state::<commands::notifications::Notifications>().shutdown();
-                app.state::<commands::live_sessions::LiveSessions>().shutdown();
+                app.state::<commands::notifications::Notifications>()
+                    .shutdown();
+                app.state::<commands::live_sessions::LiveSessions>()
+                    .shutdown();
                 commands::browser::close_all();
                 commands::previews::close_all();
                 commands::work_terminal::close_all();

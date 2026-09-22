@@ -275,6 +275,75 @@ impl Helper {
     }
 }
 
+const HELPER_ADAPTERS: [&str; 5] = ["claude", "codex", "opencode", "grok", "kimi"];
+
+impl Helper {
+    /// One tool-free completion outside the helper conversation. Tries the default agent
+    /// first, then every other installed helper-capable agent, and each of their usable
+    /// accounts, until one returns a response `accept` takes.
+    pub(super) fn complete<T>(
+        &self,
+        prompt: &str,
+        accept: impl Fn(&str) -> Result<T, String>,
+    ) -> Result<T, String> {
+        self.runtime.access.ensure()?;
+        let policy = self.runtime.policy()?;
+        let root = self.runtime.profiles_root();
+        let mut agents = vec![policy.default_meta_agent.clone()];
+        agents.extend(HELPER_ADAPTERS.iter().map(|a| a.to_string()));
+        agents.retain(|agent| !agent.is_empty());
+        let mut seen = std::collections::HashSet::new();
+        agents.retain(|agent| seen.insert(agent.clone()));
+        let mut failures = vec![];
+        for agent in agents {
+            let Ok((adapter, _)) = policy.resolve(&agent) else {
+                continue; // Not installed or disabled.
+            };
+            if !HELPER_ADAPTERS.contains(&adapter.as_str()) {
+                continue;
+            }
+            let bindings = match agent_profiles::routing_accounts(&root, &adapter, None) {
+                Ok(bindings) => bindings,
+                Err(error) => {
+                    failures.push(format!("{agent}: {error}"));
+                    continue;
+                }
+            };
+            for binding in bindings {
+                if agent_profiles::validate_binding(&root, &binding).is_err()
+                    || !policy.account_allowed("", &agent, &binding)
+                {
+                    continue;
+                }
+                let attempt = policy
+                    .model_for_account(&agent, None, &binding)
+                    .and_then(|model| {
+                        super::tasks::helper_process::run(
+                            &self.runtime,
+                            &agent,
+                            &binding,
+                            model.as_deref(),
+                            prompt,
+                            &AtomicBool::new(false),
+                        )
+                    })
+                    .and_then(|response| accept(&response.result));
+                match attempt {
+                    Ok(value) => return Ok(value),
+                    Err(error) => failures.push(format!("{agent} ({}): {error}", binding.label)),
+                }
+            }
+        }
+        if failures.is_empty() {
+            return Err("No installed agent can do this. Install and sign in to Claude Code, Codex, OpenCode, Grok or Kimi Code in Agents.".into());
+        }
+        Err(format!(
+            "No agent could finish this. Tried:\n{}",
+            failures.join("\n")
+        ))
+    }
+}
+
 fn parse_response(text: &str) -> Result<Value, String> {
     let text = text.trim();
     let text = text

@@ -136,8 +136,8 @@ export function AgentSupport() {
           billing, separate from a Google subscription; multiple subscription logins are not
           isolated. Antigravity runs worker tasks; a verified tool-free interface is still needed
           for automatic routing and Ask Jackalope. Gemini CLI also runs as a worker, with unknown
-          account quota and no direct project MCP injection. Kimi supports routing and Ask. Aider
-          and Goose have account setup only. Installed-provider acceptance remains in progress.
+          account quota and no direct project MCP injection. Kimi supports routing and Ask.
+          Installed-provider acceptance remains in progress.
         </p>
         <p>
           Model access and subscription requirements depend on your provider. See the{' '}

@@ -8,8 +8,6 @@ pub(in crate::commands) const BUILTIN_AGENTS: &[&str] = &[
     "kimi",
     "antigravity",
     "gemini",
-    "aider",
-    "goose",
 ];
 
 pub(super) fn discover_runner(
@@ -28,8 +26,6 @@ pub(super) fn discover_runner(
             "kimi" => "Kimi Code",
             "antigravity" => "Antigravity",
             "gemini" => "Gemini CLI",
-            "aider" => "Aider",
-            "goose" => "Goose",
             _ => id,
         }
         .into(),
@@ -80,14 +76,6 @@ pub(super) fn discover_runner(
             }
             if adapter == "gemini" {
                 runner.detail = "Uses gemini in headless mode with automatic edit approval. Add separate accounts and complete sign-in in Jackalope; access and quota are checked when a task starts.".into();
-                return runner;
-            }
-            if adapter == "aider" {
-                runner.detail = "Installed. Add separate provider API-key accounts in Jackalope. Task execution support is still in development.".into();
-                return runner;
-            }
-            if adapter == "goose" {
-                runner.detail = "Installed. Add separate accounts and configure each provider in Jackalope. Task execution support is still in development.".into();
                 return runner;
             }
             let args = if adapter == "codex" {

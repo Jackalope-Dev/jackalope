@@ -77,8 +77,6 @@ export const agents = [
   'kimi',
   'antigravity',
   'gemini',
-  'aider',
-  'goose',
   'other',
 ] as const;
 export type TelemetryAgent = (typeof agents)[number];

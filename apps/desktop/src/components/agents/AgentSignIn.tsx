@@ -393,7 +393,7 @@ export function AgentSignIn({
         )}
         <div className="agent-sign-in-terminal" ref={setHost} />
         <div className="flex flex-wrap justify-end gap-3 mt-4">
-          {running && ['gemini', 'goose', 'opencode'].includes(agentId) && (
+          {running && ['gemini', 'opencode'].includes(agentId) && (
             <Button disabled={saving || checking} onClick={() => void completeSetup.current?.()}>
               Finish setup
             </Button>

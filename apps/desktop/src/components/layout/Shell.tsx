@@ -72,6 +72,9 @@ const BrowserHarness = lazy(() =>
 const UsageDashboard = lazy(() =>
   import('../tasks/UsageDashboard').then((m) => ({ default: m.UsageDashboard })),
 );
+const CommitReview = lazy(() =>
+  import('../projects/CommitReview').then((m) => ({ default: m.CommitReview })),
+);
 const WorktreeManager = lazy(() =>
   import('../projects/WorktreeManager').then((m) => ({ default: m.WorktreeManager })),
 );
@@ -626,6 +629,9 @@ export function Shell({
                     setActiveTab('schedules');
                   }}
                 />
+              )}
+              {activeTab === 'changes' && (
+                <CommitReview key={activeProjectId} onOpenProject={openProjectSetup} />
               )}
               {activeTab === 'worktrees' && (
                 <WorktreeManager key={activeProjectId} onOpenProject={openProjectSetup} />

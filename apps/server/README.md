@@ -91,8 +91,8 @@ A batch contains 1–50 events. Installation IDs are forbidden. No task ID or us
 | `operation_result` | Allowlisted `operation`; `outcome`: `accepted`, `failed`, `blocked`, `partial`, `canceled` |
 | `app_error` | `code`: `history_save_failed`, `history_load_failed`, `agent_discovery_failed`, `checkpoint_failed`, `verification_error`, `verification_failed`, `update_failed`, `ui_error`, `ui_rejection`, `ui_render_error`, `operation_failed`, `task_failed`; optional allowlisted `operation` or `feature` context |
 
-Task agents are `codex`, `claude`, `grok`, `opencode`, `kimi`, `antigravity`, `gemini`,
-`aider`, `goose` or `other`; workflows are `task` or `chat`. Account labels, model IDs
+Task agents are `codex`, `claude`, `grok`, `opencode`, `kimi`, `antigravity`, `gemini`
+or `other`; workflows are `task` or `chat`. Account labels, model IDs
 and task identifiers remain excluded. The operation inventory is closed in
 [contracts.ts](src/contracts.ts) and mirrored in the desktop/native schemas.
 Accepted operations acknowledge commands, not eventual task success. See

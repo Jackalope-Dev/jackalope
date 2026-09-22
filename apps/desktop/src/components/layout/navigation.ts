@@ -5,6 +5,7 @@ import {
   ChartNoAxesColumn,
   FileCheck2,
   GitBranch,
+  GitCommitHorizontal,
   History,
   Layers3,
   ListTodo,
@@ -109,6 +110,14 @@ export const WORKSPACE_VIEWS = [
     icon: CalendarClock,
     group: 'automations',
     primary: true,
+  },
+  {
+    id: 'changes',
+    label: 'Changes',
+    description: 'Project: review uncommitted work and commit it.',
+    icon: GitCommitHorizontal,
+    group: 'project',
+    primary: false,
   },
   {
     id: 'worktrees',

@@ -88,8 +88,7 @@ pub fn env_var_for(adapter: &str) -> Option<&'static str> {
         "kimi" => Some("KIMI_CODE_HOME"),
         "opencode" => Some("XDG_DATA_HOME"),
         "gemini" => Some("GEMINI_CLI_HOME"),
-        "aider" | "antigravity" => Some(if cfg!(windows) { "USERPROFILE" } else { "HOME" }),
-        "goose" => Some("GOOSE_PATH_ROOT"),
+        "antigravity" => Some(if cfg!(windows) { "USERPROFILE" } else { "HOME" }),
         _ => None,
     }
 }
@@ -100,7 +99,6 @@ pub(super) fn login_args(adapter: &str) -> &'static [&'static str] {
         "grok" | "kimi" => &["login"],
         "opencode" => &["auth", "login"],
         "claude" => &["auth", "login"],
-        "goose" => &["configure"],
         _ => &[],
     }
 }
@@ -383,10 +381,9 @@ pub fn apply_binding(
             command.env_remove(name);
         }
     }
-    if let Some(name) = env_var_for(&binding.adapter).filter(|_| {
-        binding.profile_id.is_some()
-            || !matches!(binding.adapter.as_str(), "antigravity" | "aider" | "goose")
-    }) {
+    if let Some(name) = env_var_for(&binding.adapter)
+        .filter(|_| binding.profile_id.is_some() || binding.adapter != "antigravity")
+    {
         command.env(name, &binding.directory);
     }
     if binding.profile_id.is_some() {
@@ -412,23 +409,13 @@ pub fn apply_binding(
     }
     if binding.profile_id.is_some() {
         match binding.adapter.as_str() {
-            "antigravity" | "aider" => {
+            "antigravity" => {
                 command
                     .env("HOME", &binding.directory)
                     .env("USERPROFILE", &binding.directory);
-                if binding.adapter == "antigravity" {
-                    for name in credential_env_vars("antigravity") {
-                        command.env_remove(name);
-                    }
+                for name in credential_env_vars("antigravity") {
+                    command.env_remove(name);
                 }
-                if binding.adapter == "aider" {
-                    command.env("AIDER_ENV_FILE", binding.directory.join(".env"));
-                    command.env("AIDER_CONFIG", binding.directory.join(".aider.conf.yml"));
-                }
-            }
-            "goose" => {
-                command.env("GOOSE_DISABLE_KEYRING", "1");
-                command.env_remove("GOOSE_ADDITIONAL_CONFIG_FILES");
             }
             "gemini" => {
                 command.env("GEMINI_FORCE_FILE_STORAGE", "true");
@@ -637,9 +624,6 @@ pub fn agent_profile_create(
             br#"{"modelProvider":"gemini"}"#,
         )
         .map_err(|e| e.to_string())?;
-    } else if agent == "aider" {
-        fs::write(directory.join(".aider.conf.yml"), "{}\n").map_err(|e| e.to_string())?;
-        fs::write(directory.join(".env"), "").map_err(|e| e.to_string())?;
     }
     save(&root, &manifest)?;
     Ok(profile)
@@ -853,7 +837,7 @@ pub fn credential_env_vars(adapter: &str) -> &'static [&'static str] {
             "GOOGLE_GENAI_USE_GCA",
             "AGY_ADC_AUTH",
         ],
-        "opencode" | "aider" | "goose" => &[
+        "opencode" => &[
             "OPENAI_API_KEY",
             "ANTHROPIC_API_KEY",
             "ANTHROPIC_AUTH_TOKEN",
@@ -1202,12 +1186,12 @@ mod tests {
     fn managed_provider_storage_cannot_be_redirected_by_legacy_settings() {
         let directory = temp_root();
         fs::create_dir_all(&directory).unwrap();
-        fs::write(directory.join(".env"), "GEMINI_CLI_HOME=elsewhere\nGEMINI_FORCE_FILE_STORAGE=false\nGOOSE_PATH_ROOT=elsewhere\nGOOSE_DISABLE_KEYRING=0\nHOME=elsewhere\nAIDER_CONFIG=elsewhere\n").unwrap();
-        for (adapter, variable) in [
-            ("gemini", "GEMINI_CLI_HOME"),
-            ("goose", "GOOSE_PATH_ROOT"),
-            ("aider", "HOME"),
-        ] {
+        fs::write(
+            directory.join(".env"),
+            "GEMINI_CLI_HOME=elsewhere\nGEMINI_FORCE_FILE_STORAGE=false\n",
+        )
+        .unwrap();
+        for (adapter, variable) in [("gemini", "GEMINI_CLI_HOME")] {
             let binding = AccountBinding {
                 adapter: adapter.into(),
                 profile_id: Some("work".into()),
@@ -1228,11 +1212,6 @@ mod tests {
             assert_eq!(vars[variable].as_deref(), directory.to_str());
             match adapter {
                 "gemini" => assert_eq!(vars["GEMINI_FORCE_FILE_STORAGE"].as_deref(), Some("true")),
-                "goose" => assert_eq!(vars["GOOSE_DISABLE_KEYRING"].as_deref(), Some("1")),
-                "aider" => assert_eq!(
-                    vars["AIDER_CONFIG"].as_deref(),
-                    directory.join(".aider.conf.yml").to_str()
-                ),
                 _ => unreachable!(),
             }
         }

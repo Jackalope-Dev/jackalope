@@ -1,4 +1,6 @@
 pub mod capacity;
+pub mod cli_host;
+pub mod cli_install;
 pub mod codebase;
 pub mod codebase_watch;
 pub mod coordination;
@@ -13,6 +15,7 @@ pub mod live_sessions;
 pub mod mcp;
 pub mod mcp_broker;
 pub mod platform;
+pub mod project_registry;
 pub mod pty;
 pub mod repo_todos;
 pub mod system;
@@ -71,6 +74,7 @@ mod file_lock;
 mod git_command;
 pub mod notifications;
 
+pub mod commit_review;
 pub mod project_git;
 
 pub mod checkpoint;

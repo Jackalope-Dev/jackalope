@@ -551,7 +551,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'Which coding agents can run tasks?',
         paragraphs: [
           'Codex, Claude Code, Grok Build, OpenCode, Kimi Code, Antigravity, and Gemini CLI have native task adapters. For DeepSeek and other supported API providers, use Connect an API provider in Agents: Jackalope prepares a private OpenCode runner, saves your protected key and discovers models. No separate OpenCode installation or account is needed. Other agents use their installed CLIs. Model access, permissions, and billing remain with your provider.',
-          'Kimi Code uses kimi for tasks, routing, and Ask Jackalope. Antigravity uses agy for worker tasks. Gemini CLI runs worker tasks with automatic file-edit approval and saved-session continuation; shell tools require the CLI’s own permission policy. Aider and Goose support account setup but do not yet have task execution adapters. Discovery of an executable is not proof of valid authentication.',
+          'Kimi Code uses kimi for tasks, routing, and Ask Jackalope. Antigravity uses agy for worker tasks. Gemini CLI runs worker tasks with automatic file-edit approval and saved-session continuation; shell tools require the CLI’s own permission policy. Discovery of an executable is not proof of valid authentication.',
         ],
       },
       {

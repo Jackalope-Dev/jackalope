@@ -285,7 +285,7 @@ pub fn agent_profile_sign_in(
     rows: Option<u16>,
 ) -> Result<String, String> {
     runtime.access.ensure()?;
-    if matches!(agent.as_str(), "antigravity" | "aider") {
+    if agent == "antigravity" {
         return Err("Connect this account with a provider API key in Jackalope.".into());
     }
     let _guard = super::integration::execution_guard()?;
@@ -423,9 +423,7 @@ mod tests {
     #[test]
     fn terminal_uses_the_same_isolation_as_tasks() {
         let mut binding = binding();
-        for agent in [
-            "codex", "claude", "grok", "opencode", "kimi", "gemini", "goose",
-        ] {
+        for agent in ["codex", "claude", "grok", "opencode", "kimi", "gemini"] {
             binding.adapter = agent.into();
             let command = login_command(&binding, std::path::Path::new("test")).unwrap();
             assert_eq!(

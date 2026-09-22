@@ -134,7 +134,7 @@ export const roadmapStages = [
         title: 'More agents at the table.',
         summary: 'Broader execution support and measured workflow improvements.',
         detail:
-          'Aider and Goose execution protocols are on the backlog. Account setup and model discovery do not yet mean those agents can run tasks. We also plan richer questions, permissions, and account controls for supported providers.',
+          'We plan richer questions, permissions, and account controls for supported providers.',
       },
       {
         title: 'Carry reviewed work further.',

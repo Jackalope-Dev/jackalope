@@ -37,15 +37,18 @@ export function storeManifest({ name, publisher, publisherDisplayName, version }
   return `<?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+ xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+ xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
- IgnorableNamespaces="uap uap10 rescap">
+ IgnorableNamespaces="uap uap5 uap10 desktop4 rescap">
  <Identity Name="${xml(name)}" Publisher="${xml(publisher)}" Version="${version}.0" ProcessorArchitecture="x64" />
  <Properties><DisplayName>Jackalope</DisplayName><PublisherDisplayName>${xml(publisherDisplayName)}</PublisherDisplayName><Description>A workspace for your projects and coding agents.</Description><Logo>Assets/StoreLogo.png</Logo></Properties>
  <Resources><Resource Language="en-US" /></Resources>
  <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.22621.0" /></Dependencies>
  <Applications><Application Id="Jackalope" Executable="jackalope-desktop.exe" uap10:RuntimeBehavior="packagedClassicApp" uap10:TrustLevel="mediumIL">
   <uap:VisualElements DisplayName="Jackalope" Description="A workspace for your projects and coding agents." Square150x150Logo="Assets/Square150x150Logo.png" Square44x44Logo="Assets/Square44x44Logo.png" BackgroundColor="transparent" />
+  <Extensions><uap5:Extension Category="windows.appExecutionAlias" Executable="jackalope.exe" EntryPoint="Windows.FullTrustApplication"><uap5:AppExecutionAlias desktop4:Subsystem="console"><uap5:ExecutionAlias Alias="jackalope.exe" /></uap5:AppExecutionAlias></uap5:Extension></Extensions>
  </Application></Applications>
  <Capabilities><rescap:Capability Name="runFullTrust" /><DeviceCapability Name="microphone" /></Capabilities>
 </Package>

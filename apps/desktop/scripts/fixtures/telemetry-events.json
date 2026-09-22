@@ -313,20 +313,6 @@
     "workflow": "chat"
   },
   {
-    "id": "00000000-0000-4000-8000-000000000052",
-    "name": "task_state",
-    "state": "review",
-    "agent": "aider",
-    "workflow": "chat"
-  },
-  {
-    "id": "00000000-0000-4000-8000-000000000053",
-    "name": "task_state",
-    "state": "review",
-    "agent": "goose",
-    "workflow": "chat"
-  },
-  {
     "id": "00000000-0000-4000-8000-000000000054",
     "name": "task_state",
     "state": "review",

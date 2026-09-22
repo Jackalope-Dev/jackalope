@@ -147,12 +147,7 @@ The temporary-directory path remains controlled by OpenCode and the OS.
 
 Gemini account setup uses `GEMINI_CLI_HOME` as the parent of `.gemini` and
 `GEMINI_FORCE_FILE_STORAGE=true` to isolate credentials from the shared keychain.
-Goose uses `GOOSE_PATH_ROOT`
-and `GOOSE_DISABLE_KEYRING=1` for per-profile configuration and secrets; see its
-[path implementation](https://github.com/aaif-goose/goose/blob/main/crates/goose/src/config/paths.rs)
-and [configuration implementation](https://github.com/aaif-goose/goose/blob/main/crates/goose/src/config/base.rs).
-Aider redirects HOME/USERPROFILE, AIDER_CONFIG and AIDER_ENV_FILE and accepts
-provider API keys in the account dialog. Antigravity profiles use the documented
+Antigravity profiles use the documented
 [Gemini API-key mode](https://antigravity.google/docs/cli/install/), with separate
 API billing. Its existing subscription login remains available but does not
 support multiple isolated identities. Managed keys use DPAPI on Windows and
@@ -232,10 +227,6 @@ Sources: [Kimi ACP](https://www.kimi.com/code/docs/en/kimi-code-cli/reference/ki
 
 ## Other candidates
 
-Aider and Goose appear in the catalog and support managed account
-setup. They still lack native task protocol adapters and lifecycle acceptance.
-Their task launch explicitly fails with an explanation instead of falling through
-to Grok's flags. Account setup must not be presented as task execution acceptance.
 Copilot and other agents without a native adapter cannot execute tasks.
 
 ## Private OpenCode runner

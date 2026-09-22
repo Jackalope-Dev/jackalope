@@ -70,18 +70,7 @@ const event = z.discriminatedUnion('name', [
     ...common,
     name: z.literal('task_state'),
     agent: z
-      .enum([
-        'codex',
-        'claude',
-        'grok',
-        'opencode',
-        'kimi',
-        'antigravity',
-        'gemini',
-        'aider',
-        'goose',
-        'other',
-      ])
+      .enum(['codex', 'claude', 'grok', 'opencode', 'kimi', 'antigravity', 'gemini', 'other'])
       .optional(),
     workflow: z.enum(['task', 'chat']).optional(),
     state: z.enum([

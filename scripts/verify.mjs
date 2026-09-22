@@ -61,6 +61,20 @@ const nativeChecks = [
       '--no-default-features',
     ],
   ],
+  // The terminal command is a separate binary; without this a change that
+  // breaks only it would still pass.
+  [
+    cargo,
+    [
+      'test',
+      '--locked',
+      '--manifest-path',
+      'apps/desktop/src-tauri/Cargo.toml',
+      '--bin',
+      'jackalope',
+      '--no-default-features',
+    ],
+  ],
 ];
 const checks = [
   [process.execPath, ['scripts/security/dependencies.mjs', '--patch-only']],

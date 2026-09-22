@@ -165,6 +165,9 @@ pub struct LiveSessions {
     coordinator: Coordinator,
     alive: Arc<AtomicBool>,
     gate: Arc<Mutex<()>>,
+    /// Counts changes the dispatch loop makes, such as a batch starting or
+    /// failing before any task exists. Task history alone cannot report those.
+    changes: Arc<tokio::sync::watch::Sender<u64>>,
 }
 
 impl LiveSessions {
@@ -204,7 +207,20 @@ impl LiveSessions {
             coordinator,
             alive: Arc::new(AtomicBool::new(true)),
             gate: Arc::new(Mutex::new(())),
+            changes: Arc::new(tokio::sync::watch::channel(0).0),
         }
+    }
+
+    pub fn subscribe(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.changes.subscribe()
+    }
+
+    pub fn revision(&self) -> u64 {
+        *self.changes.borrow()
+    }
+
+    fn changed(&self) {
+        self.changes.send_modify(|revision| *revision += 1);
     }
 
     fn save(&self, ledger: &Ledger) -> Result<(), String> {
@@ -748,6 +764,7 @@ impl LiveSessions {
             while service.alive.load(Ordering::Relaxed) {
                 match service.tick() {
                     Ok(true) => {
+                        service.changed();
                         let _ = app.emit("live-sessions-changed", ());
                     }
                     Err(error) => {
@@ -757,6 +774,7 @@ impl LiveSessions {
                             }
                             inner.error = Some(format!("Session dispatch paused: {error}"));
                         }
+                        service.changed();
                         let _ = app.emit("live-sessions-changed", ());
                     }
                     _ => {}

@@ -264,8 +264,6 @@ pub enum TelemetryAgent {
     Kimi,
     Antigravity,
     Gemini,
-    Aider,
-    Goose,
     Other,
 }
 #[derive(Clone, Deserialize, Serialize)]

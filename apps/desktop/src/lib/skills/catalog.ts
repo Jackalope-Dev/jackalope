@@ -4,7 +4,6 @@
  * - Anthropic Agent Skills & Prompt Library (MIT / Apache 2.0)
  * - Daniel Miessler's Fabric patterns (MIT)
  * - Awesome Cursor Rules & cursor.directory (MIT)
- * - Aider System Prompts & Repo-Map patterns (Apache 2.0)
  * - SWE-agent Thought-Action-Observation loops (MIT)
  */
 

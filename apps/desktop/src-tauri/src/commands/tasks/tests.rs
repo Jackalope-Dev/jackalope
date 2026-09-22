@@ -320,18 +320,13 @@ fn antigravity_rejects_missing_accounts_and_does_not_invent_resumed_usage() {
 }
 
 #[test]
-fn only_aider_and_goose_remain_explicitly_unimplemented() {
+fn every_builtin_agent_is_executable() {
     for adapter in BUILTIN_AGENTS {
-        let executable = runtime::EXECUTABLE_ADAPTERS.contains(adapter);
-        let unsupported = ["aider", "goose"].contains(adapter);
-        assert_eq!(executable, !unsupported, "{adapter}");
+        assert!(runtime::EXECUTABLE_ADAPTERS.contains(adapter), "{adapter}");
     }
-    for adapter in ["aider", "goose"] {
-        let message = runtime::unimplemented_adapter(adapter);
-        let expected = format!("The {adapter} task adapter is not implemented yet");
-        assert!(message.starts_with(&expected));
-        assert!(message.contains("Gemini CLI"));
-    }
+    let message = runtime::unimplemented_adapter("other");
+    assert!(message.starts_with("The other task adapter is not implemented yet"));
+    assert!(message.contains("Gemini CLI"));
 }
 
 #[test]

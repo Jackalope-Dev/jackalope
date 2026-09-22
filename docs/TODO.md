@@ -170,7 +170,6 @@ release dates.
 - [ ] Validate hourly schedules, timezones, missed runs and restart recovery.
 - [ ] Complete packaged desktop-control checks, including multiple monitors,
   interruption, indicator failure and permission renewal.
-- [ ] Implement Aider and Goose execution protocols.
 - [ ] Validate Gemini CLI task execution with installed profiles: login and account switching,
   headless flags and stream events for the installed version, exact-session resume, reported
   usage, cancellation, the attempt limit, quota and permission failures. Unit tests do not
@@ -219,6 +218,13 @@ release dates.
 
 - [ ] Validate required account access in development and release builds, including
   reconnect, revocation, offline expiry and saved-work recovery.
+
+- [ ] Deploy migration `0017_device_machine.sql` and validate per-machine device
+  slots: desktop connections send a hashed machine key, and the ten-device limit
+  counts distinct machines, so profiles, resets and reinstalls on one computer
+  share a slot. Confirm older clients and services still connect, the website
+  device list stays usable when one machine has several connections, and macOS,
+  Windows and Linux machine identifiers resolve in installed builds.
 
 - [ ] Validate multi-device settings sync, account changes, offline/conflict
   recovery, deletion and saved opt-outs.

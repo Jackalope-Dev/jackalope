@@ -46,7 +46,7 @@ window.__TAURI_INTERNALS__ = { transformCallback: () => 0, unregisterCallback: (
       exitCode: 0, chunks: [], truncated: false,
     };
     case 'agent_profile_status': {
-      const state = profile?.pending ? f.outcome === 'success' ? ['aider','opencode'].includes(f.agent) ? 'configured' : 'signedIn' : 'signedOut' : 'signedIn';
+      const state = profile?.pending ? f.outcome === 'success' ? ['antigravity','opencode'].includes(f.agent) ? 'configured' : 'signedIn' : 'signedOut' : 'signedIn';
       if ((state === 'signedIn' || state === 'configured') && profile) profile.pending = false;
       return { state, identity: state === 'signedIn' ? 'sample@example.test' : null,
         detail: state === 'signedIn' ? 'Provider identity detected.' : 'Sign-in needed.', checkedAt: new Date().toISOString() };
@@ -66,7 +66,7 @@ f.theme('dark');
 ReactDOM.createRoot(document.getElementById('root')).render(
   React.createElement('main', { className: 'agent-manager p-8' },
     React.createElement('p', null, 'Browser fixture only; no native sign-in or tasks launched.'),
-    React.createElement(AgentAccounts, { agentId: f.agent, agentName: f.agent === 'aider' ? 'Aider' : f.agent === 'opencode' ? 'OpenCode' : 'Codex' })));`;
+    React.createElement(AgentAccounts, { agentId: f.agent, agentName: f.agent === 'antigravity' ? 'Antigravity' : f.agent === 'opencode' ? 'OpenCode' : 'Codex' })));`;
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
@@ -189,9 +189,9 @@ try {
   await signIn().waitFor({ state: 'hidden' });
   await newRow().getByRole('status').filter({ hasText: 'Signed in' }).waitFor();
   assert.equal(await newRow().count(), 1);
-  await page.goto(`${url}?agent=aider`);
+  await page.goto(`${url}?agent=antigravity`);
   const addKey = page.getByRole('button', { name: 'Add account & connect', exact: true });
-  const connect = page.getByRole('dialog', { name: /Connect Aider/ });
+  const connect = page.getByRole('dialog', { name: /Connect Antigravity/ });
   await addKey.click();
   await connect.getByRole('button', { name: 'Cancel', exact: true }).click();
   await connect.waitFor({ state: 'hidden' });

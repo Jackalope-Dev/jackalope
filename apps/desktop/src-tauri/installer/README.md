@@ -26,6 +26,13 @@ Tauri's supported include. The upstream installer template, install scope,
 WebView2 handling, upgrades, shortcuts and uninstall behavior remain unchanged.
 The MSI uses native WiX controls with matching welcome and header artwork.
 
+The EXE installer also adds its install folder to the current user's `PATH` so
+terminals can run `jackalope`, and its uninstaller removes that entry. The hook
+edits the `Path` registry value directly, preserving its expandable type, and
+broadcasts the change; new terminals see it, already-open ones do not. The MSI
+does not change `PATH`. Store packages expose the command through an execution
+alias instead.
+
 Build both packages with `pnpm tauri build`. Review EXE welcome, destination,
 progress and finish pages, and MSI welcome/destination pages, including keyboard
 focus and non-default display scaling. Installation/uninstallation is a separate

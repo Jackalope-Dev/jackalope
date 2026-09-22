@@ -152,11 +152,11 @@ pub fn desktop_set_launch_at_login(enabled: bool, app: AppHandle) -> Result<(), 
     result.map_err(|e| e.to_string())
 }
 
+/// Raises the main window from the tray, the Dock or a second app launch,
+/// building it first when a headless host has none yet.
 pub(crate) fn show_main_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.unminimize();
-        let _ = window.set_focus();
+    if let Err(error) = app.state::<crate::MainWindow>().show(app) {
+        eprintln!("Jackalope could not open its window: {error}");
     }
 }
 

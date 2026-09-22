@@ -294,7 +294,7 @@ provider, Tailscale and cross-platform acceptance remain open.
 
 ## Known limits
 
-Aider and Goose account setup does not include native task execution. Gemini CLI
+Gemini CLI
 tasks run through its headless stream; installed-profile execution is not yet validated.
 Antigravity named accounts use Gemini API keys; isolated subscription accounts are
 unsupported. Discovery and fixture responses do not establish real account execution.

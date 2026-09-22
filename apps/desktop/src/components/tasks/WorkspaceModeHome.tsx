@@ -1,4 +1,11 @@
-import { ArrowRight, BookOpen, GitBranch, ListTodo, Workflow } from 'lucide-react';
+import {
+  ArrowRight,
+  BookOpen,
+  GitBranch,
+  GitCommitHorizontal,
+  ListTodo,
+  Workflow,
+} from 'lucide-react';
 import { matchesWorkFilter, type WorkItem, workPresence } from '../../lib/task-collection';
 import { attentionQueue, type WorkspacePreset } from '../../lib/workbench';
 import { AgentStack } from '../agents/AgentAvatar';
@@ -53,6 +60,12 @@ export function WorkspaceModeHome({
             view: 'project-knowledge',
           },
           {
+            label: 'Changes',
+            detail: 'Review and commit work',
+            icon: GitCommitHorizontal,
+            view: 'changes',
+          },
+          {
             label: 'Worktrees',
             detail: 'Branches and local workspaces',
             icon: GitBranch,
@@ -69,7 +82,9 @@ export function WorkspaceModeHome({
             key={view}
             type="button"
             onClick={() =>
-              navigateWorkspace(view as 'project-knowledge' | 'worktrees' | 'repo-todos')
+              navigateWorkspace(
+                view as 'project-knowledge' | 'changes' | 'worktrees' | 'repo-todos',
+              )
             }
           >
             <Icon size={19} />

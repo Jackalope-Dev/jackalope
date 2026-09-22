@@ -28,3 +28,13 @@ test('invalid identities and non-Store versions fail before packaging', () => {
   assert.throws(() => storeManifest({ ...identity, publisher: 'test' }));
   assert.throws(() => storeManifest({ ...identity, publisherDisplayName: '' }));
 });
+test('the terminal command is exposed as a console execution alias', () => {
+  const manifest = storeManifest(identity);
+  assert.match(
+    manifest,
+    /<uap5:Extension Category="windows.appExecutionAlias" Executable="jackalope.exe"/,
+  );
+  assert.match(manifest, /<uap5:AppExecutionAlias desktop4:Subsystem="console">/);
+  assert.match(manifest, /<uap5:ExecutionAlias Alias="jackalope.exe" \/>/);
+  assert.match(manifest, /IgnorableNamespaces="uap uap5 uap10 desktop4 rescap"/);
+});

@@ -174,9 +174,7 @@ export function AgentAccounts({
   const [editing, setEditing] = useState<AgentProfile>();
   const desktop = isTauriEnvironment();
   const keyAccount =
-    agentId === 'antigravity' ||
-    agentId === 'aider' ||
-    (agentId === 'opencode' && connectionMethod === 'apiKey');
+    agentId === 'antigravity' || (agentId === 'opencode' && connectionMethod === 'apiKey');
   const load = useCallback(async () => {
     await useAgentAccountsStore.getState().load(agentId, true);
     onChanged?.();
@@ -379,15 +377,11 @@ export function AgentAccounts({
                     disabled={locked}
                     onClick={(event) => {
                       signInOpener.current = event.currentTarget;
-                      setSignInWithKey(agentId === 'antigravity' || agentId === 'aider');
+                      setSignInWithKey(agentId === 'antigravity');
                       setSignIn(profile);
                     }}
                   >
-                    {agentId === 'antigravity' || agentId === 'aider'
-                      ? 'Connect API key'
-                      : agentId === 'goose'
-                        ? 'Set up account'
-                        : 'Sign in'}
+                    {agentId === 'antigravity' ? 'Connect API key' : 'Sign in'}
                   </Button>
                 )}
                 {!existing && agentId === 'opencode' && (

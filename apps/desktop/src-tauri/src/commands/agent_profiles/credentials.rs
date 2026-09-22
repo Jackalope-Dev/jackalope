@@ -11,7 +11,7 @@ pub(super) struct ApiKey {
 fn allowed(agent: &str, name: &str) -> bool {
     match agent {
         "antigravity" => name == "GEMINI_API_KEY",
-        "aider" | "opencode" => provider(name).is_some(),
+        "opencode" => provider(name).is_some(),
         _ => false,
     }
 }
