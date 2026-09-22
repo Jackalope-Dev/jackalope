@@ -11,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { nativeTask } from '../../lib/task-runtime';
 import {
   archiveWorktree,
   cleanupWorktree,
@@ -143,6 +144,27 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   const branchName = branch ?? `feat/${slug.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   const desktop = isTauriEnvironment();
   const projectPath = project?.path;
+  const [sizes, setSizes] = useState<
+    Record<string, { bytes: number; files: number; partial: boolean; skippedLinks: number }>
+  >({});
+  const [measuring, setMeasuring] = useState('');
+  const measure = async (path: string) => {
+    if (!projectPath || measuring) return;
+    setMeasuring(path);
+    try {
+      const value = await nativeTask<{
+        bytes: number;
+        files: number;
+        partial: boolean;
+        skippedLinks: number;
+      }>('git_worktree_usage', { repoPath: projectPath, worktreePath: path });
+      setSizes((previous) => ({ ...previous, [path]: value }));
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setMeasuring('');
+    }
+  };
   // Leftover folders are not registered worktrees, so Git never reports them
   // with the list above; they are read separately.
   const loadOrphans = useCallback(async () => {
@@ -475,6 +497,14 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
               <div className="worktree-identity">
                 <h2>{wt.branch || (wt.is_bare ? 'Bare repository' : 'Detached HEAD')}</h2>
                 <p className="task-muted mt-1">{wt.path}</p>
+                {sizes[wt.path] && (
+                  <p className="task-muted">
+                    {sizes[wt.path].partial ? 'At least ' : ''}
+                    {(sizes[wt.path].bytes / 1024 / 1024).toFixed(1)} MiB in{' '}
+                    {sizes[wt.path].files.toLocaleString()} files · Git data and linked folders
+                    excluded. File sizes may differ from allocated disk space.
+                  </p>
+                )}
                 <div className="worktree-meta">
                   <span className="font-mono">
                     {wt.head ? wt.head.slice(0, 7) : 'No resolved commit'}
@@ -515,6 +545,17 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                 )}
               </div>
               <div className="workspace-actions">
+                <Button
+                  variant="ghost"
+                  disabled={!!measuring || !desktop || !!wt.cleanup?.missing}
+                  onClick={() => void measure(wt.path)}
+                >
+                  {measuring === wt.path
+                    ? 'Measuring…'
+                    : sizes[wt.path]
+                      ? 'Refresh size'
+                      : 'Inspect size'}
+                </Button>
                 {(wt.cleanup?.merged || wt.cleanup?.content_merged) &&
                   !wt.cleanup.blocked_reason && (
                     <ConfirmAction

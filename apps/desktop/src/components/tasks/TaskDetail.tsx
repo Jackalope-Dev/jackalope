@@ -68,6 +68,9 @@ import { WorkspaceReadiness } from './WorkspaceReadiness';
 import './task-detail.css';
 
 const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
+const TaskTerminal = lazy(() =>
+  import('./TaskTerminal').then((module) => ({ default: module.TaskTerminal })),
+);
 // The tools panel pulls in the agent, connection and project editors; load it
 // only when the user opens it.
 const TaskTools = lazy(() => import('./TaskTools').then((m) => ({ default: m.TaskTools })));
@@ -100,13 +103,14 @@ export function TaskDetail({
   const [queueing, setQueueing] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const workRequest = useWorkViewStore((state) => state.request);
+  const preset = useWorkbenchStore((state) => state.presets[run.projectId] ?? 'focus');
   const savedTab = useWorkViewStore.getState().reading[run.taskId];
   const [tab, setTab] = useState(
     savedTab === 'context'
       ? 'activity'
       : savedTab === 'delivery'
         ? 'changes'
-        : (savedTab ?? 'result'),
+        : (savedTab ?? (preset === 'build' ? 'changes' : 'result')),
   );
   const [detailsOpen, setDetailsOpen] = useState(savedTab === 'context');
   const [reviewSection, setReviewSection] = useState<ReviewSection>(
@@ -118,7 +122,6 @@ export function TaskDetail({
   useEffect(() => {
     if (workRequest?.id !== run.id) return;
     const section = workRequest.section;
-    if (section === 'terminal') return;
     if (section === 'question' || section === 'recovery') {
       document
         .getElementById(section === 'question' ? 'task-questions' : 'task-recovery')
@@ -152,9 +155,8 @@ export function TaskDetail({
   const [connections, setConnections] = useState<McpServerConfig[] | null>(null);
   const applied = useCallback(() => setIntegrated(true), []);
   const key = `reply:${run.taskId}`;
-  const preset = useWorkbenchStore((state) => state.presets[run.projectId] ?? 'focus');
   const split = useWorkViewStore((state) => state.split[run.taskId] ?? preset === 'build');
-  const alongside = split && ['changes', 'preview'].includes(tab);
+  const alongside = split && ['changes', 'preview', 'terminal', 'activity'].includes(tab);
   const reply = drafts[key]?.prompt ?? '';
   const active = isActive(run);
   const previewRunning = useManagedPreview(run.id, !active && !integrated);
@@ -494,7 +496,11 @@ export function TaskDetail({
           All tasks
         </Button>
         <WorkspaceHeading title={title} titleRef={heading} description={run.projectName} />
-        <WorkContext key={`context:${run.taskId}`} run={run} />
+        <WorkContext
+          key={`context:${run.taskId}`}
+          run={run}
+          onTerminal={() => setTab('terminal')}
+        />
         {isLatest && !integrated && (
           <WorkFeedbackInbox
             key={`feedback:${run.taskId}`}
@@ -689,6 +695,7 @@ export function TaskDetail({
               { value: 'result', label: 'Result' },
               { value: 'changes', label: 'Review' },
               { value: 'preview', label: 'Preview' },
+              { value: 'terminal', label: 'Terminal' },
               { value: 'activity', label: 'Activity' },
             ].map(({ value, label }) => (
               <Tabs.Trigger key={value} value={value}>
@@ -696,7 +703,7 @@ export function TaskDetail({
               </Tabs.Trigger>
             ))}
           </Tabs.List>
-          {['changes', 'preview'].includes(tab) && (
+          {['changes', 'preview', 'terminal', 'activity'].includes(tab) && (
             <Button
               variant="ghost"
               className="conversation-toggle"
@@ -1018,6 +1025,11 @@ export function TaskDetail({
                 />
               )}
             </Disclosure>
+          </Tabs.Content>
+          <Tabs.Content value="terminal">
+            <Suspense fallback={<p>Loading terminal…</p>}>
+              <TaskTerminal run={run} />
+            </Suspense>
           </Tabs.Content>
           <Tabs.Content value="preview">
             {!active && run.status !== 'interrupted' && run.workspace && !integrated ? (

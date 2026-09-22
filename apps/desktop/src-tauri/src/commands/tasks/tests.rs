@@ -37,6 +37,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         process_contained: false,
         verify_command: None,
         prepare_command: None,
+        setup_files: Vec::new(),
         auto_verify: false,
         verification: None,
         finishing: false,
@@ -415,7 +416,8 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
         account_binding: None, model,
         prompt: "Create a file named receipt.txt containing exactly JACKALOPE_NATIVE_OK. Do not run shell commands or use network tools. Remember the phrase copper-rabbit-731 for our next turn; do not write that phrase to a file. Finish with a short confirmation.".into(),
         isolated: true, previous_run_id: None, connection_ids: Some(vec![]), coordination: None,
-        prepare_command: None, auto_verify: false, monitor_change: None,
+        prepare_command: None,
+        setup_files: Vec::new(), auto_verify: false, monitor_change: None,
         context_selection: Default::default(), context_receipt: Default::default(),
     };
     let workflow_trial = std::env::var_os("JACKALOPE_WORKFLOW_TRIAL").is_some();
@@ -899,6 +901,7 @@ process.stdin.on('end', () => {
         agent_profile_id: None,
         verify_command: None,
         prepare_command: None,
+        setup_files: Vec::new(),
         auto_verify: false,
         target_branch: None,
         account_binding: None,

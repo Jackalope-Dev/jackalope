@@ -10,7 +10,7 @@
   margin-top: 12px;
 }
 .routing-circuit {
-  color: var(--color-accent);
+  color: var(--color-accent-ink);
   margin: -2px 0 2px;
 }
 .routing-circuit > svg {

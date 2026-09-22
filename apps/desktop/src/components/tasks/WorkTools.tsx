@@ -4,6 +4,7 @@ import { ChevronDown, SquareTerminal } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { sessionCommand } from '../../lib/live-session';
 import { nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -12,12 +13,21 @@ const TaskTerminal = lazy(() =>
   import('./TaskTerminal').then((m) => ({ default: m.TaskTerminal })),
 );
 
-export function WorkTools({ run, requestRevision }: { run: TaskRun; requestRevision?: number }) {
+export function WorkTools({
+  run,
+  requestRevision,
+  onTerminal,
+}: {
+  run: TaskRun;
+  requestRevision?: number;
+  onTerminal?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
+  const preferredEditor = useSettingsStore((state) => state.preferredEditor);
   useEffect(() => {
-    if (requestRevision) setOpen(true);
-  }, [requestRevision]);
+    if (requestRevision && !onTerminal) setOpen(true);
+  }, [requestRevision, onTerminal]);
   const act = async (action: () => Promise<unknown>) => {
     setError('');
     try {
@@ -29,12 +39,18 @@ export function WorkTools({ run, requestRevision }: { run: TaskRun; requestRevis
   return (
     <>
       <Dialog.Root open={open} onOpenChange={setOpen}>
-        <Dialog.Trigger asChild>
-          <Button variant="outline">
-            <SquareTerminal size={16} aria-hidden="true" />
-            Terminal
+        {onTerminal ? (
+          <Button variant="outline" onClick={onTerminal}>
+            <SquareTerminal size={16} aria-hidden="true" /> Terminal
           </Button>
-        </Dialog.Trigger>
+        ) : (
+          <Dialog.Trigger asChild>
+            <Button variant="outline">
+              <SquareTerminal size={16} aria-hidden="true" />
+              Terminal
+            </Button>
+          </Dialog.Trigger>
+        )}
         <DialogContent
           className="work-terminal-dialog"
           aria-describedby={undefined}
@@ -74,16 +90,19 @@ export function WorkTools({ run, requestRevision }: { run: TaskRun; requestRevis
               </Menu.Item>
             ))}
             <Menu.Separator />
-            {(['vscode', 'cursor'] as const).map((editor) => (
-              <Menu.Item
-                key={editor}
-                onSelect={() =>
-                  void act(() => nativeTask('task_open_editor', { id: run.id, editor }))
-                }
-              >
-                Open in {editor === 'vscode' ? 'VS Code' : 'Cursor'}
-              </Menu.Item>
-            ))}
+            {[...(['vscode', 'cursor'] as const)]
+              .sort((a) => (a === preferredEditor ? -1 : 1))
+              .map((editor) => (
+                <Menu.Item
+                  key={editor}
+                  onSelect={() =>
+                    void act(() => nativeTask('task_open_editor', { id: run.id, editor }))
+                  }
+                >
+                  Open in {editor === 'vscode' ? 'VS Code' : 'Cursor'}
+                  {editor === preferredEditor ? ' (preferred)' : ''}
+                </Menu.Item>
+              ))}
             <Menu.Item
               onSelect={() => void act(() => navigator.clipboard.writeText(run.workspace))}
             >

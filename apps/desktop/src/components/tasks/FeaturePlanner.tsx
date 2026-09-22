@@ -454,6 +454,7 @@ export function FeaturePlanner({
                         agentAccounts: project.preferences?.agentAccounts,
                         verifyCommand: project.preferences?.verifyCommand,
                         prepareCommand: project.preferences?.prepareCommand,
+                        setupFiles: project.preferences?.setupFiles,
                         autoVerify: project.preferences?.autoVerify === true,
                         items,
                       },

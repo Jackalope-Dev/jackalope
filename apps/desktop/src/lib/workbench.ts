@@ -4,9 +4,13 @@ import { taskDecision } from './task-workflow.ts';
 
 export type WorkspacePreset = 'focus' | 'build' | 'oversee';
 export const workspacePresets = [
-  { id: 'focus', label: 'Focus', description: 'One conversation, with tools when you need them.' },
-  { id: 'build', label: 'Build', description: 'Keep conversation beside changes or preview.' },
-  { id: 'oversee', label: 'Oversee', description: 'Start with work that needs your attention.' },
+  { id: 'focus', label: 'Focus', description: 'A quiet canvas for one task or conversation.' },
+  { id: 'build', label: 'Build', description: 'Conversation, changes and tools side by side.' },
+  {
+    id: 'oversee',
+    label: 'Oversee',
+    description: 'A live board for progress, questions and reviews.',
+  },
 ] as const;
 
 export function workSummary(run: TaskRun) {

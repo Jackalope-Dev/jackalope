@@ -277,15 +277,43 @@ pub fn run_cancellable_with_output(
 }
 
 pub fn run_supervised(
-    mut command: Command,
+    command: Command,
     limits: Limits,
     canceled: impl Fn() -> bool,
     observe: impl Fn(&[u8], bool) + Send + Sync + 'static,
 ) -> Result<CommandResult, String> {
+    run_supervised_input(command, limits, canceled, observe, None)
+}
+
+pub fn run_with_input(
+    command: Command,
+    timeout: Duration,
+    input: Vec<u8>,
+) -> Result<CommandResult, String> {
+    run_supervised_input(
+        command,
+        Limits::total(timeout),
+        || false,
+        |_, _| {},
+        Some(input),
+    )
+}
+
+fn run_supervised_input(
+    mut command: Command,
+    limits: Limits,
+    canceled: impl Fn() -> bool,
+    observe: impl Fn(&[u8], bool) + Send + Sync + 'static,
+    input: Option<Vec<u8>>,
+) -> Result<CommandResult, String> {
     let _runner_lease =
         super::managed_runtime::acquire(std::path::Path::new(command.get_program()))?;
     command
-        .stdin(Stdio::null())
+        .stdin(if input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     #[cfg(windows)]
@@ -312,6 +340,12 @@ pub fn run_supervised(
     };
     let stdout = child.stdout.take().ok_or("Missing command output")?;
     let stderr = child.stderr.take().ok_or("Missing command diagnostics")?;
+    let writer = input.zip(child.stdin.take()).map(|(input, mut stdin)| {
+        std::thread::spawn(move || {
+            use std::io::Write;
+            stdin.write_all(&input)
+        })
+    });
     let observe = std::sync::Arc::new(observe);
     // Milliseconds since `start` at which the command last wrote anything. Both reader
     // threads publish here so the wait loop can tell "slow but working" from "wedged".
@@ -355,6 +389,9 @@ pub fn run_supervised(
         std::thread::sleep(Duration::from_millis(30));
     };
     tree.terminate();
+    if let Some(writer) = writer {
+        let _ = writer.join();
+    }
     let (stdout, out_cut) = out
         .join()
         .map_err(|_| "Command output reader failed")?
@@ -378,6 +415,46 @@ pub fn run_supervised(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn input_is_data_and_closes_before_process_exit() {
+        #[cfg(windows)]
+        let mut command = {
+            let mut command = Command::new("powershell.exe");
+            command.args([
+                "-NoLogo",
+                "-NoProfile",
+                "-Command",
+                "[Console]::Out.Write([Console]::In.ReadToEnd())",
+            ]);
+            command
+        };
+        #[cfg(unix)]
+        let mut command = Command::new("/bin/cat");
+        command.env_remove("JACKALOPE_TASK_TOKEN");
+        let input = b"fixture token\n$(echo must-not-execute) & quoted\"value\n".to_vec();
+        let result = run_with_input(command, Duration::from_secs(15), input.clone()).unwrap();
+        assert!(result.success, "{result:?}");
+        assert_eq!(result.stdout.as_bytes(), input);
+    }
+    #[test]
+    fn blocked_input_writer_obeys_process_deadline() {
+        #[cfg(windows)]
+        let command = {
+            let mut command = Command::new("cmd.exe");
+            command.args(["/D", "/C", "ping -n 30 127.0.0.1 >nul"]);
+            command
+        };
+        #[cfg(unix)]
+        let command = {
+            let mut command = Command::new("/bin/sleep");
+            command.arg("30");
+            command
+        };
+        let result =
+            run_with_input(command, Duration::from_millis(250), vec![b'x'; 2_000_000]).unwrap();
+        assert!(result.timed_out);
+        assert!(result.duration_ms < 5000, "{result:?}");
+    }
     #[test]
     #[cfg(windows)]
     fn live_output_can_cancel_before_the_command_exits() {

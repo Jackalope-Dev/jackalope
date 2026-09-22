@@ -12,6 +12,8 @@ import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { agentAccountFor, type Project } from '../../stores/projectStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { CodexSpeedSelect } from '../tasks/CodexSpeedSelect';
+import { DictationButton } from '../tasks/DictationButton';
+import { PromptPresets } from '../tasks/PromptPresets';
 import { TaskAssessmentNotice, useTaskAssessment } from '../tasks/useTaskAssessment';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -22,9 +24,11 @@ import { WorkflowStarter } from './WorkflowStarter';
 export function SessionStart({
   project,
   onOpenProject,
+  embedded = false,
 }: {
   project?: Project;
   onOpenProject: () => void;
+  embedded?: boolean;
 }) {
   const draftKey = `jackalope-live-start:${project?.id ?? 'none'}`;
   const assessment = useTaskAssessment();
@@ -126,6 +130,7 @@ export function SessionStart({
         targetBranch: project.preferences?.baseBranch || project.gitBranch,
         verifyCommand: project.preferences?.verifyCommand,
         prepareCommand: project.preferences?.prepareCommand,
+        setupFiles: project.preferences?.setupFiles,
         autoVerify: project.preferences?.autoVerify ?? true,
         contextSelection: context,
       };
@@ -159,12 +164,19 @@ export function SessionStart({
     }
   };
   return (
-    <div className="live-start">
-      <div className="live-start-mark" aria-hidden="true" ref={markRef}>
-        <AgentCharacter provider={project?.preferences?.preferredRunner || 'auto'} gaze={gaze} />
-      </div>
-      <span className="live-start-label">New chat</span>
-      <h2>{project?.name ?? 'Choose a project'}</h2>
+    <div className={`live-start${embedded ? ' live-start-embedded' : ''}`}>
+      {!embedded && (
+        <>
+          <div className="live-start-mark" aria-hidden="true" ref={markRef}>
+            <AgentCharacter
+              provider={project?.preferences?.preferredRunner || 'auto'}
+              gaze={gaze}
+            />
+          </div>
+          <span className="live-start-label">New work</span>
+          <h2>{project?.name ?? 'Choose a project'}</h2>
+        </>
+      )}
       {project ? (
         <form
           className="live-start-composer"
@@ -271,6 +283,22 @@ export function SessionStart({
             onPlan={() => void send('plan')}
           />
           <div className="live-start-actions">
+            <PromptPresets
+              projectId={project.id}
+              onInsert={(prompt) => {
+                assessment.clear();
+                setText((current) => (current.trim() ? `${current}\n\n${prompt}` : prompt));
+                input.current?.focus();
+              }}
+            />
+            <DictationButton
+              disabled={busy}
+              onText={(value) => {
+                assessment.clear();
+                setText((current) => (current.trim() ? `${current}\n${value}` : value));
+                input.current?.focus();
+              }}
+            />
             <Button
               type="submit"
               disabled={!text.trim() || busy || !isTauriEnvironment()}

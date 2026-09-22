@@ -12,6 +12,21 @@
     "note": "Broader cost, speed and installed-platform comparisons remain in validation."
   },
   {
+    "id": "focused-workspace-desktop-integrations",
+    "date": "2026-09-21",
+    "status": "In development",
+    "title": "One workspace, closer to your desktop",
+    "description": "A shared Work page and bottom status bar keep task context close, with more control over desktop and terminal behavior.",
+    "items": [
+      "Keep conversations, tasks and plans together, with recent work in the sidebar and workspace, activity and quota information below.",
+      "Switch between a quiet Focus canvas, a Build workspace with tools beside work, and a full-width Oversee activity board.",
+      "Choose zoom, shortcuts, editor and shell preferences; reuse saved prompts and commands, split task terminals and optionally restore stopped output.",
+      "Configure native sleep prevention, macOS menus and unread Dock badges, optional local dictation and pairing with an existing WSL Linux host.",
+      "Prepare worktrees with explicitly chosen ignored files and inspect their size before guarded cleanup."
+    ],
+    "note": "Implemented for validation. WSL requires a running Linux Jackalope host and dictation requires a local transcription service. Installed cross-platform acceptance remains in progress."
+  },
+  {
     "id": "opencode-task-permissions",
     "date": "2026-09-18",
     "status": "In development",
@@ -30,7 +45,7 @@
     "title": "A workspace that fits your workflow",
     "description": "Project layouts, task terminals, separate windows and reversible chat topics keep work and feedback together.",
     "items": [
-      "Choose Focus, Build or Oversee, and use essential or customized project setup.",
+      "Choose Focus, Build or Oversee, and configure your project in one guided setup.",
       "Open task workspace tools and save feedback from separate review and preview windows.",
       "Prepare source-linked drafts from chat topics and record local workflow timings."
     ],

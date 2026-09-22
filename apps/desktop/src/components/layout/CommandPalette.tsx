@@ -3,13 +3,14 @@ import { SearchField } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Folder, LifeBuoy, MessageSquare, Plus, Settings2 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
-import { shortcutLabel } from '../../lib/platform-shortcuts';
+import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { taskTitle } from '../../lib/task-title';
 import { taskDecision } from '../../lib/task-workflow';
 import { openExternalUrl } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
@@ -30,6 +31,7 @@ export function CommandPalette({
   onSelectProject?: (id: string) => void;
 }) {
   const [query, setQuery] = useState('');
+  const shortcuts = useSettingsStore((state) => state.shortcuts);
   const previousFocus = useRef<HTMLElement | null>(null);
   const setTheme = useThemeStore((state) => state.setTheme);
   const search = query.trim().toLowerCase();
@@ -100,8 +102,10 @@ export function CommandPalette({
     'help docs documentation knowledgebase faq troubleshooting guides'
       .split(' ')
       .some((kw) => kw.includes(search)) || search.includes('help');
-  const views = WORKSPACE_VIEWS.filter((item) =>
-    `${item.label} ${item.description}`.toLowerCase().includes(search),
+  const views = WORKSPACE_VIEWS.filter(
+    (item) =>
+      item.id !== 'live-sessions' &&
+      `${item.label} ${item.description}`.toLowerCase().includes(search),
   );
   const themes = PRESET_THEMES.filter((item) => item.name.toLowerCase().includes(search));
 
@@ -222,21 +226,22 @@ export function CommandPalette({
               </button>
             ))}
             <p className="menu-label">Commands</p>
-            {onCapture && ('new task capture idea'.includes(search) || !search) && (
-              <button
-                data-command
-                type="button"
-                className="workspace-menu-item w-full"
-                onClick={() => {
-                  onClose();
-                  onCapture();
-                }}
-              >
-                <Plus size={16} />
-                <span>New task</span>
-                <kbd>{shortcutLabel('Shift+N')}</kbd>
-              </button>
-            )}
+            {onCapture &&
+              ('new work task conversation capture idea'.includes(search) || !search) && (
+                <button
+                  data-command
+                  type="button"
+                  className="workspace-menu-item w-full"
+                  onClick={() => {
+                    onClose();
+                    onCapture();
+                  }}
+                >
+                  <Plus size={16} />
+                  <span>New work</span>
+                  <kbd>{displayShortcut(resolveShortcuts(shortcuts).newWork)}</kbd>
+                </button>
+              )}
             {showSettings && (
               <button
                 data-command

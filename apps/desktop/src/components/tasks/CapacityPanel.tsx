@@ -4,6 +4,7 @@ import { Zap } from 'lucide-react';
 
 import { useEffect, useState } from 'react';
 import { getAgentMetadata } from '../../lib/agent-catalog';
+import { capacityWindowName } from '../../lib/capacity-display';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { type CapacityWindow, useCapacityStore } from '../../stores/capacityStore';
 import { Button } from '../ui/button';
@@ -14,21 +15,6 @@ import './capacity-panel.css';
 
 const agentName = (agent: string) =>
   agent === 'jev' ? 'TypeSafe Jev' : (getAgentMetadata(agent)?.name ?? agent);
-function windowName(window: CapacityWindow) {
-  if (window.window === 'weekly') return 'Weekly allowance';
-  if (window.window === 'monthly') return 'Monthly allowance';
-  if (window.window === 'billing') return 'Included allowance';
-  const minutes = window.durationMinutes;
-  if (!minutes) {
-    if (window.window === 'primary') return 'Primary window';
-    if (window.window === 'secondary') return 'Secondary window';
-    return 'Usage window';
-  }
-  if (minutes % 1440 === 0) return `${minutes / 1440}-day window`;
-  if (minutes % 60 === 0) return `${minutes / 60}-hour window`;
-  return `${minutes}-minute window`;
-}
-
 const windowExpired = (window: CapacityWindow, now: number) =>
   window.resetsAt != null && window.resetsAt * 1000 <= now;
 /** Single-line reset text; the tiles ellipsize, so the full wording lives in `resetDetail`. */
@@ -190,7 +176,7 @@ export function CapacityPanel() {
                           <CapacityGauge remaining={remaining} />
                           <div className="capacity-dial-meta">
                             <span className="capacity-dial-name">
-                              <span>{windowName(window)}</span>
+                              <span>{capacityWindowName(window)}</span>
                               {low && (
                                 <Badge variant="warning">
                                   {remaining === 0 ? 'Limit reached' : 'Low'}

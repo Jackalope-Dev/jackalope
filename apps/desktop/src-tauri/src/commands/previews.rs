@@ -37,6 +37,9 @@ fn sessions() -> &'static Mutex<HashMap<String, Preview>> {
 
 pub fn ensure_idle(workspace: &str) -> Result<(), String> {
     super::work_terminal::ensure_idle(workspace)?;
+    ensure_preview_idle(workspace)
+}
+pub(super) fn ensure_preview_idle(workspace: &str) -> Result<(), String> {
     let path = dunce::canonicalize(workspace).map_err(|e| e.to_string())?;
     let mut sessions = sessions().lock().map_err(|e| e.to_string())?;
     for preview in sessions.values_mut() {
@@ -65,6 +68,24 @@ pub fn close_all() {
         }
         sessions.clear();
     }
+}
+pub fn active_ports() -> Vec<(String, u16)> {
+    sessions()
+        .lock()
+        .map(|mut sessions| {
+            sessions
+                .values_mut()
+                .filter_map(|preview| {
+                    preview
+                        .child
+                        .try_wait()
+                        .ok()
+                        .filter(Option::is_none)
+                        .map(|_| (preview.view.run_id.clone(), preview.view.port))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn view(preview: &mut Preview) -> Result<PreviewView, String> {

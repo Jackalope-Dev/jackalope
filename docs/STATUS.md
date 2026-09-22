@@ -18,13 +18,43 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 
 ## Desktop workspace
 
-- Focus, Build and Oversee presets save per project and reset conversation-layout
-  overrides when selected. Needs you prioritizes recovery and questions, then older
-  reviews. Task context retains a compact visit receipt, workspace identity and checks.
+- Work is the shared entry point for conversations, tasks and plans. Its sidebar
+  groups recent work by next action; the bottom bar shows the selected workspace,
+  local activity and visual account allowances with freshness and reset times.
+  Settings → Desktop holds sleep prevention, owned terminals and preview ports.
+  Settings groups account and support details.
+- Desktop preferences include interface zoom, editor and shell selection, terminal
+  font size, HTTP links and editable search, new-work and settings shortcuts. Saved
+  prompts and commands can apply to all projects or one project; commands require an
+  explicit Run action. Optional dictation inserts editable text through a separately
+  configured loopback transcription service and never sends the task automatically.
+- Idle-sleep prevention supports off, active-work and app-open modes using native
+  Windows, macOS and Linux APIs. macOS retains native traffic lights and application
+  menus, with an unread Dock count. Notifications can be marked unread again.
+  Native platform acceptance remains open.
+- Windows can pair with an already running Linux Jackalope host inside a selected
+  WSL distribution. Linux owns its projects, agents, accounts and execution. This
+  requires Python 3 and host setup inside WSL; it does not translate Windows projects
+  or launch a Linux host automatically. Remote terminal and embedded-preview control
+  remain in the Linux app.
+- Project setup can explicitly copy listed Git-ignored files into new task worktrees
+  before the existing preparation command. Both checkouts must ignore each file;
+  links, parent paths and overwrites are refused. Worktree size inspection counts
+  bounded logical file sizes, labels partial results and retains existing cleanup guards.
+- Focus uses a compact navigation rail, a conversation composer and one next task.
+  Build keeps recent work, project tools and conversation beside review, preview,
+  terminal or activity. Oversee uses full-width navigation, live work counts, an
+  attention queue and a board. Modes and their work-list filters save per project;
+  selecting a mode resets conversation-layout overrides without clearing drafts.
+  Needs you prioritizes recovery and questions, then older reviews. Task context
+  retains a compact visit receipt, workspace identity and checks.
 - Task workspace tools include a native terminal with bounded reconnectable output,
   VS Code/Cursor workspace links and separate result, review, preview and terminal
   windows. A running task terminal reserves its workspace against agent work, checks,
   previews, integration and cleanup. Closing a pane keeps it running; quitting stops it.
+  Two terminal panes can share a task workspace, with output search and explicit
+  saved-command execution. Optional local output retention restores a stopped
+  snapshot of up to 256 KiB per pane; it never restarts commands.
   Feedback from separate panes is saved locally for explicit addition to the reply draft.
   Separate panes retain their own task drafts; their refreshes do not replace the main
   window's draft or selection. Queue pause and stop remain visible in Focus mode.
@@ -37,17 +67,17 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Installed multi-window acceptance and comparative workflow measurements remain open.
 
 - Projects, saved task drafts, queues, recurring schedules and local change monitors.
-- Essential project setup includes agents, Git behavior and an optional first task;
-  customization adds decisions and appearance. Background command detection fills unset preferences without running
+- Project setup includes agents, decisions, Git behavior, appearance and an optional
+  first task. Background command detection fills unset preferences without running
   commands or replacing explicit choices; inspection failure does not block setup.
-- Tasks opens Chat first. Inbox keeps the project-scoped work list that includes chats,
+- Work combines a new-conversation composer and the project-scoped work list,
   with remembered filters, compact capture and keyboard row navigation. Work rows show
   each agent's character, live or next-action status and who is working now. Task and
   project command search covers both.
   Active task, plan and chat views show recent tool activity, workspace file labels and
   native check output from existing events, without extra model calls.
   Project opens an overview with unfinished work, setup and recorded local deliveries.
-- Chat's start page groups review and blocked work under Needs you, alongside active work across projects. Task
+- The Work sidebar groups review and blocked work under Needs you, alongside active work. Task
   and session sections remember where the user was reading. Project readiness distinguishes
   unavailable inspection from a clean checkout.
 - Result views prioritize unanswered questions, recovery and failed checks. Isolated

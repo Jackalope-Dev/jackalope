@@ -9,6 +9,7 @@ import {
 } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
+import { useHostContextStore } from '../../stores/hostContextStore';
 import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -20,6 +21,7 @@ interface Host {
   address: string;
   ssh: boolean;
   port: number;
+  wsl?: boolean;
 }
 export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
   const [hosts, setHosts] = useState<Host[]>([]);
@@ -33,7 +35,31 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [distributions, setDistributions] = useState<string[]>([]);
   const host = hosts.find((item) => item.id === selected) ?? hosts[0];
+  useEffect(() => {
+    useHostContextStore.setState({
+      host: host && !adding ? { name: host.name, wsl: !!host.wsl, address: host.address } : null,
+    });
+    return () => {
+      useHostContextStore.setState({ host: null });
+    };
+  }, [host, adding]);
+  useEffect(() => {
+    if (method !== 'wsl') return;
+    let disposed = false;
+    void nativeTask<string[]>('wsl_distributions').then(
+      (items) => {
+        if (!disposed) setDistributions(items);
+      },
+      (reason) => {
+        if (!disposed) setError(String(reason));
+      },
+    );
+    return () => {
+      disposed = true;
+    };
+  }, [method]);
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
       const next = await nativeTask<Host[]>('remote_hosts');
@@ -136,6 +162,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
                   name,
                   address,
                   ssh: method === 'ssh',
+                  wsl: method === 'wsl',
                   port,
                   code: code.trim(),
                 });
@@ -165,29 +192,72 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
               />
             </FormField>
             <FormField label="Connection">
-              <Select value={method} onValueChange={setMethod} disabled={busy}>
+              <Select
+                value={method}
+                onValueChange={(value) => {
+                  setMethod(value);
+                  setAddress('');
+                  setError('');
+                }}
+                disabled={busy}
+              >
                 <SelectItem value="ssh">SSH</SelectItem>
                 <SelectItem value="https">HTTPS</SelectItem>
+                {/Win/i.test(navigator.platform) && (
+                  <SelectItem value="wsl">WSL distribution</SelectItem>
+                )}
               </Select>
             </FormField>
             <FormField
-              label={method === 'ssh' ? 'SSH host' : 'HTTPS address'}
+              label={
+                method === 'wsl'
+                  ? 'WSL distribution'
+                  : method === 'ssh'
+                    ? 'SSH host'
+                    : 'HTTPS address'
+              }
               description={
                 method === 'ssh'
                   ? 'Use an alias that already connects from your terminal.'
                   : undefined
               }
             >
-              <Input
-                type={method === 'ssh' ? 'text' : 'url'}
-                required
-                placeholder={method === 'ssh' ? 'user@workstation' : 'https://workstation:8443'}
-                value={address}
-                disabled={busy}
-                onChange={(event) => setAddress(event.target.value)}
-              />
+              {method === 'wsl' ? (
+                <Select
+                  aria-label="WSL distribution"
+                  value={address || '__choose'}
+                  onValueChange={setAddress}
+                  disabled={busy}
+                >
+                  <SelectItem value="__choose" disabled>
+                    {distributions.length ? 'Choose a distribution…' : 'No distributions found'}
+                  </SelectItem>
+                  {distributions.map((distribution) => (
+                    <SelectItem key={distribution} value={distribution}>
+                      {distribution}
+                    </SelectItem>
+                  ))}
+                </Select>
+              ) : (
+                <Input
+                  type={method === 'ssh' ? 'text' : 'url'}
+                  required
+                  placeholder={method === 'ssh' ? 'user@workstation' : 'https://workstation:8443'}
+                  value={address}
+                  disabled={busy}
+                  onChange={(event) => setAddress(event.target.value)}
+                />
+              )}
             </FormField>
-            {method === 'ssh' && (
+            {method === 'wsl' && (
+              <p className="task-muted">
+                Start the Linux build of Jackalope inside this distribution, configure its projects
+                and agent accounts, then create a pairing code in its Remote access settings. Python
+                3 is required for the connection. Tasks, Git, setup and checks execute in Linux
+                using that host’s credentials.
+              </p>
+            )}
+            {(method === 'ssh' || method === 'wsl') && (
               <Disclosure>
                 <DisclosureSummary>Host port</DisclosureSummary>
                 <Input
@@ -211,7 +281,12 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
                 onChange={(event) => setCode(event.target.value)}
               />
             </FormField>
-            <Button type="submit" disabled={busy} loading={busy} loadingLabel="Connecting…">
+            <Button
+              type="submit"
+              disabled={busy || !address}
+              loading={busy}
+              loadingLabel="Connecting…"
+            >
               Connect
             </Button>
           </form>

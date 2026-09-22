@@ -7,12 +7,25 @@ release dates.
 
 ## Reliability and accessibility
 
+- [ ] Accept the Work sidebar and bottom status bar in installed WebViews, including
+  task/session switching, remote-host identity, stale quota, keyboard focus, zoom,
+  themes and minimum window sizes. Validate saved prompts, commands and shortcut conflicts.
+- [ ] Validate native sleep prevention and release on idle/quit, macOS traffic lights,
+  menus and unread Dock count, microphone permission denial and local dictation
+  cancellation on supported systems. Test WSL pairing against a running Linux host,
+  restart/disconnect recovery and Linux account/project boundaries.
+- [ ] Exercise copied setup files on different source/target ignore rules, linked
+  paths and partial write failures. Accept bounded size inspection on large worktrees.
 - [ ] Accept task terminals and detached panes in installed Windows, macOS and Linux
   builds: reconnect, Unicode output, shell exit, stale feedback, simultaneous windows,
   process cleanup, workspace removal and agent/check/preview reservation conflicts.
   Validate editor protocol handlers and per-project layout persistence on those systems.
+  Include shell selection, both split panes, output search, HTTP links and opt-in
+  stopped-output restoration without command replay.
 - [ ] Compare Focus, Build and Oversee on representative first-task, correction and
-  return-to-work journeys. Include topic regrouping, stale revisions, draft promotion,
+  return-to-work journeys. Check mode changes with open tasks, chats and plans,
+  persisted filters, unsent drafts, questions, Stop controls and empty projects.
+  Include topic regrouping, stale revisions, draft promotion,
   large histories and local timing exports; report human effort and outcome quality.
 
 - [ ] Validate line comments, stale-patch anchors, batched feedback, split conversation and
@@ -40,8 +53,8 @@ release dates.
   pending-message guards, unavailable cost and batch-limit pauses. Independent native
   task planning remains separate from the shared-workspace batch flow.
 - [ ] Validate installed onboarding, project changes, saved drafts, inferred
-  defaults and explicit overrides, including cancellation and restart. Cover essential
-  and customized project setup, appearance rollback and automatic command detection.
+  defaults and explicit overrides, including cancellation and restart. Cover all six
+  project setup steps, appearance rollback and automatic command detection.
 - [ ] Validate ordinary-task follow-up queues with installed providers, including
   stop-and-send, restart pauses, failed saves, cancellation and merge guards.
 - [ ] Run the [daily-use pilot](AGENT-QUALITY.md#daily-use-pilot) with consenting users

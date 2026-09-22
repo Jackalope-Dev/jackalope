@@ -26,6 +26,8 @@ pub struct QueueItem {
     #[serde(default)]
     pub prepare_command: Option<String>,
     #[serde(default)]
+    pub setup_files: Vec<String>,
+    #[serde(default)]
     pub auto_verify: bool,
     pub title: String,
     pub prompt: String,
@@ -60,6 +62,8 @@ pub struct QueueRequest {
     pub verify_command: Option<String>,
     #[serde(default)]
     pub prepare_command: Option<String>,
+    #[serde(default)]
+    pub setup_files: Vec<String>,
     #[serde(default)]
     pub auto_verify: bool,
     pub title: String,
@@ -102,6 +106,8 @@ pub struct PlanRequest {
     pub(super) verify_command: Option<String>,
     #[serde(default)]
     pub(super) prepare_command: Option<String>,
+    #[serde(default)]
+    pub setup_files: Vec<String>,
     #[serde(default)]
     pub(super) auto_verify: bool,
     pub(super) items: Vec<PlanEntry>,

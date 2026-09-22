@@ -58,6 +58,40 @@ Use this map to locate platform-specific behavior and the checks needed when cha
 CI packages are review artifacts, not signed public release candidates. Run the
 relevant native jobs and device checks before claiming platform acceptance.
 
+### Workspace integrations
+
+Settings → Desktop controls interface zoom, task-terminal shell and font, editor
+links, keyboard shortcuts and idle-sleep prevention. Windows uses a thread execution
+state lease; macOS uses an IOKit power assertion; Linux uses a login1 inhibitor.
+Failure is shown in the bottom status bar. Explicit user sleep, shutdown and lid
+policies remain under the operating system's control. Validate acquisition and
+release on work completion, setting changes and quit.
+
+macOS uses native traffic lights and standard application menus. The Dock badge
+reflects unread in-app notifications. Windows and Linux retain their existing
+window controls. Verify title-bar drag regions, resizing, detached windows, menu
+focus and unread transitions in installed builds.
+
+On Windows, Hosts can pair with a Linux Jackalope instance already running inside
+WSL. Enable Remote access in that Linux app, configure its Linux projects and
+accounts, then choose its distribution and enter its port and pairing code in the
+Windows app. Python 3 must be available in the distribution. Requests use a bounded
+`wsl.exe --exec` helper with pairing data on standard input and loopback HTTP inside
+Linux; shell selection alone does not change the agent execution environment.
+The Linux host retains execution ownership. Remote task check-ins and dispatch use
+the existing host protocol; terminal and embedded-preview controls stay in the
+Linux app. Automatic host installation/startup and Windows path translation are
+not provided.
+
+Optional dictation requires an OpenAI-compatible transcription endpoint on a
+numeric loopback HTTP address. The user starts microphone recording explicitly;
+recordings are limited to one minute, converted to mono WAV and sent only to the
+configured local service. Text is inserted into the draft for editing. Jackalope
+stores no audio files and bundles no speech model. Windows Store packaging declares
+the microphone capability; macOS declares its usage description and audio-input
+entitlement. Test permission denial, missing service, cancellation and window closure
+on each target WebView.
+
 ### Native checks on your devices
 
 Ubuntu 24.04/GNOME 46 Wayland is the first Linux acceptance target; repeat applicable

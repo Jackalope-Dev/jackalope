@@ -102,7 +102,7 @@ body {
 }
 
 .workspace-shell {
-  height: 100dvh;
+  height: calc(100dvh / var(--interface-zoom, 1));
   padding: 0 12px 12px;
   display: flex;
   flex-direction: column;
@@ -291,11 +291,10 @@ body {
 }
 .appearance-trigger {
   background: transparent;
-  border-radius: 50%;
-  transition: transform 160ms;
+  border-radius: 10px;
 }
 .appearance-trigger:hover {
-  transform: rotate(-15deg) scale(1.08);
+  background: var(--color-surface-hover);
 }
 .workspace-navigation {
   display: flex;
@@ -320,14 +319,14 @@ body {
     color 140ms;
 }
 .workspace-nav-item:hover {
-  background: var(--color-accent-subtle);
+  background: var(--color-surface-hover);
   color: var(--color-text-primary);
 }
 .workspace-nav-item[aria-current],
 .workspace-nav-item[data-active] {
-  color: var(--color-text-primary);
-  background: var(--color-surface-elevated);
-  box-shadow: 0 2px 8px var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+  background: var(--color-accent-subtle);
+  font-weight: 600;
 }
 .workspace-canvas {
   min-height: 0;
@@ -337,13 +336,14 @@ body {
   flex-direction: column;
   overflow: hidden;
   border-radius: 18px;
+  border: 1px solid var(--color-border-subtle);
   background: var(--color-bg);
-  box-shadow: 0 12px 40px -20px var(--color-accent-glow);
+  box-shadow: var(--shadow-surface);
 }
 .workspace-menu,
 .appearance-panel {
-  border-radius: 20px;
-  background: linear-gradient(160deg, var(--color-surface-elevated), var(--color-surface));
+  border-radius: 14px;
+  background: var(--color-surface-elevated);
   box-shadow: var(--shadow-pop);
   color: var(--color-text-primary);
 }

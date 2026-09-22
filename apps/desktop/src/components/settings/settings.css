@@ -40,7 +40,9 @@
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--color-text-secondary);
-  transition: all 140ms ease;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
   cursor: pointer;
 }
 
@@ -50,7 +52,8 @@
 
 .settings-scope-pill.is-active {
   background: var(--color-surface-elevated);
-  color: var(--color-accent-ink);
+  color: var(--color-text-primary);
+  font-weight: 600;
   box-shadow: var(--shadow-selection);
 }
 
@@ -86,7 +89,9 @@
   text-align: left;
   width: 100%;
   cursor: pointer;
-  transition: all 120ms ease;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
 }
 
 .settings-nav-item:hover {
@@ -97,6 +102,7 @@
 .settings-nav-item.is-active {
   background: var(--color-accent-subtle);
   color: var(--color-accent-ink);
+  font-weight: 600;
 }
 
 .settings-nav-item svg {
@@ -520,4 +526,17 @@
 }
 .project-preferences .settings-input {
   min-width: 0;
+}
+.desktop-services {
+  display: grid;
+  gap: 12px;
+  padding-block: 20px;
+  border-block: 1px solid var(--color-border-subtle);
+  margin-bottom: 24px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-scope-pill,
+  .settings-nav-item {
+    transition: none;
+  }
 }

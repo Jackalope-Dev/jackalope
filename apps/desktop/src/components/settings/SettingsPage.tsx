@@ -30,8 +30,10 @@ import { Setting, SettingGroup } from './Setting';
 import { SystemInfoView } from './SystemInfo';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
+import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
 import { RemoteAccess } from './RemoteAccess';
+import { SavedActions } from './SavedActions';
 
 interface SettingsPageProps {
   onClose: () => void;
@@ -41,6 +43,8 @@ interface SettingsPageProps {
 }
 const categories = [
   'General',
+  'Desktop',
+  'Saved actions',
   'Jackalope account',
   'Invitations',
   'Appearance',
@@ -56,6 +60,12 @@ const categories = [
   'Diagnostics',
 ] as const;
 export type SettingsCategory = (typeof categories)[number];
+const settingsGroup = (category: SettingsCategory): SettingsCategory =>
+  category === 'Invitations'
+    ? 'Jackalope account'
+    : category === 'System' || category === 'Diagnostics'
+      ? 'Updates & support'
+      : category;
 
 export function SettingsPage({
   onClose,
@@ -83,6 +93,11 @@ export function SettingsPage({
   const [category, setCategory] = useState<SettingsCategory>(
     initialCategory ?? (initialScope === 'project' ? 'Project' : 'General'),
   );
+  const selectedSection = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (settingsGroup(category) !== category)
+      selectedSection.current?.scrollIntoView({ block: 'start' });
+  }, [category]);
   const [query, setQuery] = useState('');
   const [message, setMessage] = useState('');
   const [confirming, setConfirming] = useState(false);
@@ -91,7 +106,7 @@ export function SettingsPage({
   const matches = (section: SettingsCategory, words: string) =>
     query.trim()
       ? `${section} ${words}`.toLowerCase().includes(query.trim().toLowerCase())
-      : section === category;
+      : settingsGroup(section) === settingsGroup(category);
   const visible = scopedCategories.filter((c) =>
     matches(
       c,
@@ -103,6 +118,9 @@ export function SettingsPage({
         Diagnostics: 'activity log routing events errors codebase',
         General:
           'window close exit system tray background quit minimize guided setup onboarding notifications companion animations quiet',
+        Desktop:
+          'keyboard shortcuts zoom terminal shell font editor keep awake sleep power WSL links running services previews ports disk worktrees',
+        'Saved actions': 'prompt presets commands shortcuts reuse global project',
         Appearance: 'theme color light dark atmosphere picker toolbar',
         Agents:
           'default models available detected allowed restrict cli command executable configuration automatic quota handoff',
@@ -216,23 +234,25 @@ export function SettingsPage({
       </div>
       <div className="settings-body">
         <nav className="settings-sidebar" aria-label="Settings categories">
-          {scopedCategories.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className={`settings-nav-item ${category === c && !query ? 'is-active' : ''}`}
-              aria-current={category === c && !query ? 'page' : undefined}
-              onClick={() => {
-                setCategory(c);
-                setQuery('');
-                setMessage('');
-                setConfirming(false);
-                setConfirmation('');
-              }}
-            >
-              {c}
-            </button>
-          ))}
+          {scopedCategories
+            .filter((c) => settingsGroup(c) === c)
+            .map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={`settings-nav-item ${settingsGroup(category) === c && !query ? 'is-active' : ''}`}
+                aria-current={settingsGroup(category) === c && !query ? 'page' : undefined}
+                onClick={() => {
+                  setCategory(c);
+                  setQuery('');
+                  setMessage('');
+                  setConfirming(false);
+                  setConfirmation('');
+                }}
+              >
+                {c}
+              </button>
+            ))}
           <button
             type="button"
             className="settings-nav-item settings-community-link"
@@ -245,7 +265,11 @@ export function SettingsPage({
         <div className="settings-content">
           {!visible.length && <p>No settings match “{query}”.</p>}
           {visible.map((c) => (
-            <section key={c} className="settings-section">
+            <section
+              key={c}
+              className="settings-section"
+              ref={c === category ? selectedSection : undefined}
+            >
               <WorkspaceSectionHeading
                 title={c === 'Project' ? 'Project settings' : c}
                 description={
@@ -256,6 +280,8 @@ export function SettingsPage({
                 <JackalopeAccount onInvitations={() => setCategory('Invitations')} />
               )}
               {c === 'Connected work' && <IssueConnections />}
+              {c === 'Desktop' && <DesktopPreferences />}
+              {c === 'Saved actions' && <SavedActions />}
               {c === 'Remote access' && <RemoteAccess />}
               {c === 'Invitations' && (
                 <ReferralSettings onAccount={() => setCategory('Jackalope account')} />

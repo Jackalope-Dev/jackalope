@@ -92,6 +92,8 @@ pub struct TaskRun {
     #[serde(default)]
     pub prepare_command: Option<String>,
     #[serde(default)]
+    pub setup_files: Vec<String>,
+    #[serde(default)]
     pub auto_verify: bool,
     #[serde(default)]
     pub verification: Option<crate::commands::verification::Verification>,
@@ -159,6 +161,8 @@ pub struct RunRequest {
     pub verify_command: Option<String>,
     #[serde(default)]
     pub prepare_command: Option<String>,
+    #[serde(default)]
+    pub setup_files: Vec<String>,
     #[serde(default)]
     pub auto_verify: bool,
     #[serde(default)]
@@ -268,6 +272,7 @@ impl TaskRun {
             process_contained: self.process_contained.clone(),
             verify_command: self.verify_command.clone(),
             prepare_command: self.prepare_command.clone(),
+            setup_files: self.setup_files.clone(),
             auto_verify: self.auto_verify.clone(),
             verification: verification,
             finishing: self.finishing.clone(),

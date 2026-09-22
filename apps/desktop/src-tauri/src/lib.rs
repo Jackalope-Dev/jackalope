@@ -62,6 +62,7 @@ pub fn run() {
             app.manage(commands::account::AccountService::new(preferences.join("account.bin"), runtime.access.clone()));
             commands::account::launch_refresh(app.handle().clone());
             app.manage(WindowBehavior::load(preferences.join("desktop.json")));
+            app.manage(commands::desktop_integration::DesktopIntegration::load(preferences.join("awake.json")));
             app.manage(commands::notifications::Notifications::load(preferences.join("notifications.json")));
             app.manage(commands::community::Community::load(preferences.join("community.json")));
             let coordinator = Coordinator::new(directory.join("coordination"), runtime.clone())?;
@@ -77,7 +78,10 @@ pub fn run() {
             app.manage(scheduler);
             app.manage(runtime);
             app.manage(coordinator);
+            commands::desktop_integration::launch(app.handle().clone());
             let mut window = tauri::WebviewWindowBuilder::from_config(app, &app.config().app.windows[0])?;
+            #[cfg(target_os = "macos")]
+            { window = window.decorations(true).title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true); }
             if let Some(profile) = &profile { window = window.data_directory(profile.join("webview")); }
             if resetting {
                 let token = std::fs::read_to_string(directory.join(RESET_MARKER))?;
@@ -85,6 +89,8 @@ pub fn run() {
                 window = window.initialization_script(format!("if (localStorage.getItem('jackalope-reset-receipt') !== {token}) {{ for (const key of Object.keys(localStorage)) {{ if (key.startsWith('jackalope-')) localStorage.removeItem(key); }} sessionStorage.clear(); localStorage.setItem('jackalope-reset-receipt', {token}); }} window.__JACKALOPE_RESET__ = true;"));
             }
             window.build()?;
+            #[cfg(target_os = "macos")]
+            window_behavior::setup_app_menu(app)?;
             commands::notifications::launch(app.handle().clone());
             if let Err(error) = setup_tray(app) {
                 eprintln!("System tray unavailable; closing will quit Jackalope: {error}");
@@ -129,6 +135,12 @@ pub fn run() {
             commands::account::app_account_poll,
             commands::account::app_account_disconnect,
             desktop_settings,
+            commands::desktop_integration::desktop_activity,
+            commands::desktop_integration::desktop_keep_awake,
+            commands::desktop_integration::desktop_unread_badge,
+            commands::desktop_integration::desktop_zoom,
+            commands::remote::wsl::wsl_distributions,
+            commands::dictation::desktop_transcribe,
             commands::notifications::notification_status,
             commands::notifications::notification_configure,
             commands::notifications::notification_test,
@@ -145,6 +157,7 @@ pub fn run() {
             app_reset,
             app_finish_reset,
             git_list_worktrees,
+            commands::worktree_usage::git_worktree_usage,
             git_create_worktree,
             commands::worktree_cleanup::git_cleanup_worktree,
             commands::worktree_cleanup::git_archive_worktree,
@@ -174,6 +187,7 @@ pub fn run() {
             commands::managed_runtime::managed_runtime_cancel,
             pty_spawn,
             commands::work_terminal::task_terminal_start,
+            commands::work_terminal::task_terminal_restore,
             commands::work_windows::task_work_window,
             commands::work_windows::task_open_editor,
             commands::work_terminal::task_terminal_status,
@@ -312,6 +326,7 @@ pub fn run() {
                 window_behavior::show_main_window(app);
             }
             if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
+                app.state::<commands::desktop_integration::DesktopIntegration>().shutdown();
                 app.state::<commands::helper::Helper>().stop();
                 app.state::<commands::remote::RemoteAccess>().shutdown();
                 commands::remote::close_tunnels();

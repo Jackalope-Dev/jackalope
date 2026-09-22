@@ -16,9 +16,9 @@ export const roadmapStages = [
     items: [
       {
         title: 'A workspace that fits how you work.',
-        summary: 'Focus, Build and Oversee layouts, task terminals and separate windows.',
+        summary: 'A unified Work page, workspace status, split terminals and desktop preferences.',
         detail:
-          'Choose a project layout, keep review beside the conversation, or focus on work that needs you. Open a shell in the task workspace, hand its files to an installed editor, or pop out a result, review, preview or terminal. Group chat messages into reversible topics and prepare source-linked task drafts. Saved feedback returns to the task before sending. Incremental session updates and optional local timing exports support performance investigation. Installed acceptance and comparisons of real workflow efficiency remain in progress.',
+          'Keep conversations, tasks and plans in Work, with recent work in the sidebar and workspace, activity and quota information along the bottom. Focus on one conversation with a compact navigation rail, Build with tools and review beside work, or Oversee progress and decisions on a full-width activity board. Modes keep your drafts and remember their own filters. Configure zoom, shortcuts, editor and shell preferences, reuse saved prompts and commands, and optionally retain stopped terminal output. Dictation requires a local transcription service. Explicit ignored-file setup and worktree size inspection support isolated work. Open a shell in the task workspace, hand its files to an installed editor, or pop out a result, review, preview or terminal. Group chat messages into reversible topics and prepare source-linked task drafts. Saved feedback returns to the task before sending. Incremental session updates and optional local timing exports support performance investigation. Installed acceptance and comparisons of real workflow efficiency remain in progress.',
       },
       {
         title: 'Feedback where the work happens.',
@@ -36,19 +36,19 @@ export const roadmapStages = [
         title: 'From request to a result you can inspect.',
         summary: 'Shared work discovery, local previews, and a clear delivery handoff.',
         detail:
-          'Tasks opens Chat first. Inbox keeps the shared work list with explicit project scope, remembered views, and command search. Each row shows the assigned agent, live or next-action status, and the next useful step. Isolated results keep review, merge into the target branch, and workspace cleanup together. Project overview helps you resume unfinished work. Short task titles keep full instructions in Details. Results lead with output, and review puts the diff beside checks and evidence. Compact follow-up and visible action buttons keep the next step clear. Queue a follow-up or explicitly stop current work and send; saved queues pause after failures and restart. Local previews remember setup and can capture fresh browser evidence for corrections. Delivery reads local Git and optional GitHub PR/CI state, then prepares editable handoff drafts. Publishing and deployment remain explicit steps. Installed acceptance and usability validation are still in progress.',
+          'Work combines conversations and the shared work list with explicit project scope, remembered views, and command search. Each row shows the assigned agent, live or next-action status, and the next useful step. Isolated results keep review, merge into the target branch, and workspace cleanup together. Project overview helps you resume unfinished work. Short task titles keep full instructions in Details. Results lead with output, and review puts the diff beside checks and evidence. Compact follow-up and visible action buttons keep the next step clear. Queue a follow-up or explicitly stop current work and send; saved queues pause after failures and restart. Local previews remember setup and can capture fresh browser evidence for corrections. Delivery reads local Git and optional GitHub PR/CI state, then prepares editable handoff drafts. Publishing and deployment remain explicit steps. Installed acceptance and usability validation are still in progress.',
       },
       {
         title: 'Keep the ideas coming.',
         summary: 'A running conversation with a compact window you can pin.',
         detail:
-          'Open Chat and send a message to start. Sessions keep your messages in one isolated workspace. Pause work, review the changes, run checks, and explicitly merge the latest result into your target branch. Queued messages must run or be canceled first. Saved integration receipts prevent work from restarting in the old workspace; continue in a new chat with the result attached. Pop out and pin conversations, preserve drafts, and pause later batches at optional batch or estimated-cost thresholds. Those thresholds are not billing caps. Installed-provider and window validation remain in progress.',
+          'Open Work and send a message to start. Sessions keep your messages in one isolated workspace. Pause work, review the changes, run checks, and explicitly merge the latest result into your target branch. Queued messages must run or be canceled first. Saved integration receipts prevent work from restarting in the old workspace; continue in a new chat with the result attached. Pop out and pin conversations, preserve drafts, and pause later batches at optional batch or estimated-cost thresholds. Those thresholds are not billing caps. Installed-provider and window validation remain in progress.',
       },
       {
         title: 'A clearer path through daily work.',
         summary: 'Faster project setup, review checkpoints, and reusable task starters.',
         detail:
-          'Project setup walks through your repository, agents, decisions, Git behavior, appearance, and an optional first task. Setup detects project commands automatically and preserves your saved choices. Chat surfaces work waiting across projects, and results remember the section you were reading. Track reviewed files, approve outcomes, and prepare a review request for another agent from the diff toolbar. Compare changes since your last review, inspect why lessons were included, and prepare editable issue, PR-feedback, CI-repair, or dependency-update requests. GitHub imports are read-only. Optional usefulness ratings and review minutes stay local to each task. Installed testing and observed daily-use trials remain open.',
+          'Project setup walks through your repository, agents, decisions, Git behavior, appearance, and an optional first task. Setup detects project commands automatically and preserves your saved choices. The Work sidebar surfaces work waiting for you, and results remember the section you were reading. Track reviewed files, approve outcomes, and prepare a review request for another agent from the diff toolbar. Compare changes since your last review, inspect why lessons were included, and prepare editable issue, PR-feedback, CI-repair, or dependency-update requests. GitHub imports are read-only. Optional usefulness ratings and review minutes stay local to each task. Installed testing and observed daily-use trials remain open.',
       },
       {
         title: 'Your agents. One workspace.',
@@ -89,7 +89,7 @@ export const roadmapStages = [
     status: 'Current focus · In development',
     title: 'Make it feel like home.',
     description:
-      'The next step is confidence: from the first sign-in to coming back to unfinished work. We’re preparing Jackalope for real projects and everyday use.',
+      'The next step is confidence: from the first sign-in to coming back to unfinished work. Native sleep prevention, macOS menus and Dock badges, and pairing with an existing WSL Linux host need installed validation. We’re preparing Jackalope for real projects and everyday use.',
     next: 'A dependable local workspace comes before a wider release.',
     link: { label: 'Follow the development changelog', href: '/changelog/' },
     items: [

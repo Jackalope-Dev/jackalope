@@ -16,6 +16,9 @@ interface WorkViewState {
   resetSplits: (ids: string[]) => void;
   remember: (id: string, section: string) => void;
   request: { id: string; section: string; revision: number } | null;
+  listRequest: string | null;
+  openList: (filter: string) => void;
+  clearListRequest: () => void;
   setScope: (scope: 'all' | 'project') => void;
   setView: (key: string, view: WorkView) => void;
   open: (id: string, section?: string) => void;
@@ -43,6 +46,9 @@ export const useWorkViewStore = create<WorkViewState>()(
           ),
         })),
       request: null,
+      listRequest: null,
+      openList: (filter) => set({ scope: 'all', listRequest: filter }),
+      clearListRequest: () => set({ listRequest: null }),
       setScope: (scope) => set({ scope }),
       setView: (key, view) => set((state) => ({ views: { ...state.views, [key]: view } })),
       open: (id, section = 'result') =>

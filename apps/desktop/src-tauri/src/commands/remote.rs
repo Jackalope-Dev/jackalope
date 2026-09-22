@@ -1,6 +1,7 @@
 mod api;
 mod client;
 mod transport;
+pub mod wsl;
 pub use client::*;
 pub use transport::*;
 

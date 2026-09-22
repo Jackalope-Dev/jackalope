@@ -15,21 +15,25 @@ import {
 } from '../../lib/task-collection';
 import { nativeTask } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
-import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
-import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
+import { useLiveSessionStore } from '../../stores/liveSessionStore';
+import { useManagedTaskStore } from '../../stores/managedTaskStore';
+import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
+import { useWorkbenchStore } from '../../stores/workbenchStore';
 import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
+import { LiveSessionView } from '../sessions/LiveSessionView';
+import { SessionStart } from '../sessions/SessionStart';
 import { ArchivedHistory } from '../settings/ArchivedHistory';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
-import { CaptureTask } from './CaptureTask';
 import { ManagedTaskView } from './ManagedTaskView';
 import { ProjectQueue } from './ProjectQueue';
 import { TaskCollection } from './TaskCollection';
 import { TaskDetail } from './TaskDetail';
+import { WorkspaceModeHome } from './WorkspaceModeHome';
 
 export function TaskWorkspace({
   onCapture,
@@ -43,12 +47,12 @@ export function TaskWorkspace({
   composerFocus?: number;
 }) {
   const { projects, activeProjectId } = useProjectStore();
+  const preset = useWorkbenchStore((state) => state.presets[activeProjectId ?? ''] ?? 'focus');
   const managed = useManagedTaskStore();
-  useEffect(observeManagedTasks, []);
   const runs = useExecutionStore((state) => state.runs);
   const sessions = useLiveSessionStore((state) => state.sessions);
+  const selectedSessionId = useLiveSessionStore((state) => state.selectedId);
   const sessionRuns = useLiveSessionStore((state) => state.runs);
-  useEffect(observeLiveSessions, []);
   const allRuns = useMemo(
     () => [...new Map([...runs, ...sessionRuns].map((run) => [run.id, run])).values()],
     [runs, sessionRuns],
@@ -59,32 +63,86 @@ export function TaskWorkspace({
   const loading = useExecutionStore((state) => state.loading);
   const error = useExecutionStore((state) => state.error) || managed.error;
   const ideas = useTaskStore((state) => state.tasks);
-  const { scope, setScope, views, setView: saveView } = useWorkViewStore();
+  const {
+    scope,
+    setScope,
+    views,
+    setView: saveView,
+    listRequest,
+    clearListRequest,
+  } = useWorkViewStore();
   const projectFilter = scope === 'all' ? 'all' : (activeProjectId ?? 'unassigned');
   const [archived, setArchived] = useState(false);
   const [cleanupBusy, setCleanupBusy] = useState(false);
   const [parallel, setParallel] = useState(false);
   const [composerExpanded, setComposerExpanded] = useState(false);
-  const hasWork = !!(runs.length || ideas.length || sessions.length);
+  const [browsing, setBrowsing] = useState(false);
+  const hasWork = !!(
+    runs.length ||
+    ideas.length ||
+    sessions.length ||
+    managed.queue.managedTasks?.length
+  );
+  const modeContext = `${activeProjectId}:${preset}`;
+  const previousModeContext = useRef(modeContext);
+  useEffect(() => {
+    if (previousModeContext.current === modeContext) return;
+    previousModeContext.current = modeContext;
+    setBrowsing(false);
+    setComposerExpanded(false);
+    setArchived(false);
+    setParallel(false);
+  }, [modeContext]);
   useEffect(() => {
     if (!composerFocus) return;
     setComposerExpanded(true);
+    setBrowsing(false);
+    setArchived(false);
     setParallel(false);
     const frame = requestAnimationFrame(() => {
-      const input = document.getElementById('task-intent');
+      const input = document.querySelector<HTMLTextAreaElement>('.task-home textarea');
       input?.focus();
       input?.scrollIntoView({ block: 'center' });
     });
     return () => cancelAnimationFrame(frame);
   }, [composerFocus]);
-  const viewKey = `${projectFilter}:${archived ? 'archive' : 'current'}`;
-  const view = views[viewKey] ?? defaultWorkView;
+  const legacyViewKey = `${projectFilter}:${archived ? 'archive' : 'current'}`;
+  const viewKey = `${legacyViewKey}:${preset}`;
+  const view = views[viewKey] ??
+    (preset === 'build' ? views[legacyViewKey] : undefined) ?? {
+      ...defaultWorkView,
+      layout: preset === 'oversee' ? ('board' as const) : ('list' as const),
+    };
   const setView = (value: typeof view) => saveView(viewKey, value);
+  useEffect(() => {
+    if (!listRequest) return;
+    const key = `${projectFilter}:current:${preset}`;
+    const saved = useWorkViewStore.getState().views[key];
+    saveView(key, {
+      ...defaultWorkView,
+      ...saved,
+      layout: saved?.layout ?? (preset === 'oversee' ? 'board' : 'list'),
+      filter: listRequest,
+      query: '',
+    });
+    setBrowsing(true);
+    setArchived(false);
+    setParallel(false);
+    clearListRequest();
+  }, [listRequest, projectFilter, preset, saveView, clearListRequest]);
+  const browse = (filter: string) => {
+    setBrowsing(true);
+    setView({ ...view, filter });
+    requestAnimationFrame(() =>
+      document.querySelector('.task-collection')?.scrollIntoView({ block: 'start' }),
+    );
+  };
   const integratedIds = managed.queue.mergedRunIds;
   const lastOpened = useRef<string | null>(null);
   const openItem = useCallback(
     (item: WorkItem) => {
       lastOpened.current = item.id;
+      useLiveSessionStore.getState().select(null);
       if (!item.managed) useManagedTaskStore.getState().select(null);
       if (item.managed) {
         select(null);
@@ -92,7 +150,7 @@ export function TaskWorkspace({
       } else if (item.session) {
         useLiveSessionStore.getState().select(item.session.id);
         useProjectStore.getState().selectProject(item.session.request.projectId);
-        navigateWorkspace('live-sessions');
+        select(null);
       } else if (item.run) select(item.run.id);
       else if (item.idea) onCapture(item.idea.id);
     },
@@ -185,20 +243,44 @@ export function TaskWorkspace({
         integrated={integratedIds.includes(selected.id)}
       />
     );
+  const selectedSession = sessions.find(
+    (session) =>
+      session.id === selectedSessionId &&
+      (projectFilter === 'all' || session.request.projectId === projectFilter),
+  );
+  if (selectedSession)
+    return (
+      <LiveSessionView
+        key={selectedSession.id}
+        session={selectedSession}
+        runs={sessionRuns}
+        onBack={() => useLiveSessionStore.getState().select(null)}
+      />
+    );
   if (parallel && project)
     return <ProjectQueue project={project} onBack={() => setParallel(false)} />;
   return (
-    <WorkspacePage className="task-home">
+    <WorkspacePage className="task-home" data-mode={preset} data-browsing={browsing || undefined}>
       <WorkspaceHeading
         title={
-          runs.length || ideas.length || sessions.length
-            ? scope === 'all'
-              ? 'All work'
-              : `Work in ${project?.name ?? 'your workspace'}`
-            : 'What do you want to accomplish?'
+          preset === 'focus'
+            ? browsing
+              ? 'Your work'
+              : 'What will you focus on?'
+            : preset === 'oversee'
+              ? scope === 'all'
+                ? 'Activity across your projects'
+                : `Oversee ${project?.name ?? 'your work'}`
+              : `Build in ${project?.name ?? 'your workspace'}`
         }
         description={
-          hasWork ? undefined : (
+          preset === 'focus' ? (
+            'One conversation or task at a time. Everything else is within reach.'
+          ) : preset === 'oversee' ? (
+            'See what is moving, answer questions and keep reviews moving.'
+          ) : hasWork ? (
+            'Keep your conversation beside changes, previews and terminals.'
+          ) : (
             <span>
               Describe what to build, fix, or explore, or{' '}
               <button
@@ -213,11 +295,17 @@ export function TaskWorkspace({
         }
         action={
           <div className="task-home-actions">
-            {!!needsYou && (
+            {preset === 'focus' && hasWork && (
+              <Button variant="outline" onClick={() => setBrowsing(!browsing)}>
+                {browsing ? 'Back to focus' : 'All work'}
+              </Button>
+            )}
+            {!!needsYou && preset === 'build' && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => {
+                  setBrowsing(true);
                   setView({
                     ...view,
                     filter: 'attention',
@@ -230,10 +318,20 @@ export function TaskWorkspace({
                 Needs you · {needsYou}
               </Button>
             )}
-            {hasWork && (
-              <Button onClick={() => onCapture()}>
+            {(hasWork || preset === 'oversee') && (preset !== 'focus' || browsing) && (
+              <Button
+                onClick={() => {
+                  setComposerExpanded(true);
+                  requestAnimationFrame(() => {
+                    const input =
+                      document.querySelector<HTMLTextAreaElement>('.task-home textarea');
+                    input?.focus();
+                    input?.scrollIntoView({ block: 'center' });
+                  });
+                }}
+              >
                 <Plus size={16} />
-                New task
+                New work
               </Button>
             )}
             <Menu.Root>
@@ -244,15 +342,9 @@ export function TaskWorkspace({
               </Menu.Trigger>
               <Menu.Portal>
                 <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
-                  <Menu.Item
-                    className="workspace-menu-item"
-                    onSelect={() => {
-                      useLiveSessionStore.getState().select(null);
-                      navigateWorkspace('live-sessions');
-                    }}
-                  >
+                  <Menu.Item className="workspace-menu-item" onSelect={() => onCapture()}>
                     <Radio size={16} />
-                    Open Chat
+                    Save a task draft
                   </Menu.Item>
                   {project && (
                     <Menu.Item
@@ -275,12 +367,35 @@ export function TaskWorkspace({
           </div>
         }
       />
-      {composerVisible && (!hasWork || composerExpanded) && (
-        <CaptureTask
-          inline
-          compact={!!(runs.length || ideas.length || sessions.length)}
-          onClose={() => {}}
-          onStarted={() => {}}
+      {preset !== 'focus' && !archived && (
+        <WorkspaceModeHome
+          preset={preset}
+          items={items}
+          filter={view.filter}
+          onOpen={openItem}
+          onFilter={browse}
+          onPlan={() => setParallel(true)}
+        />
+      )}
+      {composerVisible &&
+        ((!hasWork && preset !== 'oversee') ||
+          composerExpanded ||
+          (preset === 'focus' && !browsing)) && (
+          <SessionStart
+            embedded
+            key={project?.id ?? 'none'}
+            project={project}
+            onOpenProject={() => useOnboardingStore.getState().begin()}
+          />
+        )}
+      {preset === 'focus' && !browsing && (
+        <WorkspaceModeHome
+          preset={preset}
+          items={items}
+          filter={view.filter}
+          onOpen={openItem}
+          onFilter={browse}
+          onPlan={() => setParallel(true)}
         />
       )}
       {(runs.length > 0 || ideas.length > 0 || sessions.length > 0) && (
@@ -290,7 +405,7 @@ export function TaskWorkspace({
       )}
       {loading && <LoadingState label={'Loading task history…'} />}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
-      {runs.length > 0 || ideas.length > 0 || sessions.length > 0 ? (
+      {(preset !== 'focus' || browsing) && (hasWork || preset === 'oversee') ? (
         <TaskCollection
           key={String(archived)}
           archived={archived}

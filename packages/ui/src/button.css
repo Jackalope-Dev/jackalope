@@ -51,9 +51,9 @@
     border: 1px solid var(--color-border);
   }
   :where(.ui-button[data-variant="ghost"]) {
-    background: color-mix(in srgb, var(--color-surface-hover) 55%, transparent);
+    background: transparent;
     color: var(--color-text-secondary);
-    border: 1px solid var(--color-border-subtle);
+    border: 1px solid transparent;
   }
   :where(
     .ui-button[data-variant="secondary"],

@@ -38,7 +38,7 @@ import { OnboardingAgentAccount } from './OnboardingAgentAccount';
 import { ProjectThemeStep } from './ProjectThemeStep';
 import './onboarding.css';
 
-const allSteps: { id: OnboardingStep; label: string }[] = [
+const steps: { id: OnboardingStep; label: string }[] = [
   { id: 'project', label: 'Project' },
   { id: 'agent', label: 'Agents' },
   { id: 'routing', label: 'Decisions' },
@@ -74,10 +74,6 @@ export function OnboardingFlow({
   onSkip: () => void;
 }) {
   const onboarding = useOnboardingStore();
-  const customize = onboarding.customize || ['routing', 'theme'].includes(onboarding.step);
-  const steps = customize
-    ? allSteps
-    : allSteps.filter((step) => !['routing', 'theme'].includes(step.id));
   const { projects } = useProjectStore();
   const project =
     onboarding.pendingProject ?? projects.find((item) => item.id === onboarding.projectId);
@@ -339,15 +335,6 @@ export function OnboardingFlow({
               </li>
             ))}
           </ol>
-          {['project', 'agent'].includes(step) && (
-            <Button
-              variant="ghost"
-              disabled={busy}
-              onClick={() => onboarding.setCustomize(!customize)}
-            >
-              {customize ? 'Use essential setup' : 'Customize decisions and appearance'}
-            </Button>
-          )}
         </aside>
         <section className="onboarding-content" aria-labelledby="onboarding-heading">
           <div className="onboarding-step-meta">
@@ -795,7 +782,7 @@ export function OnboardingFlow({
                         },
                         draft,
                       );
-                      advance(() => onboarding.go(customize ? 'routing' : 'behavior'));
+                      advance(() => onboarding.go('routing'));
                     })
                   }
                 >
@@ -844,11 +831,7 @@ export function OnboardingFlow({
               </div>
 
               <div className="onboarding-actions">
-                <Button
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => onboarding.go(customize ? 'routing' : 'agent')}
-                >
+                <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('routing')}>
                   <ArrowLeft size={16} />
                   Back
                 </Button>
@@ -859,7 +842,7 @@ export function OnboardingFlow({
                       if (!commitPolicy) return;
                       await projectGitPolicy(project.path, commitPolicy);
                       setThemePreview(undefined);
-                      advance(() => onboarding.go(customize ? 'theme' : 'task'));
+                      advance(() => onboarding.go('theme'));
                     })
                   }
                 >
@@ -921,7 +904,7 @@ export function OnboardingFlow({
                   disabled={busy}
                   onClick={() => {
                     setThemePreview(undefined);
-                    onboarding.go(customize ? 'theme' : 'behavior');
+                    onboarding.go('theme');
                   }}
                 >
                   <ArrowLeft size={16} />

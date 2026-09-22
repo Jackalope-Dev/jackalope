@@ -896,6 +896,7 @@ setInterval(()=>{},1000);
             agent_profile_id: None,
             verify_command: None,
             prepare_command: None,
+            setup_files: Vec::new(),
             auto_verify: false,
             target_branch: None,
             account_binding: None,

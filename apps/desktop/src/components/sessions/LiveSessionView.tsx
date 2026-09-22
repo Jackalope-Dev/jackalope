@@ -13,7 +13,7 @@ import {
   Square,
   X,
 } from 'lucide-react';
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
 import {
   type LiveSession,
@@ -49,6 +49,10 @@ import { SessionRecovery } from './SessionRecovery';
 import { SessionTopics } from './SessionTopics';
 import { TranscriptResult } from './TranscriptResult';
 import './live-session.css';
+
+const TaskTerminal = lazy(() =>
+  import('../tasks/TaskTerminal').then((module) => ({ default: module.TaskTerminal })),
+);
 
 export function LiveSessionView({
   session,
@@ -104,13 +108,33 @@ export function LiveSessionView({
     const saved = useWorkViewStore.getState().reading[`session:${session.id}`];
     return saved === 'delivery'
       ? 'changes'
-      : ['work', 'changes', 'preview'].includes(saved)
+      : ['work', 'changes', 'preview', 'terminal'].includes(saved)
         ? saved
-        : 'work';
+        : preset === 'build' && latest
+          ? 'changes'
+          : 'work';
   });
   useEffect(() => {
     useWorkViewStore.getState().remember(`session:${session.id}`, tab);
   }, [session.id, tab]);
+  const workRequest = useWorkViewStore((state) => state.request);
+  useEffect(() => {
+    if (
+      !workRequest ||
+      (workRequest.id !== `session:${session.id}` &&
+        !session.batches.some((batch) => batch.runId === workRequest.id))
+    )
+      return;
+    const section = workRequest.section;
+    setTab(
+      ['preview', 'terminal'].includes(section)
+        ? section
+        : ['changes', 'review', 'integrate', 'verify', 'delivery'].includes(section)
+          ? 'changes'
+          : 'work',
+    );
+    setExpanded(section !== 'result' && section !== 'conversation');
+  }, [workRequest, session.id, session.batches]);
   const [addition, setAddition] = useState<{
     text: string;
     revision: number;
@@ -252,7 +276,7 @@ export function LiveSessionView({
           )}
         </button>
       </Tooltip>
-      {detached && (
+      {detached && !/Mac/.test(navigator.platform) && (
         <>
           <button
             type="button"
@@ -279,9 +303,12 @@ export function LiveSessionView({
       className={`live-session${detached ? ' live-session-detached' : ''}`}
       aria-label={session.title}
     >
-      <header className="live-header" data-tauri-drag-region={detached || undefined}>
+      <header
+        className={`live-header${detached && /Mac/.test(navigator.platform) ? ' live-header-native-mac' : ''}`}
+        data-tauri-drag-region={detached || undefined}
+      >
         {!detached && onBack && (
-          <Button variant="ghost" size="icon" aria-label="Back to sessions" onClick={onBack}>
+          <Button variant="ghost" size="icon" aria-label="Back to work" onClick={onBack}>
             <ArrowLeft size={18} />
           </Button>
         )}
@@ -396,7 +423,14 @@ export function LiveSessionView({
       )}
       <WorkSourceLink prompts={session.messages.map((message) => message.text)} />
       {latest && !detached && (
-        <WorkContext key={`context:${session.id}`} run={latest}>
+        <WorkContext
+          key={`context:${session.id}`}
+          run={latest}
+          onTerminal={() => {
+            setExpanded(true);
+            setTab('terminal');
+          }}
+        >
           <SessionTopics key={`topics:${session.id}`} session={session} />
         </WorkContext>
       )}
@@ -548,7 +582,7 @@ export function LiveSessionView({
               </Button>
             )}
             <fieldset className="live-tabs" aria-label="Session details">
-              {(['work', 'changes', 'preview'] as const).map((value) => (
+              {(['work', 'changes', 'preview', 'terminal'] as const).map((value) => (
                 <Button
                   key={value}
                   variant="ghost"
@@ -564,7 +598,13 @@ export function LiveSessionView({
                     }
                   }}
                 >
-                  {value === 'work' ? 'Activity' : value === 'changes' ? 'Review' : 'Preview'}
+                  {value === 'work'
+                    ? 'Activity'
+                    : value === 'changes'
+                      ? 'Review'
+                      : value === 'terminal'
+                        ? 'Terminal'
+                        : 'Preview'}
                 </Button>
               ))}
             </fieldset>
@@ -644,6 +684,14 @@ export function LiveSessionView({
                 )}
               </>
             )}
+            {tab === 'terminal' &&
+              (latest ? (
+                <Suspense fallback={<p>Loading terminal…</p>}>
+                  <TaskTerminal run={latest} />
+                </Suspense>
+              ) : (
+                <p>A terminal is available after this conversation creates a workspace.</p>
+              ))}
             {tab === 'changes' &&
               (active ? (
                 <p className="live-muted">Finish or stop work to review the current changes.</p>

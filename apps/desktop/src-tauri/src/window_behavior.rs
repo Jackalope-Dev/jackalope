@@ -160,6 +160,57 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
+pub fn setup_app_menu(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::{
+        menu::{PredefinedMenuItem, Submenu},
+        Emitter,
+    };
+    let menu = Menu::default(app.handle())?;
+    if let Some(first) = menu.items()?.first().and_then(|item| item.as_submenu()) {
+        first.insert(
+            &MenuItem::with_id(app, "app-settings", "Settings…", true, None::<&str>)?,
+            2,
+        )?;
+    }
+    let work = Submenu::with_items(
+        app,
+        "Work",
+        true,
+        &[
+            &MenuItem::with_id(app, "app-new-work", "New Work", true, None::<&str>)?,
+            &MenuItem::with_id(
+                app,
+                "app-search",
+                "Search and Commands…",
+                true,
+                None::<&str>,
+            )?,
+            &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(app, "app-show", "Show Jackalope", true, None::<&str>)?,
+        ],
+    )?;
+    menu.insert(&work, 1)?;
+    app.set_menu(menu)?;
+    app.on_menu_event(|app, event| {
+        let action = match event.id.as_ref() {
+            "app-settings" => "settings",
+            "app-new-work" => "newWork",
+            "app-search" => "search",
+            "app-show" => {
+                show_main_window(app);
+                return;
+            }
+            _ => return,
+        };
+        show_main_window(app);
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.emit("desktop-action", action);
+        }
+    });
+    Ok(())
+}
+
 #[cfg(target_os = "linux")]
 fn watch_tray_host(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {

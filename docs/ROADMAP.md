@@ -18,8 +18,14 @@ representative benefit and installed-platform acceptance remain open.
 
 ## Built: the local workspace
 
-- Per-project Focus, Build and Oversee layouts, task terminals, detachable task views
-  and reversible chat topics that prepare source-linked drafts. Local timing exports
+- One Work entry point, a recent-work sidebar and a bottom status bar for workspace,
+  activity and quota freshness. Desktop preferences include power, running services, zoom,
+  shortcuts, editor/shell choices, saved actions and optional local dictation.
+  Split terminals can retain stopped output without replaying commands. Explicit
+  ignored-file setup and bounded worktree size inspection support isolated work.
+- Per-project Focus, Build and Oversee modes provide a quiet conversation canvas,
+  a workspace with tools beside work, or a full-width activity and attention board.
+  Task terminals, detachable task views and reversible chat topics prepare source-linked drafts. Local timing exports
   and incremental session updates support performance investigation; installed acceptance
   and representative comparisons remain in progress.
 
@@ -47,6 +53,12 @@ installed-app acceptance remain separate. See [current capabilities and limits](
 for the detailed inventory and [contributor priorities](TODO.md) for outstanding checks.
 
 ## In progress: dependable everyday use
+
+Native sleep prevention, macOS window/menu and unread-badge integration, and Windows
+pairing with a separately configured WSL Linux host are implemented for native
+acceptance. WSL requires its own running Jackalope host, Linux projects/accounts and
+Python 3. Dictation requires a local transcription service. Installed permissions,
+recovery and cross-platform behavior still require validation.
 
 Trusted-host pairing and a responsive web companion support scoped task check-ins,
 questions, follow-ups, dispatch and change review. SSH forwarding and HTTPS retain

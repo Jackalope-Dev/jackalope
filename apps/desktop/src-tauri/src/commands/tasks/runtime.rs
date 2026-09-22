@@ -371,6 +371,16 @@ impl TaskRuntime {
             r.base_head = base_head;
         })?;
         if previous.is_none() {
+            let copied =
+                crate::commands::workspace_setup::copy_files(&root, &workspace, &req.setup_files)?;
+            if copied > 0 {
+                self.update(id, |run| {
+                    activity(
+                        run,
+                        &format!("Copied {copied} explicitly selected setup files."),
+                    )
+                });
+            }
             if let Some(command) = req
                 .prepare_command
                 .as_deref()
@@ -1277,6 +1287,21 @@ impl TaskRuntime {
             })
             .collect()
     }
+    pub fn active_work_count(&self) -> usize {
+        self.inner
+            .lock()
+            .map(|inner| {
+                inner
+                    .runs
+                    .values()
+                    .filter(|run| {
+                        ["starting", "running", "stopping"].contains(&run.status.as_str())
+                            || run.finishing
+                    })
+                    .count()
+            })
+            .unwrap_or(0)
+    }
     pub fn integration_directory(&self) -> PathBuf {
         self.directory.join("integrations")
     }
@@ -1329,6 +1354,7 @@ impl TaskRuntime {
                 .and_then(|binding| binding.profile_id.clone()),
             verify_command: run.verify_command.clone(),
             prepare_command: run.prepare_command.clone(),
+            setup_files: run.setup_files.clone(),
             auto_verify: run.auto_verify,
             target_branch: run.target_branch.clone(),
             account_binding: None,
@@ -1548,6 +1574,7 @@ impl TaskRuntime {
                 request.codex_speed = request.codex_speed.or(old.codex_speed);
                 request.verify_command = old.verify_command.clone();
                 request.prepare_command = old.prepare_command.clone();
+                request.setup_files = old.setup_files.clone();
                 request.auto_verify = old.auto_verify;
                 if request.connection_ids.is_none() {
                     request.connection_ids = old.connection_ids.clone();
@@ -1558,6 +1585,7 @@ impl TaskRuntime {
                 request.codex_speed = request.codex_speed.or(old.codex_speed);
                 request.verify_command = old.verify_command.clone();
                 request.prepare_command = old.prepare_command.clone();
+                request.setup_files = old.setup_files.clone();
                 request.auto_verify = old.auto_verify;
                 request.target_branch = old.target_branch.clone().or(request.target_branch.take());
                 if request.connection_ids.is_none() {
@@ -1640,6 +1668,7 @@ impl TaskRuntime {
                 process_contained: false,
                 verify_command: request.verify_command.clone(),
                 prepare_command: request.prepare_command.clone(),
+                setup_files: request.setup_files.clone(),
                 auto_verify: request.auto_verify,
                 finishing: false,
                 verification_error: None,

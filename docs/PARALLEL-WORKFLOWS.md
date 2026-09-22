@@ -29,7 +29,7 @@ then save. Topic edits reject stale revisions from another window. Prepare task 
 retains source chat/message references and selected instructions; starting that task is
 a separate action through ordinary capture. Ungrouping preserves the original messages.
 
-Open **Tasks → Chat** and send a message, or choose **Open Chat** from Inbox.
+Open **Work**, choose **New work** and send a message. The empty workspace shows the composer directly.
 The first message names the session;
 history groups sessions by attention, activity and completion, with recent work first.
 Capture stays available while a batch runs. Messages arriving together are grouped
@@ -104,7 +104,7 @@ independently of their saved order, while retaining fairness across projects.
 Canceled, failed and already launched descendants do not inflate that priority.
 Scope, interface, verification and snapshot gates still determine eligibility.
 
-The parent stays together in Chat and Inbox. Expand assignments for their results,
+The parent stays together in Work. Expand assignments for their results,
 questions and follow-ups; all attempts and reported usage remain attached. Workers
 inherit the selected agent, account, model, effort and tools. The existing queue
 shares execution capacity and passes verified predecessor snapshots to dependencies.

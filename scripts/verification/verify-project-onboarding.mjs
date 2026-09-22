@@ -46,7 +46,7 @@ window.__TAURI_INTERNALS__={metadata:{currentWindow:{label:'main'},currentWebvie
 useProjectStore.setState({projects:overview?[project,{...project,id:'second',name:'Second',path:'C:/Fixture/second'}]:[],activeProjectId:'atlas'});
 useAgentAccountsStore.setState({load:async()=>{}});
 useExecutionStore.setState({runners:[{id:'codex',name:'Codex',available:true,signedIn:true,account:'fixture',detail:'Browser fixture only'}],discovering:false});
-if(!useOnboardingStore.getState().pendingProject)useOnboardingStore.setState({status:'active',step:'agent',customize:!location.search.includes('essential'),projectId:'atlas',pendingProject:project,firstTask:''});
+if(!useOnboardingStore.getState().pendingProject)useOnboardingStore.setState({status:'active',step:'agent',projectId:'atlas',pendingProject:project,firstTask:''});
 ReactDOM.createRoot(document.getElementById('root')).render(overview?React.createElement(ProjectOverview,{onOpenProject:()=>{}}):React.createElement(OnboardingFlow,{onFinish:(agent,key)=>{f.finished={agent,key,project:useOnboardingStore.getState().pendingProject,draft:useOnboardingStore.getState().firstTask}},onSkip:()=>{f.finished={skipped:true}}}));
 `;
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
@@ -66,23 +66,12 @@ try {
     route.fulfill({ contentType: 'application/javascript', body: fixture }),
   );
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${url}/?essential`, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.getByText('Step 2 of 4', { exact: true }).waitFor();
-  assert.deepEqual(await page.locator('.onboarding-steps li strong').allTextContents(), [
-    'Project',
-    'Agents',
-    'Behavior',
-    'First task',
-  ]);
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByText('Step 3 of 4', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByText('Step 4 of 4', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Back', exact: true }).click();
-  await page.getByText('Step 3 of 4', { exact: true }).waitFor();
-  await page.evaluate(() => localStorage.clear());
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.getByText('Step 2 of 6', { exact: true }).waitFor();
+  assert.equal(
+    await page.getByRole('button', { name: /Customize decisions|Use essential setup/ }).count(),
+    0,
+  );
   assert.deepEqual(await page.locator('.onboarding-steps li strong').allTextContents(), [
     'Project',
     'Agents',
@@ -318,7 +307,7 @@ try {
   await page.getByText('Working tree clean', { exact: true }).waitFor();
   assert.deepEqual(errors, []);
   console.log(
-    'Project onboarding browser checks passed: four essential and six customized steps, automatic defaults, explicit overrides, stale inspection responses, unavailable inspection, provisional settings, draft restoration, theme rollback, keyboard and narrow layouts. No native tasks launched.',
+    'Project onboarding browser checks passed: all six steps by default, automatic defaults, explicit overrides, stale inspection responses, unavailable inspection, provisional settings, draft restoration, theme rollback, keyboard and narrow layouts. No native tasks launched.',
   );
 } finally {
   await browser.close();

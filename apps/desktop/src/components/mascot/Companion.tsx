@@ -1,8 +1,9 @@
 import { ExternalLinkIcon, Popover, SearchIcon } from '@jackalope/ui';
 import { ArrowLeft, Check, CircleCheck, CircleHelp, Info, Settings2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { isActive, statusLabel } from '../../lib/task-runtime';
+import { isActive, nativeTask, statusLabel } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
+import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import {
   type CompanionNotice,
   shouldNotify,
@@ -23,9 +24,11 @@ import './companion.css';
 export function Companion({
   onSearch,
   onSettings,
+  compact = false,
 }: {
   onSearch: () => void;
   onSettings: () => void;
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [section, setSection] = useState<'ask' | 'activity'>('ask');
@@ -47,7 +50,7 @@ export function Companion({
   const interactedOutside = useRef(false);
   const pendingAction = useRef<(() => void) | null>(null);
   const [hint, setHint] = useState<Pick<CompanionNotice, 'id' | 'title' | 'kind'> | null>(null);
-  const { sources, readIds, markRead } = useCompanionStore();
+  const { sources, readIds, markRead, markUnread } = useCompanionStore();
   const runs = useExecutionStore((state) => state.runs);
   const loading = useExecutionStore((state) => state.loading);
   const error = useExecutionStore((state) => state.error);
@@ -57,6 +60,11 @@ export function Companion({
   const level = useSettingsStore((state) => state.notifications);
   const notices = sortNotices(Object.values(sources).flat());
   const unread = notices.filter((notice) => !readIds.includes(notice.id));
+  const unreadCount = unread.length;
+  useEffect(() => {
+    if (isTauriEnvironment())
+      void nativeTask('desktop_unread_badge', { count: unreadCount }).catch(() => {});
+  }, [unreadCount]);
   const announce = unread.filter((notice) => shouldNotify(notice.kind, level));
   const announcementKey = JSON.stringify(
     announce.map(({ id, title, kind }) => ({ id, title, kind })),
@@ -102,8 +110,8 @@ export function Companion({
   };
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <footer className="companion-dock">
-        <div className="companion-caption" aria-hidden="true">
+      <div className={compact ? 'companion-dock companion-inline' : 'companion-dock'}>
+        <div className="companion-caption" aria-hidden="true" hidden={compact}>
           <span>{announce.length ? `${announce.length} unread` : 'Jackalope'}</span>
           <small>{activity}</small>
         </div>
@@ -138,7 +146,7 @@ export function Companion({
             )}
           </div>
         </Popover.Anchor>
-      </footer>
+      </div>
       <Popover.Portal>
         <Popover.Content
           id="jackalope-companion-panel"
@@ -258,15 +266,17 @@ export function Companion({
                                       <ExternalLinkIcon size={16} />
                                     </button>
                                   )}
-                                  {isUnread && (
+                                  {
                                     <button
                                       type="button"
-                                      aria-label={`Mark ${notice.title} as read`}
-                                      onClick={() => markRead([notice.id])}
+                                      aria-label={`Mark ${notice.title} as ${isUnread ? 'read' : 'unread'}`}
+                                      onClick={() =>
+                                        isUnread ? markRead([notice.id]) : markUnread(notice.id)
+                                      }
                                     >
-                                      Mark read
+                                      {isUnread ? 'Mark read' : 'Mark unread'}
                                     </button>
-                                  )}
+                                  }
                                   {notice.onDismiss && (
                                     <button type="button" onClick={notice.onDismiss}>
                                       Dismiss

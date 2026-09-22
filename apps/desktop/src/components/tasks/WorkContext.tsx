@@ -14,10 +14,12 @@ import './workbench.css';
 export function WorkContext({
   run,
   allowNavigation = true,
+  onTerminal,
   children,
 }: {
   run: TaskRun;
   allowNavigation?: boolean;
+  onTerminal?: () => void;
   children?: ReactNode;
 }) {
   const summary = useMemo(() => workSummary(run), [run]);
@@ -81,7 +83,7 @@ export function WorkContext({
           </DialogContent>
         </Dialog.Root>
         {children}
-        <WorkTools run={run} requestRevision={requested} />
+        <WorkTools run={run} requestRevision={requested} onTerminal={onTerminal} />
       </div>
     </section>
   );

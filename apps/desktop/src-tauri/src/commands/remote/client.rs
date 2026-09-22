@@ -10,6 +10,8 @@ pub struct Host {
     ssh: bool,
     port: u16,
     token: String,
+    #[serde(default)]
+    wsl: bool,
 }
 fn path(runtime: &TaskRuntime) -> PathBuf {
     runtime.integration_directory().join("remote-hosts.bin")
@@ -23,7 +25,7 @@ fn hosts(runtime: &TaskRuntime) -> Result<Vec<Host>, String> {
         .unwrap_or(Ok(Vec::new()))
 }
 fn public(host: &Host) -> Value {
-    json!({"id":host.id,"name":host.name,"address":host.address,"ssh":host.ssh,"port":host.port})
+    json!({"id":host.id,"name":host.name,"address":host.address,"ssh":host.ssh,"port":host.port,"wsl":host.wsl})
 }
 async fn endpoint(host: &Host) -> Result<(String, Option<String>), String> {
     if !host.ssh {
@@ -41,6 +43,16 @@ async fn endpoint(host: &Host) -> Result<(String, Option<String>), String> {
     ))
 }
 async fn request(host: &Host, route: &str, value: Value) -> Result<Value, String> {
+    if host.wsl {
+        return super::wsl::request(
+            host.address.clone(),
+            host.port,
+            host.token.clone(),
+            route.into(),
+            value,
+        )
+        .await;
+    }
     let (base, authority) = endpoint(host).await?;
     let client = reqwest::Client::builder()
         .no_proxy()
@@ -87,6 +99,7 @@ pub async fn remote_host_pair(
     name: String,
     address: String,
     ssh: bool,
+    wsl: Option<bool>,
     port: u16,
     code: String,
     state: State<'_, TaskRuntime>,
@@ -94,7 +107,13 @@ pub async fn remote_host_pair(
     if name.trim().is_empty() || name.chars().count() > 80 || port < 1024 || code.len() != 64 {
         return Err("Enter a name, host and current pairing code.".into());
     }
-    let address = if ssh {
+    let wsl = wsl.unwrap_or(false);
+    if wsl && ssh {
+        return Err("Choose one host connection method.".into());
+    }
+    let address = if wsl {
+        super::wsl::distribution(address.trim())?.into()
+    } else if ssh {
         transport::ssh_alias(address.trim())?;
         address.trim().to_string()
     } else {
@@ -110,6 +129,7 @@ pub async fn remote_host_pair(
         ssh,
         port,
         token: String::new(),
+        wsl,
     };
     let device = super::super::system::device_name()
         .chars()

@@ -115,6 +115,7 @@ export interface TaskRun {
   targetBranch?: string | null;
   verifyCommand?: string | null;
   prepareCommand?: string | null;
+  setupFiles?: string[];
   autoVerify?: boolean;
   finishing?: boolean;
   verificationError?: string | null;
@@ -253,6 +254,7 @@ export interface RunRequest {
   targetBranch?: string;
   verifyCommand?: string;
   prepareCommand?: string;
+  setupFiles?: string[];
   autoVerify?: boolean;
   prompt: string;
   isolated: boolean;

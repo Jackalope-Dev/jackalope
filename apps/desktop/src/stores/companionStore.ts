@@ -26,9 +26,18 @@ export const useCompanionStore = create<{
   publish: (source: string, notices: CompanionNotice[]) => void;
   remove: (source: string) => void;
   markRead: (ids: string[]) => void;
+  markUnread: (id: string) => void;
 }>()((set) => ({
   sources: {},
   readIds: readSaved(),
+  markUnread: (id) =>
+    set((state) => {
+      const readIds = state.readIds.filter((saved) => saved !== id);
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(readIds));
+      } catch {}
+      return { readIds };
+    }),
   publish: (source, notices) =>
     set((state) => ({ sources: { ...state.sources, [source]: notices } })),
   remove: (source) =>

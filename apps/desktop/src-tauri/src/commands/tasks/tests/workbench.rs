@@ -48,6 +48,60 @@ fn task_terminal_reconnects_and_reserves_its_workspace_until_stopped() {
     assert_eq!(first["generation"], status()["generation"]);
     assert!(work_terminal::ensure_idle(&run.workspace).is_err());
     assert!(crate::commands::previews::ensure_idle(&run.workspace).is_err());
+    work_terminal::start_with_shell(&runtime, &run.id, "default", "split", true).unwrap();
+    let split_id = format!("{}::split", run.task_id);
+    let split = serde_json::to_value(
+        work_terminal::task_terminal_status(split_id.clone(), 0, String::new())
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(split["running"].as_bool().unwrap());
+    let split_generation = split["generation"].as_str().unwrap().to_string();
+    let split_cleanup = Stop(split_id.clone(), split_generation.clone());
+    assert!(work_terminal::start_with_shell(&runtime, &run.id, "default", "third", false).is_err());
+    assert!(work_terminal::task_terminal_write(
+        split_id.clone(),
+        generation.clone(),
+        "must not write".into()
+    )
+    .is_err());
+    work_terminal::task_terminal_write(split_id.clone(), split_generation.clone(), "exit\r".into())
+        .unwrap();
+    let saved_output = runtime.integration_directory().join("terminal-output");
+    let started = std::time::Instant::now();
+    loop {
+        let split = serde_json::to_value(
+            work_terminal::task_terminal_status(split_id.clone(), 0, String::new())
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
+        if split["output"].as_str().unwrap().contains("\u{1b}[6n") {
+            let _ = work_terminal::task_terminal_write(
+                split_id.clone(),
+                split_generation.clone(),
+                "\u{1b}[1;1R".into(),
+            );
+        }
+        if split["running"] == false && saved_output.read_dir().unwrap().next().is_some() {
+            break;
+        }
+        assert!(
+            started.elapsed().as_secs() < 15,
+            "Exited shell output was not saved"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    drop(split_cleanup);
+    assert!(work_terminal::ensure_idle(&run.workspace).is_err());
+    assert!(runtime
+        .integration_directory()
+        .join("terminal-output")
+        .read_dir()
+        .unwrap()
+        .next()
+        .is_some());
     work_terminal::task_terminal_resize(run.task_id.clone(), generation.clone(), 100, 28).unwrap();
     work_terminal::task_terminal_write(
         run.task_id.clone(),

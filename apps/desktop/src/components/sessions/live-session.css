@@ -87,7 +87,7 @@
   flex: none;
 }
 .live-header .app-titlebar-button[aria-pressed="true"] {
-  color: var(--color-accent);
+  color: var(--color-accent-ink);
   background: var(--color-surface-hover);
 }
 .live-statusbar {
@@ -333,6 +333,10 @@
 .live-start + .daily-work {
   padding: 8px var(--workspace-gutter, 32px) 24px;
 }
+.live-start.live-start-embedded {
+  padding: 0;
+  margin-top: 24px;
+}
 .live-start-mark {
   width: 88px;
   height: 88px;
@@ -369,7 +373,7 @@
 .live-start-composer:focus-within {
   border-color: var(--color-border-focus);
   outline: 1px solid var(--color-border-focus);
-  outline-offset: 2px;
+  outline-offset: 0;
 }
 .live-start-composer textarea {
   width: 100%;
@@ -584,4 +588,7 @@
 }
 .live-columns[data-result-view="true"] .live-transcript {
   display: none;
+}
+.live-header-native-mac {
+  padding-left: 80px;
 }

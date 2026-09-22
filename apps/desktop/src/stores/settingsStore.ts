@@ -10,8 +10,18 @@ export interface SettingsState {
   // Experience & appearance
   mascotReactions: boolean;
   showThemePickerInToolbar: boolean;
+  showTrialPassesInToolbar: boolean;
   notifications: NotificationLevel;
   osNotifications: boolean;
+  interfaceZoom: number;
+  terminalFontSize: number;
+  terminalShell: 'default' | 'powershell' | 'pwsh' | 'cmd' | 'wsl' | 'bash' | 'zsh';
+  preferredEditor: 'vscode' | 'cursor';
+  terminalLinks: boolean;
+  retainTerminalOutput: boolean;
+  shortcuts: Record<string, string>;
+  dictationEndpoint: string;
+  dictationModel: string;
 
   // Runners & execution
   defaultRunner: DefaultRunnerId;
@@ -50,8 +60,18 @@ export const DEFAULT_SETTINGS: Omit<
 > = {
   mascotReactions: true,
   showThemePickerInToolbar: true,
+  showTrialPassesInToolbar: true,
   notifications: 'all' as const,
   osNotifications: true,
+  interfaceZoom: 1,
+  terminalFontSize: 13,
+  terminalShell: 'default',
+  preferredEditor: 'vscode',
+  terminalLinks: true,
+  retainTerminalOutput: false,
+  shortcuts: {},
+  dictationEndpoint: '',
+  dictationModel: 'whisper-1',
 
   defaultRunner: 'codex' as const,
   concurrencyLimit: 2,

@@ -6,7 +6,7 @@ verification, integration and schedule services.
 
 ## Capture and context
 
-New task and Ctrl/Cmd+Shift+N open capture from any workspace destination. Guided
+New work and the configurable Ctrl/Cmd+Shift+N shortcut open the conversation composer. Saved-draft and issue-intake actions retain the task capture dialog. Guided
 setup also offers capture before project setup. Ideas can have an empty project
 identifier; they do not create fictitious projects or authorize execution.
 A draft's suggested project is frozen when captured, editable, and preserved
@@ -25,21 +25,26 @@ connections are tested before their tokens are saved in protected native storage
 
 ## Work and results
 
-Tasks opens Chat. Inbox defaults to the selected project's work and offers an explicit All work scope.
-Chat and Inbox share discovery without duplicate attempts. Needs-input/recovery
+Work combines conversations, tasks and plans, defaults to the selected project and offers an explicit All work scope.
+The work list and recent-work sidebar share discovery without duplicate attempts. Needs-input/recovery
 and failed-check work precede results ready for review, active work, saved ideas and
 finished work. Integration state comes from native verified receipts. Filters, search
-and list/board choices persist per scope. Work rows show the assigned agent character,
+and list/board choices persist per scope and mode. Work rows show the assigned agent character,
 live or next-action status and the next useful action. Active and waiting work also
 appear in a compact in-progress strip. Arrow keys, Home and End move between visible
 work rows; command search also finds projects, tasks, sessions and current-task actions.
-Parallel planning remains inside Inbox with the existing ownership and dependency
+Parallel planning remains inside Work with the existing ownership and dependency
 contracts; plans stay editable before dispatch.
 
-Chat's start page leads with the message composer. Its options menu holds session
-limits, workflow starters and saved project context. Loaded work appears underneath,
-prioritizing attention and review across projects. Its links select the relevant
-project or open the all-project Inbox. The last task or
+Focus leads with a message composer and one task to resume, using a compact navigation
+rail. All work opens the searchable list. Build keeps recent work in the sidebar,
+offers project tools and opens task review beside the conversation. Other tool tabs
+can retain the conversation, including terminals and activity. Oversee uses full-width
+navigation, counts from current work, prioritized decisions and a board; New work
+opens its composer explicitly. Questions and Stop remain available in every mode.
+The composer options menu holds session limits, workflow starters and saved project
+context. Modes save per project, preserve unsent drafts and reset conversation-layout
+overrides when selected. The last task or
 session section persists across navigation. Project setup covers project, agents,
 decisions, behavior, appearance and an optional first task.
 Workspace inspection can suggest preparation, checks and preview commands without
@@ -48,7 +53,7 @@ executing them. Failed or pending inspection never establishes a clean checkout.
 Task detail keeps the assigned agent, recorded progress and next action together.
 Task titles extract a short objective locally without changing the original request;
 deliberately named tasks retain their titles. Existing work takes priority in the list;
-New task opens capture, and secondary actions live in the work actions menu.
+New work opens the composer, and secondary actions live in the work actions menu.
 Result contains earlier exchanges, agent response and the latest screenshot. Review
 opens directly to changed files, with project checks, requirements and agent evidence
 alongside. Optional review tools are disclosed, and merge preparation opens explicitly.

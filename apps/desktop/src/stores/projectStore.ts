@@ -29,6 +29,7 @@ export interface ProjectPreferences {
   verifyCommand?: string;
   previewCommand?: string;
   prepareCommand?: string;
+  setupFiles?: string[];
   autoVerify?: boolean;
   isolatedByDefault?: boolean;
 }

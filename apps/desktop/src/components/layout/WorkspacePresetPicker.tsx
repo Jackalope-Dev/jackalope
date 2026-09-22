@@ -1,20 +1,25 @@
 import { DropdownMenu as Menu } from '@jackalope/ui';
-import { Check, PanelsTopLeft } from 'lucide-react';
+import { Check, ChevronDown, Columns3, Hammer, Scan } from 'lucide-react';
 import { workspacePresets } from '../../lib/workbench';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useWorkbenchStore } from '../../stores/workbenchStore';
-import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
+import { useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from './navigation';
 
 export function WorkspacePresetPicker({ projectId }: { projectId: string }) {
   const preset = useWorkbenchStore((state) => state.presets[projectId] ?? 'focus');
+  const Icon = preset === 'focus' ? Scan : preset === 'build' ? Hammer : Columns3;
   return (
     <Menu.Root>
-      <Menu.Trigger className="command-trigger" aria-label="Workspace layout">
-        <PanelsTopLeft size={16} />
+      <Menu.Trigger
+        className="command-trigger workspace-mode-trigger"
+        aria-label="Workspace layout"
+      >
+        <Icon size={16} />
         <span>{workspacePresets.find((item) => item.id === preset)?.label}</span>
+        <ChevronDown size={12} />
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Content align="end" className="work-preset-menu">
@@ -22,6 +27,10 @@ export function WorkspacePresetPicker({ projectId }: { projectId: string }) {
             <Menu.Item
               key={item.id}
               onSelect={() => {
+                const execution = useExecutionStore.getState();
+                const sessions = useLiveSessionStore.getState();
+                const managed = useManagedTaskStore.getState();
+                const views = useWorkViewStore.getState();
                 useWorkbenchStore.getState().setPreset(projectId, item.id);
                 useWorkViewStore.getState().resetSplits([
                   ...useExecutionStore
@@ -37,16 +46,19 @@ export function WorkspacePresetPicker({ projectId }: { projectId: string }) {
                     .map((task) => `managed:${task.id}`),
                 ]);
                 if (item.id === 'oversee') {
-                  const views = useWorkViewStore.getState();
                   views.setScope('project');
-                  views.setView(`${projectId}:current`, {
-                    ...defaultWorkView,
-                    filter: 'attention',
-                  });
-                  useExecutionStore.getState().select(null);
-                  useManagedTaskStore.getState().select(null);
-                  navigateWorkspace('kanban');
+                  execution.select(null);
+                  sessions.select(null);
+                  managed.select(null);
+                } else {
+                  const id = managed.selectedId
+                    ? `managed:${managed.selectedId}`
+                    : sessions.selectedId
+                      ? `session:${sessions.selectedId}`
+                      : execution.selectedId;
+                  if (id) views.open(id, item.id === 'build' ? 'changes' : 'result');
                 }
+                navigateWorkspace('kanban');
               }}
             >
               <span>

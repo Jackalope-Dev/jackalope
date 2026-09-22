@@ -47,7 +47,7 @@ export function storeManifest({ name, publisher, publisherDisplayName, version }
  <Applications><Application Id="Jackalope" Executable="jackalope-desktop.exe" uap10:RuntimeBehavior="packagedClassicApp" uap10:TrustLevel="mediumIL">
   <uap:VisualElements DisplayName="Jackalope" Description="A workspace for your projects and coding agents." Square150x150Logo="Assets/Square150x150Logo.png" Square44x44Logo="Assets/Square44x44Logo.png" BackgroundColor="transparent" />
  </Application></Applications>
- <Capabilities><rescap:Capability Name="runFullTrust" /></Capabilities>
+ <Capabilities><rescap:Capability Name="runFullTrust" /><DeviceCapability Name="microphone" /></Capabilities>
 </Package>
 `;
 }

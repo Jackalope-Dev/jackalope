@@ -281,6 +281,7 @@ export function CaptureTask({
         targetBranch: project.preferences?.baseBranch || project.gitBranch,
         verifyCommand: project.preferences?.verifyCommand,
         prepareCommand: project.preferences?.prepareCommand,
+        setupFiles: project.preferences?.setupFiles,
         autoVerify: project.preferences?.autoVerify === true,
         prompt: finalPrompt,
         effort: current.effort ?? 'balanced',

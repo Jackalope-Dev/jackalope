@@ -3,6 +3,8 @@ pub mod codebase;
 pub mod codebase_watch;
 pub mod coordination;
 pub mod coordination_mcp;
+pub mod desktop_integration;
+pub mod dictation;
 pub mod git;
 pub mod harness;
 pub mod helper;
@@ -18,7 +20,9 @@ pub mod task_strategy;
 pub mod tasks;
 pub mod work_terminal;
 pub mod work_windows;
+pub mod workspace_setup;
 pub mod worktree_cleanup;
+pub mod worktree_usage;
 
 pub mod agent_models;
 pub mod agent_policy;

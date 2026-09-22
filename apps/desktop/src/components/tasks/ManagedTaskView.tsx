@@ -60,8 +60,20 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
   const correction = useExecutionStore((state) => state.drafts[correctionKey]?.prompt ?? '');
   const setCorrection = (prompt: string) =>
     useExecutionStore.getState().draft(correctionKey, { prompt });
-  const [viewTab, setViewTab] = useState('overview');
   const preset = useWorkbenchStore((state) => state.presets[task.request.projectId] ?? 'focus');
+  const hasResult = !!work.combined && !isActive(work.combined);
+  const [viewTab, setViewTab] = useState(preset === 'build' && hasResult ? 'review' : 'overview');
+  const workRequest = useWorkViewStore((state) => state.request);
+  const handledWorkRequest = useRef<number | null>(null);
+  useEffect(() => {
+    if (
+      workRequest?.id !== `managed:${task.id}` ||
+      handledWorkRequest.current === workRequest.revision
+    )
+      return;
+    handledWorkRequest.current = workRequest.revision;
+    setViewTab(workRequest.section === 'changes' && hasResult ? 'review' : 'overview');
+  }, [workRequest, task.id, hasResult]);
   const split = useWorkViewStore(
     (state) => state.split[`managed:${task.id}`] ?? preset === 'build',
   );
@@ -221,7 +233,6 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
     requestAnimationFrame(() => document.getElementById('managed-result-correction')?.focus());
   };
   const lead = work.active[0] ?? work.combined ?? work.planner;
-  const hasResult = !!work.combined && !isActive(work.combined);
   const showAssignments = task.started && (!work.combined || work.active.length > 0);
   const assignments = (
     <ManagedAssignments

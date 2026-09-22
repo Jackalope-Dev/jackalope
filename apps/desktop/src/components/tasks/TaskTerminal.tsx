@@ -1,13 +1,20 @@
+import { Input } from '@jackalope/ui';
 import { FitAddon } from '@xterm/addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
 import { useEffect, useRef, useState } from 'react';
 import { sessionCommand } from '../../lib/live-session';
 import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { saveWorkFeedback } from '../../lib/work-feedback';
+import { useSavedActionsStore } from '../../stores/savedActionsStore';
+import { useSettingsStore } from '../../stores/settingsStore';
+import { useWorkViewStore } from '../../stores/workViewStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
+import { Select, SelectItem } from '../ui/Select';
 import '@xterm/xterm/css/xterm.css';
+import './task-terminal.css';
 
 interface TerminalView {
   generation: string;
@@ -18,17 +25,86 @@ interface TerminalView {
   reset: boolean;
 }
 export function TaskTerminal({ run }: { run: TaskRun }) {
+  const splitKey = `terminal:${run.taskId}`;
+  const split = useWorkViewStore((state) => state.split[splitKey] ?? false);
+  return (
+    <div className="terminal-workspace">
+      <Button
+        variant="ghost"
+        aria-pressed={split}
+        onClick={() => useWorkViewStore.getState().setSplit(splitKey, !split)}
+      >
+        {split ? 'Hide second terminal' : 'Split terminal'}
+      </Button>
+      <div className={split ? 'terminal-panes is-split' : 'terminal-panes'}>
+        <TerminalPane run={run} slot="main" />
+        {split && <TerminalPane run={run} slot="split" />}
+      </div>
+      {split && (
+        <p className="task-muted">
+          Both shells reserve this workspace. Stop both before resuming agent work. Hiding a pane
+          leaves its shell running.
+        </p>
+      )}
+    </div>
+  );
+}
+function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
+  const terminalId = slot === 'main' ? run.taskId : `${run.taskId}::split`;
   const host = useRef<HTMLDivElement>(null);
   const action = useRef<HTMLButtonElement>(null);
   const reload = useRef<() => Promise<void>>(async () => {});
   const generationRef = useRef('');
   const [workspace, setWorkspace] = useState(run.workspace);
   const [running, setRunning] = useState(false);
+  const [savedOutput, setSavedOutput] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [hasSelection, setHasSelection] = useState(false);
   const [feedbackSaved, setFeedbackSaved] = useState(false);
   const selectionText = useRef<() => string>(() => '');
+  const terminalRef = useRef<Terminal | null>(null);
+  const [query, setQuery] = useState('');
+  const [searchMessage, setSearchMessage] = useState('');
+  const searchLine = useRef(-1);
+  const savedCommands = useSavedActionsStore((state) => state.actions).filter(
+    (action) =>
+      action.kind === 'command' && (!action.projectId || action.projectId === run.projectId),
+  );
+  const [commandId, setCommandId] = useState('');
+  const command = savedCommands.find((action) => action.id === commandId);
+  const findOutput = () => {
+    const terminal = terminalRef.current;
+    if (!terminal || !query) return;
+    const buffer = terminal.buffer.active;
+    for (let offset = 1; offset <= buffer.length; offset++) {
+      const row = (searchLine.current + offset) % buffer.length;
+      const line = buffer.getLine(row);
+      if (!line) continue;
+      const text = line.translateToString();
+      const index = text.toLowerCase().indexOf(query.toLowerCase());
+      if (index >= 0) {
+        let chars = 0;
+        let start = 0;
+        let end = 0;
+        for (let column = 0; column < line.length; column++) {
+          const cell = line.getCell(column);
+          if (!cell || cell.getWidth() === 0) continue;
+          const length = (cell.getChars() || ' ').length;
+          if (chars <= index) start = column;
+          end = column + cell.getWidth();
+          chars += length;
+          if (chars >= index + query.length) break;
+        }
+        terminal.select(start, row, end - start);
+        terminal.scrollToLine(row);
+        searchLine.current = row;
+        setSearchMessage(`Match on line ${row + 1}`);
+        return;
+      }
+    }
+    setSearchMessage('No match in retained output.');
+  };
   useEffect(() => {
     if (!host.current || !isTauriEnvironment()) return;
     let disposed = false;
@@ -36,18 +112,32 @@ export function TaskTerminal({ run }: { run: TaskRun }) {
     let cursor = 0;
     let generation = '';
     let writable = false;
+    let restored = false;
     generationRef.current = '';
     setWorkspace(run.workspace);
     setRunning(false);
+    setSavedOutput(false);
     setHasSelection(false);
     setFeedbackSaved(false);
     const terminal = new Terminal({
       cursorBlink: false,
-      fontSize: 13,
+      fontSize: Math.max(11, Math.min(20, useSettingsStore.getState().terminalFontSize || 13)),
       scrollback: 3000,
       screenReaderMode: true,
-      linkHandler: { activate: () => {} },
+      linkHandler: {
+        activate: (_event, uri) => {
+          if (useSettingsStore.getState().terminalLinks && /^https?:\/\//i.test(uri))
+            void openExternalUrl(uri);
+        },
+      },
     });
+    terminalRef.current = terminal;
+    terminal.loadAddon(
+      new WebLinksAddon((_event, uri) => {
+        if (useSettingsStore.getState().terminalLinks && /^https?:\/\//i.test(uri))
+          void openExternalUrl(uri);
+      }),
+    );
     const fit = new FitAddon();
     terminal.loadAddon(fit);
     terminal.open(host.current);
@@ -77,13 +167,17 @@ export function TaskTerminal({ run }: { run: TaskRun }) {
       fit.fit();
       if (writable)
         void nativeTask('task_terminal_resize', {
-          id: run.taskId,
+          id: terminalId,
           generation,
           cols: terminal.cols,
           rows: terminal.rows,
         }).catch(() => {});
     };
     const observer = new ResizeObserver(resize);
+    const unsubscribeSettings = useSettingsStore.subscribe((settings) => {
+      terminal.options.fontSize = Math.max(11, Math.min(20, settings.terminalFontSize));
+      resize();
+    });
     observer.observe(host.current);
     terminal.attachCustomKeyEventHandler((event) => {
       if (event.key === 'Escape' && event.shiftKey) {
@@ -107,7 +201,7 @@ export function TaskTerminal({ run }: { run: TaskRun }) {
     });
     const input = terminal.onData((input) => {
       if (writable)
-        void nativeTask('task_terminal_write', { id: run.taskId, generation, input }).catch(
+        void nativeTask('task_terminal_write', { id: terminalId, generation, input }).catch(
           (cause) => {
             if (!disposed) setError(String(cause));
           },
@@ -119,11 +213,21 @@ export function TaskTerminal({ run }: { run: TaskRun }) {
       if (loading || disposed || document.hidden) return;
       loading = true;
       try {
-        const view = await nativeTask<TerminalView | null>('task_terminal_status', {
-          id: run.taskId,
+        let view = await nativeTask<TerminalView | null>('task_terminal_status', {
+          id: terminalId,
           cursor,
           generation,
         });
+        if (!view && !restored && useSettingsStore.getState().retainTerminalOutput) {
+          restored = true;
+          view = await nativeTask<TerminalView | null>('task_terminal_restore', {
+            id: run.taskId,
+            slot,
+          });
+          if (!disposed) setSavedOutput(!!view);
+        } else if (view && !disposed) {
+          setSavedOutput(false);
+        }
         if (disposed) return;
         writable = view?.running ?? false;
         setRunning(writable);
@@ -163,8 +267,10 @@ export function TaskTerminal({ run }: { run: TaskRun }) {
       selection.dispose();
       selectionText.current = () => '';
       terminal.dispose();
+      terminalRef.current = null;
+      unsubscribeSettings();
     };
-  }, [run.taskId, run.workspace]);
+  }, [run.taskId, run.workspace, slot, terminalId]);
   const change = async () => {
     setBusy(true);
     setError('');
@@ -172,8 +278,11 @@ export function TaskTerminal({ run }: { run: TaskRun }) {
       if (!running && run.liveSessionId)
         await sessionCommand('action', { id: run.liveSessionId, action: 'pause' });
       await nativeTask(running ? 'task_terminal_stop' : 'task_terminal_start', {
-        id: running ? run.taskId : run.id,
+        id: running ? terminalId : run.id,
+        slot,
+        retainOutput: useSettingsStore.getState().retainTerminalOutput,
         ...(running ? { generation: generationRef.current } : {}),
+        ...(!running ? { shell: useSettingsStore.getState().terminalShell } : {}),
       });
       await reload.current();
     } catch (cause) {
@@ -183,12 +292,18 @@ export function TaskTerminal({ run }: { run: TaskRun }) {
     }
   };
   return (
-    <section className="task-terminal" aria-label="Task terminal">
+    <section
+      className="task-terminal"
+      aria-label={slot === 'main' ? 'Main task terminal' : 'Second task terminal'}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p>
+          {slot === 'split' ? 'Second shell · ' : ''}
           {running
             ? 'Terminal running · stop it to resume agent work'
-            : 'Shell in this task’s workspace'}
+            : savedOutput
+              ? 'Saved output · start a new shell to continue'
+              : 'Shell in this task’s workspace'}
         </p>
         <Button
           ref={action}
@@ -204,6 +319,64 @@ export function TaskTerminal({ run }: { run: TaskRun }) {
         </Button>
       </div>
       <p className="work-context-path">{workspace}</p>
+      {!!savedCommands.length && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            aria-label="Saved terminal command"
+            value={commandId || '__choose'}
+            onValueChange={setCommandId}
+          >
+            <SelectItem value="__choose" disabled>
+              Choose a saved command…
+            </SelectItem>
+            {savedCommands.map((action) => (
+              <SelectItem key={action.id} value={action.id}>
+                {action.name}
+              </SelectItem>
+            ))}
+          </Select>
+          <Button
+            variant="outline"
+            disabled={!command || !running || busy}
+            onClick={() => {
+              if (!command) return;
+              setBusy(true);
+              void nativeTask('task_terminal_write', {
+                id: terminalId,
+                generation: generationRef.current,
+                input: `${command.body}\r`,
+              })
+                .catch((reason) => setError(String(reason)))
+                .finally(() => setBusy(false));
+            }}
+          >
+            Run command
+          </Button>
+          {command && <code className="work-context-path">{command.body}</code>}
+        </div>
+      )}
+      <form
+        className="flex flex-wrap items-center gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          findOutput();
+        }}
+      >
+        <Input
+          aria-label="Find terminal output"
+          placeholder="Find in output…"
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            searchLine.current = -1;
+            setSearchMessage('');
+          }}
+        />
+        <Button variant="outline" type="submit" disabled={!query}>
+          Find next
+        </Button>
+        <span role="status">{searchMessage}</span>
+      </form>
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       <div ref={host} className="task-terminal-screen" />
       {hasSelection && (

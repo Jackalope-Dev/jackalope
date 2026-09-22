@@ -1,24 +1,19 @@
 import { LifeBuoy, Megaphone, Minus, Settings2, Square, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { shortcutLabel } from '../../lib/platform-shortcuts';
+import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { FeedbackDialog } from '../settings/FeedbackDialog';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { Tooltip } from '../ui/Tooltip';
 
-/**
- * Custom window chrome, replacing the OS titlebar (see `decorations: false`
- * in tauri.conf.json). The bar itself is a `data-tauri-drag-region` so
- * dragging it moves the window; the button group stops mousedown
- * propagation so clicking a button doesn't also start a window drag.
- * A no-op outside Tauri (browser dev preview keeps its normal chrome).
- */
 export function TitleBar({ onSettings }: { onSettings?: () => void }) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const feedbackButton = useRef<HTMLButtonElement>(null);
   const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
+  const nativeMac = /Mac/.test(navigator.platform);
+  const shortcuts = useSettingsStore((state) => state.shortcuts);
 
   useEffect(() => {
     if (!isTauriEnvironment()) return;
@@ -44,7 +39,7 @@ export function TitleBar({ onSettings }: { onSettings?: () => void }) {
   };
 
   return (
-    <div data-tauri-drag-region className="app-titlebar">
+    <div data-tauri-drag-region className={`app-titlebar${nativeMac ? ' app-titlebar-mac' : ''}`}>
       <div className="app-titlebar-label" data-tauri-drag-region>
         <img src="/mascot.svg" alt="" aria-hidden="true" className="size-3.5" />
         <span>Jackalope</span>
@@ -52,7 +47,7 @@ export function TitleBar({ onSettings }: { onSettings?: () => void }) {
       <div className="app-titlebar-controls">
         {onSettings && showThemePicker && <ArcColorPicker variant="titlebar" />}
         {onSettings && (
-          <Tooltip content={`Settings (${shortcutLabel(',')})`}>
+          <Tooltip content={`Settings (${displayShortcut(resolveShortcuts(shortcuts).settings)})`}>
             <button
               type="button"
               className="app-titlebar-button"
@@ -90,33 +85,37 @@ export function TitleBar({ onSettings }: { onSettings?: () => void }) {
             <LifeBuoy size={16} />
           </button>
         </Tooltip>
-        <button
-          type="button"
-          className="app-titlebar-button"
-          aria-label="Minimize window"
-          onMouseDown={(event) => event.stopPropagation()}
-          onClick={() => withWindow((win) => win.minimize())}
-        >
-          <Minus size={14} />
-        </button>
-        <button
-          type="button"
-          className="app-titlebar-button"
-          aria-label={isMaximized ? 'Restore window' : 'Maximize window'}
-          onMouseDown={(event) => event.stopPropagation()}
-          onClick={() => withWindow((win) => win.toggleMaximize())}
-        >
-          <Square size={11} />
-        </button>
-        <button
-          type="button"
-          className="app-titlebar-button app-titlebar-button-close"
-          aria-label="Close window"
-          onMouseDown={(event) => event.stopPropagation()}
-          onClick={() => withWindow((win) => win.close())}
-        >
-          <X size={14} />
-        </button>
+        {!nativeMac && (
+          <>
+            <button
+              type="button"
+              className="app-titlebar-button"
+              aria-label="Minimize window"
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={() => withWindow((win) => win.minimize())}
+            >
+              <Minus size={14} />
+            </button>
+            <button
+              type="button"
+              className="app-titlebar-button"
+              aria-label={isMaximized ? 'Restore window' : 'Maximize window'}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={() => withWindow((win) => win.toggleMaximize())}
+            >
+              <Square size={11} />
+            </button>
+            <button
+              type="button"
+              className="app-titlebar-button app-titlebar-button-close"
+              aria-label="Close window"
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={() => withWindow((win) => win.close())}
+            >
+              <X size={14} />
+            </button>
+          </>
+        )}
       </div>
       <FeedbackDialog
         open={feedbackOpen}

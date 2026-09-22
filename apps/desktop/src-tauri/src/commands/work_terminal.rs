@@ -1,7 +1,8 @@
 use super::{integration, process_control::ProcessTree, tasks::TaskRuntime};
 use crate::state::PtySession;
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
     io::Read,
@@ -33,11 +34,54 @@ struct Terminal {
     generation: String,
     pty: PtySession,
     output: Arc<Mutex<Output>>,
+    history: Option<std::path::PathBuf>,
+}
+impl Terminal {
+    fn persist(&self) -> Result<(), String> {
+        let Some(path) = &self.history else {
+            return Ok(());
+        };
+        let record = SavedTerminal {
+            workspace: self.workspace.to_string_lossy().into_owned(),
+            generation: self.generation.clone(),
+            output: self.output.lock().map_err(|e| e.to_string())?.text.clone(),
+        };
+        super::history::write_atomic(
+            path,
+            &serde_json::to_vec(&record).map_err(|e| e.to_string())?,
+        )
+    }
 }
 impl Drop for Terminal {
     fn drop(&mut self) {
         let _ = self.pty.stop();
+        if let Err(error) = self.persist() {
+            eprintln!("Terminal output could not be saved: {error}");
+        }
     }
+}
+#[derive(Serialize, Deserialize)]
+struct SavedTerminal {
+    workspace: String,
+    generation: String,
+    output: String,
+}
+fn terminal_id(task: &str, slot: &str) -> Result<String, String> {
+    match slot {
+        "main" => Ok(task.into()),
+        "split" => Ok(format!("{task}::split")),
+        _ => Err("Choose the main or split terminal.".into()),
+    }
+}
+fn history_path(runtime: &TaskRuntime, id: &str) -> std::path::PathBuf {
+    let name: String = Sha256::digest(id.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    runtime
+        .integration_directory()
+        .join("terminal-output")
+        .join(format!("{name}.json"))
 }
 static TERMINALS: OnceLock<Mutex<HashMap<String, Terminal>>> = OnceLock::new();
 fn terminals() -> &'static Mutex<HashMap<String, Terminal>> {
@@ -104,15 +148,51 @@ pub fn close_all() {
         sessions.clear();
     }
 }
+pub fn active_count() -> usize {
+    terminals()
+        .lock()
+        .map(|mut terminals| {
+            terminals
+                .values_mut()
+                .filter_map(|terminal| running(terminal).ok())
+                .filter(|active| *active)
+                .count()
+        })
+        .unwrap_or(0)
+}
 
 #[tauri::command]
-pub async fn task_terminal_start(id: String, state: State<'_, TaskRuntime>) -> Result<(), String> {
+pub async fn task_terminal_start(
+    id: String,
+    shell: Option<String>,
+    slot: Option<String>,
+    retain_output: Option<bool>,
+    state: State<'_, TaskRuntime>,
+) -> Result<(), String> {
     let runtime = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || start(&runtime, &id))
-        .await
-        .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || {
+        start_with_shell(
+            &runtime,
+            &id,
+            shell.as_deref().unwrap_or("default"),
+            slot.as_deref().unwrap_or("main"),
+            retain_output.unwrap_or(false),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
+#[cfg(test)]
 pub(super) fn start(runtime: &TaskRuntime, id: &str) -> Result<(), String> {
+    start_with_shell(runtime, id, "default", "main", false)
+}
+pub(super) fn start_with_shell(
+    runtime: &TaskRuntime,
+    id: &str,
+    shell: &str,
+    slot: &str,
+    retain_output: bool,
+) -> Result<(), String> {
     runtime.access.ensure()?;
     let _guard = integration::execution_guard()?;
     let runs = runtime.integration_runs()?;
@@ -120,6 +200,15 @@ pub(super) fn start(runtime: &TaskRuntime, id: &str) -> Result<(), String> {
         .iter()
         .find(|run| run.id == id)
         .ok_or("Task not found")?;
+    let terminal_id = terminal_id(&run.task_id, slot)?;
+    let history = if retain_output {
+        let path = history_path(runtime, &terminal_id);
+        std::fs::create_dir_all(path.parent().ok_or("Terminal history folder unavailable")?)
+            .map_err(|e| e.to_string())?;
+        Some(path)
+    } else {
+        None
+    };
     let workspace = dunce::canonicalize(&run.workspace).map_err(|e| e.to_string())?;
     if runs.iter().any(|other| {
         dunce::canonicalize(&other.workspace).ok().as_ref() == Some(&workspace)
@@ -133,7 +222,7 @@ pub(super) fn start(runtime: &TaskRuntime, id: &str) -> Result<(), String> {
     }
     {
         let mut sessions = terminals().lock().map_err(|e| e.to_string())?;
-        if let Some(terminal) = sessions.get_mut(&run.task_id) {
+        if let Some(terminal) = sessions.get_mut(&terminal_id) {
             if running(terminal)? {
                 return if terminal.workspace == workspace {
                     Ok(())
@@ -143,9 +232,20 @@ pub(super) fn start(runtime: &TaskRuntime, id: &str) -> Result<(), String> {
             }
         }
     }
-    super::previews::ensure_idle(&run.workspace)?;
+    super::previews::ensure_preview_idle(&run.workspace)?;
     super::verification::ensure_idle(&run.workspace)?;
     let mut sessions = terminals().lock().map_err(|e| e.to_string())?;
+    let main_id = self::terminal_id(&run.task_id, "main")?;
+    let split_id = self::terminal_id(&run.task_id, "split")?;
+    for (key, terminal) in sessions.iter_mut() {
+        if key != &main_id
+            && key != &split_id
+            && terminal.workspace == workspace
+            && running(terminal)?
+        {
+            return Err("Stop the other task's terminal before using this workspace.".into());
+        }
+    }
     let exited: Vec<_> = sessions
         .iter_mut()
         .filter_map(|(id, terminal)| matches!(running(terminal), Ok(false)).then_some(id.clone()))
@@ -168,20 +268,7 @@ pub(super) fn start(runtime: &TaskRuntime, id: &str) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
-    #[cfg(windows)]
-    let mut command = {
-        let mut c = CommandBuilder::new("powershell.exe");
-        c.arg("-NoLogo");
-        c.arg("-NoProfile");
-        c
-    };
-    #[cfg(not(windows))]
-    let mut command = CommandBuilder::new(
-        std::env::var("SHELL")
-            .ok()
-            .filter(|s| std::path::Path::new(s).is_absolute())
-            .unwrap_or_else(|| "/bin/sh".into()),
-    );
+    let mut command = shell_command(shell, &workspace)?;
     command.cwd(&workspace);
     command.env("TERM", "xterm-256color");
     command.env_remove("JACKALOPE_BRIDGE_TOKEN");
@@ -205,7 +292,7 @@ pub(super) fn start(runtime: &TaskRuntime, id: &str) -> Result<(), String> {
     };
     let output = Arc::new(Mutex::new(Output::default()));
     sessions.insert(
-        run.task_id.clone(),
+        terminal_id.clone(),
         Terminal {
             workspace,
             generation: uuid::Uuid::new_v4().to_string(),
@@ -216,9 +303,10 @@ pub(super) fn start(runtime: &TaskRuntime, id: &str) -> Result<(), String> {
                 tree: Some(tree),
             },
             output: output.clone(),
+            history,
         },
     );
-    let task_id = run.task_id.clone();
+    let task_id = terminal_id;
     let monitor_generation = sessions[&task_id].generation.clone();
     drop(sessions);
     std::thread::spawn(move || {
@@ -252,11 +340,67 @@ pub(super) fn start(runtime: &TaskRuntime, id: &str) -> Result<(), String> {
         if terminal.generation != monitor_generation {
             break;
         }
-        if !matches!(running(terminal), Ok(true)) {
-            break;
+        match running(terminal) {
+            Ok(true) => {}
+            Ok(false) => {
+                if let Err(error) = terminal.persist() {
+                    eprintln!("Terminal output could not be saved: {error}");
+                }
+                break;
+            }
+            Err(_) => break,
         }
     });
     Ok(())
+}
+
+fn shell_command(shell: &str, workspace: &std::path::Path) -> Result<CommandBuilder, String> {
+    #[cfg(windows)]
+    {
+        let mut command = match shell {
+            "default" | "powershell" => CommandBuilder::new("powershell.exe"),
+            "pwsh" => CommandBuilder::new("pwsh.exe"),
+            "cmd" => CommandBuilder::new("cmd.exe"),
+            "wsl" => CommandBuilder::new("wsl.exe"),
+            _ => return Err("Choose a Windows terminal shell in Desktop settings.".into()),
+        };
+        match shell {
+            "default" => {
+                command.args(["-NoLogo", "-NoProfile"]);
+            }
+            "powershell" | "pwsh" => {
+                command.arg("-NoLogo");
+            }
+            "cmd" => {
+                command.arg("/D");
+            }
+            "wsl" => {
+                command.arg("--cd");
+                command.arg(workspace);
+            }
+            _ => {}
+        }
+        Ok(command)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = workspace;
+        let executable = match shell {
+            "default" => std::env::var("SHELL")
+                .ok()
+                .filter(|value| std::path::Path::new(value).is_absolute())
+                .unwrap_or_else(|| "/bin/sh".into()),
+            "bash" => "/bin/bash".into(),
+            "zsh" => "/bin/zsh".into(),
+            _ => {
+                return Err(
+                    "Choose a terminal shell available on this computer in Desktop settings."
+                        .into(),
+                )
+            }
+        };
+        Ok(CommandBuilder::new(executable))
+    }
 }
 
 #[tauri::command]
@@ -326,8 +470,50 @@ pub async fn task_terminal_stop(id: String, generation: String) -> Result<(), St
         if let Some(terminal) = terminals().lock().map_err(|e| e.to_string())?.get_mut(&id) {
             ensure_generation(terminal, &generation)?;
             terminal.pty.stop().map_err(|e| e.to_string())?;
+            terminal.persist()?;
         }
         Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn task_terminal_restore(
+    id: String,
+    slot: Option<String>,
+    state: State<'_, TaskRuntime>,
+) -> Result<Option<TerminalView>, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let key = terminal_id(&id, slot.as_deref().unwrap_or("main"))?;
+        let path = history_path(&runtime, &key);
+        if !path.exists() {
+            return Ok(None);
+        }
+        let saved: SavedTerminal = serde_json::from_slice(&super::history::read_bounded(
+            &path,
+            (OUTPUT_LIMIT * 6 + 8192) as u64,
+        )?)
+        .map_err(|_| "Saved terminal output could not be read.")?;
+        if saved.output.len() > OUTPUT_LIMIT {
+            return Err("Saved terminal output exceeds its limit.".into());
+        }
+        let saved_path = dunce::canonicalize(&saved.workspace).map_err(|e| e.to_string())?;
+        if !runtime.integration_runs()?.iter().any(|run| {
+            run.task_id == id
+                && dunce::canonicalize(&run.workspace).ok().as_ref() == Some(&saved_path)
+        }) {
+            return Err("This terminal's workspace is no longer available in task history.".into());
+        }
+        Ok(Some(TerminalView {
+            generation: saved.generation,
+            workspace: saved.workspace,
+            running: false,
+            cursor: saved.output.len(),
+            output: saved.output,
+            reset: true,
+        }))
     })
     .await
     .map_err(|e| e.to_string())?

@@ -4,6 +4,7 @@ import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/l
 import { appendFeedbackDraft } from '../../lib/review-feedback';
 import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
+import { DictationButton } from '../tasks/DictationButton';
 import { useManagedPreview } from '../tasks/useManagedPreview';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -181,6 +182,14 @@ export function SessionComposer({
         void send();
       }}
     >
+      <DictationButton
+        disabled={saving}
+        onText={(value) => {
+          editing.current = true;
+          setText((current) => (current.trim() ? `${current}\n${value}` : value));
+          input.current?.focus();
+        }}
+      />
       <Textarea
         ref={input}
         aria-label="Message"

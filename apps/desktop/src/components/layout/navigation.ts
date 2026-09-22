@@ -16,26 +16,26 @@ import {
 export const WORKSPACE_VIEWS = [
   {
     id: 'live-sessions',
-    label: 'Tasks',
+    label: 'Work',
     description: 'Chat: live conversation to send a message, follow work and review changes.',
     icon: Layers3,
     group: 'tasks',
-    primary: true,
+    primary: false,
   },
   {
     id: 'kanban',
-    label: 'Tasks',
+    label: 'Work',
     description: 'Tasks: plan, review and archive work.',
     icon: ListTodo,
     group: 'tasks',
-    primary: false,
+    primary: true,
   },
   {
     id: 'remote-hosts',
     label: 'Hosts',
     description: 'Connect to trusted hosts and continue work from another device.',
     icon: Network,
-    group: 'tasks',
+    group: 'hosts',
     primary: false,
   },
   {
@@ -56,7 +56,7 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'agents',
-    label: 'Agents',
+    label: 'Agents & tools',
     description: 'Manage runners, accounts and configuration.',
     icon: Bot,
     group: 'agents',
@@ -104,11 +104,11 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'schedules',
-    label: 'Recurring',
+    label: 'Automations',
     description: 'Tasks: schedules and automatic runs.',
     icon: CalendarClock,
-    group: 'tasks',
-    primary: false,
+    group: 'automations',
+    primary: true,
   },
   {
     id: 'worktrees',
@@ -168,7 +168,7 @@ export const WORKSPACE_VIEWS = [
   },
 ] as const;
 export type ActiveTab = (typeof WORKSPACE_VIEWS)[number]['id'];
-export const DEFAULT_WORKSPACE_TAB: ActiveTab = 'live-sessions';
+export const DEFAULT_WORKSPACE_TAB: ActiveTab = 'kanban';
 export const AGENT_VIEWS = [
   { id: 'agents', label: 'Runners' },
   { id: 'usage', label: 'Usage & quota' },

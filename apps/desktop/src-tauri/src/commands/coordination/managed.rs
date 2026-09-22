@@ -418,6 +418,7 @@ impl Coordinator {
             agent_accounts,
             verify_command: task.request.verify_command.clone(),
             prepare_command: task.request.prepare_command.clone(),
+            setup_files: task.request.setup_files.clone(),
             auto_verify: true,
             items,
         })?;
