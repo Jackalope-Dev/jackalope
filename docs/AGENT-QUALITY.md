@@ -41,22 +41,15 @@ tool-only measurements; these omit worker execution and cannot establish task sa
   is launched to emulate them. These are agent instructions, not native enforcement
   of a worker count or evidence that a provider actually delegated. Provider
   lifecycle, usage coverage and quality still require installed trials.
-- In the opt-in compact-prompt experiment, confirmed Codex, Claude, OpenCode and Grok native-session continuations with the
-  same recorded prompt-policy hash reuse prior workflow instructions. Current task,
-  contract, workspace, permissions and coordination data remain explicit. Older
-  receipts, changed policies and other adapters receive full guidance.
-  Normal tasks use version-four final-phase guidance and a concise preamble;
-  managed assignments retain full ownership instructions. The quality runner's
-  `--compact-prompts --after-workflow=legacy` flags reproduce version-three
-  frontend guidance for comparison. Ordinary tasks retain their concise native
-  preamble; native compact/context-reuse experiments apply only to the full
-  managed-task preamble. Keep these boundaries explicit in comparisons.
+- Ordinary tasks use final-phase guidance and a concise preamble; managed
+  assignments retain full ownership instructions. Native continuations receive
+  current workflow, task, contract and workspace instructions.
 - Automatic guidelines distinguish design tokens from authentication tokens, skip
   negated requests and fenced examples, and avoid a debugging workflow for spelling
   fixes. Explicitly selected guidelines and project defaults remain available.
 - Generated instructions identify the worktree Jackalope already assigned. Saved
-  version-one and version-two ideas reconstruct their original generated text before migration;
-  edited instructions remain verbatim.
+  generated drafts are recognized against the current guidelines; edited instructions
+  remain verbatim.
 - Native MCP adapters use their tool descriptions. Grok, Antigravity and Gemini CLI receive a
   short authenticated `GET /v1/help` bootstrap instead of the entire HTTP manual
   on every launch. Coordination ownership, untrusted messages, pending user input
@@ -82,7 +75,7 @@ tool-only measurements; these omit worker execution and cannot establish task sa
   environment variables, test selection or verification results.
 - Repository maps rank file paths and bounded Tree-sitter declarations, include
   related test names and task-referenced file locations, and remain limited to
-  6 KB. The compact experiment caps this at 3 KB when the request explicitly names one or two indexed files.
+  6 KB.
   Cached lines are advisory and must be verified before edits. Scans share
   a lock per repository/commit, allowing unrelated repositories to scan independently.
   Account capacity reads share in-flight refreshes and use at most four concurrent
@@ -107,6 +100,18 @@ tool-only measurements; these omit worker execution and cannot establish task sa
   `.projected.json` responses and checks exact paginated stdout recovery without
   executing their commands. Keep captures private. These replays measure tool-output
   delivery, not model tokens, task speed or quality.
+- OpenCode task launches attach a local output hook, including API-key connections
+  using that runner. It only projects complete, successful, untruncated pytest or
+  Node TAP shell output between 2 KB and 50 KB. Diagnostics, skips and summary counts
+  remain visible; the exact original is saved before replacement, with a recovery
+  path in the tool response. Commands, arguments, permissions and metadata are unchanged.
+  The authenticated local projection endpoint has a one-second deadline; missing
+  metadata, unsupported output and storage or endpoint failures retain the original.
+  Captures share a 20 MB limit per process, including concurrent pending writes.
+  Other agents retain their native shell output and share the `computer_verify` path.
+  OpenCode can install configuration dependencies before loading an external plugin.
+  Compare fresh profiles and repeat use separately, retain setup time, and do not
+  equate fewer output bytes with lower total cost, faster tasks or unchanged quality.
 - Codex receives permission to invoke verification only when the task has a saved
   check. `computer_verify {}` runs that attempt's saved command; `project.verification`
   exposes the command and automatic-check setting. Launch guidance names the saved
@@ -132,20 +137,6 @@ usage and deduplicated per-message usage, which can arrive before a CLI's final 
 These are overlapping observations, not additive costs. Delayed reporting can still
 overshoot a limit, and partial observations do not establish complete billed usage.
 
-`scripts/evaluation/opencode-history-plugin.mjs` provides an evaluation-only
-`experimental.chat.messages.transform` control. Load its absolute file URL through
-OpenCode's process-local plugin configuration, set `JACKALOPE_HISTORY_COMPACTION=deduplicate`
-and provide an absolute `JACKALOPE_HISTORY_COMPACTION_RECEIPT` JSONL path. It replaces
-later identical successful read/grep/glob outputs with references to the first
-complete result. Different arguments, output, title or metadata remain independent;
-errors, attachments and already compacted or truncated results are preserved.
-Receipts contain hashes, call IDs and byte counts, not source text. Receipt-write
-failure leaves the request untouched. This is not a desktop default or Jev semantic
-pruning; byte reductions do not establish token, cost, speed or quality improvements.
-Use `--after-history-compaction=deduplicate` with `--agent=opencode` to attach this
-plugin only to the candidate process. The runner pins both implementation hashes
-and retains zero-replacement invocations; missing hook receipts do not prove a
-transform ran. Keep all variants on the same CLI, provider account and model.
 OpenCode output totals include separately reported reasoning tokens; CLI cost
 estimates are retained separately from independently priced API-equivalent costs.
 
@@ -344,26 +335,19 @@ usage. Preserve the original plan and all unfavorable or partial results. Early
 stopping and configuration selection are exploratory; confirm a promising change
 on a separately frozen held-out suite before making a savings claim.
 
-The quality runner accepts per-variant `--after-workflow=final`,
-`--after-task-approach=scoped`,
-`--after-tool-surface=available`, `--after-named-read=on`,
-`--after-repo-map=off`,
-`--after-context-reuse=on` and `--after-source-context=on` switches; replace `after`
-with `control` as needed.
-`--after-result-queries=on` enables queries over captured MCP responses;
-`--after-result-preview=on` additionally bounds large unselected responses while
-keeping the complete source recoverable. Preview requires result queries. `--after-initial-tools=small` measures eager delivery of a
-complete bounded catalog. Keep these controls explicit in saved comparisons.
+The quality runner accepts per-variant `--after-task-approach=scoped`,
+`--after-tool-surface=available` and `--after-repo-map=off` switches; replace
+`after` with `control` as needed. `--after-result-queries=on` enables queries over
+captured MCP responses; `--after-result-preview=on` additionally bounds large
+unselected responses while keeping the complete source recoverable. Preview
+requires result queries. `--after-initial-tools=small` measures eager delivery of
+a complete bounded catalog. Keep these controls explicit in saved comparisons.
 Authored multi-source join cases can be generated with
 `node scripts/evaluation/pipeline-cases.mjs <suite.json>`. The name identifies the
 fixture family, not an available agent tool. Both sizes are screening fixtures.
-The default final-workflow policy updates
-version-two debugging guidance. Scoped task-approach guidance limits call-site
-investigation to code changes while preserving applicable instructions and checks;
-it is the default for Balanced tasks. Saved
-version-two and compact version-three prompts
-remain reproducible. Context reuse independently tests established native sessions
-with the same policy hash; missing sessions or changed policies receive full guidance.
+Scoped task-approach guidance limits call-site investigation to code changes while
+preserving applicable instructions and checks; it is the default for Balanced tasks.
+Use frozen prompt baselines or source snapshots for historical comparisons.
 Changing model or experiment configuration invalidates resume.
 New comparisons record runner/fixture Node versions and the OS and reject resume
 when a recorded environment changes. Older comparisons keep this metadata unknown.
@@ -374,11 +358,8 @@ models is a different experiment from a same-model harness comparison.
 
 Available-tool discovery omits MCP operations without selected on-demand connections
 and verification without a saved command. Browser, questions, evidence and coordination
-remain available. The named-read experiment resolves an exact, unambiguous read-only
-tool through the existing broker, avoiding a separate agent search turn when its
-arguments are already known. Incomplete catalogs, duplicate names, changed schemas,
-disallowed tools and mutating operations cannot take this shortcut. It preserves
-attempt ownership, connection allowlists, cancellation and result recovery.
+remain available. Selected connections execute through discovered handles, retaining
+connection allowlists, attempt ownership, cancellation and result recovery.
 
 `--after-tool-surface=deferred` defers browser,
 desktop and coordination schemas for ordinary OpenCode tasks. The discovery tool
@@ -640,12 +621,12 @@ retain full ownership guidance. Explicit repository/user check requirements stil
 apply, and successful saved checks are reused only for an unchanged snapshot.
 
 The registry covers remaining evaluation controls such as available tool schemas,
-captured-result queries and source preparation. Quality trials pin those values in
+captured-result queries and conditional source reads. Quality trials pin those values in
 retained plans and resume validation. Unknown or retired controls fail explicitly;
 reproduce historical runs with their frozen source and executable. Native agents
 retain their own tools, permissions and account binding.
 
-The `read_context` and `plan_delegation` tools use native MCP with
+The `read_context` tool uses native MCP with
 Codex, Claude Code, OpenCode and Kimi. Dynamic discovery is OpenCode-only. The HTTP
 bridge adapters retain their existing endpoints. Source queries return at most
 twelve ranked files and 16 KB of candidate metadata; source ranges remain bounded
@@ -657,12 +638,11 @@ user setting or proof of a faster workflow.
 | `JACKALOPE_OPENCODE_TRANSPORT=cli` | Reproduces the earlier headless JSON transport for evaluation. Ordinary OpenCode tasks use an authenticated task-owned server and explicit permission replies. External unattended comparisons reject requests in both arms; user-mediated recovery is a separate outcome. |
 | `JACKALOPE_SCOPE_GUARD=off` | Removes the shared guidance to distinguish required outcomes from suggestions, preserve regression contracts, inspect bounded source first and select relevant plus mandatory checks. The guidance is normally included across adapters. |
 | `JACKALOPE_PROVIDER_EFFORT=off` or `low` | Preserves OpenCode provider defaults or requests its advertised low variant independently of task-approach text. Neither is automatic quality-based effort selection. Compare against normal effort with the same model and prompt. |
-| `JACKALOPE_NATIVE_TOOLS=bounded` | Available only in native test binaries. Attaches a process-local OpenCode read hook that defaults otherwise unspecified reads to 120 lines. Explicit ranges remain intact, and a receipt must persist before changing the request. Ordinary desktop builds do not contain this hook; it is a development ablation, not a user setting. |
+| `JACKALOPE_NATIVE_TOOLS=off` | Disables the default recoverable OpenCode test-output filter for matched comparisons. `output` enables that default. Native file reads retain their original arguments and permissions. |
 | `JACKALOPE_RESULT_QUERIES=on` | Exposes exact queries over captured tool results, complete JSON row pages, bounded path hints and explicit selection guidance. Records row selection, fallback, truncation and expansion counters. |
 | `JACKALOPE_RESULT_PREVIEW=on` | With result queries enabled, captures large unselected text/JSON responses locally and returns explicit previews with recoverable originals. Errors and non-text responses remain intact. |
 | `JACKALOPE_INITIAL_TOOLS=small` | Attempts discovery for up to three seconds before launch. Supplies a complete catalog only when it has at most four tools and 6 KB of metadata; other catalogs retain on-demand discovery. Initialization time and broker searches remain in the measurements. |
 | `JACKALOPE_CONTEXT_READ=on` | Exposes bounded source ranges and ranked symbol locations. Previously read block hashes can omit unchanged text; callers must retain that text in context. Explicitly requested blocks are not reranked away. |
-| `JACKALOPE_DISPATCH_PLAN=on` | Exposes a local admission aid for two or three workers, disjoint write scopes, bounded context and explicit overhead/token estimates. It does not launch agents, authorize delegation or enforce provider spending. |
 | `JACKALOPE_JEV_ASSISTANCE=shadow` | Records configured relevance/review assessments without changing selected context or suppressing monitors. Source candidate ranking is shadow-only. Existing Jev settings and credentials are required. |
 
 `node scripts/evaluation/assistance.mjs receipts.json labels.json report.json`
@@ -704,10 +684,16 @@ cost as a worker estimate, not a billing total. Keep
 measured; missing fields in older OpenCode comparisons also block total-cost claims.
 For an isolated DeepSeek/OpenCode screening run, `--provider-meter=deepseek` starts
 an authenticated loopback meter, confines the provider and model, redirects its
-endpoint, disables project configuration and uses fresh XDG directories. It reads
+endpoint, disables project configuration and uses separate XDG directories per attempt. It reads
 `DEEPSEEK_API_KEY` or the existing OpenCode DeepSeek credential; the child receives
 only a per-run proxy token. Both arms use the same isolation. Reports retain request
 counts, status, usage, cache counts and duration without prompts, responses or keys.
+`profileStateBeforeSetup` records whether configuration, a model catalog and a plugin
+dependency manifest already existed. File presence is not proof of a working cache.
+Fresh and prepared-profile studies need separate protocols; apply the same non-model
+setup to every arm and retain its duration alongside task time. Direct receipts include
+launch timestamps for comparison with the meter's first request. Do not subtract
+provider durations from wall time as though auxiliary requests cannot overlap.
 Auxiliary calls and retries are included. Missing usage or any incomplete/failed
 request leaves totals unknown. The cost gate uses complete meter totals only for
 runs without routing or agent-helper receipts. Separate, reported Jev-only helper

@@ -1,6 +1,57 @@
 use super::*;
 
 #[test]
+fn native_output_plugin_preserves_existing_configuration_and_never_stores_bridge_credentials() {
+    let directory = std::env::temp_dir().join(format!("jackalope-plugin-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let original = json!({"plugin":["file:///existing.mjs"],"model":"custom/worker",
+        "permission":{"external_directory":"deny"},"provider":{"custom":{"options":{"baseURL":"https://example.invalid"}}},
+        "mcp":{"existing":{"enabled":false}}});
+    let mut command = Command::new("fixture");
+    command.env("OPENCODE_CONFIG_CONTENT", original.to_string());
+    command.env("JACKALOPE_BRIDGE_TOKEN", "private-fixture-token");
+    configure_tool_plugin(&mut command, &directory, "fixture").unwrap();
+    let config: Value = serde_json::from_str(
+        command
+            .get_envs()
+            .find(|(key, _)| *key == "OPENCODE_CONFIG_CONTENT")
+            .unwrap()
+            .1
+            .unwrap()
+            .to_str()
+            .unwrap(),
+    )
+    .unwrap();
+    for key in ["model", "permission", "provider", "mcp"] {
+        assert_eq!(config[key], original[key]);
+    }
+    assert_eq!(config["plugin"][0], original["plugin"][0]);
+    assert_eq!(config["plugin"].as_array().unwrap().len(), 2);
+    let plugin = reqwest::Url::parse(config["plugin"][1].as_str().unwrap())
+        .unwrap()
+        .to_file_path()
+        .unwrap();
+    assert_eq!(plugin, directory.join("fixture.native-tools.mjs"));
+    assert!(!std::fs::read_to_string(&plugin)
+        .unwrap()
+        .contains("private-fixture-token"));
+    let unchanged = config.to_string();
+    assert!(configure_tool_plugin(&mut command, &directory.join("missing"), "next").is_err());
+    assert_eq!(
+        command
+            .get_envs()
+            .find(|(key, _)| *key == "OPENCODE_CONFIG_CONTENT")
+            .unwrap()
+            .1
+            .unwrap()
+            .to_str()
+            .unwrap(),
+        unchanged
+    );
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
 fn continuation_configuration_preserves_provider_and_permission_settings() {
     let mut command = Command::new("opencode");
     let original = json!({

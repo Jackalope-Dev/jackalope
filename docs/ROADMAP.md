@@ -54,13 +54,15 @@ the host's execution ownership. Native multi-device, transport and provider acce
 remain in progress; implementation does not establish release availability.
 
 Focused task guidance and retrievable compact verification output are implemented.
+OpenCode tasks also retain complete recovery files when compacting recognized
+successful test output; native shell filtering remains specific to that adapter.
 [Quality trials](AGENT-QUALITY.md) compare the changed behavior against a preserved
 baseline; broader provider comparisons and independent acceptance remain in progress.
 External container benchmarks can exercise the native task path with unchanged
 upstream grading; representative benefits still require matched confirmation.
 OpenCode's task-owned server connects permission prompts and structured questions
 to task review while retaining session ownership and usage. Provider-advertised
-effort requests and source-read experiments have separate validation; installed
+effort requests and output filtering have separate validation; installed
 cross-platform acceptance and repeatable quality or efficiency gains remain open.
 
 Codex speed controls, fresh context for changed workspaces, dependency-priority
@@ -73,23 +75,23 @@ Chronological history comparisons and bounded offline prompt optimization have
 separate validation and held-out gates. Representative first-pass acceptance and
 actual correction counts still need measurement before making outcome claims.
 
-Versioned prompt guidance and recoverable tool-result selection are implemented.
+Current prompt guidance and recoverable tool-result selection are implemented.
 Ordinary tasks default to concise instructions, available tool schemas and final
 automatic saved checks, with full ownership guidance for managed assignments.
 Content-keyed syntax caching and recoverable explicit result selection are core
-behavior. Local failure triage can avoid redundant classification of recorded facts;
-same-policy managed-task continuation remains an experiment. Cross-agent adoption
+behavior. Local failure triage can avoid redundant classification of recorded facts.
+Cross-agent adoption
 and end-to-end savings remain evaluation work.
 Final requirement assessments help users inspect evidence before acceptance.
 Sanitized comparison exports retain matched configurations,
 oracle outcomes and reporting limits. Broader independent acceptance remains open.
 Optional Jev discovery ranking and local response-field selection have separate
 evaluation suites; the public benchmark methodology keeps their scope explicit.
-Source-attributed repair fixtures and separate workflow, source preparation, tool and continuation
-experiments support screening. Human review exports and complete-attempt cost
+Source-attributed repair fixtures and matched tool and continuation comparisons
+support screening. Human review exports and complete-attempt cost
 accounting support independent confirmation before broader product claims.
 Captured-result queries and previews, deferred OpenCode tool discovery,
-conditional source reads, bounded delegation planning, agent-callable typed Jev
+conditional source reads, agent-callable typed Jev
 questions with native evidence reads and shadow Jev assistance retain separate
 evaluation controls.
 

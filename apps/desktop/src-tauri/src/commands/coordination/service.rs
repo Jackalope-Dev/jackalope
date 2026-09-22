@@ -442,15 +442,9 @@ impl Coordinator {
                         .route("/v1/user-prompt/poll", get(bridge_get_user_prompt))
                         .route("/v1/validation-step", post(bridge_validation_step))
                         .route("/v1/computer/verify", post(bridge_computer_verify))
+                        .route("/v1/native/output", post(bridge_native_output))
                         .layer(DefaultBodyLimit::max(65_536))
                         .with_state(service.clone());
-                    #[cfg(test)]
-                    let router = router.route(
-                        "/v1/native/output",
-                        post(bridge_native_output)
-                            .layer(DefaultBodyLimit::max(65_536))
-                            .with_state(service.clone()),
-                    );
                     let router = router
                         .merge(crate::commands::coordination_mcp::router(service.clone()))
                         .layer(axum::middleware::from_fn_with_state(

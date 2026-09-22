@@ -136,34 +136,6 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Assess whether two or three independent workers justify delegation. Validates disjoint write scopes, bounded briefs, explicit estimated overhead and an aggregate token admission budget. Returns focused briefs only when admitted. Estimates are not measured savings; this tool neither launches workers nor grants permission.",
-        annotations(read_only_hint = true, open_world_hint = false)
-    )]
-    async fn plan_delegation(
-        &self,
-        context: RequestContext<RoleServer>,
-        Parameters(input): Parameters<super::tasks::dispatch_plan::Input>,
-    ) -> Result<CallToolResult, ErrorData> {
-        if !crate::commands::experiments::is("JACKALOPE_DISPATCH_PLAN", "on") {
-            return Err(ErrorData::invalid_request(
-                "Delegation planning is not enabled.",
-                None,
-            ));
-        }
-        let run = self
-            .service
-            .authorized_run(&request_headers(&context)?)
-            .map_err(bridge_error)?;
-        let value = super::tasks::dispatch_plan::assess(input)
-            .map_err(|e| ErrorData::invalid_params(e, None))?;
-        self.service.runtime.update(&run.id, |run| {
-            *run.efficiency.delegation_plans.get_or_insert(0) += 1;
-            *run.efficiency.delegation_plans_admitted.get_or_insert(0) +=
-                u64::from(value["admitted"] == true);
-        });
-        Ok(CallToolResult::structured(value))
-    }
-    #[tool(
         description = "Read bounded source ranges or find file/symbol locations in the assigned workspace. Supply a previously read blockHash to omit unchanged text. Changed bytes refresh automatically. Results retain file/line/hash provenance; ranking is advisory and never filters explicitly requested blocks.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
@@ -392,34 +364,6 @@ impl CoordinationTools {
             .runtime
             .mcp_broker
             .read(&run.id, input)
-            .await
-            .map_err(|e| ErrorData::invalid_request(e, None))?;
-        super::mcp_broker::record_usage(&self.service.runtime, &run, usage);
-        Ok(result)
-    }
-
-    #[tool(
-        description = "Read an exactly named tool from selected connections when its name and arguments are already known. Supply server if ambiguous. Only unambiguous declared read-only operations execute. Otherwise search_tools supplies the schema. Optional output selects recoverable fields as in read_tool.",
-        annotations(
-            read_only_hint = true,
-            destructive_hint = false,
-            open_world_hint = true
-        )
-    )]
-    async fn read_named_tool(
-        &self,
-        context: RequestContext<RoleServer>,
-        Parameters(input): Parameters<super::mcp_broker::NamedReadInput>,
-    ) -> Result<CallToolResult, ErrorData> {
-        let run = self
-            .service
-            .authorized_run(&request_headers(&context)?)
-            .map_err(bridge_error)?;
-        let (result, usage) = self
-            .service
-            .runtime
-            .mcp_broker
-            .read_named(&run.id, input)
             .await
             .map_err(|e| ErrorData::invalid_request(e, None))?;
         super::mcp_broker::record_usage(&self.service.runtime, &run, usage);
@@ -928,19 +872,13 @@ impl ServerHandler for CoordinationTools {
         if !super::decisions::agent_questions::available(&self.service.runtime, &run.project_id) {
             tools.retain(|tool| tool.name != "ask_jev");
         }
-        if !crate::commands::experiments::is("JACKALOPE_DISPATCH_PLAN", "on") {
-            tools.retain(|tool| tool.name != "plan_delegation");
-        }
         if !crate::commands::experiments::is("JACKALOPE_CONTEXT_READ", "on") {
             tools.retain(|tool| tool.name != "read_context");
         }
         let queries = crate::commands::experiments::is("JACKALOPE_RESULT_QUERIES", "on");
         for tool in &mut tools {
             if !queries {
-                if matches!(
-                    tool.name.as_ref(),
-                    "read_tool" | "execute_tool" | "read_named_tool"
-                ) {
+                if matches!(tool.name.as_ref(), "read_tool" | "execute_tool") {
                     let mut schema = serde_json::Value::Object((*tool.input_schema).clone());
                     omit_row_schema(&mut schema);
                     if let serde_json::Value::Object(schema) = schema {
@@ -963,9 +901,6 @@ impl ServerHandler for CoordinationTools {
                     tool.input_schema = std::sync::Arc::new(schema);
                 }
             }
-        }
-        if !crate::commands::experiments::is("JACKALOPE_NAMED_READ", "on") {
-            tools.retain(|tool| tool.name != "read_named_tool");
         }
         let lean = run.efficiency.execution_profile.as_deref() == Some("lean");
         if !catalog::deferred(&run) {
@@ -1009,9 +944,7 @@ impl ServerHandler for CoordinationTools {
 
 fn available_tool(name: &str, discovery: bool, check: Option<&str>) -> bool {
     match name {
-        "search_tools" | "read_tool" | "read_named_tool" | "read_tool_result" | "execute_tool" => {
-            discovery
-        }
+        "search_tools" | "read_tool" | "read_tool_result" | "execute_tool" => discovery,
         "computer_verify" => check.is_some_and(|value| !value.trim().is_empty()),
         _ => true,
     }
@@ -1084,12 +1017,11 @@ mod tests {
     #[test]
     fn ordinary_read_schemas_omit_experimental_row_fields_and_references() {
         let router = CoordinationTools::platform_router();
-        for tool in router.list_all().into_iter().filter(|tool| {
-            matches!(
-                tool.name.as_ref(),
-                "read_tool" | "read_named_tool" | "execute_tool"
-            )
-        }) {
+        for tool in router
+            .list_all()
+            .into_iter()
+            .filter(|tool| matches!(tool.name.as_ref(), "read_tool" | "execute_tool"))
+        {
             let mut schema = serde_json::to_value(&tool.input_schema).unwrap();
             assert!(schema.to_string().contains("#/$defs/Rows"));
             omit_row_schema(&mut schema);
@@ -1101,7 +1033,6 @@ mod tests {
 
     #[test]
     fn available_tools_omit_only_unavailable_operations() {
-        assert!(!available_tool("read_named_tool", false, Some("test")));
         assert!(!available_tool("computer_verify", true, None));
         assert!(available_tool("computer_verify", false, Some("test")));
         for tool in [
@@ -1121,10 +1052,16 @@ mod tests {
         let router = CoordinationTools::platform_router();
         let tools = router.list_all();
         let names: Vec<_> = tools.iter().map(|tool| tool.name.as_ref()).collect();
-        for name in ["read_context", "plan_delegation", "discover_harness_tools"] {
+        for name in ["read_context", "discover_harness_tools"] {
             assert!(names.contains(&name), "Missing native route: {name}");
         }
-        for name in ["read_tools", "read_pipeline", "read_relevant_tool"] {
+        for name in [
+            "read_tools",
+            "read_pipeline",
+            "read_relevant_tool",
+            "plan_delegation",
+            "read_named_tool",
+        ] {
             assert!(!names.contains(&name), "Retired native route: {name}");
         }
         assert!(

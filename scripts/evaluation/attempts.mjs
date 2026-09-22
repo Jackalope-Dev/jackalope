@@ -65,8 +65,6 @@ export function aggregateAttempts(report) {
           'verificationReuses',
           'nativeVerificationCalls',
           'contextBlocksUnchanged',
-          'delegationPlans',
-          'delegationPlansAdmitted',
           'jevQuestionCalls',
           'jevQuestions',
         ].map((key) => [key, sum(runs.map((run) => run.efficiency?.[key]))]),

@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, sync::OnceLock};
 
 #[derive(Deserialize)]
 struct Registry {
+    #[cfg(test)]
     version: u32,
     fields: BTreeMap<String, Field>,
 }
@@ -33,16 +34,6 @@ pub(super) fn is(environment: &str, value: &str) -> bool {
         .find(|field| field.environment.as_deref() == Some(environment))
         .is_some_and(|field| resolved(field) == value)
 }
-pub(super) fn fingerprint() -> String {
-    let values: BTreeMap<_, _> = registry()
-        .fields
-        .iter()
-        .filter(|(_, field)| field.environment.is_some())
-        .map(|(name, field)| (name, resolved(field)))
-        .collect();
-    serde_json::json!({"version":registry().version,"registry":include_str!("experiments.json"),"values":values}).to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -55,14 +46,6 @@ mod tests {
             if let Some(name) = &field.environment {
                 assert!(names.insert(name));
             }
-        }
-        let fingerprint = fingerprint();
-        for field in registry()
-            .fields
-            .values()
-            .filter(|field| field.environment.is_some())
-        {
-            assert!(fingerprint.contains(field.environment.as_ref().unwrap()));
         }
     }
 }

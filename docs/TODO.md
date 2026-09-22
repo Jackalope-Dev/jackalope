@@ -91,9 +91,13 @@ release dates.
   graders and compare matched native/Jackalope runs before expanding to other harnesses.
   Extend container payload/provider coverage and independently confirm any pilot signal.
   Confirm OpenCode server permissions, paginated continuation, child usage and process
-  cleanup in installed Windows/macOS/Linux apps. Evaluate scope guidance, bounded
-  native reads and provider effort separately and combined;
+  cleanup in installed Windows/macOS/Linux apps. Evaluate scope guidance, native
+  output filtering and provider effort separately and combined;
   retain only supported benefits and use untouched tasks for confirmation.
+  Validate native OpenCode output filtering and recovery with managed and installed
+  runners across platforms, multiple plugins, fresh profiles and repeated use.
+  Retain dependency setup time, failed/incomplete-output fallbacks and every attempt;
+  compare incremental improvements separately from a native-agent advantage.
 - [ ] Validate [local setup](LOCAL-AI.md) with real models in the packaged app:
   hardware/memory requirements, current installers, download cancellation/resume,
   account selection and continued tasks. Check macOS/Linux and enterprise configuration.
@@ -101,18 +105,17 @@ release dates.
   idle cleanup, account/configuration changes and matched cold/warm latency.
 - [ ] Measure documentation round trips, provider tokens and routing quality on matched
   tasks after context/prompt changes. Keep all eligible models and quality-first selection.
-  Include versioned prompt comparisons, resumed sessions, bounded maps and recoverable
+  Include frozen prompt comparisons, resumed sessions, bounded maps and recoverable
   tool-result selection. Require representative independent acceptance before broad
   website claims; retain failures, cache accounting and correction work.
   Compare locally parsed verification output, including format fallback, failure
   diagnostics, tool adoption and native-agent controls.
-  Screen available-tool exposure, exact read-only lookup, explicit source preparation
-  and task-scoped/final-phase guidance
-  independently; freeze promising settings before new held-out confirmation.
+  Screen available-tool exposure and task-scoped guidance independently; freeze
+  promising settings before new held-out confirmation.
   Include OpenCode deferred-tool discovery and client permission preservation;
   require native client compatibility before extending it to other adapters.
-  Compare captured-result queries, repeated source ranges, dirty-file syntax reuse
-  and delegation admission on workflows that actually exercise those mechanisms.
+  Compare captured-result queries, repeated source ranges and dirty-file syntax reuse
+  on workflows that actually exercise those mechanisms.
   Label shadow Jev false negatives independently before enabling new suppression.
   Compare optional agent Jev questions with agent-only judgments, including direct
   evidence reads, request overhead, all helper costs and uncertain-answer fallbacks.
@@ -121,7 +124,6 @@ release dates.
   Evaluate combinations only with a concrete interaction hypothesis; include native
   output offloading, permission parity and every recovery turn. Freeze promising
   configurations before independent held-out confirmation.
-  Keep adapter-specific history hooks separate from shared broker behavior.
   Require independent original-patch acceptance for quality claims. Counterbalanced
   review-time and correction measurements are separate prerequisites for claiming faster review.
   Exercise validated project lessons with identical chronological history available

@@ -31,52 +31,6 @@ fn delayed_call_receipts_cannot_erase_completed_batch_accounting() {
     assert!(call.supersedes(&BrokerUsage::default()));
 }
 
-#[test]
-fn named_reads_reject_ambiguous_mutating_and_incomplete_discovery() {
-    let tool = json!({"tool":{"name":"lookup"},"operation":"read_tool","handle":"one"});
-    let found = json!({"tools":[tool],"errors":[],"nextOffset":null});
-    assert_eq!(named_read_handle(&found, "lookup").unwrap(), "one");
-    assert!(named_read_handle(&found, "look").is_err());
-    let mut ambiguous = found.clone();
-    ambiguous["tools"].as_array_mut().unwrap().push(tool);
-    assert!(named_read_handle(&ambiguous, "lookup").is_err());
-    let mut mutable = found.clone();
-    mutable["tools"][0]["operation"] = json!("execute_tool");
-    assert!(named_read_handle(&mutable, "lookup").is_err());
-    let mut partial = found.clone();
-    partial["nextOffset"] = json!(8);
-    assert!(named_read_handle(&partial, "lookup").is_err());
-    partial["nextOffset"] = Value::Null;
-    partial["errors"] = json!([{"error":"Unavailable connection"}]);
-    assert!(named_read_handle(&partial, "lookup").is_err());
-}
-
-#[tokio::test]
-async fn named_read_uses_existing_allowlist_and_attempt_boundaries() {
-    let broker = Broker::default();
-    let path = folder();
-    let mut connection = fixture(SERVER);
-    connection
-        .extra
-        .insert("enabled_tools".into(), json!(["tool_19"]));
-    broker.prepare("one", vec![connection], path, None).unwrap();
-    let input = || NamedReadInput {
-        name: "tool_19".into(),
-        server: Some("fixture".into()),
-        arguments: json!({"value":"hello"}).as_object().unwrap().clone(),
-        output: None,
-    };
-    let (_, usage) = broker.read_named("one", input()).await.unwrap();
-    assert_eq!(usage.schema_bytes_returned, 0);
-    assert_eq!(usage.calls, 1);
-    let mut denied = input();
-    denied.name = "tool_18".into();
-    assert!(broker.read_named("one", denied).await.is_err());
-    assert!(broker.read_named("other", input()).await.is_err());
-    broker.close("one");
-    assert!(broker.read_named("one", input()).await.is_err());
-}
-
 fn fixture(script: &str) -> McpServerConfig {
     serde_json::from_value(json!({"id":"fixture","name":"Fixture","scope":"project:test","transport":"stdio","command":"node","args":["-e",script],"discovery":true})).unwrap()
 }

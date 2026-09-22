@@ -114,7 +114,7 @@ test('Jev helper receipts are charged once and unknown usage never becomes free'
 test('experiment ordering balances repeated pairs and rejects unknown switch values', () => {
   const a = variantOrder(['control', 'after'], 'task', 1, 'frozen');
   assert.deepEqual(variantOrder(['control', 'after'], 'task', 2, 'frozen'), [...a].reverse());
-  assert.throws(() => experimentOptions(['--after-named-read=maybe'], ['after']), /Invalid/);
+  assert.throws(() => experimentOptions(['--after-tool-surface=maybe'], ['after']), /Invalid/);
 });
 
 test('cost separates cache reads and missing measurements never become zero', () => {

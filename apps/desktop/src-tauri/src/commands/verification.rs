@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use std::{path::Path, process::Command, time::Duration};
 use tauri::State;
 mod leases;
-#[cfg(test)]
 pub(super) mod native_output;
 pub(super) mod output;
 mod test_report;

@@ -1,44 +1,67 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import nativeTools from '../src-tauri/src/commands/tasks/opencode/tools.mjs';
 
-test('native read defaults preserve explicit ranges and require a saved receipt', async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'jackalope-read-'));
+test('native output hook falls back unchanged on unavailable or invalid projections', async () => {
   const old = { ...process.env };
+  const fetch = globalThis.fetch;
+  const root = await mkdtemp(path.join(os.tmpdir(), 'jackalope-output-fallback-'));
   try {
-    process.env.JACKALOPE_NATIVE_TOOLS = 'bounded';
+    process.env.JACKALOPE_NATIVE_TOOLS = 'output';
     process.env.JACKALOPE_NATIVE_TOOLS_RECEIPT = path.join(root, 'receipts.jsonl');
-    const hooks = await nativeTools({ directory: root });
-    const definition = {
-      description:
-        'By default, this tool returns up to 2000 lines. Any line longer than 2000 characters is truncated.',
-      parameters: { properties: { limit: {} } },
-    };
-    await hooks['tool.definition']({ toolID: 'read' }, definition);
-    assert.match(definition.parameters.properties.limit.description, /120/);
-    assert.match(definition.description, /120 lines/);
-    assert.match(definition.description, /2000 characters/);
-    const request = { tool: 'read', callID: 'a' };
-    const implicit = { args: { filePath: 'a.ts' } };
-    await hooks['tool.execute.before'](request, implicit);
-    assert.equal(implicit.args.limit, 120);
-    for (const args of [
-      { filePath: 'a.ts', limit: 2000 },
-      { filePath: 'a.ts', offset: 500 },
+    process.env.JACKALOPE_BRIDGE_URL = 'http://127.0.0.1:1';
+    process.env.JACKALOPE_BRIDGE_TOKEN = 'test-only';
+    const original = `${'test_values.py::test_value PASSED [100%]\n'.repeat(90)}90 passed in 0.1s\n`;
+    for (const [response, disable] of [
+      [() => new Response('unavailable', { status: 503 }), true],
+      [
+        () => {
+          throw new DOMException('Timed out', 'TimeoutError');
+        },
+        true,
+      ],
+      [() => new Response('invalid JSON'), true],
+      [() => Response.json(null), false],
+      [() => Response.json({ output: 'short', omitted_lines: -1 }), false],
+      [() => Response.json({ output: original, omitted_lines: 1 }), false],
     ]) {
-      const output = { args: { ...args } };
-      await hooks['tool.execute.before'](request, output);
-      assert.deepEqual(output.args, args);
+      let calls = 0;
+      globalThis.fetch = async (_url, options) => {
+        calls++;
+        assert.equal(options.redirect, 'error');
+        assert.ok(options.signal instanceof AbortSignal);
+        return response();
+      };
+      const hooks = await nativeTools();
+      for (let n = 0; n < 2; n++) {
+        const output = { metadata: { exit: 0, truncated: false }, output: original };
+        await hooks['tool.execute.after']({ tool: 'bash' }, output);
+        assert.equal(output.output, original);
+      }
+      assert.equal(calls, disable ? 1 : 2);
     }
-    delete process.env.JACKALOPE_NATIVE_TOOLS_RECEIPT;
-    const unavailable = { args: { filePath: 'a.ts' } };
-    await hooks['tool.execute.before'](request, unavailable);
-    assert.equal(unavailable.args.limit, undefined);
+    assert.deepEqual(await readdir(root), []);
+    globalThis.fetch = async () => {
+      assert.fail('Ineligible output must stay local');
+    };
+    const hooks = await nativeTools();
+    for (const [tool, text] of [
+      ['read', original],
+      ['bash', `${original}<shell_metadata>timed out</shell_metadata>`],
+      ['bash', 'ordinary output\n'.repeat(300)],
+      ['bash', original.repeat(20)],
+      ['bash', '1 passed in 0.1s'],
+    ]) {
+      const output = { metadata: { exit: 0, truncated: false }, output: text };
+      await hooks['tool.execute.after']({ tool }, output);
+      assert.equal(output.output, text);
+    }
   } finally {
+    globalThis.fetch = fetch;
     process.env = old;
     await rm(root, { recursive: true, force: true });
   }
@@ -108,5 +131,46 @@ test('native output projection saves exact recovery data and preserves metadata 
     process.env = old;
     await new Promise((resolve) => server.close(resolve));
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('parallel native output calls share the capture limit and release unused reservations', async () => {
+  const old = { ...process.env };
+  const fetch = globalThis.fetch;
+  try {
+    process.env.JACKALOPE_NATIVE_TOOLS = 'output';
+    process.env.JACKALOPE_NATIVE_TOOLS_RECEIPT = 'unused-fixture-path';
+    process.env.JACKALOPE_BRIDGE_URL = 'http://127.0.0.1:1';
+    process.env.JACKALOPE_BRIDGE_TOKEN = 'test-only';
+    let release;
+    const pending = new Promise((resolve) => {
+      release = resolve;
+    });
+    let requests = 0;
+    globalThis.fetch = async () => {
+      requests++;
+      await pending;
+      return Response.json(null);
+    };
+    const hooks = await nativeTools();
+    const original = `${'x'.repeat(49_950)}\n90 passed in 0.1s`;
+    const invoke = () =>
+      hooks['tool.execute.after'](
+        { tool: 'bash' },
+        {
+          metadata: { exit: 0, truncated: false },
+          output: original,
+        },
+      );
+    const calls = Array.from({ length: 450 }, invoke);
+    const limit = Math.floor(20_000_000 / Buffer.byteLength(original));
+    assert.equal(requests, limit);
+    release();
+    await Promise.all(calls);
+    await invoke();
+    assert.equal(requests, limit + 1);
+  } finally {
+    globalThis.fetch = fetch;
+    process.env = old;
   }
 });

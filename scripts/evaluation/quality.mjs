@@ -4,10 +4,7 @@ import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { release } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  assemblePrompt,
-  PROMPT_VERSION,
-} from '../../apps/desktop/src/lib/skills/context-assembler.ts';
+import { assemblePrompt } from '../../apps/desktop/src/lib/skills/context-assembler.ts';
 import { resolveTaskGuidelines } from '../../apps/desktop/src/lib/skills/task-context.ts';
 import { effortPrompt } from '../../apps/desktop/src/lib/task-effort.ts';
 import { runUsageBreakdown } from '../../apps/desktop/src/lib/usage-breakdown.ts';
@@ -19,11 +16,6 @@ import {
   registrySha256,
   variantOrder,
 } from './experiments.mjs';
-import {
-  historyExperimentEnvironment,
-  historyExperimentIdentity,
-  historyExperimentReceipt,
-} from './history-experiment.mjs';
 import { validateLearningCase } from './learning-contract.mjs';
 import { prepareProviderMeter } from './provider-meter.mjs';
 import { qualityCases } from './quality-cases.mjs';
@@ -86,12 +78,14 @@ const selected = value(
   suitePath ? cases.map((c) => c.id).join(',') : 'copy-edit,design-tokens,scheduler-fix',
 ).split(',');
 const variants = value('--variants', 'before,after').split(',');
-const compactPrompts = args.includes('--compact-prompts');
+if (args.includes('--compact-prompts'))
+  throw new Error(
+    'Retired compact-prompt control. Use the frozen source for historical comparisons.',
+  );
 const stopOnFailure = args.includes('--stop-on-failure');
 const experiments = experimentOptions(args, variants);
 const orderSeed = value('--order-seed', null);
 for (const variant of variants) {
-  if (compactPrompts && variant === 'after') experiments[variant]['context-style'] = 'compact';
   experimentEnvironment(experiments[variant]);
 }
 const experimental = args.some((arg) =>
@@ -182,7 +176,6 @@ if (
   !['codex', 'claude', 'antigravity', 'opencode'].includes(agent)
 )
   throw new Error('Invalid quality evaluation options.');
-const historyIdentity = await historyExperimentIdentity(agent, experiments);
 if (!args.includes('--execute')) {
   if (value('--save-prompts', null)) {
     if (experimental)
@@ -195,7 +188,6 @@ if (!args.includes('--execute')) {
         id,
         [
           assemblePrompt({
-            version: compactPrompts ? 3 : PROMPT_VERSION,
             rawPrompt: cases.find((c) => c.id === id).prompt,
             selectedSkillIds: resolveTaskGuidelines(
               cases.find((c) => c.id === id).prompt,
@@ -203,7 +195,7 @@ if (!args.includes('--execute')) {
             ),
             executionMode: 'isolated',
           }).assembledPrompt,
-          effortPrompt(requestedEffort, compactPrompts),
+          effortPrompt(requestedEffort),
         ].join('\n\n'),
       ]),
     );
@@ -279,11 +271,9 @@ if (!args.includes('--execute')) {
     cases: selected,
     variants,
     repeat,
-    compactPrompts,
     providerMeter,
     ...(stopOnFailure ? { stopOnFailure: true } : {}),
     ...(experimental ? { experiments } : {}),
-    ...(historyIdentity ? { historyCompaction: historyIdentity } : {}),
     ...(orderSeed !== null ? { orderSeed } : {}),
     ...(Object.values(models).some((m) => m !== model) ? { models } : {}),
     suiteSha256: createHash('sha256')
@@ -376,19 +366,12 @@ if (!args.includes('--execute')) {
                   ))
                 : [
                     assemblePrompt({
-                      version:
-                        experiments[variant].workflow === 'final'
-                          ? 4
-                          : compactPrompts && variant === 'after'
-                            ? 3
-                            : 2,
                       rawPrompt: fixture.prompt,
                       selectedSkillIds: resolveTaskGuidelines(fixture.prompt, undefined),
                       executionMode: 'isolated',
                     }).assembledPrompt,
                     effortPrompt(
                       efforts[variant] ?? undefined,
-                      compactPrompts && variant === 'after',
                       experiments[variant]['task-approach'] === 'scoped',
                     ),
                   ].join('\n\n');
@@ -429,10 +412,6 @@ if (!args.includes('--execute')) {
         }
         if (completed) continue;
         await writeFile(specPath, `${JSON.stringify(spec, null, 2)}\n`);
-        const historyReceiptPath = specPath.replace(/\.json$/, '.history.jsonl');
-        const historyMode = experiments[variant]['history-compaction'];
-        const historyEnv = historyExperimentEnvironment(historyMode, historyReceiptPath);
-        if (historyMode !== 'off') await writeFile(historyReceiptPath, '', { mode: 0o600 });
         activeTrial = { case: id, variant, repetition, startedAt: new Date().toISOString() };
         await checkpoint();
         console.log(`Quality: ${id}, ${variant}, repetition ${repetition}`);
@@ -461,10 +440,7 @@ if (!args.includes('--execute')) {
                   ...(meter?.env ?? process.env),
                   JACKALOPE_QUALITY_SPEC: specPath,
                   RUST_TEST_THREADS: '1',
-                  JACKALOPE_CONTEXT_EXPERIMENT:
-                    compactPrompts && variant === 'after' ? 'compact' : 'off',
                   ...experimentEnvironment(experiments[variant]),
-                  ...historyEnv,
                 },
                 stdio: ['ignore', 'pipe', 'pipe'],
               },
@@ -548,7 +524,6 @@ if (!args.includes('--execute')) {
           model: models[variant],
           experiments: experiments[variant],
           experimentRegistry: { version: registry.version, sha256: registrySha256 },
-          historyCompaction: await historyExperimentReceipt(historyMode, historyReceiptPath),
           source: fixture.source ?? null,
           variant,
           repetition,

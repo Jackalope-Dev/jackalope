@@ -98,7 +98,16 @@ test('optimization controls are explicit and independently reproducible', () => 
 });
 
 test('retired paths and core behavior cannot be enabled or disabled through experiment controls', () => {
+  assert.throws(() => experimentOptions(['--after-native-tools=bounded'], ['after']), /Invalid/);
+  assert.throws(() => experimentEnvironment({ 'native-tools': 'bounded' }), /Invalid/);
   const fields = [
+    'workflow',
+    'named-read',
+    'context-reuse',
+    'source-context',
+    'history-compaction',
+    'dispatch-plan',
+    'context-style',
     'batch-read',
     'result-artifacts',
     'result-excerpts',

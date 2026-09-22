@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import {
   aggregateAttempts,
@@ -9,8 +12,38 @@ import {
   experimentOptions,
   registry,
 } from '../../../scripts/evaluation/experiments.mjs';
-import { deepseekUsage, startProviderMeter } from '../../../scripts/evaluation/provider-meter.mjs';
+import {
+  deepseekUsage,
+  inspectProviderProfile,
+  startProviderMeter,
+} from '../../../scripts/evaluation/provider-meter.mjs';
 import { studyPlan } from '../../../scripts/evaluation/study-plan.mjs';
+
+test('profile observations distinguish fresh setup from existing caches without reading content', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'jackalope-meter-profile-'));
+  try {
+    assert.deepEqual(await inspectProviderProfile(root), {
+      configPresent: false,
+      catalogPresent: false,
+      pluginManifestPresent: false,
+    });
+    for (const name of [
+      'config/opencode/opencode.json',
+      'cache/opencode/models.json',
+      'config/opencode/node_modules/@opencode-ai/plugin/package.json',
+    ]) {
+      await mkdir(path.dirname(path.join(root, name)), { recursive: true });
+      await writeFile(path.join(root, name), 'private-content');
+    }
+    assert.deepEqual(await inspectProviderProfile(root), {
+      configPresent: true,
+      catalogPresent: true,
+      pluginManifestPresent: true,
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test('provider totals replace worker reports while disjoint Jev helpers are added once', () => {
   const usage = (input) => ({ reported: true, input, output: 2, cacheRead: 0, cacheWrite: 0 });

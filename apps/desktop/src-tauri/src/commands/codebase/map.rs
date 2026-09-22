@@ -325,18 +325,6 @@ pub(crate) fn prepare_task_map(
         return None;
     }
     let (snapshot, cache_hit) = cached_snapshot(root)?;
-    let explicit = snapshot
-        .files
-        .iter()
-        .filter(|file| task.contains(&file.path))
-        .count();
-    let budget = if (1..=2).contains(&explicit)
-        && crate::commands::experiments::is("JACKALOPE_CONTEXT_EXPERIMENT", "compact")
-    {
-        budget.min(3_000)
-    } else {
-        budget
-    };
     let recent: BTreeSet<String> = recent_paths.iter().cloned().collect();
 
     let mut imports: BTreeMap<&str, Vec<&str>> = BTreeMap::new();

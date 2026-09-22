@@ -190,9 +190,8 @@ give Jackalope control of the model's conversation history or built-in tools.
 | Model reasoning effort | Native flags for Codex and Claude Code. OpenCode requests only enabled low/medium/high variants advertised for the selected provider/model; DeepSeek Balanced requests high. Unsupported variants and absent effort preserve provider defaults. Requested effort is not proof of provider behavior. |
 | Exact result selection and recovery | Shared broker for selected on-demand connections. Codex, Claude, OpenCode and Kimi use native MCP; Grok, Antigravity and Gemini use the HTTP bridge. Explicit selections retain the captured original. These do not intercept the agent's own shell or file tools. |
 | Optional browser, desktop and coordination schemas loaded during execution | Opt-in lean OpenCode discovery, using MCP list-changed notifications. Other adapters retain existing catalogs until client refresh and permission behavior are verified. |
-| Source-range reads and delegation planning | Experimental native MCP tools for Codex, Claude, OpenCode and Kimi; no equivalent new HTTP endpoints are supplied. |
-| Native history rewriting | The evaluation-only OpenCode plugin can deduplicate exact read results. It is not installed by ordinary task launches or implemented across all adapters. |
-| Native source-read limits | OpenCode-only native test binaries can bound unspecified reads for evaluation. Explicit ranges and permission checks remain native. Ordinary desktop builds do not attach this hook or intercept native file reads. |
+| Source-range reads | Experimental native MCP tool for Codex, Claude, OpenCode and Kimi; no equivalent new HTTP endpoints are supplied. |
+| Native test-output filtering | OpenCode shell results can omit recognized passing-test detail after saving the complete original. Failed, truncated or unsupported output remains unchanged. Native file reads and tool permissions remain intact. |
 
 Ordinary tasks use concise launch instructions and hide unavailable tool schemas
 by default. Static MCP clients retain coordination tools; dynamic loading remains

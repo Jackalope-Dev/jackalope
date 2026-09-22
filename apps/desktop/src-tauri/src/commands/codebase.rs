@@ -15,7 +15,6 @@ const MAX_REFERENCES: usize = 30_000;
 static SCANNING: AtomicBool = AtomicBool::new(false);
 
 mod analysis_cache;
-pub(crate) mod context_pack;
 pub(crate) mod context_read;
 pub(crate) mod map;
 mod symbols;

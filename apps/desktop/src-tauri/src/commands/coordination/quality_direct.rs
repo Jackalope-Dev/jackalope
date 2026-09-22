@@ -122,6 +122,7 @@ pub(super) fn run(
         account_binding: Some(binding),
         workspace: repo.to_string_lossy().into(),
         status: "running".into(),
+        started_at: chrono::Utc::now().to_rfc3339(),
         ..Default::default()
     }));
     {
@@ -216,6 +217,7 @@ pub(super) fn run(
     if let Ok(Ok((text, _))) = diagnostics {
         result.diagnostics.push(text);
     }
+    result.ended_at = Some(chrono::Utc::now().to_rfc3339());
     Ok((result, stopped))
 }
 

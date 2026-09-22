@@ -14,12 +14,11 @@ import { assemblePrompt, PROMPT_VERSION } from '../src/lib/skills/context-assemb
 import { resolveTaskGuidelines } from '../src/lib/skills/task-context.ts';
 import { effortPrompt } from '../src/lib/task-effort.ts';
 
-test('evaluation defaults match new task guidance without changing explicit legacy prompts', () => {
+test('evaluation defaults match current task guidance', () => {
   assert.equal(PROMPT_VERSION, 4);
-  assert.equal(registry.fields.workflow.default, 'final');
   assert.equal(registry.fields['task-approach'].default, 'scoped');
-  assert.equal(effortPrompt('balanced'), effortPrompt('balanced', false, true));
-  assert.notEqual(effortPrompt('balanced'), effortPrompt('balanced', false, false));
+  assert.equal(effortPrompt('balanced'), effortPrompt('balanced', true));
+  assert.notEqual(effortPrompt('balanced'), effortPrompt('balanced', false));
 });
 
 test('provider quota stops further evaluations without disguising ordinary failures', () => {
@@ -40,6 +39,9 @@ test('prompt baselines pin effort and selected cases without launching providers
   const script = fileURLToPath(new URL('../../../scripts/evaluation/quality.mjs', import.meta.url));
   const invoke = (args) =>
     spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', windowsHide: true });
+  const retired = invoke(['--compact-prompts']);
+  assert.notEqual(retired.status, 0);
+  assert.match(retired.stderr, /Retired compact-prompt control/);
   const saved = invoke([
     '--effort=balanced',
     '--cases=copy-edit',
@@ -102,7 +104,6 @@ test('resuming completed trials launches no workers and rejects changed configur
       cases: [fixture.id],
       variants: ['before', 'after'],
       repeat: 1,
-      compactPrompts: false,
       providerMeter: null,
       suiteSha256: createHash('sha256')
         .update(JSON.stringify([fixture]))

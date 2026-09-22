@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -194,6 +194,24 @@ export async function startProviderMeter({
   };
 }
 
+export async function inspectProviderProfile(directory) {
+  const present = async (name) => {
+    try {
+      await stat(path.join(directory, name));
+      return true;
+    } catch (error) {
+      return error.code === 'ENOENT' ? false : null;
+    }
+  };
+  return {
+    configPresent: await present('config/opencode/opencode.json'),
+    catalogPresent: await present('cache/opencode/models.json'),
+    pluginManifestPresent: await present(
+      'config/opencode/node_modules/@opencode-ai/plugin/package.json',
+    ),
+  };
+}
+
 export async function prepareProviderMeter(directory, model) {
   const key =
     process.env.DEEPSEEK_API_KEY ??
@@ -201,6 +219,7 @@ export async function prepareProviderMeter(directory, model) {
       .deepseek?.key;
   const meter = await startProviderMeter({ key, model });
   try {
+    const profileStateBeforeSetup = await inspectProviderProfile(directory);
     const config = path.join(directory, 'config');
     await mkdir(path.join(config, 'opencode'), { recursive: true });
     await writeFile(
@@ -233,7 +252,13 @@ export async function prepareProviderMeter(directory, model) {
       OPENCODE_DISABLE_PROJECT_CONFIG: 'true',
       OPENCODE_DISABLE_AUTOUPDATE: 'true',
     });
-    return { ...meter, env };
+    return {
+      ...meter,
+      env,
+      async close() {
+        return { ...(await meter.close()), profileStateBeforeSetup };
+      },
+    };
   } catch (error) {
     await meter.close();
     throw error;

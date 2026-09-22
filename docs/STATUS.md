@@ -11,6 +11,10 @@ evidence; catalog facts do not prove quality, credit or upstream freshness.
 Experiment settings share a versioned registry. Optional DeepSeek request metering,
 quality-study feasibility planning and isolated warm API helpers support screening;
 representative benefit and installed-platform acceptance remain open.
+OpenCode tasks locally compact recognized passing-test output by default while
+retaining exact recovery files and diagnostics. Other adapters retain their native
+shell output. Fresh-profile setup costs and representative task benefits need
+separate acceptance; smaller responses do not establish general cost or speed gains.
 
 ## Desktop workspace
 
@@ -111,7 +115,7 @@ representative benefit and installed-platform acceptance remain open.
   acceptance, combined patch review and guarded integration with recoverable cleanup.
   Final verification guidance batches checks after implementation. Agents can report
   all requirement assessments in one call; review shows their justifications and
-  evidence separately from human acceptance. Compact prompt/map changes remain opt-in experiments.
+  evidence separately from human acceptance.
 - Durable ownership handoffs, explicit interface agreements and changed-file scope
   checks gate dependent work and integration. Projects can opt into agent reconciliation
   and verified local merging; source worktrees remain available. See
@@ -179,9 +183,8 @@ representative benefit and installed-platform acceptance remain open.
   result-field selection are core behavior, with static-client coordination tools
   preserved. Local failure triage can classify recorded quota/check facts.
   Remaining evaluation controls cover captured-result queries and previews, small
-  tool catalogs, exact named reads, source preparation and conditional source reads,
-  managed-task context reuse, deferred OpenCode tools, delegation planning and shadow
-  Jev assistance. Optional agent questions expose typed Jev judgments over native
+  tool catalogs, conditional source reads, deferred OpenCode tools and shadow Jev
+  assistance. Optional agent questions expose typed Jev judgments over native
   file/captured-result evidence, with separate usage accounting.
   Matched exports retain complete-attempt usage, failures and private-receipt
   boundaries. Source-attributed repair fixtures and randomized review sets support
@@ -196,7 +199,7 @@ representative benefit and installed-platform acceptance remain open.
   payload targets Linux x86_64/OpenCode; broader provider and benchmark acceptance remain open.
   OpenCode tasks use an authenticated owned server for recoverable permission prompts,
   structured questions, exact-session continuation and child-session usage. Scope,
-  native-read and provider-effort ablations retain matched permission policies and
+  native-output and provider-effort ablations retain matched permission policies and
   independent accounting; cross-platform installed acceptance and representative
   improvement claims remain open.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.

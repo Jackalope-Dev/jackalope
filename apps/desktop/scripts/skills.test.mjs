@@ -4,16 +4,13 @@ import { detectSkillsFromPrompt, getSkillById, VETTED_SKILLS } from '../src/lib/
 import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
 import { getToolById, VETTED_TOOLS } from '../src/lib/skills/tool-registry.ts';
 
-test('default final-phase guidance preserves diagnostics and saved v2 prompts', () => {
+test('default final-phase guidance preserves diagnostics and explicit instructions', () => {
   const options = {
     rawPrompt: 'Fix the scheduler',
     selectedSkillIds: ['systematic-debugging'],
     executionMode: 'isolated',
   };
-  const legacy = assemblePrompt({ ...options, version: 2 }).assembledPrompt;
-  const candidate = assemblePrompt({ ...options, version: 4 }).assembledPrompt;
-  assert.equal(assemblePrompt(options).assembledPrompt, candidate);
-  assert.match(legacy, /Reproduce behavioral defects with a focused failing check/);
+  const candidate = assemblePrompt(options).assembledPrompt;
   assert.match(candidate, /only when its result is needed/);
   assert.match(candidate, /explicit user or repository instructions/);
   assert.match(candidate, /final verification/);

@@ -1,5 +1,17 @@
 [
   {
+    "id": "recoverable-test-output",
+    "date": "2026-09-22",
+    "status": "In development",
+    "title": "Less repetitive test output",
+    "description": "Agents can receive concise successful test results with the complete captured output still available.",
+    "items": [
+      "OpenCode tasks, including API-key connections through its runner, retain warnings and recovery files when filtering recognized passing-test output.",
+      "Failed, incomplete and unsupported output stays intact; other agents share compact saved-check results through Jackalope verification."
+    ],
+    "note": "Broader cost, speed and installed-platform comparisons remain in validation."
+  },
+  {
     "id": "opencode-task-permissions",
     "date": "2026-09-18",
     "status": "In development",

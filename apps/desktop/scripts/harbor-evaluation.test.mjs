@@ -57,7 +57,7 @@ test('external comparisons reject unbounded or unmatched execution settings', ()
     externalSpec({
       ...input,
       variant: 'jackalope',
-      experiments: { 'native-tools': 'bounded', 'provider-effort': 'low' },
+      experiments: { 'native-tools': 'output', 'provider-effort': 'low' },
     }),
   );
 });

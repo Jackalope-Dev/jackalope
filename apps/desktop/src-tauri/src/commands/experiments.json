@@ -12,8 +12,8 @@
       "environment": "JACKALOPE_SCOPE_GUARD"
     },
     "native-tools": {
-      "values": ["off", "bounded", "output"],
-      "default": "off",
+      "values": ["off", "output"],
+      "default": "output",
       "environment": "JACKALOPE_NATIVE_TOOLS"
     },
     "opencode-transport": {
@@ -31,11 +31,6 @@
       "default": "off",
       "environment": null
     },
-    "workflow": {
-      "values": ["legacy", "final"],
-      "default": "final",
-      "environment": null
-    },
     "task-approach": {
       "values": ["general", "scoped"],
       "default": "scoped",
@@ -45,11 +40,6 @@
       "values": ["full", "available", "deferred"],
       "default": "available",
       "environment": "JACKALOPE_TOOL_SURFACE"
-    },
-    "named-read": {
-      "values": ["off", "on"],
-      "default": "off",
-      "environment": "JACKALOPE_NAMED_READ"
     },
     "result-queries": {
       "values": ["off", "on"],
@@ -76,30 +66,10 @@
       "default": "on",
       "environment": "JACKALOPE_REPO_MAP"
     },
-    "context-reuse": {
-      "values": ["off", "on"],
-      "default": "off",
-      "environment": "JACKALOPE_CONTEXT_REUSE"
-    },
-    "source-context": {
-      "values": ["off", "on"],
-      "default": "off",
-      "environment": "JACKALOPE_SOURCE_CONTEXT"
-    },
     "context-read": {
       "values": ["off", "on"],
       "default": "off",
       "environment": "JACKALOPE_CONTEXT_READ"
-    },
-    "history-compaction": {
-      "values": ["off", "deduplicate"],
-      "default": "off",
-      "environment": "JACKALOPE_HISTORY_COMPACTION"
-    },
-    "dispatch-plan": {
-      "values": ["off", "on"],
-      "default": "off",
-      "environment": "JACKALOPE_DISPATCH_PLAN"
     },
     "jev-assistance": {
       "values": ["active", "shadow"],
@@ -110,11 +80,6 @@
       "values": ["off", "on"],
       "default": "off",
       "environment": "JACKALOPE_JEV_QUESTIONS"
-    },
-    "context-style": {
-      "values": ["off", "compact"],
-      "default": "off",
-      "environment": "JACKALOPE_CONTEXT_EXPERIMENT"
     },
     "warm-opencode": {
       "values": ["on", "off"],

@@ -176,7 +176,6 @@ async fn bridge_verification_output(
         .map_err(|_| StatusCode::BAD_REQUEST)
 }
 
-#[cfg(test)]
 async fn bridge_native_output(
     WebState(service): WebState<Coordinator>,
     headers: HeaderMap,

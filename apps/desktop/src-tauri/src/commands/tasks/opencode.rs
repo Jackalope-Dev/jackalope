@@ -5,19 +5,18 @@ use std::collections::{HashMap, HashSet};
 
 const MAX_RESPONSE: usize = 4_000_000;
 
-#[cfg(test)]
 pub(super) fn configure_tools(
     command: &mut Command,
     directory: &Path,
     id: &str,
 ) -> Result<(), String> {
-    let mode = if crate::commands::experiments::is("JACKALOPE_NATIVE_TOOLS", "bounded") {
-        "bounded"
-    } else if crate::commands::experiments::is("JACKALOPE_NATIVE_TOOLS", "output") {
-        "output"
-    } else {
+    if !crate::commands::experiments::is("JACKALOPE_NATIVE_TOOLS", "output") {
         return Ok(());
-    };
+    }
+    configure_tool_plugin(command, directory, id)
+}
+
+fn configure_tool_plugin(command: &mut Command, directory: &Path, id: &str) -> Result<(), String> {
     let mut config: Value = serde_json::from_str(&crate::commands::mcp::opencode_config(
         &serde_json::Map::new(),
         command,
@@ -39,7 +38,7 @@ pub(super) fn configure_tools(
         .push(json!(url.as_str()));
     command
         .env("OPENCODE_CONFIG_CONTENT", config.to_string())
-        .env("JACKALOPE_NATIVE_TOOLS", mode)
+        .env("JACKALOPE_NATIVE_TOOLS", "output")
         .env(
             "JACKALOPE_NATIVE_TOOLS_RECEIPT",
             directory.join(format!("{id}.native-tools.jsonl")),

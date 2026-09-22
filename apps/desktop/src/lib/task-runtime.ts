@@ -34,7 +34,6 @@ export interface TaskRun {
     toolCalls?: Record<string, number>;
     toolObservationsTruncated?: boolean;
     launchPromptBytes: number;
-    promptPolicyHash?: string | null;
     launches: number;
     jevQuestionCalls?: number | null;
     jevQuestions?: number | null;

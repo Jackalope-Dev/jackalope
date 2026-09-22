@@ -6,6 +6,7 @@ export default async function nativeTools() {
   const endpoint = process.env.JACKALOPE_BRIDGE_URL;
   const token = process.env.JACKALOPE_BRIDGE_TOKEN;
   let capturedBytes = 0;
+  let pendingBytes = 0;
   let unavailable = false;
   async function receipt(value) {
     const target = process.env.JACKALOPE_NATIVE_TOOLS_RECEIPT;
@@ -34,10 +35,13 @@ export default async function nativeTools() {
         return;
       const original = output.output;
       const bytes = Buffer.byteLength(original);
-      if (bytes <= 2000 || bytes > 50_000 || capturedBytes + bytes > 20_000_000) return;
+      if (bytes <= 2000 || bytes > 50_000 || capturedBytes + pendingBytes + bytes > 20_000_000)
+        return;
+      if (!original.includes(' passed') && !original.includes('# pass ')) return;
       const body = JSON.stringify({ output: original, exit_code: 0, truncated: false });
       if (Buffer.byteLength(body) > 60_000) return;
       const started = performance.now();
+      pendingBytes += bytes;
       try {
         const response = await fetch(`${endpoint}/v1/native/output`, {
           method: 'POST',
@@ -79,36 +83,9 @@ export default async function nativeTools() {
         output.output = text;
       } catch {
         unavailable = true;
+      } finally {
+        pendingBytes -= bytes;
       }
-    },
-    'tool.definition': async (input, output) => {
-      if (input.toolID === 'read' && mode === 'bounded') {
-        output.description = output.description.replace(
-          'By default, this tool returns up to 2000 lines',
-          'By default, this tool returns up to 120 lines',
-        );
-        output.description +=
-          '\nJackalope defaults unspecified reads to 120 lines. Use offset and limit to inspect additional ranges; set an explicit larger limit when complete context is needed. Partial reads cannot establish absence.';
-        const description =
-          'Maximum lines to read. Defaults to 120; specify a larger limit when needed.';
-        if (
-          typeof output.parameters?.extend === 'function' &&
-          typeof output.parameters.shape?.limit?.describe === 'function'
-        ) {
-          output.parameters = output.parameters.extend({
-            limit: output.parameters.shape.limit.describe(description),
-          });
-          output.jsonSchema = undefined;
-        } else if (output.parameters?.properties?.limit) {
-          output.parameters.properties.limit.description = description;
-        }
-      }
-    },
-    'tool.execute.before': async (input, output) => {
-      if (input.tool !== 'read' || mode !== 'bounded') return;
-      if (output.args.limit !== undefined || output.args.offset !== undefined) return;
-      if (await receipt({ mode, action: 'default-range', callID: input.callID, lines: 120 }))
-        output.args.limit = 120;
     },
   };
 }
