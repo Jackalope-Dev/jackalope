@@ -171,8 +171,10 @@ representative benefit and installed-platform acceptance remain open.
   per-repository locks allow independent scans. Detailed launch timings and latency
   summaries retain failures and missing measurements in quality comparisons.
 - New tasks use version-four final-phase guidance and concise ordinary-task native
-  instructions. Managed assignments retain full ownership guidance. Required
-  checks remain explicit; final automatic checks reuse a successful result only
+  instructions. Managed assignments retain full ownership guidance.
+  Locally parsed test summaries and compact successful output preserve captured
+  diagnostics and recoverable originals; comparative task savings remain unproven.
+  Required checks remain explicit; final automatic checks reuse a successful result only
   for the same workspace snapshot. Content-keyed syntax caching and recoverable
   result-field selection are core behavior, with static-client coordination tools
   preserved. Local failure triage can classify recorded quota/check facts.

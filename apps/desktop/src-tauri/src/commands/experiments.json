@@ -1,13 +1,18 @@
 {
   "version": 1,
   "fields": {
+    "verification-output": {
+      "values": ["legacy", "test-report"],
+      "default": "test-report",
+      "environment": "JACKALOPE_VERIFICATION_OUTPUT"
+    },
     "scope-guard": {
       "values": ["on", "off"],
       "default": "on",
       "environment": "JACKALOPE_SCOPE_GUARD"
     },
     "native-tools": {
-      "values": ["off", "bounded"],
+      "values": ["off", "bounded", "output"],
       "default": "off",
       "environment": "JACKALOPE_NATIVE_TOOLS"
     },

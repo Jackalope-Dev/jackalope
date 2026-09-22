@@ -10,7 +10,10 @@ use serde::{Deserialize, Serialize};
 use std::{path::Path, process::Command, time::Duration};
 use tauri::State;
 mod leases;
+#[cfg(test)]
+pub(super) mod native_output;
 pub(super) mod output;
+mod test_report;
 pub use leases::{ensure_all_idle, ensure_idle};
 
 /// Ceiling on a single check or setup command. Commands are cut off for going quiet

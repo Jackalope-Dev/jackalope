@@ -88,14 +88,25 @@ tool-only measurements; these omit worker execution and cannot establish task sa
   Account capacity reads share in-flight refreshes and use at most four concurrent
   reads, preserving candidate order and final policy/quota reservation checks.
 - `computer_verify` omits recognized passing-test lines only from long successful
-  responses, preserving diagnostics and stderr. Failed output remains intact within
-  the existing capture limit. `verification_output` (HTTP `/v1/computer/output`)
+  responses, preserving diagnostics and stderr. It recognizes complete pytest and
+  Node TAP summaries before omitting supported progress or passing-test records.
+  Parsed pytest, Cargo and Node TAP counts describe reported output, not independent
+  correctness. Failed, timed-out and truncated captures remain intact within the
+  capture limit, including output reporting failed tests despite a zero process exit.
+  Unknown formats retain their original output. `--after-verification-output=legacy`
+  reproduces the earlier passing-line filter for evaluation.
+  `verification_output` (HTTP `/v1/computer/output`)
   accepts `{}` to recover the latest saved result and check ID after a lost or
   timed-out response. Further output pages require that ID to prevent mixing checks.
   Stored results and the review UI retain captured output. Neither operation permits
   a new command. Agent verification reuses a passing result only when the saved
   command and Git workspace snapshot still match; changed, failed or unbound checks
   execute again. Reading output alone does not verify subsequent edits.
+  The ignored native `replay_captured_verification` test accepts a JSON array of saved
+  `Verification` records through `JACKALOPE_VERIFICATION_REPLAY`, writes sibling
+  `.projected.json` responses and checks exact paginated stdout recovery without
+  executing their commands. Keep captures private. These replays measure tool-output
+  delivery, not model tokens, task speed or quality.
 - Codex receives permission to invoke verification only when the task has a saved
   check. `computer_verify {}` runs that attempt's saved command; `project.verification`
   exposes the command and automatic-check setting. Launch guidance names the saved

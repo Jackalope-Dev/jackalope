@@ -176,6 +176,16 @@ async fn bridge_verification_output(
         .map_err(|_| StatusCode::BAD_REQUEST)
 }
 
+#[cfg(test)]
+async fn bridge_native_output(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(input): Json<super::verification::native_output::Input>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    service.authorized_run(&headers)?;
+    Ok(Json(super::verification::native_output::project(input)))
+}
+
 pub(super) async fn bridge_project(
     WebState(service): WebState<Coordinator>,
     headers: HeaderMap,

@@ -840,7 +840,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Run this attempt's saved project check by calling with {}. No command or args are needed; project.verification.command shows the exact saved command. Replacements and extra arguments are rejected. Reuses a successful result only when the command and workspace snapshot still match. Runs in the task directory with bounded execution, stall and cancellation controls. Returns exit code, stdout and stderr. Long successful output may omit passing-test lines. If the response is lost or times out, call verification_output with {} to recover the latest stored result without rerunning. Failures remain intact within capture limits.",
+        description = "Run this attempt's saved project check with {}. project.verification.command shows the command; replacements and extra arguments are rejected. Reuses a passing result only for the same command and workspace snapshot. Returns process exit status, stdout and stderr with bounded execution and cancellation. Recognized test summaries are parsed output, not independent correctness evidence. Long successful output may omit passing-test records; failures and incomplete captures stay intact. After a lost response or client timeout, verification_output {} recovers the stored result without rerunning.",
         annotations(read_only_hint = false, open_world_hint = false)
     )]
     async fn computer_verify(

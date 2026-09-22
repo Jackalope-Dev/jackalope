@@ -13,6 +13,8 @@ pub(super) fn configure_tools(
 ) -> Result<(), String> {
     let mode = if crate::commands::experiments::is("JACKALOPE_NATIVE_TOOLS", "bounded") {
         "bounded"
+    } else if crate::commands::experiments::is("JACKALOPE_NATIVE_TOOLS", "output") {
+        "output"
     } else {
         return Ok(());
     };

@@ -104,6 +104,8 @@ release dates.
   Include versioned prompt comparisons, resumed sessions, bounded maps and recoverable
   tool-result selection. Require representative independent acceptance before broad
   website claims; retain failures, cache accounting and correction work.
+  Compare locally parsed verification output, including format fallback, failure
+  diagnostics, tool adoption and native-agent controls.
   Screen available-tool exposure, exact read-only lookup, explicit source preparation
   and task-scoped/final-phase guidance
   independently; freeze promising settings before new held-out confirmation.

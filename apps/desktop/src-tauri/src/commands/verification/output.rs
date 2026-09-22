@@ -19,11 +19,33 @@ fn stdout_stream() -> String {
 }
 
 pub(super) fn response(check: &Verification) -> Value {
+    response_with_reports(
+        check,
+        crate::commands::experiments::is("JACKALOPE_VERIFICATION_OUTPUT", "test-report"),
+    )
+}
+
+fn response_with_reports(check: &Verification, test_reports: bool) -> Value {
     let result = &check.result;
+    let reports = if test_reports {
+        super::test_report::reports(&result.stdout)
+    } else {
+        Vec::new()
+    };
     let mut omitted = 0;
-    let mut stdout = if result.success && result.stdout.len() > 2000 {
-        let lines: Vec<_> = result
-            .stdout
+    let mut stdout = if result.success
+        && !result.timed_out
+        && !result.truncated
+        && !super::test_report::has_failures(&reports)
+        && result.stdout.len() > 2000
+    {
+        let (projected, projected_lines) = if test_reports {
+            super::test_report::compact(&result.stdout, &reports)
+        } else {
+            (result.stdout.clone(), 0)
+        };
+        omitted += projected_lines;
+        let lines: Vec<_> = projected
             .lines()
             .filter(|line| {
                 let line = line.trim();
@@ -34,7 +56,7 @@ pub(super) fn response(check: &Verification) -> Value {
             })
             .collect();
         if omitted > 0 {
-            format!("[Jackalope omitted {omitted} passing-test lines. Use verification_output to read the stored output.]\n{}", lines.join("\n"))
+            format!("[Jackalope omitted {omitted} successful-test progress/detail lines. Use verification_output to read the stored output.]\n{}", lines.join("\n"))
         } else {
             result.stdout.clone()
         }
@@ -45,10 +67,14 @@ pub(super) fn response(check: &Verification) -> Value {
         stdout.clone_from(&result.stdout);
         omitted = 0;
     }
-    json!({"check_id":check.checked_at,"exit_code":result.exit_code,"stdout":stdout,
+    let mut response = json!({"check_id":check.checked_at,"exit_code":result.exit_code,"stdout":stdout,
         "stderr":result.stderr,"success":result.success,"timed_out":result.timed_out,
         "truncated":result.truncated,"omitted_passing_lines":omitted,
-        "stored_stdout_bytes":result.stdout.len(),"stored_stderr_bytes":result.stderr.len()})
+        "stored_stdout_bytes":result.stdout.len(),"stored_stderr_bytes":result.stderr.len()});
+    if !reports.is_empty() {
+        response["reported_test_summaries"] = json!(reports);
+    }
+    response
 }
 
 pub fn read(check: Option<&Verification>, input: OutputRequest) -> Result<Value, String> {
@@ -152,5 +178,90 @@ mod tests {
             .is_err());
         }
         assert!(read(None, serde_json::from_value(json!({})).unwrap()).is_err());
+    }
+
+    #[test]
+    fn pytest_projection_is_recoverable_and_never_discards_failed_or_incomplete_output() {
+        let mut check = check(true);
+        check.result.stdout = format!(
+            "{}\nwarning: retained\n=== 100 passed in 0.01s ===\n",
+            (0..100)
+                .map(|n| format!("tests/test_api.py::test_case_{n} PASSED [100%]"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        let projected = response_with_reports(&check, true);
+        assert_eq!(projected["omitted_passing_lines"], 100);
+        assert_eq!(
+            projected["reported_test_summaries"][0]["counts"]["passed"],
+            100
+        );
+        assert!(projected["stdout"]
+            .as_str()
+            .unwrap()
+            .contains("warning: retained"));
+        assert!(
+            serde_json::to_vec(&projected).unwrap().len()
+                < serde_json::to_vec(&response_with_reports(&check, false))
+                    .unwrap()
+                    .len()
+        );
+        let recovered = read(
+            Some(&check),
+            serde_json::from_value(json!({"limit":16000})).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(recovered["text"], check.result.stdout);
+        for kind in ["failed", "timed_out", "truncated"] {
+            let mut incomplete = check.clone();
+            match kind {
+                "failed" => incomplete.result.success = false,
+                "timed_out" => incomplete.result.timed_out = true,
+                _ => incomplete.result.truncated = true,
+            }
+            let result = response_with_reports(&incomplete, true);
+            assert_eq!(result["stdout"], incomplete.result.stdout);
+            assert_eq!(result["stderr"], incomplete.result.stderr);
+            assert_eq!(result["omitted_passing_lines"], 0);
+        }
+        check
+            .result
+            .stdout
+            .push_str("\n=== 1 failed in 0.01s ===\n");
+        let reported_failure = response_with_reports(&check, true);
+        assert_eq!(reported_failure["stdout"], check.result.stdout);
+        assert_eq!(reported_failure["success"], true);
+    }
+
+    #[test]
+    #[ignore = "Replays private captured Verification JSON records without running their commands"]
+    fn replay_captured_verification() {
+        let source =
+            std::path::PathBuf::from(std::env::var("JACKALOPE_VERIFICATION_REPLAY").unwrap());
+        let checks: Vec<Verification> =
+            serde_json::from_slice(&std::fs::read(&source).unwrap()).unwrap();
+        let mut responses = Vec::new();
+        for check in checks {
+            let started = std::time::Instant::now();
+            let candidate = response_with_reports(&check, true);
+            let elapsed = started.elapsed().as_micros();
+            let legacy = response_with_reports(&check, false);
+            let mut recovered = String::new();
+            loop {
+                let page = read(Some(&check), serde_json::from_value(json!({"check_id":check.checked_at,"offset":recovered.chars().count(),"limit":16000})).unwrap()).unwrap();
+                recovered.push_str(page["text"].as_str().unwrap());
+                if page["next_offset"].is_null() {
+                    break;
+                }
+            }
+            assert_eq!(recovered, check.result.stdout);
+            assert_eq!(candidate["stderr"], check.result.stderr);
+            responses.push(json!({"check_id":check.checked_at,"candidate":candidate,"legacy":legacy,"projection_us":elapsed,"stdout_recovered":true}));
+        }
+        std::fs::write(
+            source.with_extension("projected.json"),
+            serde_json::to_vec_pretty(&responses).unwrap(),
+        )
+        .unwrap();
     }
 }
