@@ -1,7 +1,7 @@
 //! A native mirror of the workspace's project list.
 //!
 //! The desktop UI owns projects and their preferences in its own store; this
-//! keeps just enough of that list — identity, name and path — where other
+//! keeps just enough of that list — identity, name, path and accent — where other
 //! processes can read it. Without it the `jackalope` command could not learn
 //! the project id the UI uses for a repository, and work started from a
 //! terminal would look unattached in project-scoped views.
@@ -22,6 +22,10 @@ pub struct ProjectRecord {
     pub id: String,
     pub name: String,
     pub path: String,
+    /// The project's theme accent as `#rrggbb`, so a terminal can wear the
+    /// same colour as the app. Absent for a repository the app has not opened.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent: Option<String>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -105,6 +109,7 @@ pub fn ensure(runtime: &TaskRuntime, project_path: &str) -> Result<ProjectRecord
         id: uuid::Uuid::new_v4().to_string(),
         name,
         path: project_path.to_string(),
+        accent: None,
     };
     ledger.projects.push(record.clone());
     write_ledger(&file, &ledger)?;
@@ -140,6 +145,7 @@ mod tests {
             id: "known".into(),
             name: "repo".into(),
             path: directory.to_string_lossy().into_owned(),
+            accent: None,
         });
         write_ledger(&file, &ledger).unwrap();
 

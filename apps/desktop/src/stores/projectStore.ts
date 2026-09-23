@@ -249,10 +249,29 @@ interface ProjectRecord {
   id: string;
   name: string;
   path: string;
+  /** The accent the project shows in, so the terminal can match it. */
+  accent?: string;
+}
+
+/**
+ * The app-wide accent, used for projects without a theme of their own. Set by
+ * the theme store, which imports this one, so it is pushed rather than read.
+ */
+let appAccent: string | undefined;
+
+export function setRegistryAppAccent(accent: string) {
+  if (accent === appAccent) return;
+  appAccent = accent;
+  mirrorProjects(useProjectStore.getState().projects);
 }
 
 function projectRecords(projects: Project[]): ProjectRecord[] {
-  return projects.map(({ id, name, path }) => ({ id, name, path }));
+  return projects.map(({ id, name, path, preferences }) => ({
+    id,
+    name,
+    path,
+    accent: preferences?.theme?.accentHex ?? appAccent,
+  }));
 }
 
 // Keeps the native mirror in step with this store. The `jackalope` command
@@ -294,11 +313,12 @@ async function mergeProjectRegistry() {
 }
 
 let mirrored: string | null = null;
-useProjectStore.subscribe((state) => {
-  // Subscribing rather than writing from each mutator means a future action
-  // cannot forget to mirror.
-  const encoded = JSON.stringify(projectRecords(state.projects));
+function mirrorProjects(projects: Project[]) {
+  const encoded = JSON.stringify(projectRecords(projects));
   if (encoded === mirrored) return;
   mirrored = encoded;
-  writeProjectRegistry(state.projects);
-});
+  writeProjectRegistry(projects);
+}
+// Subscribing rather than writing from each mutator means a future action
+// cannot forget to mirror.
+useProjectStore.subscribe((state) => mirrorProjects(state.projects));

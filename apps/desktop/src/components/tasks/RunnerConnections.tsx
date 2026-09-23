@@ -102,7 +102,6 @@ export function RunnerConnections({
       });
     }
   }
-  const missing = runners.filter((runner) => !identified.some((agent) => agent.id === runner.id));
   return (
     <WorkspacePage className="agents-page">
       <div className="agents-page-content workspace-stack">
@@ -364,12 +363,6 @@ export function RunnerConnections({
               runners.find((runner) => runner.id === 'antigravity')?.desktopInstalled
             }
           />
-        )}
-        {missing.length > 0 && (
-          <p className="task-muted">
-            Not detected: {missing.map((runner) => runner.name).join(', ')}. Install and sign in
-            through the CLI, then check again.
-          </p>
         )}
         <ProviderConnections />
         <LocalAiSetup compact />
