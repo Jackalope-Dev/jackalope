@@ -1,13 +1,15 @@
 import { PRESET_THEMES } from '@jackalope/brand/theme';
 import { SearchField } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Folder, LifeBuoy, MessageSquare, Plus, Settings2 } from 'lucide-react';
+import { Folder, LifeBuoy, MessageSquare, Plus, Settings2, SquareTerminal } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
+import { openCliTerminal } from '../../lib/cli-terminal';
 import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { taskTitle } from '../../lib/task-title';
 import { taskDecision } from '../../lib/task-workflow';
 import { openExternalUrl } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
+import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -98,6 +100,14 @@ export function CommandPalette({
       .split(' ')
       .some((kw) => kw.includes(search)) ||
       'settings & preferences'.includes(search));
+  const terminalProject = useProjectStore((state) =>
+    state.projects.find((item) => item.id === state.activeProjectId),
+  );
+  const remoteHost = useHostContextStore((state) => state.host);
+  const showTerminal =
+    Boolean(terminalProject) &&
+    !remoteHost &&
+    'terminal cli command shell console jackalope'.split(' ').some((kw) => kw.includes(search));
   const showHelp =
     'help docs documentation knowledgebase faq troubleshooting guides'
       .split(' ')
@@ -242,6 +252,21 @@ export function CommandPalette({
                   <kbd>{displayShortcut(resolveShortcuts(shortcuts).newWork)}</kbd>
                 </button>
               )}
+            {showTerminal && terminalProject && (
+              <button
+                data-command
+                type="button"
+                className="workspace-menu-item w-full"
+                onClick={() => {
+                  onClose();
+                  void openCliTerminal(terminalProject.path).catch(() => {});
+                }}
+              >
+                <SquareTerminal size={16} />
+                <span>Open terminal in {terminalProject.name}</span>
+                <kbd>{displayShortcut(resolveShortcuts(shortcuts).terminal)}</kbd>
+              </button>
+            )}
             {showSettings && (
               <button
                 data-command

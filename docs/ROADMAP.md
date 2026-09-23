@@ -77,6 +77,11 @@ to task review while retaining session ownership and usage. Provider-advertised
 effort requests and output filtering have separate validation; installed
 cross-platform acceptance and repeatable quality or efficiency gains remain open.
 
+The `jackalope` terminal command runs routed conversations from any Git repository
+through the desktop host, which it can start headless, and the app can hand a
+conversation to the system terminal. Installed PATH setup, hand-off on each
+platform and terminal answers to agent questions remain in progress.
+
 Codex speed controls, fresh context for changed workspaces, dependency-priority
 dispatch and CPU-based check capacity are implemented. Execution timings and offline
 delivery comparisons retain waits, failures and missing review evidence. Validate

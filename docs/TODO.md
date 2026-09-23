@@ -45,6 +45,14 @@ release dates.
   Include parent-task links, unified Needs you counts, shared file browsing, preview
   setup explanations and evidence attachment, and blocked-result review. Include optional
   file markers, outcome approval, and real agent-review requests from the review toolbar.
+- [ ] Accept the `jackalope` command in installed macOS, Windows and Linux packages:
+  PATH linking and the macOS system link, NSIS PATH hooks, the Store execution alias,
+  AppImage relaunch, updates and uninstall. Exercise cold start, second-launch window
+  promotion, several terminals, app-to-terminal hand-off on each platform's terminals,
+  narrow terminals, Unicode, `NO_COLOR` and reconnect after a host restart.
+- [ ] Answer agent questions from the terminal, interleave earlier attempts' output in
+  its transcript, and add a non-interactive `jackalope run` with machine-readable
+  output for scripts and CI.
 - [ ] Validate bulk task archiving, undo, restore and restart recovery in installed
   builds, including unsaved history and interrupted attempts.
 - [ ] Validate live sessions with installed providers: rapid capture, concurrent window

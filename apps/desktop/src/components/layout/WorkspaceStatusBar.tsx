@@ -1,6 +1,8 @@
 import { Popover } from '@jackalope/ui';
-import { GitBranch, ListTodo, Monitor } from 'lucide-react';
+import { GitBranch, ListTodo, Monitor, SquareTerminal } from 'lucide-react';
+import { useState } from 'react';
 
+import { openCliTerminal } from '../../lib/cli-terminal';
 import { sessionWork } from '../../lib/live-session';
 import { managedTaskWork } from '../../lib/managed-task';
 import { isActive } from '../../lib/task-runtime';
@@ -26,6 +28,7 @@ export function WorkspaceStatusBar({
   onSettings: () => void;
 }) {
   const host = useHostContextStore((state) => state.host);
+  const [terminalError, setTerminalError] = useState('');
   const runs = useExecutionStore((state) => state.runs);
   const selectedId = useExecutionStore((state) => state.selectedId);
   const { sessions, selectedId: selectedSession, runs: sessionRuns } = useLiveSessionStore();
@@ -104,6 +107,26 @@ export function WorkspaceStatusBar({
         {host ? 'This computer: ' : ''}
         {active} running{attention ? ` · ${attention} needs you` : ''}
       </button>
+      {project && !host && (
+        <button
+          type="button"
+          onClick={() => {
+            setTerminalError('');
+            void openCliTerminal(project.path).catch((cause) =>
+              setTerminalError(typeof cause === 'string' ? cause : String(cause)),
+            );
+          }}
+          aria-describedby={terminalError ? 'statusbar-terminal-error' : undefined}
+        >
+          <SquareTerminal size={15} aria-hidden="true" />
+          Terminal
+        </button>
+      )}
+      {terminalError && (
+        <span id="statusbar-terminal-error" role="alert" className="statusbar-error">
+          {terminalError}
+        </span>
+      )}
       <StatusBarUsage remote={Boolean(host)} />
       <Companion compact onSearch={onSearch} onSettings={onSettings} />
     </section>

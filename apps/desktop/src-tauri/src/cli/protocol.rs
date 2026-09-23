@@ -69,6 +69,12 @@ pub enum Request {
     /// Waits until work changes, then returns. Clients use a second connection
     /// for this so it never blocks their other requests.
     Watch { since: u64 },
+    /// Reports which conversation a terminal the app started is showing, so the
+    /// app can hand that conversation to another terminal.
+    Attached {
+        terminal: String,
+        session_id: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -435,9 +435,33 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 revision: revision(&runtime, &sessions),
             })
         }
+        Request::Attached {
+            terminal,
+            session_id,
+        } => {
+            if let Ok(mut attached) = attached().lock() {
+                match session_id {
+                    Some(id) => attached.insert(terminal, id),
+                    None => attached.remove(&terminal),
+                };
+            }
+            Ok(Response::Ok)
+        }
         Request::Ping => Ok(Response::Ok),
         Request::ShowWindow => Ok(show_window(app)),
     }
+}
+
+/// Conversations shown in terminals the app started, keyed by terminal.
+fn attached() -> &'static std::sync::Mutex<std::collections::HashMap<String, String>> {
+    static ATTACHED: std::sync::OnceLock<
+        std::sync::Mutex<std::collections::HashMap<String, String>>,
+    > = std::sync::OnceLock::new();
+    ATTACHED.get_or_init(Default::default)
+}
+
+pub(super) fn attached_session(terminal: &str) -> Option<String> {
+    attached().lock().ok()?.get(terminal).cloned()
 }
 
 fn show_window(app: &AppHandle) -> Response {

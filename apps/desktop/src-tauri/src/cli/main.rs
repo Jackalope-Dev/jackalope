@@ -32,7 +32,17 @@ OPTIONS
 ";
 
 fn main() {
-    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let mut arguments: Vec<String> = std::env::args().skip(1).collect();
+    // `--profile=<dir>` selects a non-default profile, as JACKALOPE_PROFILE_DIR
+    // does. The app passes it when opening a system terminal, since a terminal
+    // application that is already running will not inherit the app's environment.
+    if let Some(index) = arguments
+        .iter()
+        .position(|argument| argument.starts_with("--profile="))
+    {
+        let directory = arguments.remove(index)["--profile=".len()..].to_string();
+        std::env::set_var("JACKALOPE_PROFILE_DIR", directory);
+    }
     let flags: Vec<&str> = arguments
         .iter()
         .map(String::as_str)

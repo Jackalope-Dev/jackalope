@@ -98,10 +98,14 @@ pub(super) fn discover_runner(
                     }
                     runner.detail = if runner.signed_in {
                         "Uses your existing CLI sign-in. Model follows your agent configuration."
+                            .into()
+                    } else if binding.profile_id.is_some() {
+                        // A managed account keeps its own credentials, separate from the
+                        // login the CLI uses in a terminal.
+                        format!("Sign in to the selected account \"{}\", or switch to your current CLI account.", binding.label)
                     } else {
-                        "Sign in using the agent's CLI, then refresh."
-                    }
-                    .into();
+                        "Sign in using the agent's CLI, then refresh.".into()
+                    };
                 }
                 Err(error) => runner.detail = error.to_string(),
             }

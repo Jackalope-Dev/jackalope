@@ -216,6 +216,9 @@ pub fn run(launch: Launch) {
             Ok(())
         })
         .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                commands::cli_terminal::window_destroyed(window.label());
+            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main"
                     && window.state::<WindowBehavior>().should_hide()
@@ -331,6 +334,10 @@ pub fn run(launch: Launch) {
             commands::repo_todos::repo_todos_read,
             commands::repo_todos::repo_todos_save,
             commands::cli_install::cli_install_status,
+            commands::cli_terminal::cli_terminal_window,
+            commands::cli_terminal::cli_terminal_start,
+            commands::cli_terminal::cli_terminal_close,
+            commands::cli_terminal::cli_terminal_popout,
             commands::cli_install::cli_install_system,
             commands::project_registry::project_registry_list,
             commands::project_registry::project_registry_save,

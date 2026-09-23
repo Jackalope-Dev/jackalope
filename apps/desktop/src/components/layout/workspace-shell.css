@@ -25,7 +25,7 @@
   overflow-y: auto;
   flex-shrink: 0;
 }
-.workspace-shell .workspace-navigation > nav:first-child {
+.workspace-shell .workspace-navigation > nav {
   flex-direction: column;
   align-items: stretch;
 }
@@ -122,6 +122,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.statusbar-error {
+  color: var(--color-danger);
+  padding: 6px 8px;
+  max-width: 320px;
+}
 .statusbar-details {
   width: min(440px, calc(100vw - 24px));
   max-height: min(480px, var(--radix-popover-content-available-height));
@@ -160,7 +165,7 @@
     overflow: visible;
     padding: 0;
   }
-  .workspace-shell .workspace-navigation > nav:first-child {
+  .workspace-shell .workspace-navigation > nav {
     flex-direction: row;
     flex-wrap: wrap;
   }
@@ -176,4 +181,29 @@
 }
 .app-titlebar-mac .app-titlebar-left {
   min-width: 78px;
+}
+.workspace-shell .workspace-navigation {
+  overflow-x: hidden;
+  transition: width 160ms ease;
+}
+.workspace-shell .workspace-nav-toggle {
+  align-self: flex-start;
+  width: auto;
+  padding: 8px 12px;
+  color: var(--color-text-muted);
+}
+.workspace-shell .workspace-navigation[data-collapsed] {
+  width: 52px;
+  align-items: center;
+}
+.workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-toggle {
+  align-self: center;
+}
+.workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-item {
+  justify-content: center;
+  padding-inline: 0;
+  width: 40px;
+}
+.workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-item > span {
+  display: none;
 }

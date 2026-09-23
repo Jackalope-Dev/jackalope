@@ -246,6 +246,20 @@ pub(super) fn start_with_shell(
             return Err("Stop the other task's terminal before using this workspace.".into());
         }
     }
+    let command = shell_command(shell, &workspace)?;
+    spawn_terminal(sessions, terminal_id, workspace, command, history)
+}
+
+/// Starts `command` in a pseudo-terminal under `terminal_id` and captures its
+/// output for the status/write/resize/stop commands. Callers apply their own
+/// ownership rules first; this only enforces the shared terminal limit.
+fn spawn_terminal(
+    mut sessions: std::sync::MutexGuard<'_, HashMap<String, Terminal>>,
+    terminal_id: String,
+    workspace: std::path::PathBuf,
+    mut command: CommandBuilder,
+    history: Option<std::path::PathBuf>,
+) -> Result<(), String> {
     let exited: Vec<_> = sessions
         .iter_mut()
         .filter_map(|(id, terminal)| matches!(running(terminal), Ok(false)).then_some(id.clone()))
@@ -268,7 +282,6 @@ pub(super) fn start_with_shell(
         .map_err(|e| e.to_string())?;
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
-    let mut command = shell_command(shell, &workspace)?;
     command.cwd(&workspace);
     command.env("TERM", "xterm-256color");
     command.env_remove("JACKALOPE_BRIDGE_TOKEN");
@@ -530,5 +543,29 @@ mod tests {
         assert_eq!(output.offset + output.text.len(), OUTPUT_LIMIT * 4);
         output.append("next");
         assert!(output.text.ends_with("next"));
+    }
+}
+
+/// Runs `command` in the terminal `id` unless one is already running there.
+/// Used for terminals that host a client rather than owning a task workspace,
+/// so the task terminal's workspace checks do not apply.
+pub(super) fn start_command(
+    id: &str,
+    workspace: std::path::PathBuf,
+    command: CommandBuilder,
+) -> Result<(), String> {
+    let mut sessions = terminals().lock().map_err(|e| e.to_string())?;
+    if let Some(terminal) = sessions.get_mut(id) {
+        if running(terminal)? {
+            return Ok(());
+        }
+    }
+    spawn_terminal(sessions, id.into(), workspace, command, None)
+}
+
+/// Ends the terminal `id`; dropping it stops its process tree.
+pub(super) fn close(id: &str) {
+    if let Ok(mut sessions) = terminals().lock() {
+        sessions.remove(id);
     }
 }

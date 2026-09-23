@@ -16,10 +16,27 @@ export function nextVersion(current, bump) {
   return version(parts.join('.'));
 }
 
+/**
+ * The environment without the repository a Git hook exported, so commands act on
+ * `cwd` rather than the repository whose hook launched this script.
+ */
+export function gitEnvironment() {
+  const env = { ...process.env };
+  for (const key of Object.keys(env))
+    if (/^GIT_(DIR|WORK_TREE|INDEX_FILE|COMMON_DIR|OBJECT_DIRECTORY|PREFIX)$/.test(key))
+      delete env[key];
+  return env;
+}
+
 export const gitAt =
   (directory) =>
   (...args) =>
-    execFileSync('git', args, { cwd: directory, encoding: 'utf8', windowsHide: true }).trim();
+    execFileSync('git', args, {
+      cwd: directory,
+      encoding: 'utf8',
+      windowsHide: true,
+      env: gitEnvironment(),
+    }).trim();
 
 export function versionFloor(git, current) {
   let highest = version(current);

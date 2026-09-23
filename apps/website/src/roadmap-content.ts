@@ -100,6 +100,12 @@ export const roadmapStages = [
           'Pair a device, choose shared projects, and check tasks, answer questions, send follow-ups or review changes. Desktop hosts connect over SSH or HTTPS; phones use HTTPS with optional private Tailscale setup. Work stays on its host when a client disconnects. Native multi-device and platform acceptance remain in progress; this is not a released hosting service.',
       },
       {
+        title: 'Your agents, from the terminal.',
+        summary: 'A jackalope command that picks up where the app leaves off.',
+        detail:
+          'Run jackalope in any repository to describe work, let Jackalope choose the agent, and watch progress in a terminal conversation. It shares sessions and account access with the app and can start it in the background. Open it from the status bar, then move the conversation to your own terminal. Installed setup on each platform and answering agent questions from the terminal are still in progress.',
+      },
+      {
         title: 'A first run worth coming back to.',
         summary: 'Setup, agent sign-in, and a clear path to your first task.',
         detail:

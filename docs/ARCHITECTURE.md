@@ -67,6 +67,7 @@ names; changes must preserve both sides and old saved records.
 | tasks/routing.rs, tasks/routing/ | Validated default-agent selection, quota admission, routing subprocess ownership and bounded handoff |
 | coordination.rs, coordination/ | Queue contracts, eligibility, storage, guarded dispatch and loopback bridge |
 | integration.rs | Captured source snapshots, review receipts and guarded fast-forward application |
+| cli_host.rs, cli_install.rs, cli_terminal.rs, project_registry.rs | Terminal-command host endpoint, PATH links, app terminal hand-off and the shared project mirror |
 | git.rs, git_command.rs, worktree_cleanup.rs | Worktree operations and explicit Git environment policies |
 | history.rs, reset.rs | Atomic writes, quarantine, recovery and explicit reset |
 | process_control.rs, pty.rs | Owned process trees, Unix pipe-based crash guardians and separate tested PTY primitives |
