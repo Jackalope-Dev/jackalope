@@ -236,7 +236,9 @@ export async function verifyUpdateFeeds(
       manifest.version !== plan.version ||
       manifest.signature !== asset.signature ||
       url.origin !== 'https://cdn.crabnebula.app' ||
-      url.search ||
+      // Cloud appends a `from` parameter describing the request; any other
+      // query could redirect or alter the download.
+      [...url.searchParams.keys()].some((key) => key !== 'from') ||
       url.hash ||
       url.username ||
       url.password ||

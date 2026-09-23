@@ -314,6 +314,22 @@ test('published updater feeds must return the candidate version, signature and e
     }),
     /not ready/,
   );
+  const withQuery = (query) => async (url) => {
+    const manifest = await (await fetcher(url)).json();
+    return Response.json({ ...manifest, url: `${manifest.url}?${query}` });
+  };
+  const hashIgnoringQuery = (url) => readDownloadHash(new URL(url).pathname);
+  await verifyUpdateFeeds(plan, {
+    fetcher: withQuery('from=%7B%22channel%22%3A%22beta%22%7D'),
+    readDownloadHash: hashIgnoringQuery,
+  });
+  await assert.rejects(
+    verifyUpdateFeeds(plan, {
+      fetcher: withQuery('from=x&redirect=https%3A%2F%2Fexample.invalid'),
+      readDownloadHash: hashIgnoringQuery,
+    }),
+    /does not match/,
+  );
   for (const override of [
     { version: '0.1.0' },
     { signature: 'wrong' },
