@@ -196,7 +196,8 @@ pub enum Response {
     },
     Session {
         revision: u64,
-        session: SessionView,
+        // Boxed: far larger than every other response.
+        session: Box<SessionView>,
     },
     Started {
         session_id: String,

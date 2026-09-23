@@ -20,6 +20,7 @@ import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { observeWorkbenchPreferences, useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
+import { BranchIndicator } from './BranchIndicator';
 import { WorkSidebar } from './WorkSidebar';
 import { WorkspaceStatusBar } from './WorkspaceStatusBar';
 import './workspace-shell.css';
@@ -477,6 +478,7 @@ export function Shell({
               </Menu.Content>
             </Menu.Portal>
           </Menu.Root>
+          <BranchIndicator />
           <InvitationsButton
             onClick={() => {
               setSettingsProjectId(undefined);

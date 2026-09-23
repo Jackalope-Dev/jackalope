@@ -423,7 +423,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 .ok_or("That conversation is no longer open.")?;
             Ok(Response::Session {
                 revision: runtime.revision(),
-                session: session_view(session, &snapshot.runs),
+                session: Box::new(session_view(session, &snapshot.runs)),
             })
         }
         Request::SessionAction { session_id, action } => {

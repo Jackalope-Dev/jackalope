@@ -446,7 +446,7 @@ impl App {
         if let Some(Response::Session { session, .. }) =
             self.request(Request::SessionDetail { session_id: id })
         {
-            self.view = Some(session);
+            self.view = Some(*session);
         }
         self.offer_question();
     }

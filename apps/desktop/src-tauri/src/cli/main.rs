@@ -186,7 +186,7 @@ fn latest(client: &mut Client, project: &Project) -> Result<Option<String>, Stri
 }
 
 fn status() -> Result<(), String> {
-    let Some((handshake, mut client)) = attach() else {
+    let Some((handshake, mut client)) = attach_or_wait() else {
         println!("Jackalope is not running. Run 'jackalope' to start it.");
         return Ok(());
     };
@@ -276,6 +276,49 @@ fn status() -> Result<(), String> {
     Ok(())
 }
 
+/// Whether an app owns this profile but is not serving yet. The app holds an
+/// exclusive lock on its task history from the moment it starts loading, well
+/// before it can answer, so a refused shared lock means "starting". The probe
+/// releases immediately, and the app retries its lock briefly, so probing never
+/// stops an app from starting.
+fn host_starting() -> bool {
+    let Some(path) = profile_root().map(|root| root.join("task-runs-v1/runtime.lock")) else {
+        return false;
+    };
+    let Ok(file) = std::fs::File::open(path) else {
+        return false;
+    };
+    match file.try_lock_shared() {
+        Ok(()) => {
+            let _ = file.unlock();
+            false
+        }
+        Err(std::fs::TryLockError::WouldBlock) => true,
+        Err(_) => false,
+    }
+}
+
+/// Attaches, waiting for an app that is still starting rather than treating it
+/// as absent. When nothing owns the profile this returns at once.
+fn attach_or_wait() -> Option<(Handshake, Client)> {
+    if let Some(found) = attach() {
+        return Some(found);
+    }
+    let deadline = Instant::now() + Duration::from_secs(60);
+    let mut told = false;
+    while host_starting() && Instant::now() < deadline {
+        if !told {
+            eprintln!("Waiting for Jackalope to finish starting…");
+            told = true;
+        }
+        std::thread::sleep(Duration::from_millis(250));
+        if let Some(found) = attach() {
+            return Some(found);
+        }
+    }
+    None
+}
+
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum ColdStart {
     Open,
@@ -284,7 +327,9 @@ pub(crate) enum ColdStart {
 
 /// Attaches to the running host, starting one when asked to.
 fn ensure_host(preference: Option<ColdStart>) -> Result<(Handshake, Client), String> {
-    if let Some(found) = attach() {
+    // A host that is still starting must not be mistaken for none at all, or
+    // this would try to start a second one.
+    if let Some(found) = attach_or_wait() {
         return Ok(found);
     }
     let choice = match preference.or_else(remembered_choice) {

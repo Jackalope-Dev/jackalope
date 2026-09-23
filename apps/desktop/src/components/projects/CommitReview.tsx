@@ -1,5 +1,13 @@
 import { Badge, Checkbox, IconButton, RefreshIcon } from '@jackalope/ui';
-import { Bot, FileDiff, FolderGit2, GitCommitHorizontal, Settings2, Sparkles } from 'lucide-react';
+import {
+  Bot,
+  FileDiff,
+  FolderGit2,
+  GitCommitHorizontal,
+  Settings2,
+  Sparkles,
+  Undo2,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
 import { nativeTask } from '../../lib/task-runtime';
@@ -11,6 +19,7 @@ import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice'
 import { navigateWorkspace } from '../layout/navigation';
 import { DiffPreview } from '../tasks/DiffPreview';
 import { Button } from '../ui/button';
+import { ConfirmAction } from '../ui/ConfirmAction';
 import { EmptyState } from '../ui/EmptyState';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
@@ -71,7 +80,12 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
   );
   const loadWorktrees = useProjectStore((state) => state.loadWorktreesForActiveProject);
   const runs = useExecutionStore((state) => state.runs);
-  const { checkout: chosen, choose } = useCommitReviewStore();
+  const {
+    checkout: chosen,
+    choose,
+    excluded: excludedByCheckout,
+    setExcluded,
+  } = useCommitReviewStore();
   const desktop = isTauriEnvironment();
   const projectPath = project?.path ?? '';
   const checkouts = useMemo(() => {
@@ -90,7 +104,6 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [focused, setFocused] = useState('');
   const [patch, setPatch] = useState<{ path: string; text: string } | null>(null);
   const [patchError, setPatchError] = useState('');
@@ -102,9 +115,12 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
   const [policy, setPolicy] = useState<CommitPolicy | null>(null);
   const current = useRef(checkout);
   current.current = checkout;
-  const known = useRef(new Set<string>());
 
   const files = changes?.files ?? [];
+  const excludedPaths = excludedByCheckout[checkout] ?? [];
+  const selected = new Set(
+    files.map((file) => file.path).filter((path) => !excludedPaths.includes(path)),
+  );
   const branch = changes?.branch ?? null;
   const agents = useMemo(() => {
     if (!branch || !project) return [];
@@ -129,13 +145,12 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       });
       if (current.current !== target) return;
       setChanges(next);
+      window.dispatchEvent(new Event('jackalope:changes-updated'));
       const paths = new Set(next.files.map((file) => file.path));
-      // Keep the user's choices across refreshes; new files start selected.
-      const seen = known.current;
-      setSelected(
-        (previous) => new Set([...paths].filter((path) => previous.has(path) || !seen.has(path))),
-      );
-      known.current = paths;
+      // Forget exclusions for files that no longer have changes.
+      const { excluded, setExcluded } = useCommitReviewStore.getState();
+      const kept = (excluded[target] ?? []).filter((path) => paths.has(path));
+      if (kept.length !== (excluded[target] ?? []).length) setExcluded(target, kept);
       setFocused((previous) => (paths.has(previous) ? previous : (next.files[0]?.path ?? '')));
     } catch (cause) {
       if (current.current === target) setError(String(cause));
@@ -146,8 +161,6 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
 
   useEffect(() => {
     setChanges(null);
-    known.current = new Set();
-    setSelected(new Set());
     setFocused('');
     setFeedback('');
     void refresh();
@@ -199,12 +212,27 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
   const busy = generating || committing;
 
   const toggle = (path: string, on: boolean) =>
-    setSelected((previous) => {
-      const next = new Set(previous);
-      if (on) next.add(path);
-      else next.delete(path);
-      return next;
-    });
+    setExcluded(
+      checkout,
+      on ? excludedPaths.filter((item) => item !== path) : [...excludedPaths, path],
+    );
+
+  const discard = async (file: ChangedFile) => {
+    setError('');
+    setFeedback('');
+    try {
+      await nativeTask('git_discard_changes', {
+        repoPath: projectPath,
+        worktreePath: checkout,
+        paths: [file.path],
+      });
+      setFeedback(`Discarded changes to ${file.path}.`);
+    } catch (cause) {
+      setError(String(cause));
+    } finally {
+      await refresh();
+    }
+  };
 
   const generate = async () => {
     if (busy || !chosenFiles.length) return;
@@ -349,8 +377,9 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
                     indeterminate={chosenFiles.length > 0 && !allSelected}
                     disabled={busy}
                     onChange={(event) =>
-                      setSelected(
-                        event.target.checked ? new Set(files.map((file) => file.path)) : new Set(),
+                      setExcluded(
+                        checkout,
+                        event.target.checked ? [] : files.map((file) => file.path),
                       )
                     }
                   />
@@ -396,6 +425,28 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
                           </span>
                         )}
                       </button>
+                      <ConfirmAction
+                        title={`Discard changes to ${name}?`}
+                        description={
+                          file.status === 'untracked' || file.status === 'added'
+                            ? 'This new file will be deleted. This cannot be undone.'
+                            : 'The file goes back to its last committed version. This cannot be undone.'
+                        }
+                        label="Discard changes"
+                        busyLabel="Discarding…"
+                        onConfirm={() => discard(file)}
+                        trigger={
+                          <IconButton
+                            variant="ghost"
+                            className="commit-discard"
+                            label={`Discard changes to ${file.path}`}
+                            title="Discard changes"
+                            disabled={busy || file.status === 'conflicted'}
+                          >
+                            <Undo2 size={15} />
+                          </IconButton>
+                        }
+                      />
                     </li>
                   );
                 })}

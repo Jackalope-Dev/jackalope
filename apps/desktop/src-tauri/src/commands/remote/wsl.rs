@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::Value;
 
 pub fn distribution(value: &str) -> Result<&str, String> {
     if value.is_empty()
@@ -88,7 +88,7 @@ pub async fn request(
     }
     #[cfg(windows)]
     tauri::async_runtime::spawn_blocking(move || {
-        let input = serde_json::to_vec(&json!({"port":port,"token":token,"route":route,"body":body})).map_err(|e| e.to_string())?;
+        let input = serde_json::to_vec(&serde_json::json!({"port":port,"token":token,"route":route,"body":body})).map_err(|e| e.to_string())?;
         let mut command = std::process::Command::new("wsl.exe");
         command.args(["--distribution", &distro, "--exec", "python3", "-c", REQUEST]);
         let result = super::super::process_control::run_with_input(command, std::time::Duration::from_secs(35), input)?;

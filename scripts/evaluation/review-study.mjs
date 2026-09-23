@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { gitEnvironment } from '../git-environment.mjs';
 
 const [comparisonPath, output, seed = 'review-1'] = process.argv.slice(2);
 if (!comparisonPath || !output)
@@ -50,11 +51,13 @@ for (const [index, row] of ranked.entries()) {
       `Missing review workspace for ${row.case}; retain the failed trial separately.`,
     );
   const diff = execFileSync('git', ['diff', '--no-ext-diff', '--no-color', 'HEAD'], {
+    env: gitEnvironment(),
     cwd: receipt.run.workspace,
     encoding: 'utf8',
     maxBuffer: 2e6,
   });
   const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], {
+    env: gitEnvironment(),
     cwd: receipt.run.workspace,
     encoding: 'utf8',
   }).trim();
@@ -63,6 +66,7 @@ for (const [index, row] of ranked.entries()) {
       'Review export requires tracked-only patches; untracked files must not be silently omitted.',
     );
   const changed = execFileSync('git', ['diff', '--name-only', '-z', 'HEAD'], {
+    env: gitEnvironment(),
     cwd: receipt.run.workspace,
     encoding: 'utf8',
   })
@@ -76,6 +80,7 @@ for (const [index, row] of ranked.entries()) {
     source.push({
       name,
       before: execFileSync('git', ['show', `HEAD:${name}`], {
+        env: gitEnvironment(),
         cwd: receipt.run.workspace,
         encoding: 'utf8',
       }),

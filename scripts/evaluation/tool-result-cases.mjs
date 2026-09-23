@@ -30,7 +30,7 @@ export const toolResultCases = ['deliveries', 'builds', 'packages'].map((categor
     files: { 'README.md': readme },
     check,
     toolFixture: { report },
-    oracle: `const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),cp=require('node:child_process');const root=process.argv[2];assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root,'result.json'),'utf8')),${JSON.stringify(answer)});assert.equal(fs.readFileSync(path.join(root,'README.md'),'utf8'),${JSON.stringify(readme)});const files=cp.execFileSync('git',['ls-files','--others','--exclude-standard'],{cwd:root,encoding:'utf8'}).trim().split(/\\r?\\n/).filter(Boolean);assert.deepEqual(files,['result.json']);assert.equal(cp.execFileSync('git',['diff','--name-only','HEAD'],{cwd:root,encoding:'utf8'}).trim(),'');`,
+    oracle: `const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),cp=require('node:child_process');const root=process.argv[2];const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!/^GIT_(DIR|WORK_TREE|INDEX_FILE|COMMON_DIR|OBJECT_DIRECTORY|PREFIX)$/.test(key)));assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root,'result.json'),'utf8')),${JSON.stringify(answer)});assert.equal(fs.readFileSync(path.join(root,'README.md'),'utf8'),${JSON.stringify(readme)});const files=cp.execFileSync('git',['ls-files','--others','--exclude-standard'],{cwd:root,encoding:'utf8',env}).trim().split(/\\r?\\n/).filter(Boolean);assert.deepEqual(files,['result.json']);assert.equal(cp.execFileSync('git',['diff','--name-only','HEAD'],{cwd:root,encoding:'utf8',env}).trim(),'');`,
   };
 });
 

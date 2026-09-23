@@ -244,3 +244,11 @@
     padding: 0 4px;
   }
 }
+.commit-discard {
+  flex-shrink: 0;
+  opacity: 0;
+}
+.commit-files li:hover .commit-discard,
+.commit-files li:focus-within .commit-discard {
+  opacity: 1;
+}

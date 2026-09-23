@@ -409,6 +409,84 @@ pub async fn git_commit_changes(
     .map_err(|e| e.to_string())?
 }
 
+/// Throws away uncommitted work in the selected files: tracked files return to
+/// HEAD, newly added files leave the index and the disk, untracked files are
+/// deleted. Only paths the current status lists are touched, and a deletion
+/// must resolve to a regular file inside the checkout.
+#[tauri::command]
+pub async fn git_discard_changes(
+    repo_path: String,
+    worktree_path: String,
+    paths: Vec<String>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = super::integration::execution_guard()?;
+        let root = checkout(&repo_path, &worktree_path)?;
+        let files = selected(&root, &paths)?;
+        let has_head = head(&root).is_some();
+        let mut restore: Vec<&str> = vec![];
+        let mut unstage: Vec<&str> = vec![];
+        let mut delete: Vec<&str> = vec![];
+        for file in &files {
+            match file.status.as_str() {
+                "untracked" => delete.push(&file.path),
+                "added" => {
+                    unstage.push(&file.path);
+                    delete.push(&file.path);
+                }
+                "conflicted" => {
+                    return Err(format!(
+                        "Resolve the conflict in {} before discarding it.",
+                        file.path
+                    ))
+                }
+                _ if !has_head => {
+                    unstage.push(&file.path);
+                    delete.push(&file.path);
+                }
+                _ => {
+                    restore.push(&file.path);
+                    if let Some(old) = &file.old_path {
+                        // A rename is undone by restoring the old path and
+                        // dropping the new one.
+                        restore.push(old);
+                        unstage.push(&file.path);
+                        delete.push(&file.path);
+                    }
+                }
+            }
+        }
+        if !unstage.is_empty() {
+            let mut args = vec!["rm", "--cached", "--quiet", "--ignore-unmatch", "-r", "--"];
+            args.extend(&unstage);
+            git(&root, &args, Policy::Isolated)?;
+        }
+        let restore: Vec<&str> = restore
+            .into_iter()
+            .filter(|path| !delete.contains(path))
+            .collect();
+        if !restore.is_empty() {
+            let mut args = vec!["restore", "--source=HEAD", "--staged", "--worktree", "--"];
+            args.extend(&restore);
+            git(&root, &args, Policy::Isolated)?;
+        }
+        for path in delete {
+            let target = root.join(path);
+            // Never follow a path out of the checkout or delete a directory.
+            let Ok(resolved) = dunce::canonicalize(&target) else {
+                continue; // Already gone.
+            };
+            if !resolved.starts_with(&root) || !resolved.is_file() {
+                return Err(format!("{path} is not a file inside this checkout."));
+            }
+            std::fs::remove_file(&resolved).map_err(|e| format!("{path}: {e}"))?;
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -438,6 +516,63 @@ mod tests {
                 ("gone.rs", "deleted", None, true),
             ]
         );
+    }
+
+    fn fixture() -> PathBuf {
+        let root = std::env::temp_dir().join(format!("jl-discard-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let root = dunce::canonicalize(root).unwrap();
+        let git = |args: &[&str]| {
+            assert!(
+                command(&root, args, Policy::Isolated)
+                    .output()
+                    .unwrap()
+                    .status
+                    .success(),
+                "{args:?}"
+            )
+        };
+        git(&["init", "-q"]);
+        git(&["config", "user.email", "t@example.invalid"]);
+        git(&["config", "user.name", "T"]);
+        std::fs::write(root.join("kept.txt"), "one\n").unwrap();
+        git(&["add", "."]);
+        git(&["commit", "-q", "-m", "base"]);
+        root
+    }
+
+    #[tokio::test]
+    async fn discard_restores_tracked_and_removes_new_files() {
+        let root = fixture();
+        std::fs::write(root.join("kept.txt"), "edited\n").unwrap();
+        std::fs::write(root.join("new.txt"), "new\n").unwrap();
+        std::fs::write(root.join("staged.txt"), "staged\n").unwrap();
+        assert!(command(&root, &["add", "staged.txt"], Policy::Isolated)
+            .status()
+            .unwrap()
+            .success());
+        let path = root.to_string_lossy().to_string();
+        git_discard_changes(
+            path.clone(),
+            path.clone(),
+            vec!["kept.txt".into(), "new.txt".into(), "staged.txt".into()],
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(root.join("kept.txt")).unwrap(),
+            "one\n"
+        );
+        assert!(!root.join("new.txt").exists());
+        assert!(!root.join("staged.txt").exists());
+        assert!(changes(&root).unwrap().files.is_empty());
+        // Paths outside the current status are refused, not guessed at.
+        assert!(
+            git_discard_changes(path.clone(), path, vec!["../outside".into()])
+                .await
+                .is_err()
+        );
+        std::fs::remove_dir_all(root).ok();
     }
 
     #[test]
