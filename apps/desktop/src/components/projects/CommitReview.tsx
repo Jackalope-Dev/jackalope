@@ -7,6 +7,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useCommitReviewStore } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
 import { navigateWorkspace } from '../layout/navigation';
 import { DiffPreview } from '../tasks/DiffPreview';
 import { Button } from '../ui/button';
@@ -422,19 +423,12 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
                   Generate
                 </Button>
               </div>
-              {generateError && (
-                <InlineNotice tone="error" className="commit-generate-error">
-                  <span>{generateError}</span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => navigateWorkspace('agents')}
-                  >
-                    Set up agents
-                  </Button>
-                </InlineNotice>
-              )}
+              {generateError &&
+                (isAgentSetupError(generateError) ? (
+                  <AgentSetupNotice message={generateError} />
+                ) : (
+                  <InlineNotice tone="error">{generateError}</InlineNotice>
+                ))}
               <label className="commit-field">
                 <span className="sr-only">Title</span>
                 <Input
