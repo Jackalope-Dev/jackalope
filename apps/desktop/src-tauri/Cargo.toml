@@ -42,7 +42,7 @@ chrono = { version = "0.4", features = ["serde"] }
 portable-pty = "0.9"
 axum = "0.8"
 uuid = { version = "1", features = ["v4"] }
-rmcp = { version = "=3.2.0", default-features = false, features = ["server", "macros", "transport-streamable-http-server", "client", "transport-child-process", "transport-streamable-http-client-reqwest", "reqwest"] }
+rmcp = { version = "=3.4.0", default-features = false, features = ["server", "macros", "transport-streamable-http-server", "client", "transport-child-process", "transport-streamable-http-client-reqwest", "reqwest"] }
 
 toml_edit = { version = "0.25", features = ["serde"] }
 toml = "1"
