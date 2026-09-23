@@ -9,6 +9,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { observeWorkbenchPerformance } from '../../lib/workbench-performance';
+import { openChanges } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeHelper, useHelperStore } from '../../stores/helperStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
@@ -276,6 +277,17 @@ export function Shell({
     });
     void listen('jackalope-tray-settings', () => {
       window.dispatchEvent(new CustomEvent('jackalope:open-settings', { detail: 'General' }));
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else stops.push(unlisten);
+    });
+    // `/diff` in the terminal: open Changes on that checkout, in its project.
+    void listen<string>('jackalope:open-changes', ({ payload: path }) => {
+      const owner = useProjectStore
+        .getState()
+        .projects.find((project) => path === project.path || path.startsWith(`${project.path}/`));
+      if (owner) useProjectStore.getState().selectProject(owner.id);
+      openChanges(path);
     }).then((unlisten) => {
       if (disposed) unlisten();
       else stops.push(unlisten);

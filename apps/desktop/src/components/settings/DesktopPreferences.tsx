@@ -17,6 +17,7 @@ import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
+import { CliCommandSetting } from './CliCommandSetting';
 import { Setting, SettingGroup } from './Setting';
 
 export interface DesktopActivity {
@@ -188,6 +189,7 @@ export function DesktopPreferences() {
           />
         </Setting>
       </SettingGroup>
+      <CliCommandSetting />
       <Setting
         title="Restore terminal output"
         description="Save the last 256 KiB when a terminal stops or Jackalope quits. After restarting, output is read-only until you start a new shell. Applies to newly started terminals."

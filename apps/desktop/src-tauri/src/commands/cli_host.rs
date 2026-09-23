@@ -236,6 +236,44 @@ fn ensure_project(app: &AppHandle, path: &str) -> Result<protocol::Project, Stri
     })
 }
 
+/// The conversation as turns: each batch of messages, then what the agent
+/// produced for it, then anything still waiting to be sent.
+fn transcript(session: &LiveSession, runs: &[TaskRun]) -> Vec<protocol::Message> {
+    let mut messages = Vec::new();
+    let visible: Vec<_> = session
+        .messages
+        .iter()
+        .filter(|message| !message.canceled)
+        .collect();
+    for (index, message) in visible.iter().enumerate() {
+        messages.push(protocol::Message {
+            role: "you".into(),
+            text: message.text.clone(),
+            sent: message.run_id.is_some(),
+        });
+        // A reply follows the last message its run carried.
+        let Some(run_id) = &message.run_id else {
+            continue;
+        };
+        let last_of_batch = visible
+            .get(index + 1)
+            .is_none_or(|next| next.run_id.as_ref() != Some(run_id));
+        if !last_of_batch {
+            continue;
+        }
+        if let Some(run) = runs.iter().find(|run| &run.id == run_id) {
+            if !run.result.trim().is_empty() {
+                messages.push(protocol::Message {
+                    role: "agent".into(),
+                    text: run.result.clone(),
+                    sent: true,
+                });
+            }
+        }
+    }
+    messages
+}
+
 /// Projects the newest attempt in a conversation into what a terminal renders.
 fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionView {
     let run = runs
@@ -250,16 +288,7 @@ fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionVie
         title: session.title.clone(),
         paused: session.paused,
         error: session.error.clone(),
-        messages: session
-            .messages
-            .iter()
-            .filter(|message| !message.canceled)
-            .map(|message| protocol::Message {
-                role: "you".into(),
-                text: message.text.clone(),
-                sent: message.run_id.is_some(),
-            })
-            .collect(),
+        messages: transcript(session, runs),
         run_id: run.map(|run| run.id.clone()),
         status: run.map(|run| run.status.clone()),
         agent: run.map(|run| run.agent.clone()),
@@ -338,18 +367,23 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             open.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
             Ok(Response::Sessions { sessions: open })
         }
-        Request::StartSession { project_path, text } => {
+        Request::StartSession {
+            project_path,
+            text,
+            agent,
+        } => {
             let project = ensure_project(app, &project_path)?;
             let sessions = app.state::<LiveSessions>();
             let session_id = uuid::Uuid::new_v4().to_string();
             // `auto` hands agent choice to routing, which is the point: the
-            // terminal describes the work and Jackalope picks who does it.
+            // terminal describes the work and Jackalope picks who does it,
+            // unless the user named an agent with `/agent`.
             let request: super::tasks::RunRequest = serde_json::from_value(serde_json::json!({
                 "id": format!("cli-{}", uuid::Uuid::new_v4().simple()),
                 "projectId": project.id,
                 "projectName": project.name,
                 "projectPath": project.path,
-                "agent": "auto",
+                "agent": agent.as_deref().filter(|agent| !agent.is_empty()).unwrap_or("auto"),
                 "model": null,
                 "prompt": "",
                 "isolated": true,
@@ -498,6 +532,13 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             let policy = serde_json::from_value(value)
                 .map_err(|_| "Choose user, coAuthor or agent.".to_string())?;
             commit_policy(super::project_git::project_git_policy(project.path, Some(policy)).await?)
+        }
+        Request::ShowChanges { path } => {
+            use tauri::Emitter;
+            let response = show_window(app);
+            // The window may still be loading; it asks again once ready.
+            let _ = app.emit("jackalope:open-changes", path);
+            Ok(response)
         }
         Request::Ping => Ok(Response::Ok),
         Request::ShowWindow => Ok(show_window(app)),
