@@ -1,8 +1,0 @@
-* text=auto eol=lf
-patches/*.patch whitespace=-space-before-tab
-*.png binary
-*.bmp binary
-*.ico binary
-*.icns binary
-*.webm binary
-*.woff2 binary
