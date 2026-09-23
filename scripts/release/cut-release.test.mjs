@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { cutRelease } from './cut-release.mjs';
-import { gitAt } from './prepare-release.mjs';
+import { gitAt, gitEnvironment } from './prepare-release.mjs';
 
 async function repository(t) {
   const base = await mkdtemp(resolve(tmpdir(), 'jackalope-release-cut-'));
@@ -13,7 +13,7 @@ async function repository(t) {
   const remote = resolve(base, 'origin.git');
   const directory = resolve(base, 'source');
   await mkdir(directory);
-  execFileSync('git', ['init', '--bare', remote], { stdio: 'pipe' });
+  execFileSync('git', ['init', '--bare', remote], { stdio: 'pipe', env: gitEnvironment() });
   const git = gitAt(directory);
   git('init', '-b', 'master');
   git('config', 'user.name', 'Release Test');

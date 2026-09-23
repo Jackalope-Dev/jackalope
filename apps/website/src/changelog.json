@@ -1,5 +1,19 @@
 [
   {
+    "id": "jackalope-in-your-terminal",
+    "date": "2026-09-23",
+    "status": "In development",
+    "title": "Jackalope in your terminal",
+    "description": "A jackalope command brings routed conversations to any Git repository and shares them with the desktop app.",
+    "items": [
+      "Run jackalope in a repository to describe work, let Jackalope choose the agent and follow progress in a terminal conversation.",
+      "Rejoin conversations with jackalope --continue or jackalope attach, and list them with jackalope ls.",
+      "When the app is closed, the command can open it or run it in the background; opening the app again brings up the same session.",
+      "Open the command from the status bar or Cmd/Ctrl+J, then move the conversation to your own terminal."
+    ],
+    "note": "Installed setup on each platform is still being validated, and agent questions are answered in the app for now."
+  },
+  {
     "id": "recoverable-test-output",
     "date": "2026-09-22",
     "status": "In development",

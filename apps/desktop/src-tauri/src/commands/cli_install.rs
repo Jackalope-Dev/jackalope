@@ -35,7 +35,7 @@ const NAME: &str = if cfg!(windows) {
 
 /// The command shipped beside this executable. Canonicalized so a launch
 /// through a link still finds the real bundle.
-fn bundled_command() -> Option<PathBuf> {
+pub(super) fn bundled_command() -> Option<PathBuf> {
     let executable = std::fs::canonicalize(std::env::current_exe().ok()?).ok()?;
     let command = executable.parent()?.join(NAME);
     command.is_file().then_some(command)

@@ -1,8 +1,9 @@
 import { DropdownMenu as Menu, SearchIcon } from '@jackalope/ui';
 import { listen } from '@tauri-apps/api/event';
-import { Check, ChevronDown, Plus, Settings2 } from 'lucide-react';
+import { Check, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { captureDraftForProject } from '../../lib/capture-draft';
+import { openCliTerminal } from '../../lib/cli-terminal';
 import { displayShortcut, matchesShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
@@ -10,6 +11,7 @@ import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { observeWorkbenchPerformance } from '../../lib/workbench-performance';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeHelper, useHelperStore } from '../../stores/helperStore';
+import { useHostContextStore } from '../../stores/hostContextStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
@@ -359,6 +361,8 @@ export function Shell({
   }, []);
   const shortcutSettings = useSettingsStore((state) => state.shortcuts);
   const shortcuts = resolveShortcuts(shortcutSettings);
+  const navCollapsed = useWorkViewStore((state) => state.navCollapsed) && preset === 'build';
+  const toggleNav = useWorkViewStore((state) => state.toggleNav);
   const shortcut = displayShortcut(shortcuts.search);
   useEffect(() => {
     if (!isTauriEnvironment()) return;
@@ -390,11 +394,21 @@ export function Shell({
         event.preventDefault();
         if (activeTab === 'preferences') setActiveTab(previousView.current);
         else navigate('preferences');
+      } else if (preset === 'build' && matchesShortcut(event, bindings.sidebar)) {
+        event.preventDefault();
+        useWorkViewStore.getState().toggleNav();
+      } else if (matchesShortcut(event, bindings.terminal)) {
+        const state = useProjectStore.getState();
+        const project = state.projects.find((item) => item.id === state.activeProjectId);
+        if (project && !useHostContextStore.getState().host) {
+          event.preventDefault();
+          void openCliTerminal(project.path).catch(() => {});
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, focusComposer, navigate, shortcutSettings]);
+  }, [activeTab, focusComposer, navigate, preset, shortcutSettings]);
 
   return (
     <div className="workspace-shell" data-mode={preset}>
@@ -503,7 +517,23 @@ export function Shell({
         </div>
       </header>
       <div className="workspace-body">
-        <aside className="workspace-navigation">
+        <aside className="workspace-navigation" data-collapsed={navCollapsed || undefined}>
+          {preset === 'build' && (
+            <Tooltip
+              side="right"
+              content={`${navCollapsed ? 'Expand' : 'Collapse'} sidebar (${displayShortcut(shortcuts.sidebar)})`}
+            >
+              <button
+                type="button"
+                className="workspace-nav-item workspace-nav-toggle"
+                aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-expanded={!navCollapsed}
+                onClick={toggleNav}
+              >
+                {navCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+              </button>
+            </Tooltip>
+          )}
           <nav aria-label="Workspace" className="flex items-center gap-1">
             {WORKSPACE_VIEWS.filter((item) => item.primary).map((item) => (
               <button
@@ -527,7 +557,9 @@ export function Shell({
               </button>
             ))}
           </nav>
-          {preset === 'build' && <WorkSidebar onOpen={() => setActiveTab('kanban')} />}
+          {preset === 'build' && !navCollapsed && (
+            <WorkSidebar onOpen={() => setActiveTab('kanban')} />
+          )}
           <button
             type="button"
             className="workspace-nav-item workspace-settings"

@@ -90,9 +90,12 @@ export async function prepare(v, directory = root) {
     'apps/desktop/src-tauri/tauri.conf.json',
   ]) {
     const full = resolve(directory, path);
-    const data = JSON.parse(await readFile(full, 'utf8'));
-    data.version = v;
-    await writeFile(full, `${JSON.stringify(data, null, 2)}\n`);
+    const text = await readFile(full, 'utf8');
+    // Edit the value in place: re-serializing would expand short arrays and
+    // fail the repository formatter on every release cut.
+    const updated = text.replace(/("version"\s*:\s*")[^"]+(")/, `$1${v}$2`);
+    if (JSON.parse(updated).version !== v) throw new Error(`Could not set the version in ${path}`);
+    await writeFile(full, updated);
   }
   const cargoPath = resolve(directory, 'apps/desktop/src-tauri/Cargo.toml');
   await writeFile(

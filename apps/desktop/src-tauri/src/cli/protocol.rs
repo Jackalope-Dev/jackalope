@@ -69,6 +69,22 @@ pub enum Request {
     /// Waits until work changes, then returns. Clients use a second connection
     /// for this so it never blocks their other requests.
     Watch { since: u64 },
+    /// Reports which conversation a terminal the app started is showing, so the
+    /// app can hand that conversation to another terminal.
+    Attached {
+        terminal: String,
+        session_id: Option<String>,
+    },
+    /// Which agents are ready and which one routes by default. Probing sign-in
+    /// can take seconds, so clients ask on a connection of their own.
+    Overview,
+    /// A repository's commit authorship settings.
+    CommitPolicy { project_path: String },
+    /// `user`, `coAuthor` or `agent`.
+    SetCommitAttribution {
+        project_path: String,
+        attribution: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,6 +93,9 @@ pub struct Project {
     pub id: String,
     pub name: String,
     pub path: String,
+    /// The project's theme accent as `#rrggbb`, when the app has one for it.
+    #[serde(default)]
+    pub accent: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,6 +159,17 @@ pub struct SessionView {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentStatus {
+    pub id: String,
+    pub name: String,
+    /// `ready`, `sign-in`, `installed`, `missing` or `disabled`.
+    pub state: String,
+    pub account: String,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "response", rename_all = "kebab-case")]
 pub enum Response {
     Ok,
@@ -165,6 +195,15 @@ pub enum Response {
     /// Work changed; the client re-reads what it is showing.
     Changed {
         revision: u64,
+    },
+    Overview {
+        agents: Vec<AgentStatus>,
+        default_agent: String,
+    },
+    CommitPolicy {
+        attribution: String,
+        name: String,
+        email: String,
     },
 }
 

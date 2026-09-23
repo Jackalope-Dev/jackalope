@@ -7,7 +7,7 @@ import {
 } from '@jackalope/brand/theme';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { useProjectStore } from './projectStore';
+import { setRegistryAppAccent, useProjectStore } from './projectStore';
 
 interface ThemeState {
   previewing: boolean;
@@ -96,3 +96,6 @@ export function refreshProjectTheme() {
 }
 useProjectStore.subscribe(refreshProjectTheme);
 refreshProjectTheme();
+// The terminal matches each project's colour; projects without a theme use this.
+useThemeStore.subscribe((state) => setRegistryAppAccent(state.appTheme.accentHex));
+setRegistryAppAccent(useThemeStore.getState().appTheme.accentHex);

@@ -1,0 +1,46 @@
+.cli-terminal-window {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 16px 16px;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+}
+.cli-terminal-window > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.cli-terminal-window > header h1 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.cli-terminal-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cli-terminal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cli-terminal-ended {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.cli-terminal-screen {
+  flex: 1;
+  min-height: 240px;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 8px;
+  background: var(--color-surface-sunken);
+}

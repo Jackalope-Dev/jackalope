@@ -232,6 +232,7 @@ fn ensure_project(app: &AppHandle, path: &str) -> Result<protocol::Project, Stri
         id: record.id,
         name: record.name,
         path: record.path,
+        accent: record.accent,
     })
 }
 
@@ -305,6 +306,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                         id: record.id,
                         name: record.name,
                         path: record.path,
+                        accent: record.accent,
                     })
                     .collect(),
             })
@@ -435,9 +437,92 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 revision: revision(&runtime, &sessions),
             })
         }
+        Request::Attached {
+            terminal,
+            session_id,
+        } => {
+            if let Ok(mut attached) = attached().lock() {
+                match session_id {
+                    Some(id) => attached.insert(terminal, id),
+                    None => attached.remove(&terminal),
+                };
+            }
+            Ok(Response::Ok)
+        }
+        Request::Overview => {
+            let runtime = app.state::<TaskRuntime>();
+            let policy = runtime.policy()?;
+            let runners = super::tasks::task_runners(app.state::<TaskRuntime>()).await?;
+            let agents = runners
+                .into_iter()
+                .map(|runner| {
+                    let state = if policy.enabled_agents.get(&runner.id) == Some(&false) {
+                        "disabled"
+                    } else if !runner.available {
+                        "missing"
+                    } else if runner.signed_in {
+                        "ready"
+                    } else if runner.detail.starts_with("Sign in ") {
+                        "sign-in"
+                    } else {
+                        // Agents whose sign-in cannot be probed report as installed.
+                        "installed"
+                    };
+                    protocol::AgentStatus {
+                        id: runner.id,
+                        name: runner.name,
+                        state: state.into(),
+                        account: runner.account,
+                        detail: runner.detail,
+                    }
+                })
+                .collect();
+            Ok(Response::Overview {
+                agents,
+                default_agent: policy.default_meta_agent.clone(),
+            })
+        }
+        Request::CommitPolicy { project_path } => {
+            let project = ensure_project(app, &project_path)?;
+            commit_policy(super::project_git::project_git_policy(project.path, None).await?)
+        }
+        Request::SetCommitAttribution {
+            project_path,
+            attribution,
+        } => {
+            let project = ensure_project(app, &project_path)?;
+            let current =
+                super::project_git::project_git_policy(project.path.clone(), None).await?;
+            let mut value = serde_json::to_value(&current).map_err(|e| e.to_string())?;
+            value["attribution"] = serde_json::Value::String(attribution);
+            let policy = serde_json::from_value(value)
+                .map_err(|_| "Choose user, coAuthor or agent.".to_string())?;
+            commit_policy(super::project_git::project_git_policy(project.path, Some(policy)).await?)
+        }
         Request::Ping => Ok(Response::Ok),
         Request::ShowWindow => Ok(show_window(app)),
     }
+}
+
+fn commit_policy(policy: super::project_git::CommitPolicy) -> Result<Response, String> {
+    let value = serde_json::to_value(&policy).map_err(|e| e.to_string())?;
+    Ok(Response::CommitPolicy {
+        attribution: value["attribution"].as_str().unwrap_or("user").into(),
+        name: policy.name,
+        email: policy.email,
+    })
+}
+
+/// Conversations shown in terminals the app started, keyed by terminal.
+fn attached() -> &'static std::sync::Mutex<std::collections::HashMap<String, String>> {
+    static ATTACHED: std::sync::OnceLock<
+        std::sync::Mutex<std::collections::HashMap<String, String>>,
+    > = std::sync::OnceLock::new();
+    ATTACHED.get_or_init(Default::default)
+}
+
+pub(super) fn attached_session(terminal: &str) -> Option<String> {
+    attached().lock().ok()?.get(terminal).cloned()
 }
 
 fn show_window(app: &AppHandle) -> Response {

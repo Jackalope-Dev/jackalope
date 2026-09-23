@@ -1,6 +1,6 @@
 [package]
 name = "jackalope-desktop"
-version = "0.1.1"
+version = "0.1.2"
 description = "Jackalope - Ultra-performant desktop shell and harness for agentic workflows"
 authors = ["Jackalope Contributors"]
 edition = "2021"

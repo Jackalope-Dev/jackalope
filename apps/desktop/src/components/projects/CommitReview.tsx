@@ -459,7 +459,14 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
                 />
               </label>
               <p className="commit-author">
-                <span>{authorLine(policy, agents)}</span>
+                <span>
+                  {branch ? (
+                    <>
+                      To <code>{branch}</code> ·{' '}
+                    </>
+                  ) : null}
+                  {authorLine(policy, agents)}
+                </span>
                 <button
                   type="button"
                   className="commit-author-link"
@@ -477,7 +484,6 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
               >
                 <GitCommitHorizontal size={18} aria-hidden="true" />
                 Commit {chosenFiles.length} {chosenFiles.length === 1 ? 'file' : 'files'}
-                {branch ? ` to ${branch}` : ''}
               </Button>
               <Button type="button" variant="outline" disabled={busy} onClick={askForReview}>
                 <Bot size={18} aria-hidden="true" />

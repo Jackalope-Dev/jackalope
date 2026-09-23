@@ -151,6 +151,56 @@ export interface KnowledgeGuide {
 
 export const knowledgeGuides: KnowledgeGuide[] = [
   {
+    slug: 'terminal-command',
+    category: 'workflows',
+    title: 'Work with Jackalope from the terminal',
+    shortTitle: 'Terminal command',
+    description:
+      'Use the jackalope command to start and rejoin conversations from any Git repository, and move a conversation between the app and your terminal.',
+    readingTime: '3 min read',
+    sections: [
+      {
+        id: 'start-terminal',
+        question: 'How do I start a conversation from the terminal?',
+        paragraphs: [
+          'Open a terminal in a Git repository and run jackalope. Describe the work; Jackalope chooses the agent and shows which one it picked and why, the step it is on and the output as it arrives. The repository becomes a project in the app if it was not one already.',
+          'The command uses the same sessions, accounts and approved access as the app. Replies go to the same conversation. Type /help for commands such as /stop, /pause and /sessions.',
+        ],
+        codeBox: {
+          title: 'Common commands',
+          code: 'jackalope              # start a conversation here\njackalope --continue   # rejoin the latest one here\njackalope ls           # list open conversations\njackalope attach 5cd0  # rejoin by id prefix',
+        },
+      },
+      {
+        id: 'not-running',
+        question: 'What if Jackalope is not open?',
+        paragraphs: [
+          'The command asks whether to open the app or run it in the background, and remembers your answer. Running in the background keeps your work available without a window. Opening the app later brings up the same session rather than a second copy.',
+          'Leaving the terminal, with /quit or Ctrl+C, does not stop the work. Rejoin it from any terminal or the app.',
+        ],
+      },
+      {
+        id: 'app-terminal',
+        question: 'Can I use it inside the app or move it to my own terminal?',
+        paragraphs: [
+          'Choose Terminal in the bottom status bar, or press Cmd+J (Ctrl+J on Windows and Linux), to open the command for the current project in its own window. Open in Terminal continues the same conversation in your system terminal and closes the app window.',
+        ],
+      },
+      {
+        id: 'install-command',
+        question: 'Why does my shell say the command is not found?',
+        paragraphs: [
+          'Installed Jackalope adds the command automatically: on macOS and Linux it links ~/.local/bin/jackalope, and on Windows the installer adds its folder to your PATH. Open a new terminal after installing.',
+          'The default macOS shell does not search ~/.local/bin. Choose Install command in the app terminal window to add a link in /usr/local/bin; macOS asks for an administrator password.',
+        ],
+        callout: {
+          kind: 'note',
+          text: 'Agent questions appear in the terminal but are answered in the app for now.',
+        },
+      },
+    ],
+  },
+  {
     slug: 'chat-and-follow-ups',
     category: 'workflows',
     title: 'Continue coding-agent work with chat and follow-ups',

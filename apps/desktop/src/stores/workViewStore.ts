@@ -12,6 +12,9 @@ interface WorkViewState {
   views: Record<string, WorkView>;
   reading: Record<string, string>;
   split: Record<string, boolean>;
+  /** The app sidebar shows icons only. */
+  navCollapsed: boolean;
+  toggleNav: () => void;
   setSplit: (id: string, split: boolean) => void;
   resetSplits: (ids: string[]) => void;
   remember: (id: string, section: string) => void;
@@ -30,6 +33,8 @@ export const useWorkViewStore = create<WorkViewState>()(
       views: {},
       reading: {},
       split: {},
+      navCollapsed: false,
+      toggleNav: () => set((state) => ({ navCollapsed: !state.navCollapsed })),
       resetSplits: (ids) =>
         set((state) => ({
           split: Object.fromEntries(
@@ -58,7 +63,13 @@ export const useWorkViewStore = create<WorkViewState>()(
     }),
     {
       name: 'jackalope-work-views',
-      partialize: ({ scope, views, reading, split }) => ({ scope, views, reading, split }),
+      partialize: ({ scope, views, reading, split, navCollapsed }) => ({
+        scope,
+        views,
+        reading,
+        split,
+        navCollapsed,
+      }),
     },
   ),
 );

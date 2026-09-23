@@ -58,6 +58,13 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Feedback from separate panes is saved locally for explicit addition to the reply draft.
   Separate panes retain their own task drafts; their refreshes do not replace the main
   window's draft or selection. Queue pause and stop remain visible in Focus mode.
+- The `jackalope` terminal command holds routed conversations in the current Git
+  repository, lists and rejoins sessions, and streams status from the process that
+  owns the profile, starting a windowed or headless host when none runs. A second app
+  launch raises the running host. The status bar, command search and Cmd/Ctrl+J open
+  it in an app window that can hand the conversation to the system terminal. Release
+  builds link the command onto PATH; agent questions are still answered in the app.
+  See [terminal command](CLI.md).
 - Chat topics are reversible, revision-checked groups of source messages. Local
   suggestions use headings and opening lines; a saved topic can prepare a separate task
   draft without launching it. Original conversations remain intact.

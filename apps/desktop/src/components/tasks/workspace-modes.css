@@ -7,7 +7,7 @@
   align-items: center;
   gap: 12px;
 }
-.workspace-shell[data-mode="focus"] .workspace-navigation > nav:first-child {
+.workspace-shell[data-mode="focus"] .workspace-navigation > nav {
   gap: 8px;
   flex: 1;
 }
@@ -53,7 +53,7 @@
   overflow: visible;
   padding: 0;
 }
-.workspace-shell[data-mode="oversee"] .workspace-navigation > nav:first-child {
+.workspace-shell[data-mode="oversee"] .workspace-navigation > nav {
   flex: 1;
   flex-direction: row;
   flex-wrap: wrap;
@@ -232,7 +232,7 @@
     flex-direction: row;
     gap: 4px;
   }
-  .workspace-shell[data-mode="focus"] .workspace-navigation > nav:first-child {
+  .workspace-shell[data-mode="focus"] .workspace-navigation > nav {
     flex-direction: row;
     flex-wrap: wrap;
     gap: 4px;

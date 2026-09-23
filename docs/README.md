@@ -25,6 +25,7 @@ maintained behavior, a repeatable workflow or a reusable template. Follow the
 - [Recurring templates](RECURRING-TEMPLATES.md), [example parallel plan](examples/parallel-plan.json)
 - [Project knowledge](PROJECT-KNOWLEDGE.md), [codebase maps](CODEBASE.md), [Ask Jackalope](HELPER.md)
 - [MCP discovery](MCP-DISCOVERY.md), [browser automation](BROWSER-AUTOMATION.md), [desktop control](DESKTOP-CONTROL.md)
+- [Terminal command](CLI.md)
 
 ## Account services and website
 

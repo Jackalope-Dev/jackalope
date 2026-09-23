@@ -1,6 +1,7 @@
 pub mod capacity;
 pub mod cli_host;
 pub mod cli_install;
+pub mod cli_terminal;
 pub mod codebase;
 pub mod codebase_watch;
 pub mod coordination;

@@ -32,7 +32,17 @@ OPTIONS
 ";
 
 fn main() {
-    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let mut arguments: Vec<String> = std::env::args().skip(1).collect();
+    // `--profile=<dir>` selects a non-default profile, as JACKALOPE_PROFILE_DIR
+    // does. The app passes it when opening a system terminal, since a terminal
+    // application that is already running will not inherit the app's environment.
+    if let Some(index) = arguments
+        .iter()
+        .position(|argument| argument.starts_with("--profile="))
+    {
+        let directory = arguments.remove(index)["--profile=".len()..].to_string();
+        std::env::set_var("JACKALOPE_PROFILE_DIR", directory);
+    }
     let flags: Vec<&str> = arguments
         .iter()
         .map(String::as_str)
@@ -131,6 +141,7 @@ fn converse(
     }
     let (handshake, mut client) = ensure_host(preference)?;
     let project = project(&mut client)?;
+    brand::set_accent(project.accent.as_deref());
     let session_id = match session_id {
         Some(prefix) => Some(resolve(&mut client, &prefix)?),
         None if resume => Some(
@@ -199,7 +210,7 @@ fn status() -> Result<(), String> {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum ColdStart {
+pub(crate) enum ColdStart {
     Open,
     Background,
 }
@@ -262,7 +273,7 @@ fn preferences_path() -> Option<PathBuf> {
     Some(profile_root()?.join("task-runs-v1/preferences/cli.json"))
 }
 
-fn remembered_choice() -> Option<ColdStart> {
+pub(crate) fn remembered_choice() -> Option<ColdStart> {
     let bytes = std::fs::read(preferences_path()?).ok()?;
     let value: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
     match value.get("coldStart")?.as_str()? {
@@ -272,7 +283,14 @@ fn remembered_choice() -> Option<ColdStart> {
     }
 }
 
-fn remember_choice(choice: ColdStart) {
+/// Clears the remembered answer so the next cold start asks again.
+pub(crate) fn forget_choice() {
+    if let Some(path) = preferences_path() {
+        let _ = std::fs::remove_file(path);
+    }
+}
+
+pub(crate) fn remember_choice(choice: ColdStart) {
     let Some(path) = preferences_path() else {
         return;
     };

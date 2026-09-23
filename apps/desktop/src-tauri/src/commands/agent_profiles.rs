@@ -381,9 +381,12 @@ pub fn apply_binding(
             command.env_remove(name);
         }
     }
-    if let Some(name) = env_var_for(&binding.adapter)
-        .filter(|_| binding.profile_id.is_some() || binding.adapter != "antigravity")
-    {
+    // Claude Code keys its macOS Keychain entry on CLAUDE_CONFIG_DIR, so setting it
+    // for the CLI login (even to ~/.claude) hides the user's existing sign-in.
+    if let Some(name) = env_var_for(&binding.adapter).filter(|_| {
+        binding.profile_id.is_some()
+            || !matches!(binding.adapter.as_str(), "antigravity" | "claude")
+    }) {
         command.env(name, &binding.directory);
     }
     if binding.profile_id.is_some() {
@@ -1180,6 +1183,29 @@ mod tests {
         let mut default = std::process::Command::new("opencode");
         apply_binding(&mut default, &binding).unwrap();
         assert_eq!(default.get_envs().count(), 1);
+    }
+
+    #[test]
+    fn claude_cli_login_keeps_its_default_config_dir() {
+        let directory = temp_root();
+        let mut binding = AccountBinding {
+            adapter: "claude".into(),
+            profile_id: None,
+            directory: directory.clone(),
+            label: "CLI".into(),
+        };
+        let has_config_dir = |binding: &AccountBinding| {
+            let mut command = std::process::Command::new("claude");
+            apply_binding(&mut command, binding).unwrap();
+            command
+                .get_envs()
+                .any(|(key, value)| key == "CLAUDE_CONFIG_DIR" && value.is_some())
+        };
+        assert!(!has_config_dir(&binding));
+        fs::create_dir_all(&directory).unwrap();
+        binding.profile_id = Some("work".into());
+        assert!(has_config_dir(&binding));
+        fs::remove_dir_all(directory).ok();
     }
 
     #[test]
