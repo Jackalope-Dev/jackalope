@@ -426,11 +426,6 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
           {wt.cleanup?.blocked_reason && (
             <p className="task-muted mt-2">{wt.cleanup.blocked_reason}</p>
           )}
-          {!!wt.cleanup?.discarded_paths?.length && (
-            <p className="task-muted mt-2">
-              Ignored paths deleted during cleanup: {wt.cleanup.discarded_paths.join(', ')}
-            </p>
-          )}
         </div>
         <div className="workspace-actions">
           {(wt.cleanup?.merged || wt.cleanup?.content_merged) && !wt.cleanup.blocked_reason && (
