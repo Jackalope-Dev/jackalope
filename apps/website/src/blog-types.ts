@@ -33,6 +33,7 @@ export type BlogPost = {
   seoTitle?: string;
   category: string;
   date: string;
+  updated?: string;
   readingTime: string;
   description: string;
   cover?: EditorialCover;

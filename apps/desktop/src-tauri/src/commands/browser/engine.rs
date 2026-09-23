@@ -163,7 +163,7 @@ impl Engine {
         engine.call(json!({"action":"stream_disable"}))?;
         #[cfg(windows)]
         engine.call(
-            json!({"action":"launch", "headless":true, "executablePath":browser,
+            json!({"action":"launch", "headless":!slot.headed, "executablePath":browser,
             "webmcp":false, "hideScrollbars":false}),
         )?;
         #[cfg(unix)]

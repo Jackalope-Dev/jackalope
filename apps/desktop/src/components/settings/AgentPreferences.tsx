@@ -94,6 +94,21 @@ export function AgentPreferences({ projectId }: { projectId?: string }) {
             ))}
         </Select>
       </Setting>
+      {!projectId && (
+        <Setting
+          title="Automatic quota handoff"
+          description="Continue eligible tasks with another enabled agent when an account reaches its limit."
+        >
+          <Switch
+            label="Automatic quota handoff"
+            checked={agents.automaticQuotaHandoff}
+            disabled={busy || !isTauriEnvironment()}
+            onCheckedChange={(automaticQuotaHandoff) =>
+              void save(() => useAgentConfigStore.setState({ automaticQuotaHandoff }))
+            }
+          />
+        </Setting>
+      )}
       {project && (
         <ProjectAccountGroup
           key={project.id}

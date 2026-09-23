@@ -1,5 +1,21 @@
 use super::*;
 
+#[test]
+fn equivalent_workers_require_the_same_explicit_model_and_agent() {
+    let a = candidate("a", "codex", "model", Some(80.0));
+    let mut b = candidate("b", "codex", "model", Some(60.0));
+    b.binding.directory = PathBuf::from("/another-account");
+    assert!(equivalent_workers(&[a.clone(), b.clone()]));
+    b.model = None;
+    assert!(!equivalent_workers(&[b.clone(), b.clone()]));
+    b.model = Some("different".into());
+    assert!(!equivalent_workers(&[a.clone(), b.clone()]));
+    b.model = a.model.clone();
+    b.agent = "custom-codex".into();
+    assert!(!equivalent_workers(&[a, b]));
+    assert!(!equivalent_workers(&[]));
+}
+
 pub(super) fn candidate(id: &str, adapter: &str, model: &str, left: Option<f64>) -> Candidate {
     Candidate {
         id: id.into(),

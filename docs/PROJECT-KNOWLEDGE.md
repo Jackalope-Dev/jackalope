@@ -43,9 +43,9 @@ not an assertion that the lesson caused a successful outcome.
 results locally. It returns up to ten recent matches and opens their source tasks.
 It does not search private CLI histories or infer unsaved preferences.
 
-## Automatic lessons and findings
+## Automatic lessons
 
-Project context and Performance & insights refresh automatic lessons when opened.
+Project context refreshes automatic lessons when opened.
 Review decisions refresh them immediately, and new tasks refresh them before
 selecting context, including native queues and schedules. Composer previews reuse
 a scan for up to 30 seconds. Continuations keep their original frozen context.
@@ -84,19 +84,6 @@ folders. It does not follow directory symlinks. Manifest reads are capped at
 500-per-profile knowledge limits also bound automatic entries and suppression
 records. Older observations remain historical; these bounds are not a complete
 semantic analysis of every repository or every user action.
-
-Performance & insights shows actual saved review corrections, unsuccessful checks,
-quota handoffs, lesson sources and task links. Acceptance counts explicit final
-outcome decisions on the latest loaded attempt of each task. A finished process or
-marking a task reviewed without outcomes never implies acceptance. Accepted final
-requirements must refer to one saved file snapshot. Records may be stale relative
-to current files. The page states loaded-history coverage and decision denominators.
-
-With at least three decided tasks in each group, the page compares recorded
-acceptance with and without saved context. These are observational counts for
-different tasks, not evidence of causal quality improvement. Duration excludes
-active and mixed-agent handoff attempts. The page does not invent time or token
-savings, monetary estimates, agent specialties, or generalized recommendations.
 
 ## Workflows
 

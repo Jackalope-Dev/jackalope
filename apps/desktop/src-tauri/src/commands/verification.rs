@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::{path::Path, process::Command, time::Duration};
 use tauri::State;
 mod leases;
+pub(super) mod native_output;
 pub(super) mod output;
+mod test_report;
 pub use leases::{ensure_all_idle, ensure_idle};
 
 /// Ceiling on a single check or setup command. Commands are cut off for going quiet
@@ -132,6 +134,7 @@ pub(in crate::commands) fn prepare(
         let saved = record.clone();
         runtime.update_checked(id, |run| {
             run.preparation = Some(saved);
+            run.efficiency.preparation_reuses = Some(run.efficiency.preparation_reuses.unwrap_or(0) + 1);
             activity(
                 run,
                 "Workspace dependencies already match the project manifests. Skipped the setup command.",
@@ -141,7 +144,9 @@ pub(in crate::commands) fn prepare(
     }
     let _lease = leases::reserve(workspace)?;
     drop(guard);
-    let _slot = leases::check_slot(|| !runtime.is_running(id))?;
+    let _slot = runtime.timed(id, "preparationWait", || {
+        leases::check_slot(|| !runtime.is_running(id))
+    })?;
     let mut attempt = 1;
     let record = loop {
         runtime.update_checked(id, |run| {
@@ -159,12 +164,14 @@ pub(in crate::commands) fn prepare(
                 },
             );
         })?;
-        let result = process_control::run_supervised(
-            shell(command, workspace)?,
-            check_limits(PREPARE_STALL_SECS),
-            || !runtime.is_running(id),
-            observer(runtime, id),
-        )?;
+        let result = runtime.timed(id, "preparation", || {
+            process_control::run_supervised(
+                shell(command, workspace)?,
+                check_limits(PREPARE_STALL_SECS),
+                || !runtime.is_running(id),
+                observer(runtime, id),
+            )
+        })?;
         let record = PreparationRecord::from_result(command, attempt, &result);
         let saved = record.clone();
         runtime.update_checked(id, |run| {
@@ -194,7 +201,16 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
     let active = ["starting", "running"].contains(&run.status.as_str());
     let result = (|| {
         runtime.stage(&run.id, Some("verification_wait"));
-        let _slot = leases::check_slot(|| active && !runtime.is_running(&run.id))?;
+        runtime.update(&run.id, |r| {
+            r.progress = Some(StepProgress::new(
+                "verification_wait",
+                "Waiting for project checks",
+                1,
+            ));
+        });
+        let _slot = runtime.timed(&run.id, "verificationWait", || {
+            leases::check_slot(|| active && !runtime.is_running(&run.id))
+        })?;
         let directory = runtime.integration_directory();
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         let before = super::integration::workspace_tree(run, &directory)?;
@@ -207,12 +223,14 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
                 1,
             ))
         });
-        let result = process_control::run_supervised(
-            shell(command, &run.workspace)?,
-            check_limits(CHECK_STALL_SECS),
-            || agent_active && !runtime.is_running(&run.id),
-            observer(runtime, &run.id),
-        )?;
+        let result = runtime.timed(&run.id, "verification", || {
+            process_control::run_supervised(
+                shell(command, &run.workspace)?,
+                check_limits(CHECK_STALL_SECS),
+                || agent_active && !runtime.is_running(&run.id),
+                observer(runtime, &run.id),
+            )
+        })?;
         runtime.update(&run.id, |r| r.progress = None);
         let after = super::integration::workspace_tree(run, &directory)?;
         let verification = Verification {
@@ -222,10 +240,14 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
             result,
         };
         let _guard = super::integration::execution_guard()?;
-        runtime.update_checked(&run.id, |r| r.verification = Some(verification.clone()))?;
+        runtime.update_checked(&run.id, |r| {
+            r.verification = Some(verification.clone());
+            *r.efficiency.native_verification_calls.get_or_insert(0) += 1;
+        })?;
         Ok(verification)
     })();
     let resume = active && !run.finishing && runtime.is_running(&run.id);
+    runtime.update(&run.id, |r| r.progress = None);
     runtime.stage(&run.id, resume.then_some("execution"));
     result
 }
@@ -252,11 +274,12 @@ pub(in crate::commands) fn finish(runtime: &TaskRuntime, id: &str) -> Result<(),
     }) {
         return Err("Checks could not start while another attempt owns this workspace.".into());
     }
-    if let Some(check) = &run.verification {
-        let tree = super::integration::workspace_tree(run, &runtime.integration_directory())?;
-        if check.command == command && check.result.success && check.tree.as_ref() == Some(&tree) {
-            return Ok(());
-        }
+    if reusable_check(runtime, run, command)?.is_some() {
+        runtime.update_checked(id, |r| {
+            r.efficiency.verification_reuses =
+                Some(r.efficiency.verification_reuses.unwrap_or(0) + 1)
+        })?;
+        return Ok(());
     }
     let _lease = leases::reserve(&run.workspace)?;
     drop(guard);
@@ -264,32 +287,52 @@ pub(in crate::commands) fn finish(runtime: &TaskRuntime, id: &str) -> Result<(),
     Ok(())
 }
 
+fn reusable_check<'a>(
+    runtime: &TaskRuntime,
+    run: &'a TaskRun,
+    command: &str,
+) -> Result<Option<&'a Verification>, String> {
+    let Some(check) = run
+        .verification
+        .as_ref()
+        .filter(|check| check.command == command && check.result.success && check.tree.is_some())
+    else {
+        return Ok(None);
+    };
+    let tree = super::integration::workspace_tree(run, &runtime.integration_directory())?;
+    Ok((check.tree.as_ref() == Some(&tree)).then_some(check))
+}
+
 pub async fn agent_verify(
     runtime: TaskRuntime,
     run: TaskRun,
     input: super::harness::ComputerVerifyInput,
 ) -> Result<serde_json::Value, String> {
-    let command = run.verify_command.clone().filter(|s| !s.trim().is_empty())
-        .ok_or("No project verification command is authorized. Ask the user to set one in Project Settings, or use your agent's own permitted tools.")?;
-    let requested = std::iter::once(input.command)
-        .chain(input.args)
-        .collect::<Vec<_>>()
-        .join(" ");
-    if requested != command {
-        return Err(
-            "Only this task's saved project verification command is allowed through the bridge."
-                .into(),
-        );
-    }
     tauri::async_runtime::spawn_blocking(move || {
         let guard = super::integration::execution_guard()?;
+        let runs = runtime.integration_runs()?;
+        let run = runs
+            .iter()
+            .find(|current| current.id == run.id)
+            .ok_or("Task not found")?;
+        let command = agent_command(run.verify_command.as_deref(), &input)?;
         if !runtime.is_running(&run.id) {
             return Err("This attempt is no longer active.".into());
         }
         let _lease = leases::reserve(&run.workspace)?;
+        if let Some(check) = reusable_check(&runtime, run, command)? {
+            let mut response = output::response(check);
+            runtime.update_checked(&run.id, |r| {
+                r.efficiency.verification_reuses =
+                    Some(r.efficiency.verification_reuses.unwrap_or(0) + 1)
+            })?;
+            response["reused"] = true.into();
+            return Ok(response);
+        }
         drop(guard);
-        let result = execute(&runtime, &run, &command)?;
-        let response = output::response(&result);
+        let result = execute(&runtime, run, command)?;
+        let mut response = output::response(&result);
+        response["reused"] = false.into();
         runtime.update_checked(&run.id, |current| {
             current.efficiency.verification(
                 &result.result.stdout,
@@ -312,6 +355,61 @@ pub async fn agent_verify(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+fn agent_command<'a>(
+    saved: Option<&'a str>,
+    input: &super::harness::ComputerVerifyInput,
+) -> Result<&'a str, String> {
+    let command = saved.filter(|s| !s.trim().is_empty())
+        .ok_or("No project verification command is authorized. Ask the user to set one in Project Settings, or use your agent's own permitted tools.")?;
+    if input.command.is_empty() && input.args.is_empty() {
+        return Ok(command);
+    }
+    let requested = std::iter::once(input.command.as_str())
+        .chain(input.args.iter().map(String::as_str))
+        .collect::<Vec<_>>()
+        .join(" ");
+    if requested != command {
+        return Err("Only this task's saved project verification command is allowed through the bridge. Call computer_verify with {} to run it; project.verification.command shows the saved command.".into());
+    }
+    Ok(command)
+}
+
+#[cfg(test)]
+mod agent_command_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn saved_checks_accept_empty_or_matching_requests_without_expanding_authority() {
+        let saved = "node --check \"a b.mjs\" && node --check next.mjs";
+        for input in [
+            json!({}),
+            json!({"command":saved}),
+            json!({"command":"node","args":["--check", "\"a b.mjs\"", "&&", "node", "--check", "next.mjs"]}),
+        ] {
+            assert_eq!(
+                agent_command(Some(saved), &serde_json::from_value(input).unwrap()).unwrap(),
+                saved
+            );
+        }
+        for input in [json!({}), json!({"command":"node","args":["--test"]})] {
+            for saved in [None, Some(""), Some("   ")] {
+                assert!(
+                    agent_command(saved, &serde_json::from_value(input.clone()).unwrap()).is_err()
+                );
+            }
+        }
+        for input in [
+            json!({"args":["--test"]}),
+            json!({"command":" "}),
+            json!({"command":"node","args":["--test"]}),
+            json!({"command":saved,"args":["&&", "echo", "unexpected"]}),
+        ] {
+            assert!(agent_command(Some(saved), &serde_json::from_value(input).unwrap()).is_err());
+        }
+    }
 }
 
 #[tauri::command]

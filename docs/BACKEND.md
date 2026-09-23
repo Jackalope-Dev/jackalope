@@ -20,23 +20,16 @@ rehearsal builds have no reporting endpoint. Disclosure precedes the first uploa
 feedback always needs a separate review and Send action. Hosting updates alone
 does not activate ingestion. See [BETA-MONITORING.md](BETA-MONITORING.md).
 
-## Telemetry: on by default, opt-out
+## Telemetry and feedback
 
-Configured official builds default telemetry **on**, with an opt-out. Requirements:
+Configured official builds default telemetry **on**. Onboarding discloses collection
+in a separate step with an opt-out. Settings can disable it later; disabling stops
+sending immediately. Enabled telemetry sends automatically without a per-event action.
 
-- Disclosed as its own step in the onboarding flow, plain language, with a
-  clear one-click way to turn it off right there — not buried in a settings
-  submenu the user has to go find.
-- Also toggleable at any later point from Settings; toggling off must stop
-  sending immediately, not just suppress future opt-in prompts.
-- Fully automatic once enabled: no user action per event. This is the
-  opposite of feedback (below), which is never automatic.
+Telemetry contains metadata only:
 
-**Payload boundary — metadata only, never content.** This is the hard
-constraint, not a nice-to-have, because Jackalope runs against users' private
-codebases and agent conversations:
-
-- Allowed: fixed feature names, task status transitions, fixed error categories,
+- Allowed: fixed view/operation names and outcomes, task status transitions with
+  allowlisted agent and task/Chat workflow, fixed error categories and page/operation context,
   installed app version, installed channel and OS. Each event gets a random UUID
   for bounded retry deduplication; it is never an installation identifier.
 - Never: installation/account/device IDs, prompts, agent output, source, paths,
@@ -48,20 +41,40 @@ codebases and agent conversations:
   logs do not store IPs or headers. Daily keyed hashes serve only rate limiting;
   review Cloudflare edge/Access log retention before activating collection.
 
-## Feedback: separate, explicit, user-initiated
+Feedback has separate consent and an explicit review/Send action. Disclose the
+submitted fields before sending; never attach diagnostic bundles silently.
+Submitting feedback does not require telemetry to be enabled. See
+[monitoring and payload contracts](BETA-MONITORING.md) and
+[feedback invitations](FEEDBACK-INVITATIONS.md) for delivery and retention behavior.
 
-Feedback is not telemetry and must never be bundled into it:
+## Trusted hosts and companion
 
-- Settings provides feedback review and an explicit Send action. Nothing is sent
-  until the user triggers it.
-- The submission can reasonably include more context than telemetry does
-  (the user is choosing to share it), but still needs a clear "what gets
-  sent" disclosure at the point of submission — don't silently attach a full
-  diagnostic bundle without saying so.
-- No implicit dependency on telemetry being enabled — a user who opted out of
-  telemetry can still submit feedback, and vice versa; keep the two toggles
-  independent in the data model and the UI.
+`commands/remote` owns a separate, disabled-by-default loopback service, normally port
+9472. The UI enables explicit project templates; remote requests can supply a project
+identifier and task text, never a project path, executable, agent account or arbitrary
+native command. New sessions use isolation and the host's saved agent/check settings.
+Native execution access and coordinator/runtime safeguards still apply.
 
+The allowlisted API exposes pairing and task status, detail, review, start, follow-up,
+question response, pause/resume and stop. Device tokens are random bearer credentials;
+only their hashes are saved on the host. Single-use pairing codes expire after five
+minutes and are limited to twenty attempts. Native host/client records use protected
+storage; browser tokens stay on the paired origin. Revocation and project removal
+reject subsequent requests. Already accepted actions can finish.
+
+Host and Origin validation, request limits, same-origin assets and a restrictive CSP
+protect the HTTP boundary. Desktop SSH transport requires an existing authenticated
+alias and a verified host key; forwarding is loopback-only and process-owned. HTTPS
+clients reject redirects and plain HTTP addresses. Phone access requires a trusted
+HTTPS proxy. Optional Tailscale Serve setup uses private port 8443, refuses an existing
+listener there and leaves other Serve configuration intact. Disabling Jackalope access
+stops its API; Tailscale configuration remains with its owner.
+
+Messages retain request IDs across reconnect/reload and reuse the native durable session
+or follow-up receipts. Network failure never automatically resends a mutation. Disconnect
+does not cancel host tasks; host exit follows normal local task shutdown/recovery rules.
+The companion is a separate Vite entry served from bundled desktop assets. Installed
+SSH, Tailscale, phone and cross-platform acceptance remain required.
 
 ## Remaining service work
 
@@ -69,6 +82,5 @@ Client disclosure, opt-out, bounded delivery and explicit feedback Send are impl
 Activation still needs migrated infrastructure, configured private Access/email settings,
 sender verification and installed beta traffic acceptance. Keep credentials out of source.
 
-Pairing, presence, remote dispatch/reconnect, companion clients and a compatible
-self-hosted/managed offering remain roadmap work. They need an explicit architecture
-and authorization model rather than reuse of the local bridge as a public API.
+Managed hosting, shared remote workspaces and native mobile applications remain roadmap
+work. They must preserve the separate remote API and its scoped authorization boundary.

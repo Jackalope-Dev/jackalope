@@ -6,10 +6,6 @@
   padding: 44px clamp(24px, 5vw, 72px) 64px;
   color: var(--color-text-primary);
 }
-.task-detail {
-  max-width: 1120px;
-  margin: 0 auto;
-}
 .task-detail > .inline-notice {
   margin-top: 20px;
 }
@@ -42,9 +38,9 @@
   color: var(--color-text-secondary);
 }
 .task-composer {
-  border-radius: 20px;
-  background: linear-gradient(150deg, var(--color-surface-elevated), var(--color-surface));
-  box-shadow: 0 8px 36px -16px var(--color-accent-glow);
+  border-radius: 16px;
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-flat);
   border: 1px solid var(--color-border);
   transition: border-color 0.18s;
 }
@@ -73,68 +69,9 @@
   gap: 16px;
   padding: 12px 20px;
 }
-.task-context-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-}
-.task-context-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-radius: 7px;
-  background: var(--color-surface-sunken);
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  max-width: 210px;
-  overflow: hidden;
-}
-.task-context-chip select,
-.task-filter select {
-  background: transparent;
-  outline: none;
-  max-width: 160px;
-  cursor: pointer;
-}
-.task-context-chip select:focus-visible,
-.task-filter select:focus-visible {
-  outline: 1px solid var(--color-accent);
-  outline-offset: 3px;
-}
 select option {
   background: var(--color-surface-elevated);
   color: var(--color-text-primary);
-}
-.task-composer-note {
-  padding: 0 24px 17px;
-  font-size: var(--text-xs);
-  line-height: 1.6;
-  color: var(--color-text-muted);
-}
-.task-first-project {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 30px 0;
-  border-top: 1px solid var(--color-border-subtle);
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-.task-first-project > div {
-  flex: 1;
-}
-.task-list-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin: 42px 0 13px;
-}
-.task-filter {
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
 }
 .task-link {
   color: var(--color-accent-ink);
@@ -147,23 +84,6 @@ select option {
 .task-link:hover {
   text-decoration: underline;
 }
-.task-list-row {
-  display: flex;
-  gap: 20px;
-  align-items: center;
-  width: 100%;
-  padding: 20px 8px;
-  text-align: left;
-  border-top: 1px solid var(--color-border-subtle);
-  border-radius: 7px;
-  font-size: var(--text-sm);
-}
-.task-list-row > div {
-  flex: 1;
-}
-.task-list-row:hover {
-  background: var(--color-surface-hover);
-}
 .task-back {
   display: flex;
   align-items: center;
@@ -171,21 +91,6 @@ select option {
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
   margin-bottom: 28px;
-}
-.task-context-line {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  margin-top: 18px;
-  overflow-wrap: anywhere;
-}
-.task-path {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  margin-top: 8px;
-  overflow-wrap: anywhere;
 }
 .task-result {
   margin-top: 30px;
@@ -282,28 +187,6 @@ select option {
   color: var(--color-text-secondary);
   cursor: pointer;
 }
-.task-review {
-  padding: 22px 0;
-  margin-top: 22px;
-  border-top: 1px solid var(--color-border-subtle);
-}
-.task-files li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow-wrap: anywhere;
-  font-size: var(--text-xs);
-  padding: 6px 0;
-}
-.task-usage-line {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
-  border-top: 1px solid var(--color-border-subtle);
-  padding-top: 20px;
-  margin-top: 15px;
-}
 .task-next {
   margin-top: 32px;
   padding-top: 24px;
@@ -324,19 +207,6 @@ select option {
 .task-reply:focus {
   outline: 1px solid var(--color-accent);
 }
-.task-attempt-picker {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  font-size: var(--text-xs);
-  margin-top: 20px;
-  color: var(--color-text-secondary);
-}
-.task-attempt-picker select {
-  padding: 7px;
-  background: var(--color-surface-elevated);
-  border-radius: 6px;
-}
 .task-request {
   padding-top: 20px;
   font-size: var(--text-sm);
@@ -344,7 +214,6 @@ select option {
 }
 .task-error {
   padding: 14px 16px;
-  border-left: 2px solid var(--color-accent);
   border-radius: 3px;
   background: var(--color-accent-subtle);
   font-size: var(--text-xs);
@@ -403,9 +272,8 @@ select option {
 .task-input:focus {
   outline: 1px solid var(--color-accent);
 }
-.runner-row {
-  padding: 25px 0;
-  border-top: 1px solid var(--color-border-subtle);
+.usage-filters .themed-select {
+  max-width: 220px;
 }
 .usage-filters select {
   background: var(--color-surface-elevated);
@@ -413,32 +281,12 @@ select option {
   border-radius: 7px;
   max-width: 220px;
 }
-.usage-overview {
-  display: flex;
-  gap: 45px;
-  align-items: center;
-  padding-bottom: 24px;
-}
-.usage-total {
-  font-size: var(--text-4xl);
-  font-weight: 500;
-  letter-spacing: -0.05em;
-  font-variant-numeric: tabular-nums;
-}
 .usage-task-link {
   display: block;
   max-width: 290px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.task-usage-empty,
-.usage-capacity {
-  padding: 24px 0;
-  border-top: 1px solid var(--color-border-subtle);
-}
-.usage-capacity {
-  margin-top: 30px;
 }
 @media (max-width: 1000px) {
   .task-page {
@@ -449,9 +297,6 @@ select option {
   }
   .task-composer-footer {
     align-items: flex-end;
-  }
-  .task-first-project {
-    flex-wrap: wrap;
   }
 }
 .feedback-touchpoint {

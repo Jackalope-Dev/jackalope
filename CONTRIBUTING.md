@@ -22,7 +22,7 @@ including local development builds. Automated tests use isolated access fixtures
 
 ## Development
 
-Use Node 24.18 or later within Node 24, pnpm 10.11.0 (pinned in package.json),
+Use Node 26.9 or later within Node 26, pnpm 10.11.0 (pinned in package.json),
 and Rust 1.98.1 with rustfmt. CI tests that Rust toolchain; update its workflow
 and this guide together when raising the baseline. The crate declares Rust 1.98.
 Windows native development also needs the MSVC C++ build tools and WebView2.
@@ -71,6 +71,20 @@ pnpm --filter @jackalope/server test
 pnpm test:release
 ```
 
+With the desktop development server running, exercise the project setup and Chat
+review flows in an isolated Edge browser context:
+
+```powershell
+$env:JACKALOPE_PREVIEW_URL = 'http://127.0.0.1:5173'
+node scripts/verification/verify-project-onboarding.mjs
+node scripts/verification/verify-live-session.mjs
+```
+
+These scripts render actual components with explicit native-service fixtures.
+They cover drafts, readiness races, guided setup, review, merge handoffs, limits,
+keyboard access and responsive themes. Screenshots go to ignored `output/playwright/`;
+they do not prove provider execution or installed-app acceptance.
+
 Run the full verification gate before submitting changes:
 
 ```powershell
@@ -99,9 +113,18 @@ Keep the CI checks required for integration. Local verification does not
 include CI's Linux/macOS desktop, browser, keyring and packaging checks, and a
 Windows pass cannot establish that those platform-specific checks pass.
 
+CI runs the full gate once on Windows. Linux and macOS use `pnpm verify --native-only`
+for desktop JavaScript, Rust formatting and native unit tests, then run their
+browser, credential-storage, desktop-control and packaging checks. Shared server,
+website, UI gallery and repository checks are covered by the required Windows job.
+The separate security workflow also runs weekly so new advisories are detected
+without rebuilding every platform. Required check names stay consistent with the
+release source checks and branch protection.
+
 `verify` runs Biome, local documentation links, release-script tests, generated server bindings, server
 typecheck/tests/dry-run build, shared UI typecheck/gallery build, desktop JavaScript tests, Rust formatting/native
-unit tests and frontend production builds. Install [Gitleaks 8.30.1](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1) to run the
+unit tests, frontend production builds and the website Worker dry run. CI reads the
+Node version from `.node-version`; use the same version locally. Install [Gitleaks 8.30.1](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1) to run the
 separate secret check; it scans reachable history and current nonignored files.
 CI runs both checks without deployment credentials. `pnpm licenses:generate` regenerates
 the [dependency inventory](docs/DEPENDENCIES.md) after dependency changes.

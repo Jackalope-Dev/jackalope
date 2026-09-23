@@ -7,12 +7,12 @@ export function planningDraft(
     TaskTicket,
     | 'rawPrompt'
     | 'refinedPrompt'
-    | 'promptVersion'
     | 'assignedAgent'
     | 'clarifications'
     | 'connectionIds'
     | 'contextSelection'
     | 'effort'
+    | 'codexSpeed'
     | 'model'
   >,
 ) {
@@ -32,18 +32,15 @@ export function planningDraft(
     executionMode: isolated ? ('isolated' as const) : ('current' as const),
   };
   const generated = assemblePrompt(assembly).assembledPrompt;
-  const legacy =
-    task.promptVersion === undefined || task.promptVersion === 1
-      ? assemblePrompt({ ...assembly, version: 1 }).assembledPrompt
-      : undefined;
   const automatic = task.clarifications?.some(
     (item) => item.question === 'Task guideline selection' && item.answer === 'Automatic',
   );
   const structured = task.refinedPrompt
-    ? task.refinedPrompt === generated || task.refinedPrompt === legacy
+    ? task.refinedPrompt === generated
     : automatic && task.rawPrompt === generated;
   return {
     effort: task.effort,
+    codexSpeed: task.codexSpeed,
     model: task.model,
     contextSelection: task.contextSelection,
     prompt: structured ? task.rawPrompt : task.refinedPrompt || task.rawPrompt,

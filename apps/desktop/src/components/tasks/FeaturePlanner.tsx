@@ -3,9 +3,13 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { featureDraftKey } from '../../lib/feature-draft';
-import { type FeatureStep, featurePlanningPrompt, readFeaturePlan } from '../../lib/feature-plan';
+import {
+  type FeatureStep,
+  featurePlanningPrompt,
+  multiAgentPlanningPrompt,
+  readFeaturePlan,
+} from '../../lib/feature-plan';
 import { queueCommand } from '../../lib/queue';
-import { multiAgentPlanningPrompt } from '../../lib/task-decomposition';
 import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -450,6 +454,7 @@ export function FeaturePlanner({
                         agentAccounts: project.preferences?.agentAccounts,
                         verifyCommand: project.preferences?.verifyCommand,
                         prepareCommand: project.preferences?.prepareCommand,
+                        setupFiles: project.preferences?.setupFiles,
                         autoVerify: project.preferences?.autoVerify === true,
                         items,
                       },

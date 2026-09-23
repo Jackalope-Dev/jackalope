@@ -7,14 +7,15 @@ Every desktop build requires a native verified account access lease, including
 local development builds. Native execution checks remain authoritative
 including after revocation and offline expiry. Saved work remains reviewable.
 
-Project setup has four steps: Project, Agents, Appearance and First task. Adding another project
-reuses this flow without replaying the launch gate or app privacy. The Agents step
+Project setup has six steps: Project, Agents, Decisions, Behavior, Appearance and
+First task. Adding another project reuses this flow without replaying the launch
+gate or app privacy. The Agents step
 stages a project default and an optional allowed-agent list for the existing
 native policy path. It requires at least one available enabled agent, moves the
 default when it is switched off, and preserves global agent preferences. Existing
 project drafts and saved completion state remain compatible. The selected project,
-agent preferences, appearance and first task stay in the onboarding draft until
-workspace entry. Back/Cancel does not register the project or change its saved
+agent preferences, detected command defaults, appearance and first task stay in the
+onboarding draft until workspace entry. Back does not register the project or change its saved
 preferences. Legacy account/theme steps without a provisional project resume at
 Project; new Appearance steps resume with their saved draft. No database migration
 is required; the existing persisted-state merge supplies the new optional fields.

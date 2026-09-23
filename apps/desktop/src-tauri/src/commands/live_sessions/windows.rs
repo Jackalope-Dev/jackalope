@@ -36,6 +36,13 @@ pub async fn live_session_window(
                 .min_inner_size(320.0, 320.0)
                 .decorations(false)
                 .always_on_top(session.pinned);
+                #[cfg(target_os = "macos")]
+                {
+                    builder = builder
+                        .decorations(true)
+                        .title_bar_style(tauri::TitleBarStyle::Overlay)
+                        .hidden_title(true);
+                }
                 if let Some(profile) = std::env::var_os("JACKALOPE_PROFILE_DIR") {
                     builder = builder.data_directory(PathBuf::from(profile).join("webview"));
                 }

@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "fields": {
+    "verification-output": {
+      "values": ["legacy", "test-report"],
+      "default": "test-report",
+      "environment": "JACKALOPE_VERIFICATION_OUTPUT"
+    },
+    "scope-guard": {
+      "values": ["on", "off"],
+      "default": "on",
+      "environment": "JACKALOPE_SCOPE_GUARD"
+    },
+    "native-tools": {
+      "values": ["off", "output"],
+      "default": "output",
+      "environment": "JACKALOPE_NATIVE_TOOLS"
+    },
+    "opencode-transport": {
+      "values": ["server", "cli"],
+      "default": "server",
+      "environment": "JACKALOPE_OPENCODE_TRANSPORT"
+    },
+    "provider-effort": {
+      "values": ["on", "off", "low"],
+      "default": "on",
+      "environment": "JACKALOPE_PROVIDER_EFFORT"
+    },
+    "learning": {
+      "values": ["off", "local", "jev"],
+      "default": "off",
+      "environment": null
+    },
+    "task-approach": {
+      "values": ["general", "scoped"],
+      "default": "scoped",
+      "environment": null
+    },
+    "tool-surface": {
+      "values": ["full", "available", "deferred"],
+      "default": "available",
+      "environment": "JACKALOPE_TOOL_SURFACE"
+    },
+    "result-queries": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_RESULT_QUERIES"
+    },
+    "result-preview": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_RESULT_PREVIEW",
+      "requires": {
+        "on": {
+          "result-queries": "on"
+        }
+      }
+    },
+    "initial-tools": {
+      "values": ["search", "small"],
+      "default": "search",
+      "environment": "JACKALOPE_INITIAL_TOOLS"
+    },
+    "repo-map": {
+      "values": ["on", "off"],
+      "default": "on",
+      "environment": "JACKALOPE_REPO_MAP"
+    },
+    "context-read": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_CONTEXT_READ"
+    },
+    "jev-assistance": {
+      "values": ["active", "shadow"],
+      "default": "active",
+      "environment": "JACKALOPE_JEV_ASSISTANCE"
+    },
+    "jev-questions": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_JEV_QUESTIONS"
+    },
+    "warm-opencode": {
+      "values": ["on", "off"],
+      "default": "on",
+      "environment": "JACKALOPE_WARM_OPENCODE"
+    },
+    "warm-api-helpers": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_WARM_API_HELPERS"
+    }
+  }
+}

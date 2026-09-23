@@ -8,17 +8,13 @@
   min-width: 0;
   min-height: 0;
   width: 100%;
-  max-width: 1320px;
-  margin-inline: auto;
-  padding: var(--workspace-page-padding) var(--workspace-gutter, 32px) 48px;
-  overflow-y: auto;
-  overflow-wrap: anywhere;
-  color: var(--color-text-primary);
-}
-.workspace-canvas > .workspace-page-layout {
   max-width: none;
   margin-inline: 0;
-  padding-inline: max(var(--workspace-gutter, 32px), calc((100% - 1320px) / 2));
+  padding: var(--workspace-page-padding) var(--workspace-gutter, 32px) 48px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  overflow-wrap: anywhere;
+  color: var(--color-text-primary);
 }
 .workspace-heading {
   display: flex;

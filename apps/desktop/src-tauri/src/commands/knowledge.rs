@@ -44,6 +44,8 @@ pub struct KnowledgeEntry {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextSelection {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jev_preparation: Option<super::decisions::agent_questions::Input>,
     #[serde(default)]
     pub advance_workflow: bool,
     #[serde(default)]
@@ -60,6 +62,13 @@ pub struct ContextSelection {
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextReceipt {
+    // Preserve historical preparation evidence without executing it on a new launch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jev_preparation: Option<super::decisions::agent_questions::Input>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jev_preparation_result: Option<serde_json::Value>,
+    #[serde(default)]
+    pub reasons: std::collections::BTreeMap<String, String>,
     pub entries: Vec<KnowledgeEntry>,
     pub bytes: usize,
 }
@@ -322,6 +331,9 @@ fn select(
             .filter(|e| {
                 e.enabled
                     && !e.dismissed
+                    && e.automatic
+                        .as_ref()
+                        .is_none_or(|source| source.selectable())
                     && e.kind == KnowledgeKind::Memory
                     && e.content.len() <= 800
                     && e.title.len() <= 120
@@ -338,11 +350,9 @@ fn select(
             })
             .filter(|(score, entry)| {
                 *score
-                    >= if entry
-                        .automatic
-                        .as_ref()
-                        .is_some_and(|source| source.kind == "adjustment")
-                    {
+                    >= if entry.automatic.as_ref().is_some_and(|source| {
+                        matches!(source.kind.as_str(), "adjustment" | "review")
+                    }) {
                         2
                     } else {
                         1
@@ -358,6 +368,21 @@ fn select(
                 .take(3)
                 .map(|(_, e)| e),
         );
+    }
+    for entry in &receipt.entries {
+        let reason = if entry.kind == KnowledgeKind::Workflow {
+            "Workflow explicitly selected for this task.".into()
+        } else {
+            let query = words(prompt);
+            let phrases: Vec<_> = entry
+                .keywords
+                .iter()
+                .filter(|phrase| query.contains(&words(phrase)))
+                .cloned()
+                .collect();
+            format!("Request matched: {}.", phrases.join(", "))
+        };
+        receipt.reasons.insert(entry.id.clone(), reason);
     }
     receipt.bytes = receipt.text().len();
     Ok(receipt)

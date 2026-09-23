@@ -15,6 +15,12 @@ export interface KnowledgeEntry {
     kind: 'preference' | 'adjustment' | 'review' | 'repository' | 'verification';
     evidence: string[];
     managed: boolean;
+    resolution?: {
+      runId: string;
+      requirementId: string;
+      tree: string;
+      checkedAt: string;
+    } | null;
   } | null;
   dismissed?: boolean;
   process?: ProcessTemplate;
@@ -40,8 +46,34 @@ export interface ContextSelection {
   memoryOff?: boolean;
 }
 export interface ContextReceipt {
+  jevPreparation?: JevPreparation | null;
+  jevPreparationResult?: Record<string, unknown> | null;
+  reasons?: Record<string, string>;
   entries: KnowledgeEntry[];
   bytes: number;
+}
+
+export interface JevPreparation {
+  state: string | Record<string, unknown> | unknown[];
+  questions: Record<
+    string,
+    | {
+        type: 'choice';
+        instructions: string | Record<string, unknown> | unknown[];
+        criteria: Record<string, unknown>;
+      }
+    | {
+        type: 'score';
+        instructions: string | Record<string, unknown> | unknown[];
+        criteria: unknown[];
+      }
+    | {
+        type: 'noul';
+        instructions: string | Record<string, unknown> | unknown[];
+        criteria?: { true?: string; false?: string };
+      }
+  >;
+  sources?: Record<string, { kind: 'file'; path: string; startLine?: number; lines?: number }>;
 }
 
 const knowledgeCache = createReadCache<KnowledgeEntry[]>(30_000);

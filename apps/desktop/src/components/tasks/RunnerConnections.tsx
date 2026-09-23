@@ -12,6 +12,7 @@ import { AddAgentForm } from '../agents/AddAgentForm';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import { AgentInstallGuide } from '../agents/AgentInstallGuide';
 import { LocalAiSetup } from '../agents/LocalAiSetup';
+import { ProviderConnections } from '../agents/ProviderConnections';
 import { navigateWorkspace, openAgentConfiguration } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
@@ -362,6 +363,7 @@ export function RunnerConnections({
             through the CLI, then check again.
           </p>
         )}
+        <ProviderConnections />
         <LocalAiSetup compact />
       </div>
       <Dialog.Root open={adding} onOpenChange={setAdding}>

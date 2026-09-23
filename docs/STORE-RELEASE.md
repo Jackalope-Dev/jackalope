@@ -2,7 +2,8 @@
 
 The Store path packages the native desktop as a full-trust x64 MSIX. Microsoft
 signs certified Store submissions; this does not supply a signed EXE/MSI for an
-independent download. The existing installer release path remains separate.
+independent download. This is the primary Windows distribution path. macOS/Linux releases continue through
+CrabNebula; both workflows use the same reviewed version and release-note commit.
 
 ## Build and review
 
@@ -26,8 +27,9 @@ Rehearsals without a fixed WebView2 runtime depend on the machine's installed
 Evergreen runtime and cannot establish clean-machine acceptance.
 
 The **Store release** workflow defaults to a manually dispatched rehearsal.
-Rehearsals verify and package without publication. Submission mode builds release
-packages and calls the Store API only after the owner enables automation.
+Rehearsals verify and package without publication. Candidate mode builds real-identity
+release packages without submitting; submission mode also calls the Store API.
+Select beta or stable as the workflow branch; that selects beta or stable delivery.
 
 For a submission, enroll at [Store developer registration](https://storedeveloper.microsoft.com/)
 and reserve an MSIX product. Copy the exact package name, publisher identity and
@@ -80,21 +82,27 @@ One-time setup:
    review/accept its license and independently verify the SHA256 before configuring.
    The package retains the complete extracted runtime including its notices. Review
    required runtime notices and SmartScreen disclosures before submitting.
-4. Complete installed acceptance, then set `STORE_AUTOMATION_ENABLED=true`.
-   Use `RELEASE_DISTRIBUTION=store` to skip automatic legacy installer builds on beta
-   pushes. Add repository tag rules and optional environment reviewers to match
-   who should be allowed to publish; neither replaces Microsoft certification.
+4. Run `pnpm release:setup --apply` to configure protected branches, branch-scoped
+   Store/Cloud environments and immutable release tags. It selects
+   `RELEASE_DISTRIBUTION=store` and removes Windows from Cloud targets. Existing
+   enablement flags are preserved. Keep them off until their prerequisites pass.
+5. Prepare two increasing beta versions with `pnpm release:prepare patch`, review
+   notes, set `Status: ready`, verify, commit and push each. Run **Store release**
+   in candidate mode to inspect the package. After the first manual Partner Center
+   submission is published, set `STORE_SUBMISSION_ENABLED=true` and
+   `STORE_BETA_TEST_ENABLED=true` for manual beta submissions only. Install the
+   older version through the Store and submit the newer version to its tester flight.
+6. Complete the installed update checks below. Set `STORE_ACCEPTED=true`, clear
+   `STORE_BETA_TEST_ENABLED`, and enable `STORE_AUTOMATION_ENABLED=true`.
 
-For each release, update the app's version and release notes, review/commit the
-change, and push a tag matching `store-beta/vX.Y.Z` or `store-stable/vX.Y.Z`.
-The tag must match `tauri.conf.json`. Manual dispatch also supports either channel.
-Keep release tags fixed to their reviewed source. Source corrections require a
-new version and tag; do not move or delete `store-beta/v*` or `store-stable/v*` tags.
-The workflow runs verification, builds a real-identity MSIX with fixed WebView2,
-checks artifact hashes, uploads it, and submits it with publication after
-certification. Beta targets the configured flight; stable targets the base product
-and preserves its existing audience/listings. Both retain approved-account access
-while this preview is underway; `stable` does not mean publicly discoverable.
+Ready release commits pushed to beta or stable automatically build and submit after
+verification. Beta targets the configured flight; stable targets the base product,
+preserving its audience and listings, and requires `store-stable` approval after
+packaging. Both retain approved-account access while this preview is underway;
+`stable` does not mean publicly discoverable. Required source checks must succeed
+before any Store write. Publication reserves `store-beta/vX.Y.Z` or
+`store-stable/vX.Y.Z` automatically at the source commit. Do not manually push tags
+to trigger releases, move them or delete them. See [release automation](RELEASE-AUTOMATION.md).
 
 Use increasing three-part versions across both channels. The fourth MSIX part is
 always zero. A stable release should be newer than the latest beta if beta testers
@@ -111,18 +119,49 @@ notifications/status remain the source for certification success or rejection.
 
 The workflow exits after submission, avoiding Windows runner charges while Store
 certification runs. It caches Rust dependencies/build outputs and retains package
-artifacts for 14 days. Review current GitHub runner, cache and artifact-storage billing for the
+artifacts for 30 days. Review current GitHub runner, cache and artifact-storage billing for the
 repository's visibility and plan before enabling frequent packaging jobs. The same scripts work on another Windows CI runner:
 
 ~~~powershell
 ./scripts/release/store-runtime.ps1
 ./scripts/release/store.ps1 -Mode submission -Channel beta
+# Set EXPECTED_SOURCE, EXPECTED_CHANNEL, GITHUB_REF_NAME, GITHUB_REPOSITORY,
+# authenticated GH_TOKEN and the same Store submission/acceptance gates as Actions.
 node scripts/release/store-submit.mjs 'C:\path\to\output\store\id'
 ~~~
 
 Locally, assign the path printed by `store-runtime.ps1` to `STORE_WEBVIEW2_PATH`.
 The download helper exports that variable automatically only under GitHub Actions.
-No workflow has been run against a real Store product as part of implementation.
+Fixture and build success do not establish live Store submission or certification.
+
+## In-app updates and installed acceptance
+
+Store builds check for available packages through Windows `StoreContext`, including
+startup/periodic checks controlled by the app's automatic-check preference. The
+Store manages its own background update setting independently. App updates offers
+**Check for updates** and **Install update**; installation asks for Store consent
+and can close the app. Store package APIs do not provide a reliable target app
+version, so the UI announces an available Store update without inventing a version
+or Cloud release notes. Reopen the app to verify the installed version.
+
+The native installation guard blocks app-initiated installation while tasks,
+verification/integration or interrupted work remain, and flushes task history.
+New task execution is blocked while the installation request is active. Cancellation,
+low battery, network and Store failures remain retryable. Store-owned background
+updates are outside this app guard. Packaged Store identity is required; a browser
+fixture, unpackaged executable or local rehearsal is not a live Store update test.
+The Store chooses eligible packages by account/flight membership; the in-app Cloud
+channel selector is not available in Store builds.
+
+On a disposable Windows user/profile, install the older published Store package,
+connect an approved account, execute a real task, save work and restart. After the
+newer flight is certified and available to that Microsoft account, check from the
+app, exercise cancellation and retry, and install while idle. Confirm the new version,
+saved work and account connection after reopening. Also check task blocking,
+offline recovery, denied Store sign-in and Store Library updates. Complete these
+checks before setting `STORE_ACCEPTED`; retain evidence privately.
+
+[Microsoft Store update APIs](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/package-updates-from-store).
 
 ## Access and invitations
 

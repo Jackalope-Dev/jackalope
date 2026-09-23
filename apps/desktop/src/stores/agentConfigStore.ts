@@ -1,32 +1,9 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import type { BuiltinAgentId } from '../lib/agent-catalog';
+import { createPersistStorage } from '../lib/persist-storage.ts';
 import { nativeTask } from '../lib/task-runtime.ts';
 import { useProjectStore } from './projectStore.ts';
-
-const memoryStore: Record<string, string> = {};
-const safeStorage = createJSONStorage(() => ({
-  getItem: (name: string) => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      return window.localStorage.getItem(name);
-    }
-    return memoryStore[name] ?? null;
-  },
-  setItem: (name: string, value: string) => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(name, value);
-    } else {
-      memoryStore[name] = value;
-    }
-  },
-  removeItem: (name: string) => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.removeItem(name);
-    } else {
-      delete memoryStore[name];
-    }
-  },
-}));
 
 export interface CustomAgentConfig {
   id: string;
@@ -57,7 +34,6 @@ interface AgentConfigState {
   automaticQuotaHandoff: boolean;
   customAgents: CustomAgentConfig[];
 
-  // Actions
   toggleAgent: (agentId: string, enabled?: boolean) => void;
   toggleModel: (modelId: string, allowed?: boolean) => void;
   setDefaultMetaAgent: (agentId: string) => void;
@@ -65,7 +41,6 @@ interface AgentConfigState {
   updateCustomAgent: (id: string, patch: Partial<CustomAgentConfig>) => void;
   removeCustomAgent: (id: string) => void;
 
-  // Query helpers
   isAgentEnabled: (agentId: string) => boolean;
   isModelAllowed: (modelId: string) => boolean;
 }
@@ -85,17 +60,7 @@ export const useAgentConfigStore = create<AgentConfigState>()(
         kimi: true,
         antigravity: true,
       },
-      allowedModels: {
-        // By default, all standard models are allowed
-        'claude-3-7-sonnet': true,
-        'claude-3-5-sonnet': true,
-        'claude-3-5-haiku': true,
-        'o3-mini': true,
-        o1: true,
-        'gpt-4o': true,
-        'grok-3': true,
-        'grok-beta': true,
-      },
+      allowedModels: {},
       defaultMetaAgent: 'codex',
       automaticQuotaHandoff: true,
       customAgents: [],
@@ -167,7 +132,7 @@ export const useAgentConfigStore = create<AgentConfigState>()(
     }),
     {
       name: 'jackalope-agent-config-v1',
-      storage: safeStorage,
+      storage: createPersistStorage(),
     },
   ),
 );

@@ -10,6 +10,7 @@ impl Coordinator {
         let merged_run_ids = crate::commands::integration::applied_run_ids(&self.runtime)?;
         let inner = self.inner.lock().unwrap();
         Ok(QueueView {
+            managed_tasks: inner.ledger.managed_tasks.clone(),
             assist_policies: inner.ledger.assist_policies.clone(),
             reconciliations: inner.ledger.reconciliations.clone(),
             agreements: inner.ledger.agreements.clone(),
@@ -88,6 +89,7 @@ impl Coordinator {
             agent_profile_id: req.agent_profile_id,
             verify_command: req.verify_command,
             prepare_command: req.prepare_command,
+            setup_files: req.setup_files,
             auto_verify: req.auto_verify,
             title: req.title.trim().into(),
             prompt: req.prompt.trim().into(),
@@ -201,6 +203,7 @@ impl Coordinator {
                     agent_profile_id: request.agent_accounts.get(&item.agent).cloned(),
                     verify_command: request.verify_command.clone(),
                     prepare_command: request.prepare_command.clone(),
+                    setup_files: request.setup_files.clone(),
                     auto_verify: request.auto_verify,
                     title: item.title,
                     prompt: item.prompt,
@@ -218,7 +221,14 @@ impl Coordinator {
         }
         self.save(&ledger)?;
         inner.ledger = ledger;
-        inner.enabled.remove(&request.project_id);
+        if !inner
+            .ledger
+            .managed_tasks
+            .iter()
+            .any(|task| Some(&task.id) == request.feature_id.as_ref())
+        {
+            inner.enabled.remove(&request.project_id);
+        }
         Ok(created)
     }
 
@@ -244,6 +254,9 @@ impl Coordinator {
             self.refresh_scopes_locked(&mut inner)?;
             *self.scope_checked.lock().unwrap() = Some(std::time::Instant::now());
         }
+        if self.deliver_managed_locked(&mut inner, &runs, &merged, &url)? {
+            return Ok(());
+        }
         if self.assist_locked(&mut inner, &runs, &merged, &url)? {
             return Ok(());
         }
@@ -252,12 +265,20 @@ impl Coordinator {
             let run_id = Uuid::new_v4().to_string();
             let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
             let mut ledger = inner.ledger.clone();
+            managed_delivery::capture_interfaces(&mut ledger, &item, &run_id);
             ledger
                 .items
                 .iter_mut()
                 .find(|i| i.id == item.id)
                 .unwrap()
                 .run_id = Some(run_id.clone());
+            if let Some(task) = ledger
+                .managed_tasks
+                .iter_mut()
+                .find(|task| Some(&task.id) == item.feature_id.as_ref())
+            {
+                task.run_ids.push(run_id.clone());
+            }
             self.save(&ledger)?;
             inner.ledger = ledger;
             inner
@@ -269,6 +290,7 @@ impl Coordinator {
                 retry_of: None,
                 live_session_id: None,
                 effort: None,
+                codex_speed: None,
                 dependency_snapshot: Default::default(),
                 monitor_change: None,
                 context_selection: item.context_selection.clone(),
@@ -282,6 +304,7 @@ impl Coordinator {
                 agent_profile_id: item.agent_profile_id,
                 verify_command: item.verify_command,
                 prepare_command: item.prepare_command,
+                setup_files: item.setup_files,
                 auto_verify: item.auto_verify,
                 target_branch: item.target_branch,
                 account_binding: None,
@@ -290,32 +313,69 @@ impl Coordinator {
                 previous_run_id: None,
                 connection_ids: None,
                 coordination: Some(CoordinationContext {
+                    managed: true,
                     endpoint: url.clone(),
                     token: token.clone(),
                     instructions,
                 }),
             };
+            if let Some(task) = inner
+                .ledger
+                .managed_tasks
+                .iter()
+                .find(|task| Some(&task.id) == assigned.feature_id.as_ref())
+            {
+                request.model = task.request.model.clone();
+                request.effort = task.request.effort;
+                request.codex_speed = task.request.codex_speed;
+                request.connection_ids = task.request.connection_ids.clone();
+                request.agent_profile_id = task.request.agent_profile_id.clone();
+            }
             let result = (|| {
+                if let Some(task) = inner
+                    .ledger
+                    .managed_tasks
+                    .iter()
+                    .find(|task| Some(&task.id) == assigned.feature_id.as_ref())
+                {
+                    crate::commands::task_strategy::validate_source(
+                        &task.request,
+                        &task.assessment.source_head,
+                    )?;
+                }
                 if assigned.staged_dependencies && !assigned.dependencies.is_empty() {
-                    let ids = assigned
-                        .dependencies
-                        .iter()
-                        .filter_map(|id| {
-                            inner
-                                .ledger
-                                .items
-                                .iter()
-                                .find(|i| &i.id == id)
-                                .and_then(|i| i.run_id.clone())
-                        })
-                        .collect::<Vec<_>>();
+                    let ids = if managed_delivery::is_integration(&inner.ledger, &assigned) {
+                        managed_delivery::source_ids(&inner.ledger, &assigned)
+                    } else {
+                        assigned
+                            .dependencies
+                            .iter()
+                            .filter_map(|id| {
+                                inner
+                                    .ledger
+                                    .items
+                                    .iter()
+                                    .find(|i| &i.id == id)
+                                    .and_then(|i| i.run_id.clone())
+                            })
+                            .collect::<Vec<_>>()
+                    };
                     request.dependency_snapshot =
-                        crate::commands::integration::prepare_dependencies(
-                            &self.runtime.integration_directory(),
-                            &runs,
-                            &ids,
-                            &request.id,
-                        )?;
+                        if managed_delivery::is_integration(&inner.ledger, &assigned) {
+                            crate::commands::integration::dependencies::reconciliation_input(
+                                &self.runtime.integration_directory(),
+                                &runs,
+                                &ids,
+                                &request.id,
+                            )?
+                        } else {
+                            crate::commands::integration::prepare_dependencies(
+                                &self.runtime.integration_directory(),
+                                &runs,
+                                &ids,
+                                &request.id,
+                            )?
+                        };
                 }
                 if !request.dependency_snapshot.sources.is_empty() {
                     request.coordination.as_mut().unwrap().instructions.push_str(&format!("\nThis workspace includes verified predecessor snapshots, not just the target branch. Inspect these immutable input receipts and perform only your assigned work: {}\n", serde_json::to_string(&request.dependency_snapshot).map_err(|e| e.to_string())?));
@@ -340,6 +400,9 @@ impl Coordinator {
                     .unwrap()
                     .error = Some(error);
                 inner.enabled.remove(&item.project_id);
+                if let Some(id) = &item.feature_id {
+                    inner.enabled.remove(&managed::dispatch_key(id));
+                }
                 self.save(&inner.ledger)?;
             }
         }
@@ -356,12 +419,14 @@ impl Coordinator {
                         Some(format!("http://{}", listener.local_addr().unwrap()));
                     let router = Router::new()
                         .route("/v1/help", get(bridge_help))
+                        .route("/v1/jev/questions", post(bridge_jev_questions))
                         .route("/v1/computer/output", post(bridge_verification_output))
                         .route("/v1/project", get(bridge_project))
                         .route("/v1/agreements", post(agreements::bridge_agreement))
                         .route("/v1/tools/search", post(bridge_tool_search))
                         .route("/v1/tools/execute", post(bridge_tool_execute))
                         .route("/v1/tools/read", post(bridge_tool_read))
+                        .route("/v1/tools/result", post(bridge_tool_result))
                         .route("/v1/messages", post(bridge_message))
                         .route("/v1/messages", get(inbox::bridge_inbox))
                         .route("/v1/messages/ack", post(inbox::bridge_ack))
@@ -380,6 +445,7 @@ impl Coordinator {
                         .route("/v1/user-prompt/poll", get(bridge_get_user_prompt))
                         .route("/v1/validation-step", post(bridge_validation_step))
                         .route("/v1/computer/verify", post(bridge_computer_verify))
+                        .route("/v1/native/output", post(bridge_native_output))
                         .layer(DefaultBodyLimit::max(65_536))
                         .with_state(service.clone());
                     let router = router
@@ -406,6 +472,9 @@ impl Coordinator {
         let service = self.clone();
         std::thread::spawn(move || {
             while service.alive.load(Ordering::Relaxed) {
+                if let Err(error) = service.dispatch_followups() {
+                    service.inner.lock().unwrap().error = Some(error);
+                }
                 if let Err(error) = service.tick() {
                     let mut inner = service.inner.lock().unwrap();
                     inner.error = Some(error);
@@ -416,12 +485,34 @@ impl Coordinator {
         });
     }
 
-    pub fn start_manual(&self, mut request: RunRequest) -> Result<String, String> {
+    pub fn start_manual(&self, request: RunRequest) -> Result<String, String> {
         self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
+        self.start_manual_locked(&mut inner, request)
+    }
+
+    pub(super) fn start_manual_locked(
+        &self,
+        mut inner: &mut Inner,
+        mut request: RunRequest,
+    ) -> Result<String, String> {
+        self.validate_followup_launch(&inner.ledger, &request)?;
         let mut assigned = None;
-        if request.live_session_id.is_some() {
+        if request.previous_run_id.is_some() || request.retry_of.is_some() {
+            super::managed::prepare_followup(
+                &inner.ledger,
+                &self.runtime.integration_runs()?,
+                &mut request,
+            )?;
+        }
+        if request.live_session_id.is_some()
+            || inner
+                .ledger
+                .managed_tasks
+                .iter()
+                .any(|task| task.planner_run_id == request.id)
+        {
             let runs = self.runtime.integration_runs()?;
             if !runs.iter().any(|run| run.id == request.id)
                 && runs
@@ -435,7 +526,11 @@ impl Coordinator {
                 return Err("Session is waiting for execution capacity.".into());
             }
         }
-        if let Some(previous_id) = &request.previous_run_id {
+        if let Some(previous_id) = request
+            .previous_run_id
+            .as_ref()
+            .or(request.retry_of.as_ref())
+        {
             let runs = self.runtime.integration_runs()?;
             if let Some(previous) = runs.iter().find(|r| &r.id == previous_id) {
                 if let Some(item) = inner
@@ -449,6 +544,17 @@ impl Coordinator {
                     })
                     .cloned()
                 {
+                    if inner
+                        .ledger
+                        .managed_tasks
+                        .iter()
+                        .any(|task| Some(&task.id) == item.feature_id.as_ref())
+                        && inner.ledger.items.iter().any(|child| {
+                            child.dependencies.contains(&item.id) && child.run_id.is_some()
+                        })
+                    {
+                        return Err("Dependent work already uses this assignment. Follow up on the final combined result instead.".into());
+                    }
                     if item.canceled {
                         return Err(
                             "This task was abandoned. Add a new task to claim its scope again."
@@ -464,6 +570,7 @@ impl Coordinator {
                         .grants
                         .insert(token.clone(), (item.id.clone(), request.id.clone()));
                     request.coordination = Some(CoordinationContext {
+                        managed: true,
                         endpoint,
                         token,
                         instructions: instructions(&item),
@@ -474,14 +581,24 @@ impl Coordinator {
         }
         if request.coordination.is_none() {
             if let Some(endpoint) = inner.url.clone() {
+                let managed = inner
+                    .ledger
+                    .managed_tasks
+                    .iter()
+                    .any(|task| task.planner_run_id == request.id);
                 let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
                 inner
                     .grants
                     .insert(token.clone(), (request.id.clone(), request.id.clone()));
                 request.coordination = Some(CoordinationContext {
+                    managed,
                     endpoint,
                     token,
-                    instructions: harness_instructions(),
+                    instructions: if managed {
+                        harness_instructions()
+                    } else {
+                        focused_instructions()
+                    },
                 });
             }
         }
@@ -492,6 +609,12 @@ impl Coordinator {
             );
         }
         let token = request.coordination.as_ref().unwrap().token.clone();
+        if let Some(item) = &assigned {
+            let mut ledger = inner.ledger.clone();
+            managed_delivery::capture_interfaces(&mut ledger, item, &request.id);
+            self.save(&ledger)?;
+            inner.ledger = ledger;
+        }
         let result = (|| {
             let snapshot = self.startup(&mut inner, &request, assigned.as_ref())?;
             request
@@ -505,6 +628,22 @@ impl Coordinator {
         })();
         if result.is_err() {
             inner.grants.remove(&token);
+        } else if let Some(task_id) = assigned.as_ref().and_then(|item| item.feature_id.as_ref()) {
+            let mut ledger = inner.ledger.clone();
+            if let Some(task) = ledger
+                .managed_tasks
+                .iter_mut()
+                .find(|task| &task.id == task_id)
+            {
+                task.error = None;
+                if let Some(delivery) = &mut task.delivery {
+                    delivery.interventions += 1;
+                    delivery.repair_limit = delivery.repairs.len() + 2;
+                    delivery.ready_at = None;
+                }
+                self.save(&ledger)?;
+                inner.ledger = ledger;
+            }
         }
         if let Err(error) = self.reconcile_locked(&mut inner) {
             inner.error = Some(error);
@@ -591,6 +730,7 @@ impl Coordinator {
                         .and_then(|b| b.profile_id.clone()),
                     verify_command: run.verify_command.clone(),
                     prepare_command: run.prepare_command.clone(),
+                    setup_files: run.setup_files.clone(),
                     auto_verify: run.auto_verify,
                     title: run.prompt.chars().take(50).collect(),
                     prompt: run.prompt.clone(),

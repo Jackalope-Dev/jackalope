@@ -53,6 +53,7 @@ export function TaskIntegration({ run, onApplied }: { run: TaskRun; onApplied: (
         merged={queue.mergedRunIds}
         onChanged={refresh}
         onlyRunId={run.id}
+        changesReviewed={!queue.mergedRunIds.includes(run.id)}
       />
     </div>
   );

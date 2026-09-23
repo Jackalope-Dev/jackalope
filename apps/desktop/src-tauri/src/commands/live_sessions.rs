@@ -1,5 +1,8 @@
 mod windows;
 pub use windows::*;
+mod changes;
+mod topics;
+pub use topics::*;
 
 use super::{
     coordination::Coordinator,
@@ -31,8 +34,8 @@ pub struct SessionMessage {
 
 #[derive(Deserialize)]
 pub struct FirstMessage {
-    id: String,
-    text: String,
+    pub(super) id: String,
+    pub(super) text: String,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -57,6 +60,14 @@ pub struct SessionDraft {
 #[serde(rename_all = "camelCase")]
 pub struct LiveSession {
     #[serde(default)]
+    pub topics: Vec<SessionTopic>,
+    #[serde(default)]
+    pub topics_revision: u64,
+    #[serde(default)]
+    pub limits: SessionLimits,
+    #[serde(default)]
+    pub integrated_run_id: Option<String>,
+    #[serde(default)]
     pub pinned: bool,
     pub id: String,
     pub title: String,
@@ -72,6 +83,61 @@ pub struct LiveSession {
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionLimits {
+    pub max_batches: Option<usize>,
+    pub pause_at_estimated_usd: Option<f64>,
+}
+
+impl SessionLimits {
+    fn validate(&self) -> Result<(), String> {
+        if self
+            .max_batches
+            .is_some_and(|value| value == 0 || value > 1000)
+            || self
+                .pause_at_estimated_usd
+                .is_some_and(|value| !value.is_finite() || value <= 0.0 || value > 100_000.0)
+        {
+            return Err("Choose 1–1,000 batches and a positive estimated-cost threshold up to $100,000, or leave limits blank.".into());
+        }
+        Ok(())
+    }
+}
+
+fn limit_reason(session: &LiveSession, runs: &[TaskRun]) -> Option<String> {
+    if session
+        .limits
+        .max_batches
+        .is_some_and(|limit| session.batches.len() >= limit)
+    {
+        return Some("The session reached its batch limit. Review the result and adjust limits before resuming.".into());
+    }
+    let threshold = session.limits.pause_at_estimated_usd?;
+    let mut total = 0.0;
+    for batch in &session.batches {
+        let Some(run) = runs.iter().find(|run| run.id == batch.run_id) else {
+            return Some("A session attempt is unavailable. Restore its history before resuming with a cost threshold.".into());
+        };
+        let mut usage = vec![&run.usage];
+        if let Some(routing) = &run.routing {
+            usage.extend(routing.handoffs.iter().map(|leg| &leg.usage));
+            if routing.attempts.is_empty() {
+                usage.extend(routing.decisions.iter().map(|decision| &decision.usage));
+            } else {
+                usage.extend(routing.attempts.iter().map(|attempt| &attempt.usage));
+            }
+        }
+        for value in usage {
+            match value.estimated_cost_usd.filter(|cost| cost.is_finite() && *cost >= 0.0) {
+                Some(cost) if value.reported => total += cost,
+                _ => return Some("Estimated cost is unavailable for part of this session. Review usage or remove the cost threshold before resuming.".into()),
+            }
+        }
+    }
+    (total >= threshold).then(|| "The session reached its estimated-cost threshold. Review usage and adjust limits before resuming.".into())
+}
+
+#[derive(Clone, Default, Serialize, Deserialize)]
 struct Ledger {
     sessions: Vec<LiveSession>,
 }
@@ -79,6 +145,8 @@ struct Ledger {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSnapshot {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revisions: Option<std::collections::BTreeMap<String, String>>,
     pub sessions: Vec<LiveSession>,
     pub runs: Vec<TaskRun>,
     pub error: Option<String>,
@@ -97,6 +165,9 @@ pub struct LiveSessions {
     coordinator: Coordinator,
     alive: Arc<AtomicBool>,
     gate: Arc<Mutex<()>>,
+    /// Counts changes the dispatch loop makes, such as a batch starting or
+    /// failing before any task exists. Task history alone cannot report those.
+    changes: Arc<tokio::sync::watch::Sender<u64>>,
 }
 
 impl LiveSessions {
@@ -136,7 +207,20 @@ impl LiveSessions {
             coordinator,
             alive: Arc::new(AtomicBool::new(true)),
             gate: Arc::new(Mutex::new(())),
+            changes: Arc::new(tokio::sync::watch::channel(0).0),
         }
+    }
+
+    pub fn subscribe(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.changes.subscribe()
+    }
+
+    pub fn revision(&self) -> u64 {
+        *self.changes.borrow()
+    }
+
+    fn changed(&self) {
+        self.changes.send_modify(|revision| *revision += 1);
     }
 
     fn save(&self, ledger: &Ledger) -> Result<(), String> {
@@ -172,31 +256,56 @@ impl LiveSessions {
             .ok_or_else(|| "Session not found.".into())
     }
 
-    fn snapshot(&self, id: Option<&str>) -> Result<SessionSnapshot, String> {
+    pub(super) fn snapshot(&self, id: Option<&str>) -> Result<SessionSnapshot, String> {
         let inner = self.inner.lock().map_err(|e| e.to_string())?;
         let mut sessions = inner.ledger.sessions.clone();
         let error = inner.error.clone();
         drop(inner);
+        let integrated = self.integrated_ids()?;
         for session in &mut sessions {
+            session.integrated_run_id = session
+                .batches
+                .iter()
+                .rev()
+                .find(|batch| integrated.contains(&batch.run_id))
+                .map(|batch| batch.run_id.clone());
+            if session.integrated_run_id.is_some() {
+                session.closed = true;
+                session.paused = true;
+            }
             for batch in &mut session.batches {
                 batch.prompt.clear();
             }
         }
         let runs = self.runtime.live_session_runs(id)?;
         Ok(SessionSnapshot {
+            revisions: None,
             sessions,
             runs,
             error,
         })
     }
 
+    #[cfg(test)]
     fn create(
+        &self,
+        id: String,
+        title: String,
+        request: RunRequest,
+        first_message: Option<FirstMessage>,
+    ) -> Result<String, String> {
+        self.create_with_limits(id, title, request, first_message, SessionLimits::default())
+    }
+
+    pub(super) fn create_with_limits(
         &self,
         id: String,
         title: String,
         mut request: RunRequest,
         first_message: Option<FirstMessage>,
+        limits: SessionLimits,
     ) -> Result<String, String> {
+        limits.validate()?;
         Uuid::parse_str(&id).map_err(|_| "Invalid session identifier")?;
         if let Some(message) = &first_message {
             Uuid::parse_str(&message.id).map_err(|_| "Invalid message identifier")?;
@@ -262,6 +371,10 @@ impl LiveSessions {
                 })
                 .collect();
             ledger.sessions.push(LiveSession {
+                topics: Vec::new(),
+                topics_revision: 0,
+                limits,
+                integrated_run_id: None,
                 pinned: false,
                 id: id.clone(),
                 title: title.trim().into(),
@@ -279,7 +392,7 @@ impl LiveSessions {
         })
     }
 
-    fn send(
+    pub(super) fn send(
         &self,
         id: &str,
         message_id: String,
@@ -290,6 +403,8 @@ impl LiveSessions {
         if text.trim().is_empty() || text.len() > 12_000 {
             return Err("Use a message between 1 and 12,000 bytes.".into());
         }
+        let _gate = self.gate.lock().map_err(|e| e.to_string())?;
+        let integrated = self.integrated_ids()?;
         self.update(|ledger| {
             let session = Self::session(ledger, id)?;
             if let Some(existing) = session.messages.iter().find(|m| m.id == message_id) {
@@ -302,6 +417,7 @@ impl LiveSessions {
             if session.closed {
                 return Err("Reopen this session before sending a message.".into());
             }
+            Self::ensure_unintegrated(session, &integrated)?;
             if session.messages.len() >= 1000 {
                 return Err("Start a new session after 1,000 messages.".into());
             }
@@ -336,11 +452,20 @@ impl LiveSessions {
         })
     }
 
-    fn action(&self, id: &str, action: &str, message_id: Option<&str>) -> Result<(), String> {
+    pub(super) fn action(
+        &self,
+        id: &str,
+        action: &str,
+        message_id: Option<&str>,
+    ) -> Result<(), String> {
         let _gate = self.gate.lock().map_err(|e| e.to_string())?;
+        let integrated = self.integrated_ids()?;
         let runs = self.runtime.live_session_runs(None)?;
         self.update(|ledger| {
             let session = Self::session(ledger, id)?;
+            if matches!(action, "resume" | "retry") {
+                Self::ensure_unintegrated(session, &integrated)?;
+            }
             match action {
                 "pause" => session.paused = true,
                 "resume" => {
@@ -373,7 +498,20 @@ impl LiveSessions {
     }
 
     fn tick(&self) -> Result<bool, String> {
+        {
+            let inner = self.inner.lock().map_err(|e| e.to_string())?;
+            if inner.error.is_some()
+                || !inner.ledger.sessions.iter().any(|session| {
+                    !session.closed
+                        && (!session.paused
+                            || session.batches.last().is_some_and(|batch| !batch.settled))
+                })
+            {
+                return Ok(false);
+            }
+        }
         let runs = self.runtime.live_session_runs(None)?;
+        let integrated = self.integrated_ids()?;
         let ids: Vec<_> = {
             let inner = self.inner.lock().map_err(|e| e.to_string())?;
             if inner.error.is_some() {
@@ -383,7 +521,13 @@ impl LiveSessions {
                 .ledger
                 .sessions
                 .iter()
-                .filter(|s| !s.closed)
+                .filter(|s| {
+                    !s.closed
+                        && !s
+                            .batches
+                            .iter()
+                            .any(|batch| integrated.contains(&batch.run_id))
+                })
                 .map(|s| s.id.clone())
                 .collect()
         };
@@ -430,6 +574,18 @@ impl LiveSessions {
             }
             if snapshot.paused || snapshot.error.is_some() {
                 continue;
+            }
+            if snapshot.batches.last().is_none_or(|batch| batch.settled) {
+                if let Some(reason) = limit_reason(&snapshot, &runs) {
+                    self.update(|ledger| {
+                        let session = Self::session(ledger, &id)?;
+                        session.paused = true;
+                        session.error = Some(reason);
+                        Ok(())
+                    })?;
+                    changed = true;
+                    continue;
+                }
             }
             if snapshot.batches.last().is_some_and(|batch| {
                 batch.settled && !runs.iter().any(|run| run.id == batch.run_id)
@@ -608,6 +764,7 @@ impl LiveSessions {
             while service.alive.load(Ordering::Relaxed) {
                 match service.tick() {
                     Ok(true) => {
+                        service.changed();
                         let _ = app.emit("live-sessions-changed", ());
                     }
                     Err(error) => {
@@ -617,6 +774,7 @@ impl LiveSessions {
                             }
                             inner.error = Some(format!("Session dispatch paused: {error}"));
                         }
+                        service.changed();
                         let _ = app.emit("live-sessions-changed", ());
                     }
                     _ => {}
@@ -647,11 +805,18 @@ fn batch_prompt(session: &LiveSession, messages: &[&SessionMessage]) -> String {
 pub async fn live_session_snapshot(
     service: State<'_, LiveSessions>,
     id: Option<String>,
+    known: Option<std::collections::BTreeMap<String, String>>,
 ) -> Result<SessionSnapshot, String> {
     let service = service.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || service.snapshot(id.as_deref()))
-        .await
-        .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || {
+        let snapshot = service.snapshot(id.as_deref())?;
+        match known {
+            Some(known) => changes::changed_snapshot(snapshot, &known),
+            None => Ok(snapshot),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -662,20 +827,43 @@ pub async fn live_session_create(
     title: Option<String>,
     request: RunRequest,
     first_message: Option<FirstMessage>,
+    limits: Option<SessionLimits>,
 ) -> Result<String, String> {
     let service = service.inner().clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        service.create(
+        service.create_with_limits(
             id,
             title.unwrap_or_else(|| "New session".into()),
             request,
             first_message,
+            limits.unwrap_or_default(),
         )
     })
     .await
     .map_err(|e| e.to_string())??;
     let _ = app.emit("live-sessions-changed", ());
     Ok(result)
+}
+
+#[tauri::command]
+pub async fn live_session_limits(
+    service: State<'_, LiveSessions>,
+    id: String,
+    limits: SessionLimits,
+) -> Result<(), String> {
+    limits.validate()?;
+    let service = service.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _gate = service.gate.lock().map_err(|e| e.to_string())?;
+        service.update(|ledger| {
+            let session = LiveSessions::session(ledger, &id)?;
+            session.limits = limits;
+            session.updated_at = Utc::now().to_rfc3339();
+            Ok(())
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -722,7 +910,73 @@ pub struct SessionReview {
 }
 
 impl LiveSessions {
-    fn review(&self, id: &str) -> Result<SessionReview, String> {
+    fn integrated_ids(&self) -> Result<std::collections::HashSet<String>, String> {
+        Ok(super::integration::plans(&self.runtime)?
+            .into_iter()
+            .filter(|plan| plan.status == "applied")
+            .flat_map(|plan| plan.run_ids)
+            .collect())
+    }
+
+    fn ensure_unintegrated(
+        session: &LiveSession,
+        integrated: &std::collections::HashSet<String>,
+    ) -> Result<(), String> {
+        if session
+            .batches
+            .iter()
+            .any(|batch| integrated.contains(&batch.run_id))
+        {
+            return Err("This session has been integrated. Start a new task from the updated target branch.".into());
+        }
+        Ok(())
+    }
+
+    pub(super) fn integration_guard(
+        &self,
+        ids: &[String],
+    ) -> Result<std::sync::MutexGuard<'_, ()>, String> {
+        let guard = self.gate.lock().map_err(|e| e.to_string())?;
+        let runs = self.runtime.integration_runs()?;
+        let inner = self.inner.lock().map_err(|e| e.to_string())?;
+        for run in runs
+            .iter()
+            .filter(|run| ids.contains(&run.id) && run.live_session_id.is_some())
+        {
+            if let Some(error) = &inner.error {
+                return Err(error.clone());
+            }
+            let session = inner
+                .ledger
+                .sessions
+                .iter()
+                .find(|session| Some(&session.id) == run.live_session_id.as_ref())
+                .ok_or("Restore the session journal before integrating its work.")?;
+            if !session.paused
+                || session
+                    .batches
+                    .last()
+                    .is_none_or(|batch| batch.run_id != run.id)
+            {
+                return Err(
+                    "Pause this session and review its latest attempt before integration.".into(),
+                );
+            }
+            if session
+                .messages
+                .iter()
+                .any(|message| !message.canceled && message.run_id.is_none())
+            {
+                return Err(
+                    "Run or cancel the queued messages before integrating this session.".into(),
+                );
+            }
+        }
+        drop(inner);
+        Ok(guard)
+    }
+
+    pub(super) fn review(&self, id: &str) -> Result<SessionReview, String> {
         let _gate = self.gate.lock().map_err(|e| e.to_string())?;
         let session = {
             let inner = self.inner.lock().map_err(|e| e.to_string())?;

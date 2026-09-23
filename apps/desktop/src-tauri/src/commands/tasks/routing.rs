@@ -7,6 +7,7 @@ use crate::commands::{
 use serde::{Deserialize, Serialize};
 
 mod evidence;
+mod jev;
 pub(super) mod process;
 mod prompt;
 #[cfg(test)]
@@ -48,6 +49,8 @@ pub struct RoutingAlternative {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RoutingDecision {
+    #[serde(default)]
+    pub assessment: Option<crate::commands::decisions::DecisionReceipt>,
     #[serde(default)]
     pub quota_pools: Vec<String>,
     pub orchestrator: String,
@@ -109,11 +112,28 @@ struct Candidate {
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Choice {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    assessment: Option<Value>,
     candidate_id: String,
     reason: String,
     expected_usage_percent: Option<f64>,
     #[serde(default)]
     alternatives: Vec<String>,
+}
+
+fn equivalent_workers(candidates: &[Candidate]) -> bool {
+    let Some(first) = candidates.first() else {
+        return false;
+    };
+    first
+        .model
+        .as_ref()
+        .is_some_and(|model| !model.trim().is_empty())
+        && candidates.iter().all(|candidate| {
+            candidate.agent == first.agent
+                && candidate.adapter == first.adapter
+                && candidate.model == first.model
+        })
 }
 
 fn remaining(record: &CapacityRecord, model: Option<&str>, now: i64) -> Option<f64> {
@@ -340,6 +360,7 @@ fn rank_by_capacity<'a>(candidates: &'a [Candidate], reason: &str) -> (&'a Candi
     (
         candidate,
         Choice {
+            assessment: None,
             candidate_id: candidate.id.clone(),
             reason: reason.into(),
             expected_usage_percent: None,
@@ -377,7 +398,7 @@ fn ranked_fallback<'a>(
         })
         .collect();
     if let Some(candidate) = ranked.first() {
-        return Ok((candidate, Choice { candidate_id: candidate.id.clone(), reason: "Using the default agent's next-ranked eligible option after quota exhaustion; current account, model and project restrictions were rechecked.".into(), expected_usage_percent: expected, alternatives: ranked.iter().skip(1).map(|candidate| candidate.id.clone()).collect() }));
+        return Ok((candidate, Choice { assessment:None, candidate_id: candidate.id.clone(), reason: "Using the default agent's next-ranked eligible option after quota exhaustion; current account, model and project restrictions were rechecked.".into(), expected_usage_percent: expected, alternatives: ranked.iter().skip(1).map(|candidate| candidate.id.clone()).collect() }));
     }
     Err("The default agent has no quota available to reroute, and none of its previously ranked fallbacks remain eligible. Progress is preserved; review accounts or wait for quota to reset.".into())
 }
@@ -408,6 +429,7 @@ impl TaskRuntime {
         let runs = self.integration_runs()?;
         let started = std::time::Instant::now();
         let mut candidates = vec![];
+        let mut accounts = vec![];
         for agent in agents {
             if !self.is_running(&req.id) {
                 return Err("Routing was stopped.".into());
@@ -423,10 +445,7 @@ impl TaskRuntime {
             let Ok((adapter, _)) = policy.resolve(&agent) else {
                 continue;
             };
-            if !matches!(
-                adapter.as_str(),
-                "codex" | "claude" | "grok" | "opencode" | "antigravity" | "kimi"
-            ) {
+            if !super::runtime::EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
                 continue;
             }
             if !orchestrator
@@ -482,20 +501,36 @@ impl TaskRuntime {
                 if let Some(id) = &local_id {
                     account_models = vec![Some(id.clone())];
                 } else {
+                    if let Some(preferred) = agent_profiles::preferred_model(&binding)? {
+                        account_models.retain(Option::is_some);
+                        account_models.insert(0, Some(preferred));
+                    }
                     account_models.retain(|model| {
                         !model
                             .as_ref()
                             .is_some_and(|id| id.starts_with("jackalope-local/"))
                     });
+                    if let Some(provider) = agent_profiles::api_provider(&binding)? {
+                        account_models.retain(|model| {
+                            model
+                                .as_ref()
+                                .is_some_and(|id| id.starts_with(&format!("{provider}/")))
+                        });
+                    }
                 }
+                account_models.sort();
+                account_models.dedup();
                 account_models.retain(|model| policy.model(&agent, model.as_deref()).is_ok());
+                if account_models.is_empty() {
+                    continue;
+                }
                 let record = if policy.custom_agents.iter().any(|custom| custom.id == agent)
                     || options
                         .command
                         .as_ref()
                         .is_some_and(|command| !command.is_empty())
                 {
-                    CapacityRecord {
+                    Some(CapacityRecord {
                         agent: adapter.clone(),
                         status: "unavailable".into(),
                         account: binding.label.clone(),
@@ -503,65 +538,85 @@ impl TaskRuntime {
                         observed_at: None,
                         detail: "Quota is not inferred from a different executable.".into(),
                         windows: vec![],
-                    }
+                    })
                 } else {
-                    tauri::async_runtime::block_on(capacity::routing_snapshot(&binding))
+                    None
                 };
-                for model in &account_models {
-                    let mut record = record.clone();
-                    if adapter == "kimi"
-                        && !capacity::kimi::uses_membership(&binding, model.as_deref())
-                    {
-                        record.windows.clear();
-                        record.status = "unavailable".into();
-                        record.observed_at = None;
-                    }
-                    candidates.push(Candidate {
-                        quota_pools: record
-                            .windows
-                            .iter()
-                            .filter(|window| {
-                                !window.pool_id.contains("unidentified")
-                                    && !window.pool_id.contains("not reported")
-                                    && !window.pool_id.contains("not available")
-                            })
-                            .map(|window| window.pool_id.clone())
-                            .collect(),
-                        id: format!("option-{}", candidates.len()),
-                        agent: agent.clone(),
-                        adapter: adapter.clone(),
-                        model: model.clone(),
-                        account: binding.label.clone(),
-                        profile_id: binding.profile_id.clone(),
-                        remaining_percent: remaining(
-                            &record,
-                            model.as_deref(),
-                            Utc::now().timestamp(),
-                        ),
-                        quota_status: record.status.clone(),
-                        quota_windows: record.windows.clone(),
-                        quota_observed_at: record.observed_at.clone(),
-                        active_tasks: runs
-                            .iter()
-                            .filter(|run| {
-                                run.id != req.id
-                                    && ["starting", "running", "stopping"]
-                                        .contains(&run.status.as_str())
-                                    && run.account_binding.as_ref().is_some_and(|active| {
-                                        active.adapter == binding.adapter
-                                            && active.directory == binding.directory
-                                    })
-                            })
-                            .count(),
-                        preferred: project.preferred_runner.as_ref() == Some(&agent),
-                        binding: binding.clone(),
-                    });
-                    if candidates.len() > 512 {
-                        return Err("Automatic routing supports up to 512 enabled agent, model and account combinations. Narrow the project options.".into());
-                    }
+                accounts.push((
+                    agent.clone(),
+                    adapter.clone(),
+                    binding,
+                    account_models,
+                    record,
+                ));
+            }
+        }
+        let bindings = accounts
+            .iter()
+            .filter(|(_, _, _, _, record)| record.is_none())
+            .map(|(_, _, binding, _, _)| binding.clone())
+            .collect();
+        let refreshed =
+            tauri::async_runtime::block_on(capacity::routing_snapshots(bindings, || {
+                !self.is_running(&req.id)
+            }))?;
+        let mut refreshed = refreshed.into_iter();
+        for (agent, adapter, binding, account_models, record) in accounts {
+            let record = record
+                .or_else(|| refreshed.next())
+                .ok_or("An account capacity check did not complete.")?;
+            for model in &account_models {
+                let mut record = record.clone();
+                if adapter == "kimi" && !capacity::kimi::uses_membership(&binding, model.as_deref())
+                {
+                    record.windows.clear();
+                    record.status = "unavailable".into();
+                    record.observed_at = None;
+                }
+                candidates.push(Candidate {
+                    quota_pools: record
+                        .windows
+                        .iter()
+                        .filter(|window| {
+                            !window.pool_id.contains("unidentified")
+                                && !window.pool_id.contains("not reported")
+                                && !window.pool_id.contains("not available")
+                        })
+                        .map(|window| window.pool_id.clone())
+                        .collect(),
+                    id: format!("option-{}", candidates.len()),
+                    agent: agent.clone(),
+                    adapter: adapter.clone(),
+                    model: model.clone(),
+                    account: binding.label.clone(),
+                    profile_id: binding.profile_id.clone(),
+                    remaining_percent: remaining(&record, model.as_deref(), Utc::now().timestamp()),
+                    quota_status: record.status.clone(),
+                    quota_windows: record.windows.clone(),
+                    quota_observed_at: record.observed_at.clone(),
+                    active_tasks: runs
+                        .iter()
+                        .filter(|run| {
+                            run.id != req.id
+                                && ["starting", "running", "stopping"]
+                                    .contains(&run.status.as_str())
+                                && run.account_binding.as_ref().is_some_and(|active| {
+                                    active.adapter == binding.adapter
+                                        && active.directory == binding.directory
+                                })
+                        })
+                        .count(),
+                    preferred: project.preferred_runner.as_ref() == Some(&agent),
+                    binding: binding.clone(),
+                });
+                if candidates.len() > 512 {
+                    return Err("Automatic routing supports up to 512 enabled agent, model and account combinations. Narrow the project options.".into());
                 }
             }
         }
+        self.update_checked(&req.id, |run| {
+            run.efficiency.timing("capacity", started.elapsed())
+        })?;
         Ok(candidates)
     }
 
@@ -587,24 +642,84 @@ impl TaskRuntime {
         if candidates.is_empty() {
             return Err("No enabled agent, model and account combination has sufficient available quota. Review Agents settings or wait for quota to reset.".into());
         }
-        let mut routers = self.routing_candidates(req, &policy, true)?;
+        use crate::commands::decisions::{
+            self, DecisionAttempt, DecisionKind, DecisionMode, DecisionPolicy, DecisionProvider,
+            DecisionReceipt,
+        };
+        let policy_result = decisions::policy(self, &req.project_id);
+        let policy_error = policy_result
+            .as_ref()
+            .err()
+            .map(|_| "Decision preferences could not be read; local rules were used.".to_string());
+        if let Some(error) = &policy_error {
+            self.update_checked(&req.id, |run| activity(run, error))?;
+        }
+        let decision_policy = policy_result.unwrap_or(DecisionPolicy {
+            mode: DecisionMode::Deterministic,
+            jev_fallback: Default::default(),
+            revision: 0,
+        });
+        let mode = decision_policy.mode;
+        let single = candidates.len() == 1;
+        let equivalent = !single && equivalent_workers(&candidates);
+        let no_model_choice = single || equivalent;
+        let observations = if !no_model_choice && mode == DecisionMode::Jev {
+            Some(evidence::evidence(&self.integration_runs()?, req))
+        } else {
+            None
+        };
+        let jev_output = if no_model_choice || mode != DecisionMode::Jev {
+            None
+        } else {
+            self.jev_route(
+                req,
+                &run,
+                &candidates,
+                observations.clone().unwrap_or(Value::Null),
+            )?
+        };
+        let used_jev = jev_output.is_some();
+        if !self.is_running(&req.id) {
+            return Err("Routing was stopped.".into());
+        }
+        let mut routers = if !no_model_choice && decision_policy.needs_agent(used_jev, false) {
+            match self.routing_candidates(req, &policy, true) {
+                Ok(candidates) => candidates,
+                Err(_) if mode == DecisionMode::Jev => vec![],
+                Err(error) => return Err(error),
+            }
+        } else {
+            vec![]
+        };
         routers.retain(|candidate| eligible(candidate, &history.handoffs));
         routers.sort_by(|a, b| {
             b.remaining_percent
                 .unwrap_or(50.0)
                 .total_cmp(&a.remaining_percent.unwrap_or(50.0))
         });
-        let single = candidates.len() == 1;
-        let router = if single { None } else { routers.first() };
-        // No routing model to consult and no prior handoff ranking to reuse: the
-        // orchestrator itself is unavailable, not out of quota. Workers are still
-        // eligible here, so select one deterministically instead of failing.
-        let deterministic = !single && router.is_none() && history.fallbacks.is_empty();
-        let observations = evidence::evidence(&self.integration_runs()?, req);
-        let prompt = prompt::build(req, &run, &candidates, observations, &history);
-        let output = router
-            .map(|router| self.routing_process(req, router, &prompt))
-            .transpose()?;
+        let router = routers.first();
+        let output = if used_jev {
+            jev_output
+        } else {
+            match router
+                .map(|router| {
+                    let observations = match observations {
+                        Some(observations) => observations,
+                        None => evidence::evidence(&self.integration_runs()?, req),
+                    };
+                    self.routing_process(
+                        req,
+                        router,
+                        &prompt::build(req, &run, &candidates, observations, &history),
+                    )
+                })
+                .transpose()
+            {
+                Ok(output) => output,
+                Err(_) if mode == DecisionMode::Jev && self.is_running(&req.id) => None,
+                Err(error) => return Err(error),
+            }
+        };
         let mut exhausted = history.handoffs.clone();
         if let (Some(router), Some(failure)) = (
             router,
@@ -625,13 +740,34 @@ impl TaskRuntime {
             });
             candidates.retain(|candidate| eligible(candidate, &exhausted));
         }
-        let fallback = output
-            .as_ref()
-            .is_none_or(|output| output.quota_failure.is_some());
+        if candidates.is_empty() {
+            return Err("No eligible worker remains after the routing account exhausted its quota. Progress is preserved.".into());
+        }
+        let fallback = output.as_ref().is_none_or(|output| {
+            output.quota_failure.is_some()
+                || (mode == DecisionMode::Jev && choose(&output.result, &candidates).is_err())
+        });
+        let deterministic = equivalent
+            || (!single
+                && !used_jev
+                && ((mode == DecisionMode::Jev && fallback)
+                    || (router.is_none()
+                        && (mode != DecisionMode::Agent || history.fallbacks.is_empty()))));
         let (_, mut choice) = if single {
-            (&candidates[0], Choice { candidate_id: candidates[0].id.clone(), reason: "Only one eligible agent, model and account; no routing model call was needed.".into(), expected_usage_percent: None, alternatives: vec![] })
+            (&candidates[0], Choice { assessment:None, candidate_id: candidates[0].id.clone(), reason: "Only one eligible agent, model and account; no routing model call was needed.".into(), expected_usage_percent: None, alternatives: vec![] })
         } else if deterministic {
-            rank_by_capacity(&candidates, "The default orchestrator had no eligible account, model or quota, so no routing model was consulted. Selected the highest-capacity eligible option.")
+            rank_by_capacity(
+                &candidates,
+                if equivalent {
+                    "All eligible accounts use the same agent and explicit model. Local rules selected an account using current capacity and workload; no routing model call was needed."
+                } else if mode == DecisionMode::Deterministic {
+                    "Local rules selected an eligible worker using project preference, current capacity and active workload. No routing model was consulted."
+                } else if mode == DecisionMode::Jev {
+                    "Jev and the configured fallback did not return a usable model selection. Local rules selected an eligible worker."
+                } else {
+                    "The default orchestrator had no eligible account, model or quota, so no routing model was consulted. Selected the highest-capacity eligible option."
+                },
+            )
         } else if fallback {
             ranked_fallback(&history, &candidates)?
         } else {
@@ -708,19 +844,83 @@ impl TaskRuntime {
         if inner.canceled.contains(&req.id) || selected.status != "starting" {
             return Err("Routing was stopped.".into());
         }
+        let attempts: Vec<DecisionAttempt> = selected
+            .routing
+            .as_ref()
+            .map(|current| {
+                current
+                    .attempts
+                    .iter()
+                    .skip(history.attempts.len())
+                    .map(|attempt| DecisionAttempt {
+                        provider: if attempt.agent == "jev" {
+                            DecisionProvider::Jev
+                        } else {
+                            DecisionProvider::Agent
+                        },
+                        usage: attempt.usage.clone(),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         let decision = RoutingDecision {
-            quota_pools: candidate.quota_pools.clone(),
-            orchestrator: policy.default_meta_agent.clone(),
-            orchestrator_model: router.and_then(|router| router.model.clone()),
-            orchestrator_account: router.map(|router| router.account.clone()).unwrap_or_else(
-                || {
-                    if single || deterministic {
-                        "Deterministic selection".into()
-                    } else {
-                        "Previously ranked fallback".into()
-                    }
+            assessment: Some(DecisionReceipt {
+                evidence: if used_jev { choice.assessment.clone() } else { None },
+                version: 1,
+                kind: DecisionKind::WorkerSelection,
+                requested_mode: mode,
+                provider: if used_jev {
+                    DecisionProvider::Jev
+                } else if router.is_some() && !fallback {
+                    DecisionProvider::Agent
+                } else {
+                    DecisionProvider::LocalRules
                 },
-            ),
+                policy_revision: decision_policy.revision,
+                model_call_attempted: !attempts.is_empty(),
+                concentration: None,
+                fallback_reason: policy_error.or_else(|| {
+                    (mode == DecisionMode::Jev && !used_jev && !no_model_choice).then(|| {
+                        if router.is_some() && !fallback {
+                            "Jev did not provide a usable assessment; the configured agent fallback selected the worker."
+                        } else {
+                            "Jev did not provide a usable assessment; local rules selected the worker."
+                        }.into()
+                    })
+                }),
+                usage: decisions::combined_usage(&attempts),
+                attempts,
+            }),
+            quota_pools: candidate.quota_pools.clone(),
+            orchestrator: if used_jev {
+                "jev".into()
+            } else if deterministic || single {
+                "local rules".into()
+            } else {
+                policy.default_meta_agent.clone()
+            },
+            orchestrator_model: if used_jev {
+                output.as_ref().and_then(|output| output.model.clone())
+            } else if deterministic || single {
+                None
+            } else {
+                router.and_then(|router| router.model.clone())
+            },
+            orchestrator_account: if used_jev {
+                "TypeSafe API key".into()
+            } else if deterministic || single {
+                "Deterministic selection".into()
+            } else {
+                router
+                    .map(|router| router.account.clone())
+                    .unwrap_or_else(|| {
+                        if single || deterministic {
+                            "Deterministic selection".into()
+                        } else {
+                            "Previously ranked fallback".into()
+                        }
+                    })
+            },
             agent: candidate.agent.clone(),
             model: candidate.model.clone(),
             account: candidate.account.clone(),
@@ -733,6 +933,9 @@ impl TaskRuntime {
         };
         {
             let run = &mut selected;
+            if no_model_choice && mode != DecisionMode::Deterministic {
+                run.efficiency.routing_calls_avoided += 1;
+            }
             run.agent = candidate.agent.clone();
             run.model = candidate.model.clone();
             run.account = candidate.account.clone();
@@ -741,7 +944,7 @@ impl TaskRuntime {
                 run,
                 &format!(
                     "{} selected {} / {} / {}: {}",
-                    policy.default_meta_agent,
+                    decision.orchestrator,
                     candidate.agent,
                     candidate.model.as_deref().unwrap_or("CLI default model"),
                     candidate.account,

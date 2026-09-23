@@ -452,7 +452,7 @@ try {
   await page.getByRole('button', { name: 'Per project', exact: true }).click();
   await page.getByLabel('Project name', { exact: true }).fill('Trail renamed');
   await page.getByRole('button', { name: 'Appearance', exact: true }).click();
-  await page.getByRole('switch', { name: 'Use app theme', exact: true }).click();
+  assert.equal(await page.getByRole('switch', { name: 'Use app theme', exact: true }).count(), 0);
   await page.getByRole('slider', { name: 'Color field', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
   assert.equal(
@@ -462,7 +462,6 @@ try {
     }),
     true,
   );
-  await page.getByRole('switch', { name: 'Use app theme', exact: true }).click();
   await page.getByRole('button', { name: 'App-wide', exact: true }).click();
   await page.getByRole('button', { name: 'Diagnostics', exact: true }).click();
   assert.equal(

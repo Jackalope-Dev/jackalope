@@ -164,6 +164,22 @@ export function ProjectPreferences({
                   }
                 />
               </FormField>
+              <FormField
+                label="Copy ignored setup files"
+                description="One relative file per line. Only these Git-ignored files are copied into new worktrees before preparation; existing files are never overwritten. Keep credentials out of saved prompts and commands."
+              >
+                <Textarea
+                  aria-label="Copy ignored setup files"
+                  rows={3}
+                  placeholder=".env.local"
+                  value={(project.preferences?.setupFiles ?? []).join('\n')}
+                  onChange={(event) =>
+                    updateProjectPreferences(project.id, {
+                      setupFiles: event.target.value.split('\n'),
+                    })
+                  }
+                />
+              </FormField>
             </div>
           </section>
           <section className="project-preferences-section">

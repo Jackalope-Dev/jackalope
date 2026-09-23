@@ -55,19 +55,19 @@ export function parseNotes(text, expectedVersion, publish = false) {
 export async function readNotes(v, publish = false) {
   return parseNotes(await readFile(resolve(root, `releases/${version(v)}.md`), 'utf8'), v, publish);
 }
-export async function assertVersions(v) {
+export async function assertVersions(v, directory = root) {
   version(v);
   for (const path of [
     'package.json',
     'apps/desktop/package.json',
     'apps/desktop/src-tauri/tauri.conf.json',
   ]) {
-    if (JSON.parse(await readFile(resolve(root, path), 'utf8')).version !== v)
+    if (JSON.parse(await readFile(resolve(directory, path), 'utf8')).version !== v)
       throw new Error(`Version mismatch in ${path}`);
   }
-  const cargo = await readFile(resolve(root, 'apps/desktop/src-tauri/Cargo.toml'), 'utf8');
+  const cargo = await readFile(resolve(directory, 'apps/desktop/src-tauri/Cargo.toml'), 'utf8');
   const lock = (
-    await readFile(resolve(root, 'apps/desktop/src-tauri/Cargo.lock'), 'utf8')
+    await readFile(resolve(directory, 'apps/desktop/src-tauri/Cargo.lock'), 'utf8')
   ).replaceAll('\r\n', '\n');
   if (
     !cargo.includes(`version = "${v}"`) ||
@@ -75,10 +75,10 @@ export async function assertVersions(v) {
   )
     throw new Error('Native package/lock version mismatch');
 }
-export async function prepare(v) {
+export async function prepare(v, directory = root) {
   version(v);
-  const notesPath = resolve(root, `releases/${v}.md`);
-  await mkdir(resolve(root, 'releases'), { recursive: true });
+  const notesPath = resolve(directory, `releases/${v}.md`);
+  await mkdir(resolve(directory, 'releases'), { recursive: true });
   await writeFile(
     notesPath,
     `# Jackalope ${v}\n\nStatus: draft\nDate: ${new Date().toISOString().slice(0, 10)}\n\n## Highlights\n\n- TODO: describe the improvement for users.\n\n## Improvements\n\n- TODO\n\n## Fixes\n\n- TODO\n\n## Known issues\n\n- TODO\n`,
@@ -89,17 +89,17 @@ export async function prepare(v) {
     'apps/desktop/package.json',
     'apps/desktop/src-tauri/tauri.conf.json',
   ]) {
-    const full = resolve(root, path);
+    const full = resolve(directory, path);
     const data = JSON.parse(await readFile(full, 'utf8'));
     data.version = v;
     await writeFile(full, `${JSON.stringify(data, null, 2)}\n`);
   }
-  const cargoPath = resolve(root, 'apps/desktop/src-tauri/Cargo.toml');
+  const cargoPath = resolve(directory, 'apps/desktop/src-tauri/Cargo.toml');
   await writeFile(
     cargoPath,
     (await readFile(cargoPath, 'utf8')).replace(/^(version = ")[^"]+("\r?$)/m, `$1${v}$2`),
   );
-  const lockPath = resolve(root, 'apps/desktop/src-tauri/Cargo.lock');
+  const lockPath = resolve(directory, 'apps/desktop/src-tauri/Cargo.lock');
   await writeFile(
     lockPath,
     (await readFile(lockPath, 'utf8')).replace(

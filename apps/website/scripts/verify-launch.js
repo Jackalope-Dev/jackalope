@@ -66,14 +66,21 @@ async function _verifyLaunch(page) {
         graph['@graph'].some((entry) => entry['@type'] === 'VideoObject'),
         'Video metadata',
       );
-      assert((await page.locator('video[controls]').count()) === 1, 'Visible tour video');
+      assert((await page.locator('video[controls]').count()) === 0, 'Tour waits for playback');
+      await page
+        .getByRole('button', { name: 'Play the 64-second product tour', exact: true })
+        .click();
+      await page.locator('video[controls]').waitFor({ state: 'visible' });
     }
     for (const width of [1280, 960, 390, 320]) {
       await page.setViewportSize({ width, height: 840 });
-      assert(
-        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-        `Overflow: ${path}, ${width}`,
-      );
+      await page
+        .waitForFunction(() => document.documentElement.scrollWidth <= innerWidth, null, {
+          timeout: 5000,
+        })
+        .catch(() => {
+          throw new Error(`Overflow: ${path}, ${width}`);
+        });
     }
   }
   await page.goto(`${origin}/`);

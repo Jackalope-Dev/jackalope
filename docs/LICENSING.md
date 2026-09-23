@@ -33,6 +33,9 @@ and is not a list of everything shipped in every installer.
   `apps/desktop/src-tauri/resources/agent-browser`. Preserve those accompanying files.
 - Agent CLIs, models and connected services have their own licenses, subscriptions
   and terms. Jackalope does not include provider access or sublicense their services.
+- Optional private OpenCode downloads retain the upstream MIT notice in
+  `commands/managed_runtime/LICENSE` and alongside the installed runner. Preserve
+  that notice and review upstream distribution notices when changing the pinned version.
 
 The website's `public/licenses/dependencies.txt` contains its production dependency
 notices. Both apps include Jackalope's license in `public/licenses/jackalope.txt`.

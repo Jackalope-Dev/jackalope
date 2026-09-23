@@ -31,7 +31,7 @@ const EDGES: { direction: ResizeDirection; className: string }[] = [
 ];
 
 export function ResizeHandles() {
-  if (!isTauriEnvironment()) return null;
+  if (!isTauriEnvironment() || /Mac/.test(navigator.platform)) return null;
 
   const startResize = async (direction: ResizeDirection) => {
     const { getCurrentWindow } = await import('@tauri-apps/api/window');

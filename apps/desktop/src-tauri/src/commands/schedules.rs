@@ -186,7 +186,9 @@ impl Scheduler {
             return Ok(());
         }
         for index in 0..ledger.schedules.len() {
-            let saved = &ledger.schedules[index];
+            let Some(saved) = ledger.schedules.get(index) else {
+                continue;
+            };
             if !saved.definition.enabled || saved.next_at > now {
                 continue;
             }
@@ -251,9 +253,49 @@ impl Scheduler {
                                 .unwrap_or_default(),
                         })
                 });
+            let mut filtered = false;
+            if let Some(change) = change
+                .as_ref()
+                .filter(|_| !quiet && !(late && saved.definition.missed == "skip"))
+            {
+                let request = saved.definition.request.clone();
+                let identity =
+                    serde_json::to_value(&saved.definition).map_err(|e| e.to_string())?;
+                let due = saved.next_at;
+                let monitor = saved.definition.monitor.clone();
+                drop(ledger);
+                filtered = super::decisions::assistance::monitor(
+                    &self.coordinator.runtime,
+                    &request,
+                    change,
+                    || !self.alive.load(Ordering::SeqCst),
+                )
+                .unwrap_or(false);
+                ledger = self.ledger.lock().map_err(|e| e.to_string())?;
+                let Some(current) = ledger.schedules.get(index) else {
+                    continue;
+                };
+                if !self.alive.load(Ordering::SeqCst)
+                    || current.next_at != due
+                    || serde_json::to_value(&current.definition).map_err(|e| e.to_string())?
+                        != identity
+                {
+                    continue;
+                }
+                if filtered {
+                    filtered = monitor.is_some_and(|monitor| {
+                        monitor
+                            .observe(&request.project_path, &change.branch)
+                            .is_ok_and(|after| after == change.after)
+                    });
+                }
+            }
+            let Some(saved) = ledger.schedules.get(index) else {
+                continue;
+            };
             if let Some(result) = observation
                 .as_ref()
-                .filter(|r| r.is_err() || quiet || monitor_only)
+                .filter(|r| r.is_err() || quiet || monitor_only || filtered)
             {
                 let mut updated = ledger.clone();
                 let current = &mut updated.schedules[index];
@@ -263,10 +305,12 @@ impl Scheduler {
                         current.local_checks += 1;
                         let first = current.observed_revision.is_none();
                         current.observed_revision = Some(revision.clone());
-                        if quiet {
+                        if quiet || filtered {
                             current.quiet_checks += 1;
                         }
-                        if first {
+                        if filtered {
+                            "Unrelated change · Jev assessment; no agent used".into()
+                        } else if first {
                             "Baseline recorded · no agent used".into()
                         } else if quiet {
                             "Unchanged · no agent used".into()

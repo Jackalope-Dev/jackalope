@@ -1,6 +1,8 @@
 import { applyThemeTokens, startThemeClock } from '@jackalope/brand/theme';
 import { MotionConfig } from 'motion/react';
 import { useEffect } from 'react';
+import { observeUiTelemetry } from '../../lib/observe-telemetry';
+import { observeCommunity } from '../../stores/communityStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -13,6 +15,8 @@ import '../ui/experience.css';
 export default function LiveSessionWindow({ id }: { id: string }) {
   useSettingsStore();
   useEffect(startThemeClock, []);
+  useEffect(observeCommunity, []);
+  useEffect(observeUiTelemetry, []);
   useEffect(() => observeLiveSessions(id), [id]);
   const { sessions, runs, loading } = useLiveSessionStore();
   const session = sessions.find((s) => s.id === id);

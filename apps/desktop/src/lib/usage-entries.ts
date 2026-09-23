@@ -17,7 +17,10 @@ export function usageEntries(runs: TaskRun[]) {
       usageObservations: [],
       effort: undefined,
       reasoningEffort: undefined,
+      codexSpeed: undefined,
+      requestedServiceTier: undefined,
       efficiency: undefined,
+      mcpUsage: undefined,
 
       startedAt: handoff.recordedAt,
       status: 'failed' as const,
@@ -53,7 +56,10 @@ export function usageEntries(runs: TaskRun[]) {
       usageObservations: [],
       effort: undefined,
       reasoningEffort: undefined,
+      codexSpeed: undefined,
+      requestedServiceTier: undefined,
       efficiency: undefined,
+      mcpUsage: undefined,
 
       startedAt: attempt.recordedAt,
       status: attempt.error ? ('failed' as const) : run.status,

@@ -3,25 +3,73 @@ import { Textarea } from '@jackalope/ui';
 import { FolderOpen } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
-import { sessionCommand } from '../../lib/live-session';
+import type { ContextSelection } from '../../lib/knowledge';
+import { type SessionLimits as Limits, sessionCommand } from '../../lib/live-session';
 import type { RunRequest } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { agentAccountFor, type Project } from '../../stores/projectStore';
+import { TaskKnowledge } from '../knowledge/TaskKnowledge';
+import { CodexSpeedSelect } from '../tasks/CodexSpeedSelect';
+import { DictationButton } from '../tasks/DictationButton';
+import { PromptPresets } from '../tasks/PromptPresets';
+import { TaskAssessmentNotice, useTaskAssessment } from '../tasks/useTaskAssessment';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
+import { ChatOptions } from './ChatOptions';
+import { SessionLimits } from './SessionLimits';
+import { WorkflowStarter } from './WorkflowStarter';
 
 export function SessionStart({
   project,
   onOpenProject,
+  embedded = false,
 }: {
   project?: Project;
   onOpenProject: () => void;
+  embedded?: boolean;
 }) {
   const draftKey = `jackalope-live-start:${project?.id ?? 'none'}`;
+  const assessment = useTaskAssessment();
   const [text, setText] = useState(() => localStorage.getItem(draftKey) ?? '');
+  const [context, setContext] = useState<ContextSelection>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(`${draftKey}:context`) ?? '{}');
+      return {
+        memoryOff: saved?.memoryOff === true,
+        excludedMemoryIds: Array.isArray(saved?.excludedMemoryIds)
+          ? saved.excludedMemoryIds.filter((id: unknown) => typeof id === 'string')
+          : [],
+      };
+    } catch {
+      return {};
+    }
+  });
+  const [codexSpeed, setCodexSpeed] = useState<RunRequest['codexSpeed']>(() => {
+    const saved = localStorage.getItem(`${draftKey}:codex-speed`);
+    return saved === 'fast' || saved === 'standard' ? saved : undefined;
+  });
   const [busy, setBusy] = useState(false);
+  const [limits, setLimits] = useState<Limits>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(`${draftKey}:limits`) ?? '{}');
+      return {
+        maxBatches:
+          Number.isInteger(saved?.maxBatches) && saved.maxBatches > 0 && saved.maxBatches <= 1000
+            ? saved.maxBatches
+            : null,
+        pauseAtEstimatedUsd:
+          typeof saved?.pauseAtEstimatedUsd === 'number' &&
+          saved.pauseAtEstimatedUsd > 0 &&
+          saved.pauseAtEstimatedUsd <= 100000
+            ? saved.pauseAtEstimatedUsd
+            : null,
+      };
+    } catch {
+      return { maxBatches: null, pauseAtEstimatedUsd: null };
+    }
+  });
   const [error, setError] = useState('');
   const [isFocused, setIsFocused] = useState(true);
   const markRef = useRef<HTMLDivElement>(null);
@@ -43,13 +91,23 @@ export function SessionStart({
     try {
       if (text) localStorage.setItem(draftKey, text);
       else localStorage.removeItem(draftKey);
+      localStorage.setItem(`${draftKey}:context`, JSON.stringify(context));
+      localStorage.setItem(`${draftKey}:limits`, JSON.stringify(limits));
+      if (codexSpeed) localStorage.setItem(`${draftKey}:codex-speed`, codexSpeed);
+      else localStorage.removeItem(`${draftKey}:codex-speed`);
     } catch {
       setError('This draft could not be saved. Keep this page open until sending succeeds.');
     }
-  }, [draftKey, text]);
-  const send = async () => {
+  }, [draftKey, text, context, limits, codexSpeed]);
+  const send = async (choice: 'assess' | 'single' | 'plan' = 'assess') => {
     const value = text.trim();
     if (!project || !value || sending.current) return;
+    if (new TextEncoder().encode(value).length > 12000) {
+      setError(
+        'This request is too long. Shorten it to 12,000 UTF-8 bytes before sending. Your draft is preserved.',
+      );
+      return;
+    }
     if (!pending.current || pending.current.text !== value)
       pending.current = { id: crypto.randomUUID(), messageId: crypto.randomUUID(), text: value };
     const attempt = pending.current;
@@ -65,23 +123,38 @@ export function SessionStart({
         projectName: project.name,
         projectPath: project.path,
         agent,
+        codexSpeed,
         agentProfileId: agentAccountFor(project, agent),
         prompt: value,
         isolated: true,
         targetBranch: project.preferences?.baseBranch || project.gitBranch,
         verifyCommand: project.preferences?.verifyCommand,
         prepareCommand: project.preferences?.prepareCommand,
+        setupFiles: project.preferences?.setupFiles,
         autoVerify: project.preferences?.autoVerify ?? true,
+        contextSelection: context,
       };
+      if (choice === 'assess' && !limits.maxBatches && !limits.pauseAtEstimatedUsd) {
+        const result = await assessment.assess(request, value);
+        if (result.strategy !== 'single') return;
+      }
+      if (choice === 'plan') {
+        await assessment.create(request, value);
+        localStorage.removeItem(draftKey);
+        localStorage.removeItem(`${draftKey}:context`);
+        return;
+      }
       await sessionCommand('create', {
         id: attempt.id,
         request,
         firstMessage: { id: attempt.messageId, text: value },
+        limits,
       });
       await useLiveSessionStore.getState().refresh(attempt.id);
       const next = latest.current.trim() === value ? '' : latest.current;
       if (next) localStorage.setItem(`jackalope-live-draft:main:${attempt.id}`, next);
       localStorage.removeItem(draftKey);
+      localStorage.removeItem(`${draftKey}:context`);
       if (mounted.current) useLiveSessionStore.getState().select(attempt.id);
     } catch (cause) {
       if (mounted.current) setError(String(cause));
@@ -91,12 +164,19 @@ export function SessionStart({
     }
   };
   return (
-    <div className="live-start">
-      <div className="live-start-mark" aria-hidden="true" ref={markRef}>
-        <AgentCharacter provider={project?.preferences?.preferredRunner || 'auto'} gaze={gaze} />
-      </div>
-      <span className="live-start-label">New chat</span>
-      <h2>{project?.name ?? 'Choose a project'}</h2>
+    <div className={`live-start${embedded ? ' live-start-embedded' : ''}`}>
+      {!embedded && (
+        <>
+          <div className="live-start-mark" aria-hidden="true" ref={markRef}>
+            <AgentCharacter
+              provider={project?.preferences?.preferredRunner || 'auto'}
+              gaze={gaze}
+            />
+          </div>
+          <span className="live-start-label">New work</span>
+          <h2>{project?.name ?? 'Choose a project'}</h2>
+        </>
+      )}
       {project ? (
         <form
           className="live-start-composer"
@@ -105,14 +185,86 @@ export function SessionStart({
             void send();
           }}
         >
+          <div className="live-start-toolbar">
+            <ChatOptions
+              onClose={() => input.current?.focus()}
+              items={[
+                {
+                  id: 'speed',
+                  label: 'Codex speed',
+                  content: () => (
+                    <CodexSpeedSelect
+                      disabled={busy}
+                      value={codexSpeed}
+                      onChange={(value) => {
+                        assessment.clear();
+                        pending.current = null;
+                        setCodexSpeed(value);
+                      }}
+                    />
+                  ),
+                },
+                {
+                  id: 'limits',
+                  label: 'Session limits',
+                  content: () => (
+                    <SessionLimits
+                      embedded
+                      initial={limits}
+                      onSave={(next) => {
+                        assessment.clear();
+                        setLimits(next);
+                      }}
+                    />
+                  ),
+                },
+                {
+                  id: 'workflow',
+                  label: 'Start from a repeatable workflow',
+                  content: (close) => (
+                    <WorkflowStarter
+                      embedded
+                      projectPath={project.path}
+                      onDraft={(prompt) => {
+                        assessment.clear();
+                        setText((current) => (current.trim() ? `${current}\n\n${prompt}` : prompt));
+                        close();
+                      }}
+                    />
+                  ),
+                },
+                {
+                  id: 'context',
+                  label: 'Saved project context',
+                  content: () => (
+                    <TaskKnowledge
+                      embedded
+                      projectId={project.id}
+                      projectPath={project.path}
+                      prompt={text}
+                      selection={context}
+                      onChange={(next) => {
+                        assessment.clear();
+                        setContext(next);
+                      }}
+                      allowWorkflows={false}
+                    />
+                  ),
+                },
+              ]}
+            />
+          </div>
           <Textarea
             ref={input}
             aria-label="Message"
             placeholder="Build, fix, or explore…"
-            rows={4}
+            rows={3}
             maxLength={12000}
             value={text}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => {
+              assessment.clear();
+              setText(event.target.value);
+            }}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             onKeyDown={(event) => {
@@ -123,7 +275,30 @@ export function SessionStart({
             }}
           />
           {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <TaskAssessmentNotice
+            assessment={assessment.assessment}
+            busy={assessment.busy}
+            onCancel={() => void assessment.cancel()}
+            onSingle={() => void send('single')}
+            onPlan={() => void send('plan')}
+          />
           <div className="live-start-actions">
+            <PromptPresets
+              projectId={project.id}
+              onInsert={(prompt) => {
+                assessment.clear();
+                setText((current) => (current.trim() ? `${current}\n\n${prompt}` : prompt));
+                input.current?.focus();
+              }}
+            />
+            <DictationButton
+              disabled={busy}
+              onText={(value) => {
+                assessment.clear();
+                setText((current) => (current.trim() ? `${current}\n${value}` : value));
+                input.current?.focus();
+              }}
+            />
             <Button
               type="submit"
               disabled={!text.trim() || busy || !isTauriEnvironment()}

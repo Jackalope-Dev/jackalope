@@ -50,7 +50,6 @@ impl BrowserProcess {
         }
         command
             .args([
-                "--headless=new",
                 "--remote-debugging-port=0",
                 "--remote-debugging-address=127.0.0.1",
                 "--no-first-run",
@@ -69,6 +68,9 @@ impl BrowserProcess {
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .process_group(0);
+        if !slot.headed {
+            command.arg("--headless=new");
+        }
         let mut child = command
             .spawn()
             .map_err(|e| format!("Could not start Chromium: {e}"))?;

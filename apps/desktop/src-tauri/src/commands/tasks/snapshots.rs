@@ -10,7 +10,47 @@ pub struct TaskChanges {
     ids: Vec<String>,
 }
 
+/// A run reduced to just enough to list and open it again, for surfaces
+/// outside the frontend (tray menu, dock) that don't need the full record.
+pub struct TaskHighlight {
+    pub id: String,
+    pub label: String,
+}
+
+fn tray_label(run: &TaskRun) -> String {
+    let prompt = run.prompt.trim();
+    let source = if prompt.is_empty() {
+        run.project_name.as_str()
+    } else {
+        prompt
+    };
+    let mut label: String = source.chars().take(60).collect();
+    if label.chars().count() < source.chars().count() {
+        label.push('…');
+    }
+    label
+}
+
 impl TaskRuntime {
+    /// Recent runs and the count awaiting review, for the tray menu and dock
+    /// badge — surfaces that live outside the frontend and need their own
+    /// lightweight read of the same state.
+    pub fn tray_summary(&self, recent_limit: usize) -> (Vec<TaskHighlight>, usize) {
+        let inner = self.inner.lock().unwrap();
+        let mut runs: Vec<&TaskRun> = inner.runs.values().collect();
+        runs.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        let awaiting_review = runs.iter().filter(|run| run.status == "review").count();
+        let recent = runs
+            .into_iter()
+            .take(recent_limit)
+            .map(|run| TaskHighlight {
+                id: run.id.clone(),
+                label: tray_label(run),
+            })
+            .collect();
+        (recent, awaiting_review)
+    }
+
     pub(in crate::commands) fn live_session_runs(
         &self,
         detail: Option<&str>,
@@ -30,7 +70,7 @@ impl TaskRuntime {
             .collect())
     }
 
-    pub(super) fn snapshot(&self, detail: Option<&str>) -> Vec<TaskRun> {
+    pub(in crate::commands) fn snapshot(&self, detail: Option<&str>) -> Vec<TaskRun> {
         let inner = self.inner.lock().unwrap();
         let mut runs: Vec<_> = inner
             .runs

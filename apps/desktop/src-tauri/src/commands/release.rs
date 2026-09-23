@@ -7,6 +7,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, State};
 use tauri_plugin_updater::UpdaterExt;
 
+#[cfg(all(windows, feature = "store"))]
+mod store;
+
 static INSTALLING: AtomicBool = AtomicBool::new(false);
 pub fn installing() -> bool {
     INSTALLING.load(Ordering::SeqCst)
@@ -26,27 +29,35 @@ pub struct ReleaseStatus {
     beta_available: bool,
     configured: bool,
     store_managed: bool,
+    store_update_available: bool,
     available_version: Option<String>,
     notes: Option<String>,
 }
 
-fn configured(app: &AppHandle) -> bool {
-    if cfg!(feature = "store") {
-        return false;
+fn configured(_app: &AppHandle) -> bool {
+    #[cfg(all(windows, feature = "store"))]
+    {
+        return store::configured();
     }
-    let config = app.config();
-    let Some(updater) = config.plugins.0.get("updater") else {
-        return false;
-    };
-    updater["pubkey"]
-        .as_str()
-        .is_some_and(|key| !key.trim().is_empty())
-        && updater["endpoints"].as_array().is_some_and(|urls| {
-            !urls.is_empty()
-                && urls
-                    .iter()
-                    .all(|url| url.as_str().is_some_and(|url| url.starts_with("https://")))
-        })
+    #[cfg(not(all(windows, feature = "store")))]
+    {
+        if cfg!(feature = "store") {
+            return false;
+        }
+        let config = _app.config();
+        let Some(updater) = config.plugins.0.get("updater") else {
+            return false;
+        };
+        updater["pubkey"]
+            .as_str()
+            .is_some_and(|key| !key.trim().is_empty())
+            && updater["endpoints"].as_array().is_some_and(|urls| {
+                !urls.is_empty()
+                    && urls
+                        .iter()
+                        .all(|url| url.as_str().is_some_and(|url| url.starts_with("https://")))
+            })
+    }
 }
 
 fn channel_endpoint(app: &AppHandle, channel: ReleaseChannel) -> Option<reqwest::Url> {
@@ -93,14 +104,23 @@ pub async fn app_release_status(
     };
     let mut status = ReleaseStatus {
         channel,
-        beta_available: channel_endpoint(&app, ReleaseChannel::Beta).is_some()
+        beta_available: !cfg!(feature = "store")
+            && channel_endpoint(&app, ReleaseChannel::Beta).is_some()
             && channel_endpoint(&app, ReleaseChannel::Stable).is_some(),
         current_version: env!("CARGO_PKG_VERSION").into(),
         configured: configured(&app),
         store_managed: cfg!(feature = "store"),
+        store_update_available: false,
         available_version: None,
         notes: None,
     };
+    #[cfg(all(windows, feature = "store"))]
+    if status.configured {
+        if check {
+            status.store_update_available = store::available(&app).await?;
+        }
+        return Ok(status);
+    }
     if check && status.configured {
         let updater = updater(&app, channel, 30)?;
         if let Some(update) = updater.check().await.map_err(|_| {
@@ -137,12 +157,15 @@ pub async fn app_install_update(
         let _guard = super::integration::execution_guard()?;
         super::verification::ensure_all_idle()?;
         runtime.ensure_history_saved()?;
-        if state
-            .preferences()?
-            .channel
-            .unwrap_or_else(|| community::build_channel(&app))
-            != channel
-        {
+        let selected_channel = if cfg!(feature = "store") {
+            community::build_channel(&app)
+        } else {
+            state
+                .preferences()?
+                .channel
+                .unwrap_or_else(|| community::build_channel(&app))
+        };
+        if selected_channel != channel {
             return Err("The update channel changed. Check again before installing.".into());
         }
         if installing() {
@@ -159,20 +182,29 @@ pub async fn app_install_update(
         INSTALLING.store(true, Ordering::SeqCst);
     }
     let _install = InstallGuard;
-    let updater = updater(&app, channel, 60)?;
-    let update = updater
-        .check()
-        .await
-        .map_err(|e| e.to_string())?
-        .ok_or("The selected update is no longer available. Check again.")?;
-    if update.version != version {
-        return Err(
-            "The available version changed. Review the new update before installing.".into(),
-        );
+    #[cfg(all(windows, feature = "store"))]
+    {
+        if version != "store" {
+            return Err("Check Microsoft Store for updates before installing.".into());
+        }
+        return store::install(&app, progress).await;
     }
-    let mut downloaded = 0u64;
-    let mut last_progress = std::time::Instant::now();
-    update.download_and_install(|chunk, total| {
+    #[cfg(not(all(windows, feature = "store")))]
+    {
+        let updater = updater(&app, channel, 60)?;
+        let update = updater
+            .check()
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or("The selected update is no longer available. Check again.")?;
+        if update.version != version {
+            return Err(
+                "The available version changed. Review the new update before installing.".into(),
+            );
+        }
+        let mut downloaded = 0u64;
+        let mut last_progress = std::time::Instant::now();
+        update.download_and_install(|chunk, total| {
         downloaded = downloaded.saturating_add(chunk as u64);
         if last_progress.elapsed() >= std::time::Duration::from_millis(100) || total == Some(downloaded) {
             let _ = progress.send(UpdateProgress { phase: "downloading", downloaded, total });
@@ -181,7 +213,8 @@ pub async fn app_install_update(
     }, || {
         let _ = progress.send(UpdateProgress { phase: "installing", downloaded: 0, total: None });
     }).await.map_err(|_| "Update could not be completed. Reopen Jackalope and check the installed version before retrying.".to_string())?;
-    app.restart();
+        app.restart();
+    }
 }
 
 #[tauri::command]

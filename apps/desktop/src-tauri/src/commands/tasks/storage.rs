@@ -36,6 +36,7 @@ impl TaskRuntime {
             inner: Arc::new(Mutex::new(Inner::default())),
             directory,
             writer,
+            warm_helpers: Default::default(),
             _owner: owner,
         };
         let paths: Vec<_> = std::fs::read_dir(&runtime.directory)
@@ -388,7 +389,7 @@ impl TaskRuntime {
             let run = inner.runs.get_mut(id).ok_or("Attempt not found")?;
             update(run);
             Self::bound_output(run);
-            self.writer.submit(run.clone(), false)?
+            self.writer.submit_output(run)?
         };
         let result = journal::Writer::wait(receive);
         let mut inner = self.inner.lock().unwrap();

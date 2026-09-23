@@ -8,6 +8,7 @@ export interface ReleaseStatus {
   betaAvailable: boolean;
   configured: boolean;
   storeManaged?: boolean;
+  storeUpdateAvailable?: boolean;
   availableVersion: string | null;
   notes: string | null;
 }
@@ -36,6 +37,7 @@ interface UpdateState {
   installing: boolean;
   progress: UpdateProgress | null;
   error: string | null;
+  installed: boolean;
   lastAttempt: number | null;
   lastChecked: number | null;
   dismissedVersion: string | null;
@@ -45,6 +47,14 @@ interface UpdateState {
   check: (automatic?: boolean) => Promise<void>;
   install: () => Promise<void>;
 }
+export function availableUpdateId(release: ReleaseStatus | null): string | null {
+  return release?.storeManaged
+    ? release.storeUpdateAvailable
+      ? 'store'
+      : null
+    : (release?.availableVersion ?? null);
+}
+
 export const UPDATE_INTERVAL = 6 * 60 * 60 * 1000;
 interface PreferenceStorage {
   getItem: (key: string) => string | null;
@@ -65,6 +75,7 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
     changingChannel: false,
     setChannel: async (channel) => {
       if (
+        get().release?.storeManaged ||
         !bridge.setChannel ||
         get().checking ||
         get().installing ||
@@ -87,6 +98,7 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
     installing: false,
     progress: null,
     error: null,
+    installed: false,
     lastAttempt: null,
     lastChecked: null,
     dismissedVersion: null,
@@ -98,7 +110,7 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
         set({ error: 'This preference could not be saved. It applies until Jackalope closes.' });
       }
     },
-    dismiss: () => set({ dismissedVersion: get().release?.availableVersion ?? null }),
+    dismiss: () => set({ dismissedVersion: availableUpdateId(get().release) }),
     load: async () => {
       if (!bridge.desktop() || get().release) return;
       if (loading) return loading;
@@ -117,6 +129,7 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
     },
     check: async (automatic = false) => {
       const state = get();
+      if (state.installed) return;
       if (!bridge.desktop() || state.checking || state.installing || state.changingChannel) return;
       if (
         automatic &&
@@ -138,15 +151,18 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
     },
     install: async () => {
       const state = get();
-      const version = state.release?.availableVersion;
+      const version = availableUpdateId(state.release);
       if (!version || state.checking || state.installing || state.changingChannel) return;
-      set({ installing: true, error: null, progress: null });
+      set({ installing: true, error: null, progress: null, installed: false });
       try {
         await bridge.install(
           version,
           (progress) => set({ progress }),
           state.release?.channel ?? 'stable',
         );
+        if (state.release?.storeManaged) {
+          set({ installed: true, release: { ...state.release, storeUpdateAvailable: false } });
+        }
       } catch (error) {
         set({ error: String(error) });
       } finally {

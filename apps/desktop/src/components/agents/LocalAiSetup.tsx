@@ -1,4 +1,4 @@
-import { IconButton, RefreshIcon } from '@jackalope/ui';
+import { FormField, IconButton, RefreshIcon, Select, SelectItem } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   ArrowLeft,
@@ -26,8 +26,10 @@ import {
   type LocalModel,
   type LocalProgress,
   type LocalVerification,
+  localHelperModels,
   modelFit,
 } from '../../lib/local-ai';
+import { useManagedRuntime } from '../../lib/managed-runtime';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
@@ -115,13 +117,18 @@ export function LocalAiSteps({
   projectSetup?: boolean;
 }) {
   const [inspection, setInspection] = useState<LocalInspection | null>(preview ?? null);
+  const runner = useManagedRuntime();
   const [step, setStep] = useState(0);
   const [selected, setSelected] = useState('qwen3.5:4b');
+  const [helperModel, setHelperModel] = useState('');
   const [busy, setBusy] = useState('');
   const [activity, setActivity] = useState<SetupActivity>('inspect');
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState<LocalProgress | null>(null);
+  useEffect(() => {
+    if (runner.preparing) setProgress(runner.progress);
+  }, [runner.preparing, runner.progress]);
   const [verification, setVerification] = useState<LocalVerification | null>(null);
   const [connected, setConnected] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -205,13 +212,17 @@ export function LocalAiSteps({
       tool,
       `Preparing ${tool === 'ollama' ? 'Ollama' : 'OpenCode'} installation…`,
       async () => {
-        await withProgress('local_ai_install', { tool });
+        if (tool === 'opencode') await runner.prepare(false);
+        else await withProgress('local_ai_install', { tool });
         await inspect();
       },
     );
   const connect = () =>
     void perform('connect', 'Connecting your local agent…', async () => {
-      const profile = await nativeTask<{ id: string }>('local_ai_connect', { modelId: selected });
+      const profile = await nativeTask<{ id: string }>('local_ai_connect', {
+        modelId: selected,
+        helperModelId: helperModel || null,
+      });
       const config = useAgentConfigStore.getState();
       const options = config.runnerOptions.opencode ?? {
         models: [],
@@ -254,7 +265,8 @@ export function LocalAiSteps({
             : async () => {
                 setStopping(true);
                 try {
-                  await nativeTask('local_ai_cancel');
+                  if (runner.preparing) await runner.cancel();
+                  else await nativeTask('local_ai_cancel');
                 } catch (cause) {
                   setError(String(cause));
                   setStopping(false);
@@ -356,6 +368,7 @@ export function LocalAiSteps({
                   selected={selected === item.id}
                   onSelect={() => {
                     setSelected(item.id);
+                    setHelperModel('');
                     setVerification(null);
                   }}
                 />
@@ -402,18 +415,18 @@ export function LocalAiSteps({
               </InstallRow>
               <InstallRow
                 title="OpenCode"
-                detail="Connects the model to file edits and agent tools · installer size varies"
+                detail="Connects the model to agent tools · private runner, up to 65 MB to download"
                 done={inspection.opencodeInstalled}
                 activity={status('opencode')}
                 pending={activity === 'opencode' && !!busy}
               >
-                {inspection.canInstall && (
+                {inspection.canPrepareRunner && (
                   <Button
                     variant="outline"
                     disabled={!desktop || !!busy}
                     onClick={() => install('opencode')}
                   >
-                    Install OpenCode
+                    Prepare runner
                   </Button>
                 )}
                 <Button
@@ -458,8 +471,8 @@ export function LocalAiSteps({
             )}
             {inspection.canInstall && (
               <p className="local-ai-caption">
-                Install buttons use Windows Package Manager and accept the selected package’s
-                installation agreements.
+                Installing Ollama uses Windows Package Manager and accepts its installation
+                agreements.
               </p>
             )}
             {inspection.hardware.freeDiskBytes !== null &&
@@ -488,6 +501,28 @@ export function LocalAiSteps({
         )}
         {step === 3 && !connected && (
           <>
+            {inspection && (
+              <FormField
+                label="Optional title model"
+                description="Use another installed local model for OpenCode's short background requests. Your coding model keeps its full context. Both models must pass the local check."
+              >
+                <Select
+                  value={helperModel || '__coding_model'}
+                  disabled={!!busy}
+                  onValueChange={(value) => {
+                    setHelperModel(value === '__coding_model' ? '' : value);
+                    setVerification(null);
+                  }}
+                >
+                  <SelectItem value="__coding_model">Use the coding model</SelectItem>
+                  {localHelperModels(inspection, selected).map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </FormField>
+            )}
             <p>
               We’ll ask the local agent to create a small test file and continue the same session in
               a disposable folder. Your projects are not used for this check.
@@ -514,7 +549,9 @@ export function LocalAiSteps({
                 disabled={!desktop || !!busy}
                 onClick={() =>
                   void perform('verify', 'Checking your local agent…', async () => {
-                    const result = await withProgress<LocalVerification>('local_ai_verify');
+                    const result = await withProgress<LocalVerification>('local_ai_verify', {
+                      helperModelId: helperModel || null,
+                    });
                     if (active.current) setVerification(result);
                   })
                 }

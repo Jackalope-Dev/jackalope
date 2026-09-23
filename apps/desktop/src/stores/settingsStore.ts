@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import type { BuiltinAgentId } from '../lib/agent-catalog';
+import { createPersistStorage } from '../lib/persist-storage.ts';
 
 export type DefaultRunnerId = BuiltinAgentId;
 export type NotificationLevel = 'all' | 'failures-only' | 'none';
@@ -9,8 +10,18 @@ export interface SettingsState {
   // Experience & appearance
   mascotReactions: boolean;
   showThemePickerInToolbar: boolean;
+  showTrialPassesInToolbar: boolean;
   notifications: NotificationLevel;
   osNotifications: boolean;
+  interfaceZoom: number;
+  terminalFontSize: number;
+  terminalShell: 'default' | 'powershell' | 'pwsh' | 'cmd' | 'wsl' | 'bash' | 'zsh';
+  preferredEditor: 'vscode' | 'cursor';
+  terminalLinks: boolean;
+  retainTerminalOutput: boolean;
+  shortcuts: Record<string, string>;
+  dictationEndpoint: string;
+  dictationModel: string;
 
   // Runners & execution
   defaultRunner: DefaultRunnerId;
@@ -49,8 +60,18 @@ export const DEFAULT_SETTINGS: Omit<
 > = {
   mascotReactions: true,
   showThemePickerInToolbar: true,
+  showTrialPassesInToolbar: true,
   notifications: 'all' as const,
   osNotifications: true,
+  interfaceZoom: 1,
+  terminalFontSize: 13,
+  terminalShell: 'default',
+  preferredEditor: 'vscode',
+  terminalLinks: true,
+  retainTerminalOutput: false,
+  shortcuts: {},
+  dictationEndpoint: '',
+  dictationModel: 'whisper-1',
 
   defaultRunner: 'codex' as const,
   concurrencyLimit: 2,
@@ -72,30 +93,6 @@ export const DEFAULT_SETTINGS: Omit<
     grok: '',
   },
 };
-
-const memoryStore: Record<string, string> = {};
-const safeStorage = createJSONStorage(() => ({
-  getItem: (name: string) => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      return window.localStorage.getItem(name);
-    }
-    return memoryStore[name] ?? null;
-  },
-  setItem: (name: string, value: string) => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(name, value);
-    } else {
-      memoryStore[name] = value;
-    }
-  },
-  removeItem: (name: string) => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.removeItem(name);
-    } else {
-      delete memoryStore[name];
-    }
-  },
-}));
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
@@ -122,7 +119,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'jackalope-settings',
-      storage: safeStorage,
+      storage: createPersistStorage(),
       merge: (saved, current) => {
         const values = saved && typeof saved === 'object' ? (saved as Record<string, unknown>) : {};
         return {

@@ -1,6 +1,11 @@
-import { Checkbox, Textarea } from '@jackalope/ui';
+import { Checkbox, FormField, Textarea } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-import { correctionPrompt, type Requirement, requirementState } from '../../lib/task-outcomes';
+import {
+  correctionPrompt,
+  type Requirement,
+  requirementAssessment,
+  requirementState,
+} from '../../lib/task-outcomes';
 import { nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
@@ -8,13 +13,18 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { ScreenshotPreview } from './ScreenshotPreview';
 
+type OutcomeRun = Pick<
+  TaskRun,
+  'id' | 'contract' | 'verification' | 'validationSteps' | 'screenshots'
+>;
+
 export function TaskOutcomes({
   run,
   canReview,
   onCorrect,
   onAdvance,
 }: {
-  run: TaskRun;
+  run: OutcomeRun;
   canReview: boolean;
   onCorrect: (prompt: string) => void;
   onAdvance: () => Promise<void>;
@@ -88,7 +98,7 @@ export function TaskOutcomes({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-medium">Expected outcomes & evidence</h2>
         {canReview && (
-          <Button variant="ghost" disabled={busy} onClick={() => void refreshTree()}>
+          <Button variant="outline" disabled={busy} onClick={() => void refreshTree()}>
             Refresh file snapshot
           </Button>
         )}
@@ -123,6 +133,7 @@ export function TaskOutcomes({
                 {item.title}
               </h3>
               <p className="task-muted">
+                Your review ·{' '}
                 {item.checkpoint && index < step && item.receipt?.accepted
                   ? 'Accepted before advancing · prior step snapshot'
                   : item.checkpoint && index > step
@@ -132,6 +143,7 @@ export function TaskOutcomes({
               {item.receipt && (
                 <p className="whitespace-pre-wrap break-words mt-2">{item.receipt.note}</p>
               )}
+              <RequirementAnswer run={run} requirementId={item.id} />
             </div>
             {canReview && (item.checkpoint ? index === step : finalStep) && (
               <Button
@@ -149,8 +161,7 @@ export function TaskOutcomes({
           </div>
           {editing === item.id && (
             <div className="space-y-3 pl-7">
-              <label className="block" htmlFor={`evidence-${item.id}`}>
-                Evidence
+              <FormField label="Evidence">
                 <Select id={`evidence-${item.id}`} value={evidence} onValueChange={setEvidence}>
                   <SelectItem value="manual">My inspection or interactive test</SelectItem>
                   {run.verification?.result.success && run.verification.tree === tree && (
@@ -169,7 +180,7 @@ export function TaskOutcomes({
                     </SelectItem>
                   ))}
                 </Select>
-              </label>
+              </FormField>
               {evidence.startsWith('screenshot:') &&
                 run.screenshots
                   ?.filter((s) => `screenshot:${s.id}` === evidence)
@@ -199,8 +210,7 @@ export function TaskOutcomes({
                   {run.verification.result.stdout} {run.verification.result.stderr}
                 </pre>
               )}
-              <label className="block" htmlFor={`note-${item.id}`}>
-                What did you verify, or what needs to change?
+              <FormField label="What did you verify, or what needs to change?">
                 <Textarea
                   id={`note-${item.id}`}
                   rows={3}
@@ -209,7 +219,7 @@ export function TaskOutcomes({
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                 />
-              </label>
+              </FormField>
               <div className="flex flex-wrap gap-2">
                 <Button
                   disabled={busy || !tree || !note.trim()}
@@ -224,7 +234,7 @@ export function TaskOutcomes({
                 >
                   Needs changes
                 </Button>
-                <Button variant="ghost" disabled={busy} onClick={() => setEditing(null)}>
+                <Button variant="outline" disabled={busy} onClick={() => setEditing(null)}>
                   Cancel
                 </Button>
               </div>
@@ -275,5 +285,33 @@ export function TaskOutcomes({
       )}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
     </section>
+  );
+}
+
+function RequirementAnswer({ run, requirementId }: { run: OutcomeRun; requirementId: string }) {
+  const report = requirementAssessment(run.validationSteps, requirementId);
+  if (!report)
+    return <p className="task-muted mt-2">No agent assessment recorded for this requirement.</p>;
+  return (
+    <div className="mt-3 space-y-2">
+      <p className="text-sm font-medium">
+        Agent assessment ·{' '}
+        {{ met: 'Met', partial: 'Partially met', unverified: 'Not verified' }[report.answer.status]}
+      </p>
+      <p className="whitespace-pre-wrap break-words">{report.answer.summary}</p>
+      {!!report.answer.evidence.length && (
+        <ul className="list-disc pl-5 text-sm">
+          {[...new Set(report.answer.evidence)].map((item) => (
+            <li key={item} className="break-words">
+              {item}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="task-muted">
+        Reported {new Date(report.timestamp).toLocaleString()}. Agent-supplied evidence; verify
+        against the current diff before accepting.
+      </p>
+    </div>
   );
 }

@@ -89,10 +89,13 @@ impl TaskRuntime {
         router: &Candidate,
         prompt: &str,
     ) -> Result<TaskRun, String> {
-        let directory =
+        let directory = if router.adapter == "opencode" {
+            self.directory.join("helper-workspace")
+        } else {
             self.directory
                 .join("routing")
-                .join(format!("{}-{}", req.id, uuid::Uuid::new_v4()));
+                .join(format!("{}-{}", req.id, uuid::Uuid::new_v4()))
+        };
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         let prompt_path = directory.join("request.txt");
         let (_, executable) = self.policy()?.resolve(&router.agent)?;
@@ -110,6 +113,14 @@ impl TaskRuntime {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        let warm_started = std::time::Instant::now();
+        let mut warm = if router.adapter == "opencode" {
+            self.warm_helpers
+                .attach(&mut cmd, &router.binding, || !self.is_running(&req.id))?
+        } else {
+            None
+        };
+        let warm_elapsed = warm_started.elapsed();
         let mut inner = self.inner.lock().unwrap();
         if inner.canceled.contains(&req.id) {
             return Err("Routing was stopped.".into());
@@ -138,6 +149,8 @@ impl TaskRuntime {
         inner.processes.insert(req.id.clone(), process.clone());
         drop(inner);
         self.update_checked(&req.id, |run| {
+            run.efficiency.timing("helperStartup", warm_elapsed);
+            run.efficiency.warm_provider_hits += u64::from(warm.as_ref().is_some_and(|lease| lease.reused));
             run.process_contained = cfg!(windows);
             activity(run, &format!("{} is choosing an agent, model and account using task context and available quota.", router.agent));
         })?;
@@ -180,11 +193,19 @@ impl TaskRuntime {
         let _ = process.lock().unwrap().wait();
         self.inner.lock().unwrap().processes.remove(&req.id);
         let written = writer.join().map_err(|_| "Routing input writer stopped")?;
-        let read = reader
+        let mut read = reader
             .join()
             .map_err(|_| "Routing output reader stopped")?
             .map_err(|e| e.to_string())?;
         let _ = diagnostics.join();
+        if let Some(lease) = &warm {
+            match lease.output(|| !self.is_running(&req.id)) {
+                Ok(text) => read.0 = text,
+                Err(error) => {
+                    failure.get_or_insert(error);
+                }
+            }
+        }
         if router.adapter == "grok" {
             let _ = std::fs::remove_file(prompt_path);
         }
@@ -228,6 +249,11 @@ impl TaskRuntime {
             && (!exit.is_some_and(|status| status.success()) || output.error.is_some())
         {
             return Err("The default agent could not complete routing. Check its account, model and quota, then retry. No worker was launched.".into());
+        }
+        if output.error.is_none() && output.quota_failure.is_none() {
+            if let Some(lease) = &mut warm {
+                lease.complete();
+            }
         }
         Ok(output)
     }

@@ -14,11 +14,15 @@ const MAX_TOTAL_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_REFERENCES: usize = 30_000;
 static SCANNING: AtomicBool = AtomicBool::new(false);
 
+mod analysis_cache;
+pub(crate) mod context_read;
 pub(crate) mod map;
+mod symbols;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CodebaseFile {
+    symbols: Vec<symbols::CodebaseSymbol>,
     path: String,
     language: String,
     bytes: u64,
@@ -26,7 +30,7 @@ pub struct CodebaseFile {
     analyzed: bool,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "camelCase")]
 pub struct CodebaseReference {
     source: String,
@@ -150,19 +154,36 @@ fn parse_bounded(parser: &mut Parser, text: &str, timeout: Duration) -> Option<T
     )
 }
 
+#[cfg(test)]
 fn extract(
     parser: &mut Parser,
     path: &str,
     text: &str,
     rust: bool,
 ) -> (Vec<CodebaseReference>, bool) {
+    let (references, _, errors) = analyze(parser, path, text, rust);
+    (references, errors)
+}
+
+fn analyze(
+    parser: &mut Parser,
+    path: &str,
+    text: &str,
+    rust: bool,
+) -> (Vec<CodebaseReference>, Vec<symbols::CodebaseSymbol>, bool) {
     let Some(tree) = parse_bounded(parser, text, Duration::from_millis(100)) else {
-        return (vec![], true);
+        return (vec![], vec![], true);
     };
     let mut refs = Vec::new();
+    let mut symbols = Vec::new();
     let mut cursor = tree.walk();
     loop {
         let node = cursor.node();
+        if symbols.len() < 64 {
+            if let Some(symbol) = symbols::declaration(node, text) {
+                symbols.push(symbol);
+            }
+        }
         let mut found = None;
         if !rust && matches!(node.kind(), "import_statement" | "export_statement") {
             if let Some(source) = node.child_by_field_name("source") {
@@ -277,11 +298,11 @@ fn extract(
                 break;
             }
             if !cursor.goto_parent() {
-                return (refs, tree.root_node().has_error());
+                return (refs, symbols, tree.root_node().has_error());
             }
         }
     }
-    (refs, tree.root_node().has_error())
+    (refs, symbols, tree.root_node().has_error())
 }
 
 fn rust_uses(node: Node<'_>, text: &str, prefix: &str, output: &mut Vec<String>) {
@@ -520,6 +541,7 @@ pub fn scan(root: &Path) -> Result<CodebaseSnapshot, String> {
             .ok_or("Unsupported repository path")?;
         match entry.metadata() {
             Ok(meta) => result.files.push(CodebaseFile {
+                symbols: vec![],
                 language: language(entry.path()).into(),
                 path,
                 bytes: meta.len(),
@@ -572,6 +594,7 @@ pub fn scan(root: &Path) -> Result<CodebaseSnapshot, String> {
         ..resolver_options
     });
     let mut total_bytes = 0;
+    let mut total_symbols = 0;
     for file in &mut result.files {
         let key = match file.language.as_str() {
             "TypeScript" if file.path.ends_with(".tsx") => "tsx",
@@ -600,7 +623,14 @@ pub fn scan(root: &Path) -> Result<CodebaseSnapshot, String> {
                 total_bytes += text.len() as u64;
                 file.lines = Some(text.lines().count());
                 let parser = parsers.get_mut(key).unwrap();
-                let (mut refs, errors) = extract(parser, &file.path, &text, key == "rs");
+                let (mut refs, mut symbols, errors) =
+                    analysis_cache::analyze(parser, &file.path, &text, key == "rs");
+                if total_symbols + symbols.len() > MAX_REFERENCES {
+                    symbols.truncate(MAX_REFERENCES - total_symbols);
+                    result.truncated = true;
+                }
+                total_symbols += symbols.len();
+                file.symbols = symbols;
                 file.analyzed = true;
                 if errors {
                     result.diagnostics.push(CodebaseDiagnostic {

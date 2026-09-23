@@ -10,8 +10,10 @@ type Comparison = {
 } & NonNullable<MarketingPage['comparison']>;
 
 const reviewed = '2026-09-09';
+const published = '2026-09-09';
 export const terminalComparison: NonNullable<MarketingPage['comparison']> = {
   name: 'Terminal tabs',
+  published: '2026-09-10',
   reviewed: '2026-09-10',
   overview: {
     jackalope: 'Tasks, context, and review together across sessions.',
@@ -49,6 +51,177 @@ export const terminalComparison: NonNullable<MarketingPage['comparison']> = {
 
 const comparisons: Comparison[] = [
   {
+    slug: 'codex-app',
+    name: 'Codex app',
+    published: '2026-09-17',
+    reviewed: '2026-09-17',
+    description:
+      'Jackalope vs Codex app: compare local worktrees, cloud execution, code review, and using Codex alongside other coding-agent CLIs.',
+    lede: 'Both support parallel work in Git worktrees and reviewing changes. Jackalope brings multiple supported agent CLIs into one local workflow; OpenAI’s Codex experience also offers cloud environments.',
+    signals: ['Git worktrees', 'Agent choice', 'Local or cloud', 'Code review'],
+    overview: {
+      jackalope: 'Coordinate supported agent CLIs, accounts, and combined local review.',
+      competitor: 'Work with Codex across local checkouts, worktrees, and cloud environments.',
+      shared: ['Parallel worktrees', 'Code review', 'Project setup'],
+    },
+    sources: [
+      {
+        label: 'OpenAI Codex environments',
+        href: 'https://learn.chatgpt.com/docs/environments/modes',
+      },
+      {
+        label: 'Codex worktrees',
+        href: 'https://learn.chatgpt.com/docs/environments/git-worktrees',
+      },
+      {
+        label: 'Codex local setup and Git tools',
+        href: 'https://learn.chatgpt.com/docs/environments/local-environment',
+      },
+    ],
+    rows: [
+      {
+        topic: 'Agent workflow',
+        jackalope: 'Codex, Claude Code, Gemini CLI, and other supported local adapters.',
+        competitor: 'The Codex experience documented in OpenAI’s desktop app.',
+      },
+      {
+        topic: 'Execution environment',
+        jackalope: 'Local execution; remote hosts remain future work.',
+        competitor: 'Local, Worktree, and configured Cloud modes.',
+      },
+      {
+        topic: 'Parallel changes',
+        jackalope: 'Separate worktrees with reviewed plans, dependencies, and combined results.',
+        competitor: 'Independent worktree chats and handoff between local and worktree checkouts.',
+      },
+      {
+        topic: 'Review and delivery',
+        jackalope: 'Patch, saved checks, outcome approval, and a separate guarded local merge.',
+        competitor: 'Diff comments, staging, commits, branch pushes, and pull-request controls.',
+      },
+    ],
+    sections: [
+      {
+        title: 'Which Codex product is being compared?',
+        paragraphs: [
+          'This page compares the desktop Codex workflow, currently documented by OpenAI within the ChatGPT desktop app. The Codex CLI is a separate interface and is the adapter Jackalope launches. Connecting that CLI to Jackalope does not embed or control OpenAI’s desktop app.',
+          'OpenAI documents parallel chats in worktrees, local setup scripts, and Git review controls. Worktree support is common ground here. Choose around the surrounding workflow and where execution needs to happen.',
+        ],
+      },
+      {
+        title: 'When does a multi-agent workspace help?',
+        paragraphs: [
+          'Consider Jackalope when you use Codex alongside Claude Code or another supported CLI and want project accounts, task history, checks, and related changes together. A reviewed plan can coordinate separate assignments while keeping one parent result to inspect.',
+          'If your work already fits Codex’s local or cloud workflow, try its existing worktree and review controls first. A second workspace is useful when it removes a concrete coordination problem, not merely because it can open more sessions.',
+        ],
+        links: [{ label: 'Codex CLI integration in Jackalope', href: '/agents/codex/' }],
+      },
+      {
+        title: 'Check the execution boundary and the finished result.',
+        paragraphs: [
+          'Codex documents a Cloud mode as well as execution on your computer. Jackalope task execution is local today. If work must continue on a hosted environment while your development computer is off, that is a material difference to evaluate.',
+          'For a local comparison, use a small change with a failing test and one follow-up. Check which files were tested, how review comments reach the agent, and how the result returns to the target branch. Jackalope remains prerelease, and provider access is supplied by your own account.',
+        ],
+        links: [
+          { label: 'Jackalope review and merge controls', href: '/knowledge/review-and-merge/' },
+        ],
+      },
+    ],
+    faqs: [
+      {
+        question: 'Can I use Codex and Claude Code together in Jackalope?',
+        answer:
+          'Yes. Both have native task adapters. Install and sign in to each CLI, choose project accounts, and give parallel tasks separate scopes and worktrees. Installed-provider acceptance remains in progress.',
+      },
+      {
+        question: 'Is Jackalope an OpenAI product or a Codex subscription?',
+        answer:
+          'No. Jackalope is an independent product of Jackalope Digital LLC. It does not include OpenAI model access, and its Codex integration uses your installed CLI and provider account.',
+      },
+    ],
+  },
+  {
+    slug: 'cursor',
+    name: 'Cursor',
+    published: '2026-09-17',
+    reviewed: '2026-09-17',
+    description:
+      'Jackalope vs Cursor: compare agent worktrees, local and cloud execution, code review, and workflows across your existing coding-agent CLIs.',
+    lede: 'Cursor includes agent workflows with worktrees and cloud execution. Jackalope organizes supported local coding-agent CLIs around tasks, project accounts, and a combined review.',
+    signals: ['Local agents', 'Git worktrees', 'Cloud execution', 'Review'],
+    overview: {
+      jackalope: 'One local task and review workflow across supported agent CLIs.',
+      competitor: 'Cursor Agent, worktrees in the Agents Window, and Cloud Agents.',
+      shared: ['Parallel agents', 'Git worktrees', 'Review before delivery'],
+    },
+    sources: [
+      { label: 'Cursor Agent overview', href: 'https://cursor.com/docs/agent/overview' },
+      { label: 'Cursor worktrees', href: 'https://cursor.com/docs/configuration/worktrees' },
+      { label: 'Cursor Cloud Agents', href: 'https://cursor.com/docs/cloud-agent' },
+    ],
+    rows: [
+      {
+        topic: 'Agent workflow',
+        jackalope: 'Bring supported CLIs and their provider accounts into a shared workspace.',
+        competitor: 'Cursor Agent edits files, uses tools, and runs commands in Cursor’s workflow.',
+      },
+      {
+        topic: 'Parallel work',
+        jackalope: 'Worktrees, task dependencies, and combined results under one reviewed plan.',
+        competitor: 'Separate worktree checkouts in the Agents Window, with configurable setup.',
+      },
+      {
+        topic: 'Cloud execution',
+        jackalope: 'Future work; current tasks run locally.',
+        competitor:
+          'Cloud Agents have their own virtual machines and can work while your computer is offline.',
+      },
+      {
+        topic: 'Review',
+        jackalope: 'Changed files, saved checks, outcome approval, and explicit local integration.',
+        competitor:
+          'Review worktree results, continue, create a commit or PR, or bring changes back.',
+      },
+    ],
+    sections: [
+      {
+        title: 'Cursor is more than an autocomplete comparison.',
+        paragraphs: [
+          'Cursor’s current documentation covers an agent that edits code and runs tools, worktrees for parallel changes, and Cloud Agents. Its UI worktree controls live in the Agents Window; the IDE also has worktree skills. Evaluate the surface you intend to use.',
+          'Jackalope’s focus is the work around installed agent CLIs: which project and account own a task, what context carries forward, and how several changes reach a reviewable result. It does not replace every editing feature in an IDE.',
+        ],
+      },
+      {
+        title: 'Decide where the work must run.',
+        paragraphs: [
+          'Cursor documents cloud execution on separate virtual machines with browser and desktop capabilities. That is relevant when a task must continue without your laptop online. Jackalope’s tasks, recurring work, and local change monitors depend on the machine running the app; remote execution remains roadmap work.',
+          'Worktree separation alone does not isolate processes from local operating-system permissions. Check the tools, credentials, and environment used by the exact workflow you select in either product.',
+        ],
+        links: [{ label: 'Jackalope’s current roadmap', href: '/roadmap/' }],
+      },
+      {
+        title: 'Compare a complete change, including one correction.',
+        paragraphs: [
+          'Use an existing repository and a small change with a clear acceptance check. Review the first result, send a focused correction, then inspect the final files and test output. Compare the effort required to recover context and deliver the change, rather than using agent count as a quality score.',
+          'Consider Jackalope early access if coordinating several supported CLIs is the missing part of your workflow. Consider Cursor’s documented local and cloud flows when you want those capabilities within Cursor. Jackalope is prerelease; this comparison does not establish performance or cost advantages.',
+        ],
+        links: [{ label: 'Supported Jackalope agents', href: '/agents/' }],
+      },
+    ],
+    faqs: [
+      {
+        question: 'Does Jackalope run Cursor Agent?',
+        answer:
+          'Jackalope does not currently have a native Cursor task adapter. You can use your preferred editor alongside a Jackalope project, but that does not make Cursor a supported task runner.',
+      },
+      {
+        question: 'Does Jackalope replace Cursor Cloud Agents?',
+        answer:
+          'No. Jackalope executes tasks on your local machine today. Evaluate a cloud workflow separately if remote execution is required.',
+      },
+    ],
+  },
+  {
     slug: 'superset',
     overview: {
       jackalope: 'Local tasks, dependencies, and one combined review.',
@@ -56,7 +229,8 @@ const comparisons: Comparison[] = [
       shared: ['Agent choice', 'Git worktrees', 'Scheduled work'],
     },
     name: 'Superset',
-    reviewed,
+    published,
+    reviewed: '2026-09-17',
     description:
       'Jackalope vs Superset: compare parallel coding agents, Git worktrees, recurring tasks, remote hosts, accounts, and how changes reach review.',
     lede: 'Both bring multiple coding agents into one workspace. The useful comparison is how you organize the work between the first prompt and the final integration.',
@@ -122,7 +296,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Accounts, automation, and cost',
         paragraphs: [
-          'Superset’s automation documentation distinguishes a created workspace from a successful agent outcome: run history records dispatch, while the workspace contains the resulting work. It also documents failed dispatch to offline hosts. Include both the scheduled run and the agent’s actual result when evaluating recurring work.',
+          'Superset requires a Pro or Enterprise plan to create, run, or resume automations. Its automation documentation distinguishes a created workspace from a successful agent outcome: run history records dispatch, while the workspace contains the resulting work. It also documents failed dispatch to offline hosts. Include both the scheduled run and the agent’s actual result when evaluating recurring work.',
           'For either workspace, list the agents and accounts you actually need before choosing. In Jackalope, provider support differs by adapter, and a catalog entry does not by itself mean task execution is implemented. Use the compatibility page to check your required agent and tool flow.',
           'Jackalope uses your installed agents and provider access; model usage is not included. Its public price has not been announced. Separate workspace charges, model usage, and any remote compute when estimating cost. For unattended local tasks, include the practical requirement that the host and required services remain available.',
         ],
@@ -161,6 +335,7 @@ const comparisons: Comparison[] = [
       shared: ['Git worktrees', 'Browser tools', 'Code review'],
     },
     name: 'Orca',
+    published,
     reviewed,
     description:
       'Jackalope vs Orca: compare agent workspaces, browser evidence, terminals, remote access, account workflows, and review of parallel changes.',
@@ -263,6 +438,7 @@ const comparisons: Comparison[] = [
       shared: ['Agent choice', 'Isolated workspaces', 'Diff review'],
     },
     name: 'Conductor',
+    published,
     reviewed,
     description:
       'Jackalope vs Conductor: compare local agent coordination with cloud workspaces, shared sessions, agent subscriptions, and code review workflows.',
@@ -377,6 +553,7 @@ const comparisons: Comparison[] = [
       shared: ['Git worktrees', 'MCP tools', 'Review workflow'],
     },
     name: 'Emdash',
+    published,
     reviewed,
     description:
       'Jackalope vs Emdash: compare parallel agents, reusable context, MCP tools, recurring tasks, browser previews, remote development, and review.',
@@ -482,6 +659,7 @@ const comparisons: Comparison[] = [
       shared: ['Local agents', 'Git worktrees', 'Code review'],
     },
     name: 'Braid',
+    published,
     reviewed,
     description:
       'Jackalope vs Braid: compare Git worktrees, agent sessions, project setup, GitHub review, task dependencies, and integration of parallel changes.',
@@ -585,6 +763,7 @@ const comparisons: Comparison[] = [
       shared: ['Local execution', 'Project context', 'MCP tools'],
     },
     name: 'Worktree',
+    published,
     reviewed,
     description:
       'Jackalope vs Worktree: compare local agent coordination with shared AI threads, team collaboration, cloud execution, MCP connections, and review.',
@@ -696,6 +875,7 @@ const comparisons: Comparison[] = [
       shared: ['Agent choice', 'Git worktrees', 'Scheduled work'],
     },
     name: 'Codius',
+    published,
     reviewed,
     description:
       'Jackalope vs Codius: compare local agent tasks with desktop, web, and mobile access, host ownership, recurring work, providers, and code review.',
@@ -793,6 +973,7 @@ const comparisons: Comparison[] = [
       shared: ['Persistent context', 'Tool use', 'Automation'],
     },
     name: 'Hermes Agent',
+    published,
     reviewed,
     description:
       'Jackalope vs Hermes Agent by Nous Research: compare coding-agent workspaces with persistent agent memory, messaging, automation, and task review.',

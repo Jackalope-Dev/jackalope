@@ -111,6 +111,18 @@ fn review_notes_are_historical_and_secrets_and_transient_instructions_are_exclud
     assert!(entries
         .iter()
         .any(|e| e.content.contains("historical feedback")));
+    let selected = store
+        .select(
+            "p",
+            root.to_str().unwrap(),
+            "Keyboard focus returns",
+            &Default::default(),
+        )
+        .unwrap();
+    assert!(selected
+        .entries
+        .iter()
+        .all(|e| e.automatic.as_ref().unwrap().kind != "review"));
     let skipped = ContextSelection {
         memory_off: true,
         ..Default::default()
@@ -120,6 +132,113 @@ fn review_notes_are_historical_and_secrets_and_transient_instructions_are_exclud
         .unwrap()
         .entries
         .is_empty());
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn review_lessons_require_later_acceptance_and_a_matching_successful_check() {
+    let (root, store) = fixture();
+    let mut rejected = run(&root, "source");
+    rejected.prompt = "Fix dialog focus".into();
+    rejected.contract = serde_json::from_value(serde_json::json!({"requirements":[{
+        "id":"focus", "title":"Dialog keyboard focus", "checkpoint":false,
+        "receipt":{"accepted":false,"evidence":"manual","note":"Return keyboard focus to the trigger after closing.","tree":"bad","recordedAt":"2026-09-09T12:01:00Z"}
+    }],"inputs":{}})).unwrap();
+    let mut resolved = rejected.clone();
+    resolved.id = "resolution".into();
+    resolved.started_at = "2026-09-09T12:02:00Z".into();
+    resolved.status = "reviewed".into();
+    let accepted = resolved.contract.requirements[0].receipt.as_mut().unwrap();
+    accepted.accepted = true;
+    accepted.tree = "checked".into();
+    accepted.recorded_at = "2026-09-09T12:04:00Z".into();
+    resolved.verification = Some(serde_json::from_value(serde_json::json!({
+        "command":"node check.mjs","checkedAt":"2026-09-09T12:03:00Z","tree":"checked",
+        "result":{"exitCode":0,"success":true,"timedOut":false,"stdout":"","stderr":"","truncated":false,"durationMs":10}
+    })).unwrap());
+    let cases = [
+        "unresolved",
+        "failed-check",
+        "stale-check",
+        "other-task",
+        "other-project",
+        "quota",
+        "not-reviewed",
+        "valid",
+    ];
+    for case in cases {
+        let mut next = resolved.clone();
+        match case {
+            "unresolved" => {
+                next.contract.requirements[0]
+                    .receipt
+                    .as_mut()
+                    .unwrap()
+                    .accepted = false
+            }
+            "failed-check" => next.verification.as_mut().unwrap().result.success = false,
+            "stale-check" => next.verification.as_mut().unwrap().tree = Some("old".into()),
+            "other-task" => next.task_id = "unrelated".into(),
+            "other-project" => next.project_id = "other".into(),
+            "quota" => next.error = Some("quota exhausted".into()),
+            "not-reviewed" => next.status = "review".into(),
+            _ => {}
+        }
+        store
+            .learn("p", root.to_str().unwrap(), &[rejected.clone(), next])
+            .unwrap();
+        let selected = store
+            .select(
+                "p",
+                root.to_str().unwrap(),
+                "Fix dialog keyboard focus",
+                &Default::default(),
+            )
+            .unwrap();
+        assert_eq!(
+            selected.entries.len(),
+            usize::from(case == "valid"),
+            "{case}"
+        );
+    }
+    let frozen = store
+        .select(
+            "p",
+            root.to_str().unwrap(),
+            "Fix dialog keyboard focus",
+            &Default::default(),
+        )
+        .unwrap();
+    assert!(frozen.entries[0]
+        .automatic
+        .as_ref()
+        .unwrap()
+        .resolution
+        .is_some());
+    resolved.contract.requirements[0]
+        .receipt
+        .as_mut()
+        .unwrap()
+        .accepted = false;
+    store
+        .learn("p", root.to_str().unwrap(), &[rejected, resolved])
+        .unwrap();
+    assert!(store
+        .select(
+            "p",
+            root.to_str().unwrap(),
+            "Fix dialog keyboard focus",
+            &Default::default()
+        )
+        .unwrap()
+        .entries
+        .is_empty());
+    assert!(frozen.entries[0]
+        .automatic
+        .as_ref()
+        .unwrap()
+        .resolution
+        .is_some());
     std::fs::remove_dir_all(root).unwrap();
 }
 

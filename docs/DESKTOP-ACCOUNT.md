@@ -90,6 +90,9 @@ app or revoke their devices from the website's waitlist page.
 Connected desktops represents profile connections, not unique physical computers.
 Isolated tests have independent credentials and local projects, so the same computer
 name can appear more than once. Restarting a profile reuses its saved connection.
+The access page groups connections with matching computer names and reported platforms
+in an expandable list, preserving each profile's details and disconnect action.
+Matching names do not establish physical device identity; unnamed connections stay separate.
 The access page distinguishes connections by a short ID, platform, app version,
 development/release build and default/isolated profile. Account checks run while
 the app is open; their timestamp does not establish human activity or task execution.

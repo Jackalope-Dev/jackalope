@@ -76,6 +76,7 @@ export interface ReconciliationJob {
   error: string | null;
 }
 export interface QueueView {
+  managedTasks?: import('./managed-task').ManagedTask[];
   assistPolicies?: AssistPolicy[];
   reconciliations?: ReconciliationJob[];
   agreements?: CoordinationAgreement[];

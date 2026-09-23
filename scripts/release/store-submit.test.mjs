@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { submissionPath, submit, updateSubmission } from './store-submit.mjs';
+import { submissionPath, submit, updateSubmission, validateSource } from './store-submit.mjs';
 
 const receipt = { identity: 'Jackalope.App', publisher: 'CN=Publisher', version: '0.2.0' };
 const app = {
@@ -135,4 +135,18 @@ test('failed upload keeps the draft checkpoint and never commits', async () => {
   );
   assert.equal(checkpoints.length, 1);
   assert.equal(checkpoints[0].status, 'DraftCreated');
+});
+
+test('Store submission is bound to the reviewed source, channel and architecture', () => {
+  const source = 'a'.repeat(40);
+  const candidate = { sourceRevision: source, channel: 'beta', architecture: 'x64' };
+  const env = { EXPECTED_SOURCE: source, EXPECTED_CHANNEL: 'beta' };
+  validateSource(candidate, env);
+  assert.throws(() => validateSource(candidate, {}), /reviewed source/);
+  assert.throws(
+    () => validateSource({ ...candidate, sourceRevision: 'b'.repeat(40) }, env),
+    /reviewed source/,
+  );
+  assert.throws(() => validateSource({ ...candidate, channel: 'stable' }, env), /reviewed source/);
+  assert.throws(() => validateSource({ ...candidate, architecture: 'arm64' }, env), /architecture/);
 });

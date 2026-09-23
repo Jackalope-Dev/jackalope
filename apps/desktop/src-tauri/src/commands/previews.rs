@@ -9,6 +9,7 @@ use std::{
     time::Duration,
 };
 use tauri::State;
+pub mod design;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +36,10 @@ fn sessions() -> &'static Mutex<HashMap<String, Preview>> {
 }
 
 pub fn ensure_idle(workspace: &str) -> Result<(), String> {
+    super::work_terminal::ensure_idle(workspace)?;
+    ensure_preview_idle(workspace)
+}
+pub(super) fn ensure_preview_idle(workspace: &str) -> Result<(), String> {
     let path = dunce::canonicalize(workspace).map_err(|e| e.to_string())?;
     let mut sessions = sessions().lock().map_err(|e| e.to_string())?;
     for preview in sessions.values_mut() {
@@ -55,6 +60,7 @@ pub fn ensure_idle(workspace: &str) -> Result<(), String> {
 }
 
 pub fn close_all() {
+    design::close_all();
     if let Ok(mut sessions) = sessions().lock() {
         for preview in sessions.values_mut() {
             preview.tree.terminate();
@@ -62,6 +68,24 @@ pub fn close_all() {
         }
         sessions.clear();
     }
+}
+pub fn active_ports() -> Vec<(String, u16)> {
+    sessions()
+        .lock()
+        .map(|mut sessions| {
+            sessions
+                .values_mut()
+                .filter_map(|preview| {
+                    preview
+                        .child
+                        .try_wait()
+                        .ok()
+                        .filter(Option::is_none)
+                        .map(|_| (preview.view.run_id.clone(), preview.view.port))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn view(preview: &mut Preview) -> Result<PreviewView, String> {
@@ -458,6 +482,7 @@ pub async fn task_preview_stop(id: String, state: State<'_, TaskRuntime>) -> Res
 
 fn stop_preview(runtime: &TaskRuntime, id: String) -> Result<(), String> {
     let _guard = integration::execution_guard()?;
+    design::close(&id);
     let mut sessions = sessions().lock().map_err(|e| e.to_string())?;
     let Some(preview) = sessions.get_mut(&id) else {
         return Ok(());

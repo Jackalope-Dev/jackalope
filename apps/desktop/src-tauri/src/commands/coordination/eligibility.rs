@@ -72,6 +72,46 @@ pub(super) fn scopes(values: Vec<String>) -> Result<Vec<String>, String> {
     }).collect()
 }
 
+fn dependency_priority(items: &[QueueItem]) -> HashMap<String, usize> {
+    fn depth(
+        id: &str,
+        children: &HashMap<&str, Vec<&str>>,
+        visiting: &mut HashSet<String>,
+        memo: &mut HashMap<String, usize>,
+    ) -> usize {
+        if let Some(value) = memo.get(id) {
+            return *value;
+        }
+        if !visiting.insert(id.into()) {
+            return 0;
+        }
+        let value = children
+            .get(id)
+            .into_iter()
+            .flatten()
+            .map(|child| 1 + depth(child, children, visiting, memo))
+            .max()
+            .unwrap_or(0);
+        visiting.remove(id);
+        memo.insert(id.into(), value);
+        value
+    }
+    let mut children: HashMap<&str, Vec<&str>> = HashMap::new();
+    for item in items
+        .iter()
+        .filter(|item| !item.canceled && item.error.is_none() && item.run_id.is_none())
+    {
+        for parent in &item.dependencies {
+            children.entry(parent).or_default().push(&item.id);
+        }
+    }
+    let mut memo = HashMap::new();
+    for item in items {
+        depth(&item.id, &children, &mut HashSet::new(), &mut memo);
+    }
+    memo
+}
+
 pub(super) fn ready_items(
     inner: &Inner,
     runs: &[crate::commands::tasks::TaskRun],
@@ -82,21 +122,49 @@ pub(super) fn ready_items(
         .concurrency
         .saturating_sub(active_runs.iter().filter(|r| !r.finishing).count());
     let mut reserved = Vec::new();
-    let mut priority = HashMap::<String, usize>::new();
-    for item in inner.ledger.items.iter().rev().filter(|i| !i.canceled) {
-        let depth = priority.get(&item.id).copied().unwrap_or(0) + 1;
-        for parent in &item.dependencies {
-            let value = priority.entry(parent.clone()).or_default();
-            *value = (*value).max(depth);
-        }
-    }
+    let priority = dependency_priority(&inner.ledger.items);
     let mut pending: Vec<_> = inner
         .ledger
         .items
         .iter()
         .filter(|item| {
-            inner.enabled.contains(&item.project_id)
-                && !item.canceled
+            (if let Some(task) = inner
+                .ledger
+                .managed_tasks
+                .iter()
+                .find(|task| Some(&task.id) == item.feature_id.as_ref())
+            {
+                inner
+                    .enabled
+                    .contains(&super::managed::dispatch_key(&task.id))
+                    && task.error.is_none()
+                    && !inner
+                        .ledger
+                        .items
+                        .iter()
+                        .filter(|other| other.feature_id == item.feature_id)
+                        .any(|other| {
+                            other.error.is_some()
+                                || other.canceled
+                                || other.run_id.as_ref().is_some_and(|id| {
+                                    runs.iter().find(|run| &run.id == id).is_none_or(|run| {
+                                        !active(&run.status)
+                                            && (!matches!(
+                                                run.status.as_str(),
+                                                "review" | "reviewed"
+                                            ) || run.error.is_some()
+                                                || run.persistence_error.is_some()
+                                                || run.dependency_invalidated
+                                                || run.verification_error.is_some()
+                                                || run.verification.as_ref().is_none_or(|check| {
+                                                    !check.result.success || check.tree.is_none()
+                                                }))
+                                    })
+                                })
+                        })
+            } else {
+                inner.enabled.contains(&item.project_id)
+            }) && !item.canceled
                 && item.run_id.is_none()
                 && item.error.is_none()
         })
@@ -119,18 +187,10 @@ pub(super) fn ready_items(
             reorder = false;
         }
         let item = pending.pop().unwrap();
-        if inner
-            .ledger
-            .scope_audits
-            .iter()
-            .any(|a| a.project_id == item.project_id && a.blocked())
-        {
+        if super::managed_delivery::scope_blocked(&inner.ledger, item, runs) {
             continue;
         }
-        if ancestors(&inner.ledger.items, item)
-            .iter()
-            .any(|id| agreements::interface_block(&inner.ledger, &item.project_id, id).is_some())
-        {
+        if super::managed_delivery::interfaces_blocked(&inner.ledger, item) {
             continue;
         }
         if !item.dependencies.iter().all(|id| {
@@ -165,6 +225,10 @@ pub(super) fn ready_items(
                 && other.project_id == item.project_id
                 && other.run_id.as_ref().is_some_and(|id| !merged.contains(id))
                 && !other.canceled
+                && !(item.feature_id.is_some()
+                    && item.feature_id == other.feature_id
+                    && (super::managed_delivery::is_integration(&inner.ledger, item)
+                        || super::managed_delivery::is_integration(&inner.ledger, other)))
                 && !(item.staged_dependencies && predecessors.contains(&other.id))
                 && overlaps(
                     &agreements::effective_scopes(&inner.ledger, item),
@@ -198,7 +262,7 @@ pub(super) fn ready_items(
     reserved.into_iter().cloned().collect()
 }
 
-fn ancestors(items: &[QueueItem], item: &QueueItem) -> HashSet<String> {
+pub(super) fn ancestors(items: &[QueueItem], item: &QueueItem) -> HashSet<String> {
     let mut found = HashSet::new();
     let mut pending = item.dependencies.clone();
     while let Some(id) = pending.pop() {
@@ -216,6 +280,29 @@ mod scheduling_tests {
     use super::*;
     fn item(id: &str, project: &str, deps: &[&str]) -> QueueItem {
         serde_json::from_value(serde_json::json!({"id":id,"projectId":project,"projectName":project,"projectPath":"fixture","title":id,"prompt":id,"agent":"codex","scopes":[id],"dependencies":deps,"createdAt":"now","runId":null,"error":null,"canceled":false})).unwrap()
+    }
+    #[test]
+    fn critical_path_is_independent_of_saved_order_and_ignores_retired_work() {
+        let mut items = vec![
+            item("leaf", "a", &["middle"]),
+            item("root", "a", &[]),
+            item("middle", "a", &["root"]),
+        ];
+        assert_eq!(dependency_priority(&items)["root"], 2);
+        items.reverse();
+        assert_eq!(dependency_priority(&items)["root"], 2);
+        items
+            .iter_mut()
+            .find(|item| item.id == "leaf")
+            .unwrap()
+            .canceled = true;
+        assert_eq!(dependency_priority(&items)["root"], 1);
+        items
+            .iter_mut()
+            .find(|item| item.id == "middle")
+            .unwrap()
+            .run_id = Some("finished".into());
+        assert_eq!(dependency_priority(&items)["root"], 0);
     }
     #[test]
     fn scheduling_prioritizes_the_critical_path_and_fair_projects() {

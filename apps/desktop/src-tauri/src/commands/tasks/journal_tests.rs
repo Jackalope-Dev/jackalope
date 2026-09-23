@@ -1,5 +1,55 @@
 use super::*;
 
+#[test]
+fn output_after_a_failed_checkpoint_retries_the_complete_record() {
+    let (directory, runtime, id) = fixture();
+    let journal = directory.join(format!("{id}.journal"));
+    std::fs::create_dir(&journal).unwrap();
+    assert!(runtime
+        .update_checked(&id, |run| run.prompt = "changed checkpoint context".into())
+        .is_err());
+    std::fs::remove_dir(&journal).unwrap();
+    runtime
+        .update_output(&id, |run| run.result.push_str("new output"))
+        .unwrap();
+    let saved: TaskRun =
+        serde_json::from_slice(&journal::read(&directory.join(format!("{id}.json"))).unwrap())
+            .unwrap();
+    assert_eq!(saved.prompt, "changed checkpoint context");
+    assert_eq!(saved.result, "baselinenew output");
+    runtime.ensure_history_saved().unwrap();
+    drop(runtime);
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn streaming_fields_survive_replacements_compaction_and_restart() {
+    let (directory, runtime, id) = fixture();
+    let path = directory.join(format!("{id}.json"));
+    for index in 0..30 {
+        runtime.update_output(&id, |run| {
+            consume_adapter_event(run, &serde_json::json!({"type":"thread.started","thread_id":format!("session-{index}")}).to_string(), "codex");
+            run.result = format!("new result {index} with escaped \"quotes\",\n 🦀");
+            run.model = Some("verified-model".into());
+            run.diagnostics = vec![format!("{index} {}", "long output ".repeat(6000))];
+            run.efficiency.timing("fixture", Duration::from_millis(2));
+            run.usage.input += 5;
+            run.error = (index % 2 == 0).then(|| "temporary error".into());
+        }).unwrap();
+    }
+    assert_ne!(
+        serde_json::from_slice::<TaskRun>(&std::fs::read(&path).unwrap())
+            .unwrap()
+            .result,
+        "baseline"
+    );
+    let expected = serde_json::to_value(&runtime.inner.lock().unwrap().runs[&id]).unwrap();
+    drop(runtime);
+    let saved: TaskRun = serde_json::from_slice(&journal::read(&path).unwrap()).unwrap();
+    assert_eq!(serde_json::to_value(saved).unwrap(), expected);
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
 fn fixture() -> (PathBuf, TaskRuntime, String) {
     let directory =
         std::env::temp_dir().join(format!("jackalope-journal-{}", uuid::Uuid::new_v4()));

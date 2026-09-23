@@ -78,10 +78,17 @@ fn remove_entry(path: &Path) -> Result<(), String> {
         }
         std::fs::remove_dir(path)
     } else {
-        if path
-            .file_name()
-            .is_some_and(|name| name == "account.bin" || name == "api-key.bin")
-        {
+        if path.file_name().is_some_and(|name| {
+            [
+                "account.bin",
+                "api-key.bin",
+                "issue-connections.bin",
+                "remote-access.bin",
+                "remote-hosts.bin",
+            ]
+            .iter()
+            .any(|candidate| name == *candidate)
+        }) {
             return super::account_storage::remove(path);
         }
         std::fs::remove_file(path)
@@ -112,6 +119,8 @@ pub async fn app_reset(
         return Err("Stop terminal agent sessions before resetting.".into());
     }
     coordinator.prepare_reset()?;
+    app.state::<super::remote::RemoteAccess>().shutdown();
+    super::remote::close_tunnels();
     runtime.stop_all();
     app.restart();
 }

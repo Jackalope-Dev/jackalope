@@ -2,7 +2,7 @@ use super::*;
 
 pub(super) const TIMEOUT: Duration = Duration::from_secs(30 * 60);
 
-pub(super) fn configure(cmd: &mut Command, workspace: &str, session: Option<&str>) {
+pub(in crate::commands) fn configure(cmd: &mut Command, workspace: &str, session: Option<&str>) {
     cmd.args([
         "--input-format",
         "stream-json",
@@ -33,7 +33,7 @@ pub(super) fn input(prompt: &str, workspace: &str) -> String {
 }
 
 #[derive(Default)]
-pub(super) struct Stream {
+pub(in crate::commands) struct Stream {
     initialized: bool,
     completed: bool,
     session: Option<String>,
@@ -43,7 +43,7 @@ pub(super) struct Stream {
 }
 
 impl Stream {
-    pub(super) fn new(session: Option<String>) -> Self {
+    pub(in crate::commands) fn new(session: Option<String>) -> Self {
         Self {
             resumed: session.is_some(),
             session,
@@ -74,7 +74,7 @@ impl Stream {
         true
     }
 
-    pub(super) fn consume(&mut self, run: &mut TaskRun, line: &str) {
+    pub(in crate::commands) fn consume(&mut self, run: &mut TaskRun, line: &str) {
         if line.trim().is_empty() {
             return;
         }
@@ -148,6 +148,8 @@ impl Stream {
                     self.text_step = Some(index);
                 }
                 if step["step_type"] == "tool" {
+                    run.efficiency
+                        .observe(&event, "antigravity", &run.workspace);
                     self.text_step = None;
                     let tool = step["tool_name"].as_str().unwrap_or("tool");
                     let state = step["state"].as_str().unwrap_or("unknown");
@@ -222,7 +224,7 @@ impl Stream {
         }
     }
 
-    pub(super) fn finish(&self, run: &mut TaskRun) {
+    pub(in crate::commands) fn finish(&self, run: &mut TaskRun) {
         if !self.completed {
             run.error.get_or_insert(
                 "Antigravity ended without a final result. Inspect activity before continuing."

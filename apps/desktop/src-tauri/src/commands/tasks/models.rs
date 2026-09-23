@@ -15,6 +15,8 @@ pub struct Usage {
 #[serde(rename_all = "camelCase")]
 pub struct UsageObservation {
     pub message_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
     pub parent_tool_use_id: Option<String>,
     pub model: Option<String>,
     pub input: u64,
@@ -31,7 +33,11 @@ pub struct TaskRun {
     #[serde(default)]
     pub effort: Option<super::effort::TaskEffort>,
     #[serde(default)]
+    pub codex_speed: Option<super::speed::CodexSpeed>,
+    #[serde(default)]
     pub reasoning_effort: Option<String>,
+    #[serde(default)]
+    pub requested_service_tier: Option<String>,
     #[serde(default)]
     pub efficiency: super::efficiency::Efficiency,
     #[serde(default)]
@@ -86,6 +92,8 @@ pub struct TaskRun {
     #[serde(default)]
     pub prepare_command: Option<String>,
     #[serde(default)]
+    pub setup_files: Vec<String>,
+    #[serde(default)]
     pub auto_verify: bool,
     #[serde(default)]
     pub verification: Option<crate::commands::verification::Verification>,
@@ -128,6 +136,8 @@ pub struct RunRequest {
     pub live_session_id: Option<String>,
     #[serde(default)]
     pub effort: Option<super::effort::TaskEffort>,
+    #[serde(default)]
+    pub codex_speed: Option<super::speed::CodexSpeed>,
     #[serde(skip)]
     pub dependency_snapshot: crate::commands::integration::DependencySnapshot,
     #[serde(skip)]
@@ -152,6 +162,8 @@ pub struct RunRequest {
     #[serde(default)]
     pub prepare_command: Option<String>,
     #[serde(default)]
+    pub setup_files: Vec<String>,
+    #[serde(default)]
     pub auto_verify: bool,
     #[serde(default)]
     pub target_branch: Option<String>,
@@ -172,6 +184,7 @@ pub struct RunRequest {
 
 #[derive(Clone)]
 pub struct CoordinationContext {
+    pub managed: bool,
     pub endpoint: String,
     pub token: String,
     pub instructions: String,
@@ -208,6 +221,8 @@ pub struct Runner {
 impl TaskRun {
     pub(in crate::commands) fn summary(&self) -> Self {
         let mut context_receipt = self.context_receipt.clone();
+        context_receipt.jev_preparation = None;
+        context_receipt.jev_preparation_result = None;
         for entry in &mut context_receipt.entries {
             entry.content.clear();
             if let Some(source) = &mut entry.automatic {
@@ -224,7 +239,9 @@ impl TaskRun {
             archived_at: self.archived_at.clone(),
             live_session_id: self.live_session_id.clone(),
             effort: self.effort,
+            codex_speed: self.codex_speed,
             reasoning_effort: self.reasoning_effort.clone(),
+            requested_service_tier: self.requested_service_tier.clone(),
             efficiency: self.efficiency.clone(),
             dependency_invalidated: self.dependency_invalidated,
             stages: self.stages.clone(),
@@ -255,6 +272,7 @@ impl TaskRun {
             process_contained: self.process_contained.clone(),
             verify_command: self.verify_command.clone(),
             prepare_command: self.prepare_command.clone(),
+            setup_files: self.setup_files.clone(),
             auto_verify: self.auto_verify.clone(),
             verification: verification,
             finishing: self.finishing.clone(),
@@ -267,7 +285,17 @@ impl TaskRun {
             session_id: self.session_id.clone(),
             result: Default::default(),
             details_omitted: true,
-            activity: Default::default(),
+            activity: if ["starting", "running", "stopping"].contains(&self.status.as_str()) {
+                self.activity
+                    .iter()
+                    .rev()
+                    .take(3)
+                    .rev()
+                    .map(|text| super::tool_activity::preview(text))
+                    .collect()
+            } else {
+                Default::default()
+            },
             diagnostics: Default::default(),
             error: self.error.clone(),
             persistence_error: self.persistence_error.clone(),

@@ -25,6 +25,7 @@
   .ui-tabs-trigger[data-state="active"] {
     background: var(--color-accent-subtle);
     color: var(--color-accent-ink);
+    font-weight: 600;
   }
   .ui-tabs-trigger:focus-visible,
   .ui-tabs-content:focus-visible {

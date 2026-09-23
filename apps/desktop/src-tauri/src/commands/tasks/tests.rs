@@ -1,4 +1,5 @@
 use super::*;
+mod workbench;
 
 pub(super) fn sample(agent: &str) -> TaskRun {
     TaskRun {
@@ -8,7 +9,9 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         archived_at: None,
         live_session_id: None,
         effort: None,
+        codex_speed: None,
         reasoning_effort: None,
+        requested_service_tier: None,
         efficiency: Default::default(),
         dependency_invalidated: false,
         dependency_snapshot: Default::default(),
@@ -34,6 +37,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         process_contained: false,
         verify_command: None,
         prepare_command: None,
+        setup_files: Vec::new(),
         auto_verify: false,
         verification: None,
         finishing: false,
@@ -87,9 +91,95 @@ fn opencode_stream_tracks_results_sessions_errors_and_deduplicated_step_usage() 
     assert!(run.usage.reported);
     consume_event(
         &mut run,
+        r#"{"type":"step_finish","part":{"id":"part_reasoning","tokens":{"input":14823,"output":224,"reasoning":8,"cache":{"read":1664,"write":0}},"cost":0.001}}"#,
+    );
+    assert_eq!((run.usage.input, run.usage.output), (16502, 236));
+    assert_eq!(run.usage_observations.last().unwrap().output, 232);
+    consume_event(
+        &mut run,
         r#"{"type":"error","error":{"name":"APIError","data":{"message":"Provider unavailable"}}}"#,
     );
     assert_eq!(run.error.as_deref(), Some("Provider unavailable"));
+}
+
+#[test]
+fn live_tool_activity_is_concrete_bounded_and_provider_independent() {
+    for adapter in ["claude", "grok"] {
+        let mut run = sample(adapter);
+        run.workspace = "C:/work".into();
+        consume_event(
+            &mut run,
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"edit-1","name":"Edit","input":{"file_path":"C:/work/src/lib.rs","new_string":"private code"}}]}}"#,
+        );
+        assert_eq!(run.activity, ["Editing src/lib.rs"]);
+        assert!(run.efficiency.touched_paths.contains("src/lib.rs"));
+        consume_event(
+            &mut run,
+            r#"{"type":"user","message":{"content":[{"type":"tool_result","is_error":true,"content":"private diagnostic"}]}}"#,
+        );
+        assert_eq!(run.activity.last().unwrap(), "Tool request failed");
+        assert!(run.error.is_none());
+        assert!(!run.activity.join(" ").contains("private"));
+    }
+    let mut run = sample("codex");
+    consume_event(
+        &mut run,
+        r#"{"type":"item.started","item":{"type":"command_execution","command":"secret command"}}"#,
+    );
+    assert_eq!(run.activity, ["Running a command"]);
+    consume_event(
+        &mut run,
+        r#"{"type":"item.completed","item":{"type":"command_execution","command":"private command","exit_code":1,"aggregated_output":"private output"}}"#,
+    );
+    assert_eq!(
+        run.summary().activity.last().unwrap(),
+        "Command failed (exit 1)"
+    );
+    assert!(run.activity.last().unwrap().contains("private output"));
+    consume_event(
+        &mut run,
+        r#"{"type":"item.completed","item":{"type":"mcp_tool_call","status":"failed"}}"#,
+    );
+    assert_eq!(run.activity.last().unwrap(), "Tool request failed");
+    consume_event(
+        &mut run,
+        r#"{"type":"item.completed","item":{"type":"file_change","changes":[{"path":"src/a.rs"}]}}"#,
+    );
+    assert_eq!(run.activity.last().unwrap(), "Changed src/a.rs");
+    consume_event(
+        &mut run,
+        r#"{"type":"item.completed","item":{"type":"file_change","status":"failed","changes":[{"path":"src/a.rs"}]}}"#,
+    );
+    assert_eq!(run.activity.last().unwrap(), "File change failed");
+    let mut run = sample("opencode");
+    consume_event(
+        &mut run,
+        r#"{"type":"tool_use","part":{"tool":"read","state":{"status":"running","input":{"filePath":"src/a.rs"}}}}"#,
+    );
+    assert_eq!(run.activity, ["Reading src/a.rs · running"]);
+}
+
+#[test]
+fn active_summaries_keep_only_three_short_activity_previews() {
+    let mut run = sample("claude");
+    run.context_receipt.jev_preparation_result =
+        Some(serde_json::json!({"answers":{"large":"private advice"}}));
+    run.activity = vec![
+        "old".into(),
+        "Reading src/a.rs\nprivate full output".into(),
+        "Editing src/a.rs".into(),
+        "x".repeat(500),
+    ];
+    let summary = run.summary();
+    assert!(summary.details_omitted);
+    assert!(summary.context_receipt.jev_preparation_result.is_none());
+    assert!(run.context_receipt.jev_preparation_result.is_some());
+    assert_eq!(summary.activity.len(), 3);
+    assert_eq!(summary.activity[0], "Reading src/a.rs");
+    assert_eq!(summary.activity[2].len(), 240);
+    assert_eq!(run.activity.len(), 4);
+    run.status = "review".into();
+    assert!(run.summary().activity.is_empty());
 }
 
 #[test]
@@ -105,6 +195,10 @@ fn antigravity_stream_keeps_attempt_usage_and_requires_a_terminal_result() {
         (30, 7, 20)
     );
     assert!(run.result.is_empty());
+    let tool = r#"{"event":"step_update","step_update":{"conversation_id":"conversation-1","step_index":9,"step_type":"tool","tool_name":"view_file","state":"ACTIVE"}}"#;
+    stream.consume(&mut run, tool);
+    stream.consume(&mut run, &tool.replace("ACTIVE", "DONE"));
+    assert_eq!(run.efficiency.tool_calls.get("view_file"), Some(&1));
     stream.consume(&mut run, r#"{"event":"result","result":{"conversation_id":"conversation-1","status":"SUCCESS","response":"Done","usage":{"input_tokens":1000,"output_tokens":200}}}"#);
     stream.finish(&mut run);
     assert!(run.error.is_none(), "{:?}", run.error);
@@ -226,10 +320,34 @@ fn antigravity_rejects_missing_accounts_and_does_not_invent_resumed_usage() {
 }
 
 #[test]
+fn every_builtin_agent_is_executable() {
+    for adapter in BUILTIN_AGENTS {
+        assert!(runtime::EXECUTABLE_ADAPTERS.contains(adapter), "{adapter}");
+    }
+    let message = runtime::unimplemented_adapter("other");
+    assert!(message.starts_with("The other task adapter is not implemented yet"));
+    assert!(message.contains("Gemini CLI"));
+}
+
+#[test]
 #[ignore = "Runs a paid or free installed agent in a disposable repository; set JACKALOPE_AGENT_TRIAL"]
 fn installed_agent_lifecycle_trial() {
     let agent = std::env::var("JACKALOPE_AGENT_TRIAL").expect("Choose the agent explicitly");
-    assert!(BUILTIN_AGENTS.contains(&agent.as_str()));
+    if agent == "opencode" {
+        if let Some(directory) = std::env::var_os("JACKALOPE_RUNTIME_TRIAL_DIR") {
+            let directory = PathBuf::from(directory);
+            assert!(directory.is_absolute());
+            crate::commands::managed_runtime::initialize(directory.clone());
+            assert!(super::executable("opencode")
+                .unwrap()
+                .starts_with(directory));
+        }
+    }
+    agent_lifecycle_trial(&agent, None);
+}
+
+pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> PathBuf {
+    assert!(BUILTIN_AGENTS.contains(&agent));
     let root = std::env::temp_dir().join(format!("jackalope-agent-trial-{}", uuid::Uuid::new_v4()));
     let repo = root.join("repo");
     std::fs::create_dir_all(&repo).unwrap();
@@ -261,23 +379,48 @@ fn installed_agent_lifecycle_trial() {
     .unwrap();
     let history = root.join("history");
     let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
-    let model = std::env::var("JACKALOPE_AGENT_MODEL").ok();
+    let selected_agent = if let Some(executable) = executable {
+        let mut policy = super::super::agent_policy::AgentPolicy::default();
+        policy
+            .custom_agents
+            .push(super::super::agent_policy::CustomAgent {
+                id: "lifecycle-fixture".into(),
+                name: "Lifecycle fixture".into(),
+                command: executable.to_string_lossy().into_owned(),
+                adapter: Some(agent.into()),
+            });
+        std::fs::create_dir_all(runtime.policy_path().parent().unwrap()).unwrap();
+        std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
+        "lifecycle-fixture"
+    } else {
+        agent
+    };
+    let model = executable
+        .is_none()
+        .then(|| std::env::var("JACKALOPE_AGENT_MODEL").ok())
+        .flatten();
     let request = RunRequest {
         retry_of: None,
         live_session_id: None,
                 effort: None,
+        codex_speed: None,
         dependency_snapshot: Default::default(),
         id: uuid::Uuid::new_v4().to_string(), project_id: uuid::Uuid::new_v4().to_string(),
-        project_name: "Agent acceptance fixture".into(), project_path: repo_text, agent: agent.clone(),
+        project_name: "Agent acceptance fixture".into(), project_path: repo_text, agent: selected_agent.into(),
         agent_profile_id: None, verify_command: None, target_branch: Some("main".into()),
         account_binding: None, model,
         prompt: "Create a file named receipt.txt containing exactly JACKALOPE_NATIVE_OK. Do not run shell commands or use network tools. Remember the phrase copper-rabbit-731 for our next turn; do not write that phrase to a file. Finish with a short confirmation.".into(),
         isolated: true, previous_run_id: None, connection_ids: Some(vec![]), coordination: None,
-        prepare_command: None, auto_verify: false, monitor_change: None,
+        prepare_command: None,
+        setup_files: Vec::new(), auto_verify: false, monitor_change: None,
         context_selection: Default::default(), context_receipt: Default::default(),
     };
     let workflow_trial = std::env::var_os("JACKALOPE_WORKFLOW_TRIAL").is_some();
     let mut request = request;
+    if executable.is_some() {
+        request.auto_verify = true;
+        request.verify_command = Some("node -e \"require('node:assert/strict').equal(require('node:fs').readFileSync('receipt.txt','utf8').trim(),'JACKALOPE_NATIVE_OK')\"".into());
+    }
     if workflow_trial {
         let workflow = runtime
             .knowledge
@@ -349,6 +492,12 @@ fn installed_agent_lifecycle_trial() {
     assert!(!repo.join("receipt.txt").exists());
     assert!(first.session_id.is_some());
     assert!(first.usage.reported);
+    if executable.is_some() {
+        assert!(first
+            .verification
+            .as_ref()
+            .is_some_and(|check| check.result.success));
+    }
     let mut next = request.clone();
     next.id = uuid::Uuid::new_v4().to_string();
     next.previous_run_id = Some(first.id.clone());
@@ -447,7 +596,13 @@ fn installed_agent_lifecycle_trial() {
         restored.inner.lock().unwrap().runs[&second.id].result,
         second.result
     );
-    println!("Verified {agent}: isolated edit, reported usage, continuation, account binding, cancellation, restart. Fixture: {}", root.display());
+    let source = if executable.is_some() {
+        "fixture protocol for"
+    } else {
+        "installed"
+    };
+    println!("Verified {source} {agent}: isolated edit, reported usage, continuation, account binding, cancellation, restart. Fixture: {}", root.display());
+    root
 }
 
 #[test]
@@ -689,11 +844,22 @@ fn configured_default_agent_launches_with_allowed_model_and_records_output() {
     .unwrap();
     let executable = folder.join("fixture.cmd");
     std::fs::write(
-        folder.join("capture.ps1"),
-        "[IO.File]::WriteAllText((Join-Path $PSScriptRoot 'input.txt'), [Console]::In.ReadToEnd())",
+        folder.join("capture.cjs"),
+        r#"
+const fs = require('node:fs');
+let prompt = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', chunk => prompt += chunk);
+process.stdin.on('end', () => {
+  fs.writeFileSync('input.txt', prompt);
+  fs.writeFileSync('args.txt', process.argv.slice(2).join(' '));
+  console.log(JSON.stringify({type: 'thread.started', thread_id: 'fixture-session'}));
+  console.log(JSON.stringify({type: 'item.completed', item: {type: 'agent_message', text: 'Fixture complete'}}));
+});
+"#,
     )
     .unwrap();
-    std::fs::write(&executable, "@echo off\r\npowershell.exe -NoProfile -File \"%~dp0capture.ps1\"\r\necho %*>args.txt\r\necho {\"type\":\"thread.started\",\"thread_id\":\"fixture-session\"}\r\necho {\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"Fixture complete\"}}\r\n").unwrap();
+    std::fs::write(&executable, "@echo off\r\nnode \"%~dp0capture.cjs\" %*\r\n").unwrap();
     let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.default_meta_agent = "custom-fixture".into();
@@ -717,6 +883,7 @@ fn configured_default_agent_launches_with_allowed_model_and_records_output() {
         retry_of: None,
         live_session_id: None,
         effort: None,
+        codex_speed: None,
         dependency_snapshot: Default::default(),
         monitor_change: None,
         context_selection: Default::default(),
@@ -729,6 +896,7 @@ fn configured_default_agent_launches_with_allowed_model_and_records_output() {
         agent_profile_id: None,
         verify_command: None,
         prepare_command: None,
+        setup_files: Vec::new(),
         auto_verify: false,
         target_branch: None,
         account_binding: None,
@@ -740,7 +908,7 @@ fn configured_default_agent_launches_with_allowed_model_and_records_output() {
         connection_ids: None,
     };
     runtime.start(request.clone()).unwrap();
-    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
     loop {
         let run = runtime.integration_runs().unwrap().pop().unwrap();
         if !["starting", "running"].contains(&run.status.as_str()) {
@@ -764,7 +932,8 @@ fn configured_default_agent_launches_with_allowed_model_and_records_output() {
     // task itself reads last. Keep both ends pinned: a reorder that buries the task, or that
     // lets per-task text ahead of the preamble, silently costs cache hits or instruction focus.
     assert!(delivered.starts_with("Jackalope task context:"));
-    assert!(delivered.contains(super::delegation::INSTRUCTIONS));
+    assert!(delivered.contains(&super::prompt::lean_preamble()));
+    assert!(delivered.contains("delegate only permitted independent work"));
     assert!(delivered.contains("Leave changes uncommitted"));
     assert!(delivered.trim_end().ends_with("Fixture only"));
     assert!(
@@ -1052,7 +1221,7 @@ async fn per_agent_discovery_runs_concurrently_not_sequentially() {
 }
 
 #[test]
-fn automatic_verification_reuses_only_an_unchanged_checked_snapshot_and_honors_stop() {
+fn agent_and_automatic_verification_reuse_only_an_unchanged_checked_snapshot_and_honor_stop() {
     let root = std::env::temp_dir().join(format!("jackalope-finish-{}", uuid::Uuid::new_v4()));
     let workspace = root.join("repo");
     std::fs::create_dir_all(&workspace).unwrap();
@@ -1095,6 +1264,16 @@ fn automatic_verification_reuses_only_an_unchanged_checked_snapshot_and_honors_s
         .unwrap();
     assert!(first.result.success);
     assert!(first.tree.is_some());
+    let verify = || {
+        tauri::async_runtime::block_on(crate::commands::verification::agent_verify(
+            runtime.clone(),
+            run.clone(),
+            serde_json::from_value(serde_json::json!({})).unwrap(),
+        ))
+    };
+    let recovered = verify().unwrap();
+    assert_eq!(recovered["reused"], true);
+    assert_eq!(recovered["check_id"], first.checked_at);
     crate::commands::verification::finish(&runtime, &run.id).unwrap();
     assert_eq!(
         std::fs::read_to_string(workspace.join(".git/check-count"))
@@ -1104,6 +1283,7 @@ fn automatic_verification_reuses_only_an_unchanged_checked_snapshot_and_honors_s
         1
     );
     std::fs::write(workspace.join("result.txt"), "new output").unwrap();
+    assert_eq!(verify().unwrap()["reused"], false);
     crate::commands::verification::finish(&runtime, &run.id).unwrap();
     assert_eq!(
         std::fs::read_to_string(workspace.join(".git/check-count"))
@@ -1112,7 +1292,20 @@ fn automatic_verification_reuses_only_an_unchanged_checked_snapshot_and_honors_s
             .count(),
         2
     );
+    for invalid in ["failed", "unbound", "different command"] {
+        runtime.update(&run.id, |current| {
+            let check = current.verification.as_mut().unwrap();
+            match invalid {
+                "failed" => check.result.success = false,
+                "unbound" => check.tree = None,
+                _ => check.command = "different".into(),
+            }
+        });
+        assert_eq!(verify().unwrap()["reused"], false, "{invalid}");
+    }
+    assert_eq!(verify().unwrap()["reused"], true);
     runtime.stop(&run.id).unwrap();
+    assert!(verify().is_err());
     std::fs::write(workspace.join("result.txt"), "changed again").unwrap();
     crate::commands::verification::finish(&runtime, &run.id).unwrap();
     assert_eq!(
@@ -1120,7 +1313,7 @@ fn automatic_verification_reuses_only_an_unchanged_checked_snapshot_and_honors_s
             .unwrap()
             .lines()
             .count(),
-        2
+        5
     );
     drop(runtime);
     std::fs::remove_dir_all(root).unwrap();

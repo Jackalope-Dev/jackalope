@@ -2,6 +2,7 @@ import { applyD1Migrations } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import telemetryFixtures from '../../desktop/scripts/fixtures/telemetry-events.json';
 import { adminRoutes, authorizeAdmin } from '../src/admin';
 import { deliverFeedback } from '../src/feedback-mail';
 import worker from '../src/index';
@@ -79,6 +80,49 @@ beforeEach(async () => {
 });
 
 describe('ingestion contract and privacy', () => {
+  it('accepts the native contract, aggregates operation and task dimensions, and deduplicates retries', async () => {
+    for (let offset = 0; offset < telemetryFixtures.length; offset += 50) {
+      const events = telemetryFixtures
+        .slice(offset, offset + 50)
+        .map((metric) => ({ ...event(), ...metric }));
+      const input = { schemaVersion: 2, events };
+      expect((await request('/v2/telemetry', input)).status).toBe(202);
+      expect((await request('/v2/telemetry', input)).status).toBe(202);
+    }
+    expect(await count('telemetry_receipts')).toBe(telemetryFixtures.length);
+    expect(await env.DB.prepare('SELECT sum(count) FROM metrics').first('sum(count)')).toBe(
+      telemetryFixtures.length,
+    );
+    const rows = (await env.DB.prepare('SELECT name,dimension FROM metrics').all()).results;
+    expect(rows).toContainEqual({
+      name: 'operation_result',
+      dimension: 'integration_apply|partial',
+    });
+    expect(rows).toContainEqual({ name: 'task_state', dimension: 'review|codex|chat' });
+    expect(rows).toContainEqual({
+      name: 'app_error',
+      dimension: 'ui_render_error|task_start|chat',
+    });
+    expect(rows).toContainEqual({ name: 'task_state', dimension: 'starting' });
+  });
+  it.each([
+    { name: 'operation_result', operation: 'private-command', outcome: 'accepted' },
+    { name: 'operation_result', operation: 'task_start', outcome: 'private-error' },
+    { name: 'task_state', state: 'running', agent: 'private-account' },
+    { name: 'app_error', code: 'ui_render_error', feature: 'private-project' },
+    {
+      name: 'operation_result',
+      operation: 'task_start',
+      outcome: 'accepted',
+      args: { prompt: 'private' },
+    },
+  ])('rejects unbounded launch-report dimensions', async (metric) => {
+    expect(
+      (await request('/v2/telemetry', { schemaVersion: 2, events: [{ ...event(), ...metric }] }))
+        .status,
+    ).toBe(400);
+    expect(await count('telemetry_receipts')).toBe(0);
+  });
   it('persists acknowledged events without request headers or raw IPs', async () => {
     const input = telemetry();
     const response = await request('/v2/telemetry', input, {
@@ -531,7 +575,7 @@ describe('private monitoring and feedback delivery', () => {
   it('filters aggregates and triages feedback with same-origin writes and no public exposure', async () => {
     await saveTelemetry(testEnv(), {
       schemaVersion: 2,
-      events: [{ ...event(), channel: 'beta' }, event()],
+      events: [{ ...event(), channel: 'beta', os: 'macos' }, event()],
     });
     const report = feedback();
     await saveFeedback(testEnv(), report);
@@ -545,6 +589,12 @@ describe('private monitoring and feedback delivery', () => {
     expect(overview.metrics).toHaveLength(1);
     expect(overview.metrics[0].channel).toBe('beta');
     expect((await call('/admin/api/overview?channel=private')).status).toBe(400);
+    const mac = (await (await call('/admin/api/overview?os=macos')).json()) as {
+      metrics: { os: string }[];
+    };
+    expect(mac.metrics).toHaveLength(1);
+    expect(mac.metrics[0].os).toBe('macos');
+    expect((await call('/admin/api/overview?os=private')).status).toBe(400);
     const options = {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

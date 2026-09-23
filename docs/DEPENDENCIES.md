@@ -18,8 +18,8 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 
 | Package | Version | Declared license |
 | --- | --- | --- |
-| @biomejs/biome | 2.5.12 | MIT OR Apache-2.0 |
-| @biomejs/cli-win32-x64 | 2.5.12 | MIT OR Apache-2.0 |
+| @biomejs/biome | 2.5.14 | MIT OR Apache-2.0 |
+| @biomejs/cli-win32-x64 | 2.5.14 | MIT OR Apache-2.0 |
 | @cloudflare/kv-asset-handler | 0.5.0 | MIT OR Apache-2.0 |
 | @cloudflare/unenv-preset | 2.16.1 | MIT OR Apache-2.0 |
 | @cloudflare/vitest-plugin | 1.1.7 | MIT |
@@ -121,9 +121,9 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | @types/hast | 3.0.5 | MIT |
 | @types/mdast | 4.0.4 | MIT |
 | @types/ms | 2.1.0 | MIT |
-| @types/node | 24.13.4 | MIT |
-| @types/react | 19.2.18 | MIT |
-| @types/react-dom | 19.2.7 | MIT |
+| @types/node | 26.6.1 | MIT |
+| @types/react | 19.3.0 | MIT |
+| @types/react-dom | 19.3.0 | MIT |
 | @types/unist | 2.0.11, 3.0.3 | MIT |
 | @typescript/typescript-win32-x64 | 7.0.2 | Apache-2.0 |
 | @ungap/structured-clone | 1.4.0 | ISC |
@@ -185,7 +185,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | expect-type | 1.4.0 | Apache-2.0 |
 | extend | 3.0.2 | MIT |
 | fdir | 6.5.0 | MIT |
-| framer-motion | 13.2.0 | MIT |
+| framer-motion | 13.4.0 | MIT |
 | get-nonce | 1.0.1 | MIT |
 | graceful-fs | 4.2.11 | ISC |
 | hast-util-from-parse5 | 8.0.3 | MIT |
@@ -208,13 +208,13 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | jiti | 2.7.0 | MIT |
 | jose | 6.2.12 | MIT |
 | kleur | 4.1.5 | MIT |
-| lefthook | 2.1.12 | MIT |
-| lefthook-windows-x64 | 2.1.12 | MIT |
+| lefthook | 2.1.14 | MIT |
+| lefthook-windows-x64 | 2.1.14 | MIT |
 | lightningcss | 1.32.0, 1.33.0 | MPL-2.0 |
 | lightningcss-win32-x64-msvc | 1.32.0, 1.33.0 | MPL-2.0 |
 | longest-streak | 3.1.0 | MIT |
 | lru_map | 0.4.1 | MIT |
-| lucide-react | 0.475.0 | ISC |
+| lucide-react | 1.47.0 | ISC |
 | magic-string | 0.30.21 | MIT |
 | markdown-table | 3.0.4 | MIT |
 | marked | 17.0.6 | MIT |
@@ -262,9 +262,9 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | micromark-util-symbol | 2.0.1 | MIT |
 | micromark-util-types | 2.0.2 | MIT |
 | miniflare | 5.20260910.0-alpha | MIT |
-| motion | 13.2.0 | MIT |
-| motion-dom | 13.2.0 | MIT |
-| motion-utils | 13.0.0 | MIT |
+| motion | 13.4.0 | MIT |
+| motion-dom | 13.3.0 | MIT |
+| motion-utils | 13.3.0 | MIT |
 | ms | 2.1.3 | MIT |
 | nanoid | 3.3.18 | MIT |
 | obug | 2.1.4 | MIT |
@@ -279,8 +279,8 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | playwright-core | 1.63.0 | Apache-2.0 |
 | postcss | 8.5.28 | MIT |
 | property-information | 7.2.0 | MIT |
-| react | 19.2.8 | MIT |
-| react-dom | 19.2.8 | MIT |
+| react | 19.3.0 | MIT |
+| react-dom | 19.3.0 | MIT |
 | react-markdown | 10.1.0 | MIT |
 | react-remove-scroll | 2.7.2 | MIT |
 | react-remove-scroll-bar | 2.3.8 | MIT |
@@ -297,7 +297,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | remark-stringify | 11.0.0 | MIT |
 | remend | 1.3.1 | Apache-2.0 |
 | rolldown | 1.2.7 | MIT |
-| scheduler | 0.27.0 | MIT |
+| scheduler | 0.28.0 | MIT |
 | semver | 7.8.5 | ISC |
 | sharp | 0.35.4 | Apache-2.0 |
 | shiki | 4.4.3 | MIT |
@@ -311,7 +311,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | style-to-js | 1.1.21 | MIT |
 | style-to-object | 1.0.14 | MIT |
 | supports-color | 10.2.2 | MIT |
-| tailwind-merge | 3.6.0 | MIT |
+| tailwind-merge | 3.6.0, 3.7.0 | MIT |
 | tailwindcss | 4.3.3 | MIT |
 | tapable | 2.3.3 | MIT |
 | tinybench | 2.9.0 | MIT |
@@ -323,7 +323,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | tslib | 2.8.1 | 0BSD |
 | typescript | 7.0.2 | Apache-2.0 |
 | undici | 7.29.0 | MIT |
-| undici-types | 7.18.2 | MIT |
+| undici-types | 8.9.0 | MIT |
 | unenv | 2.0.0-rc.24 | MIT |
 | unified | 11.0.5 | MIT |
 | unist-util-is | 6.0.1 | MIT |
@@ -337,7 +337,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | vfile | 6.0.3 | MIT |
 | vfile-location | 5.0.3 | MIT |
 | vfile-message | 4.0.3 | MIT |
-| vite | 8.2.2 | MIT |
+| vite | 8.3.0 | MIT |
 | vitest | 4.1.11 | MIT |
 | web-namespaces | 2.0.1 | MIT |
 | why-is-node-running | 2.3.0 | MIT |
@@ -377,6 +377,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | atk | 0.18.2 | MIT |
 | atk-sys | 0.18.2 | MIT |
 | atomic-waker | 1.1.2 | Apache-2.0 OR MIT |
+| auto-launch | 0.5.0 | MIT |
 | autocfg | 1.5.1 | Apache-2.0 OR MIT |
 | aws-lc-rs | 1.18.1 | ISC AND (Apache-2.0 OR ISC) |
 | aws-lc-sys | 0.45.0 | ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0) |
@@ -401,6 +402,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | bumpalo | 3.20.3 | MIT OR Apache-2.0 |
 | bytemuck | 1.25.2 | Zlib OR Apache-2.0 OR MIT |
 | byteorder | 1.5.0 | Unlicense OR MIT |
+| byteorder-lite | 0.1.0 | Unlicense OR MIT |
 | bytes | 1.12.1 | MIT |
 | cairo-rs | 0.18.5 | MIT |
 | cairo-sys-rs | 0.18.2 | MIT |
@@ -465,7 +467,9 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | derive_more-impl | 2.1.1 | MIT |
 | digest | 0.10.7 | MIT OR Apache-2.0 |
 | digest | 0.11.3 | MIT OR Apache-2.0 |
+| dirs | 4.0.0 | MIT OR Apache-2.0 |
 | dirs | 6.0.0 | MIT OR Apache-2.0 |
+| dirs-sys | 0.3.7 | MIT OR Apache-2.0 |
 | dirs-sys | 0.5.0 | MIT OR Apache-2.0 |
 | dispatch2 | 0.3.1 | Zlib OR Apache-2.0 OR MIT |
 | displaydoc | 0.2.7 | MIT OR Apache-2.0 |
@@ -624,6 +628,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | idna | 1.1.0 | MIT OR Apache-2.0 |
 | idna_adapter | 1.2.2 | Apache-2.0 OR MIT |
 | ignore | 0.4.33 | Unlicense OR MIT |
+| image | 0.25.10 | MIT OR Apache-2.0 |
 | indexmap | 1.9.3 | Apache-2.0 OR MIT |
 | indexmap | 2.14.1 | Apache-2.0 OR MIT |
 | infer | 0.19.0 | MIT |
@@ -679,6 +684,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | miniz_oxide | 0.8.9 | MIT OR Zlib OR Apache-2.0 |
 | miniz_oxide | 0.9.1 | MIT OR Zlib OR Apache-2.0 |
 | mio | 1.2.3 | MIT |
+| moxcms | 0.8.1 | BSD-3-Clause OR Apache-2.0 |
 | muda | 0.19.3 | Apache-2.0 OR MIT |
 | ndk | 0.9.0 | MIT OR Apache-2.0 |
 | ndk-sys | 0.6.0+11769913 | MIT OR Apache-2.0 |
@@ -769,6 +775,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 |
 | process-wrap | 9.1.0 | Apache-2.0 OR MIT |
 | prodash | 31.0.0 | MIT |
+| pxfm | 0.1.30 | BSD-3-Clause OR Apache-2.0 |
 | quick-xml | 0.41.0 | MIT |
 | quinn | 0.11.11 | MIT OR Apache-2.0 |
 | quinn-proto | 0.11.17 | MIT OR Apache-2.0 |
@@ -784,13 +791,14 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | rand_pcg | 0.10.2 | MIT OR Apache-2.0 |
 | raw-window-handle | 0.6.2 | MIT OR Apache-2.0 OR Zlib |
 | redox_syscall | 0.5.18 | MIT |
+| redox_users | 0.4.6 | MIT |
 | redox_users | 0.5.2 | MIT |
 | ref-cast | 1.0.27 | MIT OR Apache-2.0 |
 | ref-cast-impl | 1.0.27 | MIT OR Apache-2.0 |
 | regex | 1.13.1 | MIT OR Apache-2.0 |
 | regex-automata | 0.4.18 | MIT OR Apache-2.0 |
 | regex-syntax | 0.8.11 | MIT OR Apache-2.0 |
-| reqwest | 0.13.4 | MIT OR Apache-2.0 |
+| reqwest | 0.13.5 | MIT OR Apache-2.0 |
 | rfd | 0.16.0 | MIT |
 | ring | 0.17.14 | Apache-2.0 AND ISC |
 | rmcp | 3.2.0 | Apache-2.0 |
@@ -887,6 +895,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | tauri-codegen | 2.6.3 | Apache-2.0 OR MIT |
 | tauri-macros | 2.6.3 | Apache-2.0 OR MIT |
 | tauri-plugin | 2.6.3 | Apache-2.0 OR MIT |
+| tauri-plugin-autostart | 2.5.1 | Apache-2.0 OR MIT |
 | tauri-plugin-dialog | 2.7.3 | Apache-2.0 OR MIT |
 | tauri-plugin-fs | 2.5.2 | Apache-2.0 OR MIT |
 | tauri-plugin-shell | 2.3.6 | Apache-2.0 OR MIT |
@@ -916,13 +925,13 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | tokio-util | 0.7.19 | MIT |
 | toml | 0.8.2 | MIT OR Apache-2.0 |
 | toml | 0.9.12+spec-1.1.0 | MIT OR Apache-2.0 |
-| toml | 1.1.5+spec-1.1.0 | MIT OR Apache-2.0 |
+| toml | 1.1.6+spec-1.1.0 | MIT OR Apache-2.0 |
 | toml_datetime | 0.6.3 | MIT OR Apache-2.0 |
 | toml_datetime | 0.7.5+spec-1.1.0 | MIT OR Apache-2.0 |
 | toml_datetime | 1.1.1+spec-1.1.0 | MIT OR Apache-2.0 |
 | toml_edit | 0.19.15 | MIT OR Apache-2.0 |
 | toml_edit | 0.20.2 | MIT OR Apache-2.0 |
-| toml_edit | 0.25.13+spec-1.1.0 | MIT OR Apache-2.0 |
+| toml_edit | 0.25.15+spec-1.1.0 | MIT OR Apache-2.0 |
 | toml_parser | 1.1.3+spec-1.1.0 | MIT OR Apache-2.0 |
 | toml_writer | 1.1.2+spec-1.1.0 | MIT OR Apache-2.0 |
 | tower | 0.5.3 | MIT |
@@ -955,7 +964,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | url | 2.5.8 | MIT OR Apache-2.0 |
 | urlpattern | 0.3.0 | MIT |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT |
-| uuid | 1.26.0 | Apache-2.0 OR MIT |
+| uuid | 1.26.1 | Apache-2.0 OR MIT |
 | value-trait | 0.12.2 | Apache-2.0/MIT |
 | version_check | 0.9.5 | MIT/Apache-2.0 |
 | version-compare | 0.2.1 | MIT |

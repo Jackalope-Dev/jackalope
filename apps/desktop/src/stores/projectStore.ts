@@ -1,7 +1,8 @@
 import type { ThemePalette } from '@jackalope/brand/theme';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { createWorktree, type WorktreeEntry } from '../lib/tauri-bridge.ts';
+import { nativeTask } from '../lib/task-runtime.ts';
+import { createWorktree, isTauriEnvironment, type WorktreeEntry } from '../lib/tauri-bridge.ts';
 import { readWorktrees } from '../lib/worktree-reads.ts';
 
 export interface ProjectPreferences {
@@ -29,6 +30,7 @@ export interface ProjectPreferences {
   verifyCommand?: string;
   previewCommand?: string;
   prepareCommand?: string;
+  setupFiles?: string[];
   autoVerify?: boolean;
   isolatedByDefault?: boolean;
 }
@@ -63,14 +65,7 @@ export interface Project {
   worktrees: WorktreeEntry[];
   description?: string;
   preferences?: ProjectPreferences;
-  agentProvider:
-    | 'codex'
-    | 'grok'
-    | 'claude-code'
-    | 'aider'
-    | 'openhands'
-    | 'ollama'
-    | 'antigravity';
+  agentProvider: 'codex' | 'grok' | 'claude-code' | 'openhands' | 'ollama' | 'antigravity';
 }
 
 interface ProjectState {
@@ -243,6 +238,67 @@ export const useProjectStore = create<ProjectState>()(
         projects: state.projects.map((project) => ({ ...project, worktrees: [] })),
         activeProjectId: state.activeProjectId,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) void mergeProjectRegistry();
+      },
     },
   ),
 );
+
+interface ProjectRecord {
+  id: string;
+  name: string;
+  path: string;
+}
+
+function projectRecords(projects: Project[]): ProjectRecord[] {
+  return projects.map(({ id, name, path }) => ({ id, name, path }));
+}
+
+// Keeps the native mirror in step with this store. The `jackalope` command
+// reads it to learn which project id belongs to a repository, so work started
+// from a terminal lands in the same project as work started here.
+function writeProjectRegistry(projects: Project[]) {
+  if (!isTauriEnvironment()) return;
+  void nativeTask('project_registry_save', { projects: projectRecords(projects) }).catch(() => {
+    // The mirror is a convenience; the store stays the source of truth.
+  });
+}
+
+// Adopts repositories registered from a terminal before this window loaded,
+// then republishes so the mirror reflects any projects added while it was
+// unavailable.
+async function mergeProjectRegistry() {
+  if (!isTauriEnvironment()) return;
+  try {
+    const records = await nativeTask<ProjectRecord[]>('project_registry_list', {});
+    const state = useProjectStore.getState();
+    const known = new Set(state.projects.map((project) => projectPathKey(project.path)));
+    const added = records
+      .filter((record) => !known.has(projectPathKey(record.path)))
+      .map<Project>((record) => ({
+        id: record.id,
+        name: record.name,
+        path: record.path,
+        gitBranch: '',
+        worktrees: [],
+        agentProvider: 'codex',
+      }));
+    if (added.length) {
+      useProjectStore.setState((current) => ({ projects: [...current.projects, ...added] }));
+    }
+    writeProjectRegistry(useProjectStore.getState().projects);
+  } catch {
+    // Nothing to adopt if the host cannot be reached.
+  }
+}
+
+let mirrored: string | null = null;
+useProjectStore.subscribe((state) => {
+  // Subscribing rather than writing from each mutator means a future action
+  // cannot forget to mirror.
+  const encoded = JSON.stringify(projectRecords(state.projects));
+  if (encoded === mirrored) return;
+  mirrored = encoded;
+  writeProjectRegistry(state.projects);
+});

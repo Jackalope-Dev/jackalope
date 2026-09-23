@@ -1,8 +1,9 @@
-import { Input, SearchField } from '@jackalope/ui';
+import { DiscordIcon, Input, SearchField } from '@jackalope/ui';
 
 import { useEffect, useRef, useState } from 'react';
+import { DISCORD_URL } from '../../lib/community';
 import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -24,10 +25,15 @@ import { NotificationSettings } from './NotificationSettings';
 import { PrivacySettings } from './PrivacySettings';
 import { ReferralSettings } from './ReferralSettings';
 import { ReleaseSupport } from './ReleaseSupport';
+import { RoutingPreferences } from './RoutingSetup';
 import { Setting, SettingGroup } from './Setting';
 import { SystemInfoView } from './SystemInfo';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
+import { DesktopPreferences } from './DesktopPreferences';
+import { IssueConnections } from './IssueConnections';
+import { RemoteAccess } from './RemoteAccess';
+import { SavedActions } from './SavedActions';
 
 interface SettingsPageProps {
   onClose: () => void;
@@ -37,10 +43,15 @@ interface SettingsPageProps {
 }
 const categories = [
   'General',
+  'Desktop',
+  'Saved actions',
   'Jackalope account',
   'Invitations',
   'Appearance',
   'Agents',
+  'Connected work',
+  'Remote access',
+  'Decisions',
   'Privacy',
   'Project',
   'Updates & support',
@@ -49,6 +60,12 @@ const categories = [
   'Diagnostics',
 ] as const;
 export type SettingsCategory = (typeof categories)[number];
+const settingsGroup = (category: SettingsCategory): SettingsCategory =>
+  category === 'Invitations'
+    ? 'Jackalope account'
+    : category === 'System' || category === 'Diagnostics'
+      ? 'Updates & support'
+      : category;
 
 export function SettingsPage({
   onClose,
@@ -71,11 +88,16 @@ export function SettingsPage({
   const project = projects.find((project) => project.id === selectedProjectId);
   const scopedCategories =
     scope === 'project'
-      ? categories.filter((c) => ['Project', 'Appearance', 'Agents'].includes(c))
+      ? categories.filter((c) => ['Project', 'Appearance', 'Agents', 'Decisions'].includes(c))
       : categories.filter((c) => c !== 'Project');
   const [category, setCategory] = useState<SettingsCategory>(
     initialCategory ?? (initialScope === 'project' ? 'Project' : 'General'),
   );
+  const selectedSection = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (settingsGroup(category) !== category)
+      selectedSection.current?.scrollIntoView({ block: 'start' });
+  }, [category]);
   const [query, setQuery] = useState('');
   const [message, setMessage] = useState('');
   const [confirming, setConfirming] = useState(false);
@@ -84,7 +106,7 @@ export function SettingsPage({
   const matches = (section: SettingsCategory, words: string) =>
     query.trim()
       ? `${section} ${words}`.toLowerCase().includes(query.trim().toLowerCase())
-      : section === category;
+      : settingsGroup(section) === settingsGroup(category);
   const visible = scopedCategories.filter((c) =>
     matches(
       c,
@@ -96,13 +118,19 @@ export function SettingsPage({
         Diagnostics: 'activity log routing events errors codebase',
         General:
           'window close exit system tray background quit minimize guided setup onboarding notifications companion animations quiet',
+        Desktop:
+          'keyboard shortcuts zoom terminal shell font editor keep awake sleep power WSL links running services previews ports disk worktrees',
+        'Saved actions': 'prompt presets commands shortcuts reuse global project',
         Appearance: 'theme color light dark atmosphere picker toolbar',
         Agents:
-          'default models available detected allowed restrict cli command executable configuration',
+          'default models available detected allowed restrict cli command executable configuration automatic quota handoff',
+        'Connected work': 'GitHub Linear Jira issues pull requests API token',
+        'Remote access': 'hosts phone companion SSH pairing Tailscale device',
+        Decisions: 'Jackalope routing Jev TypeSafe API key automatic agent cost tokens capacity',
         Privacy: 'marketplace MCP network telemetry crash reporting',
         Project: 'repository name path agent instructions verification command',
         'Updates & support':
-          'version automatic install release notes help feedback diagnostics report',
+          'version automatic install release notes help feedback diagnostics report community discord',
         'Data & reset':
           'export clipboard erase delete nuke reset first time setup history local data',
       }[c],
@@ -206,28 +234,42 @@ export function SettingsPage({
       </div>
       <div className="settings-body">
         <nav className="settings-sidebar" aria-label="Settings categories">
-          {scopedCategories.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className={`settings-nav-item ${category === c && !query ? 'is-active' : ''}`}
-              aria-current={category === c && !query ? 'page' : undefined}
-              onClick={() => {
-                setCategory(c);
-                setQuery('');
-                setMessage('');
-                setConfirming(false);
-                setConfirmation('');
-              }}
-            >
-              {c}
-            </button>
-          ))}
+          {scopedCategories
+            .filter((c) => settingsGroup(c) === c)
+            .map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={`settings-nav-item ${settingsGroup(category) === c && !query ? 'is-active' : ''}`}
+                aria-current={settingsGroup(category) === c && !query ? 'page' : undefined}
+                onClick={() => {
+                  setCategory(c);
+                  setQuery('');
+                  setMessage('');
+                  setConfirming(false);
+                  setConfirmation('');
+                }}
+              >
+                {c}
+              </button>
+            ))}
+          <button
+            type="button"
+            className="settings-nav-item settings-community-link"
+            onClick={() => void openExternalUrl(DISCORD_URL)}
+          >
+            <DiscordIcon />
+            Join the Discord
+          </button>
         </nav>
         <div className="settings-content">
           {!visible.length && <p>No settings match “{query}”.</p>}
           {visible.map((c) => (
-            <section key={c} className="settings-section">
+            <section
+              key={c}
+              className="settings-section"
+              ref={c === category ? selectedSection : undefined}
+            >
               <WorkspaceSectionHeading
                 title={c === 'Project' ? 'Project settings' : c}
                 description={
@@ -237,8 +279,18 @@ export function SettingsPage({
               {c === 'Jackalope account' && (
                 <JackalopeAccount onInvitations={() => setCategory('Invitations')} />
               )}
+              {c === 'Connected work' && <IssueConnections />}
+              {c === 'Desktop' && <DesktopPreferences />}
+              {c === 'Saved actions' && <SavedActions />}
+              {c === 'Remote access' && <RemoteAccess />}
               {c === 'Invitations' && (
                 <ReferralSettings onAccount={() => setCategory('Jackalope account')} />
+              )}
+              {c === 'Decisions' && (
+                <RoutingPreferences
+                  key={scope === 'project' ? project?.id : 'app'}
+                  projectId={scope === 'project' ? project?.id : undefined}
+                />
               )}
               {c === 'General' && (
                 <>

@@ -9,39 +9,20 @@
 .onboarding-shell > .app-titlebar {
   margin: 0;
 }
-.onboarding-topbar {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 16px 36px;
-}
-.onboarding-wordmark {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
-}
-.onboarding-wordmark img {
-  width: 28px;
-  height: 28px;
-}
 .onboarding-layout {
   display: grid;
   flex: 1;
   width: 100%;
   grid-template-rows: minmax(0, 1fr);
   grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr);
-  max-width: 1100px;
-  margin: 0 auto;
+  margin: 0;
   gap: clamp(32px, 6vw, 88px);
   padding: 28px 48px;
   min-height: 0;
   align-items: center;
 }
 .onboarding-intro {
-  padding: 80px 6px 6px;
+  padding: 0 6px 48px;
   margin-inline: -6px;
 }
 .onboarding-intro h1 {
@@ -91,6 +72,7 @@
   min-width: 0;
   max-height: 100%;
   overflow: auto;
+  scrollbar-gutter: stable;
   padding: 32px;
   border-radius: 24px;
   background: linear-gradient(160deg, var(--color-surface-elevated), var(--color-surface));
@@ -151,8 +133,7 @@
   font-weight: 500;
 }
 .onboarding-privacy p,
-.onboarding-note,
-.onboarding-explanation p {
+.onboarding-note {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
   line-height: 1.65;
@@ -173,22 +154,17 @@
   background: var(--color-surface);
   box-shadow: 0 -12px 20px var(--color-surface);
   display: flex;
+  width: fit-content;
+  max-width: 100%;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 28px;
+  margin-left: auto;
   flex-wrap: wrap;
 }
 .onboarding-theme-editor {
   width: 100%;
   min-width: 0;
-}
-.onboarding-theme-inherit {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-  margin-bottom: 24px;
-  font-size: var(--text-sm);
 }
 .onboarding-runner-list {
   display: grid;
@@ -384,18 +360,6 @@
   resize: vertical;
   margin: 8px 0;
 }
-.onboarding-explanation {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--color-border);
-}
-.onboarding-explanation strong {
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-.onboarding-explanation p {
-  margin-top: 6px;
-}
 @media (max-width: 1000px) {
   .onboarding-layout {
     padding: 12px 32px;
@@ -416,9 +380,6 @@
   }
   .onboarding-intro {
     display: none;
-  }
-  .onboarding-topbar {
-    padding: 12px 20px;
   }
   .onboarding-folder {
     flex-wrap: wrap;
@@ -561,31 +522,6 @@
   color: var(--color-text-secondary);
   line-height: 1.5;
 }
-.onboarding-privacy-panel[open] .onboarding-privacy-chevron {
-  transform: rotate(180deg);
-}
-.onboarding-privacy-controls {
-  padding: 16px;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
-  border-radius: 0 0 12px 12px;
-}
-
-.onboarding-privacy-controls .settings-row-description {
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  line-height: 1.65;
-}
-.onboarding-privacy-controls h2 {
-  font-size: var(--text-base);
-  letter-spacing: normal;
-}
-.onboarding-privacy-controls .settings-disclosure-box {
-  font-size: var(--text-xs);
-  padding: 12px;
-  background: var(--color-surface-elevated);
-  border-radius: 8px;
-}
 
 .onboarding-project-options {
   display: flex;
@@ -618,9 +554,6 @@
   margin-top: 4px;
 }
 @media (max-height: 740px) {
-  .onboarding-topbar {
-    padding-block: 8px;
-  }
   .onboarding-content {
     padding: 20px;
   }

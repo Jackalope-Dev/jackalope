@@ -23,7 +23,7 @@ the native profile. Archived runs remain on disk and searchable. Active, review-
 failed, interrupted, unsaved, manually archived and live-session runs remain loaded. Session attempts
 stay available because later batches depend on their workspace and account identity.
 
-Tasks → Inbox → Archived and Settings → Data & reset list retention archives, restore runs and import
+Work → Archived and Settings → Data & reset list retention archives, restore runs and import
 `jackalope-task-recovery` exports. An import or restoration cannot overwrite an
 existing run. Recovery exports contain private task data; inspect them before sharing.
 
@@ -31,6 +31,18 @@ Unreadable journals are preserved. Restore access or disk space, then retry savi
 through the recovery notice. Retain an independent copy before manually repairing
 records. Never manufacture a successful attempt or replay interrupted work to clear
 an error. A new task can use a reviewed copy of the retained workspace.
+
+## Terminal snapshots
+
+Settings → Desktop can retain the last terminal output locally. Each pane saves a
+bounded snapshot of up to 256 KiB when stopped or during orderly shutdown, under
+`integrations/terminal-output` in the native profile. The restored view is stopped;
+starting a shell is a separate action and never replays previous input. Abrupt exits
+can lose unsaved output. Disabling retention prevents new snapshots and restoration;
+it does not erase previously saved files.
+
+Terminal output can include private command results. Keep profile backups private.
+Task history and workspace registration must still match before a snapshot is shown.
 
 ## Workspace cleanup
 

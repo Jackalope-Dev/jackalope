@@ -11,7 +11,7 @@
     padding: 10px 12px;
     border: 1px solid var(--color-border);
     border-radius: 10px;
-    background: linear-gradient(var(--color-surface), var(--color-surface-sunken));
+    background: var(--color-surface-elevated);
     color: var(--color-text-primary);
     font-size: var(--text-sm, 0.875rem);
     text-align: left;
@@ -29,7 +29,7 @@
   .themed-select:hover:not(:disabled),
   .themed-select[data-state="open"] {
     background: var(--color-surface-hover);
-    border-color: var(--color-border-focus);
+    border-color: var(--color-text-muted);
   }
   .themed-select:focus-visible {
     outline: 2px solid var(--color-accent-ink);
@@ -69,11 +69,14 @@
   }
   .themed-select-option[data-highlighted] {
     background: var(--color-surface-hover);
+  }
+  .themed-select-option:focus-visible {
     outline: 2px solid var(--color-accent-ink);
     outline-offset: -2px;
   }
   .themed-select-option[data-state="checked"] {
     color: var(--color-accent-ink);
+    font-weight: 600;
   }
   .themed-select-option[data-disabled] {
     opacity: 0.5;

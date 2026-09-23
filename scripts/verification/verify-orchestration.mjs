@@ -81,9 +81,7 @@ try {
       const project={id:'fixture',name:'Fixture project',path:'C:/fixture',gitBranch:'main',worktrees:[],agentProvider:'codex',preferences:{verifyCommand:'node check.mjs',autoVerify:true}};
       useProjectStore.setState({projects:[project],activeProjectId:'fixture'}); useExecutionStore.setState({runs:[],runners:[{id:'codex',name:'Codex',available:true,signedIn:true}],submitting:false});
       const {FeaturePlanner}=await import('/src/components/tasks/FeaturePlanner.tsx');
-      const {AgentMetricsDashboard}=await import('/src/components/tasks/AgentMetricsDashboard.tsx');
-      const runs=[{id:'one',taskId:'one',projectId:'fixture',projectPath:'C:/fixture',projectName:'Fixture project',prompt:'Private prompt',agent:'codex',status:'review',startedAt:'2026-09-09T12:00:00Z',endedAt:'2026-09-09T12:01:00Z',usage:{input:0,output:0,reported:false},stages:[{stage:'execution',startedAt:'2026-09-09T12:00:00Z',endedAt:'2026-09-09T12:01:00Z',durationMs:60000}]}];
-      function App(){const [open,setOpen]=React.useState(false);return React.createElement(React.Fragment,null,React.createElement('button',{onClick:()=>setOpen(true)},'Plan fixture'),React.createElement(AgentMetricsDashboard,{runs}),open&&React.createElement(FeaturePlanner,{project,initialGoal:window.fixture.goal,onClose:()=>setOpen(false),onAdded:async()=>{}}));}
+      function App(){const [open,setOpen]=React.useState(false);return React.createElement(React.Fragment,null,React.createElement('button',{onClick:()=>setOpen(true)},'Plan fixture'),open&&React.createElement(FeaturePlanner,{project,initialGoal:window.fixture.goal,onClose:()=>setOpen(false),onAdded:async()=>{}}));}
       ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
     </script></body></html>`,
         }),
@@ -119,18 +117,6 @@ try {
       await page.keyboard.press('Escape');
       await page.getByRole('dialog').waitFor({ state: 'hidden' });
       await page.waitForFunction(() => document.activeElement?.textContent === 'Plan fixture');
-      await page.getByRole('heading', { name: 'Execution time', exact: true }).waitFor();
-      await page.getByText('execution: 60.0s', { exact: true }).waitFor();
-      await page.getByRole('button', { name: 'Copy evaluation data', exact: true }).click();
-      await page.getByRole('button', { name: 'Copied evaluation data', exact: true }).waitFor();
-      const copied = await page.evaluate(() => window.fixture.copied);
-      assert.equal(JSON.parse(copied).stageTotalsMs.execution, 60000);
-      assert.equal(JSON.parse(copied).episodes[0].outcome, null);
-      assert.ok(!copied.includes('Private prompt') && !copied.includes('C:/fixture'));
-      await page.screenshot({
-        path: `${output}/metrics-${width}-${dark ? 'dark' : 'light'}.png`,
-        fullPage: true,
-      });
       assert.deepEqual(errors, []);
       await context.close();
     }

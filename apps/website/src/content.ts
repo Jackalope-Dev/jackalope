@@ -123,6 +123,7 @@ export const posts: BlogPost[] = [
     seoTitle: 'Coding-agent workflow: From brief to code review',
     category: 'Working with agents',
     date: '2026-09-06',
+    updated: '2026-09-17',
     readingTime: '3 min read',
     description:
       'A practical walkthrough of the task workflow: choose the project, describe the outcome, then inspect what comes back.',
@@ -151,10 +152,14 @@ export const posts: BlogPost[] = [
       {
         title: '04. Read, check, then decide.',
         paragraphs: [
-          'Inspect the patch and the agent’s summary. Run the checks appropriate to your project, and try the behavior that changed. Recorded checks refer to a particular file snapshot; changes after that point need another check.',
+          'Open Review and inspect Changes, Checks, and Merge. Read the patch and actual command output, then try the changed behavior. File markers track your place; Approve work records outcome acceptance for the current snapshot. Preparing and applying a merge is a separate action. Changed files need fresh review and checks.',
           'Ask for another iteration when necessary. Review the combined result before integrating work from multiple tasks. Each task can pass on its own while the combination still needs attention.',
         ],
       },
+    ],
+    related: [
+      { label: 'Review and merge step by step', href: '/knowledge/review-and-merge/' },
+      { label: 'Chat and queued follow-ups', href: '/knowledge/chat-and-follow-ups/' },
     ],
   },
 ];
@@ -180,6 +185,12 @@ export const pages: SitePage[] = [
     title: 'Download Jackalope for Windows, macOS & Linux',
     description:
       'Find Jackalope desktop downloads and platform availability. Join the waitlist or claim a friend’s Instant Access Pass for early access.',
+  },
+  {
+    path: '/benchmarks/',
+    title: 'Agent performance benchmarks & methodology | Jackalope',
+    description:
+      'Measured task performance through Jackalope and the native agent CLI, with token usage, independent checks, limitations, and reproducible methodology.',
   },
   {
     path: '/tour/',

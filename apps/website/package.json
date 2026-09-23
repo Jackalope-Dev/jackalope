@@ -15,7 +15,7 @@
     "@jackalope/brand": "workspace:*",
     "@jackalope/knowledge": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.6",
-    "lucide-react": "^0.475.0",
+    "lucide-react": "^1.46.0",
     "motion": "^13.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -23,12 +23,12 @@
   },
   "devDependencies": {
     "@resvg/resvg-js": "2.6.2",
-    "@types/node": "^24.13.4",
+    "@types/node": "^26.5.1",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^6.1.1",
     "typescript": "^7.0.2",
-    "vite": "^8.2.2",
+    "vite": "^8.3.0",
     "wrangler": "4.131.0"
   }
 }

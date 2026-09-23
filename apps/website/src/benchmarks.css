@@ -1,0 +1,128 @@
+.benchmark-page {
+  padding-block: 72px;
+  max-width: 1120px;
+}
+.benchmark-intro {
+  max-width: 850px;
+}
+.benchmark-eyebrow,
+.benchmark-caption {
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+.benchmark-intro h1 {
+  font-size: clamp(44px, 6vw, 76px);
+  line-height: 1.06;
+  letter-spacing: -0.045em;
+  margin-block: 18px 24px;
+}
+.benchmark-lede {
+  font-size: 20px;
+  max-width: 740px;
+  margin-bottom: 24px;
+}
+.benchmark-highlights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 24px;
+  margin-block: 48px 64px;
+}
+.benchmark-highlights > div {
+  border-top: 2px solid var(--color-action);
+  padding-top: 20px;
+}
+.benchmark-highlights strong {
+  display: block;
+  font-size: clamp(26px, 3vw, 40px);
+  line-height: 1.2;
+  margin-bottom: 12px;
+}
+.benchmark-highlights span {
+  display: block;
+  max-width: 320px;
+}
+.benchmark-section {
+  margin-top: 56px;
+}
+.benchmark-section h2 {
+  font-size: 30px;
+  letter-spacing: -0.025em;
+  margin-bottom: 20px;
+}
+.benchmark-section p {
+  max-width: 880px;
+  margin-block: 16px;
+}
+.benchmark-section a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.benchmark-result {
+  margin-top: 36px;
+}
+.benchmark-result h3 {
+  font-size: 22px;
+}
+.benchmark-table {
+  overflow-x: auto;
+  margin-block: 20px;
+}
+.benchmark-table table {
+  border-collapse: collapse;
+  width: 100%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.benchmark-table th,
+.benchmark-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+.benchmark-table th:first-child {
+  text-align: left;
+}
+.benchmark-section ol {
+  padding-left: 24px;
+  max-width: 900px;
+}
+.benchmark-section li {
+  margin-block: 18px;
+  padding-left: 8px;
+}
+.benchmark-environment {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+}
+.benchmark-environment > div {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 12px;
+}
+.benchmark-environment dt {
+  font-weight: 600;
+}
+.benchmark-environment dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.benchmark-section pre {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 20px;
+  line-height: 1.7;
+}
+@media (max-width: 600px) {
+  .benchmark-page {
+    padding-block: 40px;
+  }
+  .benchmark-lede {
+    font-size: 18px;
+  }
+  .benchmark-environment > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}

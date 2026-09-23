@@ -1,36 +1,53 @@
+import type { TaskTicket } from '../stores/taskStore.ts';
+import { type LiveSession, sessionWork } from './live-session.ts';
+import { managedTaskWork } from './managed-task.ts';
+import type { QueueView } from './queue.ts';
+import { collectWorkspaceWork, type WorkItem, workPresence } from './task-collection.ts';
 import { isActive, type TaskRun } from './task-runtime.ts';
 import { taskDecision } from './task-workflow.ts';
 
-export function returnToProject(runs: TaskRun[], projectId: string, integratedIds: string[]) {
-  const latest = new Map<string, TaskRun>();
-  for (const run of runs.filter((r) => r.projectId === projectId)) {
-    const old = latest.get(run.taskId);
-    if (!old || Date.parse(run.startedAt) > Date.parse(old.startedAt)) latest.set(run.taskId, run);
-  }
-  const priority = (run: TaskRun) =>
-    run.persistenceError ||
-    run.verificationError ||
-    run.verification?.result.success === false ||
-    run.prompts?.some((p) => p.status === 'pending') ||
-    ['failed', 'interrupted', 'stopped'].includes(run.status)
-      ? 0
-      : run.status === 'review'
-        ? 1
-        : isActive(run)
-          ? 2
-          : 3;
-  return [...latest.values()]
-    .filter(
-      (r) =>
-        !r.archivedAt &&
-        !integratedIds.includes(r.id) &&
-        (r.status !== 'reviewed' || (!!r.workspace && r.workspace !== r.projectPath)),
-    )
-    .sort((a, b) => priority(a) - priority(b) || Date.parse(b.startedAt) - Date.parse(a.startedAt));
+export function returnToProject(
+  runs: TaskRun[],
+  projectId: string,
+  integratedIds: string[],
+  {
+    ideas = [],
+    sessions = [],
+    queue,
+  }: { ideas?: TaskTicket[]; sessions?: LiveSession[]; queue?: QueueView } = {},
+) {
+  return collectWorkspaceWork(projectId, ideas, runs, sessions, integratedIds, false, queue).filter(
+    (item) => item.stage !== 'ideas' && item.stage !== 'finished',
+  );
 }
 
-export function nextAction(run: TaskRun) {
-  return taskDecision(run).action;
+export function projectTaskPresence(item: WorkItem, runs: TaskRun[], queue: QueueView) {
+  const managed = item.managed ? managedTaskWork(item.managed, queue, runs) : undefined;
+  const session = item.session ? sessionWork(item.session, runs) : undefined;
+  const active =
+    managed?.active ??
+    (session
+      ? session.active
+        ? [session.active]
+        : []
+      : item.run && isActive(item.run)
+        ? [item.run]
+        : []);
+  const waiting = active.some((run) => run.prompts?.some((prompt) => prompt.status === 'pending'));
+  return {
+    label:
+      managed?.status ??
+      session?.status ??
+      (item.run ? taskDecision(item.run).label : 'Task history unavailable'),
+    agents: active.length
+      ? [...new Set(active.map((run) => run.agent))]
+      : workPresence(item).agents,
+    state: waiting
+      ? ('waiting' as const)
+      : active.length
+        ? ('working' as const)
+        : ('idle' as const),
+  };
 }
 
 export function recoveryHandoff(run: TaskRun, original: string, next: string) {

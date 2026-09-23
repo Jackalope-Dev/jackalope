@@ -7,10 +7,33 @@ import { sha256 } from './catalog.mjs';
 import { channelConfig } from './channels.mjs';
 import { validateCloudFiles, validateCloudReceipt } from './cloud-artifacts.mjs';
 import { parseDraftId, uploadCandidate } from './cloud-upload.mjs';
-import { application, cloudConfig, cloudEndpoint } from './crabnebula-config.mjs';
+import {
+  application,
+  clearAppleSigning,
+  cloudConfig,
+  cloudEndpoint,
+} from './crabnebula-config.mjs';
 
 const publicKey = Buffer.from('test public key').toString('base64');
 const id = '01JSGWMMTRBTD4YSBEVE3W5B7V';
+test('Mac rehearsals remove empty CI signing variables and inherited notarization credentials', () => {
+  const environment = {
+    APPLE_CERTIFICATE: '',
+    APPLE_CERTIFICATE_PASSWORD: '',
+    APPLE_SIGNING_IDENTITY: 'Developer ID Application: Previous Identity',
+    APPLE_API_KEY: '',
+    APPLE_API_KEY_PATH: '/private/old-key.p8',
+    APPLE_ID: 'previous@example.test',
+    APPLE_PASSWORD: 'fixture-password',
+    PATH: '/usr/bin',
+    TAURI_SIGNING_PRIVATE_KEY: 'temporary-updater-key',
+  };
+  clearAppleSigning(environment);
+  assert.deepEqual(environment, {
+    PATH: '/usr/bin',
+    TAURI_SIGNING_PRIVATE_KEY: 'temporary-updater-key',
+  });
+});
 test('Cloud channels preserve service URL restrictions and reject unrelated query parameters', () => {
   const endpoints = {
     stableEndpoint: cloudEndpoint('stable'),

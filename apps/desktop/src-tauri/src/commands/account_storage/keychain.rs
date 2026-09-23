@@ -22,10 +22,10 @@ fn record(path: &Path) -> Result<Option<Vec<u8>>, String> {
         Ok(file) => {
             use std::io::Read;
             let mut bytes = Vec::new();
-            file.take(16385)
+            file.take((super::MAX_SECRET_BYTES + 4097) as u64)
                 .read_to_end(&mut bytes)
                 .map_err(|_| "The secure account record could not be read.")?;
-            if bytes.len() > 16384 {
+            if bytes.len() > super::MAX_SECRET_BYTES + 4096 {
                 return Err("The secure account record is invalid.".into());
             }
             Ok(Some(bytes))
@@ -54,7 +54,7 @@ pub(in crate::commands) fn read(path: &Path) -> Result<Option<Vec<u8>>, String> 
     };
     let entry = keyring::Entry::new(SERVICE, identifier(&bytes)?).map_err(unavailable)?;
     let secret = entry.get_secret().map_err(unavailable)?;
-    if secret.len() > 16384 {
+    if secret.len() > super::MAX_SECRET_BYTES {
         return Err("The secure account record is invalid.".into());
     }
     Ok(Some(secret))
@@ -65,7 +65,7 @@ pub(in crate::commands) fn write(path: &Path, bytes: &[u8]) -> Result<(), String
     let _guard = STORAGE
         .lock()
         .map_err(|_| "Secure storage is unavailable.")?;
-    if bytes.len() > 16384 {
+    if bytes.len() > super::MAX_SECRET_BYTES {
         return Err("The secure account record is too large.".into());
     }
     let previous = record(path)?;

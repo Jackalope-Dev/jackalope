@@ -4,6 +4,19 @@ import { detectSkillsFromPrompt, getSkillById, VETTED_SKILLS } from '../src/lib/
 import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
 import { getToolById, VETTED_TOOLS } from '../src/lib/skills/tool-registry.ts';
 
+test('default final-phase guidance preserves diagnostics and explicit instructions', () => {
+  const options = {
+    rawPrompt: 'Fix the scheduler',
+    selectedSkillIds: ['systematic-debugging'],
+    executionMode: 'isolated',
+  };
+  const candidate = assemblePrompt(options).assembledPrompt;
+  assert.match(candidate, /only when its result is needed/);
+  assert.match(candidate, /explicit user or repository instructions/);
+  assert.match(candidate, /final verification/);
+  assert.match(candidate, /Fix the scheduler/);
+});
+
 test('vetted skills catalog contains all core development domains and harness skills', () => {
   assert.equal(VETTED_SKILLS.length, 9);
   const categories = new Set(VETTED_SKILLS.map((s) => s.category));
@@ -79,15 +92,11 @@ test('assemblePrompt supplements prompt additively and preserves original prompt
   assert.ok(result.hasSupplementation);
   assert.equal(result.activeSkillCount, 1);
   assert.equal(result.activeToolCount, 1);
-  assert.ok(result.assembledPrompt.includes('### 🎯 Objective\nFix auth token race condition'));
-  assert.ok(result.assembledPrompt.includes('### 📐 Guidelines & Quality Constraints'));
-  assert.ok(
-    result.assembledPrompt.includes(
-      'Reproduce behavioral defects with a focused failing check when practical.',
-    ),
-  );
+  assert.ok(result.assembledPrompt.startsWith('### 🎯 Objective\nFix auth token race condition\n'));
+  assert.ok(result.assembledPrompt.includes('Guidelines & Quality Constraints'));
+  assert.ok(result.assembledPrompt.includes('including repository-required checks'));
   assert.ok(result.assembledPrompt.includes('do not create another worktree'));
-  assert.ok(result.assembledPrompt.includes('### 🛠️ Active Tools & Capabilities'));
+  assert.ok(result.assembledPrompt.includes('Active Tools & Capabilities'));
   assert.ok(result.assembledPrompt.includes('Scoped Filesystem MCP'));
 });
 

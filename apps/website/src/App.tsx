@@ -4,6 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowDownToLine, ArrowRight, Menu as MenuIcon, Moon, Sun, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { AccessPage } from './Access';
+import { BenchmarksPage } from './Benchmarks';
 import { BrandMark } from './BrandMark';
 import { tour } from './content';
 import { DownloadPage } from './Download';
@@ -43,7 +44,7 @@ function DownloadButton({ compact = false }: { compact?: boolean }) {
 const faqs = [
   [
     'What is Jackalope?',
-    'A desktop workspace for Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity. Run tasks in parallel, keep their project context together, and review the changes in one place.',
+    'Jackalope is a desktop workspace for AI coding agents, including Codex, Claude Code, Gemini CLI, Grok, OpenCode, Kimi Code, and Antigravity. Run tasks in parallel, keep their project context together, and review the changes in one place. Jackalope is prerelease; check the download page for availability.',
   ],
   [
     'Why use it instead of more terminal tabs?',
@@ -67,12 +68,12 @@ const faqs = [
   ],
   [
     'Can Jackalope choose an agent, model, and account?',
-    'Automatic tasks ask your configured default agent to choose an allowed agent, configured model, and permitted account. Jackalope validates project restrictions and tool compatibility, considers available capacity reports, and can hand off recognized quota failures to an eligible alternative while preserving the work. Explicit assignments remain available. Routing depends on your configured agents and available usage reports.',
+    'Yes. Settings → Decisions lets you choose local rules, agent-powered reasoning, or optional Jev-assisted decisions, with project overrides. Local rules use no model call. Routing respects allowed agents, configured models, accounts, tool compatibility, and reported capacity. Recognized quota failures can hand off to an eligible alternative while preserving the work. You can also assign an agent yourself.',
     'routing-question',
   ],
   [
     'Which tools does Jackalope give agents?',
-    'Browse the MCP directory and choose project connections. Selected stdio and HTTP tools support on-demand discovery; direct connection support varies by agent. Built-in tools cover browser interaction, screenshots, accessibility audits, questions, and local verification. Windows desktop control adds accessibility snapshots, window captures, focus, clicks, typing, and scrolling after you select a window for that attempt. A theme-colored glow and status bar show when control is active. Escape or Stop revokes access; mouse or keyboard activity pauses it until you Resume. It operates your live desktop under existing OS permissions; macOS and Linux X11 window control is in native validation; Wayland remains unsupported.',
+    'Browse the MCP directory and choose project connections. Selected stdio and HTTP tools support on-demand discovery; direct connection support varies by agent. Built-in tools cover browser interaction, screenshots, accessibility audits, questions, and local verification. Windows desktop control adds accessibility snapshots, window captures, focus, clicks, typing, and scrolling after you select a window for that attempt. A theme-colored glow and status bar show when control is active. Escape or Stop revokes access; mouse or keyboard activity pauses it until you Resume. It operates your live desktop under existing OS permissions. macOS, Linux X11, and GNOME 46 Wayland window control remain in native validation; GNOME requires an optional extension, and other Wayland desktops are unsupported.',
     'tools-question',
   ],
   [
@@ -253,6 +254,8 @@ export function App({ path = '/' }: { path?: string }) {
         <LegalPage kind={path === '/privacy/' ? 'privacy' : 'terms'} />
       ) : path === '/roadmap/' ? (
         <RoadmapPage />
+      ) : path === '/benchmarks/' ? (
+        <BenchmarksPage />
       ) : marketingPage ? (
         <MarketingPage page={marketingPage} dark={dark} />
       ) : (

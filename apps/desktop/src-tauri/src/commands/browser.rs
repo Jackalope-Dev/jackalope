@@ -39,6 +39,7 @@ use std::{
 };
 
 struct Slot {
+    headed: bool,
     canceled: Arc<AtomicBool>,
     reserved: AtomicBool,
     engine: Mutex<Option<Engine>>,
@@ -48,6 +49,7 @@ struct Slot {
 impl Default for Slot {
     fn default() -> Self {
         Self {
+            headed: false,
             canceled: Arc::new(AtomicBool::new(false)),
             reserved: AtomicBool::new(false),
             engine: Mutex::new(None),
@@ -69,6 +71,50 @@ pub fn register(run_id: &str) {
     if let Some(slot) = previous {
         cancel(&slot);
     }
+}
+
+pub(super) fn register_preview(run_id: &str) {
+    let previous = sessions().lock().unwrap().insert(
+        run_id.into(),
+        Arc::new(Slot {
+            headed: true,
+            ..Slot::default()
+        }),
+    );
+    if let Some(slot) = previous {
+        cancel(&slot);
+    }
+}
+
+pub(super) async fn preview_selection(
+    run_id: &str,
+    port: u16,
+    theme: Option<Value>,
+) -> Result<Value, String> {
+    with_session(run_id, move |engine| {
+        let url = engine.call(json!({"action":"url"}))?["url"]
+            .as_str()
+            .unwrap_or("")
+            .to_owned();
+        let location = reqwest::Url::parse(&url).map_err(|_| "The preview page is unavailable.")?;
+        if location.scheme() != "http"
+            || !matches!(location.host_str(), Some("127.0.0.1" | "localhost"))
+            || location.port() != Some(port)
+        {
+            return Ok(Value::Null);
+        }
+        let script = format!(
+            "((theme) => {{ if (theme) window.__jackalopePreviewTheme = theme; const selection = {}; if (theme) {{ window.__jackalopePreviewPicker.begin(); window.focus(); }} return selection; }})({})",
+            include_str!("previews/picker.js"),
+            serde_json::to_string(&theme).map_err(|e| e.to_string())?
+        );
+        let data = engine.call(json!({"action":"evaluate", "script":script}))?["result"].clone();
+        if serde_json::to_vec(&data).map_err(|e| e.to_string())?.len() > 24000 {
+            return Err("Selected element is too large. Choose a smaller element.".into());
+        }
+        Ok(data)
+    })
+    .await
 }
 
 fn cancel(slot: &Slot) {
@@ -219,6 +265,32 @@ pub async fn browser_screenshot(
     name: Option<String>,
     target_url: Option<String>,
 ) -> Result<ScreenshotArtifact, String> {
+    screenshot(run_id, workspace, name, target_url, None).await
+}
+
+pub(super) async fn preview_screenshot(
+    run_id: &str,
+    workspace: &Path,
+    selection: &str,
+) -> Result<ScreenshotArtifact, String> {
+    uuid::Uuid::parse_str(selection).map_err(|_| "Invalid selected element")?;
+    screenshot(
+        run_id,
+        workspace,
+        Some("Selected preview element".into()),
+        None,
+        Some(format!("[data-jackalope-selection='{selection}']")),
+    )
+    .await
+}
+
+async fn screenshot(
+    run_id: &str,
+    workspace: &Path,
+    name: Option<String>,
+    target_url: Option<String>,
+    selector: Option<String>,
+) -> Result<ScreenshotArtifact, String> {
     if let Some(url) = &target_url {
         validate_url(url)?;
     }
@@ -233,9 +305,9 @@ pub async fn browser_screenshot(
             .to_owned();
         let id = uuid::Uuid::new_v4().to_string();
         let capture = engine.directory.join(format!("{id}.png"));
-        engine.call(
-            json!({"action":"screenshot", "path":capture, "format":"png", "fullPage":true}),
-        )?;
+        let mut request = json!({"action":"screenshot", "path":capture, "format":"png", "fullPage":selector.is_none()});
+        if let Some(selector) = selector { request["selector"] = json!(selector); }
+        engine.call(request)?;
         if std::fs::metadata(&capture)
             .map_err(|e| e.to_string())?
             .len()
@@ -415,6 +487,7 @@ pub(super) fn accessibility_checkpoint(value: &Value) -> Option<super::harness::
             if value["truncated"] == true { " Findings were truncated." } else { "" })),
         evidence: vec![value["content"].as_str().unwrap_or_default().to_owned()],
         timestamp: chrono::Utc::now().to_rfc3339(),
+        requirements: vec![],
     })
 }
 

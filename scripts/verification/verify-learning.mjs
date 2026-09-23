@@ -69,8 +69,7 @@ try {
           body: `<!doctype html><html><head><meta charset="utf-8"><title>Learning browser fixture</title></head><body><p>Browser state only; no native tasks launched.</p><div id="root"></div><script type="module">
         import RefreshRuntime from '/@react-refresh';
         RefreshRuntime.injectIntoGlobalHook(window); window.$RefreshReg$ = () => {}; window.$RefreshSig$ = () => type => type; window.__vite_plugin_react_preamble_installed__ = true;
-        const {default: React} = await import('/node_modules/.vite/deps/react.js');
-        const {default: ReactDOM} = await import('/node_modules/.vite/deps/react-dom_client.js');
+        const source=await fetch('/src/components/knowledge/KnowledgeLibrary.tsx').then(r=>r.text()); const reactUrl=source.split('"').find(url=>url.includes('/react.js?')); const {default:React}=await import(reactUrl); const mainSource=await fetch('/src/main.tsx').then(r=>r.text()); const domUrl=mainSource.split('"').find(url=>url.includes('/react-dom_client.js?')); const {default:ReactDOM}=await import(domUrl);
         await import('/src/index.css'); await import('/src/components/ui/experience.css'); await import('/src/components/tasks/task-workspace.css');
         const {useThemeStore} = await import('/src/stores/themeStore.ts');
         const theme = useThemeStore.getState(); if (!localStorage.getItem('fixture-theme-set')) { theme.setAppTheme({...theme.appTheme, appearance:'manual',isDark:window.fixture.isDark}); localStorage.setItem('fixture-theme-set', 'yes'); }
@@ -79,18 +78,14 @@ try {
         useProjectStore.setState({projects:[{id:'fixture',name:'Fixture project',path:'C:/fixture',gitBranch:'main',worktrees:[],agentProvider:'codex'}],activeProjectId:'fixture'});
         const run = {id:'one', taskId:'one', projectId:'fixture',projectPath:'C:/fixture',projectName:'Fixture project',prompt:'Fix dialog keyboard focus',agent:'codex',status:'review',startedAt:'2026-09-09T12:00:00Z',endedAt:'2026-09-09T12:01:00Z',usage:{input:0,output:0,reported:false},contextReceipt:{entries:[window.fixture.entry]},contract:{requirements:[{id:'focus',title:'Keyboard focus returns',checkpoint:false,receipt:{accepted:false,note:'Return focus to the trigger after closing.',tree:'abc',recordedAt:'2026-09-09'}}]}};
         window.fixture.run = run; useExecutionStore.setState({runs:[run],loading:false,error:null,historyError:null,refresh:async()=>useExecutionStore.setState({historyError:null})});
-        const {UsageDashboard} = await import('/src/components/tasks/UsageDashboard.tsx');
-        const {ArcColorPicker} = await import('/src/components/theme/ArcColorPicker.tsx'); ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(React.Fragment, null, React.createElement(ArcColorPicker,{scope:'app'}), React.createElement(UsageDashboard,{view:'analytics',onTask:()=>{}})));
+        const {ProjectContext} = await import('/src/components/projects/ProjectContext.tsx');
+        const {ArcColorPicker} = await import('/src/components/theme/ArcColorPicker.tsx'); ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(React.Fragment, null, React.createElement(ArcColorPicker,{scope:'app'}), React.createElement(ProjectContext)));
       </script></body></html>`,
         }),
       );
       await page.goto(`${origin}/learning-fixture.html`);
-      await page.getByRole('heading', { name: 'Performance & insights', exact: true }).waitFor();
-      assert.equal(await page.getByText('Hours Saved', { exact: true }).count(), 0);
-      await page.getByRole('combobox', { name: 'Project', exact: true }).focus();
-      await page.keyboard.press('Enter');
-      await page.getByRole('option', { name: 'Fixture project' }).click();
-      const edit = page.getByRole('button', { name: 'Edit lesson', exact: true });
+      await page.getByRole('heading', { name: 'Project context', exact: true }).waitFor();
+      const edit = page.getByRole('button', { name: 'Edit', exact: true });
       await edit.waitFor();
       await edit.focus();
       await page.keyboard.press('Enter');
@@ -98,14 +93,13 @@ try {
       await dialog.waitFor();
       await page.keyboard.press('Escape');
       await dialog.waitFor({ state: 'hidden' });
-      await page.waitForFunction(() => document.activeElement?.textContent === 'Edit lesson');
+      await page.waitForFunction(() => document.activeElement?.textContent === 'Edit');
       assert(await edit.evaluate((el) => el === document.activeElement), 'Editor focus return');
       await edit.click();
       await page.getByRole('checkbox', { name: 'Available for future tasks' }).uncheck();
       await page.getByRole('button', { name: 'Save lesson', exact: true }).click();
-      await page.getByText(/Paused · Supplied/).waitFor();
+      await page.getByText(/Paused · Revision/).waitFor();
       assert.equal(await page.evaluate(() => window.fixture.saves), 1);
-      await page.getByText('Source evidence and matching', { exact: true }).click();
       await page.getByRole('button', { name: 'Open source task', exact: true }).click();
       assert.equal(await page.evaluate(() => window.fixture.navigated), 'kanban');
       assert(
@@ -120,26 +114,18 @@ try {
         const { useExecutionStore } = await import('/src/stores/executionStore.ts');
         useExecutionStore.setState({ runs: [] });
       });
-      await page.getByText('Not measured', { exact: true }).waitFor();
-      await page.getByText(/No findings in this view/).waitFor();
+      await edit.waitFor();
+      assert.equal(await page.getByText(/Used in/).count(), 0);
       await page.evaluate(async () => {
         window.fixture.fail = true;
         const { useExecutionStore } = await import('/src/stores/executionStore.ts');
         useExecutionStore.setState({ runs: [window.fixture.run] });
       });
       await page.getByText(/Fixture knowledge read failed/).waitFor();
-      assert.equal(await page.getByRole('button', { name: 'Edit lesson', exact: true }).count(), 0);
       await page.evaluate(() => {
         window.fixture.fail = false;
       });
-      await page.getByRole('button', { name: 'Retry', exact: true }).click();
-      await edit.waitFor();
-      await page.evaluate(async () => {
-        const { useExecutionStore } = await import('/src/stores/executionStore.ts');
-        useExecutionStore.setState({ historyError: 'Fixture history read failed' });
-      });
-      await page.getByText('Fixture history read failed', { exact: false }).waitFor();
-      await page.getByRole('button', { name: 'Reload history', exact: true }).click();
+      await page.getByRole('button', { name: 'Reload', exact: true }).click();
       await edit.waitFor();
       const color = () =>
         page.evaluate(() =>
@@ -159,14 +145,14 @@ try {
       await page.getByRole('button', { name: 'Keep theme', exact: true }).click();
       const kept = await color();
       await page.reload();
-      await page.getByRole('heading', { name: 'Performance & insights', exact: true }).waitFor();
+      await page.getByRole('heading', { name: 'Project context', exact: true }).waitFor();
       assert.equal(await color(), kept, 'Appearance persisted after reload');
       await context.close();
     }
   }
   assert.deepEqual(errors, []);
   console.log(
-    'Browser fixtures passed: light/dark, 1280x840 and 960x640, reduced motion, project filter, empty history, read-error recovery, theme rollback/persistence, lesson pause/save, source navigation, keyboard and editor focus return. No native tasks launched.',
+    'Browser fixtures passed: light/dark, 1280x840 and 960x640, reduced motion, project context, empty history, read-error recovery, theme rollback/persistence, lesson pause/save, source navigation, keyboard and editor focus return. No native tasks launched.',
   );
 } finally {
   await browser.close();

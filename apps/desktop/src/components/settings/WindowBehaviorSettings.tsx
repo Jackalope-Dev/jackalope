@@ -8,6 +8,7 @@ import { Setting, SettingGroup } from './Setting';
 interface DesktopSettings {
   closeToTray: boolean;
   trayAvailable: boolean;
+  launchAtLogin: boolean;
 }
 
 export function WindowBehaviorSettings() {
@@ -46,6 +47,20 @@ export function WindowBehaviorSettings() {
     }
   };
 
+  const updateLaunchAtLogin = async (enabled: boolean) => {
+    if (!settings || saving) return;
+    setSaving(true);
+    setError('');
+    try {
+      await nativeTask('desktop_set_launch_at_login', { enabled });
+      setSettings({ ...settings, launchAtLogin: enabled });
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <>
       <SettingGroup className="mt-6">
@@ -62,6 +77,21 @@ export function WindowBehaviorSettings() {
             checked={settings?.closeToTray ?? true}
             disabled={!settings?.trayAvailable || saving}
             onCheckedChange={update}
+          />
+        </Setting>
+        <Setting
+          title="Launch at login"
+          controlId="launch-at-login"
+          descriptionId="launch-at-login-description"
+          description="Start Jackalope automatically when you sign in."
+        >
+          <Switch
+            id="launch-at-login"
+            label="Launch at login"
+            aria-describedby="launch-at-login-description"
+            checked={settings?.launchAtLogin ?? false}
+            disabled={!settings || saving}
+            onCheckedChange={updateLaunchAtLogin}
           />
         </Setting>
       </SettingGroup>

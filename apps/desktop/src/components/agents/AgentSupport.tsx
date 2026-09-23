@@ -8,7 +8,7 @@ export function AgentSupport({ adapter }: { adapter: string }) {
   const support = agentCapabilities(adapter);
   if (!support)
     return <p className="task-muted">Choose a supported adapter to see its capabilities.</p>;
-  if (['gemini', 'aider', 'goose'].includes(adapter))
+  if (adapter === 'gemini')
     return (
       <p className="task-muted mt-4">
         Separate account setup is available. Running tasks with this agent is still in development.

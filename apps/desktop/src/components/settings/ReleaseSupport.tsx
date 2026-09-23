@@ -1,6 +1,7 @@
-import { Textarea } from '@jackalope/ui';
+import { DiscordIcon, Textarea } from '@jackalope/ui';
 import { LifeBuoy } from 'lucide-react';
 import { useState } from 'react';
+import { DISCORD_URL } from '../../lib/community';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
@@ -48,6 +49,17 @@ export function ReleaseSupport() {
         >
           <LifeBuoy className="size-4 mr-2" />
           Browse Knowledgebase
+        </Button>
+      </section>
+      <section className="space-y-3" aria-label="Community">
+        <h3 className="text-base font-medium">Community</h3>
+        <p className="settings-row-description">
+          Ask questions, share workflows, and hear about new releases first in the Jackalope
+          Discord.
+        </p>
+        <Button variant="outline" onClick={() => void openExternalUrl(DISCORD_URL)}>
+          <DiscordIcon className="size-4 mr-2" />
+          Join the Discord
         </Button>
       </section>
       <section className="space-y-3" aria-label="Support report">

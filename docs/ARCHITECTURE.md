@@ -78,6 +78,8 @@ names; changes must preserve both sides and old saved records.
 | knowledge.rs, monitors.rs | Project lessons/workflows, immutable task context receipts and local Git change checks |
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |
+| issues.rs, github_workflows.rs | Read-only issue intake and protected Linear/Jira connections |
+| remote.rs, remote/ | Project-scoped pairing API, protected host connections, SSH forwarding and companion assets |
 | verification.rs, artifacts.rs, release.rs | Saved checks, artifacts, diagnostics and signed updater |
 
 Lock order is **coordinator state → execution guard → runtime state**.
@@ -204,7 +206,9 @@ file list. The scan is cached by repository and commit rather than directory, so
 isolated task in a fresh worktree reuses the analysis of the repository it branched
 from instead of repeating it. `JACKALOPE_REPO_MAP=off` removes it for comparison runs. The launch prompt
 is ordered invariant text, then project-stable text, then the task, so the prefix a
-provider can serve from cache stays byte-identical between tasks.
+provider may serve from cache stays byte-identical between tasks. Actual serialized
+request boundaries and cache policy belong to the installed CLI; stable text alone
+does not establish a cache hit or lower cost.
 
 pnpm verify is the local/CI gate. JavaScript tests exercise derived state, contracts
 and persistence. Rust tests use disposable repositories/profiles, with opt-in

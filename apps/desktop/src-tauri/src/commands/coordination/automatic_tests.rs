@@ -2,6 +2,8 @@ use super::automatic::*;
 use super::*;
 use serde_json::{json, Value};
 
+mod claude;
+
 struct Fixture {
     root: PathBuf,
     runtime: TaskRuntime,
@@ -70,6 +72,33 @@ fn headers(id: &str) -> HeaderMap {
 }
 
 #[tokio::test]
+async fn jev_questions_require_the_attempt_credential_and_explicit_opt_in() {
+    let f = Fixture::new();
+    f.running("reader-run");
+    let input = || {
+        Json(serde_json::from_value(json!({"state":{"ready":true},"questions":{"ready":{"type":"noul","instructions":"Is input.ready true?"}}})).unwrap())
+    };
+    assert!(
+        bridge_jev_questions(WebState(f.service.clone()), HeaderMap::new(), input())
+            .await
+            .is_err()
+    );
+    assert!(
+        bridge_jev_questions(WebState(f.service.clone()), headers("foreign-run"), input())
+            .await
+            .is_err()
+    );
+    assert!(
+        bridge_jev_questions(WebState(f.service.clone()), headers("reader-run"), input())
+            .await
+            .is_err()
+    );
+    assert!(crate::commands::decisions::evaluation::records(&f.runtime)
+        .unwrap()
+        .is_empty());
+}
+
+#[tokio::test]
 async fn help_and_verification_output_require_the_current_attempt_credential() {
     let f = Fixture::new();
     f.running("reader-run");
@@ -87,14 +116,22 @@ async fn help_and_verification_output_require_the_current_attempt_credential() {
     let state = || WebState(f.service.clone());
     let input = || {
         Json(super::super::verification::output::OutputRequest {
-            check_id: "check-1".into(),
+            check_id: Some("check-1".into()),
             stream: "stdout".into(),
             offset: 0,
             limit: None,
         })
     };
-    assert!(bridge_help(state(), headers("reader-run")).await.is_ok());
-    assert!(bridge_help(state(), headers("invalid")).await.is_err());
+    assert!(
+        bridge_help(state(), headers("reader-run"), Query(HelpQuery::default()))
+            .await
+            .is_ok()
+    );
+    assert!(
+        bridge_help(state(), headers("invalid"), Query(HelpQuery::default()))
+            .await
+            .is_err()
+    );
     assert_eq!(
         bridge_verification_output(state(), headers("reader-run"), input())
             .await
@@ -109,7 +146,9 @@ async fn help_and_verification_output_require_the_current_attempt_credential() {
     );
     let mut browser = headers("reader-run");
     browser.insert("origin", "https://example.invalid".parse().unwrap());
-    assert!(bridge_help(state(), browser).await.is_err());
+    assert!(bridge_help(state(), browser, Query(HelpQuery::default()))
+        .await
+        .is_err());
     f.runtime
         .update("reader-run", |run| run.status = "review".into());
     assert!(
@@ -142,6 +181,49 @@ async fn agent_verification_cannot_add_or_replace_a_saved_command() {
             .await
             .unwrap_err()
             .contains("saved project verification command")
+    );
+}
+
+#[tokio::test]
+async fn project_exposes_only_the_authorized_attempts_verification_command() {
+    let f = Fixture::new();
+    f.running("reader-run");
+    f.running("writer-run");
+    f.runtime.update("reader-run", |run| {
+        run.verify_command = Some("node --check one.mjs && node --check two.mjs".into());
+        run.auto_verify = true;
+    });
+    f.runtime.update("writer-run", |run| {
+        run.verify_command = Some("different saved command".into());
+    });
+    let project = bridge_project(WebState(f.service.clone()), headers("reader-run"))
+        .await
+        .unwrap()
+        .0;
+    assert_eq!(
+        project["verification"]["command"],
+        "node --check one.mjs && node --check two.mjs"
+    );
+    assert_eq!(project["verification"]["automatic"], true);
+    assert_eq!(project["verification"]["arguments"], json!({}));
+    f.runtime
+        .update("reader-run", |run| run.verify_command = None);
+    let project = bridge_project(WebState(f.service.clone()), headers("reader-run"))
+        .await
+        .unwrap()
+        .0;
+    assert!(project["verification"]["command"].is_null());
+    assert!(
+        bridge_project(WebState(f.service.clone()), headers("invalid"))
+            .await
+            .is_err()
+    );
+    f.runtime
+        .update("reader-run", |run| run.status = "review".into());
+    assert!(
+        bridge_project(WebState(f.service.clone()), headers("reader-run"))
+            .await
+            .is_err()
     );
 }
 
@@ -531,18 +613,47 @@ async fn http_and_native_mcp_responses_deliver_updates_and_preserve_tool_results
     let message = fixture
         .message("mcp-delivery", Some("reader-run-task"))
         .await;
-    let list: Value = client
-        .post(format!("{endpoint}/mcp"))
-        .bearer_auth("reader-run")
-        .header("accept", "application/json, text/event-stream")
-        .json(&json!({"jsonrpc":"2.0","id":1,"method":"tools/list"}))
-        .send()
-        .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
-    assert!(list["result"]["tools"].is_array());
+    for version in ["2025-11-25", "2026-07-28"] {
+        let meta = json!({"io.modelcontextprotocol/protocolVersion":version,
+            "io.modelcontextprotocol/clientInfo":{"name":"fixture","version":"1"},
+            "io.modelcontextprotocol/clientCapabilities":{}});
+        let list: Value = client
+            .post(format!("{endpoint}/mcp"))
+            .bearer_auth("reader-run")
+            .header("accept", "application/json, text/event-stream")
+            .header("MCP-Protocol-Version", version)
+            .header("Mcp-Method", "tools/list")
+            .json(&json!({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":meta}}))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert!(list["result"]["tools"].is_array(), "{list}");
+        assert_eq!(list["result"]["ttlMs"], 0);
+        assert_eq!(list["result"]["cacheScope"], "private");
+        let discovery: Value = client
+            .post(format!("{endpoint}/mcp"))
+            .bearer_auth("reader-run")
+            .header("accept", "application/json, text/event-stream")
+            .header("MCP-Protocol-Version", version)
+            .header("Mcp-Method", "server/discover")
+            .json(
+                &json!({"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":meta}}),
+            )
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(
+            discovery["result"]["capabilities"]["tools"],
+            json!({}),
+            "{discovery}"
+        );
+    }
     for attempt in 0..2 {
         let response: Value = client.post(format!("{endpoint}/mcp")).bearer_auth("reader-run")
             .header("accept", "application/json, text/event-stream")

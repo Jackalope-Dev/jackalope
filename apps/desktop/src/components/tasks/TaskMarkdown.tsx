@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { Streamdown } from 'streamdown';
 import { useColorScheme } from '../../hooks/useColorScheme';
 import { createMarkdownHighlighter } from '../../lib/markdown-highlighter';
@@ -17,11 +17,29 @@ export default memo(function TaskMarkdown({
   onOpenLink: (url: string) => void;
 }) {
   const scheme = useColorScheme();
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = root.current;
+    if (!element) return;
+    const prepare = () => {
+      for (const block of element.querySelectorAll<HTMLElement>(
+        '[data-streamdown="code-block-body"]',
+      )) {
+        block.tabIndex = 0;
+        block.setAttribute('role', 'region');
+        block.setAttribute('aria-label', `${block.dataset.language || 'Plain text'} code`);
+      }
+    };
+    prepare();
+    const observer = new MutationObserver(prepare);
+    observer.observe(element, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
   const highlighter = useMemo(createMarkdownHighlighter, []);
   useEffect(() => highlighter.dispose, [highlighter]);
   const plugins = useMemo(() => ({ code: highlighter.plugin }), [highlighter]);
   return (
-    <div className={`task-markdown ${scheme}`}>
+    <div ref={root} className={`task-markdown ${scheme}`}>
       <Streamdown
         skipHtml
         mode={active ? 'streaming' : 'static'}

@@ -34,6 +34,7 @@ export function observeRefresh({
     }
   };
   const changed = () => {
+    if (document.hidden) return;
     if (running) pending = true;
     else if (!scheduledEvent) {
       scheduledEvent = true;

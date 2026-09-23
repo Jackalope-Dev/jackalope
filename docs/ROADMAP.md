@@ -8,76 +8,104 @@ The website uses apps/website/src/roadmap-content.ts for its interactive roadmap
 and discovery output. Keep its Built, In progress, Up next and Further out stages
 aligned with this guide when capabilities or priorities change.
 
+Provider connections retain per-account models. Private runner settings support
+integrity inspection, repair and idle-version cleanup with process leases.
+Account-scoped catalog limits and prices supplement explicitly supplied Jev model
+evidence; catalog facts do not prove quality, credit or upstream freshness.
+Experiment settings share a versioned registry. Optional DeepSeek request metering,
+quality-study feasibility planning and isolated warm API helpers support screening;
+representative benefit and installed-platform acceptance remain open.
+
 ## Built: the local workspace
 
-The website download page brings desktop platform availability, waitlist signup
-and friend-pass guidance together. Acceptance emails open its confirmation flow;
-unpublished platforms stay Coming soon. Release and delivery acceptance remain open.
+- One Work entry point, a recent-work sidebar and a bottom status bar for workspace,
+  activity and quota freshness. Desktop preferences include power, running services, zoom,
+  shortcuts, editor/shell choices, saved actions and optional local dictation.
+  Split terminals can retain stopped output without replaying commands. Explicit
+  ignored-file setup and bounded worktree size inspection support isolated work.
+- Per-project Focus, Build and Oversee modes provide a quiet conversation canvas,
+  a workspace with tools beside work, or a full-width activity and attention board.
+  Task terminals, detachable task views and reversible chat topics prepare source-linked drafts. Local timing exports
+  and incremental session updates support performance investigation; installed acceptance
+  and representative comparisons remain in progress.
 
-Verified waitlist members can connect the desktop, track their queue position and
-referrals, copy their share link and explore the website and tour. Connections
-persist and detect approval; native execution remains approval-gated. Deployed
-and installed acceptance are still required.
+- Projects, saved tasks, chat sessions and reviewed plans with isolated Git worktrees.
+  Follow-ups, previews, recorded checks and guarded integration keep work reviewable.
+  Saved line comments, visual element selection, a conversation beside review and
+  GitHub/Linear/Jira issue intake keep corrections and source work together.
+- Provider accounts, model/effort choices, capacity-aware routing and usage reporting.
+  OpenCode accepts protected provider keys, including DeepSeek, alongside CLI sign-in.
+  Guided API and local-model setup can prepare a private runner without a separate CLI install.
+  Decisions can use local rules, an agent or optional Jev assistance. Jev supports
+  repository/model evidence, cost objectives and opt-in context, result, monitor and
+  assignment assistance; live calibration and installed acceptance remain open.
+- Scoped parallel coordination, dependency snapshots, bounded verification repairs
+  and provider delegation with sequential fallback.
+- Recurring schedules, local change monitors, project lessons, codebase maps, MCP
+  connections with curated discovery and guided setup, browser tools and Ask Jackalope.
+- Shared appearance, guided setup, history recovery, archiving and optional local
+  usefulness ratings. Optional local-model setup checks editing and continuation.
+- Account connection, waitlist/referral progress, platform download guidance and
+  optional settings sync, feedback and reporting.
 
-Work discovery unifies tasks and chats with explicit project scope, remembered
-views and task/project command search. Tasks opens Chat first; Inbox holds the work
-list. Work rows show each agent's character, live or next-action status and who is
-working now. Isolated results keep review, merge into the target branch and workspace
-cleanup together. Project overview surfaces unfinished work and
-local delivery receipts. Task follow-up stays visible through review. Preview setup,
-HTTP readiness, sandboxed local pages and fresh browser evidence capture are implemented.
-Delivery reads local Git and optional GitHub PR/CI state and prepares editable handoff
-drafts. Remote publication and deployment still require explicit user action; installed
-acceptance and usability trials remain open.
-
-Live sessions start from a message in Chat, name themselves and group
-history automatically. They capture messages during execution and process ordered
-batches in a shared isolated worktree. A compact detachable window, always-on-top
-pin, persistent drafts, agent results and cumulative patch exports are implemented. Sessions pause
-after restart; installed acceptance and independent task planning remain open.
-
-Optional local-agent setup includes hardware guidance, download choices and a real
-file/session check before connecting OpenCode to Ollama. Model-free help retrieval
-and compact routing inputs preserve all eligible choices. See [local AI](LOCAL-AI.md)
-for setup and context-selection behavior; real-model and installed acceptance remain open.
-
-Kimi Code joins the native adapters with accounts, models, permissions, structured
-questions, continuation, task tokens, membership capacity, routing and Ask Jackalope.
-Kimi and OpenCode accept direct project MCP connections. Grok model discovery and
-Antigravity subscription capacity are implemented. Installed-agent acceptance remains
-in progress; provider-specific reporting and permission boundaries still apply.
-
-Projects, agent accounts, tasks, queues, Git worktrees, checks and reviewed
-integration are implemented. Task cleanup includes individual and bulk archiving
-with undo and restore while retaining results and workspaces. The workspace also includes schedules, local change
-monitors, MCP connections, browser sessions, project lessons, codebase maps,
-capacity-aware routing and Ask Jackalope. Provider and platform limits apply;
-implementation does not establish release acceptance.
-
-Repository-aware plans preserve full requests; optional verified predecessor snapshots,
-critical-path admission, structured reports, workspace verification reservations and
-execution timing are implemented. Durable ownership handoffs, explicit interface
-agreements and changed-file scope reviews gate dependent work and integration. Optional
-agent reconciliation and verified local merges keep source worktrees and recovery receipts. Repeated [execution evaluations](EXECUTION-EVALUATION.md)
-and installed acceptance are required before claiming throughput or quality gains.
-
-Lead-agent instructions assess delegation automatically using available provider
-subagent tools, with sequential fallback and combined-result responsibility. Task
-capture has no split control. Provider execution and quality acceptance remain open.
-
-Process-scoped model effort requests for Codex/Claude, usage attribution and direct-CLI
-quality comparisons are implemented. Broader independent evaluation and automatic
-effort escalation remain open; see [agent quality](AGENT-QUALITY.md).
-
-App-wide usage trends connect project, agent and task spending to saved outcomes.
-Routing overhead, missing reports and undated helper usage remain explicit.
-See [usage accounting](USAGE-AND-ROUTING.md) for coverage and attribution limits.
+These capabilities describe source behavior. Provider, platform, delivery and
+installed-app acceptance remain separate. See [current capabilities and limits](STATUS.md)
+for the detailed inventory and [contributor priorities](TODO.md) for outstanding checks.
 
 ## In progress: dependable everyday use
 
+Native sleep prevention, macOS window/menu and unread-badge integration, and Windows
+pairing with a separately configured WSL Linux host are implemented for native
+acceptance. WSL requires its own running Jackalope host, Linux projects/accounts and
+Python 3. Dictation requires a local transcription service. Installed permissions,
+recovery and cross-platform behavior still require validation.
+
+Trusted-host pairing and a responsive web companion support scoped task check-ins,
+questions, follow-ups, dispatch and change review. SSH forwarding and HTTPS retain
+the host's execution ownership. Native multi-device, transport and provider acceptance
+remain in progress; implementation does not establish release availability.
+
 Focused task guidance and retrievable compact verification output are implemented.
+OpenCode tasks also retain complete recovery files when compacting recognized
+successful test output; native shell filtering remains specific to that adapter.
 [Quality trials](AGENT-QUALITY.md) compare the changed behavior against a preserved
 baseline; broader provider comparisons and independent acceptance remain in progress.
+External container benchmarks can exercise the native task path with unchanged
+upstream grading; representative benefits still require matched confirmation.
+OpenCode's task-owned server connects permission prompts and structured questions
+to task review while retaining session ownership and usage. Provider-advertised
+effort requests and output filtering have separate validation; installed
+cross-platform acceptance and repeatable quality or efficiency gains remain open.
+
+Codex speed controls, fresh context for changed workspaces, dependency-priority
+dispatch and CPU-based check capacity are implemented. Execution timings and offline
+delivery comparisons retain waits, failures and missing review evidence. Validate
+complete task delivery and quality on representative repositories before claiming gains.
+
+Project review lessons require resolved feedback and matching successful checks.
+Chronological history comparisons and bounded offline prompt optimization have
+separate validation and held-out gates. Representative first-pass acceptance and
+actual correction counts still need measurement before making outcome claims.
+
+Current prompt guidance and recoverable tool-result selection are implemented.
+Ordinary tasks default to concise instructions, available tool schemas and final
+automatic saved checks, with full ownership guidance for managed assignments.
+Content-keyed syntax caching and recoverable explicit result selection are core
+behavior. Local failure triage can avoid redundant classification of recorded facts.
+Cross-agent adoption
+and end-to-end savings remain evaluation work.
+Final requirement assessments help users inspect evidence before acceptance.
+Sanitized comparison exports retain matched configurations,
+oracle outcomes and reporting limits. Broader independent acceptance remains open.
+Optional Jev discovery ranking and local response-field selection have separate
+evaluation suites; the public benchmark methodology keeps their scope explicit.
+Source-attributed repair fixtures and matched tool and continuation comparisons
+support screening. Human review exports and complete-attempt cost
+accounting support independent confirmation before broader product claims.
+Captured-result queries and previews, deferred OpenCode tool discovery,
+conditional source reads, agent-callable typed Jev
+questions with native evidence reads and shadow Jev assistance retain separate
+evaluation controls.
 
 Durable incremental history saves, concurrent loading, changed-record UI updates
 and background rich rendering are implemented. Local [performance fixtures](PERFORMANCE.md)
@@ -91,22 +119,23 @@ Cross-platform discovery, browser, process cleanup, credential storage and notif
 hardening are implemented for native testing, including notification activation,
 account/settings sync, Unix process guardians and tray/Dock recovery. macOS and X11
 window-control helpers and a GNOME 46 Wayland extension are implemented for validation.
-Installed acceptance remains in progress. Signing/distribution are separate follow-ups,
+Installed acceptance remains in progress. Cross-platform signing and branch-based
+release automation use Windows Store and Mac/Linux Cloud candidates. In-app Store
+update checks and installation are implemented for validation; live signing, publication and
+installed upgrades remain acceptance work,
 with Ubuntu 24.04/GNOME 46 the first Wayland acceptance target and X11 compatibility
 retained. Other compositors and GNOME versions remain unsupported.
 
 ## Up next: broader workflows
 
-Extend agent execution support, GitHub issue/review/CI integration, repository
-understanding and usage reporting. Develop measured budgets and inspectable
+Extend agent execution support, explicitly authorized GitHub publication and review
+actions, repository understanding and usage reporting. Develop enforced monetary budgets and inspectable
 routing guidance. Proactive proposals require opt-in scope, bounded cost and
 explicit approval. Recovery must preserve ownership and never silently replay
 unfinished work. See [usage and routing](USAGE-AND-ROUTING.md).
 
 ## Further out: work across machines
 
-Explore scoped identity, trusted-host pairing, remote dispatch, steering, review
-and reconnect. A companion could support remote task check-ins. Managed and
-self-hosted remote services, shared workspaces and team collaboration depend on
-validated individual remote workflows. These are exploratory directions;
-remote execution is not available today. See [BACKEND.md](BACKEND.md).
+Managed hosting, native mobile applications, shared workspaces and team collaboration
+depend on validated individual remote workflows. These remain exploratory directions.
+See [BACKEND.md](BACKEND.md).

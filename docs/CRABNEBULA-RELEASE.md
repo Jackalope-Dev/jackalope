@@ -1,138 +1,144 @@
-# CrabNebula release testing
+# Cloud signing and release setup
 
-This guide covers Windows x64 NSIS packaging, Azure Artifact Signing
-integration and upload to an unpublished CrabNebula draft. The application is
-`jackalope-digital/jackalope`; publisher verification requires Jackalope Digital LLC.
-This complements the [cross-platform plan](CROSS-PLATFORM-RELEASES.md). Store
-automation and existing R2 publication settings remain unchanged.
+Windows releases use [Microsoft Store](STORE-RELEASE.md); Azure signing is needed
+only when separately enabling direct EXE distribution. Cloud handles macOS/Linux.
+
+Use [release automation](RELEASE-AUTOMATION.md) for branches, versions, workflow
+selection, publication and recovery. This guide covers the external signing inputs
+and repeatable installed update trial. The Cloud application is
+`jackalope-digital/jackalope`; Windows publisher verification requires
+Jackalope Digital LLC. Keep enrollment state and completed trial receipts private.
+
+## Optional direct Windows signing
+
+1. Create an Azure Artifact Signing account and complete **Organization → Public**
+   identity validation for Jackalope Digital LLC. Create a **Public Trust** certificate
+   profile. Partner Center certification is separate: Store signing covers MSIX,
+   not the independently downloaded EXE. A self-signed Key Vault certificate does
+   not supply publisher trust.
+2. Configure an Entra app/service principal for GitHub OIDC with issuer
+   `https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange`
+   and subject `repo:Jackalope-Dev/jackalope:environment:cloud-beta`.
+   The shared candidate environment builds both channels. An existing cloud-stable
+   federation may remain, but publication does not sign new files.
+3. Assign **Artifact Signing Certificate Profile Signer** at the intended certificate
+   profile scope. Set the variables below; the Azure CLI signing adapter needs no
+   Azure client secret. Enable `CLOUD_SIGNING_READY` only after configuration.
+
+| GitHub variable | Value/purpose |
+| --- | --- |
+| `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` | Entra application and subscription identifiers |
+| `AZURE_SIGNING_ENDPOINT` | Account region's HTTPS `codesigning.azure.net` endpoint |
+| `AZURE_SIGNING_ACCOUNT`, `AZURE_SIGNING_PROFILE` | Artifact Signing account/profile names |
+
+The Tauri signing hook uses Microsoft's SignTool and pinned Artifact Signing client.
+It signs executables and installer components during packaging, then independently
+checks the native executable and final EXE for a valid timestamped signature and
+publisher name. Certificate rotation does not require pinning a new thumbprint.
+
+[Azure setup](https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart),
+[OIDC setup](https://github.com/Azure/artifact-signing-action/blob/main/docs/OIDC.md).
+
+## macOS signing and notarization
+
+Enroll the company in the Apple Developer Program. Create a **Developer ID
+Application** certificate, export it with its private key to a password-protected
+P12, and encode that file as base64. Create an App Store Connect API key authorized
+for notarization; download its P8 key to private storage.
+
+| Setting | Location | Purpose |
+| --- | --- | --- |
+| `APPLE_CERTIFICATE` | `cloud-beta` secret | Base64 P12 including private key |
+| `APPLE_CERTIFICATE_PASSWORD` | `cloud-beta` secret | P12 password |
+| `APPLE_API_PRIVATE_KEY` | `cloud-beta` secret | P8 key contents |
+| `APPLE_SIGNING_IDENTITY` | Repository variable | Full `Developer ID Application: … (TEAMID)` identity |
+| `APPLE_TEAM_ID` | Repository variable | Expected certificate team |
+| `APPLE_API_KEY`, `APPLE_API_ISSUER` | Repository variables | App Store Connect key ID and issuer ID |
+
+The native Mac jobs use their matching architectures. The builder creates a temporary
+keychain, signs bundled browser/desktop-control executables with hardened runtime,
+then bundles, signs and notarizes the app through Tauri. It verifies the app's publisher,
+deep signature, Gatekeeper assessment and stapled ticket before recording artifacts.
+The temporary keychain, P12/P8 files and rehearsal updater key are removed on exit;
+ephemeral hosted runners discard them if a job is terminated. Enable
+`APPLE_SIGNING_READY` only after configuration. Signing code has to pass on real Mac
+runners before it establishes release acceptance.
+
+[Tauri signing/notarization](https://v2.tauri.app/distribute/sign/macos/),
+[Apple Developer ID](https://developer.apple.com/developer-id/).
+
+## Cloud and updater credentials
+
+Confirm the application uses Tauri v2 in CrabNebula. Store `CN_API_KEY` in
+`cloud-beta` and `cloud-stable`; do not paste key values into source, command arguments
+or chat. Preserve the existing updater key and keep a private recovery backup.
+
+| Setting | Location | Purpose |
+| --- | --- | --- |
+| `CN_APPLICATION` | Repository variable | `jackalope-digital/jackalope` |
+| `TAURI_SIGNING_PRIVATE_KEY` | `cloud-beta` secret | Existing updater key used by every platform/channel |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | `cloud-beta` secret, if required | Existing key password |
+| `TAURI_UPDATER_PUBLIC_KEY` | Repository variable | Matching key embedded in clients and checked by publication |
+| `CN_API_KEY` | Both Cloud environment secrets | Draft/upload/publication access |
+
+Linux AppImage needs the updater key but no additional publisher-signing subscription.
+Candidates include both trusted Cloud channel endpoints, retain approved native
+account access and use the existing task-aware update installation safeguards.
+Signing credentials and live deployment state never belong in tracked configuration.
+
+Publication uses CN CLI 0.13.4; Windows signing uses
+Microsoft.ArtifactSigning.Client 1.0.128. Asset URLs and SHA-256 pins live in
+`cloud-tools.ps1`. Review a pin update explicitly if a vendor asset changes.
+CLI quality reports are disabled. Verify authenticated API/metadata and draft-byte
+read-back before enabling publication; fixture tests do not establish vendor access.
+
+[Cloud API keys](https://docs.crabnebula.dev/cloud/org-management/create-api-key/),
+[asset metadata](https://docs.crabnebula.dev/cloud/cli/fetch-latest-release/).
 
 ## Run a rehearsal
 
-From a reviewed source revision, run **Cloud release rehearsal**
-from master with `mode=rehearsal` and either `beta` or `stable`. The workflow runs
-repository verification and access-gate tests, builds the installer and retains
-the package, configuration and receipt as a GitHub artifact for 14 days. It is
-manual only.
-
-For a local rehearsal:
+Dispatch **Cloud release** with `mode=rehearsal` from beta or stable. It retains
+artifacts without upload/publication. For a local Windows rehearsal:
 
 ```powershell
 pnpm verify
 ./scripts/release/cloud-build.ps1 -Mode rehearsal -Channel beta
 ```
 
-Each run writes a fresh directory under `output/cloud/`. Rehearsals use the
-separate `dev.jackalope.cloud.rehearsal` identity, the name Jackalope Rehearsal,
-the executable `jackalope-rehearsal.exe`, a debug native build with embedded production frontend, a temporary updater key
-and no live update endpoints. They compile the native approval gate for both
-channels. They are unsigned tests and cannot be uploaded by the draft command.
-Do not use this installer as an external beta release or infer publisher trust
-from it. Always use an isolated profile for native trials.
+For a local macOS/Linux rehearsal:
 
-## Account setup
+```sh
+node scripts/release/cloud-build-unix.mjs rehearsal beta
+```
 
-Keep account state, enrollment progress and detailed trial receipts in private
-operator records. The following steps describe the required configuration.
+Rehearsals use a separate app identity/name, a debug native build with embedded
+production frontend, an ephemeral updater key and disabled update endpoints.
+They cannot be promoted or used as the old version of an installed update test.
+Use isolated profiles and keep other users' running apps untouched.
 
-1. In CrabNebula, confirm this app is Tauri v2 and retain the intended visibility.
-   Create an API key for release uploads and put it directly in the GitHub
-   `CN_API_KEY` secret. Never put its value in source, command arguments or chat.
-2. In Azure, enroll the organization and validate Jackalope Digital LLC. Create
-   an Artifact Signing Basic account and **Public Trust** certificate profile.
-   An ordinary self-signed Key Vault certificate does not supply publisher trust.
-3. Configure an Entra app/service principal for GitHub OIDC with issuer
-   `https://token.actions.githubusercontent.com` and audience
-   `api://AzureADTokenExchange`. Add the subjects
-   `repo:Jackalope-Dev/jackalope:environment:cloud-beta` and
-   `repo:Jackalope-Dev/jackalope:environment:cloud-stable`.
-   Give it **Artifact Signing Certificate Profile Signer** at the intended profile
-   scope. The signing adapter uses Azure CLI authentication after `azure/login`;
-   no Azure client secret is needed.
-4. Restrict the GitHub environments `cloud-beta` and `cloud-stable` to the intended
-   trusted release branch. Set the variables below and preserve updater key continuity.
-5. Once the Azure identity is ready, set `CLOUD_SIGNING_READY=true` and request
-   `mode=candidate`. This builds and checks publisher-signed files without upload.
-6. After testing that candidate, configure `CN_API_KEY` and set
-   `CLOUD_DRAFT_UPLOAD_ENABLED=true` to use `mode=draft`. This additionally uploads
-   the signed installer to an unpublished draft. This workflow has no publish step.
+## Test an installed update
 
-[Azure setup](https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart),
-[OIDC setup](https://github.com/Azure/artifact-signing-action/blob/main/docs/OIDC.md),
-[CrabNebula API keys](https://docs.crabnebula.dev/cloud/org-management/create-api-key/).
+Use two increasing versions from committed beta source with the same real updater
+key and application identity. Configure the explicit manual beta trial target list
+as described in [release automation](RELEASE-AUTOMATION.md#enablement-and-first-update-test).
 
-| Setting | Location | Value/purpose |
-| --- | --- | --- |
-| `CN_APPLICATION` | GitHub variable | `jackalope-digital/jackalope` |
-| `CLOUD_SIGNING_READY` | GitHub variable | `false` until Azure setup is complete |
-| `CLOUD_DRAFT_UPLOAD_ENABLED` | GitHub variable | `false` until a candidate and Cloud access are tested |
-| `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` | GitHub variables | Entra OIDC application and Azure subscription identifiers |
-| `AZURE_SIGNING_ENDPOINT` | GitHub variable | Regional HTTPS `codesigning.azure.net` endpoint for the account |
-| `AZURE_SIGNING_ACCOUNT`, `AZURE_SIGNING_PROFILE` | GitHub variables | Existing Artifact Signing account/profile names |
-| `TAURI_SIGNING_PRIVATE_KEY` | GitHub secret | Existing private updater key; preserve continuity |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | GitHub secret, if required | Password for the existing key |
-| `TAURI_UPDATER_PUBLIC_KEY` | GitHub variable | Matching updater public key |
-| `CN_API_KEY` | GitHub secret | Cloud release upload credential |
+1. Prepare the older version and reviewed notes. Build a signed beta candidate,
+   install it in a disposable OS user/profile, and verify its version, publisher,
+   architecture and installation path.
+2. Connect an approved account, create saved work in a disposable repository, execute
+   a real task, quit and reopen, and confirm data persists.
+3. Prepare and build the newer version. Check the draft's notes, platform artifacts,
+   signatures and receipts. Use **Publish Cloud candidate** to publish the exact
+   tested run. Beta assets are accessible by public URLs even if not advertised.
+4. In the older installation, open App updates and choose **Check for updates**,
+   then **Install and restart**. Automatic checks discover updates; installation
+   remains a user action. Confirm the newer version after restart and saved work.
+5. Exercise active-task blocking, offline/download recovery, account expiry/revocation,
+   channel selection and rejection of a wrongly signed artifact on a separate
+   controlled test feed. On macOS check both architectures and permission continuity;
+   on Linux run the AppImage directly. Follow [release acceptance](RELEASE.md).
 
-Candidate builds require a clean committed tree, matching version files, reviewed
-release notes with `Status: ready`, Azure configuration and the existing updater
-key. The legacy `RELEASE_SIGNING_READY` and `RELEASE_DISTRIBUTION` flags do not
-control this separate rehearsal workflow.
-
-## Signing and update behavior
-
-The Tauri custom signing hook uses Microsoft's SignTool and pinned Artifact Signing
-client package. It signs app executables and installer components during packaging.
-The build separately checks the final native executable and installer for a valid
-Authenticode signature, timestamp and publisher name. It permits Azure certificate
-rotation without pinning the old thumbprint. Tauri then signs the final update
-artifact with the existing updater key.
-
-Candidate builds include both trusted Cloud channel endpoints. Native and build
-validation permit only the exact configured application's beta/stable query;
-account and telemetry URLs still reject queries. Both channels require approved
-native access during preview. Existing task-aware update installation remains in
-control, and switching channels does not enable arbitrary endpoint selection.
-
-The pinned tools are CN CLI 0.13.4 (vendor asset ID and SHA-256 in `cloud-tools.ps1`)
-and Microsoft.ArtifactSigning.Client 1.0.128 (NuGet URL and SHA-256). A missing or
-changed vendor asset fails verification; review and update the pin explicitly.
-CN CLI quality reports are disabled for release commands.
-[Microsoft signing integration](https://learn.microsoft.com/en-us/azure/artifact-signing/how-to-signing-integrations),
-[Tauri signing](https://v2.tauri.app/distribute/sign/windows/).
-
-## Draft upload and recovery
-
-`cloud-upload.mjs` validates the candidate's application, channel, target, source,
-approval requirement, configured updater key and artifact hashes, and verifies
-the installer publisher before network writes. It checks for an existing release
-at the same version/channel and refuses duplicates or versions older than an existing release. It uploads only
-the exact NSIS file/signature, with `nsis-x86_64` public platform and
-`windows-x86_64` updater platform, then checks the returned draft metadata.
-
-`cloud-draft.json` records the source receipt hash, draft ID and phase. Completed
-uploads are not repeated. An uncertain draft creation or upload stops rather than
-blindly retrying a mutation. Recover using the Cloud dashboard and the original
-artifact/checkpoint; do not delete a draft just to make a retry pass. If creation
-succeeded but the response was lost, confirm the exact app, version, channel and
-notes before recording its ID and returning the phase to `created`. If an upload
-is uncertain, inspect the remote asset before any retry. An unrecognized CLI
-response also stops. Live API response compatibility still needs an authenticated
-trial; mock command tests do not establish it.
-
-## Remaining release acceptance
-
-- Complete live Azure signing and authenticated Cloud draft upload; verify the
-  real CLI response and metadata contracts against the saved candidate.
-- Accept clean Windows installation, first approved sign-in, saved-work recovery,
-  offline expiry/revocation, real agent execution and an older-to-newer signed
-  update. Confirm the installed executable's publisher and default install path.
-- Implement R2 archival copies and automatic publication only after candidate
-  acceptance; test remote byte read-back and interrupted promotion. No release
-  or public download is created by the current workflow.
-- Add platform-native Mac/Linux jobs, secure account storage and execution
-  acceptance, Apple signing/notarization and tested multi-target Cloud selection.
-- Connect the approved-member download catalog to accepted Cloud artifacts;
-  preserve the login gate and replace any active Store URL override deliberately.
-
-This is release preparation. A successful build, mocked CLI test or draft upload
-does not establish installed updates or macOS/Linux readiness.
+Only after each platform passes should it enter the accepted-target list and the
+website download catalog. Build/signing success, a published feed or a mocked test
+is not proof of an installed upgrade. The optional [Store path](STORE-RELEASE.md)
+retains its independent MSIX certification and update model.

@@ -1,6 +1,7 @@
 import { isTauriEnvironment } from './tauri-bridge.ts';
 
 export interface CodebaseFile {
+  symbols?: { name: string; line: number; kind: string }[];
   path: string;
   language: string;
   bytes: number;

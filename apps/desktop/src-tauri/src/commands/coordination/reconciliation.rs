@@ -242,6 +242,7 @@ impl Coordinator {
                 .iter()
                 .filter(|r| {
                     r.project_id == policy.project_id
+                        && !super::managed::owns_run(&inner.ledger, runs, r)
                         && ["review", "reviewed"].contains(&r.status.as_str())
                         && !merged.contains(&r.id)
                         && !runs
@@ -374,6 +375,7 @@ impl Coordinator {
                 let mut request: RunRequest = serde_json::from_value(serde_json::json!({"id":run_id,"projectId":policy.project_id,"projectName":policy.project_name,"projectPath":policy.project_path,"agent":policy.agent,"isolated":true,"verifyCommand":policy.verify_command,"autoVerify":true,"targetBranch":selected[0].target_branch,"prompt":prompt})).map_err(|e| e.to_string())?;
                 request.dependency_snapshot = input;
                 request.coordination = Some(CoordinationContext {
+                    managed: true,
                     endpoint: url.into(),
                     token: token.clone(),
                     instructions: harness_instructions(),

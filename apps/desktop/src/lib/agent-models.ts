@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ModelEvidence } from './decisions';
 import { nativeTask } from './task-runtime';
 import { isTauriEnvironment } from './tauri-bridge';
 
 export interface ModelCatalog {
-  models: { id: string; name: string; isDefault: boolean }[];
+  models: { id: string; name: string; isDefault: boolean; metadata?: ModelEvidence }[];
   source: string;
   account: string | null;
   checkedAt: string;

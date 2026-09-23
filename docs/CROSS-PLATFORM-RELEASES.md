@@ -6,10 +6,15 @@ agent acceptance pass. Windows rehearsals do not establish acceptance on another
 
 ## Distribution tooling
 
-The [cloud tooling](CRABNEBULA-RELEASE.md) implements Windows x64 NSIS preparation,
-publisher/updater signing gates and unpublished drafts. The unified multi-platform
-publication workflow remains planned. The [Store path](STORE-RELEASE.md) provides
-separate MSIX packaging and submission as an optional additional channel.
+The [cloud tooling](CRABNEBULA-RELEASE.md) implements Windows x64 NSIS, macOS
+Apple Silicon/Intel DMG and updater archives, and Linux x64 AppImage candidates.
+The [release workflow](RELEASE-AUTOMATION.md) checks the complete target set before
+publishing a channel, with signing, source-check and installed-acceptance gates.
+Native signed builds and installed upgrades still need platform acceptance.
+The [Store path](STORE-RELEASE.md) provides
+MSIX packaging, branch-based submission and Store-backed in-app update controls
+as the primary Windows channel. Cloud targets are macOS and Linux; direct EXE
+distribution is optional and requires separate publisher signing.
 
 Accept the exact candidate's clean installation, real execution, account lifecycle,
 saved-data recovery and older-to-newer update before distribution. An MSIX build
@@ -39,7 +44,7 @@ Use this map to locate platform-specific behavior and the checks needed when cha
 | Feature area | Current implementation and remaining checks |
 | --- | --- |
 | Commands and detection | GUI startup recovers the login shell's PATH with a three-second timeout, then adds common tool directories. Discovery checks executable permissions. Agents, Git, MCP, checks and previews inherit the same PATH. Test desktop launch with Homebrew, nvm, fnm, Volta, pnpm and native CLI installs, including paths with spaces. Aliases/functions are not executable files. |
-| Agents and accounts | Adapter protocols, account bindings, routing and continuation are shared. Validate each supported CLI's real login, account isolation, models, quota reporting and resume. Gemini CLI, Aider and Goose execution remain unimplemented everywhere. |
+| Agents and accounts | Adapter protocols, account bindings, routing and continuation are shared. Validate each supported CLI's real login, account isolation, models, quota reporting and resume. Gemini CLI execution is implemented but not validated with installed profiles on any platform. |
 | Secure storage | Windows retains DPAPI. macOS uses Keychain; Linux uses persistent Secret Service with encrypted D-Bus transport. Files contain opaque references. Locked/unavailable stores fail without plaintext fallback. Valid legacy Unix API-key files migrate after validation; failed migration retains the original. Disconnect, profile deletion and reset remove referenced secrets. Test restart, locked stores, migration, reset and revocation. Copying a profile does not copy its OS keyring. |
 | Processes and terminals | Commands, authentication probes, MCP, browsers and generic terminals retain owned process groups. A separate Unix guardian watches a close-on-exec pipe and kills the group if Jackalope exits abruptly; normal cleanup reaps the guardian. PTY parent exit also closes descendant pipes. Test stop, timeout, app exit, grandchildren and shell job control. Groups do not contain descendants that deliberately create new sessions, and the short interval before guardian attachment is not protected. Recovery remains conservative on Unix. |
 | Browser automation | Chrome, Edge and Chromium detection includes native installation paths, PATH, and macOS system/user Applications folders. `JACKALOPE_BROWSER_EXECUTABLE` accepts an absolute executable override. Unix sockets use short, private directories. Jackalope launches Unix Chromium in its own guarded process group and connects the bundled helper to that disposable browser over loopback CDP; Cancellation tests inspect browser process groups after Stop. Test all actions and cleanup. Safari/Firefox are unsupported engines; Snap/Flatpak Chromium confinement needs separate validation. Do not disable Chromium's sandbox as a workaround. |
@@ -52,6 +57,40 @@ Use this map to locate platform-specific behavior and the checks needed when cha
 
 CI packages are review artifacts, not signed public release candidates. Run the
 relevant native jobs and device checks before claiming platform acceptance.
+
+### Workspace integrations
+
+Settings → Desktop controls interface zoom, task-terminal shell and font, editor
+links, keyboard shortcuts and idle-sleep prevention. Windows uses a thread execution
+state lease; macOS uses an IOKit power assertion; Linux uses a login1 inhibitor.
+Failure is shown in the bottom status bar. Explicit user sleep, shutdown and lid
+policies remain under the operating system's control. Validate acquisition and
+release on work completion, setting changes and quit.
+
+macOS uses native traffic lights and standard application menus. The Dock badge
+reflects unread in-app notifications. Windows and Linux retain their existing
+window controls. Verify title-bar drag regions, resizing, detached windows, menu
+focus and unread transitions in installed builds.
+
+On Windows, Hosts can pair with a Linux Jackalope instance already running inside
+WSL. Enable Remote access in that Linux app, configure its Linux projects and
+accounts, then choose its distribution and enter its port and pairing code in the
+Windows app. Python 3 must be available in the distribution. Requests use a bounded
+`wsl.exe --exec` helper with pairing data on standard input and loopback HTTP inside
+Linux; shell selection alone does not change the agent execution environment.
+The Linux host retains execution ownership. Remote task check-ins and dispatch use
+the existing host protocol; terminal and embedded-preview controls stay in the
+Linux app. Automatic host installation/startup and Windows path translation are
+not provided.
+
+Optional dictation requires an OpenAI-compatible transcription endpoint on a
+numeric loopback HTTP address. The user starts microphone recording explicitly;
+recordings are limited to one minute, converted to mono WAV and sent only to the
+configured local service. Text is inserted into the draft for editing. Jackalope
+stores no audio files and bundles no speech model. Windows Store packaging declares
+the microphone capability; macOS declares its usage description and audio-input
+entitlement. Test permission denial, missing service, cancellation and window closure
+on each target WebView.
 
 ### Native checks on your devices
 

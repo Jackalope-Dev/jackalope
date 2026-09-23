@@ -1,11 +1,9 @@
 import { getSkillById } from './catalog.ts';
-import legacyGuidelines from './legacy-guidelines.json' with { type: 'json' };
 import { getToolById } from './tool-registry.ts';
 
-export const PROMPT_VERSION = 2;
+export const PROMPT_VERSION = 4;
 
 export interface PromptAssemblyOptions {
-  version?: number;
   rawPrompt: string;
   selectedSkillIds?: string[];
   customGuidelines?: string[];
@@ -33,7 +31,6 @@ export function assemblePrompt(options: PromptAssemblyOptions): AssembledPromptR
     selectedToolIds = [],
     projectRules = [],
     executionMode,
-    version = PROMPT_VERSION,
   } = options;
 
   const trimmedRaw = rawPrompt.trim();
@@ -51,11 +48,7 @@ export function assemblePrompt(options: PromptAssemblyOptions): AssembledPromptR
   for (const skillId of selectedSkillIds) {
     const skill = getSkillById(skillId);
     if (skill) {
-      const rules =
-        version === 1
-          ? ((legacyGuidelines as Record<string, string[]>)[skillId] ?? skill.guidelines)
-          : skill.guidelines;
-      for (const rule of rules) {
+      for (const rule of skill.guidelines) {
         skillGuidelines.add(rule);
       }
     }
@@ -71,14 +64,12 @@ export function assemblePrompt(options: PromptAssemblyOptions): AssembledPromptR
   // Add execution mode constraint if isolated
   if (executionMode === 'isolated') {
     skillGuidelines.add(
-      version === 1
-        ? 'Execute all changes in an isolated git worktree branch (.worktrees/<slug>).'
-        : 'Jackalope assigns the isolated workspace. Work in that directory; do not create another worktree.',
+      'Jackalope assigns the isolated workspace. Work in that directory; do not create another worktree.',
     );
   }
 
   // Collect active tools
-  const activeTools = selectedToolIds
+  const activeTools = [...new Set(selectedToolIds)]
     .map((id) => getToolById(id))
     .filter((t): t is NonNullable<typeof t> => Boolean(t));
 
@@ -112,8 +103,7 @@ export function assemblePrompt(options: PromptAssemblyOptions): AssembledPromptR
     const guidelinesBlock = Array.from(skillGuidelines)
       .map((g) => `- ${g}`)
       .join('\n');
-    const priority =
-      version === 1 ? '' : 'Apply relevant guidance; explicit user instructions take precedence.\n';
+    const priority = 'Apply relevant guidance; explicit user instructions take precedence.\n';
     sections.push(`### 📐 Guidelines & Quality Constraints\n${priority}${guidelinesBlock}`);
   }
 

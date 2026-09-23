@@ -28,6 +28,8 @@ export async function uploadCandidate(
   const { receipt, installer, signature, config } = await validateCloudFiles(directory, {
     requireCandidate: true,
   });
+  if (receipt.target !== 'windows-x86_64')
+    throw new Error('Use cloud-publish.mjs for multi-platform drafts');
   if (!publicKey || config.plugins.updater.pubkey !== publicKey)
     throw new Error('Candidate updater key does not match the configured release key');
   await verifyPublisher(resolve(directory, installer));

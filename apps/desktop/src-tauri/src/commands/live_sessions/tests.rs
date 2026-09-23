@@ -1,12 +1,43 @@
 use super::*;
 use std::process::Command;
 
+#[test]
+fn topic_grouping_is_durable_revision_checked_and_does_not_dispatch() {
+    let (_root, service, id) = fixture();
+    let message_id = Uuid::new_v4().to_string();
+    service
+        .send(
+            &id,
+            message_id.clone(),
+            "Keep the original instructions".into(),
+            None,
+        )
+        .unwrap();
+    let topic = SessionTopic {
+        id: Uuid::new_v4().to_string(),
+        title: "UI".into(),
+        message_ids: vec![message_id],
+    };
+    service.save_topics(&id, 0, vec![topic.clone()]).unwrap();
+    assert!(service.save_topics(&id, 0, vec![]).is_err());
+    let saved: Ledger = serde_json::from_slice(&std::fs::read(&service.path).unwrap()).unwrap();
+    assert_eq!(saved.sessions[0].topics[0].id, topic.id);
+    assert_eq!(saved.sessions[0].messages.len(), 1);
+    assert!(saved.sessions[0].batches.is_empty());
+    service.save_topics(&id, 1, vec![]).unwrap();
+    let session = service.snapshot(None).unwrap().sessions.remove(0);
+    assert_eq!(session.topics_revision, 2);
+    assert!(session.topics.is_empty());
+    assert_eq!(session.messages[0].text, "Keep the original instructions");
+}
+
 fn fixture() -> (PathBuf, LiveSessions, String) {
     let root = std::env::temp_dir().join(format!("jackalope-live-{}", Uuid::new_v4()));
     let repo = root.join("repo");
     std::fs::create_dir_all(&repo).unwrap();
     for args in [
         vec!["init", "-b", "main"],
+        vec!["config", "core.autocrlf", "false"],
         vec![
             "-c",
             "user.name=Fixture",
@@ -333,6 +364,7 @@ fn patch_export_preserves_the_index_and_includes_new_binary_files_without_a_comm
     std::fs::write(repo.join("image.bin"), binary).unwrap();
     let run = TaskRun {
         id: Uuid::new_v4().to_string(),
+        task_id: Uuid::new_v4().to_string(),
         live_session_id: Some(id.clone()),
         status: "review".into(),
         workspace: repo.to_string_lossy().into_owned(),
@@ -341,6 +373,8 @@ fn patch_export_preserves_the_index_and_includes_new_binary_files_without_a_comm
         branch: "main".into(),
         ..Default::default()
     };
+    let run_id = run.id.clone();
+    let task_id = run.task_id.clone();
     attach_run(&root, &mut service, &id, run);
     let exported = service.review(&id).unwrap();
     assert_eq!(exported.files.len(), 3);
@@ -353,6 +387,8 @@ fn patch_export_preserves_the_index_and_includes_new_binary_files_without_a_comm
         &root,
         &[
             "clone",
+            "--config",
+            "core.autocrlf=false",
             "--no-hardlinks",
             repo.to_str().unwrap(),
             target.to_str().unwrap(),
@@ -370,6 +406,185 @@ fn patch_export_preserves_the_index_and_includes_new_binary_files_without_a_comm
     );
     assert_eq!(std::fs::read(target.join("image.bin")).unwrap(), binary);
     assert_eq!(git(&target, &["rev-parse", "HEAD"]), base);
+    let first =
+        crate::commands::review_progress::progress(&service.runtime, &run_id, None).unwrap();
+    let first: serde_json::Value = serde_json::to_value(first).unwrap();
+    assert!(first["diff"].as_str().unwrap().contains("+final"));
+    let tree = first["tree"].as_str().unwrap();
+    crate::commands::review_progress::progress(&service.runtime, &run_id, Some(tree)).unwrap();
+    std::fs::write(repo.join("tracked.txt"), b"corrected\n").unwrap();
+    let next = serde_json::to_value(
+        crate::commands::review_progress::progress(&service.runtime, &run_id, None).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(next["files"], serde_json::json!(["tracked.txt"]));
+    assert!(next["diff"].as_str().unwrap().contains("+corrected"));
+    assert!(
+        crate::commands::review_progress::progress(&service.runtime, &run_id, Some(tree)).is_err()
+    );
+    let position = service
+        .runtime
+        .integration_directory()
+        .join("review-progress")
+        .join(format!("{task_id}.json"));
+    let mut saved: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&position).unwrap()).unwrap();
+    saved["tree"] = serde_json::json!("0000000000000000000000000000000000000000");
+    std::fs::write(&position, serde_json::to_vec(&saved).unwrap()).unwrap();
+    let recovered = serde_json::to_value(
+        crate::commands::review_progress::progress(&service.runtime, &run_id, None).unwrap(),
+    )
+    .unwrap();
+    assert!(recovered["viewedAt"].is_null());
+    assert!(recovered["note"]
+        .as_str()
+        .unwrap()
+        .contains("no longer available"));
+    assert!(recovered["diff"].as_str().unwrap().contains("+corrected"));
+    crate::commands::review_progress::progress(
+        &service.runtime,
+        &run_id,
+        recovered["tree"].as_str(),
+    )
+    .unwrap();
+    assert_eq!(git(&repo, &["rev-parse", "HEAD"]), base);
+    assert_eq!(std::fs::read(repo.join(".git/index")).unwrap(), index);
+}
+
+#[test]
+fn session_integration_requires_paused_latest_work_and_survives_restart() {
+    let (root, mut service, id) = fixture();
+    let repo = root.join("repo");
+    let git = |args: &[&str]| {
+        let result = Command::new("git")
+            .current_dir(&repo)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        String::from_utf8_lossy(&result.stdout).trim().to_string()
+    };
+    git(&["config", "user.name", "Fixture"]);
+    git(&["config", "user.email", "fixture@example.invalid"]);
+    let base = git(&["rev-parse", "HEAD"]);
+    let workspace = root.join("work");
+    git(&[
+        "worktree",
+        "add",
+        "-b",
+        "session-work",
+        workspace.to_str().unwrap(),
+        &base,
+    ]);
+    std::fs::write(workspace.join("result.txt"), "first result\n").unwrap();
+    let run = TaskRun {
+        id: Uuid::new_v4().to_string(),
+        task_id: Uuid::new_v4().to_string(),
+        project_id: "fixture".into(),
+        project_name: "Fixture".into(),
+        project_path: repo.to_string_lossy().into_owned(),
+        workspace: workspace.to_string_lossy().into_owned(),
+        live_session_id: Some(id.clone()),
+        base_head: base.clone(),
+        branch: "session-work".into(),
+        target_branch: Some("main".into()),
+        status: "review".into(),
+        prompt: "A useful result".into(),
+        started_at: Utc::now().to_rfc3339(),
+        ..Default::default()
+    };
+    let run_id = run.id.clone();
+    attach_run(&root, &mut service, &id, run);
+    let ids = vec![run_id.clone()];
+    service.action(&id, "resume", None).unwrap();
+    assert!(service.integration_guard(&ids).is_err());
+    service.action(&id, "pause", None).unwrap();
+    let message = Uuid::new_v4().to_string();
+    service
+        .send(&id, message.clone(), "Another change".into(), None)
+        .unwrap();
+    assert!(service.integration_guard(&ids).is_err());
+    service
+        .action(&id, "cancel-message", Some(&message))
+        .unwrap();
+    {
+        let _sessions = service.integration_guard(&ids).unwrap();
+        let _guard = crate::commands::integration::execution_guard().unwrap();
+        let directory = service.runtime.integration_directory();
+        let runs = service.runtime.integration_runs().unwrap();
+        let plan =
+            crate::commands::integration::prepare_with_message(&directory, &runs, &ids, None)
+                .unwrap();
+        std::fs::write(workspace.join("result.txt"), "corrected result\n").unwrap();
+        assert!(crate::commands::integration::apply(&directory, &runs, &plan.id).is_err());
+        let plan =
+            crate::commands::integration::prepare_with_message(&directory, &runs, &ids, None)
+                .unwrap();
+        crate::commands::integration::apply(&directory, &runs, &plan.id).unwrap();
+    }
+    assert_eq!(
+        std::fs::read_to_string(repo.join("result.txt")).unwrap(),
+        "corrected result\n"
+    );
+    assert!(service.action(&id, "resume", None).is_err());
+    assert!(service
+        .send(&id, Uuid::new_v4().to_string(), "Must not run".into(), None)
+        .is_err());
+    let restored = LiveSessions::new(
+        service.path.clone(),
+        service.runtime.clone(),
+        service.coordinator.clone(),
+    );
+    let session = restored.snapshot(None).unwrap().sessions.remove(0);
+    assert!(session.closed && session.paused);
+    assert_eq!(session.integrated_run_id, Some(run_id));
+}
+
+#[test]
+fn limits_pause_new_batches_and_do_not_infer_missing_cost() {
+    let (_root, service, _id) = fixture();
+    let mut session = service.snapshot(None).unwrap().sessions.remove(0);
+    session.limits = SessionLimits {
+        max_batches: Some(1),
+        pause_at_estimated_usd: Some(1.0),
+    };
+    assert!(limit_reason(&session, &[]).is_none());
+    session.batches.push(SessionBatch {
+        run_id: "run".into(),
+        message_ids: vec![],
+        prompt: String::new(),
+        previous_run_id: None,
+        error: None,
+        settled: true,
+    });
+    let mut run = TaskRun {
+        id: "run".into(),
+        ..Default::default()
+    };
+    assert!(limit_reason(&session, &[run.clone()])
+        .unwrap()
+        .contains("batch limit"));
+    session.limits.max_batches = None;
+    assert!(limit_reason(&session, &[run.clone()])
+        .unwrap()
+        .contains("unavailable"));
+    run.usage.reported = true;
+    run.usage.estimated_cost_usd = Some(0.5);
+    assert!(limit_reason(&session, &[run.clone()]).is_none());
+    run.usage.estimated_cost_usd = Some(1.1);
+    assert!(limit_reason(&session, &[run])
+        .unwrap()
+        .contains("threshold"));
+    assert!(SessionLimits {
+        max_batches: Some(0),
+        ..Default::default()
+    }
+    .validate()
+    .is_err());
 }
 
 #[test]
