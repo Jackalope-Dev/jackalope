@@ -468,6 +468,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | dashmap | 6.2.1 | MIT |
 | dbus | 0.9.12 | Apache-2.0/MIT |
 | dbus-secret-service | 4.1.0 | MIT OR Apache-2.0 |
+| defmt | 0.3.100 | MIT OR Apache-2.0 |
 | defmt | 1.1.1 | MIT OR Apache-2.0 |
 | defmt-macros | 1.1.1 | MIT OR Apache-2.0 |
 | defmt-parser | 1.0.0 | MIT OR Apache-2.0 |
@@ -511,7 +512,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | event-listener-strategy | 0.5.4 | Apache-2.0 OR MIT |
 | fancy-regex | 0.11.0 | MIT |
 | fast-glob | 1.1.1 | MIT |
-| faster-hex | 0.10.0 | MIT |
+| faster-hex | 0.10.1 | MIT |
 | fastrand | 2.5.0 | Apache-2.0 OR MIT |
 | fdeflate | 0.3.7 | MIT OR Apache-2.0 |
 | field-offset | 0.3.6 | MIT OR Apache-2.0 |

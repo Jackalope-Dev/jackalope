@@ -9938,7 +9938,7 @@ THE SOFTWARE.
 
 ============================================================
 
-faster-hex 0.10.0 (LICENSE)
+faster-hex 0.10.1 (LICENSE)
 
 MIT License
 
