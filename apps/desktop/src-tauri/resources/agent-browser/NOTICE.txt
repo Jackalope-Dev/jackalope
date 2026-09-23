@@ -1,0 +1,11 @@
+agent-browser 0.37.1
+Copyright 2025 Vercel Inc.
+Source: https://github.com/vercel-labs/agent-browser/tree/v0.37.1
+Source revision: 72007a6788d863611b23bed0b59d0d659c638d8e
+Distributed under Apache-2.0; see LICENSE.
+
+The native executable embeds unmodified axe-core 4.12.1 under MPL-2.0.
+Corresponding source: https://github.com/dequelabs/axe-core/tree/v4.12.1
+Its license and third-party notices are
+included in LICENSE-axe-core.txt and LICENSE-axe-core-THIRD-PARTY.txt.
+Jackalope distributes the upstream executable without modification.

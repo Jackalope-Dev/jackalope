@@ -1,0 +1,20 @@
+@import "./foundation.css";
+@layer components {
+  .ui-icon {
+    flex-shrink: 0;
+    vertical-align: middle;
+  }
+  .ui-icon-loading {
+    animation: ui-icon-spin 1s linear infinite;
+  }
+  @keyframes ui-icon-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ui-icon-loading {
+      animation: none;
+    }
+  }
+}

@@ -1,0 +1,191 @@
+name: Cloud release
+on:
+  push:
+    branches: [stable, beta]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Rehearsal, signed candidate, unpublished draft, or gated publication
+        type: choice
+        options: [rehearsal, candidate, draft, publish]
+        default: candidate
+        required: true
+      targets:
+        description: Configured platforms, or a Windows-only candidate for initial testing
+        type: choice
+        options: [configured, windows]
+        default: configured
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: cloud-release-${{ github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  plan:
+    if: github.repository == 'Jackalope-Dev/jackalope'
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.plan.outputs.enabled }}
+      channel: ${{ steps.plan.outputs.channel }}
+      mode: ${{ steps.plan.outputs.mode }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      targets: ${{ steps.plan.outputs.targets }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: '.node-version'
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_DISTRIBUTION: ${{ vars.RELEASE_DISTRIBUTION }}
+          CLOUD_RELEASE_ENABLED: ${{ vars.CLOUD_RELEASE_ENABLED }}
+          CLOUD_RELEASE_TARGETS: ${{ vars.CLOUD_RELEASE_TARGETS }}
+          CLOUD_SIGNING_READY: ${{ vars.CLOUD_SIGNING_READY }}
+          APPLE_SIGNING_READY: ${{ vars.APPLE_SIGNING_READY }}
+          CLOUD_DRAFT_UPLOAD_ENABLED: ${{ vars.CLOUD_DRAFT_UPLOAD_ENABLED }}
+          CLOUD_PUBLISH_ENABLED: ${{ vars.CLOUD_PUBLISH_ENABLED }}
+        run: node scripts/release/cloud-plan.mjs
+  build:
+    needs: plan
+    if: needs.plan.outputs.enabled == 'true'
+    name: Candidate ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    environment: cloud-beta
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RUST_TEST_THREADS: '2'
+      CLOUD_MODE: ${{ needs.plan.outputs.mode == 'rehearsal' && 'rehearsal' || 'candidate' }}
+      RELEASE_CHANNEL: ${{ needs.plan.outputs.channel }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: '.node-version'
+          cache: pnpm
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev libdbus-1-dev patchelf libfuse2 at-spi2-core libatspi2.0-dev libjson-glib-dev libxi-dev libxtst-dev libxcomposite-dev
+      - run: pnpm install --frozen-lockfile
+      - run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt
+      - run: rustup override set 1.98.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/desktop/src-tauri/target
+          key: cloud-${{ matrix.target }}-${{ github.ref_name }}-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            cloud-${{ matrix.target }}-${{ github.ref_name }}-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-
+            cloud-${{ matrix.target }}-${{ github.ref_name }}-rust-1.98.1-
+      - run: pnpm verify
+      - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features --features beta-access execution_access
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        if: runner.os == 'Windows' && env.CLOUD_MODE == 'candidate'
+        with:
+          dotnet-version: '8.0.x'
+      - name: Install Windows signing tools
+        if: runner.os == 'Windows' && env.CLOUD_MODE == 'candidate'
+        shell: pwsh
+        run: ./scripts/release/cloud-tools.ps1 -Azure
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906
+        if: runner.os == 'Windows' && env.CLOUD_MODE == 'candidate'
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Build Windows installer
+        id: windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          CLOUD_SIGNING_READY: ${{ vars.CLOUD_SIGNING_READY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.CLOUD_MODE == 'candidate' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.CLOUD_MODE == 'candidate' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+          AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+        run: ./scripts/release/cloud-build.ps1 -Mode $env:CLOUD_MODE -Channel $env:RELEASE_CHANNEL
+      - name: Build macOS or Linux packages
+        id: unix
+        if: runner.os != 'Windows'
+        env:
+          APPLE_SIGNING_READY: ${{ vars.APPLE_SIGNING_READY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.CLOUD_MODE == 'candidate' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.CLOUD_MODE == 'candidate' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+          APPLE_CERTIFICATE: ${{ runner.os == 'macOS' && env.CLOUD_MODE == 'candidate' && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ runner.os == 'macOS' && env.CLOUD_MODE == 'candidate' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          APPLE_API_KEY: ${{ vars.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ vars.APPLE_API_ISSUER }}
+          APPLE_API_PRIVATE_KEY: ${{ runner.os == 'macOS' && env.CLOUD_MODE == 'candidate' && secrets.APPLE_API_PRIVATE_KEY || '' }}
+        run: node scripts/release/cloud-build-unix.mjs "$CLOUD_MODE" "$RELEASE_CHANNEL"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always() && (steps.windows.outcome == 'success' || steps.unix.outcome == 'success')
+        with:
+          name: cloud-${{ env.CLOUD_MODE }}-${{ matrix.target }}
+          path: ${{ steps.windows.outputs.directory || steps.unix.outputs.directory }}
+          if-no-files-found: error
+          retention-days: 30
+  release:
+    needs: [plan, build]
+    if: needs.plan.outputs.mode == 'draft' || needs.plan.outputs.mode == 'publish'
+    runs-on: windows-2022
+    timeout-minutes: 60
+    environment: cloud-${{ needs.plan.outputs.channel }}
+    permissions:
+      contents: write
+      checks: read
+    env:
+      RELEASE_CHANNEL: ${{ needs.plan.outputs.channel }}
+      CLOUD_RELEASE_TARGETS: ${{ needs.plan.outputs.targets }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: '.node-version'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: cloud-candidate-*
+          path: output/cloud-candidates
+      - shell: pwsh
+        run: ./scripts/release/cloud-tools.ps1
+      - name: Verify and release complete candidate set
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CN_API_KEY: ${{ secrets.CN_API_KEY }}
+          CLOUD_DRAFT_UPLOAD_ENABLED: ${{ vars.CLOUD_DRAFT_UPLOAD_ENABLED }}
+          CLOUD_PUBLISH_ENABLED: ${{ vars.CLOUD_PUBLISH_ENABLED }}
+          CLOUD_ACCEPTED_TARGETS: ${{ vars.CLOUD_ACCEPTED_TARGETS }}
+          CLOUD_BETA_TEST_TARGETS: ${{ vars.CLOUD_BETA_TEST_TARGETS }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+          RELEASE_MODE: ${{ needs.plan.outputs.mode }}
+        run: node scripts/release/cloud-publish.mjs output/cloud-candidates $env:RELEASE_MODE
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: cloud-publication-${{ github.run_attempt }}
+          path: |
+            output/cloud-candidates/cloud-release.json
+            output/cloud-candidates/cloud-notes.md
+          if-no-files-found: ignore

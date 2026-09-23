@@ -1,0 +1,2228 @@
+{
+  "date": "2026-09-17",
+  "environment": {
+    "system": "Windows 11 Home 10.0.26200",
+    "processor": "AMD Ryzen 5 9600X (6 cores)",
+    "node": "26.9.0",
+    "model": "GPT-6 Astra; GPT-5.6 Luna in explicitly labeled model comparisons",
+    "cli": "codex-cli 0.155.0-alpha.2.6",
+    "effort": "medium (Balanced)",
+    "requestedSpeed": "Inherited CLI default; delivered service tier not independently established",
+    "scope": "One local machine; provider caches and remote service load not controlled"
+  },
+  "agentTrials": 160,
+  "comparisons": [
+    {
+      "id": "initial-baseline",
+      "title": "Initial coordinator baseline",
+      "detail": "Three coding fixtures, three repetitions each. The initial Jackalope build is compared with the native CLI directly. This establishes the starting overhead.",
+      "report": {
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "baseline": "direct",
+        "candidate": "control",
+        "totals": {
+          "direct": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 780365,
+            "inputTokens": 776896,
+            "outputTokens": 3469,
+            "cachedInputTokens": 614656,
+            "elapsedMs": 303901,
+            "promptBytes": 3609,
+            "medianElapsedMs": 32976,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          },
+          "control": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1015632,
+            "inputTokens": 1009586,
+            "outputTokens": 6046,
+            "cachedInputTokens": 798976,
+            "elapsedMs": 417655,
+            "promptBytes": 77532,
+            "medianElapsedMs": 45519,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          }
+        },
+        "cases": ["csv-cell", "design-tokens", "scheduler-fix"],
+        "metrics": {
+          "totalTokens": {
+            "reductionPercent": -30.148328025987837,
+            "interval": {
+              "low": -60.978532594015064,
+              "high": -1.2651398370403077,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false,
+            "eligibleForPilotSignal": false
+          },
+          "elapsedMs": {
+            "reductionPercent": -37.43126873554217,
+            "interval": {
+              "low": -68.13144675792783,
+              "high": -1.6588599354042222,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false,
+            "eligibleForPilotSignal": false
+          }
+        },
+        "blockers": [],
+        "toolPayload": {
+          "reductionPercent": null,
+          "eligibleForScopedClaim": false,
+          "scope": "Serialized MCP result bytes received versus returned inside Jackalope, including expansion reads. Excludes schemas, discovery, prompts, coordination and provider truncation. Not an end-to-end token or cost reduction.",
+          "eligibleForPilotSignal": false
+        }
+      }
+    },
+    {
+      "id": "compact-prompts",
+      "title": "Compact prompt experiment",
+      "detail": "The same 27-trial run compares compact guidance and smaller repository context with the initial Jackalope baseline. This candidate regressed and is disabled by default; use --compact-prompts only for further experiments.",
+      "report": {
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "baseline": "control",
+        "candidate": "after",
+        "totals": {
+          "control": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1015632,
+            "inputTokens": 1009586,
+            "outputTokens": 6046,
+            "cachedInputTokens": 798976,
+            "elapsedMs": 417655,
+            "promptBytes": 77532,
+            "medianElapsedMs": 45519,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          },
+          "after": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1106966,
+            "inputTokens": 1101035,
+            "outputTokens": 5931,
+            "cachedInputTokens": 877056,
+            "elapsedMs": 445917,
+            "promptBytes": 64947,
+            "medianElapsedMs": 49199,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          }
+        },
+        "cases": ["csv-cell", "design-tokens", "scheduler-fix"],
+        "metrics": {
+          "totalTokens": {
+            "reductionPercent": -8.992824172534931,
+            "interval": {
+              "low": -16.523683705016555,
+              "high": 0.6956097263324912,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false,
+            "eligibleForPilotSignal": false
+          },
+          "elapsedMs": {
+            "reductionPercent": -6.766829081418879,
+            "interval": {
+              "low": -25.504008782727293,
+              "high": 5.300248591693846,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false,
+            "eligibleForPilotSignal": false
+          }
+        },
+        "blockers": [],
+        "toolPayload": {
+          "reductionPercent": null,
+          "eligibleForScopedClaim": false,
+          "scope": "Serialized MCP result bytes received versus returned inside Jackalope, including expansion reads. Excludes schemas, discovery, prompts, coordination and provider truncation. Not an end-to-end token or cost reduction.",
+          "eligibleForPilotSignal": false
+        }
+      }
+    },
+    {
+      "id": "field-selection",
+      "title": "Exact field selection",
+      "detail": "Three large MCP-response fixtures, three repetitions each. Native CLI direct delivery is compared with Jackalope discovery and agent-requested local field selection. Both variants must produce the exact same record. This compares the whole harness, including its extra discovery and verification work.",
+      "report": {
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "baseline": "direct",
+        "candidate": "after",
+        "totals": {
+          "direct": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1201921,
+            "inputTokens": 1199470,
+            "outputTokens": 2451,
+            "cachedInputTokens": 1005312,
+            "elapsedMs": 295108,
+            "promptBytes": 4248,
+            "medianElapsedMs": 33744,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          },
+          "after": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1302300,
+            "inputTokens": 1298099,
+            "outputTokens": 4201,
+            "cachedInputTokens": 1135104,
+            "elapsedMs": 373990,
+            "promptBytes": 73188,
+            "medianElapsedMs": 41520,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": 5200812,
+            "mcpDeliveredBytes": 6339,
+            "expansionReads": 0
+          }
+        },
+        "cases": ["tool-builds", "tool-deliveries", "tool-packages"],
+        "metrics": {
+          "totalTokens": {
+            "reductionPercent": -8.35154723147362,
+            "interval": {
+              "low": -22.45546966660492,
+              "high": 2.7354151537158033,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false,
+            "eligibleForPilotSignal": false
+          },
+          "elapsedMs": {
+            "reductionPercent": -26.729875164346616,
+            "interval": {
+              "low": -45.52178731843901,
+              "high": -13.057662979479169,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false,
+            "eligibleForPilotSignal": false
+          }
+        },
+        "blockers": [],
+        "toolPayload": {
+          "reductionPercent": 99.87811518662855,
+          "eligibleForScopedClaim": false,
+          "scope": "Serialized MCP result bytes received versus returned inside Jackalope, including expansion reads. Excludes schemas, discovery, prompts, coordination and provider truncation. Not an end-to-end token or cost reduction.",
+          "eligibleForPilotSignal": true
+        }
+      }
+    },
+    {
+      "id": "final-workflow",
+      "title": "Final verification workflow",
+      "detail": "Three coding fixtures, three repetitions each, using the final default prompt policy. Compact prompts are disabled; verification is batched after implementation by default. The comparator is a fresh matched native CLI run.",
+      "report": {
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "baseline": "direct",
+        "candidate": "after",
+        "totals": {
+          "direct": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 801838,
+            "inputTokens": 798432,
+            "outputTokens": 3406,
+            "cachedInputTokens": 677120,
+            "elapsedMs": 290279,
+            "promptBytes": 3609,
+            "medianElapsedMs": 32176,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          },
+          "after": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1083651,
+            "inputTokens": 1077430,
+            "outputTokens": 6221,
+            "cachedInputTokens": 914048,
+            "elapsedMs": 423462,
+            "promptBytes": 79944,
+            "medianElapsedMs": 45131,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          }
+        },
+        "cases": ["csv-cell", "design-tokens", "scheduler-fix"],
+        "metrics": {
+          "totalTokens": {
+            "reductionPercent": -35.14587734679573,
+            "interval": {
+              "low": -48.716711789318246,
+              "high": -16.970739217826193,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false,
+            "eligibleForPilotSignal": false
+          },
+          "elapsedMs": {
+            "reductionPercent": -45.881031697091416,
+            "interval": {
+              "low": -71.60244752595287,
+              "high": -11.97560739521828,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false,
+            "eligibleForPilotSignal": false
+          }
+        },
+        "blockers": [],
+        "toolPayload": {
+          "reductionPercent": null,
+          "eligibleForScopedClaim": false,
+          "scope": "Serialized MCP result bytes received versus returned inside Jackalope, including expansion reads. Excludes schemas, discovery, prompts, coordination and provider truncation. Not an end-to-end token or cost reduction.",
+          "eligibleForPilotSignal": false
+        }
+      }
+    }
+  ],
+  "discovery": {
+    "trials": 24,
+    "calls": 15,
+    "localPassed": 12,
+    "jevPassed": 19,
+    "elapsedMs": 2038,
+    "inputTokens": 29280,
+    "estimatedCostUsd": 0.00122976,
+    "errors": 0,
+    "model": "jev-1.13.0",
+    "regressions": 0,
+    "baselineAllCalls": {
+      "trials": 24,
+      "calls": 24,
+      "localPassed": 12,
+      "jevPassed": 18,
+      "elapsedMs": 3919,
+      "inputTokens": 46875,
+      "estimatedCostUsd": 0.00196875,
+      "errors": 0,
+      "model": "jev-1.13.0"
+    }
+  },
+  "experiments": [
+    {
+      "id": "experiment-native-tools-scoped-direct",
+      "title": "Task-scoped guidance with structured reads",
+      "detail": "One authored extraction task, two repetitions per variant. The same native CLI control and structured-read configuration, with opt-in Balanced guidance that limits call-site investigation to code changes. Applicable repository guidance and checks remain required. Selected after observing unnecessary exploration in the earlier pilot; not held-out confirmation.",
+      "labels": {
+        "direct": "Native CLI · direct MCP",
+        "after": "Jackalope · scoped guidance"
+      },
+      "report": {
+        "version": 1,
+        "baseline": "direct",
+        "candidate": "after",
+        "matched": true,
+        "complete": true,
+        "distinctTasks": 1,
+        "independentFamilies": 1,
+        "totals": {
+          "direct": {
+            "trials": 2,
+            "successes": 2,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 226191,
+            "elapsedMs": 57933,
+            "tokensPerSuccess": 113095.5,
+            "msPerSuccess": 28966.5,
+            "estimatedModelCostUsd": 0.436806,
+            "totalCostBoundsUsd": {
+              "low": 0.436806,
+              "high": 0.436806
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.218403,
+              "high": 0.218403
+            },
+            "estimatedModelCostPerSuccess": 0.218403,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 25203,
+            "p95Ms": null,
+            "toolCalls": 6,
+            "cachedInputTokens": 205056,
+            "uncachedInputTokens": 20625
+          },
+          "after": {
+            "trials": 2,
+            "successes": 2,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 252097,
+            "elapsedMs": 70452,
+            "tokensPerSuccess": 126048.5,
+            "msPerSuccess": 35226,
+            "estimatedModelCostUsd": 0.527338,
+            "totalCostBoundsUsd": {
+              "low": 0.527338,
+              "high": 0.527338
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.263669,
+              "high": 0.263669
+            },
+            "estimatedModelCostPerSuccess": 0.263669,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 29533,
+            "p95Ms": null,
+            "toolCalls": 11,
+            "cachedInputTokens": 224768,
+            "uncachedInputTokens": 26597
+          }
+        },
+        "reductions": {
+          "tokensPerSuccess": -11.453152424278601,
+          "msPerSuccess": -21.609445393816994,
+          "estimatedModelCostPerSuccess": -20.725905779682495,
+          "conservativeTotalCostPerSuccess": -20.725905779682495
+        },
+        "intervals": {
+          "totalTokens": null,
+          "elapsedMs": null,
+          "acceptedExecutionMs": null,
+          "deliveryMs": null,
+          "conservativeTotalCostUsd": null
+        },
+        "quality": {
+          "conservativeFamilySuccessDifferenceLowerBound": null
+        },
+        "publication": {
+          "scope": "agent-execution",
+          "eligible": false,
+          "blockers": [
+            "Require at least 50 distinct tasks and 20 independent source families for the product claim gate.",
+            "A frozen, held-out confirmation run is required.",
+            "Independent quality acceptance of the original patches is incomplete.",
+            "Quality uncertainty does not rule out a two-percentage-point regression; this is a reporting tolerance, not a guarantee.",
+            "No measured time or conservatively estimated total-cost improvement with a lower confidence bound of at least 10%.",
+            "Replication, resource and cache conditions must be recorded."
+          ]
+        },
+        "sourceSha256": "86271cbde793bdda5f66bf036c99bd75786adfd57730466a198f27349a8c9b7c",
+        "limitations": "All completed and failed attempts remain in totals. The claim gate concerns agent execution; human review and correction time are optional, separate delivery measurements. Independent acceptance assesses the original patch before corrections. Cost uses explicit API-equivalent prices, not subscription billing or quota. When cumulative usage cannot identify long-context request tiers, costs are bounded and the improvement uses baseline low versus candidate high. Cache-write prices must describe an incremental charge when writes are already in input. No human acceptance is inferred from agent claims or tests. Related seeded defects share one source-family cluster. p95 is omitted below 20 measured trials. This report never authorizes publication."
+      },
+      "configuration": {
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "models": null,
+        "experiments": {
+          "direct": {
+            "workflow": "legacy",
+            "task-approach": "general",
+            "tool-surface": "full",
+            "named-read": "off",
+            "result-selection": "on",
+            "repo-map": "on",
+            "context-reuse": "off",
+            "source-context": "off"
+          },
+          "after": {
+            "workflow": "legacy",
+            "task-approach": "scoped",
+            "tool-surface": "available",
+            "named-read": "on",
+            "result-selection": "on",
+            "repo-map": "on",
+            "context-reuse": "off",
+            "source-context": "off"
+          }
+        },
+        "efforts": {
+          "direct": "balanced",
+          "after": "balanced"
+        },
+        "speeds": {
+          "direct": null,
+          "after": null
+        },
+        "seconds": 180,
+        "tokens": 500000,
+        "repeat": 2,
+        "orderSeed": "adaptive-screen-1",
+        "suiteSha256": "33a65bafb10e218d40be699196504946ac6f1cb395ca3e67421789e26026b008",
+        "frozenPromptBaselineRevision": null,
+        "executableHashes": {
+          "direct": "e3ad49174552aafef822cb30abc7dc265250772fbe3af378aa83c7d07957540d",
+          "after": "e3ad49174552aafef822cb30abc7dc265250772fbe3af378aa83c7d07957540d"
+        },
+        "pricing": {
+          "gpt-6-astra": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+            "date": "2026-09-17",
+            "input": 10,
+            "cachedInput": 1,
+            "cacheWriteIncremental": 2.5,
+            "output": 50,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          },
+          "gpt-5.6-luna": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+            "date": "2026-09-17",
+            "input": 0.2,
+            "cachedInput": 0.02,
+            "cacheWriteIncremental": 0.05,
+            "output": 1.2,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          }
+        },
+        "protocol": {
+          "phase": "screening",
+          "frozenBeforeRun": false,
+          "replicated": false,
+          "resourceLimits": "One live agent trial at a time on the same development PC; no concurrent builds. Normal desktop activity is not isolated.",
+          "cachePolicy": "Fresh task workspace and application process; inherited provider caching and remote service load. Standard API price equivalents do not establish the delivered service tier.",
+          "includesHelpers": false,
+          "includesExternalFallbacks": false
+        },
+        "interruptedAttempts": 0,
+        "activeTrialRecorded": false,
+        "stoppedEarly": false
+      }
+    },
+    {
+      "id": "experiment-native-tools-direct",
+      "title": "Native CLI control for structured tool reads",
+      "detail": "One authored extraction task, two repetitions per variant. Both sides receive the exact tool name, empty arguments and requested JSON pointer. Jackalope offers named read, local field selection and available-tool exposure; the native CLI uses the direct MCP server. Configuration selected after earlier ablations; this is screening, not held-out confirmation.",
+      "labels": {
+        "direct": "Native CLI · direct MCP",
+        "after": "Jackalope · structured read"
+      },
+      "report": {
+        "version": 1,
+        "baseline": "direct",
+        "candidate": "after",
+        "matched": true,
+        "complete": true,
+        "distinctTasks": 1,
+        "independentFamilies": 1,
+        "totals": {
+          "direct": {
+            "trials": 2,
+            "successes": 2,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 226238,
+            "elapsedMs": 51893,
+            "tokensPerSuccess": 113119,
+            "msPerSuccess": 25946.5,
+            "estimatedModelCostUsd": 0.438516,
+            "totalCostBoundsUsd": {
+              "low": 0.438516,
+              "high": 0.438516
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.219258,
+              "high": 0.219258
+            },
+            "estimatedModelCostPerSuccess": 0.219258,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 24293,
+            "p95Ms": null,
+            "toolCalls": 6,
+            "cachedInputTokens": 205056,
+            "uncachedInputTokens": 20641
+          },
+          "after": {
+            "trials": 2,
+            "successes": 2,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 226165,
+            "elapsedMs": 64079,
+            "tokensPerSuccess": 113082.5,
+            "msPerSuccess": 32039.5,
+            "estimatedModelCostUsd": 0.5027699999999999,
+            "totalCostBoundsUsd": {
+              "low": 0.5027699999999999,
+              "high": 0.5027699999999999
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.25138499999999997,
+              "high": 0.25138499999999997
+            },
+            "estimatedModelCostPerSuccess": 0.25138499999999997,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 30257,
+            "p95Ms": null,
+            "toolCalls": 9,
+            "cachedInputTokens": 199040,
+            "uncachedInputTokens": 26313
+          }
+        },
+        "reductions": {
+          "tokensPerSuccess": 0.03226690476401117,
+          "msPerSuccess": -23.482936041469937,
+          "estimatedModelCostPerSuccess": -14.652601045343827,
+          "conservativeTotalCostPerSuccess": -14.652601045343827
+        },
+        "intervals": {
+          "totalTokens": null,
+          "elapsedMs": null,
+          "acceptedExecutionMs": null,
+          "deliveryMs": null,
+          "conservativeTotalCostUsd": null
+        },
+        "quality": {
+          "conservativeFamilySuccessDifferenceLowerBound": null
+        },
+        "publication": {
+          "scope": "agent-execution",
+          "eligible": false,
+          "blockers": [
+            "Require at least 50 distinct tasks and 20 independent source families for the product claim gate.",
+            "A frozen, held-out confirmation run is required.",
+            "Independent quality acceptance of the original patches is incomplete.",
+            "Quality uncertainty does not rule out a two-percentage-point regression; this is a reporting tolerance, not a guarantee.",
+            "No measured time or conservatively estimated total-cost improvement with a lower confidence bound of at least 10%.",
+            "Replication, resource and cache conditions must be recorded."
+          ]
+        },
+        "sourceSha256": "2f8f6d49b813e41b8ebd80ecb502d03c0c4982e9d3edd3e84ae707f173dba2cc",
+        "limitations": "All completed and failed attempts remain in totals. The claim gate concerns agent execution; human review and correction time are optional, separate delivery measurements. Independent acceptance assesses the original patch before corrections. Cost uses explicit API-equivalent prices, not subscription billing or quota. When cumulative usage cannot identify long-context request tiers, costs are bounded and the improvement uses baseline low versus candidate high. Cache-write prices must describe an incremental charge when writes are already in input. No human acceptance is inferred from agent claims or tests. Related seeded defects share one source-family cluster. p95 is omitted below 20 measured trials. This report never authorizes publication."
+      },
+      "configuration": {
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "models": null,
+        "experiments": {
+          "direct": {
+            "workflow": "legacy",
+            "tool-surface": "full",
+            "named-read": "off",
+            "result-selection": "on",
+            "repo-map": "on",
+            "context-reuse": "off",
+            "source-context": "off"
+          },
+          "after": {
+            "workflow": "legacy",
+            "tool-surface": "available",
+            "named-read": "on",
+            "result-selection": "on",
+            "repo-map": "on",
+            "context-reuse": "off",
+            "source-context": "off"
+          }
+        },
+        "efforts": {
+          "direct": "balanced",
+          "after": "balanced"
+        },
+        "speeds": {
+          "direct": null,
+          "after": null
+        },
+        "seconds": 180,
+        "tokens": 500000,
+        "repeat": 2,
+        "orderSeed": "adaptive-screen-1",
+        "suiteSha256": "33a65bafb10e218d40be699196504946ac6f1cb395ca3e67421789e26026b008",
+        "frozenPromptBaselineRevision": null,
+        "executableHashes": {
+          "direct": "e3ad49174552aafef822cb30abc7dc265250772fbe3af378aa83c7d07957540d",
+          "after": "e3ad49174552aafef822cb30abc7dc265250772fbe3af378aa83c7d07957540d"
+        },
+        "pricing": {
+          "gpt-6-astra": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+            "date": "2026-09-17",
+            "input": 10,
+            "cachedInput": 1,
+            "cacheWriteIncremental": 2.5,
+            "output": 50,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          },
+          "gpt-5.6-luna": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+            "date": "2026-09-17",
+            "input": 0.2,
+            "cachedInput": 0.02,
+            "cacheWriteIncremental": 0.05,
+            "output": 1.2,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          }
+        },
+        "protocol": {
+          "phase": "screening",
+          "frozenBeforeRun": false,
+          "replicated": false,
+          "resourceLimits": "One live agent trial at a time on the same development PC; no concurrent builds. Normal desktop activity is not isolated.",
+          "cachePolicy": "Fresh task workspace and application process; inherited provider caching and remote service load. Standard API price equivalents do not establish the delivered service tier.",
+          "includesHelpers": false,
+          "includesExternalFallbacks": false
+        },
+        "interruptedAttempts": 0,
+        "activeTrialRecorded": false,
+        "stoppedEarly": false
+      }
+    },
+    {
+      "id": "experiment-source-context-direct",
+      "title": "Native CLI control for prepared source",
+      "detail": "Two seeded repairs from two source modules, one trial per variant. Native CLI receives the original task; Jackalope prepares bounded snapshots of explicitly named source files and omits unavailable tools. A combined adaptive pilot selected after earlier ablations; it does not isolate the effects of either change.",
+      "labels": {
+        "direct": "Native CLI · original task",
+        "after": "Jackalope · prepared source"
+      },
+      "report": {
+        "version": 1,
+        "baseline": "direct",
+        "candidate": "after",
+        "matched": true,
+        "complete": true,
+        "distinctTasks": 2,
+        "independentFamilies": 2,
+        "totals": {
+          "direct": {
+            "trials": 2,
+            "successes": 2,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 160822,
+            "elapsedMs": 57460,
+            "tokensPerSuccess": 80411,
+            "msPerSuccess": 28730,
+            "estimatedModelCostUsd": 0.389868,
+            "totalCostBoundsUsd": {
+              "low": 0.389868,
+              "high": 0.389868
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.194934,
+              "high": 0.194934
+            },
+            "estimatedModelCostPerSuccess": 0.194934,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 27461,
+            "p95Ms": null,
+            "toolCalls": 7,
+            "cachedInputTokens": 138368,
+            "uncachedInputTokens": 21780
+          },
+          "after": {
+            "trials": 2,
+            "successes": 2,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 288133,
+            "elapsedMs": 89800,
+            "tokensPerSuccess": 144066.5,
+            "msPerSuccess": 44900,
+            "estimatedModelCostUsd": 0.609762,
+            "totalCostBoundsUsd": {
+              "low": 0.609762,
+              "high": 0.609762
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.304881,
+              "high": 0.304881
+            },
+            "estimatedModelCostPerSuccess": 0.304881,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 37523,
+            "p95Ms": null,
+            "toolCalls": 10,
+            "cachedInputTokens": 257152,
+            "uncachedInputTokens": 29911
+          }
+        },
+        "reductions": {
+          "tokensPerSuccess": -79.1626767482061,
+          "msPerSuccess": -56.282631395753555,
+          "estimatedModelCostPerSuccess": -56.40216688725417,
+          "conservativeTotalCostPerSuccess": -56.40216688725417
+        },
+        "intervals": {
+          "totalTokens": null,
+          "elapsedMs": null,
+          "acceptedExecutionMs": null,
+          "deliveryMs": null,
+          "conservativeTotalCostUsd": null
+        },
+        "quality": {
+          "conservativeFamilySuccessDifferenceLowerBound": null
+        },
+        "publication": {
+          "scope": "agent-execution",
+          "eligible": false,
+          "blockers": [
+            "Require at least 50 distinct tasks and 20 independent source families for the product claim gate.",
+            "A frozen, held-out confirmation run is required.",
+            "Independent quality acceptance of the original patches is incomplete.",
+            "Quality uncertainty does not rule out a two-percentage-point regression; this is a reporting tolerance, not a guarantee.",
+            "No measured time or conservatively estimated total-cost improvement with a lower confidence bound of at least 10%.",
+            "Replication, resource and cache conditions must be recorded."
+          ]
+        },
+        "sourceSha256": "8853fbc0b309a1ba537ed990cfb6280b0e0e52e56a0f245ccbdf68c540ce12af",
+        "limitations": "All completed and failed attempts remain in totals. The claim gate concerns agent execution; human review and correction time are optional, separate delivery measurements. Independent acceptance assesses the original patch before corrections. Cost uses explicit API-equivalent prices, not subscription billing or quota. When cumulative usage cannot identify long-context request tiers, costs are bounded and the improvement uses baseline low versus candidate high. Cache-write prices must describe an incremental charge when writes are already in input. No human acceptance is inferred from agent claims or tests. Related seeded defects share one source-family cluster. p95 is omitted below 20 measured trials. This report never authorizes publication."
+      },
+      "configuration": {
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "models": null,
+        "experiments": {
+          "direct": {
+            "workflow": "legacy",
+            "tool-surface": "full",
+            "named-read": "off",
+            "result-selection": "on",
+            "repo-map": "on",
+            "context-reuse": "off",
+            "source-context": "off"
+          },
+          "after": {
+            "workflow": "legacy",
+            "tool-surface": "available",
+            "named-read": "off",
+            "result-selection": "on",
+            "repo-map": "on",
+            "context-reuse": "off",
+            "source-context": "on"
+          }
+        },
+        "efforts": {
+          "direct": "balanced",
+          "after": "balanced"
+        },
+        "speeds": {
+          "direct": null,
+          "after": null
+        },
+        "seconds": 180,
+        "tokens": 500000,
+        "repeat": 1,
+        "orderSeed": "adaptive-screen-1",
+        "suiteSha256": "57daf80e5b198668d22f2bbfcaaa9df0936daf21671de959b4e560c536a5b21c",
+        "frozenPromptBaselineRevision": null,
+        "executableHashes": {
+          "direct": "e3ad49174552aafef822cb30abc7dc265250772fbe3af378aa83c7d07957540d",
+          "after": "e3ad49174552aafef822cb30abc7dc265250772fbe3af378aa83c7d07957540d"
+        },
+        "pricing": {
+          "gpt-6-astra": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+            "date": "2026-09-17",
+            "input": 10,
+            "cachedInput": 1,
+            "cacheWriteIncremental": 2.5,
+            "output": 50,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          },
+          "gpt-5.6-luna": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+            "date": "2026-09-17",
+            "input": 0.2,
+            "cachedInput": 0.02,
+            "cacheWriteIncremental": 0.05,
+            "output": 1.2,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          }
+        },
+        "protocol": {
+          "phase": "screening",
+          "frozenBeforeRun": false,
+          "replicated": false,
+          "resourceLimits": "One live agent trial at a time on the same development PC; no concurrent builds. Normal desktop activity is not isolated.",
+          "cachePolicy": "Fresh task workspace and application process; inherited provider caching and remote service load. Standard API price equivalents do not establish the delivered service tier.",
+          "includesHelpers": false,
+          "includesExternalFallbacks": false
+        },
+        "interruptedAttempts": 0,
+        "activeTrialRecorded": false,
+        "stoppedEarly": false
+      }
+    },
+    {
+      "id": "experiment-workflow-control",
+      "title": "Final-phase debugging guidance",
+      "detail": "Twenty small repairs seeded in six committed Jackalope modules; one trial per variant per task. Frozen v2 guidance versus v4 final-phase debugging guidance. Source-family train/holdout labels are retained, but this is exploratory screening.",
+      "labels": {
+        "control": "Frozen v2 workflow",
+        "after": "Final-phase workflow"
+      },
+      "report": {
+        "version": 1,
+        "baseline": "control",
+        "candidate": "after",
+        "matched": true,
+        "complete": true,
+        "distinctTasks": 20,
+        "independentFamilies": 6,
+        "totals": {
+          "control": {
+            "trials": 20,
+            "successes": 20,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 2250856,
+            "elapsedMs": 781791,
+            "tokensPerSuccess": 112542.8,
+            "msPerSuccess": 39089.55,
+            "estimatedModelCostUsd": 5.984544,
+            "totalCostBoundsUsd": {
+              "low": 5.984544,
+              "high": 5.984544
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.29922719999999997,
+              "high": 0.29922719999999997
+            },
+            "estimatedModelCostPerSuccess": 0.29922719999999997,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 35999,
+            "p95Ms": 51624,
+            "toolCalls": 87,
+            "cachedInputTokens": 1885184,
+            "uncachedInputTokens": 354606
+          },
+          "after": {
+            "trials": 20,
+            "successes": 20,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 2245019,
+            "elapsedMs": 824032,
+            "tokensPerSuccess": 112250.95,
+            "msPerSuccess": 41201.6,
+            "estimatedModelCostUsd": 6.0876459999999994,
+            "totalCostBoundsUsd": {
+              "low": 6.0876459999999994,
+              "high": 6.0876459999999994
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.3043823,
+              "high": 0.3043823
+            },
+            "estimatedModelCostPerSuccess": 0.3043823,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 41241,
+            "p95Ms": 47606,
+            "toolCalls": 84,
+            "cachedInputTokens": 1877376,
+            "uncachedInputTokens": 354297
+          }
+        },
+        "reductions": {
+          "tokensPerSuccess": 0.25932356401298096,
+          "msPerSuccess": -5.403106456840745,
+          "estimatedModelCostPerSuccess": -1.7228046113455076,
+          "conservativeTotalCostPerSuccess": -1.7228046113455076
+        },
+        "intervals": {
+          "totalTokens": {
+            "low": -6.414421137734672,
+            "high": 7.0577399560349585
+          },
+          "elapsedMs": {
+            "low": -8.230791584262676,
+            "high": -1.6001049156655789
+          },
+          "acceptedExecutionMs": null,
+          "deliveryMs": null,
+          "conservativeTotalCostUsd": {
+            "low": -7.788616958794647,
+            "high": 3.691088900585049
+          }
+        },
+        "quality": {
+          "conservativeFamilySuccessDifferenceLowerBound": null
+        },
+        "publication": {
+          "scope": "agent-execution",
+          "eligible": false,
+          "blockers": [
+            "Require at least 50 distinct tasks and 20 independent source families for the product claim gate.",
+            "A frozen, held-out confirmation run is required.",
+            "Independent quality acceptance of the original patches is incomplete.",
+            "Quality uncertainty does not rule out a two-percentage-point regression; this is a reporting tolerance, not a guarantee.",
+            "No measured time or conservatively estimated total-cost improvement with a lower confidence bound of at least 10%.",
+            "Replication, resource and cache conditions must be recorded."
+          ]
+        },
+        "sourceSha256": "007b8c8cf1c4d3779148bdb181395685c190e2d255da5aa68c37988903512951",
+        "limitations": "All completed and failed attempts remain in totals. The claim gate concerns agent execution; human review and correction time are optional, separate delivery measurements. Independent acceptance assesses the original patch before corrections. Cost uses explicit API-equivalent prices, not subscription billing or quota. When cumulative usage cannot identify long-context request tiers, costs are bounded and the improvement uses baseline low versus candidate high. Cache-write prices must describe an incremental charge when writes are already in input. No human acceptance is inferred from agent claims or tests. Related seeded defects share one source-family cluster. p95 is omitted below 20 measured trials. This report never authorizes publication."
+      },
+      "configuration": {
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "models": null,
+        "experiments": {
+          "control": {
+            "workflow": "legacy",
+            "tool-surface": "full",
+            "named-read": "off",
+            "result-selection": "on",
+            "repo-map": "on",
+            "context-reuse": "off"
+          },
+          "after": {
+            "workflow": "final",
+            "tool-surface": "full",
+            "named-read": "off",
+            "result-selection": "on",
+            "repo-map": "on",
+            "context-reuse": "off"
+          }
+        },
+        "efforts": {
+          "control": "balanced",
+          "after": "balanced"
+        },
+        "speeds": {
+          "control": null,
+          "after": null
+        },
+        "seconds": 180,
+        "tokens": 500000,
+        "repeat": 1,
+        "orderSeed": "impact-screen-2",
+        "suiteSha256": "2551ec42740a98c09c1c9efa7edc83ee48ca304de3057cc2b22dc706f4d9b315",
+        "frozenPromptBaselineRevision": null,
+        "executableHashes": {
+          "control": "3963e3bd2150088f23572943938c1944a96d821d7a631c0820079cd8ffa3bec5",
+          "after": "3963e3bd2150088f23572943938c1944a96d821d7a631c0820079cd8ffa3bec5"
+        },
+        "pricing": {
+          "gpt-6-astra": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+            "date": "2026-09-17",
+            "input": 10,
+            "cachedInput": 1,
+            "cacheWriteIncremental": 2.5,
+            "output": 50,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          },
+          "gpt-5.6-luna": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+            "date": "2026-09-17",
+            "input": 0.2,
+            "cachedInput": 0.02,
+            "cacheWriteIncremental": 0.05,
+            "output": 1.2,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          }
+        },
+        "protocol": {
+          "phase": "screening",
+          "frozenBeforeRun": false,
+          "replicated": false,
+          "resourceLimits": "One live agent trial at a time on the same development PC; no concurrent builds. Normal desktop activity is not isolated.",
+          "cachePolicy": "Fresh task workspace and application process; inherited provider caching and remote service load. Standard API price equivalents do not establish the delivered service tier.",
+          "includesHelpers": false,
+          "includesExternalFallbacks": false
+        },
+        "interruptedAttempts": 0,
+        "activeTrialRecorded": false,
+        "stoppedEarly": false
+      }
+    },
+    {
+      "id": "experiment-surface-control",
+      "title": "Show tools available to this task",
+      "detail": "Three authored tasks, two repetitions each. Full tool listing versus omitting broker tools without selected connections and verification without a saved command. All remaining permissions and capabilities are unchanged.",
+      "labels": {
+        "control": "Full tool listing",
+        "after": "Available tools"
+      },
+      "report": {
+        "version": 1,
+        "baseline": "control",
+        "candidate": "after",
+        "matched": true,
+        "complete": true,
+        "distinctTasks": 3,
+        "independentFamilies": 3,
+        "totals": {
+          "control": {
+            "trials": 6,
+            "successes": 6,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 629263,
+            "elapsedMs": 233643,
+            "tokensPerSuccess": 104877.16666666667,
+            "msPerSuccess": 38940.5,
+            "estimatedModelCostUsd": 1.596982,
+            "totalCostBoundsUsd": {
+              "low": 1.596982,
+              "high": 1.596982
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.26616366666666663,
+              "high": 0.26616366666666663
+            },
+            "estimatedModelCostPerSuccess": 0.26616366666666663,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 34801,
+            "p95Ms": null,
+            "toolCalls": 26,
+            "cachedInputTokens": 538112,
+            "uncachedInputTokens": 87467
+          },
+          "after": {
+            "trials": 6,
+            "successes": 6,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 579750,
+            "elapsedMs": 227107,
+            "tokensPerSuccess": 96625,
+            "msPerSuccess": 37851.166666666664,
+            "estimatedModelCostUsd": 1.461468,
+            "totalCostBoundsUsd": {
+              "low": 1.461468,
+              "high": 1.461468
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.243578,
+              "high": 0.243578
+            },
+            "estimatedModelCostPerSuccess": 0.243578,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 38382,
+            "p95Ms": null,
+            "toolCalls": 23,
+            "cachedInputTokens": 497408,
+            "uncachedInputTokens": 78826
+          }
+        },
+        "reductions": {
+          "tokensPerSuccess": 7.868411141287512,
+          "msPerSuccess": 2.7974302675449314,
+          "estimatedModelCostPerSuccess": 8.485631021514328,
+          "conservativeTotalCostPerSuccess": 8.485631021514328
+        },
+        "intervals": {
+          "totalTokens": {
+            "low": -10.668981628243834,
+            "high": 25.585999941872295
+          },
+          "elapsedMs": {
+            "low": -6.856764291826534,
+            "high": 7.168139862327905
+          },
+          "acceptedExecutionMs": null,
+          "deliveryMs": null,
+          "conservativeTotalCostUsd": {
+            "low": -3.1080475096332716,
+            "high": 20.534533648170004
+          }
+        },
+        "quality": {
+          "conservativeFamilySuccessDifferenceLowerBound": null
+        },
+        "publication": {
+          "scope": "agent-execution",
+          "eligible": false,
+          "blockers": [
+            "Require at least 50 distinct tasks and 20 independent source families for the product claim gate.",
+            "A frozen, held-out confirmation run is required.",
+            "Independent quality acceptance of the original patches is incomplete.",
+            "Quality uncertainty does not rule out a two-percentage-point regression; this is a reporting tolerance, not a guarantee.",
+            "No measured time or conservatively estimated total-cost improvement with a lower confidence bound of at least 10%.",
+            "Replication, resource and cache conditions must be recorded."
+          ]
+        },
+        "sourceSha256": "fb22c5eafdad7361d757b68a5d5b2269b9ce5da8a594591454cf13a540c790a0",
+        "limitations": "All completed and failed attempts remain in totals. The claim gate concerns agent execution; human review and correction time are optional, separate delivery measurements. Independent acceptance assesses the original patch before corrections. Cost uses explicit API-equivalent prices, not subscription billing or quota. When cumulative usage cannot identify long-context request tiers, costs are bounded and the improvement uses baseline low versus candidate high. Cache-write prices must describe an incremental charge when writes are already in input. No human acceptance is inferred from agent claims or tests. Related seeded defects share one source-family cluster. p95 is omitted below 20 measured trials. This report never authorizes publication."
+      },
+      "configuration": {
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "models": null,
+        "experiments": {
+          "control": {
+            "workflow": "legacy",
+            "tool-surface": "full",
+            "named-read": "off",
+            "result-selection": "on",
+            "repo-map": "on",
+            "context-reuse": "off"
+          },
+          "after": {
+            "workflow": "legacy",
+            "tool-surface": "available",
+            "named-read": "off",
+            "result-selection": "on",
+            "repo-map": "on",
+            "context-reuse": "off"
+          }
+        },
+        "efforts": {
+          "control": "balanced",
+          "after": "balanced"
+        },
+        "speeds": {
+          "control": null,
+          "after": null
+        },
+        "seconds": 180,
+        "tokens": 500000,
+        "repeat": 2,
+        "orderSeed": "impact-screen-2",
+        "suiteSha256": "8d76ae320aef4f76bd141110501056f13ae9f8d831f7e4697ca8ed0ef1464d38",
+        "frozenPromptBaselineRevision": null,
+        "executableHashes": {
+          "control": "3963e3bd2150088f23572943938c1944a96d821d7a631c0820079cd8ffa3bec5",
+          "after": "3963e3bd2150088f23572943938c1944a96d821d7a631c0820079cd8ffa3bec5"
+        },
+        "pricing": {
+          "gpt-6-astra": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+            "date": "2026-09-17",
+            "input": 10,
+            "cachedInput": 1,
+            "cacheWriteIncremental": 2.5,
+            "output": 50,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          },
+          "gpt-5.6-luna": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+            "date": "2026-09-17",
+            "input": 0.2,
+            "cachedInput": 0.02,
+            "cacheWriteIncremental": 0.05,
+            "output": 1.2,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          }
+        },
+        "protocol": {
+          "phase": "screening",
+          "frozenBeforeRun": false,
+          "replicated": false,
+          "resourceLimits": "One live agent trial at a time on the same development PC; no concurrent builds. Normal desktop activity is not isolated.",
+          "cachePolicy": "Fresh task workspace and application process; inherited provider caching and remote service load. Standard API price equivalents do not establish the delivered service tier.",
+          "includesHelpers": false,
+          "includesExternalFallbacks": false
+        },
+        "interruptedAttempts": 0,
+        "activeTrialRecorded": false,
+        "stoppedEarly": false
+      }
+    },
+    {
+      "id": "experiment-named-read-control",
+      "title": "Read a known tool without a separate search turn",
+      "detail": "Three authored extraction tasks, two repetitions each. Both variants use recoverable field selection; the candidate additionally offers exact, unambiguous read-only lookup in one tool call.",
+      "labels": {
+        "control": "Search then read",
+        "after": "Exact named read available"
+      },
+      "report": {
+        "version": 1,
+        "baseline": "control",
+        "candidate": "after",
+        "matched": true,
+        "complete": true,
+        "distinctTasks": 3,
+        "independentFamilies": 1,
+        "totals": {
+          "control": {
+            "trials": 6,
+            "successes": 6,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 1001500,
+            "elapsedMs": 275156,
+            "tokensPerSuccess": 166916.66666666666,
+            "msPerSuccess": 45859.333333333336,
+            "estimatedModelCostUsd": 2.089328,
+            "totalCostBoundsUsd": {
+              "low": 2.089328,
+              "high": 2.089328
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.3482213333333333,
+              "high": 0.3482213333333333
+            },
+            "estimatedModelCostPerSuccess": 0.3482213333333333,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 42111,
+            "p95Ms": null,
+            "toolCalls": 37,
+            "cachedInputTokens": 893568,
+            "uncachedInputTokens": 105021
+          },
+          "after": {
+            "trials": 6,
+            "successes": 6,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 1035376,
+            "elapsedMs": 270771,
+            "tokensPerSuccess": 172562.66666666666,
+            "msPerSuccess": 45128.5,
+            "estimatedModelCostUsd": 2.11388,
+            "totalCostBoundsUsd": {
+              "low": 2.11388,
+              "high": 2.11388
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.3523133333333333,
+              "high": 0.3523133333333333
+            },
+            "estimatedModelCostPerSuccess": 0.3523133333333333,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 44477,
+            "p95Ms": null,
+            "toolCalls": 43,
+            "cachedInputTokens": 929280,
+            "uncachedInputTokens": 103005
+          }
+        },
+        "reductions": {
+          "tokensPerSuccess": -3.382526210683978,
+          "msPerSuccess": 1.5936414252278763,
+          "estimatedModelCostPerSuccess": -1.175114678020872,
+          "conservativeTotalCostPerSuccess": -1.175114678020872
+        },
+        "intervals": {
+          "totalTokens": null,
+          "elapsedMs": null,
+          "acceptedExecutionMs": null,
+          "deliveryMs": null,
+          "conservativeTotalCostUsd": null
+        },
+        "quality": {
+          "conservativeFamilySuccessDifferenceLowerBound": null
+        },
+        "publication": {
+          "scope": "agent-execution",
+          "eligible": false,
+          "blockers": [
+            "Require at least 50 distinct tasks and 20 independent source families for the product claim gate.",
+            "A frozen, held-out confirmation run is required.",
+            "Independent quality acceptance of the original patches is incomplete.",
+            "Quality uncertainty does not rule out a two-percentage-point regression; this is a reporting tolerance, not a guarantee.",
+            "No measured time or conservatively estimated total-cost improvement with a lower confidence bound of at least 10%.",
+            "Replication, resource and cache conditions must be recorded."
+          ]
+        },
+        "sourceSha256": "30afb2830e1ecb426c44c6a1e35eb93ce25ae7d12d22e53e3031afdc33d6b21f",
+        "limitations": "All completed and failed attempts remain in totals. The claim gate concerns agent execution; human review and correction time are optional, separate delivery measurements. Independent acceptance assesses the original patch before corrections. Cost uses explicit API-equivalent prices, not subscription billing or quota. When cumulative usage cannot identify long-context request tiers, costs are bounded and the improvement uses baseline low versus candidate high. Cache-write prices must describe an incremental charge when writes are already in input. No human acceptance is inferred from agent claims or tests. Related seeded defects share one source-family cluster. p95 is omitted below 20 measured trials. This report never authorizes publication."
+      },
+      "configuration": {
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "models": null,
+        "experiments": {
+          "control": {
+            "workflow": "legacy",
+            "tool-surface": "full",
+            "named-read": "off",
+            "result-selection": "on",
+            "repo-map": "on",
+            "context-reuse": "off",
+            "source-context": "off"
+          },
+          "after": {
+            "workflow": "legacy",
+            "tool-surface": "full",
+            "named-read": "on",
+            "result-selection": "on",
+            "repo-map": "on",
+            "context-reuse": "off",
+            "source-context": "off"
+          }
+        },
+        "efforts": {
+          "control": "balanced",
+          "after": "balanced"
+        },
+        "speeds": {
+          "control": null,
+          "after": null
+        },
+        "seconds": 180,
+        "tokens": 500000,
+        "repeat": 2,
+        "orderSeed": "impact-screen-2",
+        "suiteSha256": "db3bcded59677bf0a4dd45caef691e40acc96903029efaf80652f81db7a58056",
+        "frozenPromptBaselineRevision": null,
+        "executableHashes": {
+          "control": "3963e3bd2150088f23572943938c1944a96d821d7a631c0820079cd8ffa3bec5",
+          "after": "3963e3bd2150088f23572943938c1944a96d821d7a631c0820079cd8ffa3bec5"
+        },
+        "pricing": {
+          "gpt-6-astra": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+            "date": "2026-09-17",
+            "input": 10,
+            "cachedInput": 1,
+            "cacheWriteIncremental": 2.5,
+            "output": 50,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          },
+          "gpt-5.6-luna": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+            "date": "2026-09-17",
+            "input": 0.2,
+            "cachedInput": 0.02,
+            "cacheWriteIncremental": 0.05,
+            "output": 1.2,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          }
+        },
+        "protocol": {
+          "phase": "screening",
+          "frozenBeforeRun": false,
+          "replicated": false,
+          "resourceLimits": "One live agent trial at a time on the same development PC; no concurrent builds. Normal desktop activity is not isolated.",
+          "cachePolicy": "Fresh task workspace and application process; inherited provider caching and remote service load. Standard API price equivalents do not establish the delivered service tier.",
+          "includesHelpers": false,
+          "includesExternalFallbacks": false
+        },
+        "interruptedAttempts": 0,
+        "activeTrialRecorded": false,
+        "stoppedEarly": false
+      }
+    },
+    {
+      "id": "experiment-selection-control",
+      "title": "Recoverable local field selection",
+      "detail": "Three authored extraction tasks, two repetitions each. Exact named reads are available in both variants. Full response delivery versus optional local JSON-pointer field selection, with original output recoverable.",
+      "labels": {
+        "control": "Full responses",
+        "after": "Selected fields"
+      },
+      "report": {
+        "version": 1,
+        "baseline": "control",
+        "candidate": "after",
+        "matched": true,
+        "complete": true,
+        "distinctTasks": 3,
+        "independentFamilies": 1,
+        "totals": {
+          "control": {
+            "trials": 6,
+            "successes": 6,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 1253732,
+            "elapsedMs": 256694,
+            "tokensPerSuccess": 208955.33333333334,
+            "msPerSuccess": 42782.333333333336,
+            "estimatedModelCostUsd": 2.685712,
+            "totalCostBoundsUsd": {
+              "low": 2.685712,
+              "high": 2.685712
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.44761866666666666,
+              "high": 0.44761866666666666
+            },
+            "estimatedModelCostPerSuccess": 0.44761866666666666,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 40331,
+            "p95Ms": null,
+            "toolCalls": 41,
+            "cachedInputTokens": 1108352,
+            "uncachedInputTokens": 142291
+          },
+          "after": {
+            "trials": 6,
+            "successes": 6,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 838449,
+            "elapsedMs": 218053,
+            "tokensPerSuccess": 139741.5,
+            "msPerSuccess": 36342.166666666664,
+            "estimatedModelCostUsd": 1.887826,
+            "totalCostBoundsUsd": {
+              "low": 1.887826,
+              "high": 1.887826
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.31463766666666665,
+              "high": 0.31463766666666665
+            },
+            "estimatedModelCostPerSuccess": 0.31463766666666665,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 35290,
+            "p95Ms": null,
+            "toolCalls": 38,
+            "cachedInputTokens": 734336,
+            "uncachedInputTokens": 101304
+          }
+        },
+        "reductions": {
+          "tokensPerSuccess": 33.123745744704614,
+          "msPerSuccess": 15.05333198282781,
+          "estimatedModelCostPerSuccess": 29.708546560465166,
+          "conservativeTotalCostPerSuccess": 29.708546560465166
+        },
+        "intervals": {
+          "totalTokens": null,
+          "elapsedMs": null,
+          "acceptedExecutionMs": null,
+          "deliveryMs": null,
+          "conservativeTotalCostUsd": null
+        },
+        "quality": {
+          "conservativeFamilySuccessDifferenceLowerBound": null
+        },
+        "publication": {
+          "scope": "agent-execution",
+          "eligible": false,
+          "blockers": [
+            "Require at least 50 distinct tasks and 20 independent source families for the product claim gate.",
+            "A frozen, held-out confirmation run is required.",
+            "Independent quality acceptance of the original patches is incomplete.",
+            "Quality uncertainty does not rule out a two-percentage-point regression; this is a reporting tolerance, not a guarantee.",
+            "No measured time or conservatively estimated total-cost improvement with a lower confidence bound of at least 10%.",
+            "Replication, resource and cache conditions must be recorded."
+          ]
+        },
+        "sourceSha256": "34d86137b6a66e12a6e7e932160fe98cf3122eced0920cd3c27eda35b478978a",
+        "limitations": "All completed and failed attempts remain in totals. The claim gate concerns agent execution; human review and correction time are optional, separate delivery measurements. Independent acceptance assesses the original patch before corrections. Cost uses explicit API-equivalent prices, not subscription billing or quota. When cumulative usage cannot identify long-context request tiers, costs are bounded and the improvement uses baseline low versus candidate high. Cache-write prices must describe an incremental charge when writes are already in input. No human acceptance is inferred from agent claims or tests. Related seeded defects share one source-family cluster. p95 is omitted below 20 measured trials. This report never authorizes publication."
+      },
+      "configuration": {
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "models": null,
+        "experiments": {
+          "control": {
+            "workflow": "legacy",
+            "tool-surface": "full",
+            "named-read": "on",
+            "result-selection": "off",
+            "repo-map": "on",
+            "context-reuse": "off",
+            "source-context": "off"
+          },
+          "after": {
+            "workflow": "legacy",
+            "tool-surface": "full",
+            "named-read": "on",
+            "result-selection": "on",
+            "repo-map": "on",
+            "context-reuse": "off",
+            "source-context": "off"
+          }
+        },
+        "efforts": {
+          "control": "balanced",
+          "after": "balanced"
+        },
+        "speeds": {
+          "control": null,
+          "after": null
+        },
+        "seconds": 180,
+        "tokens": 500000,
+        "repeat": 2,
+        "orderSeed": "impact-screen-2",
+        "suiteSha256": "db3bcded59677bf0a4dd45caef691e40acc96903029efaf80652f81db7a58056",
+        "frozenPromptBaselineRevision": null,
+        "executableHashes": {
+          "control": "3963e3bd2150088f23572943938c1944a96d821d7a631c0820079cd8ffa3bec5",
+          "after": "3963e3bd2150088f23572943938c1944a96d821d7a631c0820079cd8ffa3bec5"
+        },
+        "pricing": {
+          "gpt-6-astra": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+            "date": "2026-09-17",
+            "input": 10,
+            "cachedInput": 1,
+            "cacheWriteIncremental": 2.5,
+            "output": 50,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          },
+          "gpt-5.6-luna": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+            "date": "2026-09-17",
+            "input": 0.2,
+            "cachedInput": 0.02,
+            "cacheWriteIncremental": 0.05,
+            "output": 1.2,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          }
+        },
+        "protocol": {
+          "phase": "screening",
+          "frozenBeforeRun": false,
+          "replicated": false,
+          "resourceLimits": "One live agent trial at a time on the same development PC; no concurrent builds. Normal desktop activity is not isolated.",
+          "cachePolicy": "Fresh task workspace and application process; inherited provider caching and remote service load. Standard API price equivalents do not establish the delivered service tier.",
+          "includesHelpers": false,
+          "includesExternalFallbacks": false
+        },
+        "interruptedAttempts": 0,
+        "activeTrialRecorded": false,
+        "stoppedEarly": false
+      }
+    },
+    {
+      "id": "experiment-repository-map-control",
+      "title": "Repository map ablation",
+      "detail": "Three seeded repairs from separate source families, one trial per variant. Both variants otherwise use identical Jackalope behavior. Tiny fixtures do not establish map value on large repositories.",
+      "labels": {
+        "control": "Map enabled",
+        "after": "Map omitted"
+      },
+      "report": {
+        "version": 1,
+        "baseline": "control",
+        "candidate": "after",
+        "matched": true,
+        "complete": true,
+        "distinctTasks": 3,
+        "independentFamilies": 3,
+        "totals": {
+          "control": {
+            "trials": 3,
+            "successes": 3,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 310020,
+            "elapsedMs": 112875,
+            "tokensPerSuccess": 103340,
+            "msPerSuccess": 37625,
+            "estimatedModelCostUsd": 0.820136,
+            "totalCostBoundsUsd": {
+              "low": 0.820136,
+              "high": 0.820136
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.27337866666666666,
+              "high": 0.27337866666666666
+            },
+            "estimatedModelCostPerSuccess": 0.27337866666666666,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 37550,
+            "p95Ms": null,
+            "toolCalls": 14,
+            "cachedInputTokens": 260096,
+            "uncachedInputTokens": 48404
+          },
+          "after": {
+            "trials": 3,
+            "successes": 3,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 473598,
+            "elapsedMs": 137293,
+            "tokensPerSuccess": 157866,
+            "msPerSuccess": 45764.333333333336,
+            "estimatedModelCostUsd": 0.9805079999999999,
+            "totalCostBoundsUsd": {
+              "low": 0.9805079999999999,
+              "high": 0.9805079999999999
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.32683599999999996,
+              "high": 0.32683599999999996
+            },
+            "estimatedModelCostPerSuccess": 0.32683599999999996,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 46271,
+            "p95Ms": null,
+            "toolCalls": 19,
+            "cachedInputTokens": 425728,
+            "uncachedInputTokens": 45968
+          }
+        },
+        "reductions": {
+          "tokensPerSuccess": -52.76369266498935,
+          "msPerSuccess": -21.632779623477294,
+          "estimatedModelCostPerSuccess": -19.554317820459044,
+          "conservativeTotalCostPerSuccess": -19.554317820459044
+        },
+        "intervals": {
+          "totalTokens": {
+            "low": -56.02177342395856,
+            "high": -49.33834201314777
+          },
+          "elapsedMs": {
+            "low": -36.58898490006111,
+            "high": -12.982858817209554
+          },
+          "acceptedExecutionMs": null,
+          "deliveryMs": null,
+          "conservativeTotalCostUsd": {
+            "low": -33.749420991262966,
+            "high": -6.634624946136758
+          }
+        },
+        "quality": {
+          "conservativeFamilySuccessDifferenceLowerBound": null
+        },
+        "publication": {
+          "scope": "agent-execution",
+          "eligible": false,
+          "blockers": [
+            "Require at least 50 distinct tasks and 20 independent source families for the product claim gate.",
+            "A frozen, held-out confirmation run is required.",
+            "Independent quality acceptance of the original patches is incomplete.",
+            "Quality uncertainty does not rule out a two-percentage-point regression; this is a reporting tolerance, not a guarantee.",
+            "No measured time or conservatively estimated total-cost improvement with a lower confidence bound of at least 10%.",
+            "Replication, resource and cache conditions must be recorded."
+          ]
+        },
+        "sourceSha256": "ed779ed63002561a5e1b66a7213f0bc71a9ab6fca55c4fd6bae16ea297e0e7f5",
+        "limitations": "All completed and failed attempts remain in totals. The claim gate concerns agent execution; human review and correction time are optional, separate delivery measurements. Independent acceptance assesses the original patch before corrections. Cost uses explicit API-equivalent prices, not subscription billing or quota. When cumulative usage cannot identify long-context request tiers, costs are bounded and the improvement uses baseline low versus candidate high. Cache-write prices must describe an incremental charge when writes are already in input. No human acceptance is inferred from agent claims or tests. Related seeded defects share one source-family cluster. p95 is omitted below 20 measured trials. This report never authorizes publication."
+      },
+      "configuration": {
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "models": null,
+        "experiments": {
+          "control": {
+            "workflow": "legacy",
+            "tool-surface": "full",
+            "named-read": "off",
+            "result-selection": "on",
+            "repo-map": "on",
+            "context-reuse": "off",
+            "source-context": "off"
+          },
+          "after": {
+            "workflow": "legacy",
+            "tool-surface": "full",
+            "named-read": "off",
+            "result-selection": "on",
+            "repo-map": "off",
+            "context-reuse": "off",
+            "source-context": "off"
+          }
+        },
+        "efforts": {
+          "control": "balanced",
+          "after": "balanced"
+        },
+        "speeds": {
+          "control": null,
+          "after": null
+        },
+        "seconds": 180,
+        "tokens": 500000,
+        "repeat": 1,
+        "orderSeed": "impact-screen-2",
+        "suiteSha256": "7546b026c0f575d359237e094707bbd147d884610848ea42c1e99e902677990a",
+        "frozenPromptBaselineRevision": null,
+        "executableHashes": {
+          "control": "3963e3bd2150088f23572943938c1944a96d821d7a631c0820079cd8ffa3bec5",
+          "after": "3963e3bd2150088f23572943938c1944a96d821d7a631c0820079cd8ffa3bec5"
+        },
+        "pricing": {
+          "gpt-6-astra": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+            "date": "2026-09-17",
+            "input": 10,
+            "cachedInput": 1,
+            "cacheWriteIncremental": 2.5,
+            "output": 50,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          },
+          "gpt-5.6-luna": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+            "date": "2026-09-17",
+            "input": 0.2,
+            "cachedInput": 0.02,
+            "cacheWriteIncremental": 0.05,
+            "output": 1.2,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          }
+        },
+        "protocol": {
+          "phase": "screening",
+          "frozenBeforeRun": false,
+          "replicated": false,
+          "resourceLimits": "One live agent trial at a time on the same development PC; no concurrent builds. Normal desktop activity is not isolated.",
+          "cachePolicy": "Fresh task workspace and application process; inherited provider caching and remote service load. Standard API price equivalents do not establish the delivered service tier.",
+          "includesHelpers": false,
+          "includesExternalFallbacks": false
+        },
+        "interruptedAttempts": 0,
+        "activeTrialRecorded": false,
+        "stoppedEarly": false
+      }
+    },
+    {
+      "id": "experiment-model-screen-control",
+      "title": "Initial cheaper-model budget probe",
+      "detail": "One seeded repair with a 250,000-token observed budget. The Jackalope Luna trial passed the behavioral oracle but exceeded its budget; it remains unsuccessful. The planned larger model comparison was canceled after this probe and earlier overhead observations.",
+      "labels": {
+        "control": "Jackalope · GPT-6 Astra",
+        "after": "Jackalope · GPT-5.6 Luna"
+      },
+      "report": {
+        "version": 1,
+        "baseline": "control",
+        "candidate": "after",
+        "matched": true,
+        "complete": true,
+        "distinctTasks": 1,
+        "independentFamilies": 1,
+        "totals": {
+          "control": {
+            "trials": 1,
+            "successes": 1,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 102982,
+            "elapsedMs": 42101,
+            "tokensPerSuccess": 102982,
+            "msPerSuccess": 42101,
+            "estimatedModelCostUsd": 0.26282,
+            "totalCostBoundsUsd": {
+              "low": 0.26282,
+              "high": 0.26282
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.26282,
+              "high": 0.26282
+            },
+            "estimatedModelCostPerSuccess": 0.26282,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 42101,
+            "p95Ms": null,
+            "toolCalls": 4,
+            "cachedInputTokens": 88320,
+            "uncachedInputTokens": 13965
+          },
+          "after": {
+            "trials": 1,
+            "successes": 0,
+            "accepted": null,
+            "successRate": 0,
+            "totalTokens": 363681,
+            "elapsedMs": 74027,
+            "tokensPerSuccess": null,
+            "msPerSuccess": null,
+            "estimatedModelCostUsd": null,
+            "totalCostBoundsUsd": {
+              "low": 0.02025008,
+              "high": 0.039118360000000005
+            },
+            "totalCostPerSuccessBoundsUsd": null,
+            "estimatedModelCostPerSuccess": null,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 74027,
+            "p95Ms": null,
+            "toolCalls": 8,
+            "cachedInputTokens": 304384,
+            "uncachedInputTokens": 56994
+          }
+        },
+        "reductions": {
+          "tokensPerSuccess": null,
+          "msPerSuccess": null,
+          "estimatedModelCostPerSuccess": null,
+          "conservativeTotalCostPerSuccess": null
+        },
+        "intervals": {
+          "totalTokens": null,
+          "elapsedMs": null,
+          "acceptedExecutionMs": null,
+          "deliveryMs": null,
+          "conservativeTotalCostUsd": null
+        },
+        "quality": {
+          "conservativeFamilySuccessDifferenceLowerBound": null
+        },
+        "publication": {
+          "scope": "agent-execution",
+          "eligible": false,
+          "blockers": [
+            "Require at least 50 distinct tasks and 20 independent source families for the product claim gate.",
+            "A frozen, held-out confirmation run is required.",
+            "Independent quality acceptance of the original patches is incomplete.",
+            "Quality uncertainty does not rule out a two-percentage-point regression; this is a reporting tolerance, not a guarantee.",
+            "No measured time or conservatively estimated total-cost improvement with a lower confidence bound of at least 10%.",
+            "Replication, resource and cache conditions must be recorded."
+          ]
+        },
+        "sourceSha256": "11e1c51020c930a92dd0e507076ee34f177250f242d57d6496bb56997e745a64",
+        "limitations": "All completed and failed attempts remain in totals. The claim gate concerns agent execution; human review and correction time are optional, separate delivery measurements. Independent acceptance assesses the original patch before corrections. Cost uses explicit API-equivalent prices, not subscription billing or quota. When cumulative usage cannot identify long-context request tiers, costs are bounded and the improvement uses baseline low versus candidate high. Cache-write prices must describe an incremental charge when writes are already in input. No human acceptance is inferred from agent claims or tests. Related seeded defects share one source-family cluster. p95 is omitted below 20 measured trials. This report never authorizes publication."
+      },
+      "configuration": {
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "models": {
+          "control": "gpt-6-astra",
+          "after": "gpt-5.6-luna",
+          "direct": "gpt-5.6-luna"
+        },
+        "experiments": null,
+        "efforts": {
+          "control": "balanced",
+          "after": "balanced",
+          "direct": "balanced"
+        },
+        "speeds": {
+          "control": null,
+          "after": null,
+          "direct": null
+        },
+        "seconds": 180,
+        "tokens": 250000,
+        "repeat": 1,
+        "orderSeed": "impact-screen-1",
+        "suiteSha256": "5d7b0b0e9ab60314db06392b5b3ea041e26dbf51f1910e81e1c74b0de80552b6",
+        "frozenPromptBaselineRevision": null,
+        "executableHashes": {
+          "control": "242efa48145835b325a53085132c8ef21fde71ffd70348022c9fed2ee0c606ba",
+          "after": "242efa48145835b325a53085132c8ef21fde71ffd70348022c9fed2ee0c606ba",
+          "direct": "242efa48145835b325a53085132c8ef21fde71ffd70348022c9fed2ee0c606ba"
+        },
+        "pricing": {
+          "gpt-6-astra": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+            "date": "2026-09-17",
+            "input": 10,
+            "cachedInput": 1,
+            "cacheWriteIncremental": 2.5,
+            "output": 50,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          },
+          "gpt-5.6-luna": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+            "date": "2026-09-17",
+            "input": 0.2,
+            "cachedInput": 0.02,
+            "cacheWriteIncremental": 0.05,
+            "output": 1.2,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          }
+        },
+        "protocol": {
+          "phase": "screening",
+          "frozenBeforeRun": false,
+          "replicated": false,
+          "resourceLimits": "One live agent trial at a time on the same development PC; no concurrent builds. Normal desktop activity is not isolated.",
+          "cachePolicy": "Fresh task workspace and application process; inherited provider caching and remote service load. Standard API price equivalents do not establish the delivered service tier.",
+          "includesHelpers": false,
+          "includesExternalFallbacks": false
+        },
+        "interruptedAttempts": 0,
+        "activeTrialRecorded": false,
+        "stoppedEarly": false
+      }
+    },
+    {
+      "id": "experiment-model-screen-direct",
+      "title": "Native control for the initial budget probe",
+      "detail": "The same single repair and Luna model with the original budget. This keeps the direct-CLI result from the initial probe visible; rows overlap the prior comparison.",
+      "labels": {
+        "direct": "Native CLI · GPT-5.6 Luna",
+        "after": "Jackalope · GPT-5.6 Luna"
+      },
+      "report": {
+        "version": 1,
+        "baseline": "direct",
+        "candidate": "after",
+        "matched": true,
+        "complete": true,
+        "distinctTasks": 1,
+        "independentFamilies": 1,
+        "totals": {
+          "direct": {
+            "trials": 1,
+            "successes": 1,
+            "accepted": null,
+            "successRate": 1,
+            "totalTokens": 180795,
+            "elapsedMs": 58955,
+            "tokensPerSuccess": 180795,
+            "msPerSuccess": 58955,
+            "estimatedModelCostUsd": 0.010860880000000002,
+            "totalCostBoundsUsd": {
+              "low": 0.010860880000000002,
+              "high": 0.010860880000000002
+            },
+            "totalCostPerSuccessBoundsUsd": {
+              "low": 0.010860880000000002,
+              "high": 0.010860880000000002
+            },
+            "estimatedModelCostPerSuccess": 0.010860880000000002,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 58955,
+            "p95Ms": null,
+            "toolCalls": 7,
+            "cachedInputTokens": 150784,
+            "uncachedInputTokens": 28168
+          },
+          "after": {
+            "trials": 1,
+            "successes": 0,
+            "accepted": null,
+            "successRate": 0,
+            "totalTokens": 363681,
+            "elapsedMs": 74027,
+            "tokensPerSuccess": null,
+            "msPerSuccess": null,
+            "estimatedModelCostUsd": null,
+            "totalCostBoundsUsd": {
+              "low": 0.02025008,
+              "high": 0.039118360000000005
+            },
+            "totalCostPerSuccessBoundsUsd": null,
+            "estimatedModelCostPerSuccess": null,
+            "reviewMinutes": null,
+            "correctionMinutes": null,
+            "msPerAcceptedResult": null,
+            "msPerAcceptedExecution": null,
+            "medianMs": 74027,
+            "p95Ms": null,
+            "toolCalls": 8,
+            "cachedInputTokens": 304384,
+            "uncachedInputTokens": 56994
+          }
+        },
+        "reductions": {
+          "tokensPerSuccess": null,
+          "msPerSuccess": null,
+          "estimatedModelCostPerSuccess": null,
+          "conservativeTotalCostPerSuccess": null
+        },
+        "intervals": {
+          "totalTokens": null,
+          "elapsedMs": null,
+          "acceptedExecutionMs": null,
+          "deliveryMs": null,
+          "conservativeTotalCostUsd": null
+        },
+        "quality": {
+          "conservativeFamilySuccessDifferenceLowerBound": null
+        },
+        "publication": {
+          "scope": "agent-execution",
+          "eligible": false,
+          "blockers": [
+            "Require at least 50 distinct tasks and 20 independent source families for the product claim gate.",
+            "A frozen, held-out confirmation run is required.",
+            "Independent quality acceptance of the original patches is incomplete.",
+            "Quality uncertainty does not rule out a two-percentage-point regression; this is a reporting tolerance, not a guarantee.",
+            "No measured time or conservatively estimated total-cost improvement with a lower confidence bound of at least 10%.",
+            "Replication, resource and cache conditions must be recorded."
+          ]
+        },
+        "sourceSha256": "11e1c51020c930a92dd0e507076ee34f177250f242d57d6496bb56997e745a64",
+        "limitations": "All completed and failed attempts remain in totals. The claim gate concerns agent execution; human review and correction time are optional, separate delivery measurements. Independent acceptance assesses the original patch before corrections. Cost uses explicit API-equivalent prices, not subscription billing or quota. When cumulative usage cannot identify long-context request tiers, costs are bounded and the improvement uses baseline low versus candidate high. Cache-write prices must describe an incremental charge when writes are already in input. No human acceptance is inferred from agent claims or tests. Related seeded defects share one source-family cluster. p95 is omitted below 20 measured trials. This report never authorizes publication."
+      },
+      "configuration": {
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "models": {
+          "control": "gpt-6-astra",
+          "after": "gpt-5.6-luna",
+          "direct": "gpt-5.6-luna"
+        },
+        "experiments": null,
+        "efforts": {
+          "control": "balanced",
+          "after": "balanced",
+          "direct": "balanced"
+        },
+        "speeds": {
+          "control": null,
+          "after": null,
+          "direct": null
+        },
+        "seconds": 180,
+        "tokens": 250000,
+        "repeat": 1,
+        "orderSeed": "impact-screen-1",
+        "suiteSha256": "5d7b0b0e9ab60314db06392b5b3ea041e26dbf51f1910e81e1c74b0de80552b6",
+        "frozenPromptBaselineRevision": null,
+        "executableHashes": {
+          "control": "242efa48145835b325a53085132c8ef21fde71ffd70348022c9fed2ee0c606ba",
+          "after": "242efa48145835b325a53085132c8ef21fde71ffd70348022c9fed2ee0c606ba",
+          "direct": "242efa48145835b325a53085132c8ef21fde71ffd70348022c9fed2ee0c606ba"
+        },
+        "pricing": {
+          "gpt-6-astra": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+            "date": "2026-09-17",
+            "input": 10,
+            "cachedInput": 1,
+            "cacheWriteIncremental": 2.5,
+            "output": 50,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          },
+          "gpt-5.6-luna": {
+            "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+            "date": "2026-09-17",
+            "input": 0.2,
+            "cachedInput": 0.02,
+            "cacheWriteIncremental": 0.05,
+            "output": 1.2,
+            "longContextThreshold": 272000,
+            "longInputMultiplier": 2,
+            "longOutputMultiplier": 1.5
+          }
+        },
+        "protocol": {
+          "phase": "screening",
+          "frozenBeforeRun": false,
+          "replicated": false,
+          "resourceLimits": "One live agent trial at a time on the same development PC; no concurrent builds. Normal desktop activity is not isolated.",
+          "cachePolicy": "Fresh task workspace and application process; inherited provider caching and remote service load. Standard API price equivalents do not establish the delivered service tier.",
+          "includesHelpers": false,
+          "includesExternalFallbacks": false
+        },
+        "interruptedAttempts": 0,
+        "activeTrialRecorded": false,
+        "stoppedEarly": false
+      }
+    }
+  ],
+  "routingAssessment": {
+    "calls": 6,
+    "selections": 0,
+    "errors": 0,
+    "elapsedMs": 2964,
+    "inputTokens": 17211,
+    "estimatedCostUsd": 0.000722862,
+    "model": "jev-1.13.0",
+    "scope": "Production Jev request and selection logic with unknown capacity and no accepted-cost history. Selection alone is not downstream quality or savings evidence.",
+    "source": "https://docs.typesafe.ai/models",
+    "inputUsdPerMillion": 0.042,
+    "conditions": "Sourced model facts, unknown provider capacity and no independently accepted cost history; not an end-to-end routed-worker comparison. Six calls ran alongside one agent benchmark process; no concurrent build."
+  },
+  "screeningStatus": {
+    "reason": "User requested early futility stop and product iteration. Completed unfavorable results retained.",
+    "interruptedAttempts": 1,
+    "interruptedUsageKnown": false,
+    "canceledExperiments": ["remaining continuation trials", "model-routing"],
+    "methodology": "Adaptive exploratory screening; neither fixed-sample inference nor held-out confirmation. All completed receipts retained; interrupted usage unknown."
+  }
+}

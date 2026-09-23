@@ -1,0 +1,156 @@
+.agent-workspace-actions,
+.agent-roster-heading,
+.agent-roster-name,
+.agent-presence {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.agent-roster-heading {
+  justify-content: space-between;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.agent-roster {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 20px;
+}
+.agent-roster-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 24px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 24px;
+  background: var(--color-surface);
+}
+/* Sits outside the card grid so it never competes with the action row. */
+.agent-configure {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.agent-configure:hover,
+.agent-configure:focus-visible {
+  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  color: var(--color-text-primary);
+}
+.agent-account-summary {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-height: 44px;
+  padding: 4px 0;
+  text-align: left;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.agent-account-summary > span:first-child {
+  color: var(--color-accent-ink);
+}
+.agent-account-summary-identity {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agent-account-summary:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.agent-roster-name {
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  padding-right: 32px;
+}
+.agent-roster-name h2 {
+  font-size: var(--text-xl);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+.agent-default,
+.agent-custom {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+.agent-default {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-accent-ink);
+}
+/* The default orchestrator carries the whole card so it reads at a glance
+   rather than relying on a label beside the name. */
+.agent-roster-row[data-default] {
+  border-color: color-mix(in srgb, var(--color-accent-ink) 45%, var(--color-border-subtle));
+  background: color-mix(in srgb, var(--color-accent-ink) 7%, var(--color-surface));
+}
+.agent-presence {
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+}
+.agent-presence[data-attention] {
+  color: var(--color-warning);
+}
+.agent-task-action {
+  justify-content: flex-start;
+  padding-left: 0;
+  margin-top: 4px;
+}
+@media (max-width: 700px) {
+  .agent-roster-row {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 12px 20px;
+  }
+  .agent-roster-action {
+    grid-column: 2;
+  }
+}
+
+.agent-roster-identity {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.agent-roster-action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 8px;
+  grid-column: 1 / -1;
+  align-self: end;
+  padding-top: 8px;
+}
+.agent-roster-action > button {
+  flex: 1;
+  width: auto;
+  cursor: pointer;
+}
+/* Sits in the same row as the card actions but keeps its intrinsic width so the
+   Configure/New task buttons continue to share the remaining space. */
+/* Takes the full action row so the Configure and New task buttons keep their
+   own line and never clip in a narrow card. */
+.agent-enable {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 1 0 100%;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+.agent-roster-heading {
+  flex-wrap: wrap;
+}

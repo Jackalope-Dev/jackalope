@@ -1,0 +1,18 @@
+[
+  {
+    "key": "guide",
+    "title": "Clarify setup documentation",
+    "agent": "codex",
+    "scopes": ["docs"],
+    "dependsOn": [],
+    "prompt": "Review the setup documentation against the current scripts and improve unclear instructions. Preserve supported behavior."
+  },
+  {
+    "key": "tests",
+    "title": "Review test coverage",
+    "agent": "claude",
+    "scopes": ["apps/desktop/scripts"],
+    "dependsOn": [],
+    "prompt": "Review existing test coverage and add a focused regression test for a demonstrated gap. Do not change application behavior."
+  }
+]

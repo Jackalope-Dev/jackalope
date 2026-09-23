@@ -1,0 +1,15 @@
+diff --git a/dist/components/Virtualizer.js b/dist/components/Virtualizer.js
+index 4063b992bf7c4958c0d8a305977280ea9a3a7330..c27ef8d2e16fc7300f68609f83307c313a544daf 100644
+--- a/dist/components/Virtualizer.js
++++ b/dist/components/Virtualizer.js
+@@ -300,8 +300,10 @@ var Virtualizer = class Virtualizer {
+ 	}
+ 	getScrollAnchor(viewportHeight) {
+ 		const scrollContainer = this.getScrollContainerElement();
++		if ((scrollContainer?.scrollTop ?? window.scrollY) === 0) return;
+ 		let bestAnchor;
+ 		for (const [fileElement] of this.visibleInstances.entries()) {
++			if (fileElement.offsetHeight === 0) continue;
+ 			const fileTop = getRelativeBoundingTop(fileElement, scrollContainer);
+ 			const fileBottom = fileTop + fileElement.offsetHeight;
+ 			let fileOffset;

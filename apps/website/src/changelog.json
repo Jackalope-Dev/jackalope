@@ -1,0 +1,797 @@
+[
+  {
+    "id": "recoverable-test-output",
+    "date": "2026-09-22",
+    "status": "In development",
+    "title": "Less repetitive test output",
+    "description": "Agents can receive concise successful test results with the complete captured output still available.",
+    "items": [
+      "OpenCode tasks, including API-key connections through its runner, retain warnings and recovery files when filtering recognized passing-test output.",
+      "Failed, incomplete and unsupported output stays intact; other agents share compact saved-check results through Jackalope verification."
+    ],
+    "note": "Broader cost, speed and installed-platform comparisons remain in validation."
+  },
+  {
+    "id": "focused-workspace-desktop-integrations",
+    "date": "2026-09-21",
+    "status": "In development",
+    "title": "One workspace, closer to your desktop",
+    "description": "A shared Work page and bottom status bar keep task context close, with more control over desktop and terminal behavior.",
+    "items": [
+      "Keep conversations, tasks and plans together, with recent work in the sidebar and workspace, activity and quota information below.",
+      "Switch between a quiet Focus canvas, a Build workspace with tools beside work, and a full-width Oversee activity board.",
+      "Choose zoom, shortcuts, editor and shell preferences; reuse saved prompts and commands, split task terminals and optionally restore stopped output.",
+      "Configure native sleep prevention, macOS menus and unread Dock badges, optional local dictation and pairing with an existing WSL Linux host.",
+      "Prepare worktrees with explicitly chosen ignored files and inspect their size before guarded cleanup."
+    ],
+    "note": "Implemented for validation. WSL requires a running Linux Jackalope host and dictation requires a local transcription service. Installed cross-platform acceptance remains in progress."
+  },
+  {
+    "id": "opencode-task-permissions",
+    "date": "2026-09-18",
+    "status": "In development",
+    "title": "Answer OpenCode requests within the task",
+    "description": "OpenCode tasks can ask for a specific permission or structured answer and continue through the existing task question flow.",
+    "items": [
+      "Approve an action once or deny it while retaining task and session history.",
+      "Continue the original session, stop owned processes, and include reported child-session usage."
+    ],
+    "note": "In development. Installed cross-platform acceptance remains in progress."
+  },
+  {
+    "id": "flexible-task-workspaces",
+    "date": "2026-09-18",
+    "status": "In development",
+    "title": "A workspace that fits your workflow",
+    "description": "Project layouts, task terminals, separate windows and reversible chat topics keep work and feedback together.",
+    "items": [
+      "Choose Focus, Build or Oversee, and configure your project in one guided setup.",
+      "Open task workspace tools and save feedback from separate review and preview windows.",
+      "Prepare source-linked drafts from chat topics and record local workflow timings."
+    ],
+    "note": "In development. Installed platform acceptance and comparative user studies remain in progress."
+  },
+  {
+    "id": "focused-workflows-and-trusted-hosts",
+    "date": "2026-09-18",
+    "status": "In development",
+    "title": "Review, revise and continue across devices",
+    "description": "More direct ways to turn issues and review feedback into the next useful action.",
+    "items": [
+      "Saved line comments and visual element selections prepare batched follow-ups.",
+      "Keep the conversation beside Review or Preview and browse GitHub, Linear and Jira issues.",
+      "Pair trusted hosts and use a responsive HTTPS companion to follow and steer work."
+    ],
+    "note": "Implemented for validation. Installed multi-device, provider and platform acceptance remain in progress."
+  },
+  {
+    "id": "connect-api-providers-without-a-separate-cli-install",
+    "date": "2026-09-18",
+    "status": "In development",
+    "title": "Connect API providers without a separate CLI install",
+    "description": "Jackalope can prepare a private agent runner when connecting DeepSeek and other supported API providers.",
+    "items": [
+      "One guided setup downloads and verifies the runner, then saves your protected API key and discovers models.",
+      "Tasks, configured helpers and local-model setup share the runner while keeping account and model choices separate.",
+      "Provider connections retain a model per account and recover from incomplete setup without discarding the connection.",
+      "Inspect runner integrity and disk use, repair the pinned runner, and clean idle versions while active processes retain their runtime."
+    ],
+    "note": "In development. Installed cross-platform acceptance remains in progress."
+  },
+  {
+    "id": "curated-mcp-marketplace",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "Find and connect useful tools",
+    "description": "The MCP marketplace starts with a curated collection of publisher tools and guides you through connection setup.",
+    "items": [
+      "Discover GitHub, Linear, Notion, browser tools and more, with publisher links and reviewed connection presets.",
+      "Add tokens without editing JSON, follow agent-specific sign-in steps, and check saved connections with clear retry guidance.",
+      "Keep full AllMCPs search and custom connections, with redacted configuration copying and project-aware tool visibility."
+    ]
+  },
+  {
+    "id": "context-evidence",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "Smaller tool responses and clearer task evidence",
+    "description": "Select the fields an agent needs from large tool results, then review concise answers to the task requirements.",
+    "items": [
+      "Optional response selection keeps omitted data retrievable without repeating the upstream call.",
+      "Final verification guidance batches checks after implementation, with agent explanations and evidence beside each requirement.",
+      "A reproducible benchmark methodology compares native CLI tasks with Jackalope and keeps scoped measurements separate from general savings claims."
+    ]
+  },
+  {
+    "id": "more-control-over-task-speed",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "More control over task speed.",
+    "description": "Choose Codex processing speed and inspect where task time goes.",
+    "items": [
+      "Optional Codex Fast processing keeps the selected model effort, with higher usage disclosed.",
+      "Task execution uses fresh context for changed workspaces, safer setup reuse, and resource-aware checks.",
+      "Execution timings and delivery comparisons include waits, failed work, and recorded review time."
+    ]
+  },
+  {
+    "id": "jev-decision-assistance",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "More context for Jev decisions",
+    "description": "Optional Jev assistance helps select context, assess results and focus review, with clearer routing evidence and usage.",
+    "items": [
+      "Choose routing goals and supply model evidence while preserving explicit assignments.",
+      "Enable context selection, result checks, review priorities, monitor filtering and Automatic assignment matching."
+    ],
+    "note": "In development. Real-provider savings, quality calibration and installed-app acceptance remain open."
+  },
+  {
+    "id": "gemini-cli-can-run-tasks",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "Gemini CLI can run tasks.",
+    "description": "Run Gemini CLI worker tasks from Jackalope with your selected account.",
+    "items": [
+      "Follow streamed progress and file activity, then continue the saved conversation.",
+      "Review the changes and native project checks before applying them."
+    ],
+    "note": "Shell and HTTP tools follow Gemini CLI permissions. Installed-app and cross-platform acceptance remain in progress."
+  },
+  {
+    "id": "see-what-your-agents-are-doing",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "See what your agents are doing.",
+    "description": "Follow active work with file activity and live check output in tasks and chats.",
+    "items": [
+      "Recent activity stays visible without extra model calls.",
+      "Long project checks keep their connection to Claude and OpenCode."
+    ]
+  },
+  {
+    "id": "faster-code-review-and-more-reliable-checks",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "Faster code review and more reliable checks.",
+    "description": "Large diffs open promptly, and agents can run the saved project check without asking you to repeat its command.",
+    "items": [
+      "Code highlighting runs in background workers and stays ready when switching between formatted changes and the original patch.",
+      "Project checks are discoverable by agents and run with the permissions already saved for the task."
+    ]
+  },
+  {
+    "id": "task-review-and-followups",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "Clearer task review and follow-ups",
+    "description": "Review the output and changes with less clutter, and choose how to send the next instruction.",
+    "items": [
+      "Short task titles, a diff-first review, clearer actions, and more space for results.",
+      "Queue follow-ups or stop current work and send; saved queues pause after failures and restart."
+    ]
+  },
+  {
+    "id": "less-repeated-work-between-request-and-result",
+    "date": "2026-09-16",
+    "status": "In development",
+    "title": "Less repeated work between request and result",
+    "description": "Task startup, repository context, and durable output handling now do less repeated work, with more detailed performance measurements.",
+    "items": [
+      "Account checks can run concurrently, and equivalent agent/model choices can skip an unnecessary routing call.",
+      "Repository maps include symbol locations and related tests; required verification remains part of task guidance.",
+      "Local setup offers a separately checked title model, and managed local helpers can reuse short-lived authenticated servers."
+    ],
+    "note": "Implemented in source. Installed performance and representative model-quality acceptance remain in progress."
+  },
+  {
+    "id": "jev-fallback-preference",
+    "date": "2026-09-16",
+    "status": "In development",
+    "title": "Choose a fallback for Jev decisions",
+    "description": "Keep local rules as the default fallback or choose an agent when Jev cannot make a usable decision.",
+    "items": [
+      "Save the fallback with each project decision preference in setup or settings.",
+      "Agent fallback uses normal agent capacity; usage retains both provider attempts, including unavailable reports."
+    ],
+    "note": "Real-provider cost and quality comparisons and installed cross-platform acceptance remain in progress."
+  },
+  {
+    "id": "combined-task-delivery",
+    "date": "2026-09-16",
+    "status": "In development",
+    "title": "One result from parallel work",
+    "description": "Jackalope brings related changes together and keeps integration work inside your task.",
+    "items": [
+      "Follow Plan, Work, Check and Review, then inspect one result, preview and combined diff.",
+      "Combine finished assignments, resolve overlaps in isolated workspaces and attempt bounded repairs when checks fail.",
+      "Review final outcomes before applying changes. Keep worker details, repair usage and review timing available when needed."
+    ],
+    "note": "Installed-provider acceptance and comparative quality testing remain in progress."
+  },
+  {
+    "id": "reviewed-task-planning",
+    "date": "2026-09-16",
+    "status": "In development",
+    "title": "Review the approach, then follow one task",
+    "description": "Task assessments and reviewed plans keep related work together under one parent.",
+    "items": [
+      "Use project Decisions preferences to assess focused work, investigation or planning, with local fast paths and reused assessments.",
+      "Review scoped assignments before starting. Follow planning, worker attempts, usage and combined verification in one task, then explicitly integrate the result.",
+      "Assessment usage includes calls that never launch work and counts reused decisions once."
+    ],
+    "note": "Installed-provider acceptance and held-out cost and quality comparisons remain in progress."
+  },
+  {
+    "id": "choose-how-jackalope-makes-decisions",
+    "date": "2026-09-16",
+    "status": "In development",
+    "title": "Choose how Jackalope makes decisions.",
+    "description": "Project preferences bring local rules, agent reasoning, and optional Jev-assisted routing into one guided setup.",
+    "items": [
+      "Compare decision methods during onboarding or in app and project settings.",
+      "Connect a TypeSafe API key using native protected storage, with local-rule fallback and visible Jev usage."
+    ],
+    "note": "In development. Real-provider cost and quality comparisons and installed cross-platform acceptance remain open."
+  },
+  {
+    "id": "updates-through-microsoft-store",
+    "date": "2026-09-16",
+    "status": "In development",
+    "title": "Updates through Microsoft Store.",
+    "description": "Windows update controls use Microsoft Store delivery.",
+    "items": [
+      "Check for and install Store updates from Jackalope while keeping active work protected."
+    ],
+    "note": "Store certification and installed update testing remain in progress."
+  },
+  {
+    "id": "from-a-chat-to-a-reviewed-change",
+    "date": "2026-09-16",
+    "status": "In development",
+    "title": "From a chat to a reviewed change",
+    "description": "A more complete local workflow for starting, reviewing and returning to useful work.",
+    "items": [
+      "Review, verify and explicitly merge a paused chat, with recovery receipts and a handoff into the next change.",
+      "Reach a first-task draft through simpler project setup, and find work waiting across projects.",
+      "Compare changes since your last review, inspect lesson selection and prepare editable GitHub or dependency workflow requests.",
+      "Set batch and estimated-cost pause thresholds, and track usefulness and review effort in a local report."
+    ],
+    "note": "Implemented for prerelease validation. Installed-provider, platform and daily-use acceptance remain in progress."
+  },
+  {
+    "id": "desktop-download-page",
+    "date": "2026-09-15",
+    "status": "In development",
+    "title": "A home for desktop downloads.",
+    "description": "Find your platform and a clear path into Jackalope early access.",
+    "items": [
+      "The download page brings Windows, macOS, and Linux availability together, with your likely platform first.",
+      "Acceptance and friend-pass emails lead to the download page, with email confirmation before sign-in."
+    ],
+    "note": "Downloads remain coming soon until each platform release is available."
+  },
+  {
+    "id": "desktop-waitlist-progress",
+    "date": "2026-09-15",
+    "status": "In development",
+    "title": "Your waitlist, in the desktop app",
+    "description": "Connect before early access to see your place and bring friends along.",
+    "items": [
+      "Track your position, verified referrals and earned priority, with a link and message ready to copy.",
+      "Stay connected across restarts, explore the app tour, and continue when your access is approved."
+    ]
+  },
+  {
+    "id": "review-merge-and-clean-up-in-one-place",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "Review, merge, and clean up in one place",
+    "description": "Finished work keeps review, merge into the target branch, and workspace cleanup together.",
+    "items": [
+      "After an isolated task, the next action is Review and merge, with the merge panel on the Review tab.",
+      "A single task skips the multi-task picker. Preview the change, merge into the target branch, and remove the workspace.",
+      "Failed checks can send their output into the follow-up draft. Setup can save a suggested project check."
+    ]
+  },
+  {
+    "id": "see-who-is-working-at-a-glance",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "See who is working at a glance",
+    "description": "The work list shows each agent's character, live status, and the next useful action.",
+    "items": [
+      "Work rows show the assigned agent, live or next-action status, and the next step, including when more than one agent took part.",
+      "In-progress work appears in a compact strip. Feature plans and the execution graph use the same agent characters.",
+      "Starting a task can work in a copy of your files. Plan feature work is available from the task home."
+    ]
+  },
+  {
+    "id": "chat-is-the-first-tasks-view",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "Chat is the first Tasks view.",
+    "description": "Opening Tasks starts a conversation. Inbox keeps the work list for planning, review, and archive.",
+    "items": [
+      "Tasks opens Chat first, with Inbox, Evidence, and Recurring as peer tabs.",
+      "Chat and Inbox replace the Live and Work labels."
+    ]
+  },
+  {
+    "id": "a-clearer-path-from-request-to-delivery",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "A clearer path from request to delivery",
+    "description": "Find work across projects, inspect results with a persistent follow-up, and prepare the next delivery step.",
+    "items": [
+      "Unified task and Live discovery, project overview, remembered work views, and task/project command search.",
+      "Evidence-driven task actions and local preview setup with readiness checks, embedded pages, and fresh browser capture.",
+      "Local delivery and optional PR/CI inspection with editable handoff drafts; publication and deployment remain explicit steps."
+    ],
+    "note": "Implemented in source; installed-app acceptance remains in progress."
+  },
+  {
+    "id": "live-task-setup-progress-and-retry",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "Live task setup progress and retry",
+    "description": "Tasks report the step they are on while it runs, explain why a setup command was stopped, skip setup that is already current, and can be retried after a failure.",
+    "items": [
+      "Preparation and verification commands are stopped for going quiet rather than at a fixed total runtime, so a slow command that keeps reporting progress finishes.",
+      "A task shows its current step, that step's newest output line and its elapsed time, in both the task list and task detail.",
+      "A workspace whose dependency manifests are unchanged skips its setup command instead of running it again.",
+      "A setup command stopped mid-progress is retried once automatically, and failures name the interruption and show the command output.",
+      "A failed, stopped or interrupted attempt can be retried, continuing in the previous worktree when the agent left it clean."
+    ]
+  },
+  {
+    "id": "an-easier-way-to-clear-old-tasks",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "An easier way to clear old tasks.",
+    "description": "Keep your task list focused with reversible cleanup.",
+    "items": [
+      "Archive tasks individually, select a batch, or archive finished tasks matching your filters.",
+      "Undo an archive or restore tasks from Archived. Results and workspaces stay available."
+    ]
+  },
+  {
+    "id": "live-sessions",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "Keep the ideas coming",
+    "description": "Capture quick changes in a running conversation while your agent works.",
+    "items": [
+      "Live sessions save messages and drafts, process ordered batches in an isolated workspace, and keep results together for review.",
+      "Pop out a compact session window and pin it above other apps. Review cumulative changes as a saved patch."
+    ],
+    "note": "In development. Installed-provider and native-window validation remain in progress."
+  },
+  {
+    "id": "let-the-task-choose-its-approach",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "Let the task choose its approach.",
+    "description": "Start a task without deciding whether to split it first.",
+    "items": [
+      "Lead agents assess useful delegation through available subagent tools and remain responsible for the combined result and checks.",
+      "Small or tightly coupled work stays together; saved split plans remain recoverable in feature planning."
+    ],
+    "note": "Delegation depends on the selected provider's available tools. Real-provider validation remains in progress."
+  },
+  {
+    "id": "a-simpler-task-view",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "A simpler task view",
+    "description": "Follow work and review results in a clearer task layout.",
+    "items": [
+      "See task progress with agent artwork, grouped review tools and concise errors.",
+      "Switch attempts and continue work with fewer competing controls."
+    ]
+  },
+  {
+    "id": "usage-insights-across-projects",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "See where your tokens go",
+    "description": "Usage connects spending to tasks and saved outcomes across your projects.",
+    "items": [
+      "Explore token trends and drill into projects, agents, tasks, and individual calls.",
+      "See measured agent-selection overhead, missing reports, and separate Ask Jackalope usage."
+    ]
+  },
+  {
+    "id": "clearer-agreements-between-agents",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Clearer agreements between agents.",
+    "description": "Agents can record ownership handoffs and agree on shared interfaces across separate worktrees.",
+    "items": [
+      "Conflicting ownership claims are rejected, and handoffs require the next owner to accept.",
+      "Unresolved interface decisions and changed-file scope checks block dependent work or integration until reconciled.",
+      "Projects can opt into agent reconciliation and verified local merges while retaining the original worktrees."
+    ],
+    "note": "Installed-app acceptance and broader cross-provider evaluation remain in progress."
+  },
+  {
+    "id": "gnome-wayland-window-control",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Window control on GNOME Wayland",
+    "description": "Ubuntu GNOME 46 gains scoped window control through an optional Jackalope extension.",
+    "items": [
+      "Choose a window and resume from a visible native bar, with typing, clicks, scrolling, accessibility and window capture.",
+      "Keyboard or pointer activity pauses control; Escape, connection loss and extension disable end access."
+    ],
+    "note": "Real-device and installation testing remain open. Other Wayland desktops are not supported yet."
+  },
+  {
+    "id": "match-agent-effort-to-the-task",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Match agent effort to the task",
+    "description": "Task effort now requests matching reasoning levels from Codex and Claude, with clearer usage records and more reliable long checks.",
+    "items": [
+      "Quick, Balanced and Thorough apply to the launched agent without changing global settings.",
+      "Saved verification has time to finish, and usage exports retain effort and verification output measurements."
+    ]
+  },
+  {
+    "id": "local-agent-setup",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "A guided start with local AI",
+    "description": "An optional path to trying Jackalope without an AI provider subscription, with clear requirements and download choices.",
+    "items": [
+      "Check your computer, set up OpenCode and Ollama, and verify a local file edit and continued session before connecting.",
+      "Keep model downloads optional. Jackalope bundles no model weights.",
+      "Retrieve relevant help locally and reduce repeated routing context while preserving eligible models and task requirements."
+    ],
+    "note": "Real-model quality, paid-token savings and installed setup remain under validation."
+  },
+  {
+    "id": "native-window-control-beyond-windows",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Native window control beyond Windows",
+    "description": "macOS and Linux X11 window-control backends are implemented for native validation.",
+    "items": [
+      "Keep explicit window grants, visible Pause/Resume/Cancel controls, fresh snapshots, and physical-input interruption.",
+      "Check device readiness, request macOS permissions, and use platform-appropriate shortcut labels.",
+      "Exercise Linux control against isolated native windows in CI."
+    ],
+    "note": "macOS compilation and device acceptance remain open. Wayland window control still requires a compositor-specific implementation; public availability is unchanged."
+  },
+  {
+    "id": "know-which-desktop-is-connected",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Know which desktop is connected.",
+    "description": "Connected desktops now shows app and profile details to help identify separate installations and test profiles.",
+    "items": [
+      "See app version, platform, profile type, connection expiry, and recent account and settings checks."
+    ]
+  },
+  {
+    "id": "more-focused-task-guidance-and-verification",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "More focused task guidance and verification",
+    "description": "Task instructions stay closer to your request, and long successful checks return compact results with stored output available when needed.",
+    "items": [
+      "Automatic guidance distinguishes design tokens from security work and avoids adding debugging routines to spelling fixes.",
+      "Agents use the assigned workspace and receive tool instructions appropriate to their connection.",
+      "Independent native trials compare correctness and total reported usage against a preserved baseline.",
+      "Codex can run the saved project check during a task, so it can inspect failures before finishing."
+    ],
+    "note": "In development. Broader provider comparisons and installed-app acceptance remain in progress."
+  },
+  {
+    "id": "smoother-task-history-and-review",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Smoother task history and review",
+    "description": "Task updates and large histories do less work in the desktop interface.",
+    "items": [
+      "Task output uses durable incremental saves, and the interface receives changed task records.",
+      "History loads concurrently, while large patches and code highlighting run in background workers."
+    ]
+  },
+  {
+    "id": "better-coordination-from-request-to-review",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Better coordination from request to review.",
+    "description": "Feature plans preserve the complete request and can continue from verified predecessor snapshots.",
+    "items": [
+      "Independent work shares capacity fairly, while verification reserves only its workspace.",
+      "Structured handoffs and execution timings make progress and results easier to inspect."
+    ]
+  },
+  {
+    "id": "kimi-code-joins-the-workspace",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Kimi Code joins the workspace",
+    "description": "Use Kimi for tasks and routing, with broader tool and usage coverage across existing agents.",
+    "items": [
+      "Choose Kimi accounts and models, respond to approvals and structured questions, continue sessions, and read task tokens and membership quota.",
+      "Connect project tools directly to Kimi and OpenCode, discover Grok models, and read Antigravity subscription quota."
+    ],
+    "note": "Authenticated installed-app acceptance remains in progress; provider and CLI limits apply."
+  },
+  {
+    "id": "account-access-in-every-build",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Account access in every build.",
+    "description": "Development and release builds now use the same account access checks.",
+    "items": [
+      "Connect an approved account before starting new work, with verified offline access and saved-work recovery preserved."
+    ]
+  },
+  {
+    "id": "more-at-home-on-every-desktop",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "More at home on every desktop.",
+    "description": "Task notifications, accounts, and background cleanup now cover more of the macOS and Linux experience.",
+    "items": [
+      "Open the matching task from native macOS and Linux notifications.",
+      "Account connections and settings sync are enabled across platforms.",
+      "Unix task groups gain crash cleanup, with better Linux tray and macOS Dock recovery."
+    ],
+    "note": "Desktop-control backends and installed-platform acceptance are still in progress."
+  },
+  {
+    "id": "preparing-for-more-desktops",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Preparing for more desktops.",
+    "description": "Cross-platform foundations are ready for native testing on macOS and Linux.",
+    "items": [
+      "Improved agent and browser detection, terminal cleanup, secure account storage, and notifications.",
+      "Added native CI checks and trial packages for Linux and Intel and Apple Silicon Macs."
+    ],
+    "note": "Desktop control still requires macOS and Linux backends. Signed releases and installed-device acceptance remain in progress."
+  },
+  {
+    "id": "project-lessons-grounded-in-your-work",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Project lessons grounded in your work",
+    "description": "Jackalope learns from local task feedback and repository evidence, and shows recorded findings in Performance & insights.",
+    "items": [
+      "Matching lessons retain their sources and can be edited, paused, removed or skipped.",
+      "Performance distinguishes finished runs from human outcome decisions and removes invented savings and generic recommendations."
+    ]
+  },
+  {
+    "id": "a-predictable-local-work-cycle",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "A predictable local work cycle",
+    "description": "Completed tasks get automatic checkpoints, followed by a reviewed merge and safe worktree cleanup.",
+    "items": [
+      "Choose agent, shared or user-only commit credit per project during setup.",
+      "Review automatic commit messages and merge a task group as one commit.",
+      "Detect already integrated content and remove completed worktrees and branches; one failed folder no longer stops bulk cleanup."
+    ],
+    "note": "Development milestone; installed-agent acceptance remains open."
+  },
+  {
+    "id": "hourly-recurring-tasks",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Hourly recurring tasks",
+    "description": "Schedule regular checks without writing a cron expression.",
+    "items": [
+      "Choose intervals of 1, 2, 3, 4, 6, 8 or 12 hours and a minute past the hour.",
+      "Timing follows clock hours in the selected timezone and retains existing missed-run policies."
+    ]
+  },
+  {
+    "id": "ask-jackalope-from-your-workspace",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Ask Jackalope from your workspace.",
+    "description": "Your companion connects your configured agent to official help and reviewed app actions.",
+    "items": [
+      "Ask questions with documentation sources, preview appearance changes and adjust supported preferences.",
+      "Prepare task drafts, open or stop shared tasks, navigate the app and change the default agent through reviewed actions.",
+      "Connect external agents through an expiring local MCP connection, or copy website guides as Markdown."
+    ]
+  },
+  {
+    "id": "explore-where-jackalope-goes-next",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Explore where Jackalope goes next.",
+    "description": "An interactive roadmap connects the workspace we have built with the release work and ideas ahead.",
+    "items": [
+      "Explore built, in-progress, planned, and exploratory work with expandable feature details.",
+      "A branded journey makes current priorities and future possibilities easier to follow."
+    ]
+  },
+  {
+    "id": "smarter-project-settings",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Smarter project settings.",
+    "description": "Repository context helps fill project setup defaults.",
+    "items": [
+      "Detect preparation and verification commands from documentation and manifests, and the target branch from local Git metadata.",
+      "Preserve saved choices and deliberately cleared fields when refreshing context."
+    ]
+  },
+  {
+    "id": "practical-coding-agent-guides",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Practical guides for working with coding agents.",
+    "description": "Five longer reads cover worktrees, working with two agents, code review, MCP connections and choosing a workspace.",
+    "items": [
+      "Follow worked examples, reusable prompts and checklists with authoritative references.",
+      "Navigate article sections and explore related guides and app comparisons."
+    ]
+  },
+  {
+    "id": "updated-product-tour",
+    "date": "2026-09-09",
+    "status": "Website",
+    "title": "A fresh look around Jackalope",
+    "description": "Explore the updated app in a new 64-second product tour.",
+    "items": [
+      "See themes, project setup, task dispatch, browser evidence, agent accounts, and the interactive codebase map.",
+      "Watch bold animated feature cards with an original upbeat soundtrack, a new poster, and descriptive captions."
+    ],
+    "note": "The walkthrough uses sample workspace data and scripted browser interactions."
+  },
+  {
+    "id": "unified-agent-account-list",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "See all your agent accounts together",
+    "description": "Existing CLI logins and added accounts now share one account list with detected identities and editable names.",
+    "items": [
+      "Rename, label and group the existing CLI account just like an added account.",
+      "Agents cards show account identities, total counts and overlapping icons for multiple accounts.",
+      "Keep task customization visible while retaining automatic setup defaults."
+    ]
+  },
+  {
+    "id": "simpler-automatic-task-setup",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Describe the task and let Jackalope handle setup",
+    "description": "Task creation now puts your intent first, with a compact setup summary and optional customization.",
+    "items": [
+      "Use automatic agent, model and account routing with inherited project tools and matching lessons.",
+      "Project tools no longer need a per-task checklist; saved restrictions remain intact until explicitly reset.",
+      "Find effort, workspace and agent overrides under Customize task."
+    ]
+  },
+  {
+    "id": "worktree-cleanup-ready",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Clearer worktree cleanup",
+    "description": "Clean up merged worktrees when only disposable build output or dependencies remain.",
+    "items": [
+      "See which worktrees are ready and which generated folders cleanup removes.",
+      "Keep local edits, configuration and unrecognized ignored files protected, including during archive and remove."
+    ]
+  },
+  {
+    "id": "account-setup-and-optional-settings-sync",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Connect once, set up each project.",
+    "description": "Check early access and app privacy on launch, then set up projects with their own agent choices.",
+    "items": [
+      "An animated access check leads into reusable Project, Agent and First task steps, with a project default and switches for detected agents.",
+      "New connections default to settings sync, with an opt-out before connecting and saved opt-outs preserved.",
+      "Sync appearance and notification choices with strict privacy controls and conflict review.",
+      "Delete the saved settings copy and disable sync across connected desktops."
+    ]
+  },
+  {
+    "id": "visual-project-context",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Your project at a glance",
+    "description": "Repository knowledge is easier to scan and turn into work.",
+    "items": [
+      "Project Context groups source files, technologies, instructions and commands in a visual overview.",
+      "Lessons and workflows use compact cards with full content available on demand.",
+      "Repo TODOs offer a Start task action with prefilled context. Completion moves into explicit edit controls, with Cancel and Discard beside the document heading."
+    ]
+  },
+  {
+    "id": "stay-in-control-of-desktop-assistance",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Stay in control of desktop assistance.",
+    "description": "A clear status bar and theme-colored glow show when Jackalope is using your computer.",
+    "items": [
+      "Pause or cancel from the top bar, press Escape to cancel, and explicitly resume after mouse, keyboard or window interruptions.",
+      "Larger display-scaled text and working controls keep desktop assistance readable."
+    ],
+    "note": "Desktop assistance requires Windows and permission for each window."
+  },
+  {
+    "id": "knowledgebase-and-diagnostics",
+    "date": "2026-09-08",
+    "status": "Website",
+    "title": "Guides and help, close at hand",
+    "description": "Find answers about Jackalope in a searchable knowledgebase, with direct access from the desktop app.",
+    "items": [
+      "Search guides, visual architecture diagrams, and troubleshooting recipes across nine feature categories.",
+      "Access the Knowledgebase directly from the desktop shell using the new header life preserver shortcut, the Command Palette, or Settings."
+    ]
+  },
+  {
+    "id": "quota-aware-task-routing",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "Task routing with quota awareness",
+    "description": "Jackalope's default agent can select an enabled agent, configured model and account for automatic tasks.",
+    "items": [
+      "Uses reported quota headroom and local active-work reservations when admitting work.",
+      "Hands quota-interrupted tasks to an eligible fallback in the same workspace with progress and usage retained.",
+      "Shows routing decisions and attributes routing and worker usage separately."
+    ],
+    "note": "Explicit assignments stay pinned. Missing quota is treated as unknown."
+  },
+  {
+    "id": "palettes-that-follow-your-color",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "Palettes that follow your color.",
+    "description": "Choose Single, Duo or Trio to build a coordinated theme from one primary color.",
+    "items": [
+      "Companion colors and workspace gradients update as you explore the color picker.",
+      "Palette previews preserve cancel, reset and saved themes, with readable action labels on hover."
+    ]
+  },
+  {
+    "id": "your-next-hop-into-jackalope",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "Your next hop into Jackalope.",
+    "description": "Track your waitlist place, bring people along, and share Instant Access Passes once you are in.",
+    "items": [
+      "Verified waitlist referrals earn priority, with progress visible on your access page.",
+      "Accepted members get five passes to bring people straight into early access.",
+      "Clear emails guide verification, referral milestones, pass claims, and expired reservations."
+    ]
+  },
+  {
+    "id": "workspace-foundations",
+    "date": "2026-09-06",
+    "status": "In development",
+    "title": "More of the work, in one place.",
+    "description": "The current development build brings task work and project context into a more focused workspace.",
+    "items": [
+      "Tasks groups active work, saved evidence, and recurring work. Project holds codebase exploration, worktrees, and context.",
+      "Project tool selections can travel with Codex and Claude Code task launches, while existing CLI-global tools remain available.",
+      "Recurring work includes timezone and missed-run controls. The app must remain running; it cannot wake a closed app or a sleeping computer.",
+      "Account-aware usage views and locally bundled fonts are part of the current development build."
+    ],
+    "note": "Scheduled work requires Jackalope to stay running."
+  },
+  {
+    "id": "a-first-look",
+    "date": "2026-09-06",
+    "status": "Website",
+    "title": "A first look at Jackalope.",
+    "description": "A place to explore the product and follow what comes next.",
+    "items": [
+      "Real interface captures in light and dark appearances, using an explicitly fictional Atlas project.",
+      "An interactive recorded tour covering task drafting, patch review, agent selection, and the live theme palette.",
+      "A three-step introduction, product notes, and an early-access waitlist."
+    ],
+    "note": "The walkthrough illustrates the interface with sample data."
+  }
+]

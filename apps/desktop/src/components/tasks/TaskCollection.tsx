@@ -1,0 +1,576 @@
+import {
+  Badge,
+  Checkbox,
+  Disclosure,
+  DisclosureSummary,
+  DropdownMenu as Menu,
+  SearchField,
+} from '@jackalope/ui';
+import {
+  Archive,
+  ArchiveRestore,
+  Check,
+  ChevronRight,
+  Columns3,
+  Lightbulb,
+  List,
+  ListTodo,
+  MoreHorizontal,
+  Radio,
+} from 'lucide-react';
+import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+
+import {
+  ideaStageLabels,
+  matchesWorkFilter,
+  type WorkItem,
+  workGroup,
+  workGroups,
+  workPresence,
+} from '../../lib/task-collection';
+import type { Runner } from '../../lib/task-runtime';
+import { useProjectStore } from '../../stores/projectStore';
+import { AgentStack } from '../agents/AgentAvatar';
+import { Button } from '../ui/button';
+import { EmptyState } from '../ui/EmptyState';
+import { InlineNotice } from '../ui/InlineNotice';
+import { Select, SelectItem } from '../ui/Select';
+import { RunStatus } from './RunStatus';
+import './task-collection.css';
+
+export interface TaskCollectionView {
+  filter: string;
+  layout: 'list' | 'board';
+  query: string;
+}
+
+export function TaskCollection({
+  items,
+  runners,
+  onOpen,
+  view,
+  onViewChange,
+  scope,
+  history,
+  emptyState,
+  archived = false,
+  onArchive,
+  onBusyChange,
+}: {
+  items: WorkItem[];
+  runners: Runner[];
+  onOpen: (item: WorkItem) => void;
+  view: TaskCollectionView;
+  onViewChange: (view: TaskCollectionView) => void;
+  scope?: ReactNode;
+  history?: ReactNode;
+  emptyState?: ReactNode;
+  archived?: boolean;
+  onArchive?: (items: WorkItem[], archived: boolean) => Promise<void>;
+  onBusyChange?: (busy: boolean) => void;
+}) {
+  const [selecting, setSelecting] = useState(false);
+  const [selection, setSelection] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [undo, setUndo] = useState<WorkItem[]>([]);
+  const actionFocus = useRef<HTMLButtonElement>(null);
+  const [focusReturn, setFocusReturn] = useState(0);
+  useEffect(() => {
+    if (focusReturn) actionFocus.current?.focus();
+  }, [focusReturn]);
+  const projects = useProjectStore((state) => state.projects);
+  const { layout, query } = view;
+  const filter = workGroup(view.filter);
+  const setFilter = (filter: string) => onViewChange({ ...view, filter });
+  const setLayout = (layout: 'list' | 'board') => onViewChange({ ...view, layout });
+  const setQuery = (query: string) => onViewChange({ ...view, query });
+  const filtered = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          matchesWorkFilter(item, filter) &&
+          `${item.title} ${item.idea?.rawPrompt ?? ''} ${item.run?.prompt ?? ''}`
+            .toLowerCase()
+            .includes(query.trim().toLowerCase()),
+      ),
+    [items, filter, query],
+  );
+  const eligible = filtered.filter((item) => archived || !item.archiveBlocked);
+  const selected = eligible.filter((item) => selection.includes(item.id));
+  const finished = eligible.filter((item) => item.stage === 'finished');
+  const happening = useMemo(
+    () =>
+      archived
+        ? []
+        : items
+            .map((item) => ({ item, presence: workPresence(item) }))
+            .filter(({ presence }) => presence.state !== 'idle'),
+    [archived, items],
+  );
+  const changeArchive = async (targets: WorkItem[], archive: boolean) => {
+    if (!onArchive || pending.current || !targets.length) return;
+    pending.current = true;
+    setBusy(true);
+    onBusyChange?.(true);
+    setError('');
+    setNotice('');
+    setUndo([]);
+    try {
+      await onArchive(targets, archive);
+      setSelection([]);
+      setNotice(
+        `${targets.length} ${targets.length === 1 ? 'task' : 'tasks'} ${archive ? 'archived' : 'restored'}.`,
+      );
+      if (archive) setUndo(targets);
+    } catch (cause) {
+      setError(String(cause));
+    } finally {
+      pending.current = false;
+      setBusy(false);
+      onBusyChange?.(false);
+      setFocusReturn((value) => value + 1);
+    }
+  };
+  const card = (item: WorkItem) => (
+    <div key={item.id} className="work-item-row">
+      {selecting && (
+        <label className="work-select" title={!archived ? item.archiveBlocked : undefined}>
+          <Checkbox
+            aria-label={`Select ${item.title}`}
+            disabled={busy || (!archived && !!item.archiveBlocked)}
+            checked={selected.some((selected) => selected.id === item.id)}
+            onChange={(event) =>
+              setSelection((ids) =>
+                event.target.checked ? [...ids, item.id] : ids.filter((id) => id !== item.id),
+              )
+            }
+          />
+        </label>
+      )}
+      <WorkCard item={item} runners={runners} projects={projects} onOpen={onOpen} disabled={busy} />
+      {onArchive && !selecting && (
+        <Button
+          variant="ghost"
+          className="work-archive"
+          disabled={busy || (!archived && !!item.archiveBlocked)}
+          aria-label={`${archived ? 'Restore' : 'Archive'} ${item.title}`}
+          title={
+            !archived && item.archiveBlocked
+              ? item.archiveBlocked
+              : archived
+                ? 'Restore task'
+                : 'Archive task'
+          }
+          onClick={() => void changeArchive([item], !archived)}
+        >
+          {archived ? <ArchiveRestore size={18} /> : <Archive size={18} />}
+        </Button>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="task-collection">
+      <div className="work-toolbar">
+        {history}
+        {scope}
+        <SearchField
+          aria-label="Search tasks"
+          placeholder="Find a task…"
+          value={query}
+          onValueChange={(value) => setQuery(value)}
+          containerClassName="work-search"
+        />
+        <Select aria-label="Filter tasks by status" value={filter} onValueChange={setFilter}>
+          <SelectItem value="all">All statuses</SelectItem>
+          {workGroups.map((stage) => (
+            <SelectItem key={stage.id} value={stage.id}>
+              {stage.label} · {items.filter((item) => matchesWorkFilter(item, stage.id)).length}
+            </SelectItem>
+          ))}
+        </Select>
+        <fieldset className="work-layout" aria-label="Task view">
+          <button type="button" aria-pressed={layout === 'list'} onClick={() => setLayout('list')}>
+            <List size={16} />
+            List
+          </button>
+          <button
+            type="button"
+            aria-pressed={layout === 'board'}
+            onClick={() => setLayout('board')}
+          >
+            <Columns3 size={16} />
+            Board
+          </button>
+        </fieldset>
+        {onArchive && (
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button ref={actionFocus} variant="ghost" aria-label="Organize work" disabled={busy}>
+                <MoreHorizontal size={18} />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
+                <Menu.Item
+                  className="workspace-menu-item"
+                  onSelect={() => {
+                    setSelecting(!selecting);
+                    setSelection([]);
+                  }}
+                >
+                  {selecting ? 'Done selecting' : 'Select tasks'}
+                </Menu.Item>
+                {!archived && finished.length > 0 && (
+                  <Menu.Item
+                    className="workspace-menu-item"
+                    onSelect={() => void changeArchive(finished, true)}
+                  >
+                    Archive finished ({finished.length})
+                  </Menu.Item>
+                )}
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu.Root>
+        )}
+      </div>
+      {onArchive && (selecting || archived) && (
+        <>
+          <div className="work-toolbar work-cleanup">
+            <Button
+              variant="outline"
+              disabled={busy}
+              aria-pressed={selecting}
+              onClick={() => {
+                setSelecting(!selecting);
+                setSelection([]);
+              }}
+            >
+              {selecting ? 'Done selecting' : 'Select tasks'}
+            </Button>
+            {selecting ? (
+              <>
+                <label className="work-select-all">
+                  <Checkbox
+                    aria-label="Select all matching tasks"
+                    disabled={busy || !eligible.length}
+                    checked={!!eligible.length && selected.length === eligible.length}
+                    indeterminate={selected.length > 0 && selected.length < eligible.length}
+                    onChange={(event) =>
+                      setSelection(event.target.checked ? eligible.map((item) => item.id) : [])
+                    }
+                  />
+                  Select all matching
+                </label>
+                <Button
+                  variant="outline"
+                  disabled={!selected.length || busy}
+                  loading={busy}
+                  loadingLabel={archived ? 'Restoring…' : 'Archiving…'}
+                  onClick={() => void changeArchive(selected, !archived)}
+                >
+                  {archived ? 'Restore' : 'Archive'} selected ({selected.length})
+                </Button>
+              </>
+            ) : !archived && finished.length > 0 ? (
+              <Button
+                variant="outline"
+                disabled={busy}
+                loading={busy}
+                loadingLabel="Archiving…"
+                onClick={() => void changeArchive(finished, true)}
+              >
+                <Archive size={16} /> Archive finished ({finished.length})
+              </Button>
+            ) : null}
+          </div>
+          {(archived || selecting) && (
+            <p className="task-muted work-archive-help">
+              {archived
+                ? 'Restore a task to bring it back to your current tasks.'
+                : 'Archived tasks can be restored. Results and workspaces are kept.'}
+            </p>
+          )}
+        </>
+      )}
+      {error && <InlineNotice tone="error">Some tasks could not be updated. {error}</InlineNotice>}
+      {notice && (
+        <div className="work-filter-summary">
+          <p role="status">{notice}</p>
+          {undo.length > 0 && (
+            <Button variant="ghost" disabled={busy} onClick={() => void changeArchive(undo, false)}>
+              Undo
+            </Button>
+          )}
+        </div>
+      )}
+      {(query.trim() || filter !== 'all') && (
+        <div className="work-filter-summary">
+          <p role="status">
+            {filtered.length} matching {filtered.length === 1 ? 'task' : 'tasks'}
+          </p>
+          <Button
+            variant="ghost"
+            onClick={() => onViewChange({ ...view, filter: 'all', query: '' })}
+          >
+            Clear filters
+          </Button>
+        </div>
+      )}
+      {happening.length > 0 && (
+        <section className="work-now" aria-label="Work in progress">
+          {happening.slice(0, 4).map(({ item, presence }) => (
+            <button
+              key={item.id}
+              type="button"
+              className="work-now-item"
+              disabled={busy}
+              onClick={() => onOpen(item)}
+            >
+              {presence.agents.length ? (
+                <AgentStack agents={presence.agents} state={presence.state} />
+              ) : (
+                <span className="work-avatar-fallback" aria-hidden="true">
+                  {item.session ? <Radio size={16} /> : <Lightbulb size={16} />}
+                </span>
+              )}
+              <span className="work-now-copy">
+                <strong>{item.title}</strong>
+                <span>
+                  {presence.state === 'waiting'
+                    ? presence.action
+                    : item.run?.progress?.label || presence.action}
+                </span>
+              </span>
+            </button>
+          ))}
+        </section>
+      )}
+      {!items.length && emptyState ? (
+        emptyState
+      ) : !filtered.length ? (
+        <EmptyState
+          icon={ListTodo}
+          title={items.length ? 'No matching tasks' : 'Room for your next idea'}
+          description={
+            items.length
+              ? 'Try another stage or search.'
+              : 'Start a task now, or save an idea for later. Its work and review stay here.'
+          }
+        />
+      ) : layout === 'list' ? (
+        <fieldset
+          className="work-list"
+          aria-label="Work items"
+          onKeyDown={(event) => {
+            if (
+              !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key) ||
+              !(event.target instanceof HTMLElement) ||
+              !event.target.classList.contains('work-item')
+            )
+              return;
+            const rows = Array.from(
+              event.currentTarget.querySelectorAll<HTMLButtonElement>('.work-item:not(:disabled)'),
+            ).filter((row) => row.getClientRects().length);
+            const index = rows.indexOf(event.target as HTMLButtonElement);
+            if (index < 0) return;
+            event.preventDefault();
+            const next =
+              event.key === 'Home'
+                ? 0
+                : event.key === 'End'
+                  ? rows.length - 1
+                  : Math.max(
+                      0,
+                      Math.min(rows.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)),
+                    );
+            rows[next]?.focus();
+          }}
+        >
+          {workGroups.map((stage) => {
+            const stageItems = filtered.filter((item) => matchesWorkFilter(item, stage.id));
+            if (!stageItems.length) return null;
+            const heading = (
+              <>
+                {stage.label} <span>{stageItems.length}</span>
+              </>
+            );
+            return stage.id === 'finished' &&
+              filter === 'all' &&
+              !query.trim() &&
+              !selecting &&
+              !archived ? (
+              <Disclosure key={stage.id} className="work-group work-finished">
+                <DisclosureSummary>{heading}</DisclosureSummary>
+                {stageItems.map(card)}
+              </Disclosure>
+            ) : (
+              <section key={stage.id} className="work-group" aria-label={stage.label}>
+                <h2>{heading}</h2>
+                {stageItems.map(card)}
+              </section>
+            );
+          })}
+        </fieldset>
+      ) : (
+        <div className="work-board">
+          {workGroups
+            .filter((stage) => filter === 'all' || filter === stage.id)
+            .map((stage) => {
+              const stageItems = filtered.filter((item) => matchesWorkFilter(item, stage.id));
+              return (
+                <section key={stage.id} className="work-column" aria-label={stage.label}>
+                  <h2>
+                    {stage.label}
+                    <span>{stageItems.length}</span>
+                  </h2>
+                  {stageItems.length ? (
+                    stageItems.map(card)
+                  ) : (
+                    <p className="work-column-empty">Nothing here yet</p>
+                  )}
+                </section>
+              );
+            })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const dateFormatter = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'short',
+  timeStyle: 'medium',
+});
+const WorkCard = memo(
+  function WorkCard({
+    item,
+    runners,
+    projects,
+    onOpen,
+    disabled,
+  }: {
+    item: WorkItem;
+    runners: Runner[];
+    projects: ReturnType<typeof useProjectStore.getState>['projects'];
+    onOpen: (item: WorkItem) => void;
+    disabled: boolean;
+  }) {
+    const presence = workPresence(item);
+    const agent = presence.agents[0];
+    const date = new Date(item.date);
+    const status = item.statusLabel ? (
+      <Badge
+        appearance="plain"
+        className="task-status"
+        variant={item.stage === 'attention' ? 'warning' : 'default'}
+      >
+        {item.statusLabel}
+      </Badge>
+    ) : item.run ? (
+      <RunStatus status={item.run.status} progress={item.run.progress} />
+    ) : null;
+    return (
+      <button
+        id={`work-item-${item.id}`}
+        key={item.id}
+        type="button"
+        disabled={disabled}
+        className="work-item"
+        onClick={() => onOpen(item)}
+      >
+        {presence.agents.length ? (
+          <AgentStack agents={presence.agents} state={presence.state} />
+        ) : (
+          <span className="work-avatar-fallback" aria-hidden="true">
+            {item.session ? <Radio size={16} /> : <Lightbulb size={16} />}
+          </span>
+        )}
+        <span className="work-item-content">
+          <span className="work-item-title">{item.title}</span>
+          <span className="work-item-meta">
+            <span>
+              {item.session?.request.projectName ??
+                item.run?.projectName ??
+                projects.find((p) => p.id === item.idea?.projectId)?.name ??
+                'No project yet'}
+              {agent && agent !== 'Unassigned'
+                ? ` · ${runners.find((r) => r.id === agent)?.name ?? agent}`
+                : ''}
+              {presence.agents.length > 1 ? ` +${presence.agents.length - 1}` : ''}
+            </span>
+            {Number.isNaN(date.getTime()) ? (
+              ' · Date unavailable'
+            ) : (
+              <>
+                {' · '}
+                <time dateTime={item.date} title={dateTimeFormatter.format(date)}>
+                  {dateFormatter.format(date)}
+                </time>
+              </>
+            )}
+          </span>
+        </span>
+        {item.session || item.managed ? (
+          <span className="work-item-status">
+            {status}
+            <span className="work-item-action">
+              {presence.action}
+              <ChevronRight size={14} aria-hidden="true" />
+            </span>
+          </span>
+        ) : item.run ? (
+          <span className="work-item-status">
+            {item.stage === 'finished' && item.run.status !== 'reviewed' ? (
+              <Badge appearance="plain" className="task-status">
+                <Check size={16} />
+                Integrated
+              </Badge>
+            ) : (
+              status
+            )}
+            <span className="work-item-action">
+              {presence.action}
+              <ChevronRight size={14} aria-hidden="true" />
+            </span>
+            {item.run.persistenceError && <span className="work-item-meta">Not saved</span>}
+          </span>
+        ) : (
+          <span className="work-item-status">
+            <Badge appearance="plain" className="work-idea-status">
+              {item.idea?.status === 'done' ? <Check size={15} /> : <Lightbulb size={15} />}
+              {item.idea?.runId
+                ? 'History unavailable'
+                : ideaStageLabels[item.idea?.status ?? 'backlog']}
+            </Badge>
+            <span className="work-item-action">
+              {presence.action}
+              <ChevronRight size={14} aria-hidden="true" />
+            </span>
+          </span>
+        )}
+      </button>
+    );
+  },
+  (before, after) =>
+    before.onOpen === after.onOpen &&
+    before.disabled === after.disabled &&
+    before.runners === after.runners &&
+    before.projects === after.projects &&
+    before.item.id === after.item.id &&
+    before.item.title === after.item.title &&
+    before.item.stage === after.item.stage &&
+    before.item.statusLabel === after.item.statusLabel &&
+    before.item.date === after.item.date &&
+    before.item.run === after.item.run &&
+    before.item.session === after.item.session &&
+    before.item.idea === after.item.idea,
+);

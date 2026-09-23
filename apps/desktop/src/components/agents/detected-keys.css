@@ -1,0 +1,9 @@
+.detected-keys-modal {
+  width: 90vw;
+  max-width: 640px;
+}
+
+.privacy-guarantee-banner {
+  background-color: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.25);
+}

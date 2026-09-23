@@ -1,0 +1,140 @@
+.statusbar-usage {
+  margin-left: auto;
+}
+.statusbar-usage-label {
+  white-space: nowrap;
+}
+.statusbar-quota {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 8px;
+  margin-left: 4px;
+  border-left: 1px solid var(--color-border-subtle);
+}
+.statusbar-quota-readout {
+  display: grid;
+  gap: 4px;
+  width: 36px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.statusbar-quota-more {
+  color: var(--color-text-secondary);
+}
+.allowance-meter {
+  display: block;
+  height: 7px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--color-border-subtle);
+}
+.allowance-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent-ink);
+}
+[data-tone="low"] .allowance-meter > span {
+  background: var(--color-warning);
+}
+[data-tone="empty"] .allowance-meter {
+  outline: 1px solid var(--color-danger);
+  outline-offset: -1px;
+}
+.allowance-meter[data-unknown] {
+  background: repeating-linear-gradient(
+    120deg,
+    var(--color-border-subtle) 0 3px,
+    transparent 3px 6px
+  );
+}
+.statusbar-allowances {
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(600px, var(--radix-popover-content-available-height));
+  padding: 20px;
+}
+.statusbar-allowances-heading,
+.statusbar-allowance-account > header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.statusbar-allowances-heading {
+  justify-content: space-between;
+}
+.statusbar-allowances h2 {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+.statusbar-allowances h3 {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.statusbar-allowances p {
+  margin: 4px 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.statusbar-allowances [role="alert"] {
+  color: var(--color-danger);
+}
+.statusbar-allowance-account {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.statusbar-allowance-account > header > div {
+  min-width: 0;
+}
+.statusbar-allowance-window {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: var(--text-xs);
+}
+.statusbar-allowance-label,
+.statusbar-allowance-caption {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.statusbar-allowance-label strong {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.statusbar-allowance-window[data-tone="low"] strong {
+  color: var(--color-warning);
+}
+.statusbar-allowance-window[data-tone="empty"] strong {
+  color: var(--color-danger);
+}
+.statusbar-allowance-window[data-tone="unknown"] strong,
+.statusbar-allowance-caption {
+  color: var(--color-text-secondary);
+}
+.statusbar-allowances .statusbar-allowance-empty {
+  margin-top: 16px;
+}
+.statusbar-allowances footer {
+  display: grid;
+  gap: 16px;
+  padding-top: 16px;
+}
+@media (max-width: 760px) {
+  .statusbar-usage {
+    margin-left: 0;
+  }
+}
+@media (forced-colors: active) {
+  .allowance-meter {
+    border: 1px solid CanvasText;
+  }
+  .allowance-meter > span {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+}

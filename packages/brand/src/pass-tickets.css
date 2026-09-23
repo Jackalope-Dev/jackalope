@@ -1,0 +1,159 @@
+.brand-pass-allowance {
+  container-type: inline-size;
+}
+.brand-pass-tickets {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  list-style: none;
+  padding: 0;
+  gap: 16px;
+  margin: 32px 0 24px;
+}
+.brand-pass-tickets li {
+  padding: 0;
+  border: 0;
+  border-radius: 18px;
+  background: none;
+  min-width: 0;
+  transition: transform 180ms ease;
+}
+.brand-pass-ticket {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: 100%;
+  min-height: 228px;
+  padding: 22px 18px 0;
+  text-align: left;
+  color: #fff;
+  font: inherit;
+  border: 1px solid #ffffff40;
+  border-radius: 18px;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--ticket-color) 85%, #101124),
+    color-mix(in srgb, var(--ticket-color) 48%, #101124)
+  );
+  box-shadow:
+    inset 0 1px 0 #ffffff35,
+    0 8px 22px color-mix(in srgb, var(--ticket-color) 18%, transparent);
+  cursor: pointer;
+}
+.brand-pass-ticket::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  opacity: 0.2;
+  background: repeating-linear-gradient(
+    125deg,
+    transparent 0 14%,
+    #9affff 22%,
+    #eebcff 30%,
+    transparent 38% 52%
+  );
+  background-size: 220% 220%;
+  background-position: 0 0;
+  transition: background-position 600ms ease;
+}
+.brand-pass-ticket:hover::before,
+.brand-pass-ticket:focus-visible::before {
+  background-position: 70% 60%;
+}
+.brand-pass-ticket:focus-visible {
+  outline: 3px solid var(--color-text-primary);
+  outline-offset: 4px;
+}
+.brand-pass-tickets .brand-pass-ticket svg {
+  color: #fff;
+  margin: 0;
+}
+.brand-pass-tickets .brand-pass-ticket-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 28px;
+}
+.brand-pass-tickets .brand-pass-ticket-top > svg {
+  width: 34px;
+  height: 38px;
+}
+.brand-pass-tickets .brand-pass-ticket span {
+  color: inherit;
+}
+.brand-pass-tickets .brand-pass-ticket-top > span {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  margin: 0;
+}
+.brand-pass-tickets .brand-pass-ticket strong {
+  font-size: clamp(19px, 2.3vw, 26px);
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+  margin-bottom: 24px;
+}
+.brand-pass-tickets .brand-pass-ticket-stub {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: auto -18px 0;
+  padding: 16px 18px;
+  border-top: 1px dashed #ffffff70;
+  background: #00000020;
+}
+.brand-pass-ticket-stub::before,
+.brand-pass-ticket-stub::after {
+  content: "";
+  position: absolute;
+  top: -8px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+.brand-pass-ticket-stub::before {
+  left: -7px;
+}
+.brand-pass-ticket-stub::after {
+  right: -7px;
+}
+.brand-pass-tickets .brand-pass-ticket-stub span {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 650;
+}
+.brand-pass-tickets .brand-pass-ticket-stub svg {
+  width: 17px;
+  height: 17px;
+}
+.brand-pass-tickets li:not([data-state="Available"]) .brand-pass-ticket {
+  filter: saturate(0.25);
+  opacity: 0.72;
+  cursor: default;
+}
+
+.brand-pass-tickets li[data-state="Available"]:hover {
+  transform: translateY(-4px);
+}
+@container (max-width: 680px) {
+  .brand-pass-tickets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .brand-pass-tickets li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-pass-tickets li,
+  .brand-pass-ticket::before {
+    transition: none;
+  }
+  .brand-pass-tickets li[data-state="Available"]:hover {
+    transform: none;
+  }
+}

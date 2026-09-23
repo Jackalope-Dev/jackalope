@@ -1,0 +1,412 @@
+# Parallel local work
+
+This document describes the local operator: installed agents, usage/capacity,
+isolated parallel work, coordination and review before integration.
+
+## Use it
+
+### Live sessions
+
+The project toolbar offers Focus, Build and Oversee layouts. Build starts review and
+preview beside the conversation; Oversee opens Needs you. Choosing a preset resets
+that project's task layout overrides. Individual conversation toggles remain available.
+
+The task toolbar shows the branch and changes since a previous visit. Task context
+opens the workspace and saved checks. Terminal opens a shell view in that exact
+workspace; Workspace tools opens its installed editor or a separate task window.
+The task terminal is a separate shell, not a resumed provider conversation. Stop it
+before agent work, checks, previews or integration. Its bounded output survives closing
+and reopening a view while the app runs. Controls reject commands addressed to an
+earlier shell after another window restarts it. Quitting stops its owned process tree.
+Result, review, preview and terminal panes can open in separate windows. These share
+native task state; result panes cannot independently launch a follow-up or approve work.
+Feedback from another window is retained locally until added to a reply draft or dismissed.
+
+Topics opens an editor to group original chat messages without moving them or changing dispatch.
+Message selection is searchable and loads more results on demand.
+Suggestions use local headings and opening lines. Rename, regroup or discard suggestions,
+then save. Topic edits reject stale revisions from another window. Prepare task draft
+retains source chat/message references and selected instructions; starting that task is
+a separate action through ordinary capture. Ungrouping preserves the original messages.
+
+Open **Work**, choose **New work** and send a message. The empty workspace shows the composer directly.
+The first message names the session;
+history groups sessions by attention, activity and completion, with recent work first.
+Capture stays available while a batch runs. Messages arriving together are grouped
+in order; subsequent batches continue in the same isolated worktree and retain the
+selected agent account.
+**Queue message** saves input for the next batch. **Stop and send** pauses dispatch,
+waits for actual shutdown and saves the message before resuming. Failed saves retain
+the draft. A paused queue keeps new messages until explicitly resumed.
+Use **Pop out** for a separate window; its pin controls always-on-top. Closing the
+window leaves execution running. **Pause queue** holds later messages, while
+**Stop work** also stops the active attempt through the existing runtime.
+
+Sessions save messages before claiming a batch, preserve draft revisions across
+windows, and pause after failures or restart. Pending launch retries reuse the saved
+attempt identifier. An interrupted launch requires an explicit retry. Session attempts
+stay in loaded history; a missing completed attempt blocks continuation until restored.
+Interrupted process ownership keeps the normal runtime safeguards.
+Never edit the session journal while its profile is running. Reload saved sessions
+after resolving a storage error; failed loads preserve the original file.
+
+Review and preview pause dispatch. A running preview holds further writes to its
+workspace. **Review** exports a cumulative binary-capable patch from the original
+base without committing or changing the index. A check applies only to the exact
+exported tree. Run or cancel queued messages before preparing a merge. The latest
+batch uses the same source/target snapshots, verification requirements and explicit
+merge/cleanup controls as isolated tasks. The session gate encloses coordinator →
+execution guard → runtime locking so a new batch cannot race integration. Applied
+native receipts close the session for execution, including after restart. Continue
+in a new chat to prepare the next change; existing drafts are preserved.
+
+**Changes since my last review** compares the current tree to an explicitly saved
+review position. Marking changes seen does not accept them or replace checks. Files
+changed since the displayed snapshot cannot be marked seen without refreshing.
+If Git has removed the earlier snapshot, the view falls back to all current changes.
+
+Before sending a new chat, optional workflow starters prepare editable issue, PR-review,
+CI-repair or dependency-update requests. GitHub CLI reads use the selected repository;
+imported evidence is bounded and labeled when incomplete. No remote write is performed.
+Optional session limits cap the number of batches or pause at a reported cost estimate.
+They only block the next batch; a running batch can exceed the threshold. Missing cost
+for any batch or routing work pauses further dispatch when a cost threshold is set.
+Changing limits does not resume work. Live sessions still serialize batches;
+independent native task planning and automatic integration are separate capabilities.
+
+### A planned task from ordinary capture
+
+Submitting a new task or an unlimited new chat assesses whether one lead,
+investigation or parallel work fits the request. The project's **Decisions**
+preference selects local rules, an agent or Jev. Clear small requests and explicit
+restrictions use local rules. Assessment happens on submission, never while typing;
+unchanged requests reuse a short-lived receipt. An unavailable or uncertain model
+assessment falls back locally by default. Jev can instead make one agent assessment
+when the project's fallback is explicitly Agent-powered; both calls retain usage.
+Sessions with batch or
+cost limits retain their existing serial flow.
+
+**Create a plan** or **Investigate and plan** starts a planning attempt using the
+task's selected development agent. The agent receives the complete request and
+checks repository boundaries before proposing one to four assignments. Review
+ownership and dependencies, then choose **Start reviewed plan**. Native validation
+rejects cycles, escaping paths and independent assignments with overlapping scopes.
+A changed planner attempt requires another review. Planning workspaces must remain
+unchanged before implementation starts.
+
+Planning considers integration and review effort, shared contracts, generated files,
+manifests and lockfiles. Shared changes have one owner or an explicit dependency.
+Tightly coupled work stays together; a small request can remain one assignment.
+
+Planning accounts for repeated discovery, setup and checks in each assignment.
+Dispatch prioritizes prerequisites on the longest remaining dependency chains,
+independently of their saved order, while retaining fairness across projects.
+Canceled, failed and already launched descendants do not inflate that priority.
+Scope, interface, verification and snapshot gates still determine eligibility.
+
+The parent stays together in Work. Expand assignments for their results,
+questions and follow-ups; all attempts and reported usage remain attached. Workers
+inherit the selected agent, account, model, effort and tools. The existing queue
+shares execution capacity and passes verified predecessor snapshots to dependencies.
+Multiple assignments receive a final combined review and project verification;
+a single assignment avoids that extra worker. A saved automatic verification command
+and isolated Git work are required for this flow. Explicit workflow and continuation
+requests keep their existing execution paths.
+
+New managed plans combine groups of at least two completed assignments while other
+work continues. Pending consumers receive the checked combination; running workers
+keep their frozen inputs. The combined worker uses a separate worktree, resolves
+overlapping edits and checks the complete result. Native snapshot, process ownership
+and scope guards remain in force, including overlaps with unrelated tasks. Intermediate
+combinations are included in the final source receipt and cannot be applied separately.
+Interface decisions wholly within those assignments can be mediated by the combined
+worker. Their captured revisions, source snapshots, saved verification and a completion
+report for the checked tree must still match. The journal records mediation as reconciled,
+without manufacturing participant acceptance. Decisions involving other tasks remain
+blocked; changed decisions require a fresh continuation.
+
+A successfully completed agent attempt whose saved verification failed can continue
+automatically in its existing workspace. Each reviewed plan or user correction allows
+up to two repair attempts using the bound agent/account. Consumed predecessor snapshots,
+failed or interrupted processes and unavailable history are not automatically retried.
+Exhausted repairs stay in the parent task for a correction or an explicit additional
+attempt. Sources and the target checkout are preserved throughout.
+
+**Pause dispatch** holds pending assignments. **Stop task** also stops active
+attempts; interrupted process ownership retains the runtime's recovery requirements.
+Restart leaves dispatch paused. Failed assignments can be retried before downstream
+work starts; once dependent snapshots exist, corrections belong in the final combined
+result. A changed target branch blocks further dispatch and requires reassessment.
+**Review changes** uses guarded integration. Project automatic merge and
+reconciliation policies exclude these managed tasks; managed integration and repair
+belong to the reviewed task lifecycle and never automatically apply to the target.
+
+The task shows Plan, Work, Check and Review, with Result, Review and Preview together.
+Task details groups the request, assignments, attempts and usage. New plans collect
+assignment outcomes into the final result for snapshot-bound human review. Applying
+requires the complete task, current sources, saved checks and outcome acceptance;
+cleanup follows the explicit apply choice. Preview feedback continues the combined
+result; a running preview must be stopped before that continuation.
+
+Time and usage retains all worker and repair attempts. Local measurements distinguish
+observed focused review seconds from elapsed time between worker completion and local
+application. Focused review is an observation of a visible, focused result window, not
+proof of human attention. Unknown older measurements remain unavailable. These records
+do not establish reduced review effort or fewer defects without comparative trials.
+
+Assessment receipts record the selected policy and actual provider, including
+reported usage from unsuccessful model assessments and unknown usage when a call
+cannot report it. Local decisions use no model tokens; cached receipts are counted
+once. This is bounded orchestration, not a provider billing cap. Browser fixtures and
+native state tests do not establish installed-provider acceptance or measured savings.
+
+### Parallel task queues
+
+Ordinary task results offer **Queue follow-up** while an attempt runs, alongside
+**Stop & send**. Queued instructions are saved natively in order and continue with
+the same workspace, agent and account. Stop & send saves the message before stopping
+the current attempt. The queue waits for process shutdown, finishing writes, verification
+and previews, and pauses after failed work or an app restart. Queued items remain visible
+with Resume and Cancel actions; interrupted launch ownership requires inspection instead
+of automatic replay. Run or cancel pending follow-ups before merging or manually starting
+another continuation. A failed save preserves the draft.
+
+Tasks continuing with one lead ask that agent to delegate useful independent work through
+available provider subagent tools. This stays
+within the provider session and does not create native queue entries; see
+[agent quality](AGENT-QUALITY.md) for limits. Explicit feature plans remain available
+for reviewing a queue before dispatch. Unfinished drafts from the former split
+dialog reopen in feature planning after any unfinished regular plan is imported;
+their saved run, steps and storage remain intact.
+
+1. Open the native desktop app and choose a Git project with a committed local target branch.
+2. In Tasks, choose **Plan parallel work**. Add focused tasks, or **Import a plan**
+   from JSON. Review titles, instructions, assigned agents, owned paths and dependencies.
+3. Choose the concurrency limit and **Run ready tasks**. The limit counts currently
+   active application attempts across projects. Explicit single-task launches remain
+   available separately. Pausing dispatch leaves current attempts running; each has Stop.
+4. Follow work or read structured progress/blocker/handoff messages. Each task gets
+   a separate worktree from the resolved target commit. Shared scopes wait for integration;
+   dependencies wait for their actual integrated changes, not a successful process exit.
+5. In **Review & merge**, select finished tasks and prepare the combined patch. Inspect
+   individual results and verification, then choose **Merge tasks into <target branch>**.
+   Jackalope proposes a result-derived message and creates one commit using the
+   project attribution settings. The approval can also remove completed source
+   worktrees and their local branches.
+6. Dependencies become eligible after integration. Dispatch always starts paused after
+   an application restart. Failed/stopped work can be retried in a fresh worktree or
+   abandoned to release its scope. Attempt history and integration receipts remain
+   available after successful cleanup.
+
+The [example plan](./examples/parallel-plan.json) demonstrates the import schema.
+It is not an automatic launch. Edit agents, scopes and prompts for your project
+and review every task before dispatch. Native schedules use the same guarded
+runtime; proactive proposals and remote execution remain roadmap work.
+
+Optional feature staging consumes verified immutable predecessor snapshots before final
+integration. Queue admission favors critical paths and fair project access; finishing
+attempts keep workspace ownership while verification uses separate capacity. See
+[execution quality and evaluation](EXECUTION-EVALUATION.md) for opt-in staging,
+reservations, structured reports and measurements. Legacy plans retain merge dependencies.
+
+## Coordination contract
+
+The native `Coordinator` owns a durable queue. It validates a complete imported plan,
+rejects missing dependencies/cycles/invalid scopes, and saves it atomically before
+dispatch. A mutex and the runtime’s shared integration exclusion serialize eligibility
+checks, reservation and launch. A persisted run ID is the claim; a missing or failed
+attempt is not silently reclaimed after restart. History and queue ownership locks
+prevent two app instances from using the same journals concurrently.
+
+The bridge uses Axum on an ephemeral **127.0.0.1** port, with REST operations
+and an official Rust SDK MCP transport. It also brokers opt-in project tool discovery; see [MCP-DISCOVERY.md](MCP-DISCOVERY.md). Only running assigned tasks receive a random
+bearer credential through their child-process environment. No token is put into task
+records, browser storage or global agent configuration. Continuations renew task-scoped
+access. Tokens stop authorizing calls once their attempt is no longer active.
+
+| Route | Purpose |
+| --- | --- |
+| `GET /v1/project` | Assigned task, project task ownership, dependencies, phases and messages |
+| `POST /v1/messages` | A progress, blocker or handoff note attributed to the calling task |
+| `GET /v1/messages` | Cursor-based inbox of broadcasts, addressed messages and the caller's sent messages |
+| `POST /v1/messages/ack` | Durable, idempotent acknowledgment of a visible message |
+| `/mcp` | Stateless Streamable HTTP coordination, harness and tool-discovery operations |
+| `POST /v1/tools/search`, `/v1/tools/read`, `/v1/tools/execute` | Scoped connection discovery and execution for HTTP-capable adapters |
+
+Requests with a browser Origin are rejected; no CORS policy opens access. JSON bodies
+are capped at 16 KiB and message text at 4,000 bytes. Messages are untrusted worker
+observations. They never start another task, grant permission, mark a result successful,
+or merge work. Codex/Grok use their allowed shell/network tools to call REST. Claude receives
+a per-run `--mcp-config` with an environment placeholder and explicit permission
+for just `mcp__jackalope__project` and `mcp__jackalope__message`. This uses Claude’s
+supported tool interface without weakening its shell policy or writing credentials
+to configuration files. MCP validates the current credential for every request;
+stateless transport prevents authorization leaking between client sessions. It is not a security boundary against
+another process already running as the same OS user.
+
+Every launch and continuation receives a bounded current project briefing. Native
+lifecycle changes publish project announcements automatically, and ordinary bridge
+tool responses deliver new messages without extra model turns. Delivery is bounded,
+prioritized and deduplicated; it does not acknowledge reading, interrupt agents or
+change task ownership. See the [automatic coordination contract](ORCHESTRATION-CAPABILITIES.md)
+for limits, migration/recovery and provider-independent delivery boundaries.
+
+Manual tasks appear in the project inventory with explicitly unknown scopes.
+Directed messages accept recipientTaskId (recipient_task_id in the MCP schema)
+from that inventory. Acknowledgments mean read, not agreement or permission.
+Codex receives the MCP bridge for all bridged tasks; Grok, OpenCode and Antigravity
+receive the same capabilities through permitted HTTP. See the current
+[capability contract](ORCHESTRATION-CAPABILITIES.md) for limits and notifications.
+
+Named ownership claims and interface agreements persist alongside the queue.
+Changed-file scope checks block dispatch and integration until reconciled; the app
+provides explicit recovery actions. See [decision and scope contracts](ORCHESTRATION-CAPABILITIES.md#ownership-and-interface-decisions).
+
+File scopes are normalized relative paths, used for scheduling and agent instructions.
+They are **not filesystem write enforcement**. Independent worktrees contain mistakes;
+the user still reviews the actual changed files. Explicit manually launched tasks have
+unknown write scope, so they pause new queued work for their project while active.
+
+## Review and Git integration
+
+Preparation accepts the latest finished isolated attempt for each task, rejects active
+or interrupted ownership, and snapshots all tracked/staged/untracked nonignored changes
+through a separate temporary Git index. Forced additions already in the source index are
+preserved. The source index and files are not staged, reset or committed in place.
+
+Git `commit-tree` and `merge-tree` prepare the combined result against captured the target branch.
+The app retains a reference and durable review receipt. A conflict produces a blocked
+review with the conflicting paths; it does not touch the target branch. Reiterate an affected task,
+or resolve with ordinary Git tools and prepare a new review. There is no conflict editor yet.
+
+Apply rechecks the selected sources’ HEAD, content tree and index/worktree state, current
+the target branch, checked-out target, ignored-file collisions and dirty/untracked files. It then
+performs a fast-forward only, with automatic stash and ignored-file overwrite disabled.
+No push or destructive reset is performed. When selected in the approval, cleanup
+rechecks each source and removes its worktree and matching local branch. A cleanup
+failure does not roll back a successful merge; the receipt records each result
+and supports retry. Interrupted apply receipts
+can recover an integration that reached the target branch before its final history write. If the target branch
+is externally reset away from an applied integration, dependency dispatch pauses instead
+of claiming those changes are still present.
+
+The preview is bounded text, not a substitute for running tests or examining binary files.
+Build/test results remain agent-reported evidence to inspect; preparation does not itself
+prove the combined code builds. Windows native validation and disposable Git tests cover
+the implemented path; cross-platform lifecycle checks remain open.
+
+## Commit ownership and cleanup
+
+Project setup and Project settings expose user-only, user with agent co-authors,
+and agent attribution. The local repository config stores `jackalope.commitPolicy`;
+it does not change global Git identity or sync private commit emails to the service.
+User identity starts from Git's configured name/email and can use the account's
+private commit email. Agent identities use clearly labeled `.invalid` addresses;
+they are attribution labels, not provider-verified accounts. Multiple contributing
+agents, including routing handoffs, retain distinct co-author trailers.
+
+By default, a successful task in its original Jackalope branch gets one checkpoint
+after process shutdown and automatic verification, if enabled. No-change runs do
+not create empty commits. Shared checkouts, failures, cancellations, quota handoffs,
+foreign branches, hidden index entries and divergent staged content are not
+checkpointed. Checkpoint failure retains files and appears in review. Project
+settings can disable automatic checkpoints. Agents receive consistent handoff
+instructions and Git identity environment values; the native writer owns checkpoint
+and final-merge metadata. This is not a sandbox against a CLI deliberately issuing
+its own Git commands. Review squashes the selected snapshots to one target commit,
+so intermediate commits do not clutter main/master history. Users may edit the
+suggested message before preparing the final review.
+
+Cleanup uses ancestry for clean merged branches and exact no-op Git three-way
+merges for the staged and working snapshots when content was copied or squashed.
+Equivalent content is separate from commit ancestry. Divergent content, unknown
+ignored files, locked worktrees and active/interrupted tasks remain protected.
+Only recognized ignored build/dependency folders are discarded, after inspection.
+Each bulk removal inspects its selected folder again; one error does not stop other
+candidates. A Windows folder lock reports the affected path and a retry action.
+If Git removed its registration but left residue, the remaining directory needs
+manual inspection rather than an unverified recursive deletion. No remote branches
+are deleted. Old applied receipts and saved task data remain readable.
+
+## Usage and capacity
+
+Task token history remains attributable to attempts/projects. Connected capacity adds
+the signed-in Codex account’s supported app-server limits, with native windows, shared
+pool identity, source time, reset times, unknown values and stale/error states. The
+reader initializes a bounded short-lived app-server process and requests
+`account/rateLimits/read`; it does not launch a model task or read private auth files.
+Refreshes are serialized and throttled to one per minute; snapshots become stale after
+five minutes or a passed reset. Other Codex clients consume the same account pools.
+
+Claude Code and Grok have standalone capacity readers. Claude is initialized in
+safe, nonpersistent print mode and receives a `get_usage` control request with
+`skip_behaviors: true`; this omits the local transcript scan. Its experimental
+interface reports subscription percentages (0–100) and ISO reset times, with
+separate overall and model-specific windows. API-key/third-party accounts can
+report that subscription windows are unavailable. Unsupported CLI versions ask
+the user to update instead of falling back to private credential files.
+
+Grok starts an independent `agent --no-leader stdio` connection and reads the ACP
+extensions `_x.ai/auth/info` and `_x.ai/billing`, the same billing source as its
+own usage UI. It prefers `creditUsagePercent` and `currentPeriod`; older responses
+can supply a complete included-credit used/limit pair. Missing percentages remain
+unknown, even when the reset date and subscription are known. Purchased balances
+and on-demand spending are separate from the included allowance.
+
+All three reads run concurrently within the serialized, one-minute refresh cache.
+They send no model prompts and create no task sessions. Process output and runtime
+are bounded; readers are stopped after success, failure or timeout. Sign-ins stay
+owned by the CLIs. Failed initial reads cannot claim current capacity, and a newly
+identified account or unsupported plan replaces the previous account's windows.
+
+Protocol and parser tests cover missing values, explicit zero,
+legacy credit units, model pools, output bounds and account changes.
+
+Interface references: Anthropic's published `@anthropic-ai/claude-agent-sdk`
+`SDKControlGetUsageRequest` / `SDKControlGetUsageResponse` types (experimental),
+and Grok's [billing extension](https://github.com/xai-org/grok-build/blob/72a61251fcffb464bcc687aeb5a998e5a98ec0c9/crates/codegen/xai-grok-shell/src/extensions/billing.rs)
+and [account metadata extension](https://github.com/xai-org/grok-build/blob/72a61251fcffb464bcc687aeb5a998e5a98ec0c9/crates/codegen/xai-grok-shell/src/extensions/auth.rs).
+
+Automatic routing, multi-account selection and conservative active-task quota
+reservations are implemented in `tasks/routing.rs`; see
+[USAGE-AND-ROUTING.md](USAGE-AND-ROUTING.md). Routing subprocesses run after coordinator
+reservation, without holding coordinator/execution locks during model calls. Quota
+handoff keeps the same attempt and worktree reserved until completion or a bounded
+failure, with owned-process shutdown before the next worker starts. Monetary budgets,
+live permission dialogs, crash-proof containment and shared cross-project OAuth remain
+separate work.
+
+Sources and reuse: [Axum](https://docs.rs/axum/latest/axum/) (MIT),
+[UUID](https://docs.rs/uuid/latest/uuid/) (MIT/Apache-2.0),
+[official Rust MCP SDK](https://github.com/modelcontextprotocol/rust-sdk) 3.2.0 (Apache-2.0),
+[Claude per-run MCP configuration](https://code.claude.com/docs/en/mcp),
+[Codex app-server](https://learn.chatgpt.com/docs/app-server),
+[Claude status-line telemetry](https://code.claude.com/docs/en/statusline).
+The bridge uses the application’s existing Tokio runtime; no sidecar runtime is required.
+
+## Verification
+
+Automated regression coverage and isolated native trials are described in
+[CONTRIBUTING.md](../CONTRIBUTING.md) and [SELF-DEVELOPMENT.md](SELF-DEVELOPMENT.md).
+Record detailed local receipts privately. Fixtures and source builds do not prove
+installed-app acceptance.
+Task result views keep output, review, preview and activity together. Review separates
+full-width changes from checks and evidence, merge/delivery, and optional review tools.
+Planned tasks keep request and assignment details in a separate view. Recovery,
+unanswered questions and failed checks drive the primary action. Review is a separate
+decision from passing checks or local integration.
+
+**Try result** starts the reviewed preview command in the task workspace, remembers
+it for that project, and selects a free port when the port is zero. HTTP readiness
+means the root page returns a success or redirect response, not that behavior is correct.
+The embedded page is sandboxed and has no native IPC permissions. **Capture screenshot
+and page details** uses a fresh isolated browser and saves a screenshot with bounded
+page elements and errors. It does not copy login or interactions from the embedded page.
+Users can attach that evidence to a follow-up, cancel a capture, and explicitly stop
+the preview before continuing. Preview ownership still blocks integration and cleanup.
+
+Delivery can inspect local Git state or read PR/CI through an installed, authenticated
+GitHub CLI. Ahead/behind counts use local upstream references, without fetching. PR
+checks apply to their recorded head; a different local head is shown explicitly.
+Delivery preparation creates an editable handoff and does not publish, merge or deploy.
+Deployment remains unverified until checked in the target environment.

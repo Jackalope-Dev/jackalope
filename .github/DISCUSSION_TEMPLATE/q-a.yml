@@ -1,0 +1,24 @@
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask about setup, workflows or development here. For reproducible bugs or feature requests, use the issue forms.
+        Remove tokens, private prompts and personal paths before sharing details. Report vulnerabilities privately at https://github.com/Jackalope-Dev/jackalope/security/advisories/new or email security@jackalope.dev.
+  - type: textarea
+    id: question
+    attributes:
+      label: What do you need help with?
+      description: Describe what you are trying to accomplish and where you are stuck.
+    validations:
+      required: true
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What have you tried?
+      description: Optional. Include guides you followed or relevant error messages.
+  - type: input
+    id: environment
+    attributes:
+      label: Version and environment
+      description: If relevant, include the Jackalope version or commit, OS and agent CLI/version.

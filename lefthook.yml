@@ -1,0 +1,23 @@
+min_version: 2.1.12
+assert_lefthook_installed: true
+lefthook: node node_modules/lefthook/bin/index.js
+no_auto_install: true
+
+pre-commit:
+  piped: true
+  jobs:
+    - name: existing local hook
+      run: node scripts/git-hooks.mjs preserved pre-commit
+    - name: staged checks
+      run: node scripts/git-hooks.mjs staged
+
+pre-push:
+  piped: true
+  jobs:
+    - name: existing local hook
+      run: node scripts/git-hooks.mjs push "{1}" "{2}"
+      use_stdin: true
+    - name: verify
+      run: pnpm verify
+    - name: secrets
+      run: pnpm check:secrets

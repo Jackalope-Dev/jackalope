@@ -1,0 +1,8 @@
+{
+  "uuid": "desktop-control@jackalope.dev",
+  "name": "Jackalope Window Control",
+  "description": "Guarded control of one explicitly selected window, with a visible Resume, Pause and Cancel bar.",
+  "shell-version": ["46"],
+  "version": 1,
+  "url": "https://github.com/Jackalope-Dev/jackalope"
+}

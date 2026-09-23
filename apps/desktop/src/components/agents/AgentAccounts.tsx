@@ -1,0 +1,506 @@
+import { RefreshIcon } from '@jackalope/ui';
+import * as Dialog from '@radix-ui/react-dialog';
+import { Check, Circle, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from 'react';
+import {
+  type AgentProfile,
+  accountStatusLabel,
+  checkAgentProfile,
+  createAgentProfile,
+  deleteAgentProfile,
+  renameAgentProfile,
+  setActiveAgentProfile,
+  setAgentProfileGroup,
+  setAgentProfileTag,
+} from '../../lib/agent-profiles';
+import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import {
+  accountProfiles,
+  CLI_ACCOUNT_ID,
+  profileId,
+  useAgentAccountsStore,
+} from '../../stores/agentAccountsStore';
+import { Button } from '../ui/button';
+import { ConfirmAction } from '../ui/ConfirmAction';
+import { DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
+import { FormField } from '../ui/FormField';
+import { InlineNotice } from '../ui/InlineNotice';
+import { Input } from '../ui/input';
+import { LoadingState } from '../ui/LoadingState';
+import { Select, SelectItem } from '../ui/Select';
+import { useDialogFocus } from '../ui/useDialogFocus';
+import { AgentKeySignIn } from './AgentKeySignIn';
+import { DetectedKeysModal } from './DetectedKeysModal';
+
+const AgentSignIn = lazy(() =>
+  import('./AgentSignIn').then((module) => ({ default: module.AgentSignIn })),
+);
+function AccountGroup({
+  value,
+  onChange,
+  label,
+  disabled = false,
+}: {
+  value: AgentProfile['group'];
+  onChange: (value: AgentProfile['group']) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  const groupId = useId();
+  return (
+    <fieldset className="agent-account-group" disabled={disabled}>
+      <legend className="sr-only">{label}</legend>
+      {(['work', 'personal', null] as const).map((group) => (
+        <label key={group ?? 'none'}>
+          <input
+            type="radio"
+            name={groupId}
+            checked={(value ?? null) === group}
+            onChange={() => onChange(group)}
+          />
+          <span>{group === 'work' ? 'Work' : group === 'personal' ? 'Personal' : 'Other'}</span>
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+function EditAccount({
+  profile,
+  onSave,
+  onClose,
+}: {
+  profile: AgentProfile;
+  onSave: (name: string, group: AgentProfile['group'], tag: string | null) => Promise<void>;
+  onClose: () => void;
+}) {
+  const dialogFocus = useDialogFocus();
+  const [name, setName] = useState(profile.name);
+  const [group, setGroup] = useState(profile.group);
+  const [tag, setTag] = useState(profile.tag ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  return (
+    <Dialog.Root
+      open
+      onOpenChange={(open) => {
+        if (!open && !busy) onClose();
+      }}
+    >
+      <DialogContent {...dialogFocus} className="confirm-action-dialog agent-account-edit">
+        <DialogHeader
+          title="Edit account"
+          description={<>Choose a name, label and group to keep your accounts organized.</>}
+        />
+        <form
+          className="agent-account-edit-form"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setBusy(true);
+            setError('');
+            try {
+              await onSave(name.trim(), group, tag.trim() || null);
+              onClose();
+            } catch (e) {
+              setError(String(e));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <FormField label="Account name">
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={busy}
+              required
+              maxLength={80}
+            />
+          </FormField>
+          <FormField label="Custom label (optional)">
+            <Input
+              value={tag}
+              onChange={(e) => setTag(e.target.value)}
+              disabled={busy}
+              placeholder="e.g. Client A or Research"
+              maxLength={40}
+            />
+          </FormField>
+          <div className="task-label">
+            <span aria-hidden="true">Account group</span>
+            <AccountGroup value={group} onChange={setGroup} label="Account group" disabled={busy} />
+          </div>
+          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={busy || !name.trim()}
+              loading={busy}
+              loadingLabel="Saving…"
+            >
+              Save account
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog.Root>
+  );
+}
+export function AgentAccounts({
+  agentId,
+  agentName,
+  onChanged,
+}: {
+  agentId: string;
+  agentName: string;
+  onChanged?: () => void;
+}) {
+  const accountData = useAgentAccountsStore((state) => state.agents[agentId]);
+  const view = accountData?.view;
+  const loading = accountData?.loading ?? true;
+  const [error, setError] = useState('');
+  const [name, setName] = useState('');
+  const [group, setGroup] = useState<AgentProfile['group']>('work');
+  const [busy, setBusy] = useState('');
+  const [keyModalOpen, setKeyModalOpen] = useState(false);
+  const [connectionMethod, setConnectionMethod] = useState('signIn');
+  const statuses = accountData?.statuses ?? {};
+  const [signIn, setSignIn] = useState<AgentProfile>();
+  const [signInWithKey, setSignInWithKey] = useState(false);
+  const pendingProfile = useRef<string | null>(null);
+  const signInOpener = useRef<HTMLElement | null>(null);
+  const [editing, setEditing] = useState<AgentProfile>();
+  const desktop = isTauriEnvironment();
+  const keyAccount =
+    agentId === 'antigravity' || (agentId === 'opencode' && connectionMethod === 'apiKey');
+  const load = useCallback(async () => {
+    await useAgentAccountsStore.getState().load(agentId, true);
+    onChanged?.();
+  }, [agentId, onChanged]);
+  useEffect(() => {
+    if (desktop) void useAgentAccountsStore.getState().load(agentId);
+  }, [agentId, desktop]);
+  const action = async (id: string, run: () => Promise<void>) => {
+    setBusy(id);
+    setError('');
+    try {
+      await run();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy('');
+    }
+  };
+  const check = async (profile: AgentProfile) => {
+    await useAgentAccountsStore.getState().check(agentId, profile.id);
+  };
+  const closeSignIn = async () => {
+    if (signIn && pendingProfile.current === signIn.id) {
+      await deleteAgentProfile(agentId, signIn.id);
+      pendingProfile.current = null;
+    }
+    setSignIn(undefined);
+    await load();
+  };
+  if (!desktop) return <p className="task-muted">Accounts are available in the desktop app.</p>;
+  if (!view)
+    return (
+      <div>
+        {(error || accountData?.error) && (
+          <InlineNotice tone="error">{error || accountData?.error}</InlineNotice>
+        )}
+        {loading ? (
+          <LoadingState label={'Loading accounts…'} />
+        ) : (
+          <Button variant="outline" onClick={() => void action('load', load)}>
+            Retry accounts
+          </Button>
+        )}
+      </div>
+    );
+  if (!view.envVar)
+    return (
+      <p className="task-muted">
+        {agentId === 'antigravity'
+          ? 'Antigravity uses the current agy sign-in. Separate accounts are not supported yet; changing that sign-in also changes the account used by existing tasks.'
+          : `Separate accounts are not available for ${agentName}.`}
+      </p>
+    );
+  const locked = !!busy || loading;
+  return (
+    <div className="agent-accounts">
+      {(error || accountData?.error) && (
+        <InlineNotice tone="error">{error || accountData?.error}</InlineNotice>
+      )}
+      <form
+        className="agent-account-add"
+        onSubmit={(e) => {
+          e.preventDefault();
+          signInOpener.current =
+            (e.nativeEvent as SubmitEvent).submitter ??
+            (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+          void action('add', async () => {
+            const profile = await createAgentProfile(
+              agentId,
+              name.trim() ||
+                `${group === 'personal' ? 'Personal' : group === 'work' ? 'Work' : agentName} ${view.profiles.length + 1}`,
+              group,
+            );
+            pendingProfile.current = profile.id;
+            setSignInWithKey(keyAccount);
+            setSignIn(profile);
+          });
+        }}
+      >
+        <div className="agent-account-add-heading">
+          <h4>Add another {agentName} account</h4>
+          <p className="task-muted">
+            {agentId === 'antigravity'
+              ? 'Add a separate Gemini API-key account. Google subscription logins use the existing CLI account.'
+              : keyAccount
+                ? 'Keep separate provider API keys for work, personal projects or clients.'
+                : 'Keep separate logins for work, personal projects or clients.'}
+          </p>
+        </div>
+        {agentId === 'opencode' && (
+          <Select
+            aria-label="OpenCode connection method"
+            value={connectionMethod}
+            onValueChange={setConnectionMethod}
+            disabled={locked}
+          >
+            <SelectItem value="signIn">Provider sign-in</SelectItem>
+            <SelectItem value="apiKey">Provider API key (including DeepSeek)</SelectItem>
+          </Select>
+        )}
+        <AccountGroup
+          value={group}
+          onChange={setGroup}
+          label={`New ${agentName} account group`}
+          disabled={locked}
+        />
+        <Input
+          className="task-input"
+          disabled={locked}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Account name (optional)"
+          aria-label={`New ${agentName} account name`}
+          maxLength={80}
+        />
+        <Button type="submit" disabled={locked} loading={busy === 'add'} loadingLabel="Adding…">
+          <Plus size={16} />
+          {keyAccount ? 'Add account & connect' : 'Add account & sign in'}
+        </Button>
+      </form>
+      <Button
+        type="button"
+        className="justify-self-start"
+        variant="outline"
+        disabled={locked}
+        onClick={() => setKeyModalOpen(true)}
+      >
+        <KeyRound size={15} />
+        Scan Local Models & Keys
+      </Button>
+      <ul className="agent-accounts-list">
+        {accountProfiles(view, statuses).map((profile) => {
+          const status = statuses[profile.id];
+          const existing = profile.id === CLI_ACCOUNT_ID;
+          const active = profileId(profile.id) === view.activeId;
+          return (
+            <li key={profile.id} className="agent-accounts-row">
+              <button
+                type="button"
+                className="agent-account-select"
+                aria-pressed={active}
+                aria-label={`Use ${profile.name} for new ${agentName} tasks`}
+                disabled={locked}
+                onClick={() =>
+                  void action(profile.id, async () => {
+                    await setActiveAgentProfile(agentId, profileId(profile.id));
+                    await load();
+                  })
+                }
+              >
+                {active ? <Check size={18} /> : <Circle size={18} />}
+              </button>
+              <div className="agent-account-identity">
+                <div className="flex flex-wrap items-center gap-2">
+                  <strong>{profile.name}</strong>
+                  {existing && <span className="task-muted text-xs">CLI login</span>}
+                  {profile.tag && (
+                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-[var(--color-surface-hover)] border border-[var(--color-border)]">
+                      {profile.tag}
+                    </span>
+                  )}
+                  {active && <span className="task-muted text-xs">Default for new tasks</span>}
+                </div>
+                <p className="task-muted text-sm" role="status">
+                  {busy === `check-${profile.id}` || !status
+                    ? 'Checking sign-in…'
+                    : accountStatusLabel(status)}
+                  {status?.identity && ` · ${status.identity}`}
+                </p>
+                {status && (
+                  <p className="task-muted text-xs" title={status.detail}>
+                    Checked{' '}
+                    {new Date(status.checkedAt).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                    {status.state === 'unknown' ||
+                    status.state === 'configured' ||
+                    status.state === 'notInstalled'
+                      ? ` · ${status.detail}`
+                      : ''}
+                  </p>
+                )}
+                <AccountGroup
+                  value={profile.group}
+                  label={`${profile.name} account group`}
+                  disabled={locked}
+                  onChange={(group) =>
+                    void action(`group-${profile.id}`, async () => {
+                      await setAgentProfileGroup(agentId, profileId(profile.id), group);
+                      await load();
+                    })
+                  }
+                />
+              </div>
+              <div className="agent-accounts-actions">
+                {!existing && (
+                  <Button
+                    variant="outline"
+                    disabled={locked}
+                    onClick={(event) => {
+                      signInOpener.current = event.currentTarget;
+                      setSignInWithKey(agentId === 'antigravity');
+                      setSignIn(profile);
+                    }}
+                  >
+                    {agentId === 'antigravity' ? 'Connect API key' : 'Sign in'}
+                  </Button>
+                )}
+                {!existing && agentId === 'opencode' && (
+                  <Button
+                    variant="outline"
+                    disabled={locked}
+                    onClick={(event) => {
+                      signInOpener.current = event.currentTarget;
+                      setSignInWithKey(true);
+                      setSignIn(profile);
+                    }}
+                  >
+                    Connect API key
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  disabled={locked}
+                  aria-label={`Check ${profile.name} sign-in`}
+                  title="Check sign-in"
+                  onClick={() => void action(`check-${profile.id}`, () => check(profile))}
+                >
+                  <RefreshIcon size={16} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={locked}
+                  aria-label={`Edit ${profile.name}`}
+                  onClick={() => setEditing(profile)}
+                >
+                  <Pencil size={16} />
+                </Button>
+                {!existing && (
+                  <ConfirmAction
+                    title="Remove account?"
+                    description={`Remove ${profile.name} and its sign-in data? Projects and existing tasks using it will need attention. The normal CLI sign-in is kept.`}
+                    label="Remove account"
+                    onConfirm={async () => {
+                      await deleteAgentProfile(agentId, profile.id);
+                      await load();
+                    }}
+                    trigger={
+                      <Button
+                        variant="ghost"
+                        disabled={locked}
+                        aria-label={`Remove ${profile.name}`}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    }
+                  />
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      {editing && (
+        <EditAccount
+          profile={editing}
+          onClose={() => setEditing(undefined)}
+          onSave={async (name, group, tag) => {
+            await renameAgentProfile(agentId, profileId(editing.id), name);
+            await setAgentProfileGroup(agentId, profileId(editing.id), group);
+            await setAgentProfileTag(agentId, profileId(editing.id), tag);
+            await load();
+          }}
+        />
+      )}
+      {signIn && signInWithKey && (
+        <AgentKeySignIn
+          agentId={agentId}
+          agentName={agentName}
+          profile={signIn}
+          returnFocus={signInOpener.current}
+          onClose={closeSignIn}
+          onSaved={async (useForTasks) => {
+            const status = await checkAgentProfile(agentId, signIn.id);
+            useAgentAccountsStore.getState().setStatus(agentId, signIn.id, status);
+            if (status.state !== 'signedIn' && status.state !== 'configured') {
+              throw new Error(status.detail);
+            }
+            pendingProfile.current = null;
+            setName('');
+            if (useForTasks) await setActiveAgentProfile(agentId, signIn.id);
+            await load();
+          }}
+        />
+      )}
+      {signIn && !signInWithKey && (
+        <Suspense fallback={<LoadingState label={'Opening sign-in…'} compact />}>
+          <AgentSignIn
+            agentId={agentId}
+            agentName={agentName}
+            profileId={signIn.id}
+            profileName={signIn.name}
+            returnFocus={signInOpener.current}
+            onClose={closeSignIn}
+            onUse={async () => {
+              await setActiveAgentProfile(agentId, signIn.id);
+              await load();
+            }}
+            onStatus={(status) => {
+              useAgentAccountsStore.getState().setStatus(agentId, signIn.id, status);
+              if (status?.state === 'signedIn' || status?.state === 'configured') {
+                pendingProfile.current = null;
+                setName('');
+                void load();
+              }
+            }}
+          />
+        </Suspense>
+      )}
+      <DetectedKeysModal
+        open={keyModalOpen}
+        onOpenChange={setKeyModalOpen}
+        onImported={() => void load()}
+      />
+    </div>
+  );
+}

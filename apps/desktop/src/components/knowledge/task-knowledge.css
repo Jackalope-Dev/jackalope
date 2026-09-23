@@ -1,0 +1,39 @@
+.task-knowledge {
+  margin: 0 0 24px;
+}
+.task-knowledge-heading {
+  min-height: 44px;
+  padding: 12px 0;
+  margin-bottom: 8px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.task-knowledge-body {
+  display: grid;
+  gap: 16px;
+  justify-items: start;
+}
+.task-knowledge-field {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  max-width: 560px;
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+.task-knowledge-field > .themed-select {
+  width: 100%;
+}
+.task-knowledge-field textarea {
+  min-height: 88px;
+  padding: 12px;
+  resize: vertical;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+.task-knowledge-body > label:not(.task-knowledge-field) {
+  line-height: 1.6;
+}
+.task-knowledge-body > label > input[type="checkbox"] {
+  flex-shrink: 0;
+}

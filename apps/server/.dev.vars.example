@@ -1,0 +1,4 @@
+RATE_SECRET="replace-with-at-least-32-random-characters-for-local-tests"
+
+ACCESS_SECRET=replace-with-a-separate-random-secret-of-at-least-32-characters
+SEQUENZY_API_KEY=replace-with-a-scoped-transactional-sender-key
