@@ -252,3 +252,31 @@
 .commit-files li:focus-within .commit-discard {
   opacity: 1;
 }
+
+.commit-hook-output {
+  margin-top: 8px;
+}
+.commit-hook-output pre {
+  max-height: 280px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.commit-hook-fix-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.commit-hook-fix-detail {
+  margin-top: 4px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}

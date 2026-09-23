@@ -13,6 +13,12 @@ interface CommitReviewState {
    */
   excluded: Record<string, string[]>;
   setExcluded: (checkout: string, paths: string[]) => void;
+  /**
+   * The agent run fixing a rejected commit, per checkout, so its progress and
+   * outcome stay on the Changes page across navigation and restarts.
+   */
+  hookFixes: Record<string, string>;
+  setHookFix: (checkout: string, runId: string | null) => void;
 }
 
 export const useCommitReviewStore = create<CommitReviewState>()(
@@ -28,10 +34,18 @@ export const useCommitReviewStore = create<CommitReviewState>()(
           else delete excluded[checkout];
           return { excluded };
         }),
+      hookFixes: {},
+      setHookFix: (checkout, runId) =>
+        set((state) => {
+          const hookFixes = { ...state.hookFixes };
+          if (runId) hookFixes[checkout] = runId;
+          else delete hookFixes[checkout];
+          return { hookFixes };
+        }),
     }),
     {
       name: 'jackalope-commit-review',
-      partialize: ({ excluded }) => ({ excluded }),
+      partialize: ({ excluded, hookFixes }) => ({ excluded, hookFixes }),
     },
   ),
 );

@@ -335,6 +335,146 @@ Diff{} (untrusted):\n{patch}",
     .map_err(|e| e.to_string())?
 }
 
+/// Why a commit did not happen. A hook rejection carries its output so the user
+/// can read it and hand it to an agent; anything else is a plain message.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitFailure {
+    /// `hook` when a commit hook rejected the commit, otherwise `git`.
+    kind: &'static str,
+    /// The hook that ran, when only one could have.
+    hook: Option<String>,
+    message: String,
+    /// The combined output, without terminal colour codes, bounded in size.
+    output: String,
+}
+
+impl From<String> for CommitFailure {
+    fn from(message: String) -> Self {
+        Self {
+            kind: "git",
+            hook: None,
+            message,
+            output: String::new(),
+        }
+    }
+}
+
+impl From<&str> for CommitFailure {
+    fn from(message: &str) -> Self {
+        message.to_string().into()
+    }
+}
+
+const COMMIT_HOOKS: [&str; 3] = ["pre-commit", "prepare-commit-msg", "commit-msg"];
+const OUTPUT_LIMIT: usize = 24_000;
+
+impl CommitFailure {
+    /// Git exits the same way whether a hook or Git itself refused the commit,
+    /// so a failure counts as a hook rejection when a commit hook is installed
+    /// and the output carries none of Git's own refusals.
+    fn classify(root: &Path, raw: &str) -> Self {
+        let output = bounded(&strip_ansi(raw.trim()));
+        let hooks = installed_hooks(root);
+        let git_refusal = output.lines().any(|line| {
+            let line = line.trim_start();
+            line.starts_with("fatal: ")
+                || line.starts_with("Author identity unknown")
+                || line.contains("nothing to commit")
+                || line.contains("no changes added to commit")
+        });
+        if hooks.is_empty() || git_refusal {
+            return Self {
+                kind: "git",
+                hook: None,
+                message: if output.is_empty() {
+                    "Git could not create the commit.".into()
+                } else {
+                    output.clone()
+                },
+                output,
+            };
+        }
+        let hook = (hooks.len() == 1).then(|| hooks[0].to_string());
+        Self {
+            kind: "hook",
+            message: format!(
+                "The {} hook rejected the commit. Nothing was committed and your changes are unchanged.",
+                hook.as_deref().unwrap_or("commit")
+            ),
+            hook,
+            output,
+        }
+    }
+}
+
+/// Commit hooks Git will run here, honouring `core.hooksPath`.
+fn installed_hooks(root: &Path) -> Vec<&'static str> {
+    let Ok(directory) = git(
+        root,
+        &["rev-parse", "--path-format=absolute", "--git-path", "hooks"],
+        Policy::Isolated,
+    ) else {
+        return Vec::new();
+    };
+    let directory = PathBuf::from(directory.trim());
+    COMMIT_HOOKS
+        .into_iter()
+        .filter(|name| super::platform::is_executable(&directory.join(name)))
+        .collect()
+}
+
+/// Removes terminal escape sequences such as colours and cursor movement,
+/// which hook runners emit and which would show as noise in the app.
+fn strip_ansi(text: &str) -> String {
+    let mut clean = String::with_capacity(text.len());
+    let mut characters = text.chars().peekable();
+    while let Some(character) = characters.next() {
+        if character != '\u{1b}' {
+            clean.push(character);
+            continue;
+        }
+        match characters.peek() {
+            // CSI: parameters and intermediates, then one final byte.
+            Some('[') => {
+                characters.next();
+                for next in characters.by_ref() {
+                    if ('@'..='~').contains(&next) {
+                        break;
+                    }
+                }
+            }
+            // OSC: up to the string terminator or bell.
+            Some(']') => {
+                characters.next();
+                while let Some(next) = characters.next() {
+                    if next == '\u{7}'
+                        || (next == '\u{1b}' && characters.next_if_eq(&'\\').is_some())
+                    {
+                        break;
+                    }
+                }
+            }
+            _ => {
+                characters.next();
+            }
+        }
+    }
+    clean
+}
+
+/// Keeps the end of long output, where hook runners report what failed.
+fn bounded(text: &str) -> String {
+    if text.len() <= OUTPUT_LIMIT {
+        return text.to_string();
+    }
+    let mut start = text.len() - OUTPUT_LIMIT;
+    while !text.is_char_boundary(start) {
+        start += 1;
+    }
+    format!("…\n{}", &text[start..])
+}
+
 #[tauri::command]
 pub async fn git_commit_changes(
     repo_path: String,
@@ -343,8 +483,8 @@ pub async fn git_commit_changes(
     title: String,
     body: String,
     agents: Vec<String>,
-) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
+) -> Result<String, CommitFailure> {
+    tauri::async_runtime::spawn_blocking(move || -> Result<String, CommitFailure> {
         let _guard = super::integration::execution_guard()?;
         let title = title.trim();
         if title.is_empty() || title.contains('\n') {
@@ -399,9 +539,12 @@ pub async fn git_commit_changes(
             .map_err(|e| e.to_string())?;
         let output = child.wait_with_output().map_err(|e| e.to_string())?;
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            return Err(if stderr.is_empty() { stdout } else { stderr });
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            return Err(CommitFailure::classify(
+                &root,
+                &format!("{}\n{}", stdout.trim(), stderr.trim()),
+            ));
         }
         head(&root).ok_or_else(|| "The commit finished but HEAD could not be read.".into())
     })
@@ -586,5 +729,93 @@ mod tests {
         );
         assert!(parse_message("{\"title\":\"a\\nb\"}").is_err());
         assert!(parse_message("not json").is_err());
+    }
+}
+
+#[cfg(all(test, unix))]
+mod commit_failure_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    fn repository() -> PathBuf {
+        let root = std::env::temp_dir().join(format!("jl-hook-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        for args in [
+            vec!["init", "-q"],
+            vec!["config", "user.name", "Hook Test"],
+            vec!["config", "user.email", "hook@example.invalid"],
+            vec!["config", "commit.gpgsign", "false"],
+        ] {
+            git(&root, &args, Policy::Isolated).unwrap();
+        }
+        std::fs::write(root.join("file.txt"), "change\n").unwrap();
+        git(&root, &["add", "file.txt"], Policy::Isolated).unwrap();
+        root
+    }
+
+    fn commit_output(root: &Path) -> (bool, String) {
+        let output = command(root, &["commit", "-m", "change"], Policy::Isolated)
+            .output()
+            .unwrap();
+        (
+            output.status.success(),
+            format!(
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            ),
+        )
+    }
+
+    #[test]
+    fn a_failing_pre_commit_hook_is_reported_as_a_hook_rejection() {
+        let root = repository();
+        let hook = root.join(".git/hooks/pre-commit");
+        std::fs::write(
+            &hook,
+            "#!/bin/sh\nprintf '\\033[31mlint failed: src/app.ts\\033[0m\\n' >&2\nexit 1\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let (committed, raw) = commit_output(&root);
+        assert!(!committed);
+        let failure = CommitFailure::classify(&root, &raw);
+        assert_eq!(failure.kind, "hook");
+        assert_eq!(failure.hook.as_deref(), Some("pre-commit"));
+        assert!(failure.output.contains("lint failed: src/app.ts"));
+        assert!(
+            !failure.output.contains('\u{1b}'),
+            "colour codes must be removed"
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn git_refusals_are_not_mistaken_for_hooks() {
+        let root = repository();
+        let hook = root.join(".git/hooks/pre-commit");
+        std::fs::write(&hook, "#!/bin/sh\nexit 0\n").unwrap();
+        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(commit_output(&root).0);
+        // With nothing staged, Git itself refuses even though a hook exists.
+        let (committed, raw) = commit_output(&root);
+        assert!(!committed);
+        assert_eq!(CommitFailure::classify(&root, &raw).kind, "git");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn escape_sequences_are_stripped_and_long_output_keeps_its_end() {
+        assert_eq!(
+            strip_ansi(
+                "\u{1b}[1;31merror\u{1b}[0m \u{1b}]8;;https://x\u{1b}\\link\u{1b}]8;;\u{1b}\\"
+            ),
+            "error link"
+        );
+        let long = format!("{}END", "x".repeat(OUTPUT_LIMIT + 10));
+        let kept = bounded(&long);
+        assert!(kept.starts_with('…') && kept.ends_with("END"));
+        assert!(kept.len() <= OUTPUT_LIMIT + 8);
     }
 }
