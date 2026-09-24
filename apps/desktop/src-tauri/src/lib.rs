@@ -302,6 +302,8 @@ pub fn run(launch: Launch) {
             commands::release::app_install_update,
             system_get_info,
             commands::desktop_control::platform::desktop_control_request_permissions,
+            commands::desktop_control::platform::desktop_control_open_settings,
+            commands::desktop_control::platform::desktop_control_restart,
             commands::local_ai::local_ai_inspect,
             commands::local_ai::local_ai_install,
             commands::local_ai::local_ai_pull,

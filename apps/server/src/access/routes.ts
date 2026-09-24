@@ -39,6 +39,19 @@ export function installerKey(env: Env) {
   const key = env.ACCESS_INSTALLER_KEY;
   return /^early-access\/v\d+\.\d+\.\d+\/[a-zA-Z0-9_.-]+\.exe$/.test(key) ? key : null;
 }
+const macDownloads = {
+  'macos-aarch64': { platform: 'dmg-aarch64', label: 'Apple silicon' },
+  'macos-x86_64': { platform: 'dmg-x86_64', label: 'Intel' },
+} as const;
+
+/** The CrabNebula release channel macOS members download from, when enabled. */
+export function macChannel(env: Env) {
+  return ['beta', 'stable'].includes(env.ACCESS_MAC_CHANNEL) ? env.ACCESS_MAC_CHANNEL : null;
+}
+function macDownloadUrl(channel: string, id: keyof typeof macDownloads) {
+  return `https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/${macDownloads[id].platform}?channel=${channel}`;
+}
+
 export function storeUrl(env: Env) {
   try {
     const url = new URL(env.ACCESS_STORE_URL);
@@ -251,14 +264,39 @@ export async function accessRoutes(
       const store = storeUrl(env);
       const key = installerKey(env);
       const installer = !store && key ? await env.RELEASES.head(key) : null;
+      const channel = macChannel(env);
       return json({
         email: member.email,
         ...(await invitations(env, member)),
+        macos: channel
+          ? Object.entries(macDownloads).map(([id, { label }]) => ({
+              id,
+              label,
+              url: `${url.origin}/v1/access/download/${id}`,
+            }))
+          : [],
         download: store
           ? { url: `${url.origin}/v1/access/download`, kind: 'store' }
           : installer
             ? { url: `${url.origin}/v1/access/download`, bytes: installer.size }
             : null,
+      });
+    }
+    const macId = path.match(/^\/v1\/access\/download\/(macos-(?:aarch64|x86_64))$/)?.[1] as
+      | keyof typeof macDownloads
+      | undefined;
+    if (['GET', 'HEAD'].includes(request.method) && macId) {
+      const channel = macChannel(env);
+      if (!channel) throw new AccessError(404, 'download_not_ready');
+      if (request.method === 'GET')
+        await env.DB.prepare(
+          'UPDATE access_members SET first_download_at=coalesce(first_download_at,?) WHERE id=?',
+        )
+          .bind(Date.now(), member.id)
+          .run();
+      return new Response(null, {
+        status: 302,
+        headers: { ...headers, ...cors, location: macDownloadUrl(channel, macId) },
       });
     }
     if (['GET', 'HEAD'].includes(request.method) && path === '/v1/access/download') {

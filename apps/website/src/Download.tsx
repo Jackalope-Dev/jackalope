@@ -24,6 +24,8 @@ const platformIcons = { windows: Monitor, macos: Command, linux: Terminal };
 interface DownloadMember {
   email: string;
   download?: { kind?: 'store' } | null;
+  /** macOS builds this member can download while they are not public. */
+  macos?: { id: string; label: string; url: string }[];
 }
 
 export function DownloadPage({ downloads = desktopDownloads }: { downloads?: PlatformDownload[] }) {
@@ -177,7 +179,17 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
               <h2>{option.name}</h2>
               <p>{option.detail}</p>
               <div className="download-platform-action">
-                {option.url ? (
+                {!option.url && option.id === 'macos' && member?.macos?.length ? (
+                  member.macos.map((build, index) => (
+                    <a
+                      key={build.id}
+                      className={`button ${index === 0 ? 'button-primary' : 'button-quiet'}`}
+                      href={build.url}
+                    >
+                      Download for {build.label} <ArrowDownToLine size={17} />
+                    </a>
+                  ))
+                ) : option.url ? (
                   <a
                     className="button button-primary"
                     href={
@@ -212,7 +224,7 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
             </h2>
             <p>
               {email && !token
-                ? `You’re signed in as ${email}. ${downloads.some((option) => option.url) ? 'Choose your platform above to get started.' : 'Downloads are coming soon. Your early access is ready when they arrive.'}`
+                ? `You’re signed in as ${email}. ${downloads.some((option) => option.url) || member?.macos?.length ? 'Choose your platform above to get started.' : 'Downloads are coming soon. Your early access is ready when they arrive.'}`
                 : 'Jackalope is in early access. You’ll need to be accepted from the waitlist or claim a friend’s Instant Access Pass to start using the app.'}
             </p>
             {email && !token ? (

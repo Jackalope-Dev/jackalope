@@ -89,6 +89,10 @@
 .download-platform-action {
   margin-top: 25px;
 }
+.download-platform-action {
+  display: grid;
+  gap: 8px;
+}
 .download-platform-action a {
   width: 100%;
   min-height: 44px;

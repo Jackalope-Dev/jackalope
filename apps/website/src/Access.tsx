@@ -27,6 +27,7 @@ interface Membership {
   shareUrl: string;
   invites: Invitation[];
   download: { url: string; bytes?: number; kind?: 'store' } | null;
+  macos?: { id: string; label: string; url: string }[];
 }
 
 const invitationMessage =
@@ -252,7 +253,7 @@ export function AccessPage() {
           <Panel variant="plain" id="setup" className="access-card access-download">
             <div>
               <h2>Make room for your first task.</h2>
-              {member.download ? (
+              {member.download || member.macos?.length ? (
                 <a className="button button-primary button-download" href="/download/">
                   <span className="access-progress-copy">Download Jackalope</span>
                   <ArrowDownToLine size={18} />
