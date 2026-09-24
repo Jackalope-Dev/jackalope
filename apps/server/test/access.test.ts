@@ -46,7 +46,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   bindings.ACCESS_STORE_URL = '';
-  bindings.ACCESS_MAC_CHANNEL = '';
+  bindings.ACCESS_MAC_CHANNELS = '';
   for (const table of [
     'access_sessions',
     'access_tokens',
@@ -403,16 +403,19 @@ it('requires the exact site origin, gives generic sign-in responses, and protect
 it('sends approved members to the macOS release channel and hides it when disabled', async () => {
   const { session } = await admitted('mac-owner@example.com');
   expect(await (await request('me', undefined, session)).json()).toMatchObject({ macos: [] });
-  expect((await request('download/macos-aarch64', undefined, session)).status).toBe(404);
-  bindings.ACCESS_MAC_CHANNEL = 'beta';
-  expect((await request('download/macos-aarch64')).status).toBe(401);
+  expect((await request('download/macos-aarch64/beta', undefined, session)).status).toBe(404);
+  bindings.ACCESS_MAC_CHANNELS = 'stable, beta, nightly';
+  expect((await request('download/macos-aarch64/beta')).status).toBe(401);
   expect(await (await request('me', undefined, session)).json()).toMatchObject({
     macos: [
-      { id: 'macos-aarch64', label: 'Apple silicon' },
-      { id: 'macos-x86_64', label: 'Intel' },
+      { id: 'macos-aarch64', label: 'Apple silicon', channel: 'stable' },
+      { id: 'macos-x86_64', label: 'Intel', channel: 'stable' },
+      { id: 'macos-aarch64', label: 'Apple silicon', channel: 'beta' },
+      { id: 'macos-x86_64', label: 'Intel', channel: 'beta' },
     ],
   });
-  const response = await request('download/macos-x86_64', undefined, session);
+  expect((await request('download/macos-x86_64/nightly', undefined, session)).status).toBe(404);
+  const response = await request('download/macos-x86_64/beta', undefined, session);
   expect(response.status).toBe(302);
   expect(response.headers.get('location')).toBe(
     'https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/dmg-x86_64?channel=beta',
@@ -423,7 +426,7 @@ it('sends approved members to the macOS release channel and hides it when disabl
       "SELECT first_download_at FROM access_members WHERE email='mac-owner@example.com'",
     ).first(),
   ).toEqual({ first_download_at: expect.any(Number) });
-  bindings.ACCESS_MAC_CHANNEL = '';
+  bindings.ACCESS_MAC_CHANNELS = '';
 });
 it('offers an approved member a Store link without a private installer and still rejects signed-out users', async () => {
   const { session } = await admitted('store-owner@example.com');

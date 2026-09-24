@@ -1,4 +1,4 @@
-import { Badge, Button, InlineNotice } from '@jackalope/ui';
+import { Badge, Button, InlineNotice, Select, SelectItem } from '@jackalope/ui';
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -25,7 +25,49 @@ interface DownloadMember {
   email: string;
   download?: { kind?: 'store' } | null;
   /** macOS builds this member can download while they are not public. */
-  macos?: { id: string; label: string; url: string }[];
+  macos?: MacBuild[];
+}
+interface MacBuild {
+  id: string;
+  label: string;
+  channel: 'stable' | 'beta';
+  url: string;
+}
+const channelNames = { stable: 'Stable', beta: 'Beta' } as const;
+
+/** The member's macOS builds, with a release channel choice when several are offered. */
+function MacDownloads({ builds }: { builds: MacBuild[] }) {
+  const channels = [...new Set(builds.map((build) => build.channel))];
+  const [channel, setChannel] = useState(channels[0]);
+  const selected = channels.includes(channel) ? channel : channels[0];
+  return (
+    <>
+      {channels.length > 1 && (
+        <Select
+          aria-label="Release channel"
+          value={selected}
+          onValueChange={(value) => setChannel(value as MacBuild['channel'])}
+        >
+          {channels.map((option) => (
+            <SelectItem key={option} value={option}>
+              {channelNames[option]}
+            </SelectItem>
+          ))}
+        </Select>
+      )}
+      {builds
+        .filter((build) => build.channel === selected)
+        .map((build, index) => (
+          <a
+            key={build.id}
+            className={`button ${index === 0 ? 'button-primary' : 'button-quiet'}`}
+            href={build.url}
+          >
+            Download for {build.label} <ArrowDownToLine size={17} />
+          </a>
+        ))}
+    </>
+  );
 }
 
 export function DownloadPage({ downloads = desktopDownloads }: { downloads?: PlatformDownload[] }) {
@@ -180,15 +222,7 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
               <p>{option.detail}</p>
               <div className="download-platform-action">
                 {!option.url && option.id === 'macos' && member?.macos?.length ? (
-                  member.macos.map((build, index) => (
-                    <a
-                      key={build.id}
-                      className={`button ${index === 0 ? 'button-primary' : 'button-quiet'}`}
-                      href={build.url}
-                    >
-                      Download for {build.label} <ArrowDownToLine size={17} />
-                    </a>
-                  ))
+                  <MacDownloads builds={member.macos} />
                 ) : option.url ? (
                   <a
                     className="button button-primary"

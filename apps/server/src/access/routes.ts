@@ -44,9 +44,19 @@ const macDownloads = {
   'macos-x86_64': { platform: 'dmg-x86_64', label: 'Intel' },
 } as const;
 
-/** The CrabNebula release channel macOS members download from, when enabled. */
-export function macChannel(env: Env) {
-  return ['beta', 'stable'].includes(env.ACCESS_MAC_CHANNEL) ? env.ACCESS_MAC_CHANNEL : null;
+/**
+ * The CrabNebula release channels macOS members may download, in the order the
+ * website offers them; the first is the default.
+ */
+export function macChannels(env: Env) {
+  return [
+    ...new Set(
+      (env.ACCESS_MAC_CHANNELS ?? '')
+        .split(',')
+        .map((channel) => channel.trim())
+        .filter((channel) => channel === 'stable' || channel === 'beta'),
+    ),
+  ];
 }
 function macDownloadUrl(channel: string, id: keyof typeof macDownloads) {
   return `https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/${macDownloads[id].platform}?channel=${channel}`;
@@ -264,17 +274,17 @@ export async function accessRoutes(
       const store = storeUrl(env);
       const key = installerKey(env);
       const installer = !store && key ? await env.RELEASES.head(key) : null;
-      const channel = macChannel(env);
       return json({
         email: member.email,
         ...(await invitations(env, member)),
-        macos: channel
-          ? Object.entries(macDownloads).map(([id, { label }]) => ({
-              id,
-              label,
-              url: `${url.origin}/v1/access/download/${id}`,
-            }))
-          : [],
+        macos: macChannels(env).flatMap((channel) =>
+          Object.entries(macDownloads).map(([id, { label }]) => ({
+            id,
+            label,
+            channel,
+            url: `${url.origin}/v1/access/download/${id}/${channel}`,
+          })),
+        ),
         download: store
           ? { url: `${url.origin}/v1/access/download`, kind: 'store' }
           : installer
@@ -282,12 +292,11 @@ export async function accessRoutes(
             : null,
       });
     }
-    const macId = path.match(/^\/v1\/access\/download\/(macos-(?:aarch64|x86_64))$/)?.[1] as
-      | keyof typeof macDownloads
-      | undefined;
-    if (['GET', 'HEAD'].includes(request.method) && macId) {
-      const channel = macChannel(env);
-      if (!channel) throw new AccessError(404, 'download_not_ready');
+    const macPath = path.match(/^\/v1\/access\/download\/(macos-(?:aarch64|x86_64))\/([a-z]+)$/);
+    if (['GET', 'HEAD'].includes(request.method) && macPath) {
+      const macId = macPath[1] as keyof typeof macDownloads;
+      const channel = macPath[2] as 'stable' | 'beta';
+      if (!macChannels(env).includes(channel)) throw new AccessError(404, 'download_not_ready');
       if (request.method === 'GET')
         await env.DB.prepare(
           'UPDATE access_members SET first_download_at=coalesce(first_download_at,?) WHERE id=?',
