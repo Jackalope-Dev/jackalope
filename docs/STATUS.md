@@ -127,6 +127,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   unknown cost blocking further dispatch when a cost threshold is set. These are not billing caps.
 - Codex, Claude Code, Grok Build, OpenCode, Kimi Code, Antigravity and Gemini CLI adapters with
   [provider-specific capabilities](AGENT-SUPPORT.md).
+- Project-scoped agent lists, task defaults and account choices; app-wide limits
+  remain explicit. The terminal follows saved project accents, including live updates.
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded
   quota handoff. Explicit assignments and continuation identities remain pinned.
   The Agents page connects API providers directly, including DeepSeek and OpenRouter,

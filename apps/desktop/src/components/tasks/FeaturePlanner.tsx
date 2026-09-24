@@ -70,7 +70,7 @@ export function FeaturePlanner({
     return {
       featureId: crypto.randomUUID(),
       goal: initialGoal,
-      agent: 'auto',
+      agent: project.preferences?.preferredRunner || 'auto',
       steps: [],
     };
   });

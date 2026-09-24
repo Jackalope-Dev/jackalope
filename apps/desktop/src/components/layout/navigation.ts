@@ -192,6 +192,7 @@ export function navigateWorkspace(tab: ActiveTab) {
 }
 export function openSettings(
   category:
+    | 'Agents'
     | 'General'
     | 'System'
     | 'Diagnostics'

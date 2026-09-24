@@ -17,6 +17,7 @@ import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 
 import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
 import type { EditorialCover } from './blog-types';
+import { CliDemo } from './CliDemo';
 import { ConnectedWorkspace } from './ConnectedWorkspace';
 import { DISCORD_URL } from './community';
 import { tour } from './content';
@@ -521,6 +522,8 @@ export function LandingPage({
       <ConnectedWorkspace />
 
       <Workbench />
+
+      <CliDemo />
 
       <section
         className="workspace-section section-echo"

@@ -8,10 +8,19 @@ model as the default for future OpenCode tasks; existing runs stay pinned.
 Canceling unfinished setup removes its pending account. CLI sign-in remains
 available for providers and authentication methods outside this key-only catalog.
 
+The Agents page applies enable/disable, default task agent and account choices to
+the selected project. Project agent settings also offers an allowed account list
+and Work/Personal group selection. New task and plan drafts, chats and terminal
+conversations use the project's default; explicit task choices and saved drafts
+remain unchanged. Automatic routing and its coordinating agent respect the project's
+agent and account restrictions. Settings → App → Agents retains app-wide limits
+and defaults; a project cannot enable an agent or account disabled there.
+Connections, account names, model preferences and executable configuration are shared.
+
 Agents → Configuration puts account setup before technical agent settings. Add a
 named Work, Personal or Ungrouped account and complete the provider prompts in the
 embedded sign-in panel. Provider authorization may open the browser. New accounts
-do not become active automatically; select the account to use for new tasks.
+do not become active automatically; select the account to use for new project tasks.
 
 Account rows offer a status check, provider-reported identity when available,
 rename/group editing and removal. Status is an observation from the installed CLI,
@@ -123,5 +132,7 @@ installed-app acceptance.
 With the desktop Vite server running, use `scripts/verification/verify-agent-accounts.mjs`
 and `scripts/verification/verify-provider-connections.mjs` for isolated browser
 fixtures covering keyboard/focus, themes, setup cancellation and model selection.
+`node scripts/verification/verify-project-agents.mjs` covers project switching,
+agent/account restrictions, defaults and persistence with fake IPC.
 `JACKALOPE_PREVIEW_URL` overrides their local preview address. These fixtures use
 fake IPC and never establish live credential validity or provider availability.

@@ -39,7 +39,8 @@ back on load, so a repository gets the same project id in the app and the
 terminal. A repository first used from a terminal is registered and then appears
 in the app.
 
-Conversations are live sessions with the agent set to automatic routing. Several
+Conversations use the project's default task agent, or automatic routing when no
+project default is set. An explicit `/agent` choice applies to the next conversation. Several
 terminals can show different sessions at once, and one session can be open in a
 terminal and the app together. Leaving a terminal does not stop work.
 
@@ -55,8 +56,10 @@ Inside a conversation, `/help` lists commands: `/new`, `/sessions`, `/stop`,
 `/pause`, `/resume`, `/open` and `/quit`. Alt+Enter adds a line, Up and Down
 recall input, and Page Up and Page Down scroll. Ctrl+C leaves and prints how to
 rejoin. `JACKALOPE_PROFILE_DIR` or `--profile=<dir>` selects a non-default
-profile. `NO_COLOR` disables colour; without `COLORTERM=truecolor` the banner uses
-one colour.
+profile. The terminal follows its project's saved accent, including theme changes
+while it is open and the project of an attached conversation. Colour is adjusted
+for readability; 256-colour terminals use the nearest palette match. `NO_COLOR`
+disables colour; without `COLORTERM=truecolor` the banner uses one colour.
 
 Agent questions appear in the terminal but are answered in the app. The
 transcript shows the conversation's messages followed by the latest attempt's

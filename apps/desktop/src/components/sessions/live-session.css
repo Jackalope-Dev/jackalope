@@ -1,4 +1,6 @@
 .live-session {
+  width: 100%;
+  min-width: 0;
   height: 100%;
   min-height: 0;
   display: flex;
@@ -100,6 +102,14 @@
   min-height: 48px;
   border-bottom: 1px solid var(--color-border-subtle);
   flex: none;
+}
+.live-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
 }
 .live-status {
   display: flex;
@@ -493,6 +503,9 @@
 .live-session-detached .live-statusbar {
   gap: 4px;
   padding: 0 8px;
+}
+.live-session-detached .live-status-actions {
+  gap: 4px;
 }
 .live-session-detached .live-status {
   flex: 1;

@@ -8,12 +8,12 @@ import {
   RefreshIcon,
 } from '@jackalope/ui';
 import {
+  ArrowUpFromLine,
   Bot,
   FileDiff,
   FolderGit2,
   GitCommitHorizontal,
   Settings2,
-  Sparkles,
   Undo2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -226,6 +226,9 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
   const [error, setError] = useState('');
   const [hookFailure, setHookFailure] = useState<HookFailure | null>(null);
   const [feedback, setFeedback] = useState('');
+  /** A commit just landed and has not been pushed from here yet. */
+  const [pushable, setPushable] = useState(false);
+  const [pushing, setPushing] = useState(false);
   const [focused, setFocused] = useState('');
   const [patch, setPatch] = useState<{ path: string; text: string } | null>(null);
   const [patchError, setPatchError] = useState('');
@@ -292,6 +295,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     setChanges(null);
     setFocused('');
     setFeedback('');
+    setPushable(false);
     void refresh();
   }, [refresh]);
   useEffect(() => {
@@ -351,6 +355,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
   const discard = async (file: ChangedFile) => {
     setError('');
     setFeedback('');
+    setPushable(false);
     try {
       await nativeTask('git_discard_changes', {
         repoPath: projectPath,
@@ -387,12 +392,31 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     }
   };
 
+  const push = async () => {
+    if (pushing) return;
+    setPushing(true);
+    setError('');
+    try {
+      const result = await nativeTask<string>('git_push_changes', {
+        repoPath: projectPath,
+        worktreePath: checkout,
+      });
+      setFeedback(result);
+      setPushable(false);
+    } catch (cause) {
+      setError(failureOf(cause).message);
+    } finally {
+      setPushing(false);
+    }
+  };
+
   const commit = async () => {
     if (busy || !chosenFiles.length || !title.trim()) return;
     setCommitting(true);
     setError('');
     setHookFailure(null);
     setFeedback('');
+    setPushable(false);
     try {
       const sha = await nativeTask<string>('git_commit_changes', {
         repoPath: projectPath,
@@ -405,6 +429,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       setFeedback(
         `Committed ${chosenFiles.length} ${chosenFiles.length === 1 ? 'file' : 'files'} as ${sha.slice(0, 7)}.`,
       );
+      setPushable(true);
       setTitle('');
       setBody('');
       await refresh();
@@ -585,7 +610,25 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       )}
       <div role="status">
         {feedback && (
-          <InlineNotice tone="success" className="commit-review-notice">
+          <InlineNotice
+            tone="success"
+            className="commit-review-notice"
+            action={
+              pushable && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void push()}
+                  loading={pushing}
+                  loadingLabel="Pushing…"
+                  disabled={busy}
+                >
+                  <ArrowUpFromLine size={15} />
+                  Push
+                </Button>
+              )
+            }
+          >
             {feedback}
           </InlineNotice>
         )}
@@ -702,7 +745,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
                   loadingLabel="Writing…"
                   onClick={() => void generate()}
                 >
-                  <Sparkles size={16} aria-hidden="true" />
+                  <Bot size={16} aria-hidden="true" />
                   Generate
                 </Button>
               </div>

@@ -1456,7 +1456,7 @@ impl TaskRuntime {
         }
         let policy = self.policy()?;
         let (adapter, _) = policy.resolve(if request.agent == "auto" {
-            &policy.default_meta_agent
+            policy.routing_agent(&request.project_id)?
         } else {
             &request.agent
         })?;

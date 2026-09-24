@@ -33,6 +33,9 @@ pub fn set_accent(hex: Option<&str>) {
 
 fn parse_hex(hex: &str) -> Option<(u8, u8, u8)> {
     let hex = hex.strip_prefix('#')?;
+    if !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
     let expanded: String = match hex.len() {
         3 => hex.chars().flat_map(|c| [c, c]).collect(),
         6 => hex.into(),
@@ -181,6 +184,31 @@ fn basic((r, g, b): (u8, u8, u8)) -> Color {
     }
 }
 
+/// Use the fixed xterm palette instead of the terminal's six configurable hues.
+fn indexed(color: (u8, u8, u8)) -> Color {
+    let distance = |candidate: (u8, u8, u8)| {
+        let channel = |a: u8, b: u8| (i32::from(a) - i32::from(b)).pow(2);
+        channel(color.0, candidate.0)
+            + channel(color.1, candidate.1)
+            + channel(color.2, candidate.2)
+    };
+    let palette = |index: u8| {
+        if index >= 232 {
+            let level = 8 + 10 * (index - 232);
+            (level, level, level)
+        } else {
+            let index = index - 16;
+            let level = |value: u8| if value == 0 { 0 } else { 55 + value * 40 };
+            (level(index / 36), level((index / 6) % 6), level(index % 6))
+        }
+    };
+    Color::Indexed(
+        (16..=255)
+            .min_by_key(|index| distance(palette(*index)))
+            .unwrap_or(16),
+    )
+}
+
 /// How many echo lines sit above the wordmark.
 const ECHOES: usize = 4;
 
@@ -278,6 +306,8 @@ pub fn accent() -> Color {
     let (r, g, b) = current_accent();
     if truecolor() {
         Color::Rgb(r, g, b)
+    } else if std::env::var("TERM").is_ok_and(|term| term.contains("256color")) {
+        indexed((r, g, b))
     } else {
         basic((r, g, b))
     }
@@ -434,6 +464,17 @@ mod tests {
     fn every_mark_row_has_the_same_width() {
         for row in mark() {
             assert_eq!(row.chars().count(), 16, "{row:?}");
+        }
+    }
+
+    #[test]
+    fn project_accents_use_matching_indexed_colours_and_reject_invalid_hex() {
+        assert_eq!(indexed((0, 175, 135)), Color::Indexed(36));
+        assert_eq!(indexed((175, 95, 215)), Color::Indexed(134));
+        assert_eq!(indexed((128, 128, 128)), Color::Indexed(244));
+        assert_eq!(parse_hex("#0a8"), Some((0, 170, 136)));
+        for invalid in ["#éabc", "#ééé", "#gg0000", "#12345", "00aa88"] {
+            assert_eq!(parse_hex(invalid), None);
         }
     }
 

@@ -497,6 +497,7 @@ fn local_verification(
 pub(in crate::commands) fn create_local(
     root: &Path,
     verification: &super::local_ai::Verification,
+    activate: bool,
 ) -> Result<AgentProfile, String> {
     let _guard = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
     let mut manifest = load_checked(root)?;
@@ -528,7 +529,9 @@ pub(in crate::commands) fn create_local(
     if !entry.profiles.iter().any(|p| p.id == profile.id) {
         entry.profiles.push(profile.clone());
     }
-    entry.active = Some(profile.id.clone());
+    if activate {
+        entry.active = Some(profile.id.clone());
+    }
     save(root, &manifest)?;
     Ok(profile)
 }
@@ -972,8 +975,18 @@ mod tests {
         .unwrap();
         save(&root, &other).unwrap();
         let paid = bind_account(&root, "opencode", None).unwrap();
-        let profile = create_local(&root, &verification).unwrap();
-        assert_eq!(create_local(&root, &verification).unwrap().id, profile.id);
+        let profile = create_local(&root, &verification, false).unwrap();
+        assert_eq!(
+            bind_account(&root, "opencode", None)
+                .unwrap()
+                .profile_id
+                .as_deref(),
+            Some("paid")
+        );
+        assert_eq!(
+            create_local(&root, &verification, true).unwrap().id,
+            profile.id
+        );
         assert_eq!(
             load_checked(&root).unwrap().agents["opencode"]
                 .profiles

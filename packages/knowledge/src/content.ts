@@ -164,7 +164,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How do I start a conversation from the terminal?',
         paragraphs: [
           'Open a terminal in a Git repository and run jackalope. Describe the work; Jackalope chooses the agent and shows which one it picked and why, the step it is on and the output as it arrives. The repository becomes a project in the app if it was not one already.',
-          'The command uses the same sessions, accounts and approved access as the app. Replies go to the same conversation. Type /help for commands such as /stop, /pause and /sessions.',
+          'The command uses the same sessions, accounts and approved access as the app. Replies go to the same conversation. When an agent asks a question, its choices open in the terminal so you can answer with one keypress. Type /help for commands such as /agent to choose the next agent, /diff to review and commit in the app, /stop and /sessions.',
         ],
         codeBox: {
           title: 'Common commands',
@@ -193,10 +193,6 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Installed Jackalope adds the command automatically: on macOS and Linux it links ~/.local/bin/jackalope, and on Windows the installer adds its folder to your PATH. Open a new terminal after installing.',
           'The default macOS shell does not search ~/.local/bin. Choose Install command in the app terminal window to add a link in /usr/local/bin; macOS asks for an administrator password.',
         ],
-        callout: {
-          kind: 'note',
-          text: 'Agent questions appear in the terminal but are answered in the app for now.',
-        },
       },
     ],
   },
@@ -301,6 +297,14 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'No. File review markers track your place for the displayed patch and reset when it changes. Approve work records acceptance of the task outcome for its snapshot. Merging is a separate action that applies the prepared change to the target branch.',
           'Agent review prepares an editable request for another agent. It runs only after you submit it. Review its findings and check the actual change; an agent response does not replace your acceptance or required project checks.',
+        ],
+      },
+      {
+        id: 'commit-hooks',
+        question: 'What happens when a commit hook rejects my commit?',
+        paragraphs: [
+          'Changes explains that a hook stopped the commit, names the hook when it can and keeps its output under a disclosure. Your staged files and message stay as they were.',
+          'Choose Fix with agent to send the hook output to an agent that works in the same checkout and branch. Its progress stays on Changes, with Stop and Open task while it runs. When it finishes, review what it changed and choose Commit again.',
         ],
       },
       {
@@ -643,7 +647,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'work-personal-segregation',
         question: 'How do work and personal account profiles differ?',
         paragraphs: [
-          'Named Codex, Claude Code, Grok, OpenCode, and Kimi Code profiles use separate supported CLI directories. Choose project defaults in Project → Settings. Continuations retain their bound profile.',
+          'Named Codex, Claude Code, Grok, OpenCode, and Kimi Code profiles use separate supported CLI directories. The Agents page saves enable/disable, default task agent, and account choices for the selected project. Project agent settings offers Work/Personal group selection and allowed accounts. App settings retains app-wide limits. New work uses the project default; continuations retain their bound profile.',
           'Antigravity named profiles require Gemini API keys with separate API billing. Its existing subscription login is shared and can change outside Jackalope. Profiles organize credentials; they do not isolate OS permissions or inherited provider configuration.',
         ],
       },
@@ -882,6 +886,14 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Jackalope saves task records in local versioned JSON journals with atomic replacement. On restart, unfinished attempts are marked interrupted and their saved history remains available. Unreadable files are preserved for recovery.',
           'Interrupted attempts are not automatically replayed or resumed because process ownership may be uncertain. Inspect the task and worktree before retrying. Settings → Data & reset can restore archived history or import a task recovery export.',
+        ],
+      },
+      {
+        id: 'app-updates',
+        question: 'How does Jackalope update itself?',
+        paragraphs: [
+          'Installed Jackalope checks for updates shortly after it opens and every few hours while its window is in use. When a newer version is ready, the companion shows a notice; choose Review update, then install and restart when your work is saved. Nothing installs without your choice.',
+          'In Settings → Updates & support you can check now, turn automatic checks off and, when offered, choose the Stable or Beta update channel. If a check fails, the notice shows the reason.',
         ],
       },
       {

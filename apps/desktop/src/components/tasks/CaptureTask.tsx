@@ -72,6 +72,8 @@ export function CaptureTask({
   );
   const current = useMemo(() => {
     const initial = idea ? planningDraft(idea) : emptyDraft;
+    const projectId = drafts[key]?.projectId ?? idea?.projectId ?? activeProjectId ?? '';
+    const project = projects.find((item) => item.id === projectId);
     return {
       title: idea?.title,
       planningStatus: idea?.status,
@@ -83,8 +85,11 @@ export function CaptureTask({
           ? initial.isolated
           : (projects.find((p) => p.id === activeProjectId)?.preferences?.isolatedByDefault ??
             true)),
-      projectId: drafts[key]?.projectId ?? idea?.projectId ?? activeProjectId ?? '',
-      agent: drafts[key]?.agent ?? agent ?? initial.agent,
+      projectId,
+      agent:
+        drafts[key]?.agent ??
+        agent ??
+        (idea ? initial.agent : (project?.preferences?.preferredRunner ?? initial.agent)),
     };
   }, [idea, projects, activeProjectId, drafts, key, agent]);
   const project = projects.find((p) => p.id === current.projectId);
@@ -92,7 +97,20 @@ export function CaptureTask({
   const allowed = runners.filter(
     (r) => config.isAgentEnabled(r.id) && isAgentAllowedForProject(project, r.id),
   );
-  const defaultAgent = config.defaultMetaAgent;
+  const defaultAgent =
+    [
+      project?.preferences?.preferredRunner,
+      config.defaultMetaAgent,
+      ...(project?.preferences?.allowedAgents ?? []),
+    ].find(
+      (id) =>
+        id &&
+        config.isAgentEnabled(id) &&
+        isAgentAllowedForProject(project, id) &&
+        ['codex', 'claude', 'grok', 'opencode', 'kimi'].includes(
+          config.customAgents.find((agent) => agent.id === id)?.adapter ?? id,
+        ),
+    ) ?? '';
   const currentAgent = current.agent || defaultAgent;
   const runner = (current.agent ? allowed : runners).find((r) => r.id === currentAgent);
   const [toolRevision, setToolRevision] = useState(0);

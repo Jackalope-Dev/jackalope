@@ -40,6 +40,17 @@ export interface DesktopControlReadiness {
   available: boolean;
   message: string;
   can_request_permissions: boolean;
+  missing?: DesktopPermission[];
+}
+
+export type DesktopPermission = 'accessibility' | 'screenRecording' | 'inputMonitoring';
+
+export async function openDesktopPermissionSettings(permission: DesktopPermission): Promise<void> {
+  return invoke('desktop_control_open_settings', { permission });
+}
+
+export async function restartForDesktopPermissions(): Promise<void> {
+  return invoke('desktop_control_restart');
 }
 
 export async function requestDesktopControlPermissions(): Promise<DesktopControlReadiness> {

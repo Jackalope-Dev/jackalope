@@ -221,6 +221,16 @@ export function TaskWorkspace({
   useEffect(() => {
     if (managed.selectedId && !managedTask) useManagedTaskStore.getState().select(null);
   }, [managed.selectedId, managedTask]);
+  // Session-owned attempts continue only from their chat, so open that chat instead of the
+  // standalone task page (for example when arriving from a notification).
+  const owningSession = selected?.liveSessionId
+    ? sessions.find((session) => session.id === selected.liveSessionId)
+    : undefined;
+  useEffect(() => {
+    if (!owningSession) return;
+    useLiveSessionStore.getState().select(owningSession.id);
+    select(null);
+  }, [owningSession, select]);
   if (managedTask)
     return (
       <ManagedTaskView
@@ -230,6 +240,15 @@ export function TaskWorkspace({
           managed.select(null);
           select(null);
         }}
+      />
+    );
+  if (owningSession)
+    return (
+      <LiveSessionView
+        key={owningSession.id}
+        session={owningSession}
+        runs={sessionRuns}
+        onBack={() => useLiveSessionStore.getState().select(null)}
       />
     );
   if (selected)

@@ -13,7 +13,7 @@ import { accessEmail } from './mail';
 import { checkMailDelivery } from './mail-status';
 import type { Mail } from './mail-templates';
 import { markAudienceStale } from './newsletter';
-import { installerKey, storeUrl } from './routes';
+import { installerKey, macChannels, storeUrl } from './routes';
 import { AccessError, approve, requestLink } from './service';
 import { waitlistRankSql } from './waitlist';
 
@@ -44,7 +44,9 @@ export async function accessReadiness(env: Env) {
   return {
     enabled: env.EARLY_ACCESS_ENABLED === 'true',
     mailConfigured: mailConfigured(env),
-    download,
+    // Members can be approved while macOS downloads are live, even before a
+    // Windows installer exists.
+    download: download !== 'available' && macChannels(env).length ? 'available' : download,
     version,
   };
 }

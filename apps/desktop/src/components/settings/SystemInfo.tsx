@@ -2,20 +2,31 @@ import { RefreshIcon } from '@jackalope/ui';
 import { Monitor } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  type DesktopPermission,
   getSystemInfo,
   isTauriEnvironment,
+  openDesktopPermissionSettings,
   requestDesktopControlPermissions,
+  restartForDesktopPermissions,
   type SystemInfo,
 } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 
+const PERMISSION_LABELS: Record<DesktopPermission, string> = {
+  accessibility: 'Accessibility',
+  screenRecording: 'Screen Recording',
+  inputMonitoring: 'Input Monitoring',
+};
+
 export function SystemInfoView() {
   const [host, setHost] = useState<SystemInfo | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [requestingPermissions, setRequestingPermissions] = useState(false);
+  const [requested, setRequested] = useState(false);
+  const [restarting, setRestarting] = useState(false);
   const request = useRef(0);
   const desktop = isTauriEnvironment();
   const load = useCallback(async () => {
@@ -38,10 +49,30 @@ export function SystemInfoView() {
     try {
       const readiness = await requestDesktopControlPermissions();
       setHost((current) => (current ? { ...current, desktop_control: readiness } : current));
+      setRequested(true);
     } catch (error) {
       setError(String(error));
     } finally {
       setRequestingPermissions(false);
+    }
+  };
+  const openSettings = async (permission: DesktopPermission) => {
+    setError('');
+    try {
+      await openDesktopPermissionSettings(permission);
+      setRequested(true);
+    } catch (error) {
+      setError(String(error));
+    }
+  };
+  const restart = async () => {
+    setRestarting(true);
+    setError('');
+    try {
+      await restartForDesktopPermissions();
+    } catch (error) {
+      setError(String(error));
+      setRestarting(false);
     }
   };
   useEffect(() => {
@@ -102,6 +133,36 @@ export function SystemInfoView() {
                         : 'Set up macOS permissions'}
                     </Button>
                   )}
+                {!host.desktop_control.available && !!host.desktop_control.missing?.length && (
+                  <div className="mt-4">
+                    <p className="task-muted">
+                      If macOS did not ask, turn Jackalope on in each pane, then restart the app.
+                    </p>
+                    <ul
+                      className="mt-2 flex flex-wrap gap-2"
+                      aria-label="Missing macOS permissions"
+                    >
+                      {host.desktop_control.missing.map((permission) => (
+                        <li key={permission}>
+                          <Button variant="outline" onClick={() => void openSettings(permission)}>
+                            Open {PERMISSION_LABELS[permission]}
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                    {requested && (
+                      <Button
+                        className="mt-3"
+                        disabled={restarting || loading}
+                        onClick={() => void restart()}
+                        loading={restarting}
+                        loadingLabel="Restarting…"
+                      >
+                        Restart Jackalope
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             <p className="task-muted mt-2">

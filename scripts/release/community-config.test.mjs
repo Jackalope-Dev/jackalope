@@ -27,6 +27,8 @@ test('deployment preserves bundled access settings with explicit environment ove
   assert.equal(settings.vars.EARLY_ACCESS_ENABLED, 'true');
   assert.equal(settings.vars.ADMIN_EMAIL, 'owner@example.com');
   assert.equal(settings.vars.ACCESS_EMAIL_REPLY_TO, 'reply@example.com');
+  applyCommunityConfig(settings, 'production', { PRODUCTION_ACCESS_MAC_CHANNELS: 'stable,beta' });
+  assert.equal(settings.vars.ACCESS_MAC_CHANNELS, 'stable,beta');
   assert.deepEqual(settings.secrets.required, ['RATE_SECRET', 'ACCESS_SECRET', 'SEQUENZY_API_KEY']);
   applyCommunityConfig(settings, 'production', { PRODUCTION_EARLY_ACCESS_ENABLED: 'false' });
   assert.deepEqual(settings.secrets.required, ['RATE_SECRET']);
@@ -37,6 +39,7 @@ test('deployment rejects unknown settings, unprotected admin and public installe
     { ACCESS_WEB_ORIGIN: 'http://jackalope.dev' },
     { ACCESS_AUD: '' },
     { ACCESS_INSTALLER_KEY: 'stable/Jackalope.exe' },
+    { ACCESS_MAC_CHANNELS: 'stable,nightly' },
     { EARLY_ACCESS_ENABLED: true },
   ]) {
     assert.throws(() =>

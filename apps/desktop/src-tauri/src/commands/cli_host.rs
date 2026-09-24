@@ -375,15 +375,19 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             let project = ensure_project(app, &project_path)?;
             let sessions = app.state::<LiveSessions>();
             let session_id = uuid::Uuid::new_v4().to_string();
-            // `auto` hands agent choice to routing, which is the point: the
-            // terminal describes the work and Jackalope picks who does it,
-            // unless the user named an agent with `/agent`.
+            let policy = app.state::<TaskRuntime>().policy()?;
+            let default_agent = policy
+                .projects
+                .get(&project.id)
+                .and_then(|project| project.preferred_runner.as_deref())
+                .filter(|agent| !agent.is_empty())
+                .unwrap_or("auto");
             let request: super::tasks::RunRequest = serde_json::from_value(serde_json::json!({
                 "id": format!("cli-{}", uuid::Uuid::new_v4().simple()),
                 "projectId": project.id,
                 "projectName": project.name,
                 "projectPath": project.path,
-                "agent": agent.as_deref().filter(|agent| !agent.is_empty()).unwrap_or("auto"),
+                "agent": agent.as_deref().filter(|agent| !agent.is_empty()).unwrap_or(default_agent),
                 "model": null,
                 "prompt": "",
                 "isolated": true,
@@ -450,9 +454,10 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             let sessions = app.state::<LiveSessions>().inner().clone();
             let mut tasks = runtime.subscribe();
             let mut conversations = sessions.subscribe();
-            // Both counters only grow, so their sum changes whenever either does.
+            let mut projects = super::project_registry::subscribe();
+            // Include project preferences so idle terminals receive saved theme changes.
             let revision = |runtime: &TaskRuntime, sessions: &LiveSessions| {
-                runtime.revision() + sessions.revision()
+                runtime.revision() + sessions.revision() + super::project_registry::revision()
             };
             let current = revision(&runtime, &sessions);
             if current != since {
@@ -464,6 +469,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 tokio::select! {
                     _ = tasks.changed() => {}
                     _ = conversations.changed() => {}
+                    _ = projects.changed() => {}
                 }
             })
             .await;

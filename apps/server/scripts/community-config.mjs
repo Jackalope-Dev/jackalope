@@ -7,6 +7,7 @@ export function applyCommunityConfig(settings, environment, source = process.env
     'ACCESS_EMAIL_REPLY_TO',
     'ACCESS_INSTALLER_KEY',
     'ACCESS_STORE_URL',
+    'ACCESS_MAC_CHANNELS',
     'ACCESS_NEWSLETTER_FORM',
     'ACCESS_AUDIENCE_LIST',
     'ADMIN_EMAIL',
@@ -50,6 +51,13 @@ export function applyCommunityConfig(settings, environment, source = process.env
     )
       throw new Error('Store link must be an official Microsoft product URL');
   }
+  if (
+    vars.ACCESS_MAC_CHANNELS &&
+    !vars.ACCESS_MAC_CHANNELS.split(',').every((channel) =>
+      ['stable', 'beta'].includes(channel.trim()),
+    )
+  )
+    throw new Error('macOS download channels must be stable and/or beta');
   vars.EARLY_ACCESS_ENABLED ??= 'false';
   if (!['true', 'false'].includes(vars.EARLY_ACCESS_ENABLED))
     throw new Error('Early access flag must be true or false');

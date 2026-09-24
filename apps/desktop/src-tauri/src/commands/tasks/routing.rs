@@ -416,7 +416,7 @@ impl TaskRuntime {
             .cloned()
             .unwrap_or_default();
         let mut agents: Vec<String> = if orchestrator {
-            vec![policy.default_meta_agent.clone()]
+            vec![policy.routing_agent(&req.project_id)?.to_string()]
         } else {
             BUILTIN_AGENTS
                 .iter()
@@ -434,12 +434,7 @@ impl TaskRuntime {
             if !self.is_running(&req.id) {
                 return Err("Routing was stopped.".into());
             }
-            if !orchestrator
-                && project
-                    .allowed_agents
-                    .as_ref()
-                    .is_some_and(|allowed| !allowed.contains(&agent))
-            {
+            if !policy.agent_allowed(&req.project_id, &agent) {
                 continue;
             }
             let Ok((adapter, _)) = policy.resolve(&agent) else {
@@ -897,7 +892,7 @@ impl TaskRuntime {
             } else if deterministic || single {
                 "local rules".into()
             } else {
-                policy.default_meta_agent.clone()
+                policy.routing_agent(&req.project_id)?.to_string()
             },
             orchestrator_model: if used_jev {
                 output.as_ref().and_then(|output| output.model.clone())
