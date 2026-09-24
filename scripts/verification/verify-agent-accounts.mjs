@@ -20,10 +20,11 @@ const f = window.accountFixture = {
   calls: [], outcome: 'running', failDelete: false, delayStart: false,
   theme: appearance => applyThemeTokens({ ...DEFAULT_THEME, isDark: appearance === 'dark' }),
 };
-window.__TAURI_INTERNALS__ = { invoke: async (command, args = {}) => {
+window.__TAURI_INTERNALS__ = { transformCallback: () => 0, unregisterCallback: () => {}, invoke: async (command, args = {}) => {
   f.calls.push({ command, ...args });
   const profile = f.profiles.find(p => p.id === args.id);
   switch (command) {
+    case 'managed_runtime_prepare': return;
     case 'agent_profile_list': return {
       profiles: f.profiles.filter(p => !p.pending), activeId: null,
       defaultName: 'CLI account', defaultGroup: null, defaultTag: null, envVar: 'CODEX_HOME',
@@ -45,7 +46,7 @@ window.__TAURI_INTERNALS__ = { invoke: async (command, args = {}) => {
       exitCode: 0, chunks: [], truncated: false,
     };
     case 'agent_profile_status': {
-      const state = profile?.pending ? f.outcome === 'success' ? f.agent === 'aider' ? 'configured' : 'signedIn' : 'signedOut' : 'signedIn';
+      const state = profile?.pending ? f.outcome === 'success' ? ['antigravity','opencode'].includes(f.agent) ? 'configured' : 'signedIn' : 'signedOut' : 'signedIn';
       if ((state === 'signedIn' || state === 'configured') && profile) profile.pending = false;
       return { state, identity: state === 'signedIn' ? 'sample@example.test' : null,
         detail: state === 'signedIn' ? 'Provider identity detected.' : 'Sign-in needed.', checkedAt: new Date().toISOString() };
@@ -65,7 +66,7 @@ f.theme('dark');
 ReactDOM.createRoot(document.getElementById('root')).render(
   React.createElement('main', { className: 'agent-manager p-8' },
     React.createElement('p', null, 'Browser fixture only; no native sign-in or tasks launched.'),
-    React.createElement(AgentAccounts, { agentId: f.agent, agentName: f.agent === 'aider' ? 'Aider' : 'Codex' })));`;
+    React.createElement(AgentAccounts, { agentId: f.agent, agentName: f.agent === 'antigravity' ? 'Antigravity' : f.agent === 'opencode' ? 'OpenCode' : 'Codex' })));`;
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
@@ -79,7 +80,7 @@ try {
   await page.route('**/src/main.tsx', (route) =>
     route.fulfill({ contentType: 'application/javascript', body: fixture }),
   );
-  await page.goto(url);
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   const edit = page.getByRole('button', { name: 'Edit Personal', exact: true });
   await edit.waitFor();
   for (const width of [1280, 960]) {
@@ -96,11 +97,13 @@ try {
       assert(await name.evaluate((el) => el === document.activeElement));
       const geometry = await dialog.evaluate((el) => {
         const rect = el.getBoundingClientRect();
-        const inputs = [...el.querySelectorAll('.task-input')].map((input) => {
-          const r = input.getBoundingClientRect();
-          const label = input.parentElement.getBoundingClientRect();
-          return { x: r.x, width: r.width, height: r.height, labelWidth: label.width };
-        });
+        const inputs = [...el.querySelectorAll('input:not([type]), input[type="text"]')].map(
+          (input) => {
+            const r = input.getBoundingClientRect();
+            const label = input.parentElement.getBoundingClientRect();
+            return { x: r.x, width: r.width, height: r.height, labelWidth: label.width };
+          },
+        );
         return {
           inputs,
           fits: rect.top >= 0 && rect.bottom <= innerHeight && el.scrollWidth <= el.clientWidth,
@@ -186,9 +189,9 @@ try {
   await signIn().waitFor({ state: 'hidden' });
   await newRow().getByRole('status').filter({ hasText: 'Signed in' }).waitFor();
   assert.equal(await newRow().count(), 1);
-  await page.goto(`${url}?agent=aider`);
+  await page.goto(`${url}?agent=antigravity`);
   const addKey = page.getByRole('button', { name: 'Add account & connect', exact: true });
-  const connect = page.getByRole('dialog', { name: /Connect Aider/ });
+  const connect = page.getByRole('dialog', { name: /Connect Antigravity/ });
   await addKey.click();
   await connect.getByRole('button', { name: 'Cancel', exact: true }).click();
   await connect.waitFor({ state: 'hidden' });
@@ -205,6 +208,33 @@ try {
   await connect.getByRole('button', { name: 'Connect account', exact: true }).click();
   await connect.waitFor({ state: 'hidden' });
   assert.equal(await newRow().count(), 1);
+  await page.goto(`${url}?agent=opencode`);
+  await page.getByRole('combobox', { name: 'OpenCode connection method' }).click();
+  await page.getByRole('option', { name: 'Provider API key (including DeepSeek)' }).click();
+  await page.getByRole('button', { name: 'Add account & connect', exact: true }).click();
+  const openCodeKey = page.getByRole('dialog', { name: /Connect OpenCode/ });
+  await openCodeKey.getByRole('combobox', { name: 'API provider' }).click();
+  await page.getByRole('option', { name: 'DeepSeek', exact: true }).click();
+  await openCodeKey.getByLabel('API key', { exact: true }).fill('fixture-key');
+  await page.evaluate(() => {
+    window.accountFixture.outcome = 'success';
+  });
+  await openCodeKey.getByRole('button', { name: 'Connect account', exact: true }).click();
+  await openCodeKey.waitFor({ state: 'hidden' });
+  const lastKey = await page.evaluate(() =>
+    window.accountFixture.calls.filter((call) => call.command === 'agent_profile_save_key').at(-1),
+  );
+  assert.equal(lastKey.agent, 'opencode');
+  assert.equal(lastKey.name, 'DEEPSEEK_API_KEY');
+  await page
+    .locator('.agent-accounts-row')
+    .filter({ has: page.locator('strong').filter({ hasText: /^Personal$/ }) })
+    .getByRole('button', { name: 'Sign in', exact: true })
+    .click();
+  const openCodeSignIn = page.getByRole('dialog', { name: /Sign in to OpenCode/ });
+  await openCodeSignIn.waitFor();
+  await openCodeSignIn.getByRole('button', { name: 'Done', exact: true }).click();
+  await openCodeSignIn.waitFor({ state: 'hidden' });
   assert.deepEqual(errors, []);
   await page.close();
   console.log(

@@ -27,6 +27,7 @@ import { FormField } from '../ui/FormField';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
 import { LoadingState } from '../ui/LoadingState';
+import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { AgentKeySignIn } from './AgentKeySignIn';
 import { DetectedKeysModal } from './DetectedKeysModal';
@@ -164,13 +165,16 @@ export function AgentAccounts({
   const [group, setGroup] = useState<AgentProfile['group']>('work');
   const [busy, setBusy] = useState('');
   const [keyModalOpen, setKeyModalOpen] = useState(false);
+  const [connectionMethod, setConnectionMethod] = useState('signIn');
   const statuses = accountData?.statuses ?? {};
   const [signIn, setSignIn] = useState<AgentProfile>();
+  const [signInWithKey, setSignInWithKey] = useState(false);
   const pendingProfile = useRef<string | null>(null);
   const signInOpener = useRef<HTMLElement | null>(null);
   const [editing, setEditing] = useState<AgentProfile>();
   const desktop = isTauriEnvironment();
-  const keyAccount = agentId === 'antigravity' || agentId === 'aider';
+  const keyAccount =
+    agentId === 'antigravity' || (agentId === 'opencode' && connectionMethod === 'apiKey');
   const load = useCallback(async () => {
     await useAgentAccountsStore.getState().load(agentId, true);
     onChanged?.();
@@ -245,6 +249,7 @@ export function AgentAccounts({
               group,
             );
             pendingProfile.current = profile.id;
+            setSignInWithKey(keyAccount);
             setSignIn(profile);
           });
         }}
@@ -259,6 +264,17 @@ export function AgentAccounts({
                 : 'Keep separate logins for work, personal projects or clients.'}
           </p>
         </div>
+        {agentId === 'opencode' && (
+          <Select
+            aria-label="OpenCode connection method"
+            value={connectionMethod}
+            onValueChange={setConnectionMethod}
+            disabled={locked}
+          >
+            <SelectItem value="signIn">Provider sign-in</SelectItem>
+            <SelectItem value="apiKey">Provider API key (including DeepSeek)</SelectItem>
+          </Select>
+        )}
         <AccountGroup
           value={group}
           onChange={setGroup}
@@ -361,14 +377,24 @@ export function AgentAccounts({
                     disabled={locked}
                     onClick={(event) => {
                       signInOpener.current = event.currentTarget;
+                      setSignInWithKey(agentId === 'antigravity');
                       setSignIn(profile);
                     }}
                   >
-                    {keyAccount
-                      ? 'Connect API key'
-                      : agentId === 'goose'
-                        ? 'Set up account'
-                        : 'Sign in'}
+                    {agentId === 'antigravity' ? 'Connect API key' : 'Sign in'}
+                  </Button>
+                )}
+                {!existing && agentId === 'opencode' && (
+                  <Button
+                    variant="outline"
+                    disabled={locked}
+                    onClick={(event) => {
+                      signInOpener.current = event.currentTarget;
+                      setSignInWithKey(true);
+                      setSignIn(profile);
+                    }}
+                  >
+                    Connect API key
                   </Button>
                 )}
                 <Button
@@ -426,7 +452,7 @@ export function AgentAccounts({
           }}
         />
       )}
-      {signIn && keyAccount && (
+      {signIn && signInWithKey && (
         <AgentKeySignIn
           agentId={agentId}
           agentName={agentName}
@@ -446,7 +472,7 @@ export function AgentAccounts({
           }}
         />
       )}
-      {signIn && !keyAccount && (
+      {signIn && !signInWithKey && (
         <Suspense fallback={<LoadingState label={'Opening sign-in…'} compact />}>
           <AgentSignIn
             agentId={agentId}

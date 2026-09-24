@@ -18,7 +18,7 @@ impl Coordinator {
                 .and_then(|bytes| serde_json::from_slice(&bytes).map_err(|e| e.to_string())),
             Err(error) => Err(error.to_string()),
         };
-        let (ledger, storage_error) = match loaded {
+        let (mut ledger, storage_error) = match loaded {
             Ok(ledger) => (ledger, None),
             Err(error) => {
                 let reason = format!("Task queue could not be loaded: {error}. Starting work is disabled to protect existing assignments. The original remains at {}. Close Jackalope, back it up and repair it, then restart.", path.display());
@@ -30,6 +30,11 @@ impl Coordinator {
                 (Ledger::default(), Some(reason))
             }
         };
+        for followup in &mut ledger.followups {
+            if !followup.dispatched {
+                followup.paused = true;
+            }
+        }
         let service = Self {
             inner: Arc::new(Mutex::new(Inner {
                 ledger,

@@ -424,15 +424,8 @@ pub(in crate::commands) fn prepare_with_message(
     let mut preview_target = master;
     let resolution = selected
         .iter()
-        .find(|run| run.dependency_snapshot.reconciles);
-    if selected
-        .iter()
         .filter(|run| run.dependency_snapshot.reconciles)
-        .count()
-        > 1
-    {
-        return Err("Select only one reconciliation result.".into());
-    }
+        .max_by_key(|run| run.dependency_snapshot.sources.len());
     if let Some(resolver) = resolution {
         if resolver.dependency_snapshot.target_head.as_ref() != Some(&plan.master_head)
             || selected.iter().any(|run| {
@@ -894,6 +887,7 @@ fn reachable_run_ids(plans: Vec<IntegrationPlan>, runs: &[TaskRun]) -> Result<Ve
 
 #[tauri::command]
 pub async fn integration_prepare(
+    sessions: State<'_, super::live_sessions::LiveSessions>,
     coordinator: State<'_, super::coordination::Coordinator>,
     state: State<'_, TaskRuntime>,
     run_ids: Vec<String>,
@@ -901,7 +895,9 @@ pub async fn integration_prepare(
 ) -> Result<IntegrationPlan, String> {
     let runtime = state.inner().clone();
     let coordinator = coordinator.inner().clone();
+    let sessions = sessions.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
+        let _sessions = sessions.integration_guard(&run_ids)?;
         coordinator.guarded_integration(&run_ids, |audits| {
             let plan = prepare_with_message(
                 &runtime.integration_directory(),
@@ -926,6 +922,7 @@ pub async fn integration_prepare(
 
 #[tauri::command]
 pub async fn integration_apply(
+    sessions: State<'_, super::live_sessions::LiveSessions>,
     coordinator: State<'_, super::coordination::Coordinator>,
     state: State<'_, TaskRuntime>,
     plan_id: String,
@@ -933,8 +930,11 @@ pub async fn integration_apply(
 ) -> Result<IntegrationPlan, String> {
     let runtime = state.inner().clone();
     let coordinator = coordinator.inner().clone();
+    let sessions = sessions.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let directory = runtime.integration_directory();
+        let ids = load(&directory, &plan_id)?.run_ids;
+        let _sessions = sessions.integration_guard(&ids)?;
         {
             let _guard = execution_guard()?;
             let runs = runtime.integration_runs()?;
@@ -1069,6 +1069,97 @@ mod tests {
                 let _ = fs::remove_dir_all(&self.root);
             }
         }
+    }
+
+    #[test]
+    fn successive_combined_checks_preserve_resolutions_and_detect_later_source_edits() {
+        let f = Fixture::new();
+        fs::create_dir_all(&f.plans).unwrap();
+        let verify = |run: &mut TaskRun| {
+            let tree = workspace_tree(run, &f.plans).unwrap();
+            run.verify_command = Some("fixture check".into());
+            run.verification = Some(serde_json::from_value(serde_json::json!({"command":"fixture check","checkedAt":"now","tree":tree,"result":{"success":true,"exitCode":0,"stdout":"","stderr":"","durationMs":1,"timedOut":false,"truncated":false}})).unwrap());
+        };
+        let mut a = f.run(11, "shared.txt", "first feature\n");
+        let mut b = f.run(12, "shared.txt", "second feature\n");
+        verify(&mut a);
+        verify(&mut b);
+        let mut runs = vec![a.clone(), b.clone()];
+        let mut ids = vec![a.id.clone(), b.id.clone()];
+        let input =
+            dependencies::reconciliation_input(&f.plans, &runs, &ids, "first-combination").unwrap();
+        let mut combined = f.run(13, "temporary", "");
+        fs::remove_file(Path::new(&combined.workspace).join("temporary")).unwrap();
+        git(
+            Path::new(&combined.workspace),
+            &["reset", "--hard", &input.base],
+        )
+        .unwrap();
+        combined.base_head = input.base.clone();
+        combined.dependency_snapshot = input;
+        fs::write(
+            Path::new(&combined.workspace).join("shared.txt"),
+            "both features\n",
+        )
+        .unwrap();
+        verify(&mut combined);
+        ids.push(combined.id.clone());
+        runs.push(combined.clone());
+        let base =
+            prepare_dependencies(&f.plans, &runs, &[combined.id.clone()], "consumer").unwrap();
+        assert_eq!(
+            git(&f.project, &["show", &format!("{}:shared.txt", base.base)]).unwrap(),
+            "both features"
+        );
+        let mut c = f.run(14, "independent.txt", "third feature\n");
+        verify(&mut c);
+        ids.push(c.id.clone());
+        runs.push(c);
+        let final_input =
+            dependencies::reconciliation_input(&f.plans, &runs, &ids, "final-combination").unwrap();
+        assert_eq!(
+            git(
+                &f.project,
+                &["show", &format!("{}:shared.txt", final_input.base)]
+            )
+            .unwrap(),
+            "both features"
+        );
+        let mut final_run = f.run(15, "temporary", "");
+        fs::remove_file(Path::new(&final_run.workspace).join("temporary")).unwrap();
+        git(
+            Path::new(&final_run.workspace),
+            &["reset", "--hard", &final_input.base],
+        )
+        .unwrap();
+        final_run.base_head = final_input.base.clone();
+        final_run.dependency_snapshot = final_input;
+        verify(&mut final_run);
+        ids.push(final_run.id.clone());
+        runs.push(final_run);
+        let plan = prepare(&f.plans, &runs, &ids).unwrap();
+        assert_eq!(git(&f.project, &["rev-parse", "HEAD"]).unwrap(), f.base);
+        fs::write(
+            Path::new(&a.workspace).join("shared.txt"),
+            "unexpected edit\n",
+        )
+        .unwrap();
+        assert!(apply(&f.plans, &runs, &plan.id).is_err());
+        fs::write(
+            Path::new(&a.workspace).join("shared.txt"),
+            "first feature\n",
+        )
+        .unwrap();
+        assert_eq!(apply(&f.plans, &runs, &plan.id).unwrap().status, "applied");
+        assert_eq!(
+            fs::read_to_string(f.project.join("shared.txt")).unwrap(),
+            "both features\n"
+        );
+        assert_eq!(
+            fs::read_to_string(f.project.join("independent.txt")).unwrap(),
+            "third feature\n"
+        );
+        assert!(Path::new(&combined.workspace).exists());
     }
 
     #[test]

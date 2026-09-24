@@ -5,6 +5,7 @@ import { PatchPreview } from '../components/tasks/PatchPreview';
 import { TaskActivity } from '../components/tasks/TaskActivity';
 import { TaskContextPanel } from '../components/tasks/TaskContextPanel';
 import TaskMarkdown from '../components/tasks/TaskMarkdown';
+import { TaskOutcomes } from '../components/tasks/TaskOutcomes';
 import { Button } from '../components/ui/button';
 import { Select, SelectItem } from '../components/ui/Select';
 import { assemblePrompt } from '../lib/skills/context-assembler';
@@ -18,6 +19,65 @@ const activity = [
   'Run pnpm test\nSearch suite: 4 passed',
   'Edited src/search.ts\nTrim whitespace before searching.',
 ];
+
+const outcomePreview = {
+  id: 'outcome-preview',
+  contract: {
+    step: 0,
+    inputs: {},
+    requirements: [
+      {
+        id: 'trim',
+        title: 'Search ignores surrounding whitespace',
+        checkpoint: false,
+        receipt: null,
+      },
+      {
+        id: 'keyboard',
+        title: 'Keyboard navigation remains usable',
+        checkpoint: false,
+        receipt: null,
+      },
+      {
+        id: 'native',
+        title: 'Installed app behavior is verified',
+        checkpoint: false,
+        receipt: null,
+      },
+    ],
+  },
+  validationSteps: [
+    {
+      id: 'final-review',
+      step: 'Final verification',
+      status: 'passed',
+      evidence: [],
+      timestamp: '2026-09-17T12:00:00Z',
+      requirements: [
+        {
+          requirementId: 'trim',
+          status: 'met',
+          summary:
+            'The query is trimmed before lookup. The focused search checks cover leading and trailing spaces.',
+          evidence: ['src/search.ts', 'Search suite: 4 passed (fictional fixture)'],
+        },
+        {
+          requirementId: 'keyboard',
+          status: 'partial',
+          summary:
+            'Tab order and Enter submission were inspected; screen-reader behavior remains unverified.',
+          evidence: ['Keyboard walkthrough (fictional fixture)'],
+        },
+        {
+          requirementId: 'native',
+          status: 'unverified',
+          summary: 'This browser fixture cannot establish installed-app behavior.',
+          evidence: [],
+        },
+      ],
+    },
+  ],
+} satisfies Parameters<typeof TaskOutcomes>[0]['run'];
 
 export function TaskExperienceExamples() {
   const [scenario, setScenario] = useState('choice');
@@ -153,6 +213,12 @@ export function TaskExperienceExamples() {
           }
         />
       </div>
+      <TaskOutcomes
+        run={outcomePreview}
+        canReview={false}
+        onCorrect={() => {}}
+        onAdvance={async () => {}}
+      />
     </section>
   );
 }

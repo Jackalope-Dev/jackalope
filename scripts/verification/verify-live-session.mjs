@@ -12,6 +12,7 @@ import { LiveSessionView } from '/src/components/sessions/LiveSessionView.tsx';
 import { LiveSessions } from '/src/components/sessions/LiveSessions.tsx';
 import { WORKSPACE_VIEWS } from '/src/components/layout/navigation.ts';
 import { useLiveSessionStore } from '/src/stores/liveSessionStore.ts';
+import { useProjectStore } from '/src/stores/projectStore.ts';
 import { applyThemeTokens, DEFAULT_THEME } from '/node_modules/@jackalope/brand/src/theme.ts';
 import '/src/index.css';
 import '/src/components/tasks/task-workspace.css';
@@ -19,6 +20,12 @@ import '/src/components/tasks/core-workflow.css';
 import '/src/components/ui/experience.css';
 const run = {id:'run',taskId:'run',liveSessionId:'session',projectId:'atlas',projectName:'Atlas',projectPath:'C:/Projects/atlas',workspace:'C:/Projects/atlas-session',branch:'session/search',targetBranch:'main',baseHead:'base',agent:'codex',account:'Personal',model:'Example',prompt:'Improve search',status:'running',startedAt:'2026-09-11T12:00:00Z',endedAt:null,sessionId:'provider-session',result:'',activity:[],diagnostics:[],prompts:[],error:null,persistenceError:null,exitCode:null,usage:{input:0,output:0,cacheRead:0,cacheWrite:0,reported:false}};
 const session = {id:'session',title:'Search walkthrough',request:{projectId:'atlas',projectName:'Atlas',projectPath:run.projectPath,agent:'codex'},createdAt:run.startedAt,updatedAt:run.startedAt,paused:false,closed:false,pinned:false,draft:{text:'',revision:0},error:null,messages:[{id:'first',text:'The search results need more room.',createdAt:run.startedAt,runId:'run',canceled:false}],batches:[{runId:'run',messageIds:['first'],previousRunId:null,error:null,settled:false}]};
+const project = {id:'atlas',name:'Atlas',path:run.projectPath,gitBranch:'main'};
+useProjectStore.setState({projects:[project],selectedProjectId:'atlas'});
+const patch = 'diff --git a/src/search.tsx b/src/search.tsx\\n--- a/src/search.tsx\\n+++ b/src/search.tsx\\n@@ -1 +1 @@\\n-narrow\\n+roomy\\n';
+let plan = null;
+let rating = null;
+let seen = false;
 const f = window.sessionFixture = {
  calls:[], failSend:false, holdSend:false, failPin:false, failCreate:false, holdCreate:false, release:null,
  navigation: WORKSPACE_VIEWS,
@@ -31,6 +38,19 @@ window.__TAURI_INTERNALS__ = { transformCallback:()=>0, metadata:{currentWindow:
  const s = useLiveSessionStore.getState().sessions[0];
  switch(command) {
  case 'live_session_snapshot': return {sessions:useLiveSessionStore.getState().sessions,runs:useLiveSessionStore.getState().runs,error:null};
+ case 'knowledge_list': return [];
+ case 'knowledge_preview': return {entries:[],bytes:0,reasons:{}};
+ case 'queue_snapshot': return f.managedQueue ?? {items:[],managedTasks:[],messages:[],enabledProjects:[],concurrency:3,bridgeUrl:null,bridgeError:null,mergedRunIds:[]};
+ case 'task_strategy_assess': return {id:'fixture-assessment',sourceHead:'base',strategy:'single',parallelAvailable:false,reason:'This fixture continues with one lead.',createdAt:new Date().toISOString(),cached:false,decision:{version:1,kind:'task_strategy',requestedMode:'deterministic',provider:'local_rules',policyRevision:1,modelCallAttempted:false,usage:{input:0,output:0,cacheRead:0,cacheWrite:0,reported:true}}};
+ case 'task_strategy_history': return [];
+ case 'task_strategy_cancel': return;
+ case 'task_usefulness': if(args.useful!==undefined)rating={useful:args.useful,reviewMinutes:args.reviewMinutes};return rating;
+ case 'task_review_progress': if(args.seenTree)seen=true;return {tree:'tree',diff:seen?'':patch,files:seen?[]:['src/search.tsx'],viewedAt:seen?'2026-09-16T12:00:00Z':null,note:seen?'Changes since your saved review position.':'All current changes.'};
+ case 'integration_plans': return plan?[plan]:[];
+ case 'integration_prepare': plan={id:'plan',runIds:args.runIds,projectPath:run.projectPath,targetBranch:'main',status:'ready',files:['src/search.tsx'],masterHead:'baseline',patch,conflicts:[],commitMessage:args.commitMessage||'Improve search',commitPolicy:{attribution:'agent',cleanupAfterMerge:true}};return plan;
+ case 'integration_apply': plan={...plan,status:'applied',cleanupResults:[{workspace:run.workspace,removed:true}]};f.update({integratedRunId:'run',closed:true,paused:true});return plan;
+ case 'project_github_context': return {title:'Fix search',url:'https://github.com/example/atlas/issues/42',text:'External issue body.',truncated:false};
+ case 'live_session_limits': f.update({limits:args.limits});return;
  case 'live_session_create': {
   if(f.failCreate) throw new Error('The session could not be saved.');
   if(f.holdCreate) await new Promise(resolve=>{f.release=resolve});
@@ -62,7 +82,12 @@ window.__TAURI_INTERNALS__ = { transformCallback:()=>0, metadata:{currentWindow:
   f.run({status:'stopping'});
   if(f.holdStop)await new Promise(resolve=>{f.releaseStop=resolve});
   f.run({status:'stopped'});f.update({batches:s.batches.map(batch=>({...batch,settled:true}))});return;
- case 'task_preview_status': return null;
+ case 'task_preview_status': return f.preview ?? null;
+ case 'task_preview_start': f.preview={port:5418,command:args.command,running:true,ready:true,output:'Ready',exitCode:null};return f.preview;
+ case 'task_preview_inspect': return {screenshot:{id:'capture',name:'Preview capture',timestamp:new Date().toISOString(),filePath:'C:/preview.png',url:'http://localhost:5418/',mimeType:'image/png'},snapshot:'button Save [ref=save]',errors:''};
+ case 'task_screenshot': return Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2WQAAAAASUVORK5CYII='), c=>c.charCodeAt(0));
+ case 'task_preview_inspect_cancel': return;
+
  case 'plugin:window|minimize': case 'plugin:window|close': return;
  default: throw new Error('Unexpected fixture command: '+command);
  }
@@ -84,12 +109,46 @@ try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 840 } });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (
+      message.type() === 'error' &&
+      /same key|In HTML|cannot contain a nested/.test(message.text())
+    )
+      errors.push(message.text());
+  });
   page.setDefaultTimeout(15000);
   await page.route('**/src/main.tsx*', (route) =>
     route.fulfill({ contentType: 'application/javascript', body: fixture }),
   );
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.getByRole('heading', { name: 'Search walkthrough' }).waitFor();
+  assert.equal(await page.locator('.live-status').getAttribute('aria-expanded'), 'false');
+  assert.equal(
+    await page.getByRole('button', { name: 'Pause queue', exact: true }).isVisible(),
+    true,
+  );
+  assert.equal(
+    await page.getByRole('button', { name: 'Stop work', exact: true }).isVisible(),
+    true,
+  );
+  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Session limits', exact: true }).click();
+  await page.getByLabel('Pause after this many batches').fill('8');
+  await page.getByRole('button', { name: 'Save limits', exact: true }).click();
+  await page.getByText('Limits saved.', { exact: true }).waitFor();
+  assert.equal(
+    await page.evaluate(
+      () =>
+        window.sessionFixture.calls.find((call) => call.command === 'live_session_limits').limits
+          .maxBatches,
+    ),
+    8,
+  );
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  await page.waitForFunction(
+    () => document.activeElement?.getAttribute('aria-label') === 'Chat options',
+  );
   const input = page.getByRole('textbox', { name: 'Message', exact: true });
   await input.fill('Keep the result titles on one line.');
   await page.evaluate(() => {
@@ -162,9 +221,20 @@ try {
     }),
   );
   await page.getByRole('button', { name: 'Review changes', exact: true }).click();
-  await page.getByText('1 file · Checks passed').waitFor();
+  await page.getByRole('navigation', { name: 'Changed files', exact: true }).waitFor();
   const calls = await page.evaluate(() => window.sessionFixture.calls.map((c) => c.command));
   assert.ok(calls.lastIndexOf('live_session_action') < calls.lastIndexOf('live_session_review'));
+  const reviewWidth = await page
+    .locator('.task-review')
+    .evaluate((el) => el.getBoundingClientRect().width);
+  assert.ok(reviewWidth > 800, 'Session review uses the full workspace width');
+  assert.equal(await input.isVisible(), true, 'Follow-up stays available during review');
+  const reviewPanel = await page.locator('.live-work').boundingBox();
+  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  const previewPanel = await page.locator('.live-work').boundingBox();
+  assert.equal(previewPanel.x, reviewPanel.x, 'Preview retains review alignment');
+  assert.equal(previewPanel.width, reviewPanel.width, 'Preview retains the full review width');
+  await page.getByRole('button', { name: 'Activity', exact: true }).click();
   await page.evaluate(() => window.sessionFixture.run({ verificationError: 'Check failed' }));
   await page
     .locator('.live-message')
@@ -195,6 +265,11 @@ try {
   );
   await page.evaluate(() => window.sessionFixture.releaseStop());
   await page.waitForFunction(() => document.querySelector('textarea').value === '');
+  await page.waitForFunction(() =>
+    window.sessionFixture.calls.some(
+      (call) => call.command === 'live_session_action' && call.action === 'resume',
+    ),
+  );
   assert.deepEqual(
     await page.evaluate(() =>
       window.sessionFixture.calls
@@ -215,24 +290,46 @@ try {
   assert.equal(await input.inputValue(), 'Preserve this if stopping fails.');
   await page.evaluate(() => window.sessionFixture.run({ status: 'review' }));
   await input.fill('x'.repeat(11990));
+  await page.locator('.live-status').click();
   await page.getByRole('button', { name: 'Preview', exact: true }).click();
-  const feedback = page.getByRole('textbox', { name: 'What should change?', exact: true });
-  await feedback.fill('Make the Save action clearer.');
-  await page.getByRole('button', { name: 'Add to follow-up', exact: true }).click();
-  await page.getByText('This would exceed the message limit.', { exact: false }).first().waitFor();
-  assert.equal(await feedback.inputValue(), 'Make the Save action clearer.');
+  assert.equal(
+    await page.getByRole('textbox', { name: 'What should change?', exact: true }).count(),
+    0,
+  );
+  await page.getByText('Add a preview command below, or detect one from the project.').waitFor();
+  assert.equal(
+    await page.getByRole('button', { name: 'Start preview', exact: true }).isDisabled(),
+    true,
+  );
+  assert.equal(
+    await page.getByText('Stop preview before continuing or merging.', { exact: false }).count(),
+    0,
+  );
+  await page.getByLabel('Preview command', { exact: true }).fill('node app.mjs --port {port}');
+  await page.getByRole('button', { name: 'Start preview', exact: true }).click();
+  await page.locator('summary').filter({ hasText: 'Capture a fresh page snapshot' }).click();
+  await page.getByRole('button', { name: 'Capture evidence', exact: true }).click();
+  await page.getByRole('button', { name: 'Add evidence to follow-up', exact: true }).click();
+  await page
+    .getByText('Send or shorten your follow-up before adding more feedback.', { exact: false })
+    .first()
+    .waitFor();
   assert.equal((await input.inputValue()).length, 11990);
   await input.fill('Keep the keyboard shortcuts.');
-  await page.getByRole('button', { name: 'Add to follow-up', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('#preview-feedback').value === '');
-  assert.match(
-    await input.inputValue(),
-    /Keep the keyboard shortcuts[\s\S]*Make the Save action clearer/,
+  await page.getByRole('button', { name: 'Add evidence to follow-up', exact: true }).click();
+  await page.waitForFunction(() =>
+    document.querySelector('textarea').value.includes('Preview evidence'),
   );
+  assert.match(await input.inputValue(), /Keep the keyboard shortcuts[\s\S]*Preview evidence/);
   await page.goto(`${url}/?compact`, { waitUntil: 'domcontentloaded' });
   await page.setViewportSize({ width: 440, height: 620 });
   const pin = page.getByRole('button', { name: 'Always on top', exact: true });
   await pin.click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('button[aria-label="Always on top"]')?.getAttribute('aria-pressed') ===
+      'true',
+  );
   assert.equal(await pin.getAttribute('aria-pressed'), 'true');
   await page.evaluate(() => {
     window.sessionFixture.failPin = true;
@@ -294,10 +391,31 @@ try {
   assert.equal(await page.getByRole('button', { name: 'New chat', exact: true }).count(), 0);
   assert.ok(await input.evaluate((element) => element === document.activeElement));
   await page.screenshot({ path: `${output}/hub-start-1280-dark.png` });
+  await page.getByRole('button', { name: 'Chat options', exact: true }).press('Enter');
+  await page.getByRole('menuitem', { name: 'Codex speed', exact: true }).press('Enter');
+  const speed = page.getByRole('combobox', { name: 'Codex speed', exact: true });
+  await speed.press('Enter');
+  await page.getByRole('option', { name: 'Fast · higher usage', exact: true }).press('Enter');
+  assert.equal(await speed.textContent(), 'Fast · higher usage');
+  await page.screenshot({ path: `${output}/codex-speed-1280-dark.png` });
+  await page.setViewportSize({ width: 960, height: 760 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.evaluate(() => window.sessionFixture.theme('light'));
+  await page.screenshot({ path: `${output}/codex-speed-960-light.png` });
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  assert.equal(await input.evaluate((element) => element === document.activeElement), true);
+  await page.setViewportSize({ width: 1280, height: 840 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   await input.fill('Make search results easier to scan.');
   await page.reload({ waitUntil: 'domcontentloaded' });
   await input.waitFor();
   assert.equal(await input.inputValue(), 'Make search results easier to scan.');
+  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Codex speed', exact: true }).click();
+  assert.equal(await speed.textContent(), 'Fast · higher usage');
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.evaluate(() => {
     window.sessionFixture.failCreate = true;
   });
@@ -327,6 +445,7 @@ try {
   assert.equal(creates[0].firstMessage.id, creates[1].firstMessage.id);
   assert.equal(creates[1].firstMessage.text, 'Make search results easier to scan.');
   assert.equal(creates[1].title, undefined);
+  assert.equal(creates[1].request.codexSpeed, 'fast');
   assert.equal(await page.locator('.live-message').count(), 1);
   await page.evaluate(() => window.sessionFixture.history());
   const history = page.getByRole('navigation', { name: 'Chats', exact: true });
@@ -343,6 +462,81 @@ try {
   assert.equal(titles.at(-1), 'Finished walkthrough');
   await page.screenshot({ path: `${output}/hub-1280-dark.png` });
   await page.getByRole('button', { name: 'New chat', exact: true }).click();
+  const daily = page.getByRole('region', { name: 'Work across all projects', exact: true });
+  assert.equal(await daily.getByText('No loaded work is waiting for your review.').count(), 0);
+  for (const button of [
+    daily.getByRole('button', { name: 'All projects', exact: true }),
+    daily.getByRole('button', { name: /in progress/ }),
+  ]) {
+    assert.notEqual(
+      await button.evaluate((el) => getComputedStyle(el).backgroundColor),
+      'rgba(0, 0, 0, 0)',
+    );
+  }
+  await page.evaluate(async () => {
+    const { useManagedTaskStore } = await import('/src/stores/managedTaskStore.ts');
+    const { useExecutionStore } = await import('/src/stores/executionStore.ts');
+    const run = {
+      ...(await import('/src/stores/liveSessionStore.ts')).useLiveSessionStore.getState().runs[0],
+      id: 'working-run',
+      taskId: 'working-run',
+      projectId: 'atlas',
+      status: 'running',
+      liveSessionId: null,
+    };
+    const queue = {
+      ...useManagedTaskStore.getState().queue,
+      managedTasks: [
+        {
+          id: 'working-task',
+          title: 'Implement search controls',
+          request: { projectId: 'atlas', agent: 'codex' },
+          plannerRunId: 'planner',
+          runIds: [run.id],
+          started: true,
+          error: null,
+        },
+      ],
+      items: [],
+      enabledProjects: ['managed:working-task'],
+    };
+    window.sessionFixture.managedQueue = queue;
+    useExecutionStore.setState({ runs: [run] });
+    useManagedTaskStore.setState({ queue });
+  });
+  const working = history.getByRole('button', {
+    name: 'Implement search controls Working',
+    exact: true,
+  });
+  const character = working.locator('.brand-agent-character');
+  await character.waitFor();
+  assert.equal(await character.getAttribute('data-state'), 'working');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  assert.notEqual(await character.evaluate((el) => getComputedStyle(el).animationName), 'none');
+  await page.screenshot({ path: `${output}/hub-active-controls-dark.png` });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  assert.equal(await character.evaluate((el) => getComputedStyle(el).animationName), 'none');
+  await page.evaluate(() => window.sessionFixture.theme('light'));
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.brand-agent-character, .daily-work-row')].every(
+      (element) => getComputedStyle(element).color === 'rgb(30, 30, 36)',
+    ),
+  );
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  await page.screenshot({ path: `${output}/hub-active-controls-light.png` });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.evaluate(async () => {
+    const { useManagedTaskStore } = await import('/src/stores/managedTaskStore.ts');
+    const queue = { ...useManagedTaskStore.getState().queue, managedTasks: [] };
+    window.sessionFixture.managedQueue = queue;
+    useManagedTaskStore.setState({ queue });
+    (await import('/src/stores/executionStore.ts')).useExecutionStore.setState({ runs: [] });
+    window.sessionFixture.theme('dark');
+  });
+
+  await page.getByRole('button', { name: 'New chat', exact: true }).click();
   assert.equal(await input.inputValue(), '');
   await input.fill('A separate draft');
   await history
@@ -351,10 +545,70 @@ try {
   assert.equal(await input.inputValue(), 'And keep keyboard focus in the search box.');
   await page.getByRole('button', { name: 'New chat', exact: true }).click();
   assert.equal(await input.inputValue(), 'A separate draft');
+  assert.equal(await page.getByText('Session limits', { exact: true }).count(), 0);
+  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page
+    .getByRole('menuitem', { name: 'Start from a repeatable workflow', exact: true })
+    .click();
+  await page.getByLabel('Issue number', { exact: true }).fill('42');
+  await page.getByRole('button', { name: 'Prepare task draft' }).click();
+  await page.waitForFunction(() =>
+    document.querySelector('textarea').value.includes('External issue body.'),
+  );
+  assert.ok((await input.inputValue()).startsWith('A separate draft'));
+  assert.ok((await input.inputValue()).includes("user's explicit authorization"));
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  assert.equal(await input.evaluate((node) => node === document.activeElement), true);
+  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Session limits', exact: true }).click();
+  await page.getByLabel('Pause after this many batches').fill('3');
+  await page.getByLabel('Pause at estimated cost (USD)', { exact: true }).fill('5');
+  await page.getByRole('button', { name: 'Save limits' }).click();
+  await page.getByText('Limits saved.', { exact: true }).waitFor();
+  await page.screenshot({ path: `${output}/chat-limits-dark.png` });
+  assert.deepEqual(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('jackalope-live-start:atlas:limits')),
+    ),
+    { maxBatches: 3, pauseAtEstimatedUsd: 5 },
+  );
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  await page.getByRole('button', { name: 'Chat options', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('menuitem', { name: 'Session limits', exact: true }).press('Enter');
+  assert.equal(await page.getByLabel('Pause after this many batches').inputValue(), '3');
+  assert.equal(
+    await page.getByLabel('Pause at estimated cost (USD)', { exact: true }).inputValue(),
+    '5',
+  );
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  const preservedDraft = await input.inputValue();
+  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Saved project context', exact: true }).click();
+  const memory = page.getByRole('checkbox', { name: 'Use matching project lessons (up to three)' });
+  await memory.uncheck();
+  await page.screenshot({ path: `${output}/chat-context-dark.png` });
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  assert.equal(await input.inputValue(), preservedDraft);
+  assert.equal(
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem('jackalope-live-start:atlas:context')).memoryOff,
+    ),
+    true,
+  );
+  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Saved project context', exact: true }).click();
+  assert.equal(await memory.isChecked(), false);
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  await page.getByRole('region', { name: 'Work across all projects' }).waitFor();
   await page.setViewportSize({ width: 960, height: 640 });
   await page.evaluate(() => window.sessionFixture.theme('light'));
   await page.waitForFunction(
-    () => getComputedStyle(document.querySelector('h1')).color === 'rgb(30, 30, 36)',
+    () => getComputedStyle(document.querySelector('.live-start h2')).color === 'rgb(30, 30, 36)',
   );
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
@@ -365,6 +619,43 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   const startBox = await input.boundingBox();
   assert.ok(startBox.y + startBox.height <= 700);
+  await page.setViewportSize({ width: 1280, height: 840 });
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => {
+    window.sessionFixture.run({ status: 'review', endedAt: '2026-09-16T12:00:00Z' });
+    window.sessionFixture.update({
+      paused: true,
+      batches: [{ runId: 'run', messageIds: ['first'], settled: true }],
+    });
+  });
+  await page.getByRole('button', { name: 'Review changes', exact: true }).click();
+  await page.getByRole('button', { name: 'More review actions', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Changes since last review', exact: true }).click();
+  await page.getByRole('button', { name: 'Changes since my last review' }).click();
+  await page.getByText('All current changes.', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Mark these changes seen' }).click();
+  await page.getByText('No changes since this review position.', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  await page.getByRole('button', { name: 'More review actions', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Rate this result', exact: true }).click();
+  await page.getByLabel('Minutes spent reviewing and correcting (optional)').fill('4');
+  await page.getByRole('button', { name: 'Useful result', exact: true }).click();
+  await page.getByText('Your rating is saved.', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  await page.getByRole('tab', { name: 'Merge', exact: true }).click();
+  await page.getByRole('button', { name: 'Preview merge into main', exact: true }).click();
+  await page.getByRole('button', { name: 'Merge into main and clean up', exact: true }).waitFor();
+  await page.screenshot({ path: `${output}/review-1280-dark.png` });
+  await page.getByRole('button', { name: 'Merge into main and clean up', exact: true }).click();
+  await page.getByText('Integrated into main', { exact: true }).waitFor();
+  assert.equal(await input.isDisabled(), true);
+  await page.getByRole('button', { name: 'Activity', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue in a new chat', exact: true }).click();
+  assert.ok(
+    await page.evaluate(() =>
+      localStorage.getItem('jackalope-live-start:atlas').includes('A separate draft'),
+    ),
+  );
   assert.deepEqual(errors, []);
   console.log(
     `Live-session browser checks passed. Screenshots: ${output}. Browser fixtures only; no native tasks launched.`,

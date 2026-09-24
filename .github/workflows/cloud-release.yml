@@ -1,8 +1,7 @@
 name: Cloud release
 on:
   push:
-    branches: [master, beta]
-    paths: ['releases/**', 'package.json']
+    branches: [stable, beta]
   workflow_dispatch:
     inputs:
       mode:
@@ -38,10 +37,11 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '24'
+          node-version-file: '.node-version'
       - id: plan
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_DISTRIBUTION: ${{ vars.RELEASE_DISTRIBUTION }}
           CLOUD_RELEASE_ENABLED: ${{ vars.CLOUD_RELEASE_ENABLED }}
           CLOUD_RELEASE_TARGETS: ${{ vars.CLOUD_RELEASE_TARGETS }}
           CLOUD_SIGNING_READY: ${{ vars.CLOUD_SIGNING_READY }}
@@ -73,7 +73,7 @@ jobs:
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '24'
+          node-version-file: '.node-version'
           cache: pnpm
       - name: Install Linux native dependencies
         if: runner.os == 'Linux'
@@ -92,9 +92,10 @@ jobs:
           key: cloud-${{ matrix.target }}-${{ github.ref_name }}-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-${{ github.sha }}
           restore-keys: |
             cloud-${{ matrix.target }}-${{ github.ref_name }}-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-
+            cloud-${{ matrix.target }}-${{ github.ref_name }}-rust-1.98.1-
       - run: pnpm verify
       - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features --features beta-access execution_access
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         if: runner.os == 'Windows' && env.CLOUD_MODE == 'candidate'
         with:
           dotnet-version: '8.0.x'
@@ -102,7 +103,7 @@ jobs:
         if: runner.os == 'Windows' && env.CLOUD_MODE == 'candidate'
         shell: pwsh
         run: ./scripts/release/cloud-tools.ps1 -Azure
-      - uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906
         if: runner.os == 'Windows' && env.CLOUD_MODE == 'candidate'
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
@@ -137,7 +138,7 @@ jobs:
           APPLE_API_ISSUER: ${{ vars.APPLE_API_ISSUER }}
           APPLE_API_PRIVATE_KEY: ${{ runner.os == 'macOS' && env.CLOUD_MODE == 'candidate' && secrets.APPLE_API_PRIVATE_KEY || '' }}
         run: node scripts/release/cloud-build-unix.mjs "$CLOUD_MODE" "$RELEASE_CHANNEL"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always() && (steps.windows.outcome == 'success' || steps.unix.outcome == 'success')
         with:
           name: cloud-${{ env.CLOUD_MODE }}-${{ matrix.target }}
@@ -162,8 +163,8 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '24'
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+          node-version-file: '.node-version'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           pattern: cloud-candidate-*
           path: output/cloud-candidates
@@ -180,7 +181,7 @@ jobs:
           TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
           RELEASE_MODE: ${{ needs.plan.outputs.mode }}
         run: node scripts/release/cloud-publish.mjs output/cloud-candidates $env:RELEASE_MODE
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
           name: cloud-publication-${{ github.run_attempt }}

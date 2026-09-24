@@ -44,6 +44,8 @@ pub struct ValidationStep {
     #[serde(default)]
     pub evidence: Vec<String>,
     pub timestamp: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requirements: Vec<super::outcomes::RequirementAssessment>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
@@ -175,14 +177,22 @@ pub struct RecordValidationInput {
     #[schemars(description = "File paths of screenshots or logs gathered as evidence")]
     #[serde(default)]
     pub evidence: Vec<String>,
+    #[serde(default)]
+    #[schemars(
+        description = "Optional final batch of requirement answers: requirementId from the task contract, met/partial/unverified, concise justification and evidence references. Agent assessments do not accept requirements for the user."
+    )]
+    pub requirements: Vec<super::outcomes::RequirementAssessment>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ComputerVerifyInput {
-    #[schemars(description = "Command executable to run for verification, e.g. 'pnpm' or 'cargo'")]
+    #[serde(default)]
+    #[schemars(
+        description = "Omit command and args to run this attempt's saved project check. If supplied, command and args must exactly match that saved command, available in project.verification.command."
+    )]
     pub command: String,
     #[schemars(
-        description = "Arguments to pass to the verification command, e.g. ['test'] or ['build']"
+        description = "Omit with command to use the saved check. Extra or replacement arguments are not allowed."
     )]
     #[serde(default)]
     pub args: Vec<String>,

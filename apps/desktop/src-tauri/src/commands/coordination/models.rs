@@ -26,6 +26,8 @@ pub struct QueueItem {
     #[serde(default)]
     pub prepare_command: Option<String>,
     #[serde(default)]
+    pub setup_files: Vec<String>,
+    #[serde(default)]
     pub auto_verify: bool,
     pub title: String,
     pub prompt: String,
@@ -61,6 +63,8 @@ pub struct QueueRequest {
     #[serde(default)]
     pub prepare_command: Option<String>,
     #[serde(default)]
+    pub setup_files: Vec<String>,
+    #[serde(default)]
     pub auto_verify: bool,
     pub title: String,
     pub prompt: String,
@@ -69,7 +73,7 @@ pub struct QueueRequest {
     pub dependencies: Vec<String>,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanEntry {
     #[serde(default)]
@@ -103,6 +107,8 @@ pub struct PlanRequest {
     #[serde(default)]
     pub(super) prepare_command: Option<String>,
     #[serde(default)]
+    pub setup_files: Vec<String>,
+    #[serde(default)]
     pub(super) auto_verify: bool,
     pub(super) items: Vec<PlanEntry>,
 }
@@ -132,6 +138,10 @@ pub struct CoordinationMessage {
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub(super) struct Ledger {
+    #[serde(default)]
+    pub(super) followups: Vec<super::followups::FollowUp>,
+    #[serde(default)]
+    pub(super) managed_tasks: Vec<super::managed::ManagedTask>,
     pub(super) items: Vec<QueueItem>,
     pub(super) messages: Vec<CoordinationMessage>,
     #[serde(default)]
@@ -149,6 +159,7 @@ pub(super) struct Ledger {
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QueueView {
+    pub managed_tasks: Vec<super::managed::ManagedTask>,
     pub assist_policies: Vec<super::reconciliation::AssistPolicy>,
     pub reconciliations: Vec<super::reconciliation::ReconciliationJob>,
     pub agreements: Vec<super::agreements::Agreement>,

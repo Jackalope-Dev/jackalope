@@ -4,7 +4,6 @@
  * - Anthropic Agent Skills & Prompt Library (MIT / Apache 2.0)
  * - Daniel Miessler's Fabric patterns (MIT)
  * - Awesome Cursor Rules & cursor.directory (MIT)
- * - Aider System Prompts & Repo-Map patterns (Apache 2.0)
  * - SWE-agent Thought-Action-Observation loops (MIT)
  */
 
@@ -44,10 +43,9 @@ export const VETTED_SKILLS: SkillDefinition[] = [
       /\b(fix|bug|broken|crash|error|exception|fails?|failing|hang|regression|reproduce|trace|issue)\b/i,
     ],
     guidelines: [
-      'Reproduce behavioral defects with a focused failing check when practical. Respect explicit testing constraints; verify copy-only changes through their diff.',
-      'Trace the exact call path and inspect state; do not apply superficial patches or guess root causes.',
-      'Touch only code directly relevant to the issue. Preserve adjacent logic, comments, and formatting.',
-      'Verify that the reproduction test passes and all existing regression tests remain clean.',
+      'Inspect the affected code and establish the cause. Run a reproduction check before implementation only when its result is needed to choose the fix or explicit user or repository instructions require it.',
+      'Preserve unrelated behavior and existing work. Complete the coherent implementation before batching required tests and builds in final verification.',
+      'Verify the fix and affected boundaries, including repository-required checks. Repeat passing checks only after relevant changes, failures or unresolved concerns.',
     ],
     suggestedTools: ['filesystem', 'git'],
   },

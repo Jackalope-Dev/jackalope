@@ -1,4 +1,5 @@
 import { isTauriEnvironment } from './tauri-bridge.ts';
+import { invokeNative } from './telemetry-client.ts';
 
 export interface Runner {
   desktopInstalled?: boolean;
@@ -21,14 +22,25 @@ export interface TaskRun {
   archivedAt?: string | null;
   liveSessionId?: string | null;
   effort?: import('./task-effort').TaskEffort | null;
+  codexSpeed?: 'standard' | 'fast' | null;
+  requestedServiceTier?: string | null;
   reasoningEffort?: string | null;
   efficiency?: {
+    timings?: Record<string, { calls: number; totalMs: number; maxMs: number }>;
+    firstActivityMs?: number | null;
+    routingCallsAvoided?: number;
+    warmProviderHits?: number;
+    repositoryMapCacheHits?: number;
     toolCalls?: Record<string, number>;
     toolObservationsTruncated?: boolean;
     launchPromptBytes: number;
     launches: number;
+    jevQuestionCalls?: number | null;
+    jevQuestions?: number | null;
     verificationCalls: number;
     verificationFailures: number;
+    verificationReuses?: number | null;
+    preparationReuses?: number | null;
     verificationStdoutBytes: number;
     verificationDeliveredBytes: number;
   };
@@ -61,6 +73,7 @@ export interface TaskRun {
       recordedAt: string;
     }[];
     decisions: {
+      assessment?: import('./decisions').DecisionReceipt | null;
       orchestrator: string;
       orchestratorModel: string | null;
       orchestratorAccount: string;
@@ -102,6 +115,7 @@ export interface TaskRun {
   targetBranch?: string | null;
   verifyCommand?: string | null;
   prepareCommand?: string | null;
+  setupFiles?: string[];
   autoVerify?: boolean;
   finishing?: boolean;
   verificationError?: string | null;
@@ -142,10 +156,14 @@ export interface TaskRun {
     catalogTools: number;
     catalogBytes: number;
     schemaBytesReturned: number;
+    resultBytesReceived?: number | null;
+    resultBytesReturned?: number | null;
+    resultReads?: number | null;
   };
   usageObservations?: {
     messageId: string;
     parentToolUseId: string | null;
+    sessionId?: string | null;
     model: string | null;
     input: number;
     output: number;
@@ -204,6 +222,12 @@ export interface ValidationStep {
   notes?: string | null;
   evidence: string[];
   timestamp: string;
+  requirements?: {
+    requirementId: string;
+    status: 'met' | 'partial' | 'unverified';
+    summary: string;
+    evidence: string[];
+  }[];
 }
 export interface ScreenshotArtifact {
   id: string;
@@ -216,6 +240,7 @@ export interface ScreenshotArtifact {
 }
 export interface RunRequest {
   effort?: import('./task-effort').TaskEffort;
+  codexSpeed?: 'standard' | 'fast';
   contextSelection?: import('./knowledge').ContextSelection;
   connectionIds?: string[];
   model?: string;
@@ -229,6 +254,7 @@ export interface RunRequest {
   targetBranch?: string;
   verifyCommand?: string;
   prepareCommand?: string;
+  setupFiles?: string[];
   autoVerify?: boolean;
   prompt: string;
   isolated: boolean;
@@ -284,8 +310,7 @@ export async function nativeTask<T>(command: string, args?: Record<string, unkno
     throw new Error(
       'Open the desktop app to connect projects and run agents. This browser preview does not execute work.',
     );
-  const { invoke } = await import('@tauri-apps/api/core');
-  return invoke<T>(command, args);
+  return invokeNative<T>(command, args);
 }
 
 export async function respondToPrompt(

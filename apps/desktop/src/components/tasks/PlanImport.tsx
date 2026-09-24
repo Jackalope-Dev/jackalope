@@ -208,6 +208,7 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
             targetBranch: project.preferences?.baseBranch || project.gitBranch,
             verifyCommand: project.preferences?.verifyCommand,
             prepareCommand: project.preferences?.prepareCommand,
+            setupFiles: project.preferences?.setupFiles,
             autoVerify: project.preferences?.autoVerify === true,
             agentAccounts: project.preferences?.agentAccounts,
             items: preview,

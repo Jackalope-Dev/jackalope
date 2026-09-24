@@ -25,3 +25,13 @@ export function requirementState(item: Requirement, tree: string | null) {
 export function correctionPrompt(items: Requirement[]) {
   return `Address these requirements, then provide fresh evidence for review:\n\n${items.map((item) => `- ${item.title}${item.receipt?.note ? `\n  Review feedback: ${item.receipt.note}` : ''}`).join('\n')}\n\nPreserve the other agreed outcomes. Report anything you could not verify.`;
 }
+export function requirementAssessment(
+  steps: import('./task-runtime').ValidationStep[] | undefined,
+  id: string,
+) {
+  for (const step of [...(steps ?? [])].reverse()) {
+    const answer = step.requirements?.find((item) => item.requirementId === id);
+    if (answer) return { answer, timestamp: step.timestamp };
+  }
+  return null;
+}

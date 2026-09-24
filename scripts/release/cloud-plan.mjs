@@ -7,8 +7,8 @@ import { releaseTargets } from './cloud-publish.mjs';
 const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'));
 const automatic = process.env.GITHUB_EVENT_NAME === 'push';
 const branch = process.env.GITHUB_REF_NAME;
-if (!['master', 'beta'].includes(branch)) throw new Error('Cloud releases require master or beta');
-const channel = branch === 'master' ? 'stable' : 'beta';
+if (!['stable', 'beta'].includes(branch)) throw new Error('Cloud releases require stable or beta');
+const channel = branch === 'stable' ? 'stable' : 'beta';
 const mode = automatic ? 'publish' : event.inputs?.mode;
 if (!['rehearsal', 'candidate', 'draft', 'publish'].includes(mode))
   throw new Error('Unknown release mode');
@@ -29,10 +29,16 @@ if (automatic && enabled) {
   if (refs.some((ref) => ref.ref === `refs/tags/${tag}`)) enabled = false;
 }
 if (enabled) await readNotes(v, mode !== 'rehearsal');
-const selected =
+let selected =
   !automatic && event.inputs?.targets === 'windows'
     ? ['windows-x86_64']
     : releaseTargets(process.env.CLOUD_RELEASE_TARGETS);
+if (process.env.RELEASE_DISTRIBUTION === 'store') {
+  if (event.inputs?.targets === 'windows')
+    throw new Error('Windows releases use Microsoft Store; run Store release');
+  selected = selected.filter((target) => target !== 'windows-x86_64');
+  if (!selected.length) throw new Error('Configure Mac/Linux Cloud targets for Store distribution');
+}
 const runners = {
   'windows-x86_64': 'windows-2022',
   'darwin-aarch64': 'macos-15',

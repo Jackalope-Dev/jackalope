@@ -1,14 +1,19 @@
-import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { sessionWork } from '../../lib/live-session';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import type { Project } from '../../stores/projectStore';
+import { AgentStack } from '../agents/AgentAvatar';
+import { DailyWork } from '../tasks/DailyWork';
 import { Button } from '../ui/button';
 import { LiveSessionView } from './LiveSessionView';
 import { SessionRecovery } from './SessionRecovery';
 import { SessionStart } from './SessionStart';
 import './live-session.css';
+import { managedTaskWork } from '../../lib/managed-task';
+import { useExecutionStore } from '../../stores/executionStore';
+import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
+import { ManagedTaskView } from '../tasks/ManagedTaskView';
 
 export function LiveSessions({
   project,
@@ -19,7 +24,14 @@ export function LiveSessions({
 }) {
   const { sessions, runs, selectedId, select, loading } = useLiveSessionStore();
   const [fresh, setFresh] = useState(0);
+  const managed = useManagedTaskStore();
+  const taskRuns = useExecutionStore((state) => state.runs);
+  const managedTasks = (managed.queue.managedTasks ?? []).filter(
+    (task) => !project || task.request.projectId === project.id,
+  );
+  const selectedTask = managedTasks.find((task) => task.id === managed.selectedId);
   useEffect(observeLiveSessions, []);
+  useEffect(observeManagedTasks, []);
   const session = sessions.find(
     (item) => item.id === selectedId && (!project || item.request.projectId === project.id),
   );
@@ -44,9 +56,15 @@ export function LiveSessions({
     .sort((a, b) => a.group - b.group || b.activity - a.activity);
   return (
     <section className="live-hub" aria-label="Chat">
-      <div className="live-hub-body" data-has-history={items.length > 0}>
+      <div className="live-hub-body" data-has-history={items.length > 0 || managedTasks.length > 0}>
         <div className="live-hub-canvas">
-          {session ? (
+          {selectedTask ? (
+            <ManagedTaskView
+              key={selectedTask.id}
+              task={selectedTask}
+              onBack={() => managed.select(null)}
+            />
+          ) : session ? (
             <LiveSessionView
               key={session.id}
               session={session}
@@ -61,10 +79,11 @@ export function LiveSessions({
                 project={project}
                 onOpenProject={onOpenProject}
               />
+              <DailyWork />
             </>
           )}
         </div>
-        {items.length > 0 && (
+        {(items.length > 0 || managedTasks.length > 0) && (
           <nav className="live-history" aria-label="Chats">
             <div className="live-history-action">
               <Button
@@ -73,6 +92,7 @@ export function LiveSessions({
                 className="w-full justify-center"
                 onClick={() => {
                   select(null);
+                  managed.select(null);
                   setFresh((value) => value + 1);
                 }}
               >
@@ -80,6 +100,43 @@ export function LiveSessions({
                 New chat
               </Button>
             </div>
+            {managedTasks.length > 0 && (
+              <section className="live-history-group">
+                <h2>Planned tasks</h2>
+                {managedTasks.map((task) => {
+                  const work = managedTaskWork(task, managed.queue, taskRuns);
+                  const state = work.questions.length
+                    ? 'waiting'
+                    : work.active.length
+                      ? 'working'
+                      : 'idle';
+                  return (
+                    <button
+                      type="button"
+                      className="live-history-row"
+                      key={task.id}
+                      aria-current={selectedTask?.id === task.id ? 'page' : undefined}
+                      onClick={() => {
+                        select(null);
+                        managed.select(task.id);
+                      }}
+                    >
+                      <AgentStack
+                        agents={[
+                          work.active[0]?.agent ?? work.combined?.agent ?? task.request.agent,
+                        ]}
+                        state={state}
+                        size="xs"
+                      />
+                      <span className="live-history-copy">
+                        <strong>{task.title}</strong>
+                        <span className="live-muted">{work.status}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </section>
+            )}
             {['Needs attention', 'In progress', 'Recent', 'Finished'].map((label, group) => {
               const members = items.filter((item) => item.group === group);
               return (
@@ -92,16 +149,18 @@ export function LiveSessions({
                         className="live-history-row"
                         key={item.id}
                         aria-current={item.id === session?.id ? 'page' : undefined}
-                        onClick={() => select(item.id)}
+                        onClick={() => {
+                          managed.select(null);
+                          select(item.id);
+                        }}
                       >
-                        <span className="live-mascot" aria-hidden="true">
-                          <AgentCharacter
-                            provider={work.latest?.agent ?? item.request.agent}
-                            state={
-                              work.questions.length ? 'waiting' : work.active ? 'working' : 'idle'
-                            }
-                          />
-                        </span>
+                        <AgentStack
+                          agents={[work.latest?.agent ?? item.request.agent]}
+                          state={
+                            work.questions.length ? 'waiting' : work.active ? 'working' : 'idle'
+                          }
+                          size="xs"
+                        />
                         <span className="live-history-copy">
                           <strong>{item.title}</strong>
                           <span className="live-muted">

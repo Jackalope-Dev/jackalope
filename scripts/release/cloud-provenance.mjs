@@ -4,8 +4,8 @@ import { appendFile } from 'node:fs/promises';
 const id = process.env.CANDIDATE_RUN;
 const branch = process.env.GITHUB_REF_NAME;
 const repo = process.env.GITHUB_REPOSITORY;
-if (!/^\d+$/.test(id ?? '') || !['beta', 'master'].includes(branch))
-  throw new Error('Select a completed candidate run from beta or master');
+if (!/^\d+$/.test(id ?? '') || !['beta', 'stable'].includes(branch))
+  throw new Error('Select a completed candidate run from beta or stable');
 const api = (path) =>
   JSON.parse(
     execFileSync('gh', ['api', `repos/${repo}/${path}`], { encoding: 'utf8', windowsHide: true }),

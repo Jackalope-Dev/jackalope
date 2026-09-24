@@ -16,6 +16,7 @@ export function TaskKnowledge({
   selection = {},
   onChange,
   embedded = false,
+  allowWorkflows = true,
 }: {
   projectId: string;
   projectPath: string;
@@ -23,6 +24,7 @@ export function TaskKnowledge({
   selection?: ContextSelection;
   onChange: (value: ContextSelection) => void;
   embedded?: boolean;
+  allowWorkflows?: boolean;
 }) {
   const { entries, error } = useKnowledge(projectId, projectPath);
   const [receipt, setReceipt] = useState<ContextReceipt | null>(null);
@@ -64,29 +66,31 @@ export function TaskKnowledge({
         Saved project context{receipt ? ` · ${receipt.entries.length} included` : ''}
       </Heading>
       <div className="task-knowledge-body">
-        <label className="task-knowledge-field" htmlFor="task-workflow">
-          <span>Workflow</span>
-          <Select
-            id="task-workflow"
-            aria-label="Workflow"
-            value={selection.workflowId || 'none'}
-            onValueChange={(id) =>
-              onChange({ ...selection, workflowId: id === 'none' ? null : id })
-            }
-          >
-            <SelectItem value="none">No workflow</SelectItem>
-            {selection.workflowId && !workflows.some((w) => w.id === selection.workflowId) && (
-              <SelectItem value={selection.workflowId}>
-                Unavailable workflow — choose another
-              </SelectItem>
-            )}
-            {workflows.map((workflow) => (
-              <SelectItem key={workflow.id} value={workflow.id}>
-                {workflow.title}
-              </SelectItem>
-            ))}
-          </Select>
-        </label>
+        {allowWorkflows && (
+          <label className="task-knowledge-field" htmlFor="task-workflow">
+            <span>Workflow</span>
+            <Select
+              id="task-workflow"
+              aria-label="Workflow"
+              value={selection.workflowId || 'none'}
+              onValueChange={(id) =>
+                onChange({ ...selection, workflowId: id === 'none' ? null : id })
+              }
+            >
+              <SelectItem value="none">No workflow</SelectItem>
+              {selection.workflowId && !workflows.some((w) => w.id === selection.workflowId) && (
+                <SelectItem value={selection.workflowId}>
+                  Unavailable workflow — choose another
+                </SelectItem>
+              )}
+              {workflows.map((workflow) => (
+                <SelectItem key={workflow.id} value={workflow.id}>
+                  {workflow.title}
+                </SelectItem>
+              ))}
+            </Select>
+          </label>
+        )}
         {workflow?.process?.inputs.map((name, index) => (
           <label key={name} className="task-knowledge-field" htmlFor={`workflow-input-${index}`}>
             <span>{name}</span>
@@ -133,6 +137,12 @@ export function TaskKnowledge({
                 {entry.title} · {entry.kind === 'memory' ? 'Matched lesson' : 'Selected workflow'}
               </DisclosureSummary>
               <p className="whitespace-pre-wrap break-words">{entry.content}</p>
+              {receipt.reasons?.[entry.id] && (
+                <p className="task-muted">{receipt.reasons[entry.id]}</p>
+              )}
+              <p className="task-muted">
+                Revision {entry.revision} · saved {new Date(entry.updatedAt).toLocaleDateString()}
+              </p>
             </Disclosure>
             {entry.kind === 'memory' && (
               <Button

@@ -5,6 +5,7 @@ import {
   ChartNoAxesColumn,
   FileCheck2,
   GitBranch,
+  GitCommitHorizontal,
   History,
   Layers3,
   ListTodo,
@@ -16,18 +17,26 @@ import {
 export const WORKSPACE_VIEWS = [
   {
     id: 'live-sessions',
-    label: 'Tasks',
+    label: 'Work',
     description: 'Chat: live conversation to send a message, follow work and review changes.',
     icon: Layers3,
+    group: 'tasks',
+    primary: false,
+  },
+  {
+    id: 'kanban',
+    label: 'Work',
+    description: 'Tasks: plan, review and archive work.',
+    icon: ListTodo,
     group: 'tasks',
     primary: true,
   },
   {
-    id: 'kanban',
-    label: 'Tasks',
-    description: 'Tasks: plan, review and archive work.',
-    icon: ListTodo,
-    group: 'tasks',
+    id: 'remote-hosts',
+    label: 'Hosts',
+    description: 'Connect to trusted hosts and continue work from another device.',
+    icon: Network,
+    group: 'hosts',
     primary: false,
   },
   {
@@ -48,7 +57,7 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'agents',
-    label: 'Agents',
+    label: 'Agents & tools',
     description: 'Manage runners, accounts and configuration.',
     icon: Bot,
     group: 'agents',
@@ -73,7 +82,7 @@ export const WORKSPACE_VIEWS = [
   {
     id: 'usage',
     label: 'Usage & quota',
-    description: 'Agents: account limits, token usage and performance insights.',
+    description: 'Agents: account limits and recorded token usage.',
     icon: ChartNoAxesColumn,
     group: 'agents',
     primary: false,
@@ -96,10 +105,18 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'schedules',
-    label: 'Recurring',
+    label: 'Automations',
     description: 'Tasks: schedules and automatic runs.',
     icon: CalendarClock,
-    group: 'tasks',
+    group: 'automations',
+    primary: true,
+  },
+  {
+    id: 'changes',
+    label: 'Changes',
+    description: 'Project: review uncommitted work and commit it.',
+    icon: GitCommitHorizontal,
+    group: 'project',
     primary: false,
   },
   {
@@ -160,7 +177,7 @@ export const WORKSPACE_VIEWS = [
   },
 ] as const;
 export type ActiveTab = (typeof WORKSPACE_VIEWS)[number]['id'];
-export const DEFAULT_WORKSPACE_TAB: ActiveTab = 'live-sessions';
+export const DEFAULT_WORKSPACE_TAB: ActiveTab = 'kanban';
 export const AGENT_VIEWS = [
   { id: 'agents', label: 'Runners' },
   { id: 'usage', label: 'Usage & quota' },
@@ -170,16 +187,17 @@ export const MCP_VIEWS = [
   { id: 'mcps', label: 'Connections' },
   { id: 'mcp-marketplace', label: 'Marketplace' },
 ] as const;
-export const USAGE_VIEWS = [
-  { id: 'tokens', label: 'Tokens & usage' },
-  { id: 'analytics', label: 'Performance & insights' },
-] as const;
-export type UsageView = (typeof USAGE_VIEWS)[number]['id'];
 export function navigateWorkspace(tab: ActiveTab) {
   window.dispatchEvent(new CustomEvent('jackalope:navigate', { detail: tab }));
 }
 export function openSettings(
-  category: 'General' | 'System' | 'Diagnostics' | 'Invitations' | 'Updates & support',
+  category:
+    | 'General'
+    | 'System'
+    | 'Diagnostics'
+    | 'Invitations'
+    | 'Updates & support'
+    | 'Connected work',
 ) {
   window.dispatchEvent(new CustomEvent('jackalope:open-settings', { detail: category }));
 }

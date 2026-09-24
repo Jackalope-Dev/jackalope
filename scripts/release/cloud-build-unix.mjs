@@ -138,7 +138,22 @@ try {
     ...(candidate ? [] : ['--debug']),
   ];
   run('pnpm', ['tauri', 'build', '--no-bundle', ...common]);
+  const profile = candidate ? 'release' : 'debug';
+  const native = resolve(
+    process.env.CARGO_TARGET_DIR ?? resolve(root, 'apps/desktop/src-tauri/target'),
+    profile,
+  );
   if (mac) {
+    // The terminal command ships beside the app executable and must carry the
+    // same signature and hardened runtime for notarization. It needs none of
+    // the app's entitlements.
+    run('codesign', [
+      '--force',
+      '--sign',
+      candidate ? process.env.APPLE_SIGNING_IDENTITY : '-',
+      ...(candidate ? ['--keychain', keychain, '--timestamp', '--options', 'runtime'] : []),
+      resolve(native, 'jackalope'),
+    ]);
     for (const resource of [
       'agent-browser/agent-browser',
       'desktop-control/jackalope-desktop-control',
@@ -155,11 +170,6 @@ try {
     }
   }
   run('pnpm', ['tauri', 'bundle', ...common, '--bundles', mac ? 'app,dmg' : 'appimage']);
-  const profile = candidate ? 'release' : 'debug';
-  const native = resolve(
-    process.env.CARGO_TARGET_DIR ?? resolve(root, 'apps/desktop/src-tauri/target'),
-    profile,
-  );
   const name = candidate ? 'Jackalope' : 'Jackalope Rehearsal';
   if (mac) {
     const app = resolve(native, 'bundle/macos', `${name}.app`);

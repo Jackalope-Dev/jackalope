@@ -2,6 +2,62 @@ import type { BlogPost } from './blog-types.ts';
 
 export const recentPosts: BlogPost[] = [
   {
+    slug: 'chat-to-reviewed-code-change',
+    title: 'Keep the conversation. Review the change.',
+    seoTitle: 'From coding-agent chat to a reviewed change',
+    category: 'Product notes',
+    date: '2026-09-17',
+    readingTime: '3 min read',
+    description:
+      'Queue follow-ups, review one combined result, and keep approval separate from merging in Jackalope’s latest task and chat workflows.',
+    cover: { kind: 'review', tone: 'mint', label: 'From conversation to change' },
+    sections: [
+      {
+        title: 'Can a coding-agent chat become a reviewable change?',
+        paragraphs: [
+          'Yes. In Jackalope, a chat keeps its messages, agent account, and changes in one isolated workspace. You can queue a correction while the agent works, pause before review, and inspect the patch and saved checks before merging. These workflows are implemented in the prerelease source; installed-provider and platform acceptance remain in progress.',
+          'Consider a settings form that needs keyboard access. Your first message asks for focus handling. While the agent works, you notice that validation errors also need a clear label. Queue that follow-up so the next batch receives it in order. If the current approach is wrong, use Stop and send to stop the active attempt before continuing with the new direction.',
+        ],
+        links: [{ label: 'Start and continue a chat', href: '/knowledge/chat-and-follow-ups/' }],
+      },
+      {
+        title: 'Keep a larger request together.',
+        paragraphs: [
+          'A chat is useful for successive corrections in one workspace. A reviewed plan is useful when a request has separate assignments that need coordination. Project Decisions preferences can assess the approach using local rules, an agent, or optional Jev assistance. Review the proposed scope before starting planned work.',
+          'For a settings change spanning a shared schema and two screens, follow Plan, Work, Check, and Review under one parent task. Jackalope prepares a combined result and keeps conflict resolution and bounded check repairs with that task. Individual worker success still needs a final check of the assembled change.',
+        ],
+        links: [
+          {
+            label: 'Understand decision methods and usage',
+            href: '/knowledge/task-routing-and-quotas/',
+          },
+        ],
+      },
+      {
+        title: 'Review the result that will reach your branch.',
+        paragraphs: [
+          'The Review view separates Changes, Checks, and Merge. Browse the changed files, inspect the form in a local preview, and read the check output for the current patch. A file marked reviewed helps you track your place; it does not approve the outcome. Approve work records your acceptance, and merging remains a separate action.',
+          'If you want another agent to inspect the change, prepare an agent-review request from the toolbar. You can edit the request before submitting it. Ask a concrete question, such as whether a keyboard user can reach and correct every invalid field, instead of treating a second agent’s approval as a guarantee.',
+        ],
+        links: [
+          { label: 'Review, approve, and merge changes', href: '/knowledge/review-and-merge/' },
+        ],
+      },
+      {
+        title: 'Finish one change before starting the next.',
+        paragraphs: [
+          'Pause chat dispatch and run or cancel queued messages before preparing a merge. If either the source files or target branch changes, refresh the review and required checks. After integration, start a new chat from the updated branch; the old session retains its history without continuing to edit an already-delivered workspace.',
+          'A local merge does not publish a branch, open a pull request, or deploy an application. Those remain explicit next steps. The useful outcome is a change you can explain and check, with the conversation and evidence still available when you return.',
+        ],
+      },
+    ],
+    related: [
+      { label: 'AI code review checklist', href: '/blog/review-ai-generated-code-checklist/' },
+      { label: 'Parallel work and handoffs', href: '/blog/parallel-work-clearer-handoffs/' },
+      { label: 'Recent development milestones', href: '/changelog/' },
+    ],
+  },
+  {
     slug: 'parallel-work-clearer-handoffs',
     title: 'Parallel work needs a good handoff.',
     seoTitle: 'Clearer handoffs for parallel coding agents',

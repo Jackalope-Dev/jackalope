@@ -1,20 +1,29 @@
 import { DropdownMenu as Menu, SearchIcon } from '@jackalope/ui';
 import { listen } from '@tauri-apps/api/event';
-import { Check, ChevronDown, GitBranch, Plus, Settings2 } from 'lucide-react';
+import { Check, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { captureDraftForProject } from '../../lib/capture-draft';
-import { shortcutLabel } from '../../lib/platform-shortcuts';
+import { openCliTerminal } from '../../lib/cli-terminal';
+import { displayShortcut, matchesShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
-import { telemetry } from '../../stores/communityStore';
+import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
+import { observeWorkbenchPerformance } from '../../lib/workbench-performance';
+import { openChanges } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeHelper, useHelperStore } from '../../stores/helperStore';
-import { useLiveSessionStore } from '../../stores/liveSessionStore';
+import { useHostContextStore } from '../../stores/hostContextStore';
+import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
+import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { observeWorkbenchPreferences, useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
-import { Companion } from '../mascot/Companion';
+import { BranchIndicator } from './BranchIndicator';
+import { WorkSidebar } from './WorkSidebar';
+import { WorkspaceStatusBar } from './WorkspaceStatusBar';
+import './workspace-shell.css';
 import { CompanionSources } from '../mascot/CompanionSources';
 import { RemoveProjectAction } from '../projects/RemoveProjectAction';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
@@ -31,26 +40,26 @@ import { Tooltip } from '../ui/Tooltip';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
+import { InvitationsButton } from './InvitationsButton';
 import {
   type ActiveTab,
   AGENT_VIEWS,
   DEFAULT_WORKSPACE_TAB,
   MCP_VIEWS,
   type ProjectSettingsDestination,
-  USAGE_VIEWS,
-  type UsageView,
   WORKSPACE_VIEWS,
 } from './navigation';
 import { ResizeHandles } from './ResizeHandles';
 import { TitleBar } from './TitleBar';
+import { WorkspacePresetPicker } from './WorkspacePresetPicker';
 
 export type { ActiveTab } from './navigation';
 
 // Workspace views and heavy dialogs load on demand so the first paint ships only
 // the task workspace. Each stays in its own chunk keyed by the tab that shows it.
 const RepoTodos = lazy(() => import('../tasks/RepoTodos').then((m) => ({ default: m.RepoTodos })));
-const LiveSessions = lazy(() =>
-  import('../sessions/LiveSessions').then((m) => ({ default: m.LiveSessions })),
+const RemoteHosts = lazy(() =>
+  import('../remote/RemoteHosts').then((m) => ({ default: m.RemoteHosts })),
 );
 const CodebaseMap = lazy(() =>
   import('../visualizer/CodebaseMap').then((m) => ({ default: m.CodebaseMap })),
@@ -66,6 +75,9 @@ const BrowserHarness = lazy(() =>
 );
 const UsageDashboard = lazy(() =>
   import('../tasks/UsageDashboard').then((m) => ({ default: m.UsageDashboard })),
+);
+const CommitReview = lazy(() =>
+  import('../projects/CommitReview').then((m) => ({ default: m.CommitReview })),
 );
 const WorktreeManager = lazy(() =>
   import('../projects/WorktreeManager').then((m) => ({ default: m.WorktreeManager })),
@@ -104,6 +116,8 @@ export function Shell({
   focusOnMount?: boolean;
 } = {}) {
   const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
+  useEffect(observeLiveSessions, []);
+  useEffect(observeManagedTasks, []);
   const canvas = useRef<HTMLElement>(null);
   const projectSwitcher = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -112,6 +126,51 @@ export function Shell({
   }, [focusOnMount, initialDraftKey, initialTaskAgent, initialCapture]);
   const openProjectSetup = () => useOnboardingStore.getState().begin();
   const [activeTab, setActiveTab] = useState<ActiveTab>(DEFAULT_WORKSPACE_TAB);
+  useEffect(() => {
+    if (activeTab === 'live-sessions') {
+      useExecutionStore.getState().select(null);
+      useManagedTaskStore.getState().select(null);
+      setActiveTab('kanban');
+    }
+  }, [activeTab]);
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    let disposed = false;
+    let stop: (() => void) | undefined;
+    void listen<{ id: string; pane: string; sessionId?: string }>(
+      'work-pane-open',
+      async ({ payload }) => {
+        if (payload.sessionId) {
+          await useLiveSessionStore.getState().refresh(payload.sessionId);
+          if (disposed) return;
+          const session = useLiveSessionStore
+            .getState()
+            .sessions.find((session) => session.id === payload.sessionId);
+          if (session) useProjectStore.getState().selectProject(session.request.projectId);
+          useLiveSessionStore.getState().select(payload.sessionId);
+          useWorkViewStore.getState().open(`session:${payload.sessionId}`, payload.pane);
+          setActiveTab('live-sessions');
+        } else {
+          useLiveSessionStore.getState().select(null);
+          useExecutionStore.getState().select(payload.id);
+          await useExecutionStore.getState().refresh();
+          if (disposed) return;
+          const run = useExecutionStore.getState().runs.find((run) => run.id === payload.id);
+          if (run) useProjectStore.getState().selectProject(run.projectId);
+          useManagedTaskStore.getState().select(null);
+          useWorkViewStore.getState().open(payload.id, payload.pane);
+          setActiveTab('kanban');
+        }
+      },
+    ).then((unlisten) => {
+      if (disposed) unlisten();
+      else stop = unlisten;
+    });
+    return () => {
+      disposed = true;
+      stop?.();
+    };
+  }, []);
   useEffect(() => {
     if (!isTauriEnvironment()) return;
     let disposed = false;
@@ -133,10 +192,11 @@ export function Shell({
     };
   }, []);
   useEffect(observeHelper, []);
+  useEffect(observeWorkbenchPreferences, []);
+  useEffect(observeWorkbenchPerformance, []);
   useEffect(() => {
     useHelperStore.setState({ screen: activeTab });
   }, [activeTab]);
-  const [usageView, setUsageView] = useState<UsageView>('tokens');
   const previousView = useRef<ActiveTab>(DEFAULT_WORKSPACE_TAB);
   useEffect(() => {
     if (activeTab !== 'preferences') previousView.current = activeTab;
@@ -152,25 +212,24 @@ export function Shell({
   }, []);
   const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>('General');
   const [settingsProjectId, setSettingsProjectId] = useState<string>();
-  useEffect(() => {
-    const feature: Partial<Record<ActiveTab, Feature>> = {
-      kanban: 'tasks',
-      'live-sessions': 'tasks',
-      topology: 'codebase',
-      agents: 'agents',
-      mcps: 'connections',
-      'mcp-marketplace': 'connections',
-      usage: 'usage',
-      browser: 'browser',
-      schedules: 'schedules',
-      worktrees: 'worktrees',
-    };
-    const selected = feature[activeTab];
-    if (selected) telemetry.track({ name: 'feature_used', feature: selected });
-  }, [activeTab]);
-  useEffect(() => {
-    if (activeTab === 'preferences') telemetry.track({ name: 'feature_used', feature: 'settings' });
-  }, [activeTab]);
+  const features: Partial<Record<ActiveTab, Feature>> = {
+    kanban: 'tasks',
+    'live-sessions': 'chat',
+    'project-overview': 'project',
+    'project-knowledge': 'knowledge',
+    'project-settings': 'settings',
+    'agent-settings': 'agents',
+    preferences: 'settings',
+    topology: 'codebase',
+    agents: 'agents',
+    mcps: 'connections',
+    'mcp-marketplace': 'connections',
+    usage: 'usage',
+    browser: 'browser',
+    schedules: 'schedules',
+    worktrees: 'worktrees',
+  };
+  useFeatureTelemetry(features[activeTab]);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [removingProject, setRemovingProject] = useState<Project | null>(null);
   // Keep the command palette mounted after first use so close transitions can finish.
@@ -202,20 +261,63 @@ export function Shell({
   const [composerFocus, setComposerFocus] = useState(0);
   const focusComposer = useCallback(() => {
     setCapture(null);
+    useLiveSessionStore.getState().select(null);
+    useManagedTaskStore.getState().select(null);
     useExecutionStore.getState().select(null);
     setActiveTab('kanban');
     setComposerFocus((value) => value + 1);
   }, []);
   const { projects, activeProjectId, selectProject } = useProjectStore();
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    let disposed = false;
+    const stops: Array<() => void> = [];
+    void listen('jackalope-tray-new-task', () => focusComposer()).then((unlisten) => {
+      if (disposed) unlisten();
+      else stops.push(unlisten);
+    });
+    void listen('jackalope-tray-settings', () => {
+      window.dispatchEvent(new CustomEvent('jackalope:open-settings', { detail: 'General' }));
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else stops.push(unlisten);
+    });
+    // `/diff` in the terminal: open Changes on that checkout, in its project.
+    void listen<string>('jackalope:open-changes', ({ payload: path }) => {
+      const owner = useProjectStore
+        .getState()
+        .projects.find((project) => path === project.path || path.startsWith(`${project.path}/`));
+      if (owner) useProjectStore.getState().selectProject(owner.id);
+      openChanges(path);
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else stops.push(unlisten);
+    });
+    void listen<string>('jackalope-tray-open-task', ({ payload: taskId }) => {
+      useWorkViewStore.getState().open(taskId);
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else stops.push(unlisten);
+    });
+    return () => {
+      disposed = true;
+      for (const stop of stops) stop();
+    };
+  }, [focusComposer]);
   const switchProject = (id: string) => {
     if (id === activeProjectId) return;
     const project = projects.find((item) => item.id === id);
     if (!project) return;
     const execution = useExecutionStore.getState();
     execution.draft('capture', captureDraftForProject(execution.drafts, project, activeProjectId));
+    execution.select(null);
+    useLiveSessionStore.getState().select(null);
+    useManagedTaskStore.getState().select(null);
     selectProject(id);
   };
   const selectedTaskId = useExecutionStore((state) => state.selectedId);
+  const selectedSessionId = useLiveSessionStore((state) => state.selectedId);
+  const selectedManagedId = useManagedTaskStore((state) => state.selectedId);
   const workRequest = useWorkViewStore((state) => state.request);
   useEffect(() => {
     if (!workRequest) return;
@@ -235,11 +337,14 @@ export function Shell({
       useLiveSessionStore.getState().select(run.liveSessionId);
       setActiveTab('live-sessions');
     } else {
+      useLiveSessionStore.getState().select(null);
+      useManagedTaskStore.getState().select(null);
       useExecutionStore.getState().select(run.id);
       setActiveTab('kanban');
     }
   }, [workRequest, selectProject]);
   const project = projects.find((item) => item.id === activeProjectId);
+  const preset = useWorkbenchStore((state) => state.presets[activeProjectId ?? ''] ?? 'focus');
   const view = WORKSPACE_VIEWS.find((item) => item.id === activeTab) ?? WORKSPACE_VIEWS[0];
   const navigate = useCallback((tab: ActiveTab) => {
     if (tab === 'preferences' || tab === 'audit' || tab === 'mesh') {
@@ -267,31 +372,59 @@ export function Shell({
     window.addEventListener('jackalope:open-settings', handle);
     return () => window.removeEventListener('jackalope:open-settings', handle);
   }, []);
-  const shortcut = shortcutLabel('K');
+  const shortcutSettings = useSettingsStore((state) => state.shortcuts);
+  const shortcuts = resolveShortcuts(shortcutSettings);
+  const navCollapsed = useWorkViewStore((state) => state.navCollapsed) && preset === 'build';
+  const toggleNav = useWorkViewStore((state) => state.toggleNav);
+  const shortcut = displayShortcut(shortcuts.search);
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    let disposed = false;
+    let stop: (() => void) | undefined;
+    void listen<string>('desktop-action', ({ payload }) => {
+      if (payload === 'settings') navigate('preferences');
+      if (payload === 'newWork') focusComposer();
+      if (payload === 'search') setCommandsOpen(true);
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else stop = unlisten;
+    });
+    return () => {
+      disposed = true;
+      stop?.();
+    };
+  }, [navigate, focusComposer]);
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      const bindings = resolveShortcuts(shortcutSettings);
+      if (matchesShortcut(event, bindings.search)) {
         event.preventDefault();
         setCommandsOpen((open) => !open);
-      } else if (
-        (event.metaKey || event.ctrlKey) &&
-        event.shiftKey &&
-        event.key.toLowerCase() === 'n'
-      ) {
+      } else if (matchesShortcut(event, bindings.newWork)) {
         event.preventDefault();
         focusComposer();
-      } else if ((event.metaKey || event.ctrlKey) && event.key === ',') {
+      } else if (matchesShortcut(event, bindings.settings)) {
         event.preventDefault();
         if (activeTab === 'preferences') setActiveTab(previousView.current);
         else navigate('preferences');
+      } else if (preset === 'build' && matchesShortcut(event, bindings.sidebar)) {
+        event.preventDefault();
+        useWorkViewStore.getState().toggleNav();
+      } else if (matchesShortcut(event, bindings.terminal)) {
+        const state = useProjectStore.getState();
+        const project = state.projects.find((item) => item.id === state.activeProjectId);
+        if (project && !useHostContextStore.getState().host) {
+          event.preventDefault();
+          void openCliTerminal(project.path).catch(() => {});
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, focusComposer, navigate]);
+  }, [activeTab, focusComposer, navigate, preset, shortcutSettings]);
 
   return (
-    <div className="workspace-shell">
+    <div className="workspace-shell" data-mode={preset}>
       <a className="skip-link" href="#workspace-content">
         Skip to workspace
       </a>
@@ -345,24 +478,28 @@ export function Shell({
               </Menu.Content>
             </Menu.Portal>
           </Menu.Root>
-          {project && (
-            <span className="hidden lg:flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
-              <GitBranch className="size-3" />
-              {project.gitBranch}
-            </span>
-          )}
+          <BranchIndicator />
+          <InvitationsButton
+            onClick={() => {
+              setSettingsProjectId(undefined);
+              setSettingsCategory('Invitations');
+              setActiveTab('preferences');
+            }}
+            onDismiss={() => projectSwitcher.current?.focus()}
+          />
         </div>
         <div className="flex items-center gap-3">
-          {(activeTab !== 'kanban' || selectedTaskId) && (
-            <Tooltip content={`New task (${shortcutLabel('Shift+N')})`}>
+          {project && <WorkspacePresetPicker projectId={project.id} />}
+          {(activeTab !== 'kanban' || selectedTaskId || selectedSessionId || selectedManagedId) && (
+            <Tooltip content={`New work (${displayShortcut(shortcuts.newWork)})`}>
               <button
                 type="button"
                 className="command-trigger"
                 onClick={focusComposer}
-                aria-label="Capture a task"
+                aria-label="New work"
               >
                 <Plus size={16} />
-                <span>New task</span>
+                <span>New work</span>
               </button>
             </Tooltip>
           )}
@@ -380,7 +517,7 @@ export function Shell({
           </Tooltip>
           {!isTauriEnvironment() && showThemePicker && <ArcColorPicker />}
           {!isTauriEnvironment() && (
-            <Tooltip content={`Settings (${shortcutLabel(',')})`}>
+            <Tooltip content={`Settings (${displayShortcut(shortcuts.settings)})`}>
               <button
                 type="button"
                 onClick={() => navigate('preferences')}
@@ -393,200 +530,242 @@ export function Shell({
           )}
         </div>
       </header>
-      <div className="workspace-navigation">
-        <nav aria-label="Workspace" className="flex items-center gap-1">
-          {WORKSPACE_VIEWS.filter((item) => item.primary).map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              aria-current={view.group === item.group ? 'page' : undefined}
-              className="workspace-nav-item"
+      <div className="workspace-body">
+        <aside className="workspace-navigation" data-collapsed={navCollapsed || undefined}>
+          {preset === 'build' && (
+            <Tooltip
+              side="right"
+              content={`${navCollapsed ? 'Expand' : 'Collapse'} sidebar (${displayShortcut(shortcuts.sidebar)})`}
             >
-              <item.icon className="size-3.5" />
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
-      </div>
-      <main
-        ref={canvas}
-        id="workspace-content"
-        tabIndex={-1}
-        className="workspace-canvas"
-        aria-label={view.label}
-      >
-        {view.group === 'agents' && (
-          <WorkspaceSubnavigation
-            label="Agents views"
-            items={AGENT_VIEWS}
-            value={
-              activeTab === 'agent-settings'
-                ? 'agents'
-                : activeTab === 'mcp-marketplace'
-                  ? 'mcps'
-                  : activeTab
-            }
-            onChange={navigate}
-          />
-        )}
-        {view.group !== 'settings' &&
-          view.group !== 'agents' &&
-          WORKSPACE_VIEWS.filter((item) => item.group === view.group).length > 1 && (
+              <button
+                type="button"
+                className="workspace-nav-item workspace-nav-toggle"
+                aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-expanded={!navCollapsed}
+                onClick={toggleNav}
+              >
+                {navCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+              </button>
+            </Tooltip>
+          )}
+          <nav aria-label="Workspace" className="flex items-center gap-1">
+            {WORKSPACE_VIEWS.filter((item) => item.primary).map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                onClick={() => {
+                  if (item.id === 'kanban') {
+                    useExecutionStore.getState().select(null);
+                    useLiveSessionStore.getState().select(null);
+                    useManagedTaskStore.getState().select(null);
+                  }
+                  setActiveTab(item.id);
+                }}
+                aria-current={view.group === item.group ? 'page' : undefined}
+                aria-label={item.label}
+                title={item.label}
+                className="workspace-nav-item"
+              >
+                <item.icon className="size-3.5" />
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </nav>
+          {preset === 'build' && !navCollapsed && (
+            <WorkSidebar onOpen={() => setActiveTab('kanban')} />
+          )}
+          <button
+            type="button"
+            className="workspace-nav-item workspace-settings"
+            aria-label="Settings"
+            aria-current={activeTab === 'preferences' ? 'page' : undefined}
+            title="Settings"
+            onClick={() => navigate('preferences')}
+          >
+            <Settings2 size={18} />
+            <span>Settings</span>
+          </button>
+        </aside>
+        <main
+          ref={canvas}
+          id="workspace-content"
+          tabIndex={-1}
+          className="workspace-canvas"
+          aria-label={view.label}
+        >
+          {view.group === 'agents' && (
             <WorkspaceSubnavigation
-              label={`${view.group} views`}
-              value={activeTab}
+              label="Agents views"
+              items={AGENT_VIEWS}
+              value={
+                activeTab === 'agent-settings'
+                  ? 'agents'
+                  : activeTab === 'mcp-marketplace'
+                    ? 'mcps'
+                    : activeTab
+              }
               onChange={navigate}
-              items={WORKSPACE_VIEWS.filter((item) => item.group === view.group).map((item) => ({
-                id: item.id,
-                label:
-                  item.id === 'live-sessions'
-                    ? 'Chat'
-                    : item.id === 'kanban'
-                      ? 'Tasks'
-                      : item.id === 'project-overview'
-                        ? 'Overview'
-                        : item.id === 'topology'
-                          ? 'Codebase'
-                          : item.id === 'agents'
-                            ? 'Runners'
-                            : item.id === 'agent-settings'
-                              ? 'Configuration'
-                              : item.id === 'mcps'
-                                ? 'Connections'
-                                : item.id === 'project-settings'
-                                  ? 'Settings'
-                                  : item.label,
-              }))}
             />
           )}
-        {activeTab === 'usage' && (
-          <WorkspaceSubnavigation
-            label="Usage views"
-            items={USAGE_VIEWS}
-            value={usageView}
-            onChange={setUsageView}
-          />
-        )}
-        {(activeTab === 'mcps' || activeTab === 'mcp-marketplace') && (
-          <WorkspaceSubnavigation
-            label="MCP views"
-            items={MCP_VIEWS}
-            value={activeTab}
-            onChange={navigate}
-          />
-        )}
-        <PageErrorBoundary
-          key={`${activeTab}:${activeProjectId}:${settingsCategory}`}
-          onBack={
-            activeTab === DEFAULT_WORKSPACE_TAB
-              ? undefined
-              : () => setActiveTab(DEFAULT_WORKSPACE_TAB)
-          }
-        >
-          <Suspense
-            fallback={
-              <WorkspacePage>
-                <WorkspaceHeading title={activeTab === 'topology' ? 'Codebase' : view.label} />
-                <LoadingState compact label={`Opening ${view.label}…`} />
-              </WorkspacePage>
+          {view.group !== 'settings' &&
+            view.group !== 'tasks' &&
+            view.group !== 'agents' &&
+            WORKSPACE_VIEWS.filter((item) => item.group === view.group).length > 1 && (
+              <WorkspaceSubnavigation
+                label={`${view.group} views`}
+                value={activeTab}
+                onChange={navigate}
+                items={WORKSPACE_VIEWS.filter((item) => item.group === view.group).map((item) => ({
+                  id: item.id,
+                  label:
+                    item.id === 'live-sessions'
+                      ? 'Chat'
+                      : item.id === 'kanban'
+                        ? 'Tasks'
+                        : item.id === 'project-overview'
+                          ? 'Overview'
+                          : item.id === 'topology'
+                            ? 'Codebase'
+                            : item.id === 'agents'
+                              ? 'Runners'
+                              : item.id === 'agent-settings'
+                                ? 'Configuration'
+                                : item.id === 'mcps'
+                                  ? 'Connections'
+                                  : item.id === 'project-settings'
+                                    ? 'Settings'
+                                    : item.label,
+                }))}
+              />
+            )}
+          {(activeTab === 'mcps' || activeTab === 'mcp-marketplace') && (
+            <WorkspaceSubnavigation
+              label="MCP views"
+              items={MCP_VIEWS}
+              value={activeTab}
+              onChange={navigate}
+            />
+          )}
+          <PageErrorBoundary
+            feature={features[activeTab]}
+            key={`${activeTab}:${activeProjectId}:${settingsCategory}`}
+            onBack={
+              activeTab === DEFAULT_WORKSPACE_TAB
+                ? undefined
+                : () => setActiveTab(DEFAULT_WORKSPACE_TAB)
             }
           >
-            {activeTab === 'kanban' && (
-              <TaskWorkspace
-                composerVisible={!capture}
-                composerFocus={composerFocus}
-                onCapture={(ideaId) => (ideaId ? setCapture({ ideaId }) : focusComposer())}
-                onSchedule={(id) => {
-                  const run = useExecutionStore.getState().runs.find((r) => r.id === id);
-                  if (run) selectProject(run.projectId);
-                  setScheduleRunId(id);
-                  setActiveTab('schedules');
-                }}
-              />
-            )}
-            {activeTab === 'worktrees' && (
-              <WorktreeManager key={activeProjectId} onOpenProject={openProjectSetup} />
-            )}
-            {activeTab === 'live-sessions' && (
-              <LiveSessions project={project} onOpenProject={openProjectSetup} />
-            )}
-            {activeTab === 'repo-todos' && (
-              <RepoTodos
-                key={project?.path ?? activeProjectId}
-                onCapture={(draftKey) => setCapture({ draftKey })}
-                onOpenProject={openProjectSetup}
-              />
-            )}
-            {activeTab === 'agents' && (
-              <RunnerConnections
-                onNewTask={(agent) => {
-                  useExecutionStore.getState().select(null);
-                  setCapture({ agent });
-                  setActiveTab('kanban');
-                }}
-                onRun={(run) => {
-                  selectProject(run.projectId);
-                  useExecutionStore.getState().select(run.id);
-                  setActiveTab('kanban');
-                }}
-              />
-            )}
-            {activeTab === 'usage' && (
-              <UsageDashboard view={usageView} onTask={() => setActiveTab('kanban')} />
-            )}
-            {activeTab === 'preferences' && (
-              <SettingsPage
-                key={`${settingsCategory}:${settingsProjectId ?? 'app'}`}
-                initialCategory={settingsCategory}
-                initialScope={settingsProjectId ? 'project' : 'app'}
-                initialProjectId={settingsProjectId}
-                onClose={() => setActiveTab(previousView.current)}
-              />
-            )}
-            {activeTab === 'agent-settings' && (
-              <WorkspacePage className="agent-settings-page">
-                <AgentManager key={configuredAgent} initialAgentId={configuredAgent} />
-              </WorkspacePage>
-            )}
-            {activeTab === 'project-settings' && <ProjectPreferences key={activeProjectId} />}
-            {activeTab === 'project-knowledge' && <ProjectContext key={activeProjectId} />}
-            {(activeTab === 'mcps' || activeTab === 'mcp-marketplace') && (
-              <McpWorkspace
-                view={activeTab === 'mcps' ? 'configured' : 'marketplace'}
-                onViewChange={(next) =>
-                  navigate(next === 'configured' ? 'mcps' : 'mcp-marketplace')
-                }
-              />
-            )}
-            {activeTab === 'schedules' && (
-              <ScheduleManager
-                key={activeProjectId}
-                sourceRunId={scheduleRunId}
-                onSourceHandled={() => setScheduleRunId(undefined)}
-                onOpenProject={openProjectSetup}
-                onPlanning={() => {
-                  useExecutionStore.getState().select(null);
-                  setActiveTab('kanban');
-                }}
-              />
-            )}
-            {activeTab === 'browser' && (
-              <BrowserHarness
-                onOpenProject={openProjectSetup}
-                onTask={(id) => {
-                  useExecutionStore.getState().select(id);
-                  setActiveTab('kanban');
-                }}
-              />
-            )}
-            {activeTab === 'project-overview' && (
-              <ProjectOverview onOpenProject={openProjectSetup} />
-            )}
-            {activeTab === 'topology' && <CodebaseMap onOpenProject={openProjectSetup} />}
-          </Suspense>
-        </PageErrorBoundary>
-      </main>
+            <Suspense
+              fallback={
+                <WorkspacePage>
+                  <WorkspaceHeading title={activeTab === 'topology' ? 'Codebase' : view.label} />
+                  <LoadingState compact label={`Opening ${view.label}…`} />
+                </WorkspacePage>
+              }
+            >
+              {activeTab === 'kanban' && (
+                <TaskWorkspace
+                  composerVisible={!capture}
+                  composerFocus={composerFocus}
+                  onCapture={(ideaId) => (ideaId ? setCapture({ ideaId }) : focusComposer())}
+                  onSchedule={(id) => {
+                    const run = useExecutionStore.getState().runs.find((r) => r.id === id);
+                    if (run) selectProject(run.projectId);
+                    setScheduleRunId(id);
+                    setActiveTab('schedules');
+                  }}
+                />
+              )}
+              {activeTab === 'changes' && (
+                <CommitReview key={activeProjectId} onOpenProject={openProjectSetup} />
+              )}
+              {activeTab === 'worktrees' && (
+                <WorktreeManager key={activeProjectId} onOpenProject={openProjectSetup} />
+              )}
+              {activeTab === 'remote-hosts' && (
+                <RemoteHosts
+                  onSetup={() => {
+                    setSettingsProjectId(undefined);
+                    setSettingsCategory('Remote access');
+                    setActiveTab('preferences');
+                  }}
+                />
+              )}
+              {activeTab === 'repo-todos' && (
+                <RepoTodos
+                  key={project?.path ?? activeProjectId}
+                  onCapture={(draftKey) => setCapture({ draftKey })}
+                  onOpenProject={openProjectSetup}
+                />
+              )}
+              {activeTab === 'agents' && (
+                <RunnerConnections
+                  onNewTask={(agent) => {
+                    useExecutionStore.getState().select(null);
+                    setCapture({ agent });
+                    setActiveTab('kanban');
+                  }}
+                  onRun={(run) => {
+                    selectProject(run.projectId);
+                    useExecutionStore.getState().select(run.id);
+                    setActiveTab('kanban');
+                  }}
+                />
+              )}
+              {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
+              {activeTab === 'preferences' && (
+                <SettingsPage
+                  key={`${settingsCategory}:${settingsProjectId ?? 'app'}`}
+                  initialCategory={settingsCategory}
+                  initialScope={settingsProjectId ? 'project' : 'app'}
+                  initialProjectId={settingsProjectId}
+                  onClose={() => setActiveTab(previousView.current)}
+                />
+              )}
+              {activeTab === 'agent-settings' && (
+                <WorkspacePage className="agent-settings-page">
+                  <AgentManager key={configuredAgent} initialAgentId={configuredAgent} />
+                </WorkspacePage>
+              )}
+              {activeTab === 'project-settings' && <ProjectPreferences key={activeProjectId} />}
+              {activeTab === 'project-knowledge' && <ProjectContext key={activeProjectId} />}
+              {(activeTab === 'mcps' || activeTab === 'mcp-marketplace') && (
+                <McpWorkspace
+                  view={activeTab === 'mcps' ? 'configured' : 'marketplace'}
+                  onViewChange={(next) =>
+                    navigate(next === 'configured' ? 'mcps' : 'mcp-marketplace')
+                  }
+                />
+              )}
+              {activeTab === 'schedules' && (
+                <ScheduleManager
+                  key={activeProjectId}
+                  sourceRunId={scheduleRunId}
+                  onSourceHandled={() => setScheduleRunId(undefined)}
+                  onOpenProject={openProjectSetup}
+                  onPlanning={() => {
+                    useExecutionStore.getState().select(null);
+                    setActiveTab('kanban');
+                  }}
+                />
+              )}
+              {activeTab === 'browser' && (
+                <BrowserHarness
+                  onOpenProject={openProjectSetup}
+                  onTask={(id) => {
+                    useExecutionStore.getState().select(id);
+                    setActiveTab('kanban');
+                  }}
+                />
+              )}
+              {activeTab === 'project-overview' && (
+                <ProjectOverview onOpenProject={openProjectSetup} />
+              )}
+              {activeTab === 'topology' && <CodebaseMap onOpenProject={openProjectSetup} />}
+            </Suspense>
+          </PageErrorBoundary>
+        </main>
+      </div>
       {capture && (
         <CaptureTask
           key={capture.ideaId ?? 'capture'}
@@ -615,7 +794,7 @@ export function Shell({
       <HistoryRecoveryNotice />
       <UnsavedTasksNotice />
       <CompanionSources />
-      <Companion
+      <WorkspaceStatusBar
         onSearch={() => setCommandsOpen(true)}
         onSettings={() => {
           setSettingsCategory('General');

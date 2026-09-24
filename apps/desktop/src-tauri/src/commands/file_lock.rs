@@ -3,9 +3,17 @@ use std::fs::{File, TryLockError};
 pub(super) struct FileLock(File);
 
 impl FileLock {
+    pub(super) fn try_shared(file: File) -> Result<Self, TryLockError> {
+        file.try_lock_shared()?;
+        Ok(Self(file))
+    }
     pub(super) fn try_new(file: File) -> Result<Self, TryLockError> {
         file.try_lock()?;
         Ok(Self(file))
+    }
+    /// Wraps a file whose exclusive lock the caller already holds.
+    pub(super) fn owned(file: File) -> Self {
+        Self(file)
     }
 }
 

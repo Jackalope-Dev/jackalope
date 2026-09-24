@@ -1,9 +1,11 @@
 import type { TaskTicket } from '../stores/taskStore.ts';
 import { taskAgents } from './agent-provider.ts';
 import { type LiveSession, sessionWork } from './live-session.ts';
+import { type ManagedTask, managedTaskWork } from './managed-task.ts';
+import type { QueueView } from './queue.ts';
 import { isActive, type TaskRun } from './task-runtime.ts';
 import { taskTitle } from './task-title.ts';
-import { taskNextAction } from './task-workflow.ts';
+import { taskDecision, taskNextAction } from './task-workflow.ts';
 
 export const workStages = [
   { id: 'attention', label: 'Needs you' },
@@ -12,6 +14,16 @@ export const workStages = [
   { id: 'ideas', label: 'Saved ideas' },
   { id: 'finished', label: 'Finished' },
 ] as const;
+
+export const workGroups = workStages.filter((stage) => stage.id !== 'review');
+
+export function workGroup(stage: string) {
+  return stage === 'review' ? 'attention' : stage;
+}
+
+export function matchesWorkFilter(item: WorkItem, filter: string) {
+  return filter === 'all' || workGroup(item.stage) === workGroup(filter);
+}
 
 export const ideaStageLabels: Record<TaskTicket['status'], string> = {
   backlog: 'Idea',
@@ -29,7 +41,28 @@ export interface WorkItem {
   idea?: TaskTicket;
   run?: TaskRun;
   session?: LiveSession;
+  managed?: ManagedTask;
+  statusLabel?: string;
   archiveBlocked?: string;
+}
+
+export function selectedManagedTask(
+  queue: QueueView,
+  runs: TaskRun[],
+  taskId: string | null,
+  runId: string | null,
+  projectId: string | null = null,
+) {
+  const ownsRun = (task: ManagedTask) =>
+    task.plannerRunId === runId ||
+    task.runIds.includes(runId ?? '') ||
+    managedTaskWork(task, queue, runs).work.some((run) => run.id === runId);
+  const tasks = (queue.managedTasks ?? []).filter(
+    (task) => projectId === null || task.request.projectId === projectId,
+  );
+  if (!taskId) return runId ? tasks.find(ownsRun) : undefined;
+  const task = tasks.find((task) => task.id === taskId);
+  return task && (!runId || ownsRun(task)) ? task : undefined;
 }
 
 export function workPresence(item: WorkItem): {
@@ -39,25 +72,34 @@ export function workPresence(item: WorkItem): {
 } {
   const run = item.run;
   const pending = !!run?.prompts?.some((prompt) => prompt.status === 'pending');
-  const agents = taskAgents(run, item.session?.request.agent ?? item.idea?.assignedAgent);
+  const agents = taskAgents(
+    run,
+    item.managed?.request.agent ?? item.session?.request.agent ?? item.idea?.assignedAgent,
+  );
   const state = pending
     ? 'waiting'
     : (run && isActive(run)) || item.stage === 'working'
       ? 'working'
       : 'idle';
-  const action = item.session
-    ? pending
-      ? 'Answer question'
-      : item.stage === 'attention'
-        ? 'Inspect session'
-        : item.stage === 'working'
-          ? 'View activity'
-          : 'Open Chat'
-    : run
-      ? item.stage === 'finished'
-        ? 'Open result'
-        : taskNextAction(run)
-      : 'Open idea';
+  const action = item.managed
+    ? item.stage === 'attention'
+      ? 'Inspect task'
+      : item.stage === 'review'
+        ? 'Review task'
+        : 'Open task'
+    : item.session
+      ? pending
+        ? 'Answer question'
+        : item.stage === 'attention'
+          ? 'Inspect session'
+          : item.stage === 'working'
+            ? 'View activity'
+            : 'Open Chat'
+      : run
+        ? item.stage === 'finished'
+          ? 'Open result'
+          : taskNextAction(run)
+        : 'Open idea';
   return { agents, state, action };
 }
 
@@ -68,15 +110,47 @@ export function collectWorkspaceWork(
   sessions: LiveSession[],
   integratedRunIds: string[] = [],
   archived = false,
+  queue?: QueueView,
 ): WorkItem[] {
   const sessionIds = new Set(sessions.map((session) => session.id));
+  const managedWork = (queue?.managedTasks ?? [])
+    .filter((task) => projectId === null || task.request.projectId === projectId)
+    .map((task) => ({ task, work: managedTaskWork(task, queue as QueueView, runs) }));
+  const childIds = new Set(managedWork.flatMap(({ work }) => work.work.map((run) => run.id)));
+  const parentProjects = new Map(managedWork.map(({ task }) => [task.id, task.request.projectId]));
   const items = collectWork(
     projectId,
-    ideas,
-    runs.filter((run) => !run.liveSessionId || !sessionIds.has(run.liveSessionId)),
+    ideas.filter((idea) => !idea.runId || parentProjects.get(idea.runId) !== idea.projectId),
+    runs.filter(
+      (run) => !childIds.has(run.id) && (!run.liveSessionId || !sessionIds.has(run.liveSessionId)),
+    ),
     integratedRunIds,
     archived,
   );
+  if (!archived)
+    for (const { task, work } of managedWork) {
+      items.push({
+        id: `managed:${task.id}`,
+        title: task.title,
+        date: task.createdAt,
+        managed: task,
+        statusLabel: work.status,
+        idea: ideas.find(
+          (idea) => idea.runId === task.id && idea.projectId === task.request.projectId,
+        ),
+        stage: work.integrated
+          ? 'finished'
+          : work.questions.length || work.failed || work.status === 'Needs attention'
+            ? 'attention'
+            : work.active.length || work.status === 'Queued'
+              ? 'working'
+              : work.status === 'Paused'
+                ? 'attention'
+                : 'review',
+        run: work.combined ?? work.planner,
+        archiveBlocked: 'This task retains its planning and worker history together.',
+      });
+    }
   if (!archived)
     for (const session of sessions) {
       if (projectId !== null && session.request.projectId !== projectId) continue;
@@ -92,9 +166,12 @@ export function collectWorkspaceWork(
               ? 'working'
               : session.closed
                 ? 'finished'
-                : 'review',
+                : work.latest
+                  ? 'review'
+                  : 'ideas',
         run: work.latest,
         session,
+        statusLabel: work.status,
         archiveBlocked: 'Chat sessions stay together. Open Chat to finish or resume it.',
       });
     }
@@ -142,7 +219,7 @@ export function collectWork(
       if (!!idea.archivedAt !== archived) continue;
       items.push({
         id: idea.id,
-        title: idea.title,
+        title: taskTitle(idea.rawPrompt, idea.title),
         stage: idea.runId ? 'attention' : idea.status === 'done' ? 'finished' : 'ideas',
         date: idea.updatedAt,
         idea,
@@ -156,7 +233,10 @@ export function collectWork(
     const pending = active && run.prompts?.some((prompt) => prompt.status === 'pending');
     items.push({
       id: idea?.id ?? run.taskId,
-      title: idea?.title ?? taskTitle(original.get(run.taskId)?.prompt ?? run.prompt),
+      title: taskTitle(
+        idea?.rawPrompt ?? original.get(run.taskId)?.prompt ?? run.prompt,
+        idea?.title,
+      ),
       stage:
         pending ||
         run.persistenceError ||
@@ -181,6 +261,7 @@ export function collectWork(
       date: run.startedAt,
       idea,
       run,
+      statusLabel: taskDecision(run, integratedRunIds.includes(run.id)).label,
       archiveBlocked: blocked.has(run.taskId)
         ? 'Finish or resolve all attempts and save their history first. Chat tasks stay with their session.'
         : undefined,

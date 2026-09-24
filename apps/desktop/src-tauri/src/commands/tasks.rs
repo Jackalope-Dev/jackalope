@@ -1,26 +1,32 @@
-mod antigravity;
+pub(super) mod antigravity;
 mod delegation;
 mod efficiency;
 pub(super) mod effort;
 pub(in crate::commands) mod events;
+mod gemini;
 pub(super) mod helper_process;
 mod journal;
 #[cfg(test)]
 mod journal_tests;
 pub(super) mod kimi;
 mod models;
+mod opencode;
 #[cfg(test)]
 mod performance;
 pub(super) mod preparation;
 mod project_setup;
+mod prompt;
 mod routing;
 mod runners;
 mod runtime;
 mod snapshots;
+pub(super) mod speed;
 mod storage;
 #[cfg(test)]
 mod tests;
 pub(super) mod timing;
+mod tool_activity;
+mod warm_opencode;
 
 pub(super) use events::consume_adapter_event;
 use events::*;
@@ -30,7 +36,7 @@ pub use project_setup::*;
 use runners::discover_runner;
 pub(super) use runners::executable;
 pub(super) use runners::BUILTIN_AGENTS;
-pub use snapshots::task_changes;
+pub use snapshots::{task_changes, TaskHighlight};
 
 use super::history::{quarantine, HistoryRecovery, HistoryRecoveryEntry};
 use chrono::Utc;
@@ -64,7 +70,14 @@ pub struct TaskRuntime {
     directory: PathBuf,
     // Drop joins the writer before releasing the profile lock below.
     writer: journal::Writer,
+    warm_helpers: Arc<warm_opencode::Pool>,
     _owner: Arc<super::file_lock::FileLock>,
+}
+
+impl TaskRuntime {
+    pub(super) fn invalidate_account_helpers(&self, directory: &Path) {
+        self.warm_helpers.invalidate_account(directory);
+    }
 }
 
 fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
@@ -82,7 +95,7 @@ fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
     cmd
 }
 
-fn git(path: &str, args: &[&str]) -> Result<String, String> {
+pub(super) fn git(path: &str, args: &[&str]) -> Result<String, String> {
     let out =
         super::git_command::command(Path::new(path), args, super::git_command::Policy::Inherited)
             .output()
@@ -514,25 +527,60 @@ pub async fn task_review(id: String, state: State<'_, TaskRuntime>) -> Result<Re
         .get(&id)
         .cloned()
         .ok_or("Attempt not found")?;
-    tauri::async_runtime::spawn_blocking(move || {
-        if run.workspace.is_empty() || run.base_head.is_empty() { return Err("Workspace is not available yet.".into()); }
-        let changed = git(&run.workspace, &["diff", "--name-only", "-z", &run.base_head, "--"])?;
-        let untracked = git(&run.workspace, &["ls-files", "--others", "--exclude-standard", "-z"])?;
-        let mut files: Vec<String> = changed.split('\0').chain(untracked.split('\0')).filter(|p| !p.is_empty()).map(String::from).collect();
-        files.sort(); files.dedup();
-        let mut diff = git(&run.workspace, &["diff", "--no-ext-diff", "--no-textconv", &run.base_head, "--"])?;
-        let root = std::fs::canonicalize(&run.workspace).map_err(|e| e.to_string())?;
-        for name in untracked.split('\0').filter(|p| !p.is_empty()) {
-            if diff.len() >= 120_000 { break; }
-            let path = root.join(name);
-            diff.push_str(&format!("\n\nNew file: {name}\n"));
-            if !std::fs::canonicalize(&path).is_ok_and(|p| p.starts_with(&root)) { diff.push_str("Preview unavailable: file resolves outside the workspace.\n"); continue; }
-            let mut data = Vec::new();
-            match std::fs::File::open(path).and_then(|f| f.take(120_000).read_to_end(&mut data)) {
-                Ok(_) => match String::from_utf8(data) { Ok(text) if !text.contains('\0') => diff.push_str(&text), _ => diff.push_str("Binary file; preview unavailable.") },
-                Err(error) => diff.push_str(&format!("Preview unavailable: {error}")),
-            }
+    tauri::async_runtime::spawn_blocking(move || review_run(&run))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+pub(super) fn review_run(run: &TaskRun) -> Result<Review, String> {
+    if run.workspace.is_empty() || run.base_head.is_empty() {
+        return Err("Workspace is not available yet.".into());
+    }
+    let changed = git(
+        &run.workspace,
+        &["diff", "--name-only", "-z", &run.base_head, "--"],
+    )?;
+    let untracked = git(
+        &run.workspace,
+        &["ls-files", "--others", "--exclude-standard", "-z"],
+    )?;
+    let mut files: Vec<String> = changed
+        .split('\0')
+        .chain(untracked.split('\0'))
+        .filter(|p| !p.is_empty())
+        .map(String::from)
+        .collect();
+    files.sort();
+    files.dedup();
+    let mut diff = git(
+        &run.workspace,
+        &[
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            &run.base_head,
+            "--",
+        ],
+    )?;
+    let root = std::fs::canonicalize(&run.workspace).map_err(|e| e.to_string())?;
+    for name in untracked.split('\0').filter(|p| !p.is_empty()) {
+        if diff.len() >= 120_000 {
+            break;
         }
-        Ok(Review { files, diff: diff.chars().take(120_000).collect(), note: "Current workspace compared with the task's starting commit, including new files. Existing working changes may be included when isolation is off. Preview is limited to 120,000 characters; binary files are listed only.".into() })
-    }).await.map_err(|e| e.to_string())?
+        let path = root.join(name);
+        diff.push_str(&format!("\n\nNew file: {name}\n"));
+        if !std::fs::canonicalize(&path).is_ok_and(|p| p.starts_with(&root)) {
+            diff.push_str("Preview unavailable: file resolves outside the workspace.\n");
+            continue;
+        }
+        let mut data = Vec::new();
+        match std::fs::File::open(path).and_then(|f| f.take(120_000).read_to_end(&mut data)) {
+            Ok(_) => match String::from_utf8(data) {
+                Ok(text) if !text.contains('\0') => diff.push_str(&text),
+                _ => diff.push_str("Binary file; preview unavailable."),
+            },
+            Err(error) => diff.push_str(&format!("Preview unavailable: {error}")),
+        }
+    }
+    Ok(Review { files, diff: diff.chars().take(120_000).collect(), note: "Current workspace compared with the task's starting commit, including new files. Existing working changes may be included when isolation is off. Preview is limited to 120,000 characters; binary files are listed only.".into() })
 }

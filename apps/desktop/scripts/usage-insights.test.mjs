@@ -35,6 +35,33 @@ const accepted = {
   requirements: [{ id: 'a', checkpoint: false, receipt: { accepted: true, tree: 'tree' } }],
 };
 
+test('Jev reported usage survives abstention and decision copies never duplicate billing', () => {
+  const jevUsage = { ...usage(5000), output: 12, cacheRead: 0, estimatedCostUsd: 0.00021 };
+  const task = run('jev-fallback', {
+    routing: {
+      decisions: [{ assessment: { usage: jevUsage }, usage: jevUsage }],
+      handoffs: [],
+      attempts: [
+        {
+          agent: 'jev',
+          model: 'jev-latest',
+          binding: { ...binding, adapter: 'jev', label: 'TypeSafe API key' },
+          usage: jevUsage,
+          error: 'Uncertain; local rules used.',
+          recordedAt: '2026-09-10T12:00:00Z',
+        },
+      ],
+    },
+  });
+  const entries = usageEntries([task, task]);
+  const totals = usageInsights(entries, [task], 'all');
+  assert.equal(totals.routing.tokens, 5012);
+  assert.equal(totals.total.tokens, 5112);
+  assert.equal(entries.filter((entry) => entry.agent === 'jev').length, 1);
+  assert.equal(entries.find((entry) => entry.agent === 'jev').usage.estimatedCostUsd, 0.00021);
+  assert.equal(entries.find((entry) => entry.agent === 'jev').status, 'failed');
+});
+
 test('task totals include all attempts, router failures and handoffs once; latest reviews own outcomes', () => {
   const first = run('first', {
     taskId: 'same',

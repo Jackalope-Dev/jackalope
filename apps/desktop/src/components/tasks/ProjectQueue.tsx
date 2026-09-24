@@ -22,7 +22,7 @@ import {
 } from '../../lib/queue';
 import { isActive, nativeTask, statusLabel } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { telemetry } from '../../stores/communityStore';
+import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
@@ -50,9 +50,7 @@ const emptyQueue: QueueView = {
 };
 
 export function ProjectQueue({ project, onBack }: { project: Project; onBack: () => void }) {
-  useEffect(() => {
-    telemetry.track({ name: 'feature_used', feature: 'queue' });
-  }, []);
+  useFeatureTelemetry('queue');
   const { runs, select, refresh } = useExecutionStore();
   const [queue, setQueue] = useState<QueueView>(emptyQueue);
   const [adding, setAdding] = useState(false);

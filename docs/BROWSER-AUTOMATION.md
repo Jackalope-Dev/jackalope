@@ -67,7 +67,7 @@ MCP approvals are unchanged. Other adapters use their configured transport; vali
   It is a process integration, not a security boundary against other local programs.
   Streaming is disabled before browser launch. Global agent-browser configuration,
   cloud providers, persistent authentication/state, uploads and arbitrary script
-  evaluation are not exposed. The HTML reader uses a fixed internal script.
+  evaluation are not exposed. HTML reading and preview selection use fixed internal scripts.
 - Page text remains untrusted data. Snapshots and diagnostic text are bounded to
   40,000 characters, transport responses to 2 MB and saved screenshots to the
   existing 8 MiB preview limit. Large pages can use a scoped snapshot.
@@ -75,6 +75,16 @@ MCP approvals are unchanged. Other adapters use their configured transport; vali
   Separate [native desktop control](DESKTOP-CONTROL.md) requires a user-selected
   window grant. Browser-based actions may change a site; agents must continue to
   follow the task's authorization.
+
+## Visual preview selection
+
+Preview's **Select in preview** opens a separate task-owned browser window. Users can
+navigate and sign in there, then select an element without resetting that browser's
+current state. The picker runs only on the managed preview's loopback port. Captures
+save a cropped screenshot and bounded HTML/computed-style context in the task workspace;
+page-reported source attributes remain untrusted hints. Selection notes persist in the
+desktop profile. Stopping the preview closes its selection browser and temporary profile.
+The embedded iframe and fresh-page capture do not share that window's state.
 
 ## Packaging and maintenance
 
@@ -101,3 +111,8 @@ Automated regression coverage and isolated native trials are described in
 [CONTRIBUTING.md](../CONTRIBUTING.md) and [SELF-DEVELOPMENT.md](SELF-DEVELOPMENT.md).
 Record detailed local receipts privately. Fixtures and source builds do not prove
 installed-app acceptance.
+
+The opt-in native `real_preview_picker_preserves_current_state_and_crops_the_selection`
+test opens an owned preview browser, selects changed page content, checks screenshot
+dimensions and closes the browser. Run it with Cargo's `--ignored --nocapture` flags
+on an interactive desktop; it retains the screenshot in its temporary fixture folder.

@@ -20,6 +20,7 @@ export interface LocalInspection {
   ollamaOnline: boolean;
   opencodeInstalled: boolean;
   canInstall: boolean;
+  canPrepareRunner?: boolean;
   runtimeDiskBytes: number;
   catalogCheckedAt: string;
 }
@@ -33,6 +34,13 @@ export interface LocalVerification {
   model: string;
   elapsedMs: number;
   checkedAt: string;
+  helper?: { model: string; elapsedMs: number } | null;
+}
+
+export function localHelperModels(inspection: LocalInspection, primary: string) {
+  return inspection.models.filter(
+    (model) => model.id !== primary && inspection.installedModels.includes(model.id),
+  );
 }
 
 export function formatSize(bytes: number | null) {

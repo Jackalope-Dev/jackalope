@@ -1,6 +1,6 @@
 [package]
 name = "jackalope-desktop"
-version = "0.1.0"
+version = "0.1.5"
 description = "Jackalope - Ultra-performant desktop shell and harness for agentic workflows"
 authors = ["Jackalope Contributors"]
 edition = "2021"
@@ -11,16 +11,29 @@ rust-version = "1.98"
 name = "jackalope_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# Both binaries are declared explicitly so neither is picked up by discovery.
+# The CLI deliberately does not use `jackalope_lib`: linking it would pull in
+# the entire Tauri and WebKit graph and make startup unacceptable for a command
+# that is mostly a terminal client. It shares only src/cli/protocol.rs.
+[[bin]]
+name = "jackalope-desktop"
+path = "src/main.rs"
+
+[[bin]]
+name = "jackalope"
+path = "src/cli/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 cc = "1"
 pkg-config = "0.3"
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
+tauri-plugin-autostart = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"
@@ -46,12 +59,22 @@ dunce = "1"
 oxc_resolver = "11"
 notify-debouncer-mini = "=0.7.0"
 gix = { version = "=0.87.1", default-features = false, features = ["sha1", "sha256"] }
+flate2 = "1.1.10"
+tar = "0.4.46"
+# Terminal UI for the `jackalope` binary. Only the crossterm backend is used;
+# the termwiz and termina backends would add dependencies and licence notices
+# for code that never runs.
+ratatui = { version = "0.30.2", default-features = false, features = [
+    "crossterm",
+    "underline-color",
+] }
+crossterm = "0.29.0"
 
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 beta-access = []
-store = ["beta-access"]
+store = ["beta-access", "dep:windows", "dep:windows-future", "dep:windows-collections"]
 
 [dev-dependencies]
 keyring = "=3.6.3"
@@ -60,6 +83,9 @@ keyring = "=3.6.3"
 glib = { path = "../../../patches/glib" }
 
 [target.'cfg(windows)'.dependencies]
+windows = { version = "0.62.2", optional = true, features = ["ApplicationModel", "Services_Store", "Win32_UI_Shell"] }
+windows-collections = { version = "0.3.2", optional = true }
+windows-future = { version = "0.3.2", optional = true }
 tauri-winrt-notification = "0.8.1"
 windows-sys = { version = "0.61", features = ["Win32_Storage_Packaging_Appx", "Win32_System_JobObjects", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_Threading"] }
 

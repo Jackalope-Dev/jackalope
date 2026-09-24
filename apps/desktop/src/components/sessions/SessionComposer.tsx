@@ -1,8 +1,10 @@
 import { Textarea } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/live-session';
+import { appendFeedbackDraft } from '../../lib/review-feedback';
 import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
+import { DictationButton } from '../tasks/DictationButton';
 import { useManagedPreview } from '../tasks/useManagedPreview';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -22,7 +24,13 @@ export function SessionComposer({
 }) {
   const key = `jackalope-live-draft:${location.search.includes('liveSession=') ? 'window' : 'main'}:${session.id}`;
   const previewRunning = useManagedPreview(latestRun?.id, !active);
-  const [text, setText] = useState(() => localStorage.getItem(key) ?? session.draft.text);
+  const [text, setText] = useState(() => {
+    try {
+      return localStorage.getItem(key) ?? session.draft.text;
+    } catch {
+      return session.draft.text;
+    }
+  });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const revision = useRef(session.draft.revision);
@@ -38,20 +46,26 @@ export function SessionComposer({
   useEffect(() => {
     if (!addition || added.current === addition.revision) return;
     added.current = addition.revision;
-    const value = [latest.current, addition.text].filter(Boolean).join('\n\n');
-    if (value.length > 12000) {
+    let value: string;
+    try {
+      value = appendFeedbackDraft(latest.current, addition.text);
+      localStorage.setItem(key, value);
+    } catch (cause) {
       const message =
-        'This would exceed the message limit. Send or shorten the existing draft first.';
+        cause instanceof Error && cause.name === 'Error'
+          ? cause.message
+          : 'The draft could not be saved. Your feedback is still available; free browser storage and try again.';
       setError(message);
       addition.applied(message);
       return;
     }
     editing.current = true;
+    setError('');
     latest.current = value;
     setText(value);
     input.current?.focus();
     addition.applied();
-  }, [addition]);
+  }, [addition, key]);
   useEffect(() => {
     if (!editing.current && !saving && session.draft.revision > revision.current) {
       revision.current = session.draft.revision;
@@ -168,6 +182,14 @@ export function SessionComposer({
         void send();
       }}
     >
+      <DictationButton
+        disabled={saving}
+        onText={(value) => {
+          editing.current = true;
+          setText((current) => (current.trim() ? `${current}\n${value}` : value));
+          input.current?.focus();
+        }}
+      />
       <Textarea
         ref={input}
         aria-label="Message"

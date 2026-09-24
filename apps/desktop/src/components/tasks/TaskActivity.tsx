@@ -37,7 +37,7 @@ export function TaskActivity({ entries, active }: { entries: string[]; active: b
           </p>
         )}
         {matching.length > limit && (
-          <Button variant="ghost" onClick={() => setLimit((value) => value + 40)}>
+          <Button variant="outline" onClick={() => setLimit((value) => value + 40)}>
             Show earlier entries ({matching.length - limit})
           </Button>
         )}

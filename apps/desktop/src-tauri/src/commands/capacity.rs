@@ -17,6 +17,7 @@ pub(in crate::commands) mod antigravity;
 pub(crate) mod client;
 mod connected;
 pub(in crate::commands) mod kimi;
+mod routing_cache;
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -212,21 +213,17 @@ async fn account_snapshot(root: &std::path::Path, adapter: &str) -> Result<Capac
 pub(in crate::commands) async fn routing_snapshot(
     binding: &super::agent_profiles::AccountBinding,
 ) -> CapacityRecord {
-    type RoutingCache =
-        std::collections::HashMap<(String, std::path::PathBuf), (Instant, CapacityRecord)>;
-    static CACHE: std::sync::OnceLock<std::sync::Mutex<RoutingCache>> = std::sync::OnceLock::new();
+    type RoutingCache = routing_cache::RoutingCache<(String, std::path::PathBuf), CapacityRecord>;
+    static CACHE: std::sync::OnceLock<RoutingCache> = std::sync::OnceLock::new();
     let cache = CACHE.get_or_init(Default::default);
     let key = (binding.adapter.clone(), binding.directory.clone());
-    {
-        let values = cache.lock().unwrap();
-        if let Some((checked, record)) = values
-            .get(&key)
-            .filter(|(checked, _)| checked.elapsed() < Duration::from_secs(60))
-        {
-            let _ = checked;
-            return current_snapshot(record.clone(), Utc::now().timestamp());
-        }
-    }
+    let record = cache.get(key, refresh_routing_snapshot(binding)).await;
+    current_snapshot(record, Utc::now().timestamp())
+}
+
+async fn refresh_routing_snapshot(
+    binding: &super::agent_profiles::AccountBinding,
+) -> CapacityRecord {
     let result = match binding.adapter.as_str() {
         "codex" => read_codex_bound(binding).await,
         "claude" => connected::read_claude_bound(binding).await,
@@ -242,7 +239,7 @@ pub(in crate::commands) async fn routing_snapshot(
             )
         }
     };
-    let record = result
+    result
         .map(|record| current_snapshot(record, Utc::now().timestamp()))
         .unwrap_or_else(|message| {
             unavailable(
@@ -251,13 +248,51 @@ pub(in crate::commands) async fn routing_snapshot(
                 &format!("{message} Remaining capacity is unknown."),
                 None,
             )
-        });
-    let mut values = cache.lock().unwrap();
-    if values.len() >= 256 {
-        values.clear();
+        })
+}
+
+pub(in crate::commands) async fn routing_snapshots(
+    bindings: Vec<super::agent_profiles::AccountBinding>,
+    canceled: impl Fn() -> bool,
+) -> Result<Vec<CapacityRecord>, String> {
+    let mut results = vec![None; bindings.len()];
+    let mut pending = bindings.into_iter().enumerate();
+    let mut active = tokio::task::JoinSet::new();
+    let started = Instant::now();
+    loop {
+        while active.len() < 4 {
+            let Some((index, binding)) = pending.next() else {
+                break;
+            };
+            active.spawn(async move { (index, routing_snapshot(&binding).await) });
+        }
+        if canceled() || started.elapsed() > Duration::from_secs(60) {
+            active.shutdown().await;
+            return Err(if canceled() {
+                "Routing was stopped."
+            } else {
+                "Quota discovery took too long. Retry after checking the enabled accounts."
+            }
+            .into());
+        }
+        if active.is_empty() {
+            break;
+        }
+        if let Ok(Some(result)) = timeout(Duration::from_millis(50), active.join_next()).await {
+            let (index, record) = match result {
+                Ok(record) => record,
+                Err(_) => {
+                    active.shutdown().await;
+                    return Err("An account capacity check stopped unexpectedly.".into());
+                }
+            };
+            results[index] = Some(record);
+        }
     }
-    values.insert(key, (Instant::now(), record.clone()));
-    record
+    results
+        .into_iter()
+        .map(|record| record.ok_or_else(|| "An account capacity check did not complete.".into()))
+        .collect()
 }
 
 fn failed_refresh(previous: Option<&CapacityRecord>, message: &str) -> CapacityRecord {
@@ -347,7 +382,7 @@ pub async fn capacity_snapshot(
         ));
         cache.checked = Some(Instant::now());
     }
-    Ok([
+    let mut records: Vec<_> = [
         ("codex", &cache.codex),
         ("claude", &cache.claude),
         ("grok", &cache.grok),
@@ -363,7 +398,11 @@ pub async fn capacity_snapshot(
             Utc::now().timestamp(),
         )
     })
-    .collect())
+    .collect();
+    if let Some(record) = super::jev::capacity_record(&runtime) {
+        records.push(record);
+    }
+    Ok(records)
 }
 
 #[cfg(test)]

@@ -56,6 +56,28 @@ test('adding a project clears previous setup context', () => {
   assert.equal(store.getState().step, 'project');
   assert.equal(store.getState().projectId, null);
 });
+
+test('decision drafts survive reload but do not cross project boundaries', async () => {
+  store.getState().begin('first');
+  store.getState().setRoutingMode('jev');
+  store.getState().setRoutingFallback('agent');
+  const saved = values.get('jackalope-onboarding-v1');
+  store.getState().finish();
+  values.set('jackalope-onboarding-v1', saved);
+  await store.persist.rehydrate();
+  assert.equal(store.getState().routingFallback, 'agent');
+  store.getState().selectProject('first');
+  assert.equal(store.getState().routingFallback, 'agent');
+  store.getState().selectProject('second');
+  assert.equal(store.getState().routingMode, null);
+  assert.equal(store.getState().routingFallback, null);
+  values.set(
+    'jackalope-onboarding-v1',
+    JSON.stringify({ state: { routingMode: 'jev' }, version: 0 }),
+  );
+  await store.persist.rehydrate();
+  assert.equal(store.getState().routingFallback, null);
+});
 test('old account and theme steps migrate to project setup', async () => {
   for (const step of ['account', 'behavior', 'theme']) {
     values.set(

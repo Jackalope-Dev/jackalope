@@ -4,9 +4,6 @@
   width: 100%;
   max-width: 340px;
 }
-.appearance-preferences {
-  max-width: 760px;
-}
 .appearance-toolbar-toggle {
   display: flex;
   align-items: center;
@@ -27,17 +24,6 @@
 }
 
 /* Top Header Bar */
-.settings-header {
-  height: 64px;
-  padding: 0 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--color-border-subtle);
-  background: var(--color-surface-elevated);
-  flex-shrink: 0;
-  gap: 16px;
-}
 
 .settings-scope-switcher {
   display: inline-flex;
@@ -54,7 +40,9 @@
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--color-text-secondary);
-  transition: all 140ms ease;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
   cursor: pointer;
 }
 
@@ -64,33 +52,9 @@
 
 .settings-scope-pill.is-active {
   background: var(--color-surface-elevated);
-  color: var(--color-accent-ink);
-  box-shadow: var(--shadow-selection);
-}
-
-.settings-mode-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border-radius: 8px;
-  font-size: var(--text-xs);
-  background: var(--color-surface-sunken);
-  border: 1px solid var(--color-border-subtle);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all 140ms;
-}
-
-.settings-mode-pill:hover {
-  background: var(--color-surface-hover);
   color: var(--color-text-primary);
-}
-
-.settings-mode-pill.is-advanced {
-  border-color: var(--color-accent-ink);
-  color: var(--color-accent-ink);
-  background: var(--color-accent-subtle);
+  font-weight: 600;
+  box-shadow: var(--shadow-selection);
 }
 
 /* Main Body Layout: Sidebar + Canvas */
@@ -125,7 +89,9 @@
   text-align: left;
   width: 100%;
   cursor: pointer;
-  transition: all 120ms ease;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
 }
 
 .settings-nav-item:hover {
@@ -136,6 +102,7 @@
 .settings-nav-item.is-active {
   background: var(--color-accent-subtle);
   color: var(--color-accent-ink);
+  font-weight: 600;
 }
 
 .settings-nav-item svg {
@@ -147,12 +114,18 @@
   opacity: 1;
 }
 
+.settings-community-link {
+  margin-top: auto;
+  font-size: var(--text-xs);
+}
+
 /* Settings Content Panel */
 .settings-content {
   flex: 1;
   min-width: 0;
   padding: 32px 32px 40px;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   color: var(--color-text-primary);
 }
 
@@ -174,19 +147,6 @@
 .appearance-preferences > .settings-row {
   padding: 0 0 24px;
   margin-bottom: 28px;
-}
-
-.settings-badge-advanced {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  background: var(--color-accent-subtle);
-  color: var(--color-accent-ink);
 }
 
 .settings-input {
@@ -241,10 +201,6 @@
 }
 
 @media (max-width: 800px) {
-  .settings-dialog {
-    width: 96vw;
-    height: 90vh;
-  }
   .settings-sidebar {
     width: 170px;
   }
@@ -470,9 +426,6 @@
   gap: 12px 20px;
   padding: 8px 0 24px;
 }
-.settings-scope-bar .task-select-trigger {
-  max-width: 280px;
-}
 .settings-scope-pill {
   min-height: 44px;
 }
@@ -532,9 +485,6 @@
 .project-preferences {
   min-width: 0;
 }
-.project-preferences > :not(.workspace-heading) {
-  max-width: 760px;
-}
 .project-preferences-section {
   margin-top: var(--workspace-section-gap, 32px);
   padding-top: var(--workspace-section-gap, 32px);
@@ -548,8 +498,7 @@
 .project-preferences .workspace-heading > div {
   min-width: 0;
 }
-.project-preferences .workspace-heading p,
-.project-settings-identity {
+.project-preferences .workspace-heading p {
   overflow-wrap: anywhere;
 }
 .project-preferences-section > .settings-row {
@@ -577,4 +526,17 @@
 }
 .project-preferences .settings-input {
   min-width: 0;
+}
+.desktop-services {
+  display: grid;
+  gap: 12px;
+  padding-block: 20px;
+  border-block: 1px solid var(--color-border-subtle);
+  margin-bottom: 24px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-scope-pill,
+  .settings-nav-item {
+    transition: none;
+  }
 }

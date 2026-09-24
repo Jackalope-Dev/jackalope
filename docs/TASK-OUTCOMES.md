@@ -13,6 +13,13 @@ files require fresh acceptance; the native review and integration paths enforce 
 Use selected requirements to prepare a correction in the existing follow-up field.
 Original instructions, requirements, workspace and account remain attached to the task.
 
+After implementation and required verification, the agent is instructed to submit one
+validation report with an assessment for each applicable requirement: met, partially met
+or unverified, a short justification, and evidence references. The Outcomes tab shows
+the latest assessment beside each expectation and explicitly identifies missing reports.
+These are agent claims, not human acceptance or proof that the current files still match
+the report. Older task history remains readable without assessments.
+
 ## Repeat a process with approval gates
 
 Project knowledge workflows can define required inputs, ordered steps and final

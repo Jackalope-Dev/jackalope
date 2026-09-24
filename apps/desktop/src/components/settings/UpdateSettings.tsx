@@ -2,7 +2,7 @@ import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect, useId } from 'react';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useUpdateStore } from '../../stores/updateStore';
+import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
@@ -22,6 +22,7 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
     void update.load();
   }, [update.load]);
   const { release, progress } = update;
+  const available = availableUpdateId(release);
   const busy = update.checking || update.installing || update.changingChannel;
   const percent = progress?.total
     ? Math.min(100, Math.floor((progress.downloaded / progress.total) * 100))
@@ -37,11 +38,13 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
             : !release
               ? 'Reading update settings…'
               : release.storeManaged
-                ? 'Check for updates in Microsoft Store → Library.'
+                ? release.configured
+                  ? 'Updates are delivered by Microsoft Store. You can also update from Store → Library.'
+                  : 'Install Jackalope through Microsoft Store to check for updates here.'
                 : 'Updates aren’t configured for this build.'}
         </p>
       )}
-      {release?.configured && release.betaAvailable && (
+      {release?.configured && !release.storeManaged && release.betaAvailable && (
         <div className="space-y-2">
           <label htmlFor={channelId} className="block text-sm font-medium">
             Update channel
@@ -68,7 +71,11 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Automatically check for updates</p>
-              <p className="settings-row-description">You choose when to install.</p>
+              <p className="settings-row-description">
+                {release.storeManaged
+                  ? 'Checks inside Jackalope. Background updates follow your Microsoft Store settings.'
+                  : 'You choose when to install.'}
+              </p>
             </div>
             <Switch
               label="Automatically check for updates"
@@ -78,7 +85,7 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
           </div>
           <Button
             variant="outline"
-            disabled={busy}
+            disabled={busy || update.installed}
             onClick={() => void update.check()}
             loading={update.checking}
             loadingLabel="Checking…"
@@ -88,14 +95,17 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
           {update.lastChecked !== null &&
             !update.checking &&
             !update.error &&
-            !release.availableVersion && (
-              <p className="settings-row-description">You’re up to date.</p>
-            )}
+            !available &&
+            !update.installed && <p className="settings-row-description">You’re up to date.</p>}
         </>
       )}
-      {release?.availableVersion && (
+      {release && available && (
         <div className="space-y-3">
-          <p>Version {release.availableVersion} is available.</p>
+          <p>
+            {release.storeManaged
+              ? 'An update is available from Microsoft Store.'
+              : `Version ${release.availableVersion} is available.`}
+          </p>
           {release.notes && (
             <Disclosure>
               <DisclosureSummary className="task-summary">Release notes</DisclosureSummary>
@@ -113,13 +123,15 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
             loading={update.installing}
             loadingLabel={
               progress?.phase === 'installing'
-                ? 'Installing and reopening…'
+                ? release.storeManaged
+                  ? 'Installing through Store…'
+                  : 'Installing and reopening…'
                 : percent === null
                   ? 'Downloading update…'
                   : `Downloading update… ${percent}%`
             }
           >
-            Install and restart
+            {release.storeManaged ? 'Install update' : 'Install and restart'}
           </Button>
           {update.installing && (
             <p className="settings-row-description" role="status">
@@ -129,6 +141,11 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
             </p>
           )}
         </div>
+      )}
+      {update.installed && (
+        <p role="status" className="settings-row-description">
+          Microsoft Store finished the update. Reopen Jackalope to confirm the installed version.
+        </p>
       )}
       {update.error && (
         <p className="text-sm break-words" role="alert">

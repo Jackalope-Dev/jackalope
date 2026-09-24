@@ -1,4 +1,5 @@
 import type { ContextSelection } from './knowledge';
+import type { Runner } from './task-runtime';
 
 export interface FeatureStep {
   key: string;
@@ -87,4 +88,9 @@ export function readFeaturePlan(text: string, agent: string): FeatureStep[] {
 
 export function featurePlanningPrompt(goal: string) {
   return `Plan this feature for human review. Inspect the repository and its instructions. Do not implement changes, commit, install dependencies or launch other tasks. Produce ONLY a JSON array of 1–12 small tasks. Each task needs key (unique letters/numbers/hyphens), title, prompt (self-contained instructions with necessary project decisions), scopes (relative paths, or ["."]), dependsOn (earlier task keys) and outcomes (specific, reviewable requirements). Use actual repository paths for ownership; do not guess conventional folders. Preserve every requirement and constraint from the complete request. Prefer one task for tightly coupled or small changes. Create dependencies only for real data or interface prerequisites, and place independent work in parallel. Keep tests with their implementation where practical. Dependencies consume integrated changes by default, or verified immutable snapshots when the user enables feature staging. Include a final combined-feature verification task when splitting a feature. Include implementation and relevant verification; do not invent repository details. All tasks will use the user's selected assistant. The user edits and approves the plan before any implementation dispatch.\n\nFeature:\n${goal}`;
+}
+
+export function multiAgentPlanningPrompt(goal: string, runners: Runner[]): string {
+  const available = runners.filter((runner) => runner.available);
+  return `${featurePlanningPrompt(goal)}\n\nFor each task select agent "auto" for native capability/account/quota routing, or one of these installed agents: ${available.map((runner) => runner.id).join(', ')}. Agent brand names do not establish specialties. Avoid adding workers unless independent work or a separate review justifies the coordination overhead.`;
 }

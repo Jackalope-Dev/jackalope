@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
@@ -18,12 +18,12 @@ const publicKey = Buffer.from('test public key').toString('base64');
 const source = 'a'.repeat(40);
 const id = '01JSGWMMTRBTD4YSBEVE3W5B7V';
 
-async function fixture(t) {
+async function fixture(t, selectedTargets = targets, flat = false) {
   const directory = await mkdtemp(resolve(tmpdir(), 'jackalope-multiplatform-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
-  for (const target of targets) {
-    const path = resolve(directory, target);
-    await mkdir(path);
+  for (const target of selectedTargets) {
+    const path = flat ? directory : resolve(directory, target);
+    await mkdir(path, { recursive: true });
     const receipt = {
       schemaVersion: 1,
       application,
@@ -63,7 +63,7 @@ async function fixture(t) {
     }
     await writeFile(resolve(path, 'receipt.json'), JSON.stringify(receipt));
   }
-  const options = { expectedTargets: targets, source, channel: 'beta', publicKey };
+  const options = { expectedTargets: selectedTargets, source, channel: 'beta', publicKey };
   return { directory, options, plan: await collectCandidates(directory, options) };
 }
 
@@ -157,6 +157,35 @@ test('candidate collection requires complete targets with matching source, notes
 test('target selections reject duplicates, empty sets and unsupported platforms', () => {
   for (const selected of [[], ['windows-x86_64', 'windows-x86_64'], ['darwin-arm64'], {}])
     assert.throws(() => releaseTargets(JSON.stringify(selected)));
+});
+
+test('single artifact downloads accept flat and nested layouts with identical release identity', async (t) => {
+  const nested = await fixture(t, ['linux-x86_64']);
+  const flat = await fixture(t, ['linux-x86_64'], true);
+  assert.equal(flat.plan.digest, nested.plan.digest);
+  assert.deepEqual(flat.plan.targets, ['linux-x86_64']);
+  await assert.rejects(
+    collectCandidates(flat.directory, { ...flat.options, expectedTargets: targets }),
+    /Missing, duplicate or unexpected/,
+  );
+  await assert.rejects(
+    collectCandidates(flat.directory, { ...flat.options, source: 'b'.repeat(40) }),
+    /Candidates disagree/,
+  );
+  await writeFile(resolve(flat.directory, 'notes.md'), 'changed');
+  await assert.rejects(collectCandidates(flat.directory, flat.options), /Artifact changed/);
+});
+
+test('mixed artifact layouts cannot hide a duplicate platform candidate', async (t) => {
+  const nested = await fixture(t, ['linux-x86_64']);
+  const flat = await fixture(t, ['linux-x86_64'], true);
+  await cp(resolve(nested.directory, 'linux-x86_64'), resolve(flat.directory, 'duplicate'), {
+    recursive: true,
+  });
+  await assert.rejects(
+    collectCandidates(flat.directory, flat.options),
+    /Missing, duplicate or unexpected/,
+  );
 });
 
 test('publication waits for all six assets and binds an immutable tag to candidate source', async (t) => {
@@ -284,6 +313,22 @@ test('published updater feeds must return the candidate version, signature and e
       readDownloadHash,
     }),
     /not ready/,
+  );
+  const withQuery = (query) => async (url) => {
+    const manifest = await (await fetcher(url)).json();
+    return Response.json({ ...manifest, url: `${manifest.url}?${query}` });
+  };
+  const hashIgnoringQuery = (url) => readDownloadHash(new URL(url).pathname);
+  await verifyUpdateFeeds(plan, {
+    fetcher: withQuery('from=%7B%22channel%22%3A%22beta%22%7D'),
+    readDownloadHash: hashIgnoringQuery,
+  });
+  await assert.rejects(
+    verifyUpdateFeeds(plan, {
+      fetcher: withQuery('from=x&redirect=https%3A%2F%2Fexample.invalid'),
+      readDownloadHash: hashIgnoringQuery,
+    }),
+    /does not match/,
   );
   for (const override of [
     { version: '0.1.0' },

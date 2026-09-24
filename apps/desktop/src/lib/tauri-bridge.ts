@@ -1,3 +1,5 @@
+import { invokeNative as invoke } from './telemetry-client.ts';
+
 export interface WorktreeEntry {
   path: string;
   head: string;
@@ -41,7 +43,6 @@ export interface DesktopControlReadiness {
 }
 
 export async function requestDesktopControlPermissions(): Promise<DesktopControlReadiness> {
-  const { invoke } = await import('@tauri-apps/api/core');
   return invoke<DesktopControlReadiness>('desktop_control_request_permissions');
 }
 
@@ -68,7 +69,6 @@ export async function listWorktrees(
   inspectCleanup = true,
 ): Promise<WorktreeEntry[]> {
   if (isTauriEnvironment()) {
-    const { invoke } = await import('@tauri-apps/api/core');
     return invoke<WorktreeEntry[]>('git_list_worktrees', {
       repoPath,
       targetBranch,
@@ -89,7 +89,6 @@ export async function cleanupWorktree(repoPath: string, worktree: WorktreeEntry)
   ) {
     throw new Error('Refresh and review this worktree before cleanup.');
   }
-  const { invoke } = await import('@tauri-apps/api/core');
   await invoke('git_cleanup_worktree', {
     deleteBranch: true,
     expectedBranch: worktree.branch,
@@ -107,7 +106,6 @@ export async function archiveWorktree(repoPath: string, worktree: WorktreeEntry)
   if (!status?.recoverable || !status.target_branch || !status.target_head) {
     throw new Error('Refresh and review this worktree before archiving.');
   }
-  const { invoke } = await import('@tauri-apps/api/core');
   return invoke<string>('git_archive_worktree', {
     repoPath,
     worktreePath: worktree.path,
@@ -119,13 +117,11 @@ export async function archiveWorktree(repoPath: string, worktree: WorktreeEntry)
 
 export async function pruneWorktrees(repoPath: string): Promise<number> {
   if (!isTauriEnvironment()) throw new Error('Open the desktop app to prune worktrees.');
-  const { invoke } = await import('@tauri-apps/api/core');
   return invoke<number>('git_prune_worktrees', { repoPath });
 }
 
 export async function listWorktreeOrphans(repoPath: string): Promise<WorktreeOrphan[]> {
   if (!isTauriEnvironment()) return [];
-  const { invoke } = await import('@tauri-apps/api/core');
   return invoke<WorktreeOrphan[]>('git_list_worktree_orphans', { repoPath });
 }
 
@@ -135,7 +131,6 @@ export async function removeWorktreeOrphan(
 ): Promise<void> {
   if (!isTauriEnvironment()) throw new Error('Open the desktop app to remove leftover folders.');
   if (folder.blocked_reason) throw new Error(folder.blocked_reason);
-  const { invoke } = await import('@tauri-apps/api/core');
   await invoke('git_remove_worktree_orphan', { repoPath, folderPath: folder.path });
 }
 
@@ -146,7 +141,6 @@ export async function createWorktree(
   baseCommit?: string,
 ): Promise<WorktreeEntry> {
   if (isTauriEnvironment()) {
-    const { invoke } = await import('@tauri-apps/api/core');
     return invoke<WorktreeEntry>('git_create_worktree', {
       repoPath,
       worktreePath,
@@ -160,7 +154,6 @@ export async function createWorktree(
 
 export async function getSystemInfo(): Promise<SystemInfo> {
   if (isTauriEnvironment()) {
-    const { invoke } = await import('@tauri-apps/api/core');
     return invoke<SystemInfo>('system_get_info');
   }
 
@@ -199,7 +192,6 @@ export interface McpProbeResult {
 
 export async function listMcpServers(projectId?: string): Promise<McpServerConfig[]> {
   if (isTauriEnvironment()) {
-    const { invoke } = await import('@tauri-apps/api/core');
     return invoke<McpServerConfig[]>('mcp_list_servers', { projectId });
   }
   throw new Error('Open the desktop app to read MCP connections.');
@@ -207,7 +199,6 @@ export async function listMcpServers(projectId?: string): Promise<McpServerConfi
 
 export async function saveMcpServer(server: McpServerConfig): Promise<void> {
   if (isTauriEnvironment()) {
-    const { invoke } = await import('@tauri-apps/api/core');
     return invoke('mcp_save_server', { server });
   }
   throw new Error('Open the desktop app to save an MCP connection.');
@@ -215,7 +206,6 @@ export async function saveMcpServer(server: McpServerConfig): Promise<void> {
 
 export async function deleteMcpServer(id: string, scope: string): Promise<void> {
   if (isTauriEnvironment()) {
-    const { invoke } = await import('@tauri-apps/api/core');
     return invoke('mcp_delete_server', { id, scope });
   }
   throw new Error('Open the desktop app to delete an MCP connection.');
@@ -223,7 +213,6 @@ export async function deleteMcpServer(id: string, scope: string): Promise<void> 
 
 export async function probeMcpServer(server: McpServerConfig): Promise<McpProbeResult> {
   if (isTauriEnvironment()) {
-    const { invoke } = await import('@tauri-apps/api/core');
     return invoke<McpProbeResult>('mcp_probe_server', { server });
   }
   throw new Error('Open the desktop app to test an MCP connection.');

@@ -28,14 +28,16 @@ pub struct DetectedKey {
 }
 
 pub fn mask_key(val: &str) -> String {
-    let len = val.len();
-    if len >= 12 {
-        let prefix = &val[..std::cmp::min(7, len)];
-        let suffix = &val[len - 4..];
-        format!("{prefix}...{suffix}")
-    } else if len >= 4 {
-        let prefix = &val[..2];
-        format!("{prefix}...***")
+    if val.chars().count() >= 12 {
+        let suffix: String = val
+            .chars()
+            .rev()
+            .take(4)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
+        format!("••••{suffix}")
     } else {
         "***".to_string()
     }
@@ -48,6 +50,7 @@ pub fn key_provider_info(name: &str) -> Option<(&'static str, &'static str)> {
         "XAI_API_KEY" | "GROK_API_KEY" => Some(("xAI (Grok)", "grok")),
         "GEMINI_API_KEY" => Some(("Google Gemini", "gemini")),
         "DEEPSEEK_API_KEY" => Some(("DeepSeek", "opencode")),
+        "OPENROUTER_API_KEY" => Some(("OpenRouter", "opencode")),
         "GROQ_API_KEY" => Some(("Groq", "opencode")),
         "MISTRAL_API_KEY" => Some(("Mistral AI", "opencode")),
         _ => None,
@@ -60,6 +63,7 @@ const KNOWN_KEY_NAMES: &[&str] = &[
     "XAI_API_KEY",
     "GEMINI_API_KEY",
     "DEEPSEEK_API_KEY",
+    "OPENROUTER_API_KEY",
     "GROQ_API_KEY",
     "MISTRAL_API_KEY",
 ];
@@ -178,10 +182,25 @@ fn is_key_configured(profiles_root: &Path, agent: &str, key_name: &str) -> bool 
     }
     if let Ok(entries) = std::fs::read_dir(agent_dir) {
         for entry in entries.flatten() {
+            if let Some(id) = entry.file_name().to_str() {
+                if let Ok(binding) = agent_profiles::bind_account(profiles_root, agent, Some(id)) {
+                    if agent_profiles::api_key_name(&binding)
+                        .ok()
+                        .flatten()
+                        .is_some_and(|name| name == key_name)
+                    {
+                        return true;
+                    }
+                }
+            }
             let env_file = entry.path().join(".env");
             if env_file.exists() {
                 if let Ok(content) = std::fs::read_to_string(env_file) {
-                    if content.lines().any(|l| l.trim().starts_with(key_name)) {
+                    if content.lines().any(|line| {
+                        line.trim().split_once('=').is_some_and(|(name, value)| {
+                            name.trim() == key_name && !value.trim().is_empty()
+                        })
+                    }) {
                         return true;
                     }
                 }
@@ -194,6 +213,7 @@ fn is_key_configured(profiles_root: &Path, agent: &str, key_name: &str) -> bool 
 #[tauri::command]
 pub fn agent_import_detected_key(
     runtime: State<'_, TaskRuntime>,
+    helper: State<'_, super::helper::Helper>,
     key_name: String,
     profile_name: Option<String>,
 ) -> Result<AgentProfile, String> {
@@ -206,12 +226,14 @@ pub fn agent_import_detected_key(
     if val.is_empty() {
         return Err("Environment variable contains an empty value.".into());
     }
+    if val.len() > 8192 || val.chars().any(char::is_control) {
+        return Err("Environment variable does not contain a valid API key.".into());
+    }
 
     let default_name = format!("{} (Imported Key)", key_name);
     let name = profile_name.unwrap_or(default_name).trim().to_string();
 
     let root = runtime.profiles_root();
-    // Create profile
     let profile = agent_profiles::agent_profile_create(
         runtime.clone(),
         target_agent.to_string(),
@@ -220,7 +242,6 @@ pub fn agent_import_detected_key(
         None,
     )?;
 
-    // Set tag
     let _ = agent_profiles::agent_profile_set_tag(
         runtime.clone(),
         target_agent.to_string(),
@@ -228,7 +249,25 @@ pub fn agent_import_detected_key(
         Some("Imported Key".to_string()),
     );
 
-    // Securely write key to profile directory's .env file
+    if target_agent == "opencode" {
+        if let Err(error) = agent_profiles::agent_profile_save_key(
+            runtime.clone(),
+            target_agent.into(),
+            profile.id.clone(),
+            key_name,
+            val.into(),
+        ) {
+            let _ = agent_profiles::agent_profile_delete(
+                runtime,
+                helper,
+                target_agent.into(),
+                profile.id.clone(),
+            );
+            return Err(error);
+        }
+        return Ok(profile);
+    }
+
     let profile_dir = root.join(target_agent).join(&profile.id);
     let env_path = profile_dir.join(".env");
     let env_content = format!("{key_name}={val}\n");
@@ -245,12 +284,12 @@ mod tests {
     fn mask_key_produces_safe_previews() {
         let long_key = "sk-ant-api03-abcdefghijklmnop1234";
         let masked = mask_key(long_key);
-        assert_eq!(masked, "sk-ant-...1234");
+        assert_eq!(masked, "••••1234");
         assert!(!masked.contains("abcdefghijklmnop"));
 
         let short_key = "short";
         let masked_short = mask_key(short_key);
-        assert_eq!(masked_short, "sh...***");
+        assert_eq!(masked_short, "***");
 
         let tiny = "abc";
         assert_eq!(mask_key(tiny), "***");
@@ -275,5 +314,29 @@ mod tests {
             Some(("Google Gemini", "gemini"))
         );
         assert_eq!(key_provider_info("UNKNOWN_KEY"), None);
+        assert_eq!(
+            key_provider_info("DEEPSEEK_API_KEY"),
+            Some(("DeepSeek", "opencode"))
+        );
+    }
+
+    #[test]
+    fn configured_environment_keys_require_an_exact_nonempty_assignment() {
+        let root =
+            std::env::temp_dir().join(format!("jackalope-key-detection-{}", uuid::Uuid::new_v4()));
+        let profile = root.join("opencode/fixture");
+        std::fs::create_dir_all(&profile).unwrap();
+        let path = profile.join(".env");
+        for text in [
+            "DEEPSEEK_API_KEY_OLD=fixture",
+            "DEEPSEEK_API_KEY=",
+            "# DEEPSEEK_API_KEY=fixture",
+        ] {
+            std::fs::write(&path, text).unwrap();
+            assert!(!is_key_configured(&root, "opencode", "DEEPSEEK_API_KEY"));
+        }
+        std::fs::write(&path, " DEEPSEEK_API_KEY = fixture-only ").unwrap();
+        assert!(is_key_configured(&root, "opencode", "DEEPSEEK_API_KEY"));
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

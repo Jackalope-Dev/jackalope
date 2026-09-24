@@ -152,13 +152,6 @@
   max-width: 800px;
   margin: 16px auto;
 }
-.access-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 60px;
-}
 .access-identity {
   display: flex;
   align-items: center;

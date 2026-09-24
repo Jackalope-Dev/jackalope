@@ -180,6 +180,7 @@ impl Coordinator {
         let mut states = ledger.lifecycle.clone().unwrap_or_default();
         let initialized = ledger.lifecycle.is_some();
         let mut changed = !initialized;
+        changed |= super::managed::reconcile_attempts(&mut ledger, &runs);
         for run in &runs {
             let previous = states.get(&run.id).map(String::as_str);
             let current = phase(run);

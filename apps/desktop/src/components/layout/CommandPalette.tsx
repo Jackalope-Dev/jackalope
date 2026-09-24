@@ -1,15 +1,18 @@
 import { PRESET_THEMES } from '@jackalope/brand/theme';
 import { SearchField } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Folder, LifeBuoy, MessageSquare, Plus, Settings2 } from 'lucide-react';
+import { Folder, LifeBuoy, MessageSquare, Plus, Settings2, SquareTerminal } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
-import { shortcutLabel } from '../../lib/platform-shortcuts';
+import { openCliTerminal } from '../../lib/cli-terminal';
+import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { taskTitle } from '../../lib/task-title';
 import { taskDecision } from '../../lib/task-workflow';
 import { openExternalUrl } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
+import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
@@ -30,6 +33,7 @@ export function CommandPalette({
   onSelectProject?: (id: string) => void;
 }) {
   const [query, setQuery] = useState('');
+  const shortcuts = useSettingsStore((state) => state.shortcuts);
   const previousFocus = useRef<HTMLElement | null>(null);
   const setTheme = useThemeStore((state) => state.setTheme);
   const search = query.trim().toLowerCase();
@@ -80,6 +84,7 @@ export function CommandPalette({
     ? [
         { label: taskDecision(current).action, section: taskDecision(current).section },
         { label: 'Open conversation', section: 'result' },
+        { label: 'Open task terminal and workspace tools', section: 'terminal' },
         ...(['review', 'reviewed', 'failed', 'stopped'].includes(current.status)
           ? [
               { label: 'Try result', section: 'preview' },
@@ -95,12 +100,22 @@ export function CommandPalette({
       .split(' ')
       .some((kw) => kw.includes(search)) ||
       'settings & preferences'.includes(search));
+  const terminalProject = useProjectStore((state) =>
+    state.projects.find((item) => item.id === state.activeProjectId),
+  );
+  const remoteHost = useHostContextStore((state) => state.host);
+  const showTerminal =
+    Boolean(terminalProject) &&
+    !remoteHost &&
+    'terminal cli command shell console jackalope'.split(' ').some((kw) => kw.includes(search));
   const showHelp =
     'help docs documentation knowledgebase faq troubleshooting guides'
       .split(' ')
       .some((kw) => kw.includes(search)) || search.includes('help');
-  const views = WORKSPACE_VIEWS.filter((item) =>
-    `${item.label} ${item.description}`.toLowerCase().includes(search),
+  const views = WORKSPACE_VIEWS.filter(
+    (item) =>
+      item.id !== 'live-sessions' &&
+      `${item.label} ${item.description}`.toLowerCase().includes(search),
   );
   const themes = PRESET_THEMES.filter((item) => item.name.toLowerCase().includes(search));
 
@@ -221,19 +236,35 @@ export function CommandPalette({
               </button>
             ))}
             <p className="menu-label">Commands</p>
-            {onCapture && ('new task capture idea'.includes(search) || !search) && (
+            {onCapture &&
+              ('new work task conversation capture idea'.includes(search) || !search) && (
+                <button
+                  data-command
+                  type="button"
+                  className="workspace-menu-item w-full"
+                  onClick={() => {
+                    onClose();
+                    onCapture();
+                  }}
+                >
+                  <Plus size={16} />
+                  <span>New work</span>
+                  <kbd>{displayShortcut(resolveShortcuts(shortcuts).newWork)}</kbd>
+                </button>
+              )}
+            {showTerminal && terminalProject && (
               <button
                 data-command
                 type="button"
                 className="workspace-menu-item w-full"
                 onClick={() => {
                   onClose();
-                  onCapture();
+                  void openCliTerminal(terminalProject.path).catch(() => {});
                 }}
               >
-                <Plus size={16} />
-                <span>New task</span>
-                <kbd>{shortcutLabel('Shift+N')}</kbd>
+                <SquareTerminal size={16} />
+                <span>Open terminal in {terminalProject.name}</span>
+                <kbd>{displayShortcut(resolveShortcuts(shortcuts).terminal)}</kbd>
               </button>
             )}
             {showSettings && (

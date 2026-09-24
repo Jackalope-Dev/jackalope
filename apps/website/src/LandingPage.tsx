@@ -1,6 +1,6 @@
 import { EchoMark, EchoWordmark } from '@jackalope/brand/echo';
 import { PRESET_THEMES } from '@jackalope/brand/theme';
-import { Disclosure, DisclosureSummary, ExternalLinkIcon, Tabs } from '@jackalope/ui';
+import { Disclosure, DisclosureSummary, DiscordIcon, ExternalLinkIcon, Tabs } from '@jackalope/ui';
 import {
   ArrowDown,
   ArrowRight,
@@ -18,6 +18,7 @@ import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
 import type { EditorialCover } from './blog-types';
 import { ConnectedWorkspace } from './ConnectedWorkspace';
+import { DISCORD_URL } from './community';
 import { tour } from './content';
 import { EditorialArt } from './EditorialArt';
 import { WorkspaceClip } from './WorkspaceClip';
@@ -60,7 +61,7 @@ const scenes = [
     label: 'Agents & accounts',
     title: 'Choose an agent for each task.',
     description:
-      'Use installed Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity CLIs with your existing accounts. Choose the right agent for each task.',
+      'Use installed Codex, Claude Code, Grok, OpenCode, Kimi Code, Gemini CLI, and Antigravity CLIs with your existing accounts. Choose the right agent for each task.',
     walkthrough:
       'Explore installed agents, then open account profiles to see the sign-ins available for your projects.',
   },
@@ -259,7 +260,7 @@ const features = [
     title: 'Give every agent room to work.',
     description: 'Run independent tasks side by side in separate Git worktrees.',
     detail:
-      'Assign Codex, Claude Code, Grok, OpenCode, Kimi Code, or Antigravity to each task. Set dependencies when one change needs another, and follow progress without checking a pile of terminals.',
+      'Assign Codex, Claude Code, Grok, OpenCode, Kimi Code, Gemini CLI, or Antigravity to each task. Set dependencies when one change needs another, and follow progress without checking a pile of terminals.',
     href: '/parallel-coding-agents/',
     link: 'Explore parallel work',
   },
@@ -420,7 +421,10 @@ export function LandingPage({
               </h1>
             </div>
             <p className="hero-description">
-              Run <strong>Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity</strong>{' '}
+              Run{' '}
+              <strong>
+                Codex, Claude Code, Grok, OpenCode, Kimi Code, Gemini CLI, and Antigravity
+              </strong>{' '}
               side by side. One desktop workspace for your projects, parallel tasks, and code
               review.
             </p>
@@ -434,18 +438,20 @@ export function LandingPage({
               </div>
               {available && (
                 <span className="availability">
-                  Windows x64 · {releaseVersion ?? 'Available now'}
+                  Desktop downloads{releaseVersion ? ` · ${releaseVersion}` : ' available'}
                 </span>
               )}
+              <a className="hero-community" href={DISCORD_URL}>
+                <DiscordIcon size={15} />
+                <span>
+                  Building with agents? <strong>Join the Discord</strong>
+                </span>
+                <ArrowRight size={14} />
+              </a>
             </div>
           </div>
           <div className="hero-visual">
-            <button
-              type="button"
-              className="hero-window"
-              onClick={onPlay}
-              aria-label={`Play the ${tour.durationSeconds}-second Jackalope app tour`}
-            >
+            <button type="button" className="hero-window" onClick={onPlay}>
               <span className="hero-window-meta">
                 <span>More room to build.</span>
               </span>
@@ -453,6 +459,7 @@ export function LandingPage({
                 src={tour.poster}
                 width="1920"
                 height="1080"
+                fetchPriority="high"
                 alt="Jackalope product tour featuring the updated task workspace"
               />
               <span className="hero-film-cue">

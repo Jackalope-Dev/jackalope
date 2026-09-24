@@ -127,15 +127,6 @@
 .helper-action > small {
   display: block;
 }
-.helper-error {
-  color: var(--color-danger);
-  padding: 8px 20px;
-  font-size: var(--text-xs);
-  overflow-wrap: anywhere;
-}
-.helper-action .helper-error {
-  padding: 8px 0;
-}
 .helper-tabs {
   display: flex;
   margin: 8px 20px 4px;

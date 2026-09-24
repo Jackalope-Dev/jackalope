@@ -122,15 +122,6 @@ export const troubleshootingScenarios: TroubleshootingScenario[] = [
   },
 ];
 
-export const likelyArticleSlugs = [
-  'fixing-cli-path-on-windows',
-  'resolving-git-worktree-locks',
-  'git-worktrees',
-  'task-routing-and-quotas',
-  'multi-account-and-agents',
-  'connecting-custom-mcp-servers',
-];
-
 export interface KnowledgeGuideSection {
   id: string;
   question: string;
@@ -159,6 +150,193 @@ export interface KnowledgeGuide {
 }
 
 export const knowledgeGuides: KnowledgeGuide[] = [
+  {
+    slug: 'terminal-command',
+    category: 'workflows',
+    title: 'Work with Jackalope from the terminal',
+    shortTitle: 'Terminal command',
+    description:
+      'Use the jackalope command to start and rejoin conversations from any Git repository, and move a conversation between the app and your terminal.',
+    readingTime: '3 min read',
+    sections: [
+      {
+        id: 'start-terminal',
+        question: 'How do I start a conversation from the terminal?',
+        paragraphs: [
+          'Open a terminal in a Git repository and run jackalope. Describe the work; Jackalope chooses the agent and shows which one it picked and why, the step it is on and the output as it arrives. The repository becomes a project in the app if it was not one already.',
+          'The command uses the same sessions, accounts and approved access as the app. Replies go to the same conversation. Type /help for commands such as /stop, /pause and /sessions.',
+        ],
+        codeBox: {
+          title: 'Common commands',
+          code: 'jackalope              # start a conversation here\njackalope --continue   # rejoin the latest one here\njackalope ls           # list open conversations\njackalope attach 5cd0  # rejoin by id prefix',
+        },
+      },
+      {
+        id: 'not-running',
+        question: 'What if Jackalope is not open?',
+        paragraphs: [
+          'The command asks whether to open the app or run it in the background, and remembers your answer. Running in the background keeps your work available without a window. Opening the app later brings up the same session rather than a second copy.',
+          'Leaving the terminal, with /quit or Ctrl+C, does not stop the work. Rejoin it from any terminal or the app.',
+        ],
+      },
+      {
+        id: 'app-terminal',
+        question: 'Can I use it inside the app or move it to my own terminal?',
+        paragraphs: [
+          'Choose Terminal in the bottom status bar, or press Cmd+J (Ctrl+J on Windows and Linux), to open the command for the current project in its own window. Open in Terminal continues the same conversation in your system terminal and closes the app window.',
+        ],
+      },
+      {
+        id: 'install-command',
+        question: 'Why does my shell say the command is not found?',
+        paragraphs: [
+          'Installed Jackalope adds the command automatically: on macOS and Linux it links ~/.local/bin/jackalope, and on Windows the installer adds its folder to your PATH. Open a new terminal after installing.',
+          'The default macOS shell does not search ~/.local/bin. Choose Install command in the app terminal window to add a link in /usr/local/bin; macOS asks for an administrator password.',
+        ],
+        callout: {
+          kind: 'note',
+          text: 'Agent questions appear in the terminal but are answered in the app for now.',
+        },
+      },
+    ],
+  },
+  {
+    slug: 'chat-and-follow-ups',
+    category: 'workflows',
+    title: 'Continue coding-agent work with chat and follow-ups',
+    shortTitle: 'Chat and follow-ups',
+    description:
+      'Start a chat, queue corrections, pause work, and review a saved result in Jackalope. Recover after a failed attempt or restart.',
+    readingTime: '3 min read',
+    sections: [
+      {
+        id: 'start-chat',
+        question: 'How do I start a chat in Jackalope?',
+        paragraphs: [
+          'Open Tasks → Chat, choose your project and agent account, and send the first message. The session keeps its messages and successive batches in one isolated Git workspace. You need approved Jackalope access, a supported installed agent, and a usable provider account to run work.',
+          'Describe one observable change and how it should be checked. Use New task for a structured brief or a reviewed plan when the work needs separate assignments. A chat processes batches in order; it is not a parallel plan.',
+        ],
+        links: [
+          { label: 'Set up an agent and account', href: '/knowledge/multi-account-and-agents/' },
+        ],
+      },
+      {
+        id: 'queue-correction',
+        question: 'Should I queue a message or stop current work?',
+        paragraphs: [
+          'Queue message saves a correction for the next batch while the current attempt continues. Messages are processed in order in the same workspace and account. Choose Stop and send when the active attempt needs to stop before the correction runs; Jackalope waits for shutdown and saves the message before resuming.',
+          'Pause queue prevents later batches from starting. Stop work also stops the active attempt. Ordinary tasks offer Queue follow-up and Stop & send with the same distinction. A failed save keeps the draft so you can recover it.',
+        ],
+        codeBox: {
+          title: 'A focused follow-up',
+          code: 'Keep the existing form layout.\nMake each validation error reachable from its input with a screen reader.\nCheck keyboard focus after a failed submission and report the checks you ran.',
+        },
+      },
+      {
+        id: 'resume-session',
+        question: 'What happens after failure, restart, or closing a popout?',
+        paragraphs: [
+          'Failures and app restarts pause dispatch. Open the saved chat, inspect the last attempt and any required action, then explicitly resume or retry when the problem is resolved. Queued messages do not silently replay after a restart.',
+          'Pop out opens a compact chat window, and its pin keeps that window on top. Closing the popout leaves execution running. Use the task’s stop controls when you want to stop work.',
+        ],
+        links: [
+          { label: 'Diagnose a stopped task', href: '/knowledge/troubleshooting-and-diagnostics/' },
+        ],
+      },
+      {
+        id: 'session-limits',
+        question: 'Do session limits enforce a spending cap?',
+        paragraphs: [
+          'No. Optional batch and estimated-cost thresholds pause subsequent batches. A running batch can exceed the threshold. If cost is unavailable and a cost threshold is set, Jackalope pauses further dispatch instead of assuming the work was free. Provider billing and usage limits remain separate.',
+        ],
+      },
+      {
+        id: 'review-chat',
+        question: 'How do I merge a finished chat?',
+        paragraphs: [
+          'Pause dispatch, then run or cancel queued messages. Stop any preview before integration. Review the cumulative patch and checks for the latest batch, approve the outcome when it meets your request, and explicitly merge into the intended branch.',
+          'Changes since my last review compares files with a saved review position; it does not approve or merge them. After a successful merge, continue in a new chat from the updated branch. The delivered session retains its history and cannot start more work in the old workspace.',
+        ],
+        links: [{ label: 'Review and merge step by step', href: '/knowledge/review-and-merge/' }],
+        callout: {
+          kind: 'note',
+          text: 'These workflows are implemented in prerelease source. Installed-provider, recovery, and native-window acceptance remain in progress; check Download for platform availability.',
+        },
+      },
+    ],
+  },
+  {
+    slug: 'review-and-merge',
+    category: 'workflows',
+    title: 'Review, approve, and merge AI-generated changes',
+    shortTitle: 'Review and merge AI changes',
+    description:
+      'Inspect changed files and checks, approve a task outcome, and merge into your target branch. Learn why a merge can be blocked and how to recover.',
+    readingTime: '3 min read',
+    sections: [
+      {
+        id: 'review-changes',
+        question: 'What should I review before merging an agent’s work?',
+        paragraphs: [
+          'Review the current patch against the requested behavior, read checks that apply to that patch, and try the changed flow. In Jackalope, open Review and use Changes, Checks, and Merge to inspect each part. Tasks, planned work, and chats use the same review controls.',
+          'Search the changed-file list and inspect the full diff, including unexpected files. For planned work, review the combined result under the parent task. A worker’s passing checks do not prove that several changes work together.',
+        ],
+        steps: [
+          'Read the original outcome and any unanswered questions.',
+          'Inspect the patch and compare it with the requested scope.',
+          'Read the saved check commands, exit results, and output for the current files.',
+          'Use a local preview or the application to check behavior the automated checks do not cover.',
+          'Request a correction or approve the outcome, then review the separate merge action.',
+        ],
+        links: [
+          {
+            label: 'A practical AI code review checklist',
+            href: '/blog/review-ai-generated-code-checklist/',
+          },
+        ],
+      },
+      {
+        id: 'approval-and-markers',
+        question: 'Does marking a file reviewed approve the work?',
+        paragraphs: [
+          'No. File review markers track your place for the displayed patch and reset when it changes. Approve work records acceptance of the task outcome for its snapshot. Merging is a separate action that applies the prepared change to the target branch.',
+          'Agent review prepares an editable request for another agent. It runs only after you submit it. Review its findings and check the actual change; an agent response does not replace your acceptance or required project checks.',
+        ],
+      },
+      {
+        id: 'blocked-merge',
+        question: 'Why is the merge blocked even though the agent finished?',
+        paragraphs: [
+          'Finishing an attempt does not establish that the result is ready to integrate. Required checks, outcome acceptance, active work, queued messages, a running preview, or changed source and target files can prevent a merge. The diff remains available so you can inspect the work while resolving the blocker.',
+        ],
+        bullets: [
+          'If checks failed, inspect the output and send the relevant failure with a focused follow-up.',
+          'If files or the target branch changed, refresh the prepared review and run the required checks on the new result.',
+          'For chat, pause dispatch and run or cancel queued messages before preparing integration.',
+          'Stop the task’s preview before continuing, merging, or removing its workspace.',
+          'Keep unrelated local changes and the source worktree until you have resolved the reported conflict.',
+        ],
+        links: [
+          { label: 'Worktree and integration safeguards', href: '/knowledge/git-worktrees/' },
+        ],
+      },
+      {
+        id: 'merge-and-cleanup',
+        question: 'What happens after a local merge?',
+        paragraphs: [
+          'Inspect the target branch, combined patch, checks, and proposed commit message before applying the merge. A successful local merge puts the reviewed change on that branch. Workspace cleanup is explicit. If cleanup fails, retain the receipt and retry cleanup; do not assume the merge itself failed.',
+          'A local merge does not push a branch, create a pull request, or deploy. Delivery can read local Git and optional GitHub PR and CI state through your authenticated CLI and prepare an editable next-step draft. Review its destination and effects before starting publication work.',
+          'Review and integration safeguards are implemented in prerelease source. Installed-provider and recovery acceptance remain in progress.',
+        ],
+        links: [
+          {
+            label: 'Continue a chat after delivery',
+            href: '/knowledge/chat-and-follow-ups/#review-chat',
+          },
+        ],
+      },
+    ],
+  },
   {
     slug: 'ask-jackalope',
     category: 'workflows',
@@ -294,7 +472,12 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'concurrency-collisions',
         question: 'How does Jackalope coordinate parallel work?',
         paragraphs: [
+          'New tasks can recommend focused work, investigation, or a reviewed plan using the project’s Decisions preference. Create a plan uses your selected development agent and its normal capacity. Review the concrete assignments before starting; one parent keeps planning, worker attempts, usage, and the combined result together.',
           'Parallel plans record task scopes, dependencies, and a concurrency limit. The coordinator reserves work before launching an agent; dependencies wait for the changes they need to be integrated.',
+          'New managed plans combine groups of completed assignments while other work continues. Shared contracts have one owner or an explicit dependency. Jackalope resolves overlaps in a separate workspace and checks the combined result before handing it to dependent work or final review.',
+          'Plan, Work, Check and Review keep the complete result, preview and checks together. Work details expands individual assignments. A failed check can receive up to two automatic repair attempts; a correction authorizes a fresh allowance. If more help is needed, the task keeps the result and offers a correction or another repair. Provider failures and interrupted processes require explicit recovery.',
+          'Pause dispatch holds pending work; Stop task also stops active attempts. Restart leaves dispatch paused. Review the final outcomes and combined changes before Apply changes to the target branch. Cleanup follows your selected apply option; the app does not push the changes.',
+          'Time and usage includes all attempts and repairs. Focused review counts a visible result window with focus; elapsed delivery time also includes waiting. These measurements do not guarantee savings or establish that someone was actively reading.',
           'Retries can use a fresh worktree. Interrupted work retains its history and ownership information instead of being silently relaunched. Pause stops new dispatch; use Stop for an active task.',
         ],
       },
@@ -348,8 +531,11 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'routing-subprocess',
         question: 'How does automatic agent selection work?',
         paragraphs: [
-          'Automatic tasks ask your configured default agent to choose among eligible agents, configured models, and permitted accounts. Project restrictions, tool compatibility, and reported capacity constrain the options.',
-          'Jackalope validates the returned choice and saves its reason. Routing consumes provider usage. Codex, Claude Code, Grok, OpenCode, and Kimi Code can coordinate; Antigravity runs as a worker. Explicit assignments remain available.',
+          'Settings → Decisions chooses local rules, agent-powered reasoning, or Jev-assisted decisions. Projects inherit the app default unless you override it. Automatic tasks select among eligible agents, configured models, and permitted accounts. Project restrictions, tool compatibility, and reported capacity constrain the options.',
+          'Local rules use preferences and current capacity without a model call. Agent-powered routing uses your default agent. Optional Jev uses your TypeSafe key and may reduce routing cost and latency; savings are not guaranteed. Jackalope validates the decision and saves its reason and any reported usage. For Jev uncertainty or service errors, choose Local (the default, with no extra model cost) or Agent-powered fallback, which uses agent tokens or subscription capacity. If that agent attempt fails, local rules take over. Codex, Claude Code, Grok, OpenCode, and Kimi Code can coordinate; Antigravity and Gemini CLI run as workers. Explicit assignments remain available.',
+          'Under Routing goals and optional assistance, choose Quality first, Balanced or Economical. Cost-aware choices need sufficient relevant history with complete recorded costs; otherwise quality ranking stays in place. You can add sourced facts for exact models. Unknown capabilities and costs remain unknown.',
+          'Additional Jev helpers are off by default. Enable relevant context selection, failure categories, requirement coverage, review priorities, unrelated-change filtering or Automatic assignment matching per app or project. These calls may send guidance, candidate lessons, diffs, results and check output to TypeSafe and have separate API costs. Advice cannot approve work, change explicit assignments or retry a denied action. Usage lists their purposes separately, including calls that launched no worker.',
+          'Task assessments use the same project preference. Local fast paths and unchanged recent requests avoid model calls; other eligible requests make one bounded assessment, with one extra agent attempt only when you select that Jev fallback. Both provider attempts remain visible in Usage. Jev classifies the approach but cannot generate or authorize a plan. Usage lists assessment calls separately, including calls that never launched a task, and counts reused assessments once. Real-provider cost and quality comparisons remain open.',
         ],
       },
       {
@@ -407,15 +593,15 @@ export const knowledgeGuides: KnowledgeGuide[] = [
     title: 'Set up agents and account profiles',
     shortTitle: 'Agents & accounts',
     description:
-      'Set up Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity, choose project accounts, and understand credential storage limits.',
+      'Set up supported agent CLIs, choose project accounts, and understand credential storage limits.',
     readingTime: '3 min read',
     sections: [
       {
         id: 'supported-adapters',
         question: 'Which coding agents can run tasks?',
         paragraphs: [
-          'Codex, Claude Code, Grok Build, OpenCode, Kimi Code, and Antigravity have native task adapters. Install the corresponding CLI and configure provider access. Model access, permissions, and billing remain with your provider.',
-          'Kimi Code uses kimi for tasks, routing, and Ask Jackalope. Antigravity uses agy for worker tasks. Gemini CLI, Aider, and Goose appear in account setup but do not yet have task execution adapters. Discovery of an executable is not proof of valid authentication.',
+          'Codex, Claude Code, Grok Build, OpenCode, Kimi Code, Antigravity, and Gemini CLI have native task adapters. For DeepSeek and other supported API providers, use Connect an API provider in Agents: Jackalope prepares a private OpenCode runner, saves your protected key and discovers models. No separate OpenCode installation or account is needed. Other agents use their installed CLIs. Model access, permissions, and billing remain with your provider.',
+          'Kimi Code uses kimi for tasks, routing, and Ask Jackalope. Antigravity uses agy for worker tasks. Gemini CLI runs worker tasks with automatic file-edit approval and saved-session continuation; shell tools require the CLI’s own permission policy. Discovery of an executable is not proof of valid authentication.',
         ],
       },
       {
@@ -502,7 +688,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How are project MCP tools delivered?',
         paragraphs: [
           'Configure connections in MCP → Connections and select the project tools for a task. Codex supports direct stdio and HTTP connections; Claude Code also supports SSE.',
-          'Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity support on-demand discovery for supported stdio and HTTP connections. Direct delivery supports Codex, Claude Code, OpenCode, and Kimi Code; CLI-global tools still use the agent’s own configuration.',
+          'Supported task adapters offer on-demand discovery for stdio and HTTP connections. Grok, Antigravity, and Gemini CLI use an HTTP bridge and need permission for an HTTP client. Direct delivery supports Codex, Claude Code, OpenCode, and Kimi Code; CLI-global tools still use the agent’s own configuration.',
         ],
       },
       {
@@ -831,7 +1017,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
   {
     slug: 'connecting-custom-mcp-servers',
     category: 'mcp',
-    title: 'Connect a custom MCP server',
+    title: 'Find and connect MCP tools',
     shortTitle: 'Connect MCP tools',
     description:
       'Add local commands or remote HTTP endpoints, choose the project and agent, and verify a real tool request.',
@@ -841,7 +1027,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'mcp-overview',
         question: 'How do I connect project tools?',
         paragraphs: [
-          'MCP connects agents to tools and data sources. Add connections in MCP → Connections, choose project defaults, and review what a task receives. Delivery depends on the selected adapter and transport.',
+          'Open MCP → Marketplace for a curated collection of publisher-maintained tools. Review what a service does and its setup guide, then choose Configure. Search or choose All servers to browse the wider AllMCPs directory. Use Custom connection for your own endpoint or local command.',
         ],
       },
       {
@@ -851,10 +1037,10 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Choose Local command in the connection form. Use the executable and arguments from the server’s own documentation; installing a package does not tell Jackalope which resources it should expose.',
         ],
         steps: [
-          'Give the connection a recognizable Name and unique Identifier. Choose its project or global scope and eligible agents.',
+          'Give the connection a recognizable Name. Choose this project or all projects and the eligible agents. A unique identifier is generated; you can change it in Advanced settings.',
           'Put only the executable in Command. Add each command-line argument separately under Arguments; do not paste a whole shell command into Command.',
-          'Configure the environment values the server requires. Check that the executable is discoverable under the same user account as Jackalope.',
-          'Save the connection and use its probe. Then select it for a small task that requests a specific, read-only tool action.',
+          'Configure required environment values under Advanced settings. Check that the executable is discoverable under the same user account as Jackalope.',
+          'Choose Save and check. This starts the local process and may download its package. A failed check keeps your settings so you can edit or retry. Then try a small task that requests a specific, read-only action.',
         ],
         callout: {
           kind: 'note',
@@ -867,14 +1053,14 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Choose Remote URL and use the server’s documented HTTP MCP endpoint. A product homepage, dashboard URL, or ordinary REST endpoint is not necessarily an MCP endpoint. Configure the authentication and client options the server documents.',
           'Codex direct delivery supports HTTP; Claude Code supports HTTP and legacy SSE. On-demand discovery supports HTTP and stdio, not SSE. The form retains Legacy SSE for existing SSE connections; new connections use Local command or Remote URL.',
-          'Use the probe for configured header or environment authentication. For a CLI-owned OAuth session, complete sign-in in the correct CLI account. Check redirects and expired authentication if the endpoint returns a login page instead of a protocol response.',
+          'For a token, choose Bearer token / API key and use the masked field. Other headers and client options are under Advanced settings. Save and check tests configured credentials. OAuth services instead offer Sign in through Codex or Claude: save, then finish sign-in in each selected agent account. Saving does not verify sign-in, and the connection check cannot verify an agent-owned OAuth session.',
         ],
       },
       {
         id: 'enforcing-tool-gating',
         question: 'How do I choose tools for a task?',
         paragraphs: [
-          'Review project connections and use Customize task to select those the task needs. Check CLI-global configuration separately. A connection selection is not a guarantee that the agent has no other tools or local permissions.',
+          'Review project and all-project connections under Customize task → Tools. Project overrides take precedence over all-project connections with the same identifier. Existing saved task restrictions still apply to project connections. Check CLI-global configuration separately. A connection selection is not a guarantee that the agent has no other tools or local permissions.',
         ],
       },
       {
@@ -987,6 +1173,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'Try it: improve one empty state',
         paragraphs: [
           'Tasks opens Chat. Send a message to start a conversation, or open Inbox or New task for a structured brief with effort, agent, and tool choices. For a first task, describe the starting state, desired result, constraints, and how the agent should check it. Replace the example page and commands with ones that exist in your project.',
+          'Project setup walks through your repository, agents, decisions, Git behavior, appearance, and an optional first task. Preparation, check, and preview commands are detected in the background without replacing your saved choices. Review or edit them in Project Settings before starting work; setup does not run commands or enable automatic checks.',
+          'Chat offers optional starters for GitHub issues, PR feedback, failing CI and dependency updates. GitHub evidence is read through your installed, signed-in CLI. The prepared request stays editable; it does not publish, reply or resolve threads.',
         ],
         codeBox: {
           title: 'Example task brief',
@@ -1007,12 +1195,43 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         ],
       },
       {
+        id: 'task-speed',
+        question: 'Can I speed up tasks without reducing model effort?',
+        paragraphs: [
+          'Choose Codex speed under Customize task, or in the options for a new Chat. Provider setting keeps the existing CLI choice. Standard and Fast request an explicit processing tier for Codex workers. Fast can use more credits and requires a supported model and account; it does not change model effort. Other agents keep their own settings.',
+          'The choice follows planned assignments, retries and continuations. Task details record the requested tier and offer Execution timing for measured setup, context and check stages. Some stages overlap, and older records may have no measurements. Provider acceptance and actual speed gains require observation.',
+          'Jackalope supplies relevant repository context and completed setup facts, reuses matching saved checks and schedules independent work through workspace safeguards. Required verification and review still apply.',
+        ],
+      },
+      {
+        id: 'review-feedback',
+        question: 'How do I discuss specific changes or start from an issue?',
+        paragraphs: [
+          'In Review, use the line gutter or Add comment to attach feedback to a file and line. Add the unresolved comments to one follow-up, then review and send it. Earlier-patch comments retain their original location and ask the agent to recheck it. Show conversation keeps the result alongside Review or Preview; smaller windows stack the panes.',
+          'Open Start from an issue on Project, or Browse issues and pull requests in task workflows. GitHub uses your signed-in GitHub CLI. Connect Linear or Jira Cloud in Settings → Connected work. Choose an issue to prepare an editable task draft; Linked work opens its source later. Browsing does not update the issue or publish code.',
+        ],
+      },
+      {
+        id: 'remote-access',
+        question: 'How do I continue from another computer or my phone?',
+        paragraphs: [
+          'On the machine that runs your work, open Settings → Remote access, enable paired devices, select projects and save. Keep Jackalope running. Selected projects share task content and allow paired devices to start isolated tasks, answer questions and send follow-ups using the host’s saved settings.',
+          'For another desktop, open Tasks → Hosts → Connect a host. Use an SSH alias that already signs in with a verified host key, or an HTTPS address. Create a pairing code on the host and paste it on the connecting desktop.',
+          'For a phone, set up private HTTPS with Tailscale after signing both devices into Tailscale, or enter your existing HTTPS proxy address under Connection settings. Create a pairing link, open it on the phone and name the device. Links work once and expire after five minutes. Revoke devices from the host settings.',
+          'Work continues on the host when you disconnect. Refresh status before retrying an interrupted action. Reconnecting reuses saved send identifiers to avoid duplicate messages. Host restart retains normal paused/recovery behavior. Phone and multi-device installed acceptance remain in progress; native mobile applications and managed hosting are not included.',
+        ],
+      },
+      {
         id: 'try-result',
         question: 'How do I see the result and request a correction?',
         paragraphs: [
-          'Choose Try result after work stops. Detect or enter your project’s local preview command, review it, and choose Start preview. Jackalope remembers the command and can choose an available port. A responding server means the preview is reachable; inspect the behavior and project checks before accepting the work.',
-          'Use the embedded page or open it in your browser. Describe what should change and add it to your follow-up. Capture screenshot and page details opens a fresh browser and lets you attach a screenshot, page element and errors. That fresh capture does not copy the embedded page’s sign-in or unsaved interactions.',
-          'A preview holds its workspace while running. Stop preview and continue saves its logs and resumes work with your follow-up. Chat also lets you queue messages or explicitly stop current work and send.',
+          'Open Preview after work stops. Jackalope detects a supported local preview command when none is saved. Review the command and choose Start preview. Jackalope remembers the command and can choose an available port. A responding server means the preview is reachable; inspect the behavior and project checks before accepting the work.',
+          'Use Select in preview to open the task-owned preview browser. Interact or sign in there, select an element, describe the change and add your selections to a follow-up. It captures that browser’s current state, with a cropped screenshot and HTML/style context. Selection notes survive view changes. The embedded page has separate browser state. A fresh page snapshot remains available in a disclosure.',
+          'A preview holds its workspace while running. Stop preview and continue saves its logs and resumes work with your follow-up. Running tasks offer Queue follow-up and Stop & send. Queued instructions stay in order, continue in the same workspace and account, and pause after failures or restart. Run or cancel queued follow-ups before merging. Chat also lets you queue messages or explicitly stop current work and send.',
+          'On Chat’s start page, pick up work waiting across your projects. Session limits can pause later batches after a batch count or an estimated dollar threshold. A running batch can exceed the threshold, and missing cost reports pause further work when a cost limit is set. This is not a provider billing cap.',
+        ],
+        links: [
+          { label: 'Queue messages and recover a chat', href: '/knowledge/chat-and-follow-ups/' },
         ],
       },
       {
@@ -1037,9 +1256,15 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Open the result and review changes file by file in the unified or side-by-side diff. Compare the patch with your requested outcome, including accidental changes outside the scope.',
           'Read the saved command output and checks. Confirm they ran in the intended checkout and exercised the changed behavior. A successful build does not establish that a browser flow or native application worked.',
-          'For worktree tasks, Review & merge prepares the combined patch and checks integration preconditions. Review that combined result before merging it into the target branch.',
+          'Review separates Changes, Checks, and Merge. Track files with optional review markers, then use Approve work to accept the outcome for the displayed snapshot. Preparing and applying the merge remains a separate step; inspect the combined result and required checks first.',
+          'Chat uses the same guarded merge path for its latest batch. Pause dispatch and run or cancel queued messages before preparing the merge. After integration, continue in a new chat to work from the updated target branch.',
+          'Changes since my last review compares the current files with a review position you explicitly saved. Marking them seen does not accept changes or replace checks. You can optionally rate usefulness and report review minutes; Usage summarizes these locally and offers an aggregate report to copy.',
         ],
         links: [
+          {
+            label: 'Review, approval, and blocked-merge recovery',
+            href: '/knowledge/review-and-merge/',
+          },
           {
             label: 'Understand Review & merge',
             href: '/knowledge/git-worktrees/',

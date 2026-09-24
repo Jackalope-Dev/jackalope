@@ -1,6 +1,28 @@
 use super::*;
 
 #[test]
+fn lean_help_keeps_tool_recovery_and_full_contracts_discoverable() {
+    let full = help_response(false, true);
+    let lean = help_response(true, true);
+    assert!(lean.to_string().len() < full.to_string().len() / 2);
+    for contract in [
+        "/v1/help?full=true",
+        "never switch transports",
+        "agreement gates",
+        "/v1/user-prompt/poll",
+        "elapsed time is not an answer",
+    ] {
+        assert!(lean["instructions"].as_str().unwrap().contains(contract));
+    }
+    assert_eq!(lean["verification"], full["verification"]);
+    assert_eq!(lean["discovery"], full["discovery"]);
+    assert!(lean["discovery"]
+        .as_str()
+        .unwrap()
+        .contains("structuredContent.selected.rows"));
+}
+
+#[test]
 fn unreadable_queue_keeps_the_app_available_without_overwriting_assignments() {
     let folder = std::env::temp_dir().join(format!("jackalope-queue-recovery-{}", Uuid::new_v4()));
     let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
@@ -50,6 +72,7 @@ fn queue_dispatched_tasks_also_learn_about_the_harness_bridge() {
         agent_profile_id: None,
         verify_command: None,
         prepare_command: None,
+        setup_files: Vec::new(),
         auto_verify: false,
         title: "Do a thing".into(),
         prompt: "Do a thing".into(),
@@ -143,6 +166,7 @@ fn queue_is_durable_exclusively_owned_and_paused_after_restart() {
             agent_profile_id: None,
             verify_command: None,
             prepare_command: None,
+            setup_files: Vec::new(),
             auto_verify: false,
             title: "Test".into(),
             prompt: "Implement test".into(),
@@ -208,6 +232,7 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
         agent_accounts: HashMap::new(),
         verify_command: None,
         prepare_command: None,
+        setup_files: Vec::new(),
         auto_verify: false,
         items,
     };

@@ -6,11 +6,77 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { registry, registrySha256 } from '../../../scripts/evaluation/experiments.mjs';
 import { qualityCases } from '../../../scripts/evaluation/quality-cases.mjs';
 import { qualitySummary } from '../../../scripts/evaluation/quality-metrics.mjs';
-import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
+import { evaluationReadiness, providerStopReason } from '../../../scripts/evaluation/readiness.mjs';
+import { assemblePrompt, PROMPT_VERSION } from '../src/lib/skills/context-assembler.ts';
 import { resolveTaskGuidelines } from '../src/lib/skills/task-context.ts';
 import { effortPrompt } from '../src/lib/task-effort.ts';
+
+test('evaluation defaults match current task guidance', () => {
+  assert.equal(PROMPT_VERSION, 4);
+  assert.equal(registry.fields['task-approach'].default, 'scoped');
+  assert.equal(effortPrompt('balanced'), effortPrompt('balanced', true));
+  assert.notEqual(effortPrompt('balanced'), effortPrompt('balanced', false));
+});
+
+test('provider quota stops further evaluations without disguising ordinary failures', () => {
+  assert.equal(providerStopReason([]), null);
+  assert.equal(
+    providerStopReason([{ status: 'failed', error: 'check failed', quotaFailure: null }]),
+    null,
+  );
+  assert.match(
+    providerStopReason([{ quotaFailure: { modelOnly: false } }, { status: 'review' }]),
+    /Remaining trials were not launched/,
+  );
+});
+
+test('prompt baselines pin effort and selected cases without launching providers', () => {
+  const output = mkdtempSync(path.join(tmpdir(), 'jackalope-prompt-baseline-'));
+  const filename = path.join(output, 'prompts.json');
+  const script = fileURLToPath(new URL('../../../scripts/evaluation/quality.mjs', import.meta.url));
+  const invoke = (args) =>
+    spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', windowsHide: true });
+  const retired = invoke(['--compact-prompts']);
+  assert.notEqual(retired.status, 0);
+  assert.match(retired.stderr, /Retired compact-prompt control/);
+  const saved = invoke([
+    '--effort=balanced',
+    '--cases=copy-edit',
+    `--save-prompts=${filename}`,
+    '--revision=fixture-source',
+  ]);
+  assert.equal(saved.status, 0, saved.stderr);
+  const snapshot = JSON.parse(readFileSync(filename, 'utf8'));
+  assert.equal(snapshot.effort, 'balanced');
+  const experimental = invoke([
+    '--effort=balanced',
+    '--cases=copy-edit',
+    '--after-task-approach=scoped',
+    `--save-prompts=${filename}`,
+  ]);
+  assert.notEqual(experimental.status, 0);
+  assert.match(experimental.stderr, /Experimental prompts/);
+  assert.deepEqual(JSON.parse(readFileSync(filename, 'utf8')), snapshot);
+  assert.deepEqual(Object.keys(snapshot.prompts), ['copy-edit']);
+  const options = [
+    '--variants=control,after',
+    '--cases=copy-edit',
+    `--control-prompts=${filename}`,
+  ];
+  assert.equal(invoke([...options, '--effort=balanced']).status, 0);
+  assert.notEqual(invoke([...options, '--effort=quick']).status, 0);
+  assert.notEqual(
+    invoke([
+      ...options.filter((arg) => !arg.startsWith('--cases=')),
+      '--effort=balanced',
+      '--cases=csv-cell',
+    ]).status,
+    0,
+  );
+});
 
 test('resuming completed trials launches no workers and rejects changed configuration', () => {
   const output = mkdtempSync(path.join(tmpdir(), 'jackalope-quality-resume-'));
@@ -33,6 +99,16 @@ test('resuming completed trials launches no workers and rejects changed configur
   ].join('\n\n');
   const comparison = path.join(output, 'comparison.json');
   const saved = {
+    plan: {
+      experimentRegistry: { version: registry.version, sha256: registrySha256 },
+      cases: [fixture.id],
+      variants: ['before', 'after'],
+      repeat: 1,
+      providerMeter: null,
+      suiteSha256: createHash('sha256')
+        .update(JSON.stringify([fixture]))
+        .digest('hex'),
+    },
     baselineRevision: baseline.revision,
     agent: 'codex',
     model: 'fixture',
@@ -64,7 +140,7 @@ test('resuming completed trials launches no workers and rejects changed configur
         tokens: 1000,
       }),
     );
-  const run = (model) =>
+  const run = (model, extra = []) =>
     spawnSync(
       process.execPath,
       [
@@ -79,15 +155,85 @@ test('resuming completed trials launches no workers and rejects changed configur
         `--before=${executable}`,
         `--after=${executable}`,
         `--output=${output}`,
+        ...extra,
       ],
       { encoding: 'utf8', windowsHide: true },
     );
   const resumed = run('fixture');
   assert.equal(resumed.status, 0, resumed.stderr);
   assert.equal(readFileSync(comparison, 'utf8'), JSON.stringify(saved));
+  const failed = run('fixture', ['--require-pass']);
+  assert.equal(failed.status, 1, failed.stderr);
+  assert.match(failed.stdout, /oracle did not pass/);
+  assert.equal(readFileSync(comparison, 'utf8'), JSON.stringify(saved));
+  const passed = {
+    ...saved,
+    trials: saved.trials.map((trial) => ({
+      ...trial,
+      receipt: 'retained.json',
+      processExit: 0,
+      status: 'review',
+      budgetStopped: false,
+      oraclePassed: true,
+    })),
+  };
+  writeFileSync(comparison, JSON.stringify(passed));
+  const accepted = run('fixture', ['--require-pass']);
+  assert.equal(accepted.status, 0, accepted.stderr);
   const changed = run('different-model');
   assert.notEqual(changed.status, 0);
   assert.match(changed.stderr, /Resume requires/);
+  const stopFile = path.join(output, 'stop');
+  writeFileSync(stopFile, 'Stop between matched repetitions.');
+  writeFileSync(
+    comparison,
+    JSON.stringify({
+      ...saved,
+      trials: [],
+      activeTrial: { case: fixture.id, variant: 'after', repetition: 1 },
+    }),
+  );
+  const stopped = run('fixture', [`--stop-file=${stopFile}`]);
+  assert.equal(stopped.status, 0, stopped.stderr);
+  const interrupted = JSON.parse(readFileSync(comparison, 'utf8'));
+  assert.deepEqual(interrupted.trials, []);
+  assert.equal(interrupted.activeTrial, null);
+  assert.equal(interrupted.interruptions.length, 1);
+  assert.match(interrupted.interruptions[0].reason, /usage is unknown/);
+  assert.match(interrupted.stopReason, /Unrun trials remain missing/);
+});
+
+test('readiness requires every requested trial to complete within budget and pass its oracle', () => {
+  const expected = [{ case: 'example', mode: 'staged', repetition: 1 }];
+  const passed = {
+    ...expected[0],
+    receipt: 'receipt.json',
+    processExit: 0,
+    completed: true,
+    budgetStopped: false,
+    oraclePassed: true,
+  };
+  assert.equal(evaluationReadiness([passed], expected).passed, true);
+  for (const change of [
+    { completed: false },
+    { oraclePassed: false },
+    { budgetStopped: true },
+    { budgetStopped: null },
+    { processExit: 1 },
+    { processTimeout: true },
+    { error: 'unreadable receipt' },
+    { launchError: 'provider unavailable' },
+    { receipt: null },
+  ])
+    assert.equal(
+      evaluationReadiness([{ ...passed, ...change }], expected).passed,
+      false,
+      JSON.stringify(change),
+    );
+  assert.equal(evaluationReadiness([], expected).passed, false);
+  assert.equal(evaluationReadiness([passed, passed], expected).passed, false);
+  assert.equal(evaluationReadiness([passed], [{ ...expected[0], repetition: 2 }]).passed, false);
+  assert.equal(evaluationReadiness([], []).passed, false);
 });
 
 test('quality totals include failed attempts and keep missing usage unknown', () => {
@@ -106,6 +252,39 @@ test('quality totals include failed attempts and keep missing usage unknown', ()
       .tokensPerOracleSuccess,
     null,
   );
+});
+
+test('quality latency includes failures and reports partial measurements without inventing zeros', () => {
+  const summary = qualitySummary([
+    {
+      variant: 'after',
+      oraclePassed: true,
+      elapsedMs: 100,
+      efficiency: { firstActivityMs: 10, timings: { capacity: { totalMs: 5 } } },
+    },
+    {
+      variant: 'after',
+      oraclePassed: false,
+      elapsedMs: 300,
+      efficiency: { firstActivityMs: 30, timings: { capacity: { totalMs: 15 } } },
+    },
+    { variant: 'after', oraclePassed: true, elapsedMs: null },
+  ]).after;
+  assert.deepEqual(summary.elapsedMs, { coverage: 2, total: null, p50: 100, p95: 300 });
+  assert.equal(summary.msPerOracleSuccess, null);
+  assert.deepEqual(summary.firstActivityMs, { coverage: 2, total: null, p50: 10, p95: 30 });
+  assert.deepEqual(summary.timings.capacity, { coverage: 2, total: null, p50: 5, p95: 15 });
+  const complete = qualitySummary([
+    { variant: 'after', oraclePassed: true, elapsedMs: 100 },
+    { variant: 'after', oraclePassed: false, elapsedMs: 300 },
+  ]).after;
+  assert.equal(complete.msPerOracleSuccess, 400);
+  assert.deepEqual(qualitySummary([]).after.elapsedMs, {
+    coverage: 0,
+    total: null,
+    p50: null,
+    p95: null,
+  });
 });
 
 test('quality oracles reject initial defects, accept solutions, and detect unrelated edits', () => {

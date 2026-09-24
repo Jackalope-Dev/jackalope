@@ -57,3 +57,41 @@ test('opt-out while a request is pending discards its failed retry', async () =>
   assert.equal(calls, 1);
   client.stop();
 });
+
+test('new events keep their own retry budget when an older event exhausts its attempts', async () => {
+  const calls = [];
+  const client = createTelemetry(async (events) => {
+    calls.push(events);
+    throw Error('offline');
+  });
+  client.configure(true, true);
+  client.track({ name: 'app_opened' });
+  await client.flush();
+  await client.flush();
+  client.track({ name: 'operation_result', operation: 'task_start', outcome: 'accepted' });
+  await client.flush();
+  await client.flush();
+  await client.flush();
+  await client.flush();
+  assert.equal(calls.length, 5);
+  assert.deepEqual(
+    calls.map((events) => events.length),
+    [1, 1, 2, 1, 1],
+  );
+  assert.equal(calls[2][1].id, calls[4][0].id);
+  assert.ok(calls.flat().every((event) => !('attempts' in event)));
+  client.stop();
+});
+
+test('error opt-out removes queued diagnostics while operation outcomes remain usage counts', async () => {
+  const calls = [];
+  const client = createTelemetry(async (events) => calls.push(events));
+  client.configure(true, true);
+  client.track({ name: 'app_error', code: 'operation_failed', operation: 'task_start' });
+  client.track({ name: 'operation_result', operation: 'task_start', outcome: 'failed' });
+  client.configure(true, false);
+  await client.flush();
+  assert.equal(calls[0].length, 1);
+  assert.equal(calls[0][0].name, 'operation_result');
+  client.stop();
+});

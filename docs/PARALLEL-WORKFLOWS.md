@@ -7,7 +7,29 @@ isolated parallel work, coordination and review before integration.
 
 ### Live sessions
 
-Open **Tasks → Chat** and send a message, or choose **Open Chat** from Inbox.
+The project toolbar offers Focus, Build and Oversee layouts. Build starts review and
+preview beside the conversation; Oversee opens Needs you. Choosing a preset resets
+that project's task layout overrides. Individual conversation toggles remain available.
+
+The task toolbar shows the branch and changes since a previous visit. Task context
+opens the workspace and saved checks. Terminal opens a shell view in that exact
+workspace; Workspace tools opens its installed editor or a separate task window.
+The task terminal is a separate shell, not a resumed provider conversation. Stop it
+before agent work, checks, previews or integration. Its bounded output survives closing
+and reopening a view while the app runs. Controls reject commands addressed to an
+earlier shell after another window restarts it. Quitting stops its owned process tree.
+Result, review, preview and terminal panes can open in separate windows. These share
+native task state; result panes cannot independently launch a follow-up or approve work.
+Feedback from another window is retained locally until added to a reply draft or dismissed.
+
+Topics opens an editor to group original chat messages without moving them or changing dispatch.
+Message selection is searchable and loads more results on demand.
+Suggestions use local headings and opening lines. Rename, regroup or discard suggestions,
+then save. Topic edits reject stale revisions from another window. Prepare task draft
+retains source chat/message references and selected instructions; starting that task is
+a separate action through ordinary capture. Ungrouping preserves the original messages.
+
+Open **Work**, choose **New work** and send a message. The empty workspace shows the composer directly.
 The first message names the session;
 history groups sessions by attention, activity and completion, with recent work first.
 Capture stays available while a batch runs. Messages arriving together are grouped
@@ -29,16 +51,128 @@ Never edit the session journal while its profile is running. Reload saved sessio
 after resolving a storage error; failed loads preserve the original file.
 
 Review and preview pause dispatch. A running preview holds further writes to its
-workspace. **Changes** exports a cumulative binary-capable patch from the original
+workspace. **Review** exports a cumulative binary-capable patch from the original
 base without committing or changing the index. A check applies only to the exact
-exported tree. The workspace and saved patch remain available for review and manual
-integration. Live sessions currently serialize batches; independent native task
-planning and automatic integration are not part of this flow.
+exported tree. Run or cancel queued messages before preparing a merge. The latest
+batch uses the same source/target snapshots, verification requirements and explicit
+merge/cleanup controls as isolated tasks. The session gate encloses coordinator →
+execution guard → runtime locking so a new batch cannot race integration. Applied
+native receipts close the session for execution, including after restart. Continue
+in a new chat to prepare the next change; existing drafts are preserved.
+
+**Changes since my last review** compares the current tree to an explicitly saved
+review position. Marking changes seen does not accept them or replace checks. Files
+changed since the displayed snapshot cannot be marked seen without refreshing.
+If Git has removed the earlier snapshot, the view falls back to all current changes.
+
+Before sending a new chat, optional workflow starters prepare editable issue, PR-review,
+CI-repair or dependency-update requests. GitHub CLI reads use the selected repository;
+imported evidence is bounded and labeled when incomplete. No remote write is performed.
+Optional session limits cap the number of batches or pause at a reported cost estimate.
+They only block the next batch; a running batch can exceed the threshold. Missing cost
+for any batch or routing work pauses further dispatch when a cost threshold is set.
+Changing limits does not resume work. Live sessions still serialize batches;
+independent native task planning and automatic integration are separate capabilities.
+
+### A planned task from ordinary capture
+
+Submitting a new task or an unlimited new chat assesses whether one lead,
+investigation or parallel work fits the request. The project's **Decisions**
+preference selects local rules, an agent or Jev. Clear small requests and explicit
+restrictions use local rules. Assessment happens on submission, never while typing;
+unchanged requests reuse a short-lived receipt. An unavailable or uncertain model
+assessment falls back locally by default. Jev can instead make one agent assessment
+when the project's fallback is explicitly Agent-powered; both calls retain usage.
+Sessions with batch or
+cost limits retain their existing serial flow.
+
+**Create a plan** or **Investigate and plan** starts a planning attempt using the
+task's selected development agent. The agent receives the complete request and
+checks repository boundaries before proposing one to four assignments. Review
+ownership and dependencies, then choose **Start reviewed plan**. Native validation
+rejects cycles, escaping paths and independent assignments with overlapping scopes.
+A changed planner attempt requires another review. Planning workspaces must remain
+unchanged before implementation starts.
+
+Planning considers integration and review effort, shared contracts, generated files,
+manifests and lockfiles. Shared changes have one owner or an explicit dependency.
+Tightly coupled work stays together; a small request can remain one assignment.
+
+Planning accounts for repeated discovery, setup and checks in each assignment.
+Dispatch prioritizes prerequisites on the longest remaining dependency chains,
+independently of their saved order, while retaining fairness across projects.
+Canceled, failed and already launched descendants do not inflate that priority.
+Scope, interface, verification and snapshot gates still determine eligibility.
+
+The parent stays together in Work. Expand assignments for their results,
+questions and follow-ups; all attempts and reported usage remain attached. Workers
+inherit the selected agent, account, model, effort and tools. The existing queue
+shares execution capacity and passes verified predecessor snapshots to dependencies.
+Multiple assignments receive a final combined review and project verification;
+a single assignment avoids that extra worker. A saved automatic verification command
+and isolated Git work are required for this flow. Explicit workflow and continuation
+requests keep their existing execution paths.
+
+New managed plans combine groups of at least two completed assignments while other
+work continues. Pending consumers receive the checked combination; running workers
+keep their frozen inputs. The combined worker uses a separate worktree, resolves
+overlapping edits and checks the complete result. Native snapshot, process ownership
+and scope guards remain in force, including overlaps with unrelated tasks. Intermediate
+combinations are included in the final source receipt and cannot be applied separately.
+Interface decisions wholly within those assignments can be mediated by the combined
+worker. Their captured revisions, source snapshots, saved verification and a completion
+report for the checked tree must still match. The journal records mediation as reconciled,
+without manufacturing participant acceptance. Decisions involving other tasks remain
+blocked; changed decisions require a fresh continuation.
+
+A successfully completed agent attempt whose saved verification failed can continue
+automatically in its existing workspace. Each reviewed plan or user correction allows
+up to two repair attempts using the bound agent/account. Consumed predecessor snapshots,
+failed or interrupted processes and unavailable history are not automatically retried.
+Exhausted repairs stay in the parent task for a correction or an explicit additional
+attempt. Sources and the target checkout are preserved throughout.
+
+**Pause dispatch** holds pending assignments. **Stop task** also stops active
+attempts; interrupted process ownership retains the runtime's recovery requirements.
+Restart leaves dispatch paused. Failed assignments can be retried before downstream
+work starts; once dependent snapshots exist, corrections belong in the final combined
+result. A changed target branch blocks further dispatch and requires reassessment.
+**Review changes** uses guarded integration. Project automatic merge and
+reconciliation policies exclude these managed tasks; managed integration and repair
+belong to the reviewed task lifecycle and never automatically apply to the target.
+
+The task shows Plan, Work, Check and Review, with Result, Review and Preview together.
+Task details groups the request, assignments, attempts and usage. New plans collect
+assignment outcomes into the final result for snapshot-bound human review. Applying
+requires the complete task, current sources, saved checks and outcome acceptance;
+cleanup follows the explicit apply choice. Preview feedback continues the combined
+result; a running preview must be stopped before that continuation.
+
+Time and usage retains all worker and repair attempts. Local measurements distinguish
+observed focused review seconds from elapsed time between worker completion and local
+application. Focused review is an observation of a visible, focused result window, not
+proof of human attention. Unknown older measurements remain unavailable. These records
+do not establish reduced review effort or fewer defects without comparative trials.
+
+Assessment receipts record the selected policy and actual provider, including
+reported usage from unsuccessful model assessments and unknown usage when a call
+cannot report it. Local decisions use no model tokens; cached receipts are counted
+once. This is bounded orchestration, not a provider billing cap. Browser fixtures and
+native state tests do not establish installed-provider acceptance or measured savings.
 
 ### Parallel task queues
 
-Ordinary tasks ask their lead agent to delegate useful independent work through
-available provider subagent tools. Users do not choose a split mode. This stays
+Ordinary task results offer **Queue follow-up** while an attempt runs, alongside
+**Stop & send**. Queued instructions are saved natively in order and continue with
+the same workspace, agent and account. Stop & send saves the message before stopping
+the current attempt. The queue waits for process shutdown, finishing writes, verification
+and previews, and pauses after failed work or an app restart. Queued items remain visible
+with Resume and Cancel actions; interrupted launch ownership requires inspection instead
+of automatic replay. Run or cancel pending follow-ups before merging or manually starting
+another continuation. A failed save preserves the draft.
+
+Tasks continuing with one lead ask that agent to delegate useful independent work through
+available provider subagent tools. This stays
 within the provider session and does not create native queue entries; see
 [agent quality](AGENT-QUALITY.md) for limits. Explicit feature plans remain available
 for reviewing a queue before dispatch. Unfinished drafts from the former split
@@ -256,9 +390,11 @@ Automated regression coverage and isolated native trials are described in
 [CONTRIBUTING.md](../CONTRIBUTING.md) and [SELF-DEVELOPMENT.md](SELF-DEVELOPMENT.md).
 Record detailed local receipts privately. Fixtures and source builds do not prove
 installed-app acceptance.
-Task result views keep Conversation, Review, Preview, Activity, Details and Delivery
-together. Recovery, unanswered questions and failed checks drive the primary action.
-Review is a separate decision from passing checks or local integration.
+Task result views keep output, review, preview and activity together. Review separates
+full-width changes from checks and evidence, merge/delivery, and optional review tools.
+Planned tasks keep request and assignment details in a separate view. Recovery,
+unanswered questions and failed checks drive the primary action. Review is a separate
+decision from passing checks or local integration.
 
 **Try result** starts the reviewed preview command in the task workspace, remembers
 it for that project, and selects a free port when the port is zero. HTTP readiness

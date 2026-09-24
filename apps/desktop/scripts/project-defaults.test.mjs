@@ -7,6 +7,7 @@ test('discovered defaults fill only unset preferences without opting into automa
     baseBranch: 'main',
     prepareCommand: 'pnpm install',
     verifyCommand: 'pnpm verify',
+    previewCommand: 'pnpm dev',
   };
   assert.deepEqual(missingProjectDefaults(undefined, defaults), defaults);
   assert.deepEqual(
@@ -14,7 +15,7 @@ test('discovered defaults fill only unset preferences without opting into automa
       { baseBranch: 'release', prepareCommand: '', autoVerify: false },
       defaults,
     ),
-    { verifyCommand: 'pnpm verify' },
+    { verifyCommand: 'pnpm verify', previewCommand: 'pnpm dev' },
   );
   assert.deepEqual(
     missingProjectDefaults({ verifyCommand: 'custom check' }, { verifyCommand: 'new check' }),
@@ -25,4 +26,11 @@ test('discovered defaults fill only unset preferences without opting into automa
     {},
   );
   assert.deepEqual(missingProjectDefaults(undefined, undefined), {});
+  assert.deepEqual(
+    missingProjectDefaults(
+      { prepareCommand: '', verifyCommand: 'custom check', previewCommand: '', autoVerify: false },
+      defaults,
+    ),
+    { baseBranch: 'main' },
+  );
 });

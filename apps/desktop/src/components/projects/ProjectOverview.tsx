@@ -11,17 +11,20 @@ import {
   ShieldCheck,
   Terminal,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { returnToProject } from '../../lib/project-return';
-import { queueSnapshot } from '../../lib/queue';
+import type { WorkItem } from '../../lib/task-collection';
 import { nativeTask } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useLiveSessionStore } from '../../stores/liveSessionStore';
+import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
+import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useTaskStore } from '../../stores/taskStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
+import { IssuePicker } from '../tasks/IssuePicker';
 import { ProjectReturn } from '../tasks/ProjectReturn';
 import type { Readiness } from '../tasks/WorkspaceReadiness';
 import { Button } from '../ui/button';
@@ -37,48 +40,71 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
     state.projects.find((p) => p.id === state.activeProjectId),
   );
   const runs = useExecutionStore((state) => state.runs);
-  const [integrated, setIntegrated] = useState<string[]>([]);
-  const [readiness, setReadiness] = useState<Readiness | null>(null);
+  const historyError = useExecutionStore((state) => state.historyError);
+  const { sessions, runs: sessionRuns, error: sessionError } = useLiveSessionStore();
+  const { queue, error: queueError } = useManagedTaskStore();
+  const ideas = useTaskStore((state) => state.tasks);
+  const integrated = queue.mergedRunIds;
+  const allRuns = useMemo(
+    () => [...new Map([...runs, ...sessionRuns].map((run) => [run.id, run])).values()],
+    [runs, sessionRuns],
+  );
+  const [readinessResult, setReadiness] = useState<{ path: string; value: Readiness } | null>(null);
+  const readiness = readinessResult?.path === project?.path ? readinessResult?.value : null;
+  const readinessRequest = useRef(0);
+  const [readinessError, setReadinessError] = useState('');
   const [busyReadiness, setBusyReadiness] = useState(false);
-  const [error, setError] = useState('');
+  const error = queueError || sessionError || historyError;
   const [savedNotice, setSavedNotice] = useState('');
 
   const fetchReadiness = useCallback(async (path: string) => {
     if (!isTauriEnvironment()) return;
+    const request = ++readinessRequest.current;
     setBusyReadiness(true);
+    setReadiness(null);
+    setReadinessError('');
     try {
       const data = await nativeTask<Readiness>('project_readiness', { path });
-      setReadiness(data);
-    } catch {
-      // Readiness is best-effort for overview cards
+      if (request === readinessRequest.current) setReadiness({ path, value: data });
+    } catch (cause) {
+      if (request === readinessRequest.current) setReadinessError(String(cause));
     } finally {
-      setBusyReadiness(false);
+      if (request === readinessRequest.current) setBusyReadiness(false);
     }
   }, []);
 
-  useEffect(() => {
-    let alive = true;
-    if (isTauriEnvironment()) {
-      void queueSnapshot()
-        .then((value) => {
-          if (alive) setIntegrated(value.mergedRunIds);
-        })
-        .catch((cause) => {
-          if (alive) setError(String(cause));
-        });
-    }
-    return () => {
-      alive = false;
-    };
-  }, []);
+  useEffect(observeManagedTasks, []);
+  useEffect(() => observeLiveSessions(), []);
 
   useEffect(() => {
     if (project?.path) {
       void fetchReadiness(project.path);
     }
+    return () => {
+      readinessRequest.current++;
+    };
   }, [project?.path, fetchReadiness]);
 
-  const unfinished = project ? returnToProject(runs, project.id, integrated) : [];
+  const unfinished = useMemo(
+    () =>
+      project ? returnToProject(allRuns, project.id, integrated, { ideas, sessions, queue }) : [],
+    [allRuns, project, integrated, ideas, sessions, queue],
+  );
+  const openTask = (item: WorkItem) => {
+    useExecutionStore.getState().select(null);
+    useManagedTaskStore.getState().select(item.managed?.id ?? null);
+    if (item.managed) {
+      navigateWorkspace('kanban');
+    } else if (item.session) {
+      useLiveSessionStore.getState().select(item.session.id);
+      navigateWorkspace('live-sessions');
+    } else if (item.run) {
+      useWorkViewStore.getState().open(item.run.id);
+    } else {
+      useWorkViewStore.getState().setScope('project');
+      navigateWorkspace('kanban');
+    }
+  };
   const deliveries = project
     ? runs
         .filter((run) => run.projectId === project.id && integrated.includes(run.id))
@@ -92,8 +118,20 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
 
   return (
     <WorkspacePage>
-      {error && (
-        <InlineNotice tone="error">Integration receipts could not be loaded. {error}</InlineNotice>
+      {error && <InlineNotice tone="error">Task history may be incomplete. {error}</InlineNotice>}
+      {readinessError && (
+        <InlineNotice tone="error">
+          Repository status is unavailable. {readinessError}
+          {project && (
+            <Button
+              variant="outline"
+              disabled={busyReadiness}
+              onClick={() => void fetchReadiness(project.path)}
+            >
+              Retry repository check
+            </Button>
+          )}
+        </InlineNotice>
       )}
 
       {project ? (
@@ -102,7 +140,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
           <WorkspaceHeading
             title={project.name}
             description={
-              <div className="project-heading-description">
+              <span className="project-heading-description">
                 {project.description && (
                   <span className="text-[var(--color-text-secondary)]">{project.description}</span>
                 )}
@@ -114,13 +152,15 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                 >
                   {project.path}
                 </button>
-              </div>
+              </span>
             }
             action={
               <div className="flex items-center gap-1.5 flex-wrap">
                 <Button
                   size="sm"
                   onClick={() => {
+                    useManagedTaskStore.getState().select(null);
+                    useExecutionStore.getState().select(null);
                     useLiveSessionStore.getState().select(null);
                     useProjectStore.getState().selectProject(project.id);
                     navigateWorkspace('live-sessions');
@@ -135,6 +175,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   onClick={() => {
                     useWorkViewStore.getState().setScope('project');
                     useExecutionStore.getState().select(null);
+                    useManagedTaskStore.getState().select(null);
                     navigateWorkspace('kanban');
                   }}
                 >
@@ -144,6 +185,24 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
               </div>
             }
           />
+
+          <Disclosure>
+            <DisclosureSummary>Start from an issue</DisclosureSummary>
+            <IssuePicker
+              projectPath={project.path}
+              onDraft={(prompt) => {
+                const key = `jackalope-live-start:${project.id}`;
+                const combined = [localStorage.getItem(key), prompt].filter(Boolean).join('\n\n');
+                if (new TextEncoder().encode(combined).length > 12000)
+                  throw new Error(
+                    'Your existing task draft is full. Send or shorten it before adding this issue.',
+                  );
+                localStorage.setItem(key, combined);
+                useLiveSessionStore.getState().select(null);
+                navigateWorkspace('live-sessions');
+              }}
+            />
+          </Disclosure>
 
           {/* 4-Card Status Overview Grid */}
           <div className="project-stat-grid">
@@ -162,7 +221,11 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   </span>
                 }
                 description={
-                  readiness?.changes ? (
+                  !readiness ? (
+                    <span className="project-stat-desc">
+                      {busyReadiness ? 'Checking repository…' : 'Repository status unavailable'}
+                    </span>
+                  ) : readiness.changes ? (
                     <span className="text-amber-500 font-medium">Uncommitted changes</span>
                   ) : (
                     <span className="project-stat-desc">Working tree clean</span>
@@ -173,7 +236,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                 {readiness?.head ? (
                   <span className="font-mono">commit {readiness.head.slice(0, 7)}</span>
                 ) : (
-                  <span>Repository tracked</span>
+                  <span>{readiness ? 'Repository tracked' : 'Status not yet verified'}</span>
                 )}
               </div>
             </Panel>
@@ -198,7 +261,9 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                 description={
                   <span className="project-stat-desc">
                     {savedVerify
-                      ? 'Runs after task execution'
+                      ? project.preferences?.autoVerify
+                        ? 'Runs after task execution'
+                        : 'Available for manual checks'
                       : readiness?.verifyCommand
                         ? 'Suggested check available'
                         : 'Set up in project settings'}
@@ -245,14 +310,10 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                     <Activity size={16} className="shrink-0" aria-hidden="true" />
                   </span>
                 }
-                value={
-                  <span className="project-stat-value-text">{unfinished.length} in progress</span>
-                }
+                value={<span className="project-stat-value-text">{unfinished.length} open</span>}
                 description={
                   <span className="project-stat-desc">
-                    {unfinished.length > 0
-                      ? `${unfinished.length} task${unfinished.length > 1 ? 's' : ''} awaiting action`
-                      : 'All active work completed'}
+                    {unfinished.length > 0 ? 'In progress or awaiting review' : 'No active tasks'}
                   </span>
                 }
               />
@@ -264,6 +325,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   onClick={() => {
                     useWorkViewStore.getState().setScope('project');
                     useExecutionStore.getState().select(null);
+                    useManagedTaskStore.getState().select(null);
                     navigateWorkspace('kanban');
                   }}
                 >
@@ -284,15 +346,23 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                 }
                 value={
                   <span className="project-stat-value-text">
-                    {readiness?.dependenciesMissing
-                      ? 'Missing deps'
-                      : readiness?.missingConfiguration?.length
-                        ? 'Missing config'
-                        : 'Environment ready'}
+                    {!readiness
+                      ? busyReadiness
+                        ? 'Checking setup…'
+                        : 'Setup unavailable'
+                      : readiness.dependenciesMissing
+                        ? 'Missing deps'
+                        : readiness?.missingConfiguration?.length
+                          ? 'Missing config'
+                          : 'Setup inspected'}
                   </span>
                 }
                 description={
-                  readiness?.dependenciesMissing ? (
+                  !readiness ? (
+                    <span className="project-stat-desc">
+                      Inspect the workspace before running work
+                    </span>
+                  ) : readiness.dependenciesMissing ? (
                     <span className="text-amber-500 font-medium">node_modules not found</span>
                   ) : readiness?.missingConfiguration?.length ? (
                     <span className="text-amber-500 font-medium">
@@ -300,7 +370,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                       {readiness.missingConfiguration.length > 1 ? 's' : ''}
                     </span>
                   ) : (
-                    <span className="project-stat-desc">Ready for agent execution</span>
+                    <span className="project-stat-desc">No missing setup detected</span>
                   )
                 }
               />
@@ -325,19 +395,19 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
           <section className="workspace-section workspace-stack">
             <WorkspaceSectionHeading
               title="Active tasks"
-              description="Pick up where you left off with in-progress and reviewable work."
               action={
                 unfinished.length > 0 ? (
-                  <Badge variant="outline">{unfinished.length} in progress</Badge>
+                  <Badge variant="outline">{unfinished.length} open</Badge>
                 ) : undefined
               }
             />
             <ProjectReturn
               key={project.id}
               project={project}
-              runs={runs}
-              integratedIds={integrated}
-              onOpen={(id) => useWorkViewStore.getState().open(id)}
+              items={unfinished}
+              runs={allRuns}
+              queue={queue}
+              onOpen={openTask}
             />
           </section>
 

@@ -6,8 +6,9 @@ failure recovery. Read [STATUS.md](STATUS.md), [TODO.md](TODO.md), and
 [BACKEND.md](BACKEND.md) first.
 
 Use [release automation](RELEASE-AUTOMATION.md) as the entry point for the active
-Cloud beta/stable process and [Cloud signing](CRABNEBULA-RELEASE.md) for Azure/Apple
-setup. The local EXE/MSI and static-manifest commands below describe the retained
+Windows Store and Mac/Linux Cloud beta/stable process. See [Store setup](STORE-RELEASE.md)
+for Windows signing and update acceptance, and [Cloud signing](CRABNEBULA-RELEASE.md)
+for Apple setup and optional direct Windows distribution. The local EXE/MSI and static-manifest commands below describe the retained
 legacy R2 path; do not combine that publisher with Cloud. The installed-app and
 failure-recovery acceptance procedures apply to both paths.
 
@@ -95,7 +96,7 @@ See [BACKEND.md](BACKEND.md) for the separate remote backend roadmap.
 
 ## 4. Prepare the Windows build/signing machine
 
-Use Windows x64, a supported Node 24 runtime (matching current CI), and the pnpm
+Use Windows x64, a supported Node 26 runtime (matching current CI), and the pnpm
 version in root `package.json`. Install Git, Rust
 with the MSVC toolchain, Visual Studio C++ build tools/Windows SDK, and WebView2.
 Record exact versions. Packaging may download WiX/NSIS tooling on its first run;
@@ -146,8 +147,9 @@ and the selected provider's current instructions.
 
 ## 5. Version and prepare the source
 
-For the Cloud process, run `pnpm release:prepare patch` (or minor, major, an
-explicit higher version) and review the synchronized files and generated notes.
+For Store and Cloud, use `pnpm release:cut beta patch` or a stable cut from the
+tested beta snapshot as described in [release automation](RELEASE-AUTOMATION.md).
+Review the synchronized files and generated notes.
 It leaves all changes uncommitted. The manual steps below also describe what
 must remain synchronized when working on the legacy path.
 

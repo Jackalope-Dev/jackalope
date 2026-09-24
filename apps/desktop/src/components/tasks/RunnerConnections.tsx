@@ -12,6 +12,7 @@ import { AddAgentForm } from '../agents/AddAgentForm';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import { AgentInstallGuide } from '../agents/AgentInstallGuide';
 import { LocalAiSetup } from '../agents/LocalAiSetup';
+import { ProviderConnections } from '../agents/ProviderConnections';
 import { navigateWorkspace, openAgentConfiguration } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
@@ -101,7 +102,6 @@ export function RunnerConnections({
       });
     }
   }
-  const missing = runners.filter((runner) => !identified.some((agent) => agent.id === runner.id));
   return (
     <WorkspacePage className="agents-page">
       <div className="agents-page-content workspace-stack">
@@ -186,7 +186,7 @@ export function RunnerConnections({
               const options = config.runnerOptions[runner.id];
               const blockedModels =
                 options?.restrictModels && !options.models.some((model) => model.trim());
-              const needsSignIn = !runner.signedIn && runner.detail.startsWith('Sign in using');
+              const needsSignIn = !runner.signedIn && runner.detail.startsWith('Sign in ');
               const canStart = runner.available && enabled && !blockedModels && !needsSignIn;
               const working = activeRuns.length > 0;
               const status = waitingRun
@@ -329,6 +329,14 @@ export function RunnerConnections({
                     runner.desktopInstalled &&
                     !runner.available ? (
                       <AgentInstallGuide desktopInstalled compact />
+                    ) : needsSignIn && enabled ? (
+                      <Button
+                        aria-label={`Sign in to ${custom?.name ?? runner.name}`}
+                        onClick={() => openAgentConfiguration(runner.id)}
+                      >
+                        Sign in
+                        <ArrowRight size={16} />
+                      </Button>
                     ) : (
                       <Button
                         variant="outline"
@@ -356,12 +364,7 @@ export function RunnerConnections({
             }
           />
         )}
-        {missing.length > 0 && (
-          <p className="task-muted">
-            Not detected: {missing.map((runner) => runner.name).join(', ')}. Install and sign in
-            through the CLI, then check again.
-          </p>
-        )}
+        <ProviderConnections />
         <LocalAiSetup compact />
       </div>
       <Dialog.Root open={adding} onOpenChange={setAdding}>

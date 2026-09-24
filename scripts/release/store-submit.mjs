@@ -1,8 +1,13 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+
+import { assertVersions, readNotes } from './catalog.mjs';
+import { waitForSourceChecks } from './source-checks.mjs';
+import { storePlan } from './store-plan.mjs';
 
 const api = 'https://manage.devcenter.microsoft.com/v1.0/my';
 
@@ -133,6 +138,53 @@ async function hash(path) {
   return digest.digest('hex');
 }
 
+export function validateSource(receipt, env) {
+  if (
+    !/^[a-f0-9]{40}$/.test(env.EXPECTED_SOURCE ?? '') ||
+    receipt.sourceRevision !== env.EXPECTED_SOURCE ||
+    receipt.channel !== env.EXPECTED_CHANNEL
+  )
+    throw new Error('Store candidate does not match the reviewed source and channel');
+  if (!['beta', 'stable'].includes(receipt.channel) || receipt.architecture !== 'x64')
+    throw new Error('Invalid Store candidate channel or architecture');
+}
+
+async function protectSource(receipt, env) {
+  validateSource(receipt, env);
+  if (!/^[\w.-]+\/[\w.-]+$/.test(env.GITHUB_REPOSITORY ?? ''))
+    throw new Error('Expected the release repository');
+  const github = (path, args = []) =>
+    JSON.parse(
+      execFileSync('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/${path}`, ...args], {
+        encoding: 'utf8',
+        windowsHide: true,
+      }),
+    );
+  await waitForSourceChecks(async () =>
+    github(`commits/${receipt.sourceRevision}/check-runs?per_page=100`, [
+      '--paginate',
+      '--slurp',
+    ]).flatMap((page) => page.check_runs),
+  );
+  const tag = `store-${receipt.channel}/v${receipt.version}`;
+  const refs = github(`git/matching-refs/tags/${tag}`);
+  const existing = refs.find((ref) => ref.ref === `refs/tags/${tag}`);
+  if (
+    existing &&
+    (existing.object.type !== 'commit' || existing.object.sha !== receipt.sourceRevision)
+  )
+    throw new Error('Store release tag belongs to different source');
+  if (!existing)
+    github('git/refs', [
+      '--method',
+      'POST',
+      '-f',
+      `ref=refs/tags/${tag}`,
+      '-f',
+      `sha=${receipt.sourceRevision}`,
+    ]);
+}
+
 async function main() {
   const folder = process.argv[2];
   if (!folder)
@@ -147,6 +199,13 @@ async function main() {
     !receipt.storeManagedUpdates
   )
     throw new Error('Only a clean submission build with bundled WebView2 can be submitted');
+  const env = process.env;
+  validateSource(receipt, env);
+  const plan = storePlan(env, { mode: 'submission' }, 'Status: ready');
+  if (!plan.enabled || plan.channel !== receipt.channel)
+    throw new Error('Store submission is disabled or belongs to another branch');
+  await assertVersions(receipt.version);
+  await readNotes(receipt.version, true);
   const fileName = `Jackalope_${receipt.version}_x64.msix`;
   const archive = join(folder, 'upload.zip');
   if (
@@ -154,7 +213,6 @@ async function main() {
     (await hash(archive)) !== receipt.uploadSha256
   )
     throw new Error('Package or upload archive differs from the build receipt');
-  const env = process.env;
   for (const name of ['STORE_APP_ID', 'STORE_TENANT_ID', 'STORE_CLIENT_ID', 'STORE_CLIENT_SECRET'])
     if (!env[name]) throw new Error(`Missing ${name}`);
   if (!/^[a-z0-9-]+$/i.test(env.STORE_TENANT_ID)) throw new Error('Invalid tenant ID');
@@ -174,6 +232,7 @@ async function main() {
   );
   const { access_token: token } = await auth.json();
   if (!token) throw new Error('Store authentication did not return a token');
+  await protectSource(receipt, env);
   const result = await submit({
     appId: env.STORE_APP_ID,
     channel: receipt.channel,

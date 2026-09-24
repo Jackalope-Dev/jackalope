@@ -40,7 +40,7 @@ try {
   }
   for (const path of [...routes, '/404/']) {
     const html = pageHtml(template, path, origin)
-      .replace('<html lang="en">', `<html lang="en" style="${themeStyle}">`)
+      .replace('</head>', `<style>:root{${themeStyle}}</style></head>`)
       .replace('<div id="root"></div>', `<div id="root">${render(path)}</div>`);
     const target = resolve('dist', path === '/404/' ? '404.html' : `${path.slice(1)}index.html`);
     await mkdir(dirname(target), { recursive: true });

@@ -168,12 +168,6 @@
   color: var(--color-text-muted);
   text-decoration: line-through;
 }
-.repo-todo-edit {
-  margin-left: auto;
-  padding-left: 12px;
-  color: var(--color-text-muted);
-  flex-shrink: 0;
-}
 .repo-todo-nested {
   color: var(--color-text-muted);
 }

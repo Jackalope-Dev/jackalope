@@ -25,6 +25,12 @@ dated milestones in `src/changelog.json`. Update the shared source when content
 changes; route metadata, structured data, sitemap, RSS and LLM-readable discovery
 files are generated from it.
 
+Keep article publication dates stable when editing. Use a field note's `updated`
+date for a substantive revision, and keep comparison `published` dates separate
+from `reviewed` source dates. Visible bylines, article metadata and sitemap dates
+must agree; ordinary builds do not refresh editorial dates. Discovery availability
+uses the same platform configuration as the download page, including Store links.
+
 `public/media` contains runtime screenshots and the current 64-second tour.
 The recording uses fictional sample projects, accounts, activity and check results,
 with an instrumental soundtrack and English captions. It demonstrates the frontend,
@@ -79,7 +85,20 @@ With `VITE_ACCESS_API` configured, signup uses the optional Jackalope service.
 Without it, forms use the legacy saved-form endpoints in `src/signup-config.ts`;
 the no-JavaScript form action also uses that route. Public form IDs are not API
 credentials. Forks must configure their own endpoints and consent settings before
-accepting signups. See [signup forms](SEQUENZY.md) and the [service README](../server/README.md).
+accepting signups. See the [service README](../server/README.md).
+
+Service-backed signup queues a transactional email confirmation; approval and
+access links arrive separately. Optional newsletter consent syncs independently to
+Sequenzy, whose private API credential stays on the server. Legacy saved-form
+submissions use Sequenzy's confirmation settings and bypass that queue. The popup
+uses the site's shared dialog; it does not inject a hosted provider widget.
+
+Before enabling signup, verify the sending domain, reply-to and mailing addresses,
+audience, consent settings and email sequences in the provider account. Keep account
+records and subscriber exports private. Live checks require an operator-controlled
+address and may send email; remove temporary subscribers afterwards.
+
+Provider reference: [Sequenzy saved forms](https://docs.sequenzy.com/widgets/signup-form).
 
 Copy `.env.example` to `.env.local`, or configure these public build variables.
 They are embedded in static output and must never contain secrets.

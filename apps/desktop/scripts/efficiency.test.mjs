@@ -25,6 +25,8 @@ test('usage attribution includes router failures and handoffs once, with cached 
   assert.equal(report.routing.tokens, 50);
   assert.equal(report.quotaRetries.tokens, 40);
   assert.equal(report.verificationTokens, null);
+  assert.equal(runUsageBreakdown([run], [usage(5)]).total.tokens, 205);
+  assert.equal(runUsageBreakdown([run], [{ reported: false }]).total.tokens, null);
   assert.equal(
     runUsageBreakdown([{ ...run, routing: { ...run.routing, decisions: [{}] } }]).total.tokens,
     90,

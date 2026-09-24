@@ -1,16 +1,19 @@
-import { IconButton, RefreshIcon } from '@jackalope/ui';
+import { Badge, type BadgeProps, IconButton, RefreshIcon } from '@jackalope/ui';
 import {
   Archive,
   Copy,
   FolderGit2,
   FolderX,
   GitBranch,
+  GitCommitHorizontal,
   GitMerge,
+  HardDrive,
   Lock,
   Plus,
   Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { nativeTask } from '../../lib/task-runtime';
 import {
   archiveWorktree,
   cleanupWorktree,
@@ -21,6 +24,7 @@ import {
   type WorktreeEntry,
   type WorktreeOrphan,
 } from '../../lib/tauri-bridge';
+import { openChanges } from '../../stores/commitReviewStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
@@ -35,6 +39,29 @@ import { WorkspacePage } from '../ui/WorkspacePage';
 /** Ignored paths cleanup deletes, so a confirm never hides them. */
 function discarded(worktrees: WorktreeEntry[]): string[] {
   return [...new Set(worktrees.flatMap((wt) => wt.cleanup?.discarded_paths ?? []))].sort();
+}
+
+const isReady = (wt: WorktreeEntry) =>
+  Boolean((wt.cleanup?.merged || wt.cleanup?.content_merged) && !wt.cleanup.blocked_reason);
+
+/** One plain-language status per worktree, so the row reads at a glance. */
+function worktreeStatus(
+  wt: WorktreeEntry,
+  checking: boolean,
+): { label: string; variant: BadgeProps['variant'] } {
+  if (wt.cleanup?.missing) return { label: 'Folder missing', variant: 'warning' };
+  if (wt.is_locked) return { label: 'Locked', variant: 'outline' };
+  if (isReady(wt)) return { label: 'Merged', variant: 'success' };
+  if (wt.cleanup?.recoverable) return { label: 'Uncommitted changes', variant: 'warning' };
+  if (!wt.cleanup && checking) return { label: 'Checking…', variant: 'outline' };
+  return { label: 'In progress', variant: 'accent' };
+}
+
+/** Paths inside the project show relative to it; the full path stays in the tooltip. */
+function displayPath(path: string, root?: string) {
+  if (!root) return path;
+  const base = root.replace(/[\\/]+$/, '');
+  return path.startsWith(base) && path.length > base.length ? path.slice(base.length + 1) : path;
 }
 
 /**
@@ -127,9 +154,8 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   const worktrees = (project?.worktrees ?? []).filter(
     (wt, index) => index > 0 && !['main', 'master'].includes(wt.branch),
   );
-  const ready = worktrees.filter(
-    (wt) => (wt.cleanup?.merged || wt.cleanup?.content_merged) && !wt.cleanup.blocked_reason,
-  );
+  const ready = worktrees.filter(isReady);
+  const active = worktrees.filter((wt) => !isReady(wt));
   const missing = worktrees.filter((wt) => wt.cleanup?.missing && !wt.is_locked);
   const [orphans, setOrphans] = useState<WorktreeOrphan[]>([]);
   const leftover = orphans.filter((folder) => !folder.blocked_reason);
@@ -143,6 +169,27 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   const branchName = branch ?? `feat/${slug.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   const desktop = isTauriEnvironment();
   const projectPath = project?.path;
+  const [sizes, setSizes] = useState<
+    Record<string, { bytes: number; files: number; partial: boolean; skippedLinks: number }>
+  >({});
+  const [measuring, setMeasuring] = useState('');
+  const measure = async (path: string) => {
+    if (!projectPath || measuring) return;
+    setMeasuring(path);
+    try {
+      const value = await nativeTask<{
+        bytes: number;
+        files: number;
+        partial: boolean;
+        skippedLinks: number;
+      }>('git_worktree_usage', { repoPath: projectPath, worktreePath: path });
+      setSizes((previous) => ({ ...previous, [path]: value }));
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setMeasuring('');
+    }
+  };
   // Leftover folders are not registered worktrees, so Git never reports them
   // with the list above; they are read separately.
   const loadOrphans = useCallback(async () => {
@@ -319,6 +366,161 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
       setError(`Could not copy. Select the path in the list and copy it manually: ${path}`);
     }
   };
+  const renderWorktree = (wt: WorktreeEntry) => {
+    const status = worktreeStatus(wt, checkingWorktrees);
+    return (
+      <article key={wt.path} className="worktree-row">
+        <span className="worktree-icon" data-variant={status.variant} aria-hidden="true">
+          <GitBranch size={18} />
+        </span>
+        <div className="worktree-identity">
+          <h3>
+            <span className="truncate">
+              {wt.branch || (wt.is_bare ? 'Bare repository' : 'Detached HEAD')}
+            </span>
+            <Badge variant={status.variant}>{status.label}</Badge>
+          </h3>
+          <p className="worktree-path" title={wt.path}>
+            {displayPath(wt.path, projectPath)}
+          </p>
+          {sizes[wt.path] && (
+            <p
+              className="task-muted"
+              title="Git data and linked folders excluded. File sizes may differ from allocated disk space."
+            >
+              {sizes[wt.path].partial ? 'At least ' : ''}
+              {(sizes[wt.path].bytes / 1024 / 1024).toFixed(1)} MiB in{' '}
+              {sizes[wt.path].files.toLocaleString()} files
+            </p>
+          )}
+          <div className="worktree-meta">
+            <span className="font-mono">
+              {wt.head ? wt.head.slice(0, 7) : 'No resolved commit'}
+            </span>
+            {wt.is_locked && !wt.cleanup?.missing && (
+              <span>
+                <Lock size={14} aria-hidden="true" />
+                Locked
+              </span>
+            )}
+            {wt.is_bare && <span>Bare repository</span>}
+            <span
+              className={
+                wt.cleanup?.merged && !wt.cleanup.missing ? 'text-[var(--color-success)]' : ''
+              }
+            >
+              <GitMerge size={14} aria-hidden="true" />
+              {wt.cleanup?.missing
+                ? 'Folder missing'
+                : wt.cleanup?.content_merged
+                  ? `Content already in ${wt.cleanup.target_branch}`
+                  : wt.cleanup?.merged === true
+                    ? `Commits merged into ${wt.cleanup.target_branch}`
+                    : wt.cleanup?.merged === false
+                      ? `Not merged into ${wt.cleanup.target_branch}`
+                      : checkingWorktrees
+                        ? 'Checking merge status…'
+                        : 'Merge status unavailable'}
+            </span>
+          </div>
+          {wt.cleanup?.blocked_reason && (
+            <p className="task-muted mt-2">{wt.cleanup.blocked_reason}</p>
+          )}
+        </div>
+        <div className="workspace-actions">
+          {(wt.cleanup?.merged || wt.cleanup?.content_merged) && !wt.cleanup.blocked_reason && (
+            <ConfirmAction
+              title={`Clean up ${wt.branch || 'worktree'}?`}
+              description={`Removes this worktree folder and local branch. Changes are already merged into ${wt.cleanup.target_branch}.`}
+              label="Remove worktree & branch"
+              busyLabel="Removing…"
+              onConfirm={() => cleanup(wt)}
+              trigger={
+                <Button
+                  variant="outline"
+                  disabled={refreshing || pending || !desktop}
+                  aria-label={`Remove worktree ${wt.branch || wt.path}`}
+                  loading={removing === wt.path}
+                  loadingLabel="Removing…"
+                >
+                  <Trash2 size={18} aria-hidden="true" />
+                  Remove worktree &amp; branch
+                </Button>
+              }
+            >
+              {({ busy }) => (
+                <RemovalPlan
+                  busy={busy}
+                  paths={discarded([wt])}
+                  progress={progress}
+                  busyNote={`Removing ${wt.branch || wt.path}. This may take a moment…`}
+                />
+              )}
+            </ConfirmAction>
+          )}
+          {wt.cleanup?.recoverable && (
+            <ConfirmAction
+              title={`Archive and remove ${wt.branch || 'worktree'}?`}
+              description="Saves uncommitted work to .worktrees/.archive, then removes the folder and branch."
+              label="Archive & remove"
+              busyLabel="Archiving…"
+              onConfirm={() => archive(wt)}
+              trigger={
+                <Button
+                  variant="outline"
+                  disabled={refreshing || pending || !desktop}
+                  aria-label={`Archive and remove ${wt.branch || wt.path}`}
+                  loading={removing === wt.path}
+                  loadingLabel="Archiving…"
+                >
+                  <Archive size={18} aria-hidden="true" />
+                  Archive &amp; remove
+                </Button>
+              }
+            >
+              {({ busy }) => (
+                <RemovalPlan
+                  busy={busy}
+                  progress={progress}
+                  busyNote="Archiving uncommitted work and removing folder. This may take a moment…"
+                />
+              )}
+            </ConfirmAction>
+          )}
+          <Button
+            variant="ghost"
+            disabled={!!wt.cleanup?.missing}
+            aria-label={`Review changes in ${wt.branch || wt.path}`}
+            onClick={() => openChanges(wt.path)}
+          >
+            <GitCommitHorizontal size={18} aria-hidden="true" />
+            Changes
+          </Button>
+          <IconButton
+            variant="ghost"
+            label={
+              measuring === wt.path
+                ? 'Measuring…'
+                : `${sizes[wt.path] ? 'Refresh' : 'Check'} disk size of ${wt.branch || wt.path}`
+            }
+            title={sizes[wt.path] ? 'Refresh disk size' : 'Check disk size'}
+            disabled={!!measuring || !desktop || !!wt.cleanup?.missing}
+            onClick={() => void measure(wt.path)}
+          >
+            <HardDrive size={18} />
+          </IconButton>
+          <IconButton
+            variant="ghost"
+            label={`Copy path for ${wt.branch || wt.path}`}
+            title="Copy path"
+            onClick={() => void copy(wt.path)}
+          >
+            <Copy size={18} />
+          </IconButton>
+        </div>
+      </article>
+    );
+  };
   return (
     <WorkspacePage className="">
       <WorkspaceHeading
@@ -375,50 +577,42 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
         />
       ) : (
         <>
-          <div className="worktree-cleanup-toolbar">
-            <label htmlFor="worktree-target">Check merged into</label>
-            <Select
-              id="worktree-target"
-              value={target}
-              onValueChange={setTarget}
-              disabled={pending || !desktop}
-            >
-              <SelectItem value="auto">Auto · main / master</SelectItem>
-              <SelectItem value="main">main</SelectItem>
-              <SelectItem value="master">master</SelectItem>
-            </Select>
-            <ConfirmAction
-              title={`Clean up ${ready.length} ready worktrees?`}
-              description="Removes merged worktrees and local branches. Task history is kept."
-              label="Clean up ready"
-              busyLabel="Cleaning up…"
-              onConfirm={cleanupMerged}
-              trigger={
-                <Button disabled={pending || refreshing || !desktop || !ready.length}>
-                  <Trash2 size={18} aria-hidden="true" />
-                  Clean up ready ({ready.length})
-                </Button>
-              }
-            >
-              {({ busy }) => (
-                <RemovalPlan
-                  busy={busy}
-                  names={ready.map((wt) => wt.branch || wt.path)}
-                  paths={discarded(ready)}
-                  progress={progress}
-                />
-              )}
-            </ConfirmAction>
-            {missing.length > 0 && (
-              <Button
-                variant="outline"
-                disabled={pending || refreshing || !desktop}
-                onClick={() => void prune()}
-              >
-                Remove missing entries ({missing.length})
-              </Button>
-            )}
-            <p className="task-muted">Clean up merged worktrees with no uncommitted changes.</p>
+          <div className="worktree-summary">
+            <p className="task-muted">
+              Worktrees are separate checkouts of this repository, so tasks can work on their own
+              branch in parallel without touching your main folder.
+            </p>
+            <div className="worktree-summary-bar">
+              <dl className="worktree-counts">
+                <div>
+                  <dt>In progress</dt>
+                  <dd>{active.length}</dd>
+                </div>
+                <div data-tone={ready.length ? 'success' : undefined}>
+                  <dt>Ready to clean up</dt>
+                  <dd>{ready.length}</dd>
+                </div>
+                {orphans.length > 0 && (
+                  <div data-tone="warning">
+                    <dt>Leftover folders</dt>
+                    <dd>{orphans.length}</dd>
+                  </div>
+                )}
+              </dl>
+              <label className="worktree-target" htmlFor="worktree-target">
+                Merged into
+                <Select
+                  id="worktree-target"
+                  value={target}
+                  onValueChange={setTarget}
+                  disabled={pending || !desktop}
+                >
+                  <SelectItem value="auto">Auto · main / master</SelectItem>
+                  <SelectItem value="main">main</SelectItem>
+                  <SelectItem value="master">master</SelectItem>
+                </Select>
+              </label>
+            </div>
           </div>
           {creating && (
             <form
@@ -465,128 +659,63 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
           )}
           {loading && <LoadingState label="Loading worktrees…" compact={!!worktrees.length} />}
           {checkingWorktrees && <LoadingState label="Checking merge and cleanup status…" compact />}
-          {worktrees.map((wt) => (
-            <article key={wt.path} className="worktree-row">
-              <GitBranch
-                size={24}
-                aria-hidden="true"
-                className="text-[var(--color-accent-ink)] shrink-0"
-              />
-              <div className="worktree-identity">
-                <h2>{wt.branch || (wt.is_bare ? 'Bare repository' : 'Detached HEAD')}</h2>
-                <p className="task-muted mt-1">{wt.path}</p>
-                <div className="worktree-meta">
-                  <span className="font-mono">
-                    {wt.head ? wt.head.slice(0, 7) : 'No resolved commit'}
-                  </span>
-                  {wt.is_locked && (
-                    <span>
-                      <Lock size={14} aria-hidden="true" />
-                      Locked
-                    </span>
-                  )}
-                  {wt.is_bare && <span>Bare repository</span>}
-                  <span
-                    className={
-                      wt.cleanup?.merged && !wt.cleanup.missing ? 'text-[var(--color-success)]' : ''
-                    }
-                  >
-                    <GitMerge size={14} aria-hidden="true" />
-                    {wt.cleanup?.missing
-                      ? 'Folder missing'
-                      : wt.cleanup?.content_merged
-                        ? `Content already in ${wt.cleanup.target_branch}`
-                        : wt.cleanup?.merged === true
-                          ? `Commits merged into ${wt.cleanup.target_branch}`
-                          : wt.cleanup?.merged === false
-                            ? `Not merged into ${wt.cleanup.target_branch}`
-                            : checkingWorktrees
-                              ? 'Checking merge status…'
-                              : 'Merge status unavailable'}
-                  </span>
-                </div>
-                {wt.cleanup?.blocked_reason && (
-                  <p className="task-muted mt-2">{wt.cleanup.blocked_reason}</p>
-                )}
-                {!!wt.cleanup?.discarded_paths?.length && (
-                  <p className="task-muted mt-2">
-                    Ignored paths deleted during cleanup: {wt.cleanup.discarded_paths.join(', ')}
-                  </p>
-                )}
-              </div>
-              <div className="workspace-actions">
-                {(wt.cleanup?.merged || wt.cleanup?.content_merged) &&
-                  !wt.cleanup.blocked_reason && (
-                    <ConfirmAction
-                      title={`Clean up ${wt.branch || 'worktree'}?`}
-                      description={`Removes this worktree folder and local branch. Changes are already merged into ${wt.cleanup.target_branch}.`}
-                      label="Remove worktree & branch"
-                      busyLabel="Removing…"
-                      onConfirm={() => cleanup(wt)}
-                      trigger={
-                        <Button
-                          variant="outline"
-                          disabled={refreshing || pending || !desktop}
-                          aria-label={`Remove worktree ${wt.branch || wt.path}`}
-                          loading={removing === wt.path}
-                          loadingLabel="Removing…"
-                        >
-                          <Trash2 size={18} aria-hidden="true" />
-                          Remove worktree &amp; branch
-                        </Button>
-                      }
-                    >
-                      {({ busy }) => (
-                        <RemovalPlan
-                          busy={busy}
-                          paths={discarded([wt])}
-                          progress={progress}
-                          busyNote={`Removing ${wt.branch || wt.path}. This may take a moment…`}
-                        />
-                      )}
-                    </ConfirmAction>
-                  )}
-                {wt.cleanup?.recoverable && (
-                  <ConfirmAction
-                    title={`Archive and remove ${wt.branch || 'worktree'}?`}
-                    description="Saves uncommitted work to .worktrees/.archive, then removes the folder and branch."
-                    label="Archive & remove"
-                    busyLabel="Archiving…"
-                    onConfirm={() => archive(wt)}
-                    trigger={
-                      <Button
-                        variant="outline"
-                        disabled={refreshing || pending || !desktop}
-                        aria-label={`Archive and remove ${wt.branch || wt.path}`}
-                        loading={removing === wt.path}
-                        loadingLabel="Archiving…"
-                      >
-                        <Archive size={18} aria-hidden="true" />
-                        Archive &amp; remove
-                      </Button>
-                    }
-                  >
-                    {({ busy }) => (
-                      <RemovalPlan
-                        busy={busy}
-                        progress={progress}
-                        busyNote="Archiving uncommitted work and removing folder. This may take a moment…"
-                      />
-                    )}
-                  </ConfirmAction>
-                )}
-                <Button
-                  variant="ghost"
-                  aria-label={`Copy path for ${wt.branch || wt.path}`}
-                  onClick={() => void copy(wt.path)}
-                >
-                  <Copy size={18} />
-                  Copy path
-                </Button>
-              </div>
-            </article>
-          ))}
           {worktreesError && <InlineNotice tone="error">{worktreesError}</InlineNotice>}
+          {active.length > 0 && (
+            <section className="worktree-group" aria-labelledby="worktrees-active">
+              <header className="worktree-group-heading">
+                <div>
+                  <h2 id="worktrees-active">In progress</h2>
+                  <p className="task-muted">Branches not merged yet, or with work still open.</p>
+                </div>
+                {missing.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={pending || refreshing || !desktop}
+                    onClick={() => void prune()}
+                  >
+                    Forget missing folders ({missing.length})
+                  </Button>
+                )}
+              </header>
+              {active.map(renderWorktree)}
+            </section>
+          )}
+          {ready.length > 0 && (
+            <section className="worktree-group" aria-labelledby="worktrees-ready">
+              <header className="worktree-group-heading">
+                <div>
+                  <h2 id="worktrees-ready">Ready to clean up</h2>
+                  <p className="task-muted">
+                    Merged with no uncommitted changes. Removing them keeps task history.
+                  </p>
+                </div>
+                <ConfirmAction
+                  title={`Clean up ${ready.length} ready worktrees?`}
+                  description="Removes merged worktrees and local branches. Task history is kept."
+                  label="Clean up ready"
+                  busyLabel="Cleaning up…"
+                  onConfirm={cleanupMerged}
+                  trigger={
+                    <Button size="sm" disabled={pending || refreshing || !desktop || !ready.length}>
+                      <Trash2 size={16} aria-hidden="true" />
+                      Clean up all ({ready.length})
+                    </Button>
+                  }
+                >
+                  {({ busy }) => (
+                    <RemovalPlan
+                      busy={busy}
+                      names={ready.map((wt) => wt.branch || wt.path)}
+                      paths={discarded(ready)}
+                      progress={progress}
+                    />
+                  )}
+                </ConfirmAction>
+              </header>
+              {ready.map(renderWorktree)}
+            </section>
+          )}
           {!loading && !worktreesError && !worktrees.length && (
             <EmptyState
               icon={GitBranch}
@@ -595,9 +724,12 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
             />
           )}
           {orphans.length > 0 && (
-            <section className="worktree-leftovers">
-              <div className="worktree-cleanup-toolbar">
-                <h2>Leftover folders ({orphans.length})</h2>
+            <section className="worktree-group" aria-labelledby="worktrees-leftover">
+              <header className="worktree-group-heading">
+                <div>
+                  <h2 id="worktrees-leftover">Leftover folders</h2>
+                  <p className="task-muted">Folders in .worktrees/ that Git no longer tracks.</p>
+                </div>
                 {leftover.length > 0 && (
                   <ConfirmAction
                     title={`Delete ${leftover.length} leftover ${leftover.length === 1 ? 'folder' : 'folders'}?`}
@@ -606,9 +738,9 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                     busyLabel="Deleting…"
                     onConfirm={() => removeLeftover(leftover)}
                     trigger={
-                      <Button disabled={pending || refreshing || !desktop}>
-                        <FolderX size={18} aria-hidden="true" />
-                        Delete leftover folders ({leftover.length})
+                      <Button size="sm" disabled={pending || refreshing || !desktop}>
+                        <FolderX size={16} aria-hidden="true" />
+                        Delete all ({leftover.length})
                       </Button>
                     }
                   >
@@ -623,20 +755,17 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                     )}
                   </ConfirmAction>
                 )}
-                <p className="task-muted">
-                  Unregistered folders in .worktrees/ that are no longer tracked by Git.
-                </p>
-              </div>
+              </header>
               {orphans.map((folder) => (
                 <article key={folder.path} className="worktree-row">
-                  <FolderX
-                    size={24}
-                    aria-hidden="true"
-                    className="text-[var(--color-accent-ink)] shrink-0"
-                  />
+                  <span className="worktree-icon" data-variant="warning" aria-hidden="true">
+                    <FolderX size={18} />
+                  </span>
                   <div className="worktree-identity">
                     <h3>{folder.name}</h3>
-                    <p className="task-muted mt-1">{folder.path}</p>
+                    <p className="worktree-path" title={folder.path}>
+                      {displayPath(folder.path, projectPath)}
+                    </p>
                     <div className="worktree-meta">
                       <span>
                         {folder.entries === 0
@@ -677,14 +806,14 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                         )}
                       </ConfirmAction>
                     )}
-                    <Button
+                    <IconButton
                       variant="ghost"
-                      aria-label={`Copy path for ${folder.name}`}
+                      label={`Copy path for ${folder.name}`}
+                      title="Copy path"
                       onClick={() => void copy(folder.path)}
                     >
                       <Copy size={18} />
-                      Copy path
-                    </Button>
+                    </IconButton>
                   </div>
                 </article>
               ))}

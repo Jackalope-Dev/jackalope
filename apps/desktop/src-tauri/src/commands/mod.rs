@@ -1,8 +1,13 @@
 pub mod capacity;
+pub mod cli_host;
+pub mod cli_install;
+pub mod cli_terminal;
 pub mod codebase;
 pub mod codebase_watch;
 pub mod coordination;
 pub mod coordination_mcp;
+pub mod desktop_integration;
+pub mod dictation;
 pub mod git;
 pub mod harness;
 pub mod helper;
@@ -11,18 +16,28 @@ pub mod live_sessions;
 pub mod mcp;
 pub mod mcp_broker;
 pub mod platform;
+pub mod project_registry;
 pub mod pty;
 pub mod repo_todos;
 pub mod system;
+pub mod task_strategy;
 pub mod tasks;
+pub mod work_terminal;
+pub mod work_windows;
+pub mod workspace_setup;
 pub mod worktree_cleanup;
+pub mod worktree_usage;
 
 pub mod agent_models;
 pub mod agent_policy;
 pub mod agent_profiles;
 pub mod agent_sign_in;
+pub mod decisions;
+mod experiments;
+pub mod jev;
 pub mod local_ai;
 pub mod local_detection;
+pub mod managed_runtime;
 mod retrieval;
 
 pub mod history;
@@ -44,6 +59,11 @@ pub mod schedules;
 pub mod browser;
 pub mod delivery;
 pub mod desktop_control;
+pub mod github_workflows;
+pub mod issues;
+pub mod remote;
+pub mod review_progress;
+pub mod workflow_feedback;
 
 mod resolver_fs;
 
@@ -55,6 +75,7 @@ mod file_lock;
 mod git_command;
 pub mod notifications;
 
+pub mod commit_review;
 pub mod project_git;
 
 pub mod checkpoint;

@@ -1,9 +1,11 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { Badge, Panel, RefreshIcon } from '@jackalope/ui';
+import { Zap } from 'lucide-react';
 
 import { useEffect, useState } from 'react';
 import { getAgentMetadata } from '../../lib/agent-catalog';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { capacityWindowName } from '../../lib/capacity-display';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { type CapacityWindow, useCapacityStore } from '../../stores/capacityStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -11,22 +13,8 @@ import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './capacity-panel.css';
 
-const agentName = (agent: string) => getAgentMetadata(agent)?.name ?? agent;
-function windowName(window: CapacityWindow) {
-  if (window.window === 'weekly') return 'Weekly allowance';
-  if (window.window === 'monthly') return 'Monthly allowance';
-  if (window.window === 'billing') return 'Included allowance';
-  const minutes = window.durationMinutes;
-  if (!minutes) {
-    if (window.window === 'primary') return 'Primary window';
-    if (window.window === 'secondary') return 'Secondary window';
-    return 'Usage window';
-  }
-  if (minutes % 1440 === 0) return `${minutes / 1440}-day window`;
-  if (minutes % 60 === 0) return `${minutes / 60}-hour window`;
-  return `${minutes}-minute window`;
-}
-
+const agentName = (agent: string) =>
+  agent === 'jev' ? 'TypeSafe Jev' : (getAgentMetadata(agent)?.name ?? agent);
 const windowExpired = (window: CapacityWindow, now: number) =>
   window.resetsAt != null && window.resetsAt * 1000 <= now;
 /** Single-line reset text; the tiles ellipsize, so the full wording lives in `resetDetail`. */
@@ -157,7 +145,11 @@ export function CapacityPanel() {
               <Panel className="capacity-card" key={record.agent}>
                 <header className="capacity-card-head">
                   <span className="capacity-agent-mark" aria-hidden="true">
-                    <AgentCharacter provider={record.agent} />
+                    {record.agent === 'jev' ? (
+                      <Zap size={24} />
+                    ) : (
+                      <AgentCharacter provider={record.agent} />
+                    )}
                   </span>
                   <div className="capacity-card-identity">
                     <h3>{name}</h3>
@@ -184,7 +176,7 @@ export function CapacityPanel() {
                           <CapacityGauge remaining={remaining} />
                           <div className="capacity-dial-meta">
                             <span className="capacity-dial-name">
-                              <span>{windowName(window)}</span>
+                              <span>{capacityWindowName(window)}</span>
                               {low && (
                                 <Badge variant="warning">
                                   {remaining === 0 ? 'Limit reached' : 'Low'}
@@ -213,6 +205,15 @@ export function CapacityPanel() {
                       {record.status === 'notInstalled' ? 'Not installed' : 'Balance unavailable'}
                     </p>
                     <p className="capacity-detail">{record.detail}</p>
+                    {record.agent === 'jev' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void openExternalUrl('https://console.typesafe.ai')}
+                      >
+                        Open TypeSafe account
+                      </Button>
+                    )}
                   </div>
                 )}
               </Panel>

@@ -6,8 +6,6 @@
   flex-wrap: wrap;
   gap: 12px;
   min-width: 0;
-}
-.workspace-toolbar {
   justify-content: space-between;
 }
 .workspace-toolbar > .form-field {

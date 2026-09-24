@@ -2,6 +2,7 @@ use super::{
     integration,
     tasks::{TaskRun, TaskRuntime},
 };
+use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use tauri::State;
@@ -55,6 +56,49 @@ pub struct Requirement {
     pub title: String,
     pub checkpoint: bool,
     pub receipt: Option<OutcomeReceipt>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AssessmentStatus {
+    Met,
+    Partial,
+    Unverified,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RequirementAssessment {
+    pub requirement_id: String,
+    pub status: AssessmentStatus,
+    pub summary: String,
+    #[serde(default)]
+    pub evidence: Vec<String>,
+}
+
+pub fn validate_assessments(
+    items: &[RequirementAssessment],
+    contract: Option<&TaskContract>,
+) -> Result<(), String> {
+    let mut seen = std::collections::HashSet::new();
+    if items.len() > 24
+        || items.iter().any(|item| {
+            !seen.insert(&item.requirement_id)
+                || !contract
+                    .is_some_and(|c| c.requirements.iter().any(|r| r.id == item.requirement_id))
+                || item.summary.trim().is_empty()
+                || item.summary.len() > 1200
+                || item.summary.contains('\0')
+                || item.evidence.len() > 8
+                || item
+                    .evidence
+                    .iter()
+                    .any(|s| s.trim().is_empty() || s.len() > 500 || s.contains('\0'))
+        })
+    {
+        return Err("Use unique current requirement IDs, a short justification (up to 1,200 bytes), and up to eight evidence references (500 bytes each).".into());
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -145,7 +189,7 @@ impl TaskContract {
         {
             text.push_str(&format!("CURRENT STEP: {}. Perform only this step, report its evidence and stop. Do not advance to later steps; the user must accept this checkpoint in Jackalope first.\n", current.title));
         }
-        text.push_str("Follow process steps in order. Report evidence for each requirement, including checks, screenshots and anything not verified. Human acceptance is recorded separately by Jackalope.\n");
+        text.push_str("Follow process steps in order. At the end, after implementation and required verification, make one record_validation_step call (HTTP: POST /v1/validation-step) with a requirements array covering each applicable requirement: requirementId, status (met, partial or unverified), a short summary explaining the result and justification, and evidence references to changed files, recorded checks or screenshots. Explicitly identify anything not verified; do not invent evidence. Future workflow steps remain unverified. Human acceptance is recorded separately by Jackalope.\n");
         text
     }
 
@@ -443,6 +487,40 @@ mod tests {
         };
         let contract = TaskContract::build(&selection, &Default::default()).unwrap();
         assert_eq!(contract.requirements.len(), 1);
+        assert!(contract.require_accepted("tree").is_err());
+        let mut answer: RequirementAssessment = serde_json::from_value(serde_json::json!({"requirementId":"requirement-0","status":"met","summary":"Implemented; focused test passed","evidence":["src/example.rs"]})).unwrap();
+        assert!(validate_assessments(&[answer.clone()], Some(&contract)).is_ok());
+        assert!(contract.require_accepted("tree").is_err());
+        assert!(validate_assessments(&[answer.clone(), answer.clone()], Some(&contract)).is_err());
+        assert!(validate_assessments(&[answer.clone()], None).is_err());
+        answer.requirement_id = "invented".into();
+        assert!(validate_assessments(&[answer], Some(&contract)).is_err());
+    }
+
+    #[test]
+    fn one_report_can_cover_twelve_steps_and_twelve_outcomes() {
+        let contract = TaskContract {
+            requirements: (0..24)
+                .map(|index| Requirement {
+                    id: format!("requirement-{index}"),
+                    title: format!("Expectation {index}"),
+                    checkpoint: index < 12,
+                    receipt: None,
+                })
+                .collect(),
+            ..Default::default()
+        };
+        let answers: Vec<_> = contract
+            .requirements
+            .iter()
+            .map(|item| RequirementAssessment {
+                requirement_id: item.id.clone(),
+                status: AssessmentStatus::Unverified,
+                summary: "Not yet verified".into(),
+                evidence: vec![],
+            })
+            .collect();
+        assert!(validate_assessments(&answers, Some(&contract)).is_ok());
         assert!(contract.require_accepted("tree").is_err());
     }
 }

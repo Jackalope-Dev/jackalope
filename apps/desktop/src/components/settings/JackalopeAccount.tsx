@@ -24,6 +24,28 @@ export interface AccountStatus {
   expiresAt: number | null;
   waitlist?: WaitlistProgress | null;
 }
+/**
+ * Native commands reject with the message the Rust side produced. Those
+ * messages name the actual recovery step — reconnecting, unlocking a keychain,
+ * freeing a device slot — so they must reach the user instead of being
+ * replaced by generic advice that may not apply.
+ */
+function nativeMessage(cause: unknown): string {
+  if (typeof cause === 'string') return cause;
+  if (cause instanceof Error) return cause.message;
+  if (cause && typeof cause === 'object') {
+    const value = cause as { message?: unknown; error?: unknown };
+    if (typeof value.message === 'string') return value.message;
+    if (typeof value.error === 'string') return value.error;
+    try {
+      return JSON.stringify(cause);
+    } catch {
+      return '';
+    }
+  }
+  return '';
+}
+
 export function JackalopeAccount({
   presentation = 'settings',
   onInvitations,
@@ -48,25 +70,40 @@ export function JackalopeAccount({
         .then((value) => {
           if (mounted.current) setAccount(value);
         })
-        .catch(() => {
-          if (mounted.current) setError('Could not read your account connection. Please retry.');
+        .catch((cause) => {
+          if (mounted.current)
+            setError(
+              nativeMessage(cause) || 'Could not read your account connection. Please retry.',
+            );
         });
     return () => {
       mounted.current = false;
     };
   }, []);
   useEffect(() => {
-    if (!['pending', 'waiting', 'waiting-offline'].includes(account?.state ?? '') || error) return;
+    if (!['pending', 'waiting', 'waiting-offline'].includes(account?.state ?? '')) return;
     let canceled = false;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       if (!pending.current) {
         try {
           const next = await nativeTask<AccountStatus>('app_account_poll');
-          if (!canceled) setAccount(next);
-        } catch {
+          // Keep checking after a failure rather than stranding the user on a
+          // stale message: an unlocked keychain or a freed device slot should
+          // recover on its own, without them restarting the app.
+          if (!canceled) {
+            setAccount(next);
+            setError('');
+          }
+        } catch (cause) {
+          // Report what actually failed. A generic message here hides the
+          // recoverable cases, such as a locked keychain, behind advice that
+          // does not apply.
           if (!canceled)
-            setError('Could not check the connection. Your local projects are still available.');
+            setError(
+              nativeMessage(cause) ||
+                'Could not check the connection. Your local projects are still available.',
+            );
         }
       }
       if (!canceled) timer = setTimeout(poll, pollInterval);
@@ -76,7 +113,7 @@ export function JackalopeAccount({
       canceled = true;
       clearTimeout(timer);
     };
-  }, [account?.state, pollInterval, error]);
+  }, [account?.state, pollInterval]);
   async function act(command: string, refresh = true) {
     if (pending.current) return;
     pending.current = true;
@@ -87,9 +124,7 @@ export function JackalopeAccount({
       if (mounted.current && refresh) setAccount(next);
     } catch (cause) {
       if (mounted.current)
-        setError(
-          typeof cause === 'string' ? cause : 'Could not complete the connection. Please retry.',
-        );
+        setError(nativeMessage(cause) || 'Could not complete the connection. Please retry.');
     } finally {
       pending.current = false;
       if (mounted.current) setBusy(false);

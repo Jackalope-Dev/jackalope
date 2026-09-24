@@ -15,7 +15,7 @@ const strengths = [
     icon: Search,
     title: 'Route the work. Keep the momentum.',
     description:
-      'Let your default agent choose an agent, model, and account from your project’s allowed lineup. Routing considers reported capacity; quota-aware handoffs preserve the work when an eligible fallback is available. Prefer a specific setup? Assign it yourself.',
+      'Choose local rules, agent reasoning, or optional Jev-assisted decisions for your project. Routing considers your allowed agents and reported capacity; eligible quota handoffs preserve the work. Prefer a specific setup? Assign it yourself.',
     href: '#routing-question',
     link: 'How routing works today',
   },

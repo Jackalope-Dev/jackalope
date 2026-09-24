@@ -15,6 +15,17 @@ pub(super) fn has_api_key(binding: &AccountBinding) -> Result<bool, String> {
     credentials::read(binding).map(|key| key.is_some())
 }
 
+pub(super) fn api_key_name(binding: &AccountBinding) -> Result<Option<String>, String> {
+    credentials::read(binding).map(|key| key.map(|key| key.name))
+}
+
+pub(super) fn api_provider(binding: &AccountBinding) -> Result<Option<&'static str>, String> {
+    if binding.profile_id.is_none() || binding.adapter != "opencode" {
+        return Ok(None);
+    }
+    api_key_name(binding).map(|name| name.and_then(|name| credentials::provider(&name)))
+}
+
 static PROFILE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -25,6 +36,12 @@ pub struct AgentProfile {
     pub group: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tag: Option<String>,
+    #[serde(
+        default,
+        rename = "preferredModel",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub preferred_model: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -71,8 +88,7 @@ pub fn env_var_for(adapter: &str) -> Option<&'static str> {
         "kimi" => Some("KIMI_CODE_HOME"),
         "opencode" => Some("XDG_DATA_HOME"),
         "gemini" => Some("GEMINI_CLI_HOME"),
-        "aider" | "antigravity" => Some(if cfg!(windows) { "USERPROFILE" } else { "HOME" }),
-        "goose" => Some("GOOSE_PATH_ROOT"),
+        "antigravity" => Some(if cfg!(windows) { "USERPROFILE" } else { "HOME" }),
         _ => None,
     }
 }
@@ -83,7 +99,6 @@ pub(super) fn login_args(adapter: &str) -> &'static [&'static str] {
         "grok" | "kimi" => &["login"],
         "opencode" => &["auth", "login"],
         "claude" => &["auth", "login"],
-        "goose" => &["configure"],
         _ => &[],
     }
 }
@@ -145,6 +160,65 @@ pub struct AccountBinding {
     pub profile_id: Option<String>,
     pub directory: PathBuf,
     pub label: String,
+}
+
+pub(super) fn preferred_model(binding: &AccountBinding) -> Result<Option<String>, String> {
+    let Some(id) = binding.profile_id.as_deref() else {
+        return Ok(None);
+    };
+    let root = binding
+        .directory
+        .parent()
+        .and_then(Path::parent)
+        .ok_or("Invalid account directory.")?;
+    let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
+    let manifest = load_checked(root)?;
+    Ok(manifest
+        .agents
+        .get(&binding.adapter)
+        .and_then(|entry| entry.profiles.iter().find(|profile| profile.id == id))
+        .and_then(|profile| profile.preferred_model.clone()))
+}
+
+fn complete_provider(root: &Path, id: &str, model: &str, activate: bool) -> Result<(), String> {
+    let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
+    let binding = bind_account(root, "opencode", Some(id))?;
+    let provider = api_provider(&binding)?.ok_or("Save a provider key before finishing setup.")?;
+    if model.len() > 256
+        || model.chars().any(char::is_control)
+        || !model.starts_with(&format!("{provider}/"))
+        || model.trim() != model
+        || model.len() <= provider.len() + 1
+    {
+        return Err("Choose a model from this account's provider.".into());
+    }
+    let mut manifest = load_checked(root)?;
+    let entry = manifest
+        .agents
+        .get_mut("opencode")
+        .ok_or("Unknown account")?;
+    let profile = entry
+        .profiles
+        .iter_mut()
+        .find(|profile| profile.id == id)
+        .ok_or("Unknown account")?;
+    profile.preferred_model = Some(model.to_owned());
+    entry.pending.retain(|pending| pending != id);
+    if activate {
+        entry.active = Some(id.to_owned());
+    }
+    save(root, &manifest)
+}
+
+#[tauri::command]
+pub fn agent_profile_complete_provider(
+    runtime: State<'_, TaskRuntime>,
+    id: String,
+    model: String,
+    activate: bool,
+) -> Result<(), String> {
+    runtime.access.ensure()?;
+    complete_provider(&runtime.profiles_root(), &id, &model, activate)
 }
 
 pub(in crate::commands) fn routing_accounts(
@@ -307,9 +381,11 @@ pub fn apply_binding(
             command.env_remove(name);
         }
     }
+    // Claude Code keys its macOS Keychain entry on CLAUDE_CONFIG_DIR, so setting it
+    // for the CLI login (even to ~/.claude) hides the user's existing sign-in.
     if let Some(name) = env_var_for(&binding.adapter).filter(|_| {
         binding.profile_id.is_some()
-            || !matches!(binding.adapter.as_str(), "antigravity" | "aider" | "goose")
+            || !matches!(binding.adapter.as_str(), "antigravity" | "claude")
     }) {
         command.env(name, &binding.directory);
     }
@@ -336,23 +412,13 @@ pub fn apply_binding(
     }
     if binding.profile_id.is_some() {
         match binding.adapter.as_str() {
-            "antigravity" | "aider" => {
+            "antigravity" => {
                 command
                     .env("HOME", &binding.directory)
                     .env("USERPROFILE", &binding.directory);
-                if binding.adapter == "antigravity" {
-                    for name in credential_env_vars("antigravity") {
-                        command.env_remove(name);
-                    }
+                for name in credential_env_vars("antigravity") {
+                    command.env_remove(name);
                 }
-                if binding.adapter == "aider" {
-                    command.env("AIDER_ENV_FILE", binding.directory.join(".env"));
-                    command.env("AIDER_CONFIG", binding.directory.join(".aider.conf.yml"));
-                }
-            }
-            "goose" => {
-                command.env("GOOSE_DISABLE_KEYRING", "1");
-                command.env_remove("GOOSE_ADDITIONAL_CONFIG_FILES");
             }
             "gemini" => {
                 command.env("GEMINI_FORCE_FILE_STORAGE", "true");
@@ -368,7 +434,7 @@ pub fn apply_binding(
         ] {
             command.env(name, binding.directory.join(folder));
         }
-        if let Some(model) = local_model(binding)? {
+        if let Some(verification) = local_verification(binding)? {
             let mut configuration = command
                 .get_envs()
                 .find(|(name, _)| *name == "OPENCODE_CONFIG_CONTENT")
@@ -381,7 +447,7 @@ pub fn apply_binding(
             if !configuration.is_object() {
                 return Err("Invalid OpenCode process configuration.".into());
             }
-            for (key, value) in super::local_ai::config(&model)
+            for (key, value) in super::local_ai::verified_config(&verification)
                 .as_object()
                 .ok_or("Invalid local configuration")?
             {
@@ -404,10 +470,17 @@ pub fn apply_binding(
             return Err("Add a Gemini API key to this Antigravity account before using it.".into());
         }
     }
+    super::managed_runtime::configure(command);
     Ok(())
 }
 
 pub(in crate::commands) fn local_model(binding: &AccountBinding) -> Result<Option<String>, String> {
+    local_verification(binding).map(|verification| verification.map(|verified| verified.model))
+}
+
+fn local_verification(
+    binding: &AccountBinding,
+) -> Result<Option<super::local_ai::Verification>, String> {
     if binding.adapter != "opencode" || binding.profile_id.is_none() {
         return Ok(None);
     }
@@ -418,7 +491,7 @@ pub(in crate::commands) fn local_model(binding: &AccountBinding) -> Result<Optio
     let verification: super::local_ai::Verification =
         serde_json::from_slice(&super::history::read_bounded(&path, 4096)?)
             .map_err(|_| "Local model settings are unreadable. Run local setup again.")?;
-    Ok(Some(verification.model))
+    Ok(Some(verification))
 }
 
 pub(in crate::commands) fn create_local(
@@ -435,6 +508,7 @@ pub(in crate::commands) fn create_local(
         .find(|p| p.tag.as_deref() == Some(&tag))
         .cloned()
         .unwrap_or_else(|| AgentProfile {
+            preferred_model: None,
             id: uuid::Uuid::new_v4().to_string(),
             name: format!("Local · {}", verification.model),
             group: None,
@@ -444,7 +518,7 @@ pub(in crate::commands) fn create_local(
     fs::create_dir_all(directory.join("config/opencode")).map_err(|e| e.to_string())?;
     super::history::write_atomic(
         &directory.join("config/opencode/opencode.json"),
-        &serde_json::to_vec_pretty(&super::local_ai::config(&verification.model))
+        &serde_json::to_vec_pretty(&super::local_ai::verified_config(verification))
             .map_err(|e| e.to_string())?,
     )?;
     super::history::write_atomic(
@@ -527,6 +601,7 @@ pub fn agent_profile_create(
     let entry = manifest.agents.entry(agent.clone()).or_default();
     let id = uuid::Uuid::new_v4().to_string();
     let profile = AgentProfile {
+        preferred_model: None,
         id: id.clone(),
         name: name.to_string(),
         group,
@@ -552,9 +627,6 @@ pub fn agent_profile_create(
             br#"{"modelProvider":"gemini"}"#,
         )
         .map_err(|e| e.to_string())?;
-    } else if agent == "aider" {
-        fs::write(directory.join(".aider.conf.yml"), "{}\n").map_err(|e| e.to_string())?;
-        fs::write(directory.join(".env"), "").map_err(|e| e.to_string())?;
     }
     save(&root, &manifest)?;
     Ok(profile)
@@ -707,6 +779,7 @@ pub fn agent_profile_delete(
             return Err("The account directory resolves outside its managed location.".into());
         }
         super::account_storage::remove(&directory.join("api-key.bin"))?;
+        runtime.invalidate_account_helpers(&directory);
         fs::remove_dir_all(&directory)
             .map_err(|e| format!("Account files could not be removed: {e}"))?;
     }
@@ -761,18 +834,20 @@ pub fn credential_env_vars(adapter: &str) -> &'static [&'static str] {
         "gemini" | "antigravity" => &[
             "GEMINI_API_KEY",
             "GOOGLE_API_KEY",
+            "GOOGLE_GENERATIVE_AI_API_KEY",
             "GOOGLE_APPLICATION_CREDENTIALS",
             "GOOGLE_GENAI_USE_VERTEXAI",
             "GOOGLE_GENAI_USE_GCA",
             "AGY_ADC_AUTH",
         ],
-        "opencode" | "aider" | "goose" => &[
+        "opencode" => &[
             "OPENAI_API_KEY",
             "ANTHROPIC_API_KEY",
             "ANTHROPIC_AUTH_TOKEN",
             "CLAUDE_CODE_OAUTH_TOKEN",
             "GEMINI_API_KEY",
             "GOOGLE_API_KEY",
+            "GOOGLE_GENERATIVE_AI_API_KEY",
             "GOOGLE_APPLICATION_CREDENTIALS",
             "XAI_API_KEY",
             "GROK_API_KEY",
@@ -803,9 +878,88 @@ mod tests {
     use super::*;
 
     #[test]
+    fn account_model_overrides_global_default_but_preserves_explicit_choice_and_restrictions() {
+        let root = temp_root();
+        let manifest: Manifest = serde_json::from_value(serde_json::json!({"agents":{"opencode":{
+            "profiles":[{"id":"paid","name":"Paid","preferredModel":"deepseek/flash"}],"active":"paid"
+        }}})).unwrap();
+        save(&root, &manifest).unwrap();
+        let binding = bind_account(&root, "opencode", None).unwrap();
+        let mut policy = super::super::agent_policy::AgentPolicy::default();
+        policy
+            .runner_options
+            .entry("opencode".into())
+            .or_default()
+            .default_model = "other/default".into();
+        assert_eq!(
+            policy
+                .model_for_account("opencode", None, &binding)
+                .unwrap()
+                .as_deref(),
+            Some("deepseek/flash")
+        );
+        assert_eq!(
+            policy
+                .model_for_account("opencode", Some("deepseek/pro"), &binding)
+                .unwrap()
+                .as_deref(),
+            Some("deepseek/pro")
+        );
+        policy
+            .runner_options
+            .get_mut("opencode")
+            .unwrap()
+            .restrict_models = true;
+        assert!(policy
+            .model_for_account("opencode", None, &binding)
+            .is_err());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn provider_completion_is_atomic_retryable_and_keeps_inactive_model_preferences() {
+        let root = temp_root();
+        let manifest: Manifest = serde_json::from_value(serde_json::json!({"agents":{"opencode":{
+            "profiles":[{"id":"paid","name":"Paid"},{"id":"old","name":"Old"}],"pending":["paid"],"active":"old"
+        }}})).unwrap();
+        save(&root, &manifest).unwrap();
+        let binding = bind_account(&root, "opencode", Some("paid")).unwrap();
+        fs::create_dir_all(&binding.directory).unwrap();
+        super::super::account_storage::write(
+            &binding.directory.join("api-key.bin"),
+            br#"{"name":"DEEPSEEK_API_KEY","value":"fixture-key"}"#,
+        )
+        .unwrap();
+        assert!(complete_provider(&root, "paid", "other/model", true).is_err());
+        assert_eq!(
+            load_checked(&root).unwrap().agents["opencode"].pending,
+            vec!["paid"]
+        );
+        complete_provider(&root, "paid", "deepseek/flash", false).unwrap();
+        let saved = load_checked(&root).unwrap();
+        assert_eq!(saved.agents["opencode"].active.as_deref(), Some("old"));
+        assert!(saved.agents["opencode"].pending.is_empty());
+        assert_eq!(
+            preferred_model(&binding).unwrap().as_deref(),
+            Some("deepseek/flash")
+        );
+        complete_provider(&root, "paid", "deepseek/flash", true).unwrap();
+        complete_provider(&root, "paid", "deepseek/flash", true).unwrap();
+        assert_eq!(
+            load_checked(&root).unwrap().agents["opencode"]
+                .active
+                .as_deref(),
+            Some("paid")
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn local_profiles_preserve_other_accounts_and_process_permissions() {
         let root = temp_root();
         let verification = super::super::local_ai::Verification {
+            helper: None,
             model: "qwen3.5:4b".into(),
             digest: "base".into(),
             inference_digest: "prepared".into(),
@@ -946,6 +1100,7 @@ mod tests {
             serde_json::from_str(r#"{"id":"old-id","name":"Work"}"#).unwrap();
         assert_eq!(profile.group, None);
         let grouped = AgentProfile {
+            preferred_model: None,
             group: Some("work".into()),
             ..profile
         };
@@ -1031,15 +1186,38 @@ mod tests {
     }
 
     #[test]
+    fn claude_cli_login_keeps_its_default_config_dir() {
+        let directory = temp_root();
+        let mut binding = AccountBinding {
+            adapter: "claude".into(),
+            profile_id: None,
+            directory: directory.clone(),
+            label: "CLI".into(),
+        };
+        let has_config_dir = |binding: &AccountBinding| {
+            let mut command = std::process::Command::new("claude");
+            apply_binding(&mut command, binding).unwrap();
+            command
+                .get_envs()
+                .any(|(key, value)| key == "CLAUDE_CONFIG_DIR" && value.is_some())
+        };
+        assert!(!has_config_dir(&binding));
+        fs::create_dir_all(&directory).unwrap();
+        binding.profile_id = Some("work".into());
+        assert!(has_config_dir(&binding));
+        fs::remove_dir_all(directory).ok();
+    }
+
+    #[test]
     fn managed_provider_storage_cannot_be_redirected_by_legacy_settings() {
         let directory = temp_root();
         fs::create_dir_all(&directory).unwrap();
-        fs::write(directory.join(".env"), "GEMINI_CLI_HOME=elsewhere\nGEMINI_FORCE_FILE_STORAGE=false\nGOOSE_PATH_ROOT=elsewhere\nGOOSE_DISABLE_KEYRING=0\nHOME=elsewhere\nAIDER_CONFIG=elsewhere\n").unwrap();
-        for (adapter, variable) in [
-            ("gemini", "GEMINI_CLI_HOME"),
-            ("goose", "GOOSE_PATH_ROOT"),
-            ("aider", "HOME"),
-        ] {
+        fs::write(
+            directory.join(".env"),
+            "GEMINI_CLI_HOME=elsewhere\nGEMINI_FORCE_FILE_STORAGE=false\n",
+        )
+        .unwrap();
+        for (adapter, variable) in [("gemini", "GEMINI_CLI_HOME")] {
             let binding = AccountBinding {
                 adapter: adapter.into(),
                 profile_id: Some("work".into()),
@@ -1060,11 +1238,6 @@ mod tests {
             assert_eq!(vars[variable].as_deref(), directory.to_str());
             match adapter {
                 "gemini" => assert_eq!(vars["GEMINI_FORCE_FILE_STORAGE"].as_deref(), Some("true")),
-                "goose" => assert_eq!(vars["GOOSE_DISABLE_KEYRING"].as_deref(), Some("1")),
-                "aider" => assert_eq!(
-                    vars["AIDER_CONFIG"].as_deref(),
-                    directory.join(".aider.conf.yml").to_str()
-                ),
                 _ => unreachable!(),
             }
         }
@@ -1120,12 +1293,14 @@ mod tests {
         let mut manifest = Manifest::default();
         let entry = manifest.agents.entry("codex".into()).or_default();
         entry.profiles.push(AgentProfile {
+            preferred_model: None,
             id: "work".into(),
             name: "Work".into(),
             group: None,
             tag: None,
         });
         entry.profiles.push(AgentProfile {
+            preferred_model: None,
             id: "personal".into(),
             name: "Personal".into(),
             group: None,
@@ -1160,12 +1335,14 @@ mod tests {
             AgentEntry {
                 profiles: vec![
                     AgentProfile {
+                        preferred_model: None,
                         id: "work".into(),
                         name: "Work".into(),
                         group: None,
                         tag: None,
                     },
                     AgentProfile {
+                        preferred_model: None,
                         id: "personal".into(),
                         name: "Personal".into(),
                         group: None,
@@ -1221,12 +1398,14 @@ mod tests {
         let mut manifest = Manifest::default();
         let entry = manifest.agents.entry("codex".into()).or_default();
         entry.profiles.push(AgentProfile {
+            preferred_model: None,
             id: "a".into(),
             name: "Work".into(),
             group: None,
             tag: None,
         });
         entry.profiles.push(AgentProfile {
+            preferred_model: None,
             id: "b".into(),
             name: "Personal".into(),
             group: None,

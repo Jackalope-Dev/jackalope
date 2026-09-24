@@ -1,0 +1,51 @@
+.task-live-activity {
+  min-width: 0;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-surface-sunken);
+  font-size: var(--text-sm);
+}
+.task-live-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.task-live-elapsed {
+  font-variant-numeric: tabular-nums;
+}
+.task-live-current {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.task-live-current > svg {
+  flex: 0 0 16px;
+  margin-top: 3px;
+}
+.task-live-current[data-kind="attention"] {
+  color: var(--color-danger);
+}
+.task-live-recent {
+  list-style: none;
+  margin: 8px 0 0 7px;
+  padding: 0 0 0 16px;
+  border-left: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+.task-live-recent li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

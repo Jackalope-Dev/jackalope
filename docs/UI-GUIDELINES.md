@@ -27,7 +27,10 @@ WorkspaceHeading for the page title and actions, WorkspaceSectionHeading for
 section titles, and WorkspaceSubnavigation for peer tabs. Keep page headers in
 loading and empty states. Use the shared workspace spacing classes and tokens;
 avoid page-specific padding, title margins and nested page containers. Compact
-forms may constrain their fields without moving the page header.
+forms may constrain individual fields without moving the page header. Workspace pages
+fill the available width with consistent gutters; do not add page-specific width caps
+or change the page width between tabs. Scrollable page containers reserve scrollbar
+space so content length does not shift headings or navigation.
 Give each page a clear purpose and one primary action. Keep filters and details
 near their content. Error and empty states should offer an actionable recovery path.
 
@@ -35,6 +38,38 @@ Use concise headings, familiar action labels and concrete explanations.
 Remove repeated instructions, slogans, decorative status labels and normal-state
 footnotes. Preserve accessible names, dialog descriptions and consequential
 information about cost, permissions, data loss, consent and recovery.
+
+Task titles should be short objectives, with original instructions in task details under Activity.
+Results lead with output. Review gives the changed-file browser the full content
+width, with separate Changes, Checks and Merge views. Put approval and optional
+review actions in a toolbar above the diff; never in a competing side panel.
+File review markers are optional tracking, not acceptance or merge gates. Task, managed-task
+and chat review reuse `ResultReview`; file navigation and diffs reuse `ChangedFiles`.
+Keep check failures visible in navigation, preserve review inputs when switching views,
+and load optional tools on first use. Keep one follow-up composer per task. Worker links resolve to their parent task instead of a second result screen.
+Use `WorkspaceTabs` for keyboard-navigable task and review panels with the same
+appearance as workspace navigation. Keep the task agent beside its heading.
+Use outlined buttons for secondary actions, visible selected tabs, and open sections
+for results, checks and next actions. Keep follow-up compact so the result remains usable
+at 960 by 640. Existing work should be visible before opening new-task capture.
+Chat leads with its composer and places work needing attention underneath. Keep
+optional session limits, workflow starters and context controls in its options menu.
+
+Visible content is the default. Use short headings, spacing, compact lists and clear
+buttons to make a page scannable. Do not build pages from stacks of accordions or
+collapsed sections. Remove low-value content and repeated copy instead of hiding it
+behind an expander.
+
+Keep the current state, main output, required inputs, next action and blocking checks
+or errors visible without expanding anything. Tabs can separate distinct views;
+an options menu can hold secondary commands. Neither should conceal the information
+needed to understand the current view or make its main decision.
+
+Reserve disclosures for optional detail such as long logs, raw records or rarely used
+advanced settings. Give each one a specific label and keep any useful summary visible.
+Avoid nested disclosures and repeated expand-to-reach-an-action flows. A short section
+with only one or two controls should normally remain open. Use shared keyboard and
+focus behavior whenever an optional disclosure is justified.
 
 Marketing can be expressive while showing actual product workflows. Keep
 availability and limitations beside the claims they qualify. Avoid invented
@@ -54,7 +89,8 @@ normal text contrast at least 4.5:1. Selection and status need non-color cues,
 and focus must remain visible in every theme. Use shared Select, input and button
 primitives so opened menus, disabled states and keyboard behavior stay consistent.
 
-App and project appearance share the theme controls. Preserve inheritance,
+App and project appearance share directly available theme controls, without an
+inheritance toggle. Preserve existing saved inheritance,
 saved overrides and automatic light/dark switching. Preview is temporary;
 confirming persists it, while cancellation or leaving an unconfirmed preview
 restores the saved appearance. Invalid color input must not change global styles.
@@ -70,6 +106,15 @@ drafts and explicit preferences across Back, retry and reload. Project onboardin
 has no cancel exit; users reach the final step before entering the workspace.
 The first task remains optional on that final step. Give slow or failed checks a
 clear retry path.
+
+Essential project setup is project → agents → behavior → first task. Optional
+customization adds decisions before behavior and appearance before the first task.
+Show the chosen steps in the progress list and preserve saved advanced setup on reload.
+Detect workspace command defaults in
+the background without a manual inspection step. Preserve explicit choices, including
+empty commands, and ignore stale results after changing projects or leaving setup.
+Detected defaults are provisional until entry and must not run commands or enable
+automatic checks. Inspection failure must not block setup.
 
 App appearance/privacy and account access precede the project setup steps.
 Preserve settings-sync disclosure, pre-connection opt-out and deletion choices.
@@ -139,9 +184,9 @@ with the feature. Its containerClassName adjusts placement, while shared styles
 reserve space for the search and clear icons.
 
 Disclosure and DisclosureSummary render native details/summary elements, retaining
-open, name, onToggle and nested-section behavior. The shared chevron and focus style
+open, name and onToggle behavior. The shared chevron and focus style
 replace local markers. Wrap expanded content in DisclosureBody for consistent spacing
-between paragraphs, nested disclosures and controls. Table owns cell padding and its
+between paragraphs and controls. Table owns cell padding and its
 keyboard-scrollable container; avoid recreating table gutters in page styles.
 Use workspace-sections for section gaps, workspace-section with workspace-stack for
 heading/content spacing, and workspace-card-grid for responsive grids of up to three cards.

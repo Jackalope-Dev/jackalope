@@ -102,32 +102,6 @@ export const builtinAgents = [
     accountEnvVar: 'GEMINI_CLI_HOME',
     loginCommand: 'gemini',
   },
-  {
-    id: 'aider',
-    name: 'Aider',
-    vendor: 'Paul Gauthier',
-    description:
-      'Git-integrated command-line pair programming for fast, tight interactive coding loops.',
-    strengths: ['git-workflow', 'targeted-fixes', 'pair-programming', 'diff-oriented'],
-    installCommand: 'pipx install aider-chat',
-    installUrl: 'https://aider.chat/docs/install.html',
-    defaultBinary: 'aider',
-    accountEnvVar: 'HOME',
-  },
-  {
-    id: 'goose',
-    name: 'Goose',
-    vendor: 'Block',
-    description:
-      'Extensible open-source on-machine developer agent with tool integration and automation.',
-    strengths: ['automation', 'scripting', 'extensibility', 'developer-tools'],
-    installCommand:
-      'curl -fsSL https://github.com/block/goose/releases/latest/download/download.sh | bash',
-    installUrl: 'https://block.github.io/goose/',
-    defaultBinary: 'goose',
-    accountEnvVar: 'GOOSE_PATH_ROOT',
-    loginCommand: 'goose configure',
-  },
 ] as const;
 
 export type BuiltinAgentId = (typeof builtinAgents)[number]['id'];

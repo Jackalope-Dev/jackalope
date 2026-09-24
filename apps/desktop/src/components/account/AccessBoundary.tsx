@@ -1,8 +1,9 @@
 import { EchoMark } from '@jackalope/brand/echo';
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Disclosure, DisclosureSummary, DiscordIcon } from '@jackalope/ui';
 import { ArrowRight, FolderOpen, ShieldCheck } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { DISCORD_URL } from '../../lib/community';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useCommunityStore } from '../../stores/communityStore';
@@ -167,9 +168,6 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
               <EchoMark animated={false} className="access-mark" />
               <h1 id="access-heading">Welcome to Jackalope.</h1>
               <p>Connect your account to check early access.</p>
-              <p>
-                Already on the waitlist? Connect to see your place and share your referral link.
-              </p>
             </header>
             <Disclosure className="access-privacy">
               <DisclosureSummary>
@@ -220,6 +218,10 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
                   onClick={() => void openExternalUrl('https://jackalope.dev/')}
                 >
                   About Jackalope
+                </Button>
+                <Button variant="ghost" onClick={() => void openExternalUrl(DISCORD_URL)}>
+                  <DiscordIcon size={16} />
+                  Join Discord
                 </Button>
               </div>
               {hasProjects && (

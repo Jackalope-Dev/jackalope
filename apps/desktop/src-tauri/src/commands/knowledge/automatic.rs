@@ -9,6 +9,23 @@ pub struct LearningSource {
     pub kind: String,
     pub evidence: Vec<String>,
     pub managed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolution: Option<ReviewResolution>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewResolution {
+    pub run_id: String,
+    pub requirement_id: String,
+    pub tree: String,
+    pub checked_at: String,
+}
+
+impl LearningSource {
+    pub fn selectable(&self) -> bool {
+        !self.managed || self.kind != "review" || self.resolution.is_some()
+    }
 }
 
 impl TaskRuntime {
@@ -83,6 +100,7 @@ fn candidate(
             kind: kind.into(),
             evidence: vec![evidence],
             managed: true,
+            resolution: None,
         }),
         source_run_id: run.map(|r| r.id.clone()),
         source_head: run.map(|r| r.base_head.clone()).filter(|s| !s.is_empty()),
@@ -199,14 +217,81 @@ fn task_candidates(
             if receipt.accepted || !reusable(&receipt.note) || requirement.title.len() > 150 {
                 continue;
             }
-            let keywords = phrases(&requirement.title);
+            let keywords = phrases(&format!("{} {}", requirement.title, receipt.note));
             if keywords.is_empty() {
                 continue;
             }
-            values.push(candidate(project_id, path, &format!("feedback:{}:{}", run.id, requirement.id), "Review correction", format!("Past review of \"{}\": {}\nCheck this issue when working on the same outcome; this is historical feedback, not proof of a current defect.", requirement.title, receipt.note), keywords, "review", format!("Task {} · review {} · {}", run.id, receipt.recorded_at, requirement.title), Some(run)));
+            let mut entry = candidate(project_id, path, &format!("feedback:{}:{}", run.id, requirement.id), "Review correction", format!("Past review of \"{}\": {}\nCheck this issue when working on the same outcome; this is historical feedback, not proof of a current defect.", requirement.title, receipt.note), keywords, "review", format!("Task {} · review {} · {}", run.id, receipt.recorded_at, requirement.title), Some(run));
+            if let Some(resolution) = review_resolution(run, requirement, runs) {
+                let source = entry.automatic.as_mut().unwrap();
+                source.evidence.push(format!(
+                    "Resolved in reviewed task {} · requirement {} · checked tree {}",
+                    resolution.run_id, resolution.requirement_id, resolution.tree
+                ));
+                source.resolution = Some(resolution);
+            }
+            values.push(entry);
         }
     }
     values
+}
+
+fn review_resolution(
+    source: &super::super::tasks::TaskRun,
+    requirement: &super::super::outcomes::Requirement,
+    runs: &[super::super::tasks::TaskRun],
+) -> Option<ReviewResolution> {
+    let rejected = requirement.receipt.as_ref()?;
+    let rejected_at = chrono::DateTime::parse_from_rfc3339(&rejected.recorded_at).ok()?;
+    if source.task_id.is_empty() || rejected.accepted {
+        return None;
+    }
+    let source_path = canonical(&source.project_path).ok()?;
+    let latest = runs
+        .iter()
+        .filter(|run| {
+            run.task_id == source.task_id
+                && run.project_id == source.project_id
+                && canonical(&run.project_path).ok().as_deref() == Some(source_path.as_str())
+        })
+        .max_by(|a, b| a.started_at.cmp(&b.started_at).then(a.id.cmp(&b.id)))?;
+    if latest.id == source.id
+        || latest.status != "reviewed"
+        || latest.details_omitted
+        || latest.persistence_error.is_some()
+        || latest.error.is_some()
+        || latest.quota_failure.is_some()
+    {
+        return None;
+    }
+    let accepted = latest
+        .contract
+        .requirements
+        .iter()
+        .find(|item| item.id == requirement.id && item.title == requirement.title)?
+        .receipt
+        .as_ref()?;
+    let check = latest.verification.as_ref()?;
+    let started_at = chrono::DateTime::parse_from_rfc3339(&latest.started_at).ok()?;
+    let accepted_at = chrono::DateTime::parse_from_rfc3339(&accepted.recorded_at).ok()?;
+    let checked_at = chrono::DateTime::parse_from_rfc3339(&check.checked_at).ok()?;
+    if !accepted.accepted
+        || accepted.tree.is_empty()
+        || !check.result.success
+        || check.result.interruption().is_some()
+        || check.tree.as_deref() != Some(&accepted.tree)
+        || started_at <= rejected_at
+        || checked_at < started_at
+        || accepted_at < checked_at
+    {
+        return None;
+    }
+    Some(ReviewResolution {
+        run_id: latest.id.clone(),
+        requirement_id: requirement.id.clone(),
+        tree: accepted.tree.clone(),
+        checked_at: check.checked_at.clone(),
+    })
 }
 
 fn verified_checks(

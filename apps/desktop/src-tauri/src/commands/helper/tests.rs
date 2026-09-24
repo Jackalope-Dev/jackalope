@@ -188,7 +188,15 @@ fn installed_helper_agent_answers_with_document_tools() {
         inner.view.turns.push(Turn { id:id.clone(), prompt:"Search the official docs for Ask Jackalope, read that guide, and explain in one sentence whether a proposed action has already changed settings. Include the source URL. Do not propose any changes.".into(), agent, account:binding.label.clone(), status:"working".into(), ..Default::default() });
     }
     let result = helper
-        .answer(&id, binding, Arc::new(AtomicBool::new(false)))
+        .answer(
+            &id,
+            vec![Candidate {
+                agent: binding.adapter.clone(),
+                binding,
+                model: None,
+            }],
+            Arc::new(AtomicBool::new(false)),
+        )
         .unwrap();
     assert!(
         result.contains("https://jackalope.dev/knowledge/ask-jackalope/"),

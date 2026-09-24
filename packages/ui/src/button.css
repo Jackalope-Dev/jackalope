@@ -53,6 +53,7 @@
   :where(.ui-button[data-variant="ghost"]) {
     background: transparent;
     color: var(--color-text-secondary);
+    border: 1px solid transparent;
   }
   :where(
     .ui-button[data-variant="secondary"],

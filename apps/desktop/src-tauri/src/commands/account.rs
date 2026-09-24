@@ -141,6 +141,62 @@ fn endpoints(app: &AppHandle) -> Result<(reqwest::Url, reqwest::Url), String> {
         .ok_or("This build has no account connection page.")?;
     Ok((api, web))
 }
+/// An opaque key for this computer, so reconnecting from it — from another
+/// profile, after a reset or after a reinstall — reuses its account device slot
+/// instead of taking a new one. The platform identifier never leaves the
+/// machine; only a hash of it, scoped to Jackalope, is sent.
+fn machine_key() -> Option<String> {
+    let identifier = platform_machine_id()?;
+    let identifier = identifier.trim();
+    (!identifier.is_empty()).then(|| sha256_hex(&format!("jackalope-device-v1:{identifier}")))
+}
+
+#[cfg(target_os = "macos")]
+fn platform_machine_id() -> Option<String> {
+    let output = std::process::Command::new("/usr/sbin/ioreg")
+        .args(["-rd1", "-c", "IOPlatformExpertDevice"])
+        .output()
+        .ok()?;
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .find(|line| line.contains("\"IOPlatformUUID\""))
+        .and_then(|line| line.split('"').nth(3))
+        .map(str::to_string)
+}
+
+#[cfg(target_os = "linux")]
+fn platform_machine_id() -> Option<String> {
+    ["/etc/machine-id", "/var/lib/dbus/machine-id"]
+        .iter()
+        .find_map(|path| std::fs::read_to_string(path).ok())
+}
+
+#[cfg(windows)]
+fn platform_machine_id() -> Option<String> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let output = std::process::Command::new("reg")
+        .args([
+            "query",
+            r"HKLM\SOFTWARE\Microsoft\Cryptography",
+            "/v",
+            "MachineGuid",
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .ok()?;
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .find(|line| line.contains("MachineGuid"))
+        .and_then(|line| line.split_whitespace().last())
+        .map(str::to_string)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+fn platform_machine_id() -> Option<String> {
+    None
+}
+
 fn valid_token(value: &str) -> bool {
     value.len() == 64
         && value
@@ -259,14 +315,18 @@ async fn request(
 }
 fn failure(code: u16) -> String {
     match code {
-        429 => "Too many requests. Wait a minute and try again.",
+        429 => "Too many requests. Wait a minute and try again.".into(),
         409 => {
             "Your account has reached its device limit. Disconnect an old device on the website."
+                .into()
         }
-        503 => "Account connections are not available yet. Try again later.",
-        _ => "The account service could not complete this request. Please retry.",
+        503 => "Account connections are not available yet. Try again later.".into(),
+        // An unmapped status has no advice worth giving, so name it instead of
+        // hiding it: without the code there is nothing to act on or report.
+        _ => format!(
+            "The account service could not complete this request (HTTP {code}). Please retry."
+        ),
     }
-    .into()
 }
 
 async fn sync_device_name(api: &reqwest::Url, secret: &str, data: &serde_json::Value) {
@@ -443,14 +503,28 @@ pub async fn app_account_connect(
         uuid::Uuid::new_v4().simple()
     );
     let challenge = sha256_hex(&secret);
-    let (code, data) = request(
-        &api,
-        "/v1/desktop/start",
-        reqwest::Method::POST,
-        None,
-        Some(serde_json::json!({"challenge":challenge})),
-    )
-    .await?;
+    let start = |body: serde_json::Value| {
+        let api = api.clone();
+        async move {
+            request(
+                &api,
+                "/v1/desktop/start",
+                reqwest::Method::POST,
+                None,
+                Some(body),
+            )
+            .await
+        }
+    };
+    let (mut code, mut data) = match machine_key() {
+        Some(key) => start(serde_json::json!({"challenge":challenge,"deviceKey":key})).await?,
+        None => start(serde_json::json!({"challenge":challenge})).await?,
+    };
+    if code == 400 {
+        // A service that predates machine keys rejects the unknown field.
+        // Connecting still works; this machine just takes a slot per connection.
+        (code, data) = start(serde_json::json!({"challenge":challenge})).await?;
+    }
     if code != 201 {
         return Err(failure(code));
     }
@@ -657,6 +731,21 @@ pub async fn app_account_disconnect(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn machine_key_is_stable_and_never_the_raw_identifier() {
+        let Some(key) = machine_key() else {
+            // Some sandboxes expose no machine identifier; the connection then
+            // simply omits the key.
+            return;
+        };
+        assert!(
+            valid_token(&key),
+            "the service only accepts 64 lowercase hex"
+        );
+        assert_eq!(machine_key().as_deref(), Some(key.as_str()));
+        let raw = platform_machine_id().unwrap_or_default();
+        assert!(!key.contains(raw.trim()) || raw.trim().is_empty());
+    }
     #[test]
     fn account_hashes_preserve_lowercase_hex_and_leading_zeroes() {
         assert_eq!(

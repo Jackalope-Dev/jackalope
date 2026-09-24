@@ -12,7 +12,6 @@ import { discoveryFiles, pageHtml, routes } from './src/seo.ts';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   platformDownloads(env);
-  const download = env.VITE_WINDOWS_DOWNLOAD_URL;
   const site = new URL(env.VITE_SITE_URL || siteOrigin);
   if (
     site &&
@@ -36,7 +35,7 @@ export default defineConfig(({ mode }) => {
   // Published so the admin broadcast composer can read the same product notes
   // the site shows, instead of keeping a second copy that drifts.
   const files = {
-    ...discoveryFiles(site.origin, download ? env.VITE_RELEASE_VERSION : undefined),
+    ...discoveryFiles(site.origin, env),
     'changelog.json': JSON.stringify(changelog),
   };
   const icons = {

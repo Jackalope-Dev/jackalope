@@ -13,6 +13,26 @@ pub(in crate::commands) fn run(
     prompt: &str,
     canceled: &AtomicBool,
 ) -> Result<TaskRun, String> {
+    run_bounded(
+        runtime,
+        agent,
+        binding,
+        model,
+        prompt,
+        canceled,
+        Duration::from_secs(120),
+    )
+}
+
+pub(in crate::commands) fn run_bounded(
+    runtime: &TaskRuntime,
+    agent: &str,
+    binding: &AccountBinding,
+    model: Option<&str>,
+    prompt: &str,
+    canceled: &AtomicBool,
+    timeout: Duration,
+) -> Result<TaskRun, String> {
     runtime.access.ensure()?;
     let policy = runtime.policy()?;
     let (adapter, executable) = policy.resolve(agent)?;
@@ -24,6 +44,7 @@ pub(in crate::commands) fn run(
     let directory = runtime.directory.join("helper-workspace");
     std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
     let prompt_path = directory.join(format!("{}.txt", uuid::Uuid::new_v4()));
+    let _runner_lease = crate::commands::managed_runtime::acquire(&executable)?;
     let mut cmd = command(executable);
     let _configuration = routing::process::configure(&mut cmd, &adapter, &prompt_path, prompt)?;
     crate::commands::agent_profiles::apply_binding(&mut cmd, binding)?;
@@ -40,6 +61,15 @@ pub(in crate::commands) fn run(
     if canceled.load(Ordering::SeqCst) {
         return Err("Stopped.".into());
     }
+    let warm_started = std::time::Instant::now();
+    let mut warm = if adapter == "opencode" {
+        runtime
+            .warm_helpers
+            .attach(&mut cmd, binding, || canceled.load(Ordering::SeqCst))?
+    } else {
+        None
+    };
+    let warm_elapsed = warm_started.elapsed();
     let (mut child, _) = runtime::spawn_agent(&mut cmd, agent)?;
     let tree = match ProcessTree::attach(&child) {
         Ok(tree) => tree,
@@ -73,7 +103,7 @@ pub(in crate::commands) fn run(
         if canceled.load(Ordering::SeqCst) {
             break Err("Stopped.".into());
         }
-        if started.elapsed() > Duration::from_secs(120) {
+        if started.elapsed() > timeout.min(Duration::from_secs(120)) {
             break Err("The agent timed out. Check its account and try again.".into());
         }
         std::thread::sleep(Duration::from_millis(50));
@@ -91,11 +121,14 @@ pub(in crate::commands) fn run(
     written
         .map_err(|_| "Agent input stopped")?
         .map_err(|e| e.to_string())?;
-    let (text, truncated) = read
+    let (mut text, truncated) = read
         .map_err(|_| "Agent output stopped")?
         .map_err(|e| e.to_string())?;
     if truncated {
         return Err("The agent response exceeded the size limit.".into());
+    }
+    if let Some(lease) = &warm {
+        text = lease.output(|| canceled.load(Ordering::SeqCst))?;
     }
     let mut output = TaskRun {
         agent: agent.into(),
@@ -115,5 +148,10 @@ pub(in crate::commands) fn run(
     if output.error.is_some() || output.result.trim().is_empty() {
         return Err("The agent returned no usable answer. Check its account and try again.".into());
     }
+    if let Some(lease) = &mut warm {
+        output.efficiency.warm_provider_hits += u64::from(lease.reused);
+        lease.complete();
+    }
+    output.efficiency.timing("helperStartup", warm_elapsed);
     Ok(output)
 }

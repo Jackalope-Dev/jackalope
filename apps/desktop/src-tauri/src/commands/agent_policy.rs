@@ -61,7 +61,13 @@ impl AgentPolicy {
             }
             self.model(agent, Some(&id))
         } else {
-            let model = self.model(agent, requested)?;
+            let preferred = super::agent_profiles::preferred_model(binding)?;
+            let model = self.model(
+                agent,
+                requested
+                    .filter(|value| !value.is_empty())
+                    .or(preferred.as_deref()),
+            )?;
             if model
                 .as_ref()
                 .is_some_and(|id| id.starts_with("jackalope-local/"))

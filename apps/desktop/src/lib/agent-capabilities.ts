@@ -11,6 +11,6 @@ export function connectionSupport(adapter: string, transport: string, discovery:
   if (discovery && support.discovery && transport !== 'sse') return null;
   if (!discovery && (support.direct as string[]).includes(transport)) return null;
   return transport === 'sse'
-    ? 'This connection needs Claude, or a Streamable HTTP connection with on-demand tools.'
+    ? 'Choose an agent that supports legacy SSE, or use a Streamable HTTP connection with on-demand tools.'
     : 'Enable on-demand tools for this connection to use it with this agent.';
 }

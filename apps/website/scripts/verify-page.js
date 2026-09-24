@@ -93,13 +93,15 @@ async function _verifyPage(page) {
     'Dark appearance',
   );
   assert(
-    (await page.locator('.product-capture img').getAttribute('src')) === '/media/agents.png',
+    (await page.locator('.product-capture img').getAttribute('src')) ===
+      '/media/workspace/agents.jpg',
     'Dark app screenshot',
   );
   await page.getByRole('button', { name: 'Light', exact: true }).click();
   await page.getByRole('button', { name: 'Mojave Sunset', exact: true }).click();
   assert(
-    (await page.locator('.product-capture img').getAttribute('src')) === '/media/agents-light.png',
+    (await page.locator('.product-capture img').getAttribute('src')) ===
+      '/media/workspace/agents-light.jpg',
     'Light app screenshot',
   );
   assert(
@@ -115,11 +117,9 @@ async function _verifyPage(page) {
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await page.getByRole('menuitem', { name: 'Product tour' }).waitFor();
   await page.keyboard.press('Escape');
-  assert(
-    await page
-      .getByRole('button', { name: 'Open navigation' })
-      .evaluate((el) => el === document.activeElement),
-    'Menu focus return',
+  await page.waitForFunction(
+    (button) => document.activeElement === button,
+    await page.getByRole('button', { name: 'Open navigation' }).elementHandle(),
   );
   await page.getByText('Do I need an AI subscription?', { exact: true }).focus();
   await page.keyboard.press('Enter');
@@ -131,11 +131,10 @@ async function _verifyPage(page) {
   await headerWaitlistButton.click();
   await page.getByRole('dialog', { name: 'Join the Jackalope waitlist' }).waitFor();
   await page.keyboard.press('Escape');
-  await headerWaitlistButton.evaluate((button) => {
-    if (document.activeElement !== button) {
-      throw new Error('Waitlist dialog did not return focus to its header trigger.');
-    }
-  });
+  await page.waitForFunction(
+    (button) => document.activeElement === button,
+    await headerWaitlistButton.elementHandle(),
+  );
   const play = page.getByRole('button', { name: /^Watch the \d+-second tour$/ });
   await play.click();
   await page.waitForFunction(() => document.querySelector('video')?.readyState >= 1);

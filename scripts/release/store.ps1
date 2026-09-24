@@ -71,6 +71,8 @@ try {
     $target = if ($env:CARGO_TARGET_DIR) { [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR) } else { Join-Path $repoRoot 'apps/desktop/src-tauri/target' }
     $configuration = if ($Mode -eq 'rehearsal') { 'debug' } else { 'release' }
     Copy-Item -LiteralPath (Join-Path $target "$configuration/jackalope-desktop.exe") -Destination $stage
+    # The manifest's execution alias requires the command at the package root.
+    Copy-Item -LiteralPath (Join-Path $target "$configuration/jackalope.exe") -Destination $stage
     Copy-Item -LiteralPath (Join-Path $repoRoot 'apps/desktop/src-tauri/resources') -Destination (Join-Path $stage 'resources') -Recurse
     & (Join-Path $PSScriptRoot 'store-resources.ps1') -Stage $stage -SdkBin (Join-Path $sdk.FullName 'x64')
     if ($WebViewRuntimePath) { Copy-Item -LiteralPath $WebViewRuntimePath -Destination (Join-Path $stage 'WebView2') -Recurse }
@@ -93,6 +95,7 @@ try {
         packageSha256 = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant()
         uploadSha256 = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
         executableSha256 = (Get-FileHash -LiteralPath (Join-Path $stage 'jackalope-desktop.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+        commandSha256 = (Get-FileHash -LiteralPath (Join-Path $stage 'jackalope.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
         storeSigned = $false; installedAcceptance = $false
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'receipt.json') -Encoding utf8
     if ($env:GITHUB_OUTPUT) { "directory=$output" >> $env:GITHUB_OUTPUT }

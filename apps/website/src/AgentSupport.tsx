@@ -43,6 +43,14 @@ const agents = [
     guide: '/agents/kimi-code/',
   },
   {
+    name: 'Gemini CLI',
+    mark: '✦',
+    url: 'https://geminicli.com/docs/',
+    note: 'Run worker tasks and continue saved sessions. Shell tools follow Gemini CLI permissions.',
+    connections: 'On-demand discovery',
+    guide: '/agents/gemini-cli/',
+  },
+  {
     name: 'Antigravity',
     mark: '↑',
     url: 'https://antigravity.google/docs/cli/install/',
@@ -118,17 +126,18 @@ export function AgentSupport() {
         <p>
           Jackalope uses each agent’s installed CLI and permission rules. Connections configured
           inside a CLI remain subject to that CLI’s settings. Codex, Claude Code, OpenCode, and Kimi
-          Code support direct project connections; all six support on-demand discovery. Kimi reports
-          task token totals and membership quota. Antigravity reports subscription pools through
-          read-only CLI commands. Usage coverage varies by account and CLI version. Profiles
+          Code support direct project connections; all seven support on-demand discovery. Kimi
+          reports task token totals and membership quota. Antigravity reports subscription pools
+          through read-only CLI commands. Usage coverage varies by account and CLI version. Profiles
           organize sign-ins; they are not a security sandbox.
         </p>
         <p>
           Named profiles are available for supported agents. Antigravity profiles use Gemini API
           billing, separate from a Google subscription; multiple subscription logins are not
           isolated. Antigravity runs worker tasks; a verified tool-free interface is still needed
-          for automatic routing and Ask Jackalope. Kimi supports both. Gemini CLI, Aider, and Goose
-          have account setup only; task execution is still in development.
+          for automatic routing and Ask Jackalope. Gemini CLI also runs as a worker, with unknown
+          account quota and no direct project MCP injection. Kimi supports routing and Ask.
+          Installed-provider acceptance remains in progress.
         </p>
         <p>
           Model access and subscription requirements depend on your provider. See the{' '}

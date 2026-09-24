@@ -1,46 +1,43 @@
 import { telemetry, useCommunityStore } from '../stores/communityStore';
 import { useExecutionStore } from '../stores/executionStore';
 import { useUpdateStore } from '../stores/updateStore';
-import type { TaskState } from './telemetry';
+import { createTaskTelemetry } from './task-telemetry';
+
+const observeTasks = createTaskTelemetry(telemetry.track);
 
 export function observeTelemetry() {
-  let baseline = useExecutionStore.getState();
-  const stopRuns = useExecutionStore.subscribe((next) => {
-    const prior = baseline;
-    baseline = next;
-    if (prior.loading || next.loading || !useCommunityStore.getState().settings?.reviewed) return;
-    const previous = new Map(prior.runs.map((run) => [run.id, run]));
-    for (const run of next.runs) {
-      const old = previous.get(run.id);
-      if (!old) telemetry.track({ name: 'task_state', state: 'starting' });
-      if (
-        old?.status !== run.status &&
-        ['running', 'review', 'reviewed', 'failed', 'stopped', 'interrupted'].includes(run.status)
-      )
-        telemetry.track({ name: 'task_state', state: run.status as TaskState });
-      if (old?.status !== run.status && run.status === 'failed')
-        telemetry.track({ name: 'app_error', code: 'task_failed' });
-      if (run.persistenceError && !old?.persistenceError)
-        telemetry.track({ name: 'app_error', code: 'history_save_failed' });
-      if (
-        run.verification &&
-        !run.verification.result.success &&
-        old?.verification?.result.success !== false
-      )
-        telemetry.track({ name: 'app_error', code: 'verification_failed' });
-    }
+  const stopRuns = useExecutionStore.subscribe((next, prior) => {
+    const settings = useCommunityStore.getState().settings;
+    observeTasks(next.runs, !!settings?.reviewed && settings.telemetry && settings.configured);
+    if (next.historyError && !prior.historyError)
+      telemetry.track({ name: 'app_error', code: 'history_load_failed' });
+    if (next.discoveryError && !prior.discoveryError)
+      telemetry.track({ name: 'app_error', code: 'agent_discovery_failed' });
   });
   const stopUpdates = useUpdateStore.subscribe((next, previous) => {
     if (next.error && !previous.error)
       telemetry.track({ name: 'app_error', code: 'update_failed' });
   });
-  const uiError = () => telemetry.track({ name: 'app_error', code: 'ui_error' });
-  window.addEventListener('error', uiError);
-  window.addEventListener('unhandledrejection', uiError);
+  const stopUi = observeUiTelemetry();
   return () => {
     stopRuns();
     stopUpdates();
+    stopUi();
+  };
+}
+
+export function observeUiTelemetry() {
+  const uiError = () => telemetry.track({ name: 'app_error', code: 'ui_error' });
+  const rejection = () => telemetry.track({ name: 'app_error', code: 'ui_rejection' });
+  const hidden = () => {
+    if (document.hidden) void telemetry.flush();
+  };
+  window.addEventListener('error', uiError);
+  window.addEventListener('unhandledrejection', rejection);
+  document.addEventListener('visibilitychange', hidden);
+  return () => {
     window.removeEventListener('error', uiError);
-    window.removeEventListener('unhandledrejection', uiError);
+    window.removeEventListener('unhandledrejection', rejection);
+    document.removeEventListener('visibilitychange', hidden);
   };
 }

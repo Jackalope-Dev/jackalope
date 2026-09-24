@@ -1,12 +1,15 @@
 # Cloud signing and release setup
 
+Windows releases use [Microsoft Store](STORE-RELEASE.md); Azure signing is needed
+only when separately enabling direct EXE distribution. Cloud handles macOS/Linux.
+
 Use [release automation](RELEASE-AUTOMATION.md) for branches, versions, workflow
 selection, publication and recovery. This guide covers the external signing inputs
 and repeatable installed update trial. The Cloud application is
 `jackalope-digital/jackalope`; Windows publisher verification requires
 Jackalope Digital LLC. Keep enrollment state and completed trial receipts private.
 
-## Windows signing
+## Optional direct Windows signing
 
 1. Create an Azure Artifact Signing account and complete **Organization → Public**
    identity validation for Jackalope Digital LLC. Create a **Public Trust** certificate
@@ -94,7 +97,7 @@ read-back before enabling publication; fixture tests do not establish vendor acc
 
 ## Run a rehearsal
 
-Dispatch **Cloud release** with `mode=rehearsal` from beta or master. It retains
+Dispatch **Cloud release** with `mode=rehearsal` from beta or stable. It retains
 artifacts without upload/publication. For a local Windows rehearsal:
 
 ```powershell

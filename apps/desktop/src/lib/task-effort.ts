@@ -1,5 +1,3 @@
-import type { Runner } from './task-runtime';
-
 export const taskEfforts = [
   {
     id: 'quick',
@@ -30,18 +28,11 @@ export function effortFor(value?: string) {
   return taskEfforts.find((effort) => effort.id === value) ?? taskEfforts[1];
 }
 
-export function effortPrompt(value?: string) {
+export function effortPrompt(value?: string, scoped = true) {
   const effort = effortFor(value);
-  return `[Task approach: ${effort.name}]\n${effort.instruction}\nPreserve the user's intent and existing work. Report the outcome, checks actually performed, and remaining limitations. Leave changes ready for review; do not claim verification or merge readiness without evidence.`;
-}
-
-export function suggestedRunner(runners: Runner[], preferred?: string, fallback?: string) {
-  const available = runners.filter((runner) => runner.available);
-  return (
-    available.find((runner) => runner.id === preferred) ??
-    available.find((runner) => runner.id === fallback) ??
-    available[0] ??
-    runners.find((runner) => runner.id === preferred) ??
-    runners[0]
-  );
+  const instruction =
+    scoped && effort.id === 'balanced'
+      ? "Use the task's stated inputs, tools and completion criteria. Inspect applicable project guidance and preserve existing work; broaden repository exploration only when the requested operation depends on it. For code changes, inspect related call sites and affected edge cases. Complete and verify the requested outcome."
+      : effort.instruction;
+  return `[Task approach: ${effort.name}]\n${instruction}\nPreserve the user's intent and existing work. Report the outcome, checks actually performed, and remaining limitations. Leave changes ready for review; do not claim verification or merge readiness without evidence.`;
 }

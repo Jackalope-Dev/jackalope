@@ -9,6 +9,11 @@ struct Group {
     observed: usize,
     tokens: u64,
     attempts: usize,
+    dollars: f64,
+    cost_observed: usize,
+    matched: usize,
+    latest: String,
+    fresh: usize,
 }
 
 fn task_usage(runs: &[&TaskRun]) -> Option<u64> {
@@ -43,6 +48,63 @@ fn task_usage(runs: &[&TaskRun]) -> Option<u64> {
     Some(total)
 }
 
+fn task_cost(runs: &[&TaskRun]) -> Option<f64> {
+    let mut total = 0.0;
+    for run in runs {
+        let history = run.routing.as_ref();
+        let mut usages = Vec::new();
+        if history.is_none_or(|h| h.decisions.len() > h.handoffs.len()) {
+            usages.push(&run.usage);
+        }
+        if let Some(h) = history {
+            usages.extend(h.attempts.iter().map(|a| &a.usage));
+            usages.extend(h.handoffs.iter().map(|a| &a.usage));
+            if h.attempts.is_empty() {
+                usages.extend(
+                    h.decisions
+                        .iter()
+                        .filter(|d| d.usage.reported)
+                        .map(|d| &d.usage),
+                );
+            }
+        }
+        for usage in usages {
+            if !usage.reported {
+                return None;
+            }
+            let dollars = usage
+                .estimated_cost_usd
+                .filter(|n| n.is_finite() && *n >= 0.0)?;
+            total += dollars;
+        }
+    }
+    Some(total)
+}
+
+fn success_lower_bound(accepted: usize, decided: usize) -> f64 {
+    if decided == 0 {
+        return 0.0;
+    }
+    let n = decided as f64;
+    let p = accepted as f64 / n;
+    let z = 1.96_f64;
+    (p + z * z / (2.0 * n) - z * ((p * (1.0 - p) + z * z / (4.0 * n)) / n).sqrt())
+        / (1.0 + z * z / n)
+}
+
+fn matched(prompt: &str, request: &str) -> bool {
+    let terms = |text: &str| {
+        crate::commands::retrieval::terms(text)
+            .into_iter()
+            .filter(|t| t.len() >= 4)
+            .collect::<std::collections::HashSet<_>>()
+    };
+    let left = terms(prompt);
+    let right = terms(request);
+    let common = left.intersection(&right).count();
+    common >= 3 && common as f64 / left.union(&right).count().max(1) as f64 >= 0.2
+}
+
 pub(super) fn evidence(runs: &[TaskRun], request: &RunRequest) -> Value {
     let mut latest = BTreeMap::<&str, &TaskRun>::new();
     for run in runs
@@ -54,7 +116,8 @@ pub(super) fn evidence(runs: &[TaskRun], request: &RunRequest) -> Value {
             *old = run;
         }
     }
-    let mut groups = BTreeMap::<(&str, Option<&str>, Option<&str>, Option<&str>), Group>::new();
+    let mut groups =
+        BTreeMap::<(&str, Option<&str>, Option<&str>, Option<&str>, Option<&str>), Group>::new();
     for run in latest
         .values()
         .filter(|r| ["review", "reviewed", "failed", "stopped"].contains(&r.status.as_str()))
@@ -87,11 +150,21 @@ pub(super) fn evidence(runs: &[TaskRun], request: &RunRequest) -> Value {
                     .as_ref()
                     .and_then(|b| b.profile_id.as_deref()),
                 run.reasoning_effort.as_deref(),
+                run.requested_service_tier.as_deref(),
             ))
             .or_default();
         group.accepted += usize::from(accepted);
         group.corrections += usize::from(corrections);
         group.tasks += 1;
+        group.fresh += usize::from(
+            chrono::DateTime::parse_from_rfc3339(&run.started_at).is_ok_and(|at| {
+                (0..=90).contains(&Utc::now().signed_duration_since(at).num_days())
+            }),
+        );
+        group.matched += usize::from(matched(&run.prompt, &request.prompt));
+        if run.started_at > group.latest {
+            group.latest = run.started_at.clone();
+        }
         let attempts: Vec<_> = runs
             .iter()
             .filter(|r| {
@@ -101,13 +174,19 @@ pub(super) fn evidence(runs: &[TaskRun], request: &RunRequest) -> Value {
             })
             .collect();
         group.attempts += attempts.len();
+        if let Some(dollars) = task_cost(&attempts) {
+            group.dollars += dollars;
+            group.cost_observed += 1;
+        }
         if let Some(tokens) = task_usage(&attempts) {
             group.tokens = group.tokens.saturating_add(tokens);
             group.observed += 1;
         }
     }
-    serde_json::json!({"scope":"Latest loaded task outcome by final agent/model/account/requested effort. Costs include all loaded attempts, routing and quota retries. Historical human decisions are not current-file verification or causal comparisons; difficulty and earlier configurations differ. Unknown effort is the inherited CLI default. Fewer than ten decided tasks is insufficient evidence. Never infer model ability from brand names.",
-        "groups":groups.into_iter().map(|((agent, model, profile, effort),g)| serde_json::json!({"agent":agent,"model":model,"profileId":profile,"reasoningEffort":effort,"accepted":g.accepted,"corrections":g.corrections,"total":g.tasks,"attempts":g.attempts,"usageCoverage":g.observed,"totalTokens":(g.observed==g.tasks).then_some(g.tokens),"tokensPerAcceptedTask":if g.accepted>0 && g.observed==g.tasks {Some(g.tokens as f64/g.accepted as f64)} else {None},"decided":g.accepted+g.corrections,"sufficientSample":g.accepted+g.corrections>=10})).collect::<Vec<_>>()})
+    serde_json::json!({"scope":"Latest loaded task outcome by final agent/model/account/requested effort/service tier. Costs include all loaded attempts, routing and quota retries. Historical human decisions are not current-file verification or causal comparisons; difficulty and earlier configurations differ. Unknown effort is the inherited CLI default. Fewer than ten decided tasks is insufficient evidence. Never infer model ability from brand names.",
+        "requestedEffort":request.effort.map(|effort|effort.level()),"groups":groups.into_iter().map(|((agent, model, profile, effort, tier),g)| serde_json::json!({"agent":agent,"model":model,"profileId":profile,"reasoningEffort":effort,"requestedServiceTier":tier,"accepted":g.accepted,"corrections":g.corrections,"total":g.tasks,"attempts":g.attempts,"usageCoverage":g.observed,"totalTokens":(g.observed==g.tasks).then_some(g.tokens),"tokensPerAcceptedTask":if g.accepted>0 && g.observed==g.tasks {Some(g.tokens as f64/g.accepted as f64)} else {None},"decided":g.accepted+g.corrections,"sufficientSample":g.accepted+g.corrections>=10,"matchedTaskEvidence":g.matched==g.tasks && g.tasks>=10,"freshEvidence":g.fresh==g.tasks,"successLowerBound":success_lower_bound(g.accepted,g.accepted+g.corrections),
+            "matchMethod":"Lexical task overlap; observational evidence, not matched trials", "latestObservedAt":g.latest,
+            "usdPerAcceptedTask":if g.accepted>0 && g.cost_observed==g.tasks {Some(g.dollars/g.accepted as f64)} else {None}})).collect::<Vec<_>>()})
 }
 
 #[cfg(test)]

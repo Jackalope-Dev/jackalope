@@ -97,16 +97,18 @@ export async function deviceRoutes(
     await limit(start);
     const now = Date.now();
     if (start) {
-      const { challenge } = z
-        .strictObject({ challenge: tokenSchema })
+      // `deviceKey` is an opaque hash the client derives from its machine, so
+      // repeat connections from one computer share a device slot.
+      const { challenge, deviceKey } = z
+        .strictObject({ challenge: tokenSchema, deviceKey: tokenSchema.optional() })
         .parse(await readJson(request));
       const verification = randomToken();
       const userCode = randomToken().slice(0, 8).toUpperCase();
       const expiresAt = now + 10 * 60000;
       await env.DB.prepare(
-        'INSERT INTO access_device_links(hash,verification_hash,user_code,created_at,expires_at) VALUES(?,?,?,?,?)',
+        'INSERT INTO access_device_links(hash,verification_hash,user_code,created_at,expires_at,machine_key) VALUES(?,?,?,?,?,?)',
       )
-        .bind(challenge, await tokenHash(verification), userCode, now, expiresAt)
+        .bind(challenge, await tokenHash(verification), userCode, now, expiresAt, deviceKey ?? null)
         .run();
       return json({ verification, userCode, expiresAt }, 201);
     }
@@ -250,7 +252,7 @@ export async function deviceRoutes(
     }
     await env.DB.batch([
       env.DB.prepare(
-        "INSERT INTO access_devices(id,hash,member_id,created_at,expires_at) SELECT ?,l.hash,l.member_id,?,? FROM access_device_links l JOIN access_members m ON m.id=l.member_id WHERE l.hash=? AND l.used_at IS NULL AND l.expires_at>? AND ((m.status='approved' AND (m.verified_at IS NOT NULL OR m.waitlist_verified_at IS NOT NULL)) OR (m.status='waiting' AND m.waitlist_verified_at IS NOT NULL)) ON CONFLICT(hash) DO NOTHING",
+        "INSERT INTO access_devices(id,hash,member_id,created_at,expires_at,machine_key) SELECT ?,l.hash,l.member_id,?,?,l.machine_key FROM access_device_links l JOIN access_members m ON m.id=l.member_id WHERE l.hash=? AND l.used_at IS NULL AND l.expires_at>? AND ((m.status='approved' AND (m.verified_at IS NOT NULL OR m.waitlist_verified_at IS NOT NULL)) OR (m.status='waiting' AND m.waitlist_verified_at IS NOT NULL)) ON CONFLICT(hash) DO NOTHING",
       ).bind(crypto.randomUUID(), now, now + lifetime, hash, now),
       env.DB.prepare(
         'UPDATE access_device_links SET used_at=? WHERE hash=? AND EXISTS(SELECT 1 FROM access_devices WHERE hash=?)',

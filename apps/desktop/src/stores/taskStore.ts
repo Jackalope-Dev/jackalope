@@ -8,6 +8,7 @@ export type TaskStatus = 'backlog' | 'refinement' | 'in_progress' | 'verificatio
 export interface TaskTicket {
   archivedAt?: string | null;
   effort?: TaskEffort;
+  codexSpeed?: 'standard' | 'fast';
   model?: string;
   contextSelection?: ContextSelection;
   id: string;

@@ -101,6 +101,21 @@ pub(super) fn search(query: &str) -> Vec<Value> {
     .collect()
 }
 
+pub(super) fn candidates(query: &str) -> Vec<Value> {
+    let chunks = chunks();
+    rank(
+        query,
+        &chunks
+            .iter()
+            .map(|(text, _)| text.clone())
+            .collect::<Vec<_>>(),
+    )
+    .into_iter()
+    .take(16)
+    .map(|(index, _)| chunks[index].1.clone())
+    .collect()
+}
+
 pub(super) fn passages(query: &str) -> Value {
     let chunks = chunks();
     let ranked = rank(

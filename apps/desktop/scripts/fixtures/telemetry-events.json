@@ -1,0 +1,407 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "name": "operation_result",
+    "operation": "task_start",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000002",
+    "name": "operation_result",
+    "operation": "task_retry",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000003",
+    "name": "operation_result",
+    "operation": "task_stop",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000004",
+    "name": "operation_result",
+    "operation": "task_verify",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000005",
+    "name": "operation_result",
+    "operation": "task_respond_prompt",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000006",
+    "name": "operation_result",
+    "operation": "task_outcome_review",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000007",
+    "name": "operation_result",
+    "operation": "task_preview_start",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000008",
+    "name": "operation_result",
+    "operation": "task_preview_inspect",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000009",
+    "name": "operation_result",
+    "operation": "task_retry_save",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000010",
+    "name": "operation_result",
+    "operation": "task_export_recovery",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000011",
+    "name": "operation_result",
+    "operation": "task_import_recovery",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000012",
+    "name": "operation_result",
+    "operation": "live_session_create",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000013",
+    "name": "operation_result",
+    "operation": "live_session_send",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000014",
+    "name": "operation_result",
+    "operation": "live_session_review",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000015",
+    "name": "operation_result",
+    "operation": "live_session_pause",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000016",
+    "name": "operation_result",
+    "operation": "live_session_resume",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000017",
+    "name": "operation_result",
+    "operation": "live_session_retry",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000018",
+    "name": "operation_result",
+    "operation": "live_session_finish",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000019",
+    "name": "operation_result",
+    "operation": "live_session_limits",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000020",
+    "name": "operation_result",
+    "operation": "live_session_window",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000021",
+    "name": "operation_result",
+    "operation": "queue_add",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000022",
+    "name": "operation_result",
+    "operation": "queue_import",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000023",
+    "name": "operation_result",
+    "operation": "queue_dispatch",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000024",
+    "name": "operation_result",
+    "operation": "integration_prepare",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000025",
+    "name": "operation_result",
+    "operation": "integration_apply",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000026",
+    "name": "operation_result",
+    "operation": "schedule_save",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000027",
+    "name": "operation_result",
+    "operation": "schedule_set_enabled",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000028",
+    "name": "operation_result",
+    "operation": "knowledge_save",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000029",
+    "name": "operation_result",
+    "operation": "knowledge_search",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000030",
+    "name": "operation_result",
+    "operation": "mcp_save_server",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000031",
+    "name": "operation_result",
+    "operation": "mcp_probe_server",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000032",
+    "name": "operation_result",
+    "operation": "mcp_authenticate",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000033",
+    "name": "operation_result",
+    "operation": "git_create_worktree",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000034",
+    "name": "operation_result",
+    "operation": "git_cleanup_worktree",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000035",
+    "name": "operation_result",
+    "operation": "git_archive_worktree",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000036",
+    "name": "operation_result",
+    "operation": "agent_profile_create",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000037",
+    "name": "operation_result",
+    "operation": "agent_profile_sign_in",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000038",
+    "name": "operation_result",
+    "operation": "local_ai_connect",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000039",
+    "name": "operation_result",
+    "operation": "helper_send",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000040",
+    "name": "operation_result",
+    "operation": "helper_action",
+    "outcome": "accepted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000041",
+    "name": "operation_result",
+    "operation": "integration_apply",
+    "outcome": "failed"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000042",
+    "name": "operation_result",
+    "operation": "integration_apply",
+    "outcome": "blocked"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000043",
+    "name": "operation_result",
+    "operation": "integration_apply",
+    "outcome": "partial"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000044",
+    "name": "operation_result",
+    "operation": "integration_apply",
+    "outcome": "canceled"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000045",
+    "name": "task_state",
+    "state": "review",
+    "agent": "codex",
+    "workflow": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000046",
+    "name": "task_state",
+    "state": "review",
+    "agent": "claude",
+    "workflow": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000047",
+    "name": "task_state",
+    "state": "review",
+    "agent": "grok",
+    "workflow": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000048",
+    "name": "task_state",
+    "state": "review",
+    "agent": "opencode",
+    "workflow": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000049",
+    "name": "task_state",
+    "state": "review",
+    "agent": "kimi",
+    "workflow": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000050",
+    "name": "task_state",
+    "state": "review",
+    "agent": "antigravity",
+    "workflow": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000051",
+    "name": "task_state",
+    "state": "review",
+    "agent": "gemini",
+    "workflow": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000054",
+    "name": "task_state",
+    "state": "review",
+    "agent": "other",
+    "workflow": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000055",
+    "name": "app_error",
+    "code": "ui_rejection",
+    "operation": "task_start",
+    "feature": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000056",
+    "name": "app_error",
+    "code": "ui_render_error",
+    "operation": "task_start",
+    "feature": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000057",
+    "name": "app_error",
+    "code": "history_load_failed",
+    "operation": "task_start",
+    "feature": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000058",
+    "name": "app_error",
+    "code": "agent_discovery_failed",
+    "operation": "task_start",
+    "feature": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000059",
+    "name": "app_error",
+    "code": "checkpoint_failed",
+    "operation": "task_start",
+    "feature": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000060",
+    "name": "app_error",
+    "code": "verification_error",
+    "operation": "task_start",
+    "feature": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000061",
+    "name": "app_error",
+    "code": "operation_failed",
+    "operation": "task_start",
+    "feature": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000062",
+    "name": "feature_used",
+    "feature": "chat"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000063",
+    "name": "feature_used",
+    "feature": "project"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000064",
+    "name": "feature_used",
+    "feature": "knowledge"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000065",
+    "name": "task_state",
+    "state": "running",
+    "agent": "other",
+    "workflow": "task"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000066",
+    "name": "task_state",
+    "state": "starting"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000067",
+    "name": "app_error",
+    "code": "ui_error"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000068",
+    "name": "app_opened"
+  }
+]

@@ -16,6 +16,7 @@
 .rich-diff-scroll {
   height: min(60vh, 640px);
   overflow: auto;
+  overflow-anchor: none;
 }
 .rich-diff-raw {
   max-height: 60vh;
@@ -55,9 +56,14 @@
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
+.task-markdown [data-streamdown="code-block-body"]:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
 .task-markdown [data-streamdown="code-block"] pre {
   margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
+  overflow: visible;
 }

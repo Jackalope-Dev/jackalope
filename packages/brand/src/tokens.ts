@@ -109,8 +109,10 @@ export function themeTokens(theme: ThemePalette) {
   const colors = paletteColors(theme);
   const lastHue = colors[colors.length - 1].hue;
   const atmosphere = theme.atmosphere ?? 12;
+  const surfaceSaturation = atmosphere * 0.45;
+  const shellSaturation = atmosphere * 0.65;
   const dark = isDarkAtTime(theme);
-  const tone = (light: number, saturation = atmosphere) =>
+  const tone = (light: number, saturation = surfaceSaturation) =>
     `hsl(${accentHue} ${saturation}% ${light}%)`;
   set('color-scheme', dark ? 'dark' : 'light');
   set('--brand-brightness', dark ? '1' : '0.2');
@@ -120,7 +122,10 @@ export function themeTokens(theme: ThemePalette) {
   set('--accent-l', `${accentLight}%`);
 
   set('--color-accent', `hsl(${accentHue} ${accentSat}% ${accentLight}%)`);
-  set('--color-accent-subtle', `hsl(${accentHue} ${accentSat}% ${accentLight}% / 0.12)`);
+  set(
+    '--color-accent-subtle',
+    `hsl(${accentHue} ${accentSat}% ${accentLight}% / ${dark ? 0.12 : 0.08})`,
+  );
   set('--color-accent-glow', `hsl(${accentHue} ${accentSat}% ${accentLight}% / 0.28)`);
   const luminance = relativeLuminance(hslToHex(accentHue, accentSat, accentLight));
   set('--color-on-accent', luminance > 0.179 ? '#000000' : '#ffffff');
@@ -147,19 +152,19 @@ export function themeTokens(theme: ThemePalette) {
   set('--color-palette-gradient', paletteGradient(theme));
   set('--color-accent-secondary', (colors[1] ?? colors[0]).css);
   set('--color-accent-tertiary', (colors[2] ?? colors[1] ?? colors[0]).css);
-  set('--color-shell', tone(dark ? 10 : 90, atmosphere + 8));
-  set('--color-shell-end', `hsl(${lastHue} ${atmosphere}% ${dark ? 6 : 94}%)`);
+  set('--color-shell', tone(dark ? 11 : 94, shellSaturation));
+  set('--color-shell-end', `hsl(${lastHue} ${shellSaturation}% ${dark ? 8 : 96}%)`);
   const shellStops =
     colors.length === 3
       ? [
           'var(--color-shell)',
-          `hsl(${colors[1].hue} ${atmosphere + 4}% ${dark ? 8 : 92}%)`,
+          `hsl(${colors[1].hue} ${shellSaturation}% ${dark ? 9.5 : 95}%)`,
           'var(--color-shell-end)',
         ]
       : ['var(--color-shell)', 'var(--color-shell-end)'];
   set('--color-shell-gradient', `linear-gradient(145deg, ${shellStops.join(', ')})`);
   const onboardingStops = colors.map(
-    (color, index) => `hsl(${color.hue} ${atmosphere}% ${dark ? 9 - index * 2 : 96 - index}%)`,
+    (color, index) => `hsl(${color.hue} ${shellSaturation}% ${dark ? 11 - index : 97 - index}%)`,
   );
   set(
     '--color-onboarding-gradient',
@@ -172,26 +177,27 @@ export function themeTokens(theme: ThemePalette) {
     'linear-gradient(90deg, hsl(0 75% 62%), hsl(60 75% 62%), hsl(120 75% 62%), hsl(180 75% 62%), hsl(240 75% 62%), hsl(300 75% 62%), hsl(360 75% 62%))',
   );
 
-  set('--color-bg', tone(dark ? 6 : 98));
-  set('--color-surface', tone(dark ? 9 : 96));
-  set('--color-surface-hover', tone(dark ? 13 : 93, atmosphere + 2));
-  set('--color-surface-elevated', tone(dark ? 15 : 100, atmosphere + 4));
-  set('--color-surface-sunken', tone(dark ? 5 : 94));
-  set('--color-header-search', `hsl(0 0% ${dark ? 8 : 100}%)`);
-  set('--color-header-search-border', `hsl(0 0% ${dark ? 100 : 0}% / 0.08)`);
-  set('--shadow-header-search', `inset 0 1px 3px hsl(0 0% 0% / ${dark ? 0.24 : 0.09})`);
-  set('--color-border', tone(dark ? 19 : 80));
-  set('--color-border-subtle', tone(dark ? 14 : 88));
-  set('--color-text-primary', tone(dark ? 96 : 13, 10));
-  set('--color-text-secondary', tone(dark ? 70 : 30, 8));
-  set('--color-text-muted', tone(dark ? 65 : 35, 6));
+  set('--color-bg', tone(dark ? 8 : 99));
+  set('--color-surface', tone(dark ? 11 : 97));
+  set('--color-surface-hover', tone(dark ? 16 : 94));
+  set('--color-surface-elevated', tone(dark ? 14 : 100));
+  set('--color-surface-sunken', tone(dark ? 7 : 95));
+  set('--color-header-search', tone(dark ? 8 : 99));
+  set('--color-header-search-border', 'var(--color-border-subtle)');
+  set('--shadow-header-search', `inset 0 1px 2px hsl(0 0% 0% / ${dark ? 0.12 : 0.03})`);
+  set('--color-border', tone(dark ? 25 : 82));
+  set('--color-border-subtle', tone(dark ? 19 : 90));
+  set('--color-text-primary', tone(dark ? 94 : 14, 4));
+  set('--color-text-secondary', tone(dark ? 74 : 32, 4));
+  set('--color-text-muted', tone(dark ? 66 : 40, 3));
 
   const backgrounds = colors.map((color) =>
-    relativeLuminance(hslToHex(color.hue, atmosphere + 8, dark ? 15 : 90)),
+    relativeLuminance(hslToHex(color.hue, shellSaturation, dark ? 16 : 94)),
   );
+  const inkSaturation = Math.min(accentSat, 72);
   let inkLight = accentLight;
   while (inkLight > 0 && inkLight < 100) {
-    const ink = relativeLuminance(hslToHex(accentHue, accentSat, inkLight));
+    const ink = relativeLuminance(hslToHex(accentHue, inkSaturation, inkLight));
     if (
       backgrounds.every(
         (background) =>
@@ -203,7 +209,7 @@ export function themeTokens(theme: ThemePalette) {
   }
   if (dark && inkLight === 0) inkLight = 100;
   if (!dark && inkLight === 100) inkLight = 0;
-  set('--color-accent-ink', tone(inkLight, accentSat));
+  set('--color-accent-ink', tone(inkLight, inkSaturation));
   set('--color-border-focus', 'var(--color-accent-ink)');
   set('--color-success', dark ? 'hsl(160 64% 65%)' : 'hsl(160 75% 23%)');
   set('--color-agent-codex', dark ? 'hsl(160 55% 70%)' : 'hsl(160 65% 28%)');
@@ -224,11 +230,11 @@ export function themeTokens(theme: ThemePalette) {
     dangerLight += dark ? 1 : -1;
   }
   set('--color-danger', `hsl(0 ${dangerSat}% ${dangerLight}%)`);
-  const shadow = `hsl(${accentHue} ${atmosphere}% 10% / ${dark ? 0.6 : 0.14})`;
+  const shadow = `hsl(0 0% 0% / ${dark ? 0.3 : 0.08})`;
   set('--shadow-flat', `0 1px 2px ${shadow}`);
   set('--shadow-selection', `0 2px 5px -1px ${shadow}, 0 1px 2px ${shadow}`);
-  set('--shadow-surface', `0 4px 16px -2px ${shadow}, 0 0 0 1px var(--color-border)`);
-  set('--shadow-pop', `0 16px 60px ${shadow}, 0 0 0 1px var(--color-border-subtle)`);
+  set('--shadow-surface', `0 4px 16px -4px ${shadow}`);
+  set('--shadow-pop', `0 12px 36px -8px ${shadow}, 0 2px 8px ${shadow}`);
   return tokens;
 }
 

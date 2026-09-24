@@ -1,16 +1,18 @@
 import { type FileDiffMetadata, parsePatchFiles } from '@pierre/diffs';
 import { FileDiff, Virtualizer, WorkerPoolContextProvider } from '@pierre/diffs/react';
+import DiffHighlightWorker from '@pierre/diffs/worker/worker.js?worker';
 import { useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from '../../hooks/useColorScheme';
+import { reviewExcerpt } from '../../lib/review-feedback';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
+import { useReviewFeedback } from './ReviewFeedback';
 import './rich-content.css';
 
 const poolOptions = {
   poolSize: 2,
   totalASTLRUCacheSize: 32,
-  workerFactory: () =>
-    new Worker(new URL('../../lib/diff-highlight.worker.ts', import.meta.url), { type: 'module' }),
+  workerFactory: () => new DiffHighlightWorker(),
 };
 const highlighterOptions = {
   theme: { light: 'github-light', dark: 'github-dark' },
@@ -19,6 +21,7 @@ const highlighterOptions = {
 
 export default function RichDiff({ patch, file }: { patch: string; file?: string }) {
   const scheme = useColorScheme();
+  const feedback = useReviewFeedback();
   const [split, setSplit] = useState(false);
   const [wrap, setWrap] = useState(false);
   const [raw, setRaw] = useState(false);
@@ -27,7 +30,9 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
   const immediate = useMemo(() => {
     if (!small) return undefined;
     try {
-      const files = parsePatchFiles(patch, undefined, true).flatMap((entry) => entry.files);
+      const files = parsePatchFiles(patch, crypto.randomUUID(), true).flatMap(
+        (entry) => entry.files,
+      );
       return files.length ? files : undefined;
     } catch {
       return undefined;
@@ -70,45 +75,42 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
   const unmatched = Boolean(!loading && file && !selected?.length);
   const files = unmatched ? parsed : selected;
   return (
-    <div className="rich-diff">
-      <fieldset className="rich-content-toolbar" aria-label="Diff display">
-        <Button variant="ghost" aria-pressed={split} onClick={() => setSplit(!split)}>
-          {split ? 'Split view' : 'Unified view'}
-        </Button>
-        <Button variant="ghost" aria-pressed={wrap} onClick={() => setWrap(!wrap)}>
-          Wrap lines
-        </Button>
-        <Button variant="ghost" aria-pressed={raw} onClick={() => setRaw(!raw)}>
-          Original patch
-        </Button>
-      </fieldset>
-      {unmatched && (
-        <InlineNotice>Showing all changes because this file could not be isolated.</InlineNotice>
-      )}
-      {!loading && !parsed && patch && (
-        <InlineNotice>Showing the original patch because it could not be rendered.</InlineNotice>
-      )}
-      {loading && !raw ? (
-        <InlineNotice role="status">Preparing code changes…</InlineNotice>
-      ) : raw || !files ? (
-        // biome-ignore lint/a11y/noNoninteractiveTabindex: The original patch supports keyboard scrolling.
-        <section className="rich-diff-raw" aria-label="Original patch" tabIndex={0}>
-          <pre style={{ whiteSpace: wrap ? 'pre-wrap' : 'pre' }}>
-            {patch || 'No text changes to display.'}
-          </pre>
-        </section>
-      ) : (
-        <section
-          aria-label="Code changes"
-          className="rich-diff-region"
-          ref={(node) => {
-            const viewport = node?.firstElementChild;
-            if (viewport instanceof HTMLElement) viewport.tabIndex = 0;
-          }}
-        >
-          <WorkerPoolContextProvider
-            poolOptions={poolOptions}
-            highlighterOptions={highlighterOptions}
+    <WorkerPoolContextProvider poolOptions={poolOptions} highlighterOptions={highlighterOptions}>
+      <div className="rich-diff">
+        <fieldset className="rich-content-toolbar" aria-label="Diff display">
+          <Button variant="outline" aria-pressed={split} onClick={() => setSplit(!split)}>
+            {split ? 'Split view' : 'Unified view'}
+          </Button>
+          <Button variant="outline" aria-pressed={wrap} onClick={() => setWrap(!wrap)}>
+            Wrap lines
+          </Button>
+          <Button variant="outline" aria-pressed={raw} onClick={() => setRaw(!raw)}>
+            Original patch
+          </Button>
+        </fieldset>
+        {unmatched && (
+          <InlineNotice>Showing all changes because this file could not be isolated.</InlineNotice>
+        )}
+        {!loading && !parsed && patch && (
+          <InlineNotice>Showing the original patch because it could not be rendered.</InlineNotice>
+        )}
+        {loading && !raw ? (
+          <InlineNotice role="status">Preparing code changes…</InlineNotice>
+        ) : raw || !files ? (
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: The original patch supports keyboard scrolling.
+          <section className="rich-diff-raw" aria-label="Original patch" tabIndex={0}>
+            <pre style={{ whiteSpace: wrap ? 'pre-wrap' : 'pre' }}>
+              {patch || 'No text changes to display.'}
+            </pre>
+          </section>
+        ) : (
+          <section
+            aria-label="Code changes"
+            className="rich-diff-region"
+            ref={(node) => {
+              const viewport = node?.firstElementChild;
+              if (viewport instanceof HTMLElement) viewport.tabIndex = 0;
+            }}
           >
             <Virtualizer
               className="rich-diff-scroll"
@@ -130,19 +132,61 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
                 <FileDiff
                   key={entry.name}
                   fileDiff={entry}
+                  lineAnnotations={feedback?.comments
+                    .filter(
+                      (comment) =>
+                        !comment.resolved &&
+                        comment.revision === feedback.revision &&
+                        comment.file === entry.name,
+                    )
+                    .map((comment) => ({
+                      side: comment.side,
+                      lineNumber: comment.line,
+                      metadata: comment,
+                    }))}
+                  renderAnnotation={({ metadata }) =>
+                    metadata && (
+                      <button
+                        type="button"
+                        className="review-inline-comment"
+                        onClick={() => feedback?.edit(metadata)}
+                      >
+                        {metadata.text}
+                      </button>
+                    )
+                  }
                   options={{
+                    enableGutterUtility: !!feedback?.add,
+                    onGutterUtilityClick: feedback?.add
+                      ? (range) =>
+                          feedback.add?.({
+                            file: entry.name,
+                            line: range.start,
+                            side: range.side ?? 'additions',
+                            excerpt: reviewExcerpt(entry, range.start, range.side ?? 'additions'),
+                          })
+                      : undefined,
                     diffStyle: split ? 'split' : 'unified',
                     overflow: wrap ? 'wrap' : 'scroll',
                     theme: { light: 'github-light', dark: 'github-dark' },
                     themeType: scheme,
                     preferredHighlighter: 'shiki-js',
+                    unsafeCSS: `
+                      [data-additions-count], [data-deletions-count], [data-line-number-content] { color: var(--diffs-fg); }
+                      [data-line-type^="change-"] [style*="--diffs-token-light"] {
+                        color: light-dark(
+                          color-mix(in srgb, var(--diffs-token-light) 75%, black),
+                          color-mix(in srgb, var(--diffs-token-dark) 50%, white)
+                        );
+                      }
+                    `,
                   }}
                 />
               ))}
             </Virtualizer>
-          </WorkerPoolContextProvider>
-        </section>
-      )}
-    </div>
+          </section>
+        )}
+      </div>
+    </WorkerPoolContextProvider>
   );
 }

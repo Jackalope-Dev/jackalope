@@ -1,7 +1,10 @@
+import { DiscordIcon, GitHubIcon } from '@jackalope/ui';
+import type { ReactNode } from 'react';
 import { BrandMark } from './BrandMark';
+import { DISCORD_URL } from './community';
 import './footer.css';
 
-const groups = [
+const groups: Array<{ title: string; links: Array<[string, string, ReactNode?]> }> = [
   {
     title: 'Product',
     links: [
@@ -24,7 +27,7 @@ const groups = [
       ['Field notes', '/blog/'],
       ['Changelog', '/changelog/'],
       ['Roadmap', '/roadmap/'],
-      ['Source & contributing', 'https://github.com/Jackalope-Dev/jackalope'],
+      ['Benchmarks & methodology', '/benchmarks/'],
     ],
   },
   {
@@ -36,6 +39,7 @@ const groups = [
       ['Grok', '/agents/grok/'],
       ['OpenCode', '/agents/opencode/'],
       ['Kimi Code', '/agents/kimi-code/'],
+      ['Gemini CLI', '/agents/gemini-cli/'],
     ],
   },
   {
@@ -44,6 +48,8 @@ const groups = [
       ['Your waitlist place', '/waitlist/'],
       ['Your access & passes', '/access/'],
       ['Questions', '/#questions'],
+      ['Join our Discord', DISCORD_URL, <DiscordIcon key="discord" />],
+      ['GitHub', 'https://github.com/Jackalope-Dev/jackalope', <GitHubIcon key="github" />],
       ['Follow on X', 'https://x.com/JackalopeDotDev'],
       ['Join us on Reddit', 'https://www.reddit.com/r/JackalopeDev/'],
     ],
@@ -64,13 +70,14 @@ export function Footer({ home, path }: { home: boolean; path: string }) {
           <div className="footer-group" key={group.title}>
             <h2>{group.title}</h2>
             <ul>
-              {group.links.map(([label, href]) => (
+              {group.links.map(([label, href, icon]) => (
                 <li key={href}>
                   <a
                     href={href}
                     aria-current={href === path ? 'page' : undefined}
                     rel={href === 'https://x.com/JackalopeDotDev' ? 'me' : undefined}
                   >
+                    {icon}
                     {label}
                   </a>
                 </li>

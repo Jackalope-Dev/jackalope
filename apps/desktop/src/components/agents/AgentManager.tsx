@@ -27,6 +27,7 @@ import { AgentInstallGuide } from './AgentInstallGuide';
 import { AgentModels } from './AgentModels';
 import { AgentSupport } from './AgentSupport';
 import { LocalAiSetup } from './LocalAiSetup';
+import { ManagedRuntimeSettings } from './ManagedRuntimeSettings';
 import './agents-workspace.css';
 import './agent-manager.css';
 
@@ -41,7 +42,24 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
   const [selectedAgent, setSelectedAgent] = useState(initialAgentId ?? config.defaultMetaAgent);
   const desktop = isTauriEnvironment();
   const agents = [...builtinAgents, ...config.customAgents];
-  const selected = agents.find((agent) => agent.id === selectedAgent) ?? agents[0];
+  const availableIds = new Set(
+    runners.filter((runner) => runner.available).map((runner) => runner.id),
+  );
+  const detectedIds = new Set(
+    runners
+      .filter((runner) => runner.available || runner.desktopInstalled)
+      .map((runner) => runner.id),
+  );
+  const detectedAgents = agents
+    .filter((agent) => detectedIds.has(agent.id))
+    .sort((a, b) => Number(availableIds.has(b.id)) - Number(availableIds.has(a.id)));
+  const otherAgents = agents.filter((agent) => !detectedIds.has(agent.id));
+  const groups = [
+    { id: 'detected', label: 'Detected', agents: detectedAgents },
+    { id: 'other', label: 'Other agents', agents: otherAgents },
+  ];
+  const selected =
+    agents.find((agent) => agent.id === selectedAgent) ?? detectedAgents[0] ?? agents[0];
   const selectedRunner = runners.find((r) => r.id === selected?.id);
   const selectedEnabled = selected ? config.isAgentEnabled(selected.id) : false;
   const isDefault = !!selected && config.defaultMetaAgent === selected.id;
@@ -105,31 +123,54 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
           Back to agents
         </Button>
 
-        <div className="agent-switcher-strip" role="tablist" aria-label="Select agent to configure">
-          {agents.map((agent) => {
-            const isCurrent = agent.id === selected?.id;
-            const isAgentDef = config.defaultMetaAgent === agent.id;
-            const isAgentOn = config.isAgentEnabled(agent.id);
-            return (
-              <button
-                key={agent.id}
-                type="button"
-                role="tab"
-                aria-selected={isCurrent}
-                className={`agent-switcher-tab ${isCurrent ? 'active' : ''}`}
-                onClick={() => {
-                  setSelectedAgent(agent.id);
-                  setSaved(false);
-                }}
+        <section className="agent-switcher" aria-label="Select agent to configure">
+          {groups
+            .filter((group) => group.agents.length)
+            .map((group) => (
+              <fieldset
+                key={group.id}
+                className="agent-switcher-group"
+                data-group={group.id}
+                aria-label={group.label}
               >
-                <AgentAvatar provider={agent.id} size="xs" />
-                <span className="agent-switcher-name">{agent.name}</span>
-                {isAgentDef && <Star size={11} className="text-amber-500 fill-amber-500" />}
-                {!isAgentOn && <span className="agent-switcher-off-dot" title="Disabled" />}
-              </button>
-            );
-          })}
-        </div>
+                <span className="agent-switcher-label" aria-hidden="true">
+                  {group.label}
+                </span>
+                <div className="agent-switcher-strip">
+                  {group.agents.map((agent) => {
+                    const isCurrent = agent.id === selected?.id;
+                    const isAgentDef = config.defaultMetaAgent === agent.id;
+                    const isAgentOn = config.isAgentEnabled(agent.id);
+                    const runner = runners.find((runner) => runner.id === agent.id);
+                    const appOnly = runner?.desktopInstalled && !runner.available;
+                    return (
+                      <Button
+                        key={agent.id}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-pressed={isCurrent}
+                        aria-label={`${agent.name}${isAgentDef ? ', default agent' : ''}${!isAgentOn ? ', disabled for tasks' : ''}${appOnly ? ', desktop app only' : ''}`}
+                        className={`agent-switcher-tab ${isCurrent ? 'active' : ''}`}
+                        onClick={() => {
+                          setSelectedAgent(agent.id);
+                          setSaved(false);
+                        }}
+                      >
+                        <AgentAvatar provider={agent.id} size="xs" />
+                        <span className="agent-switcher-name">{agent.name}</span>
+                        {appOnly && <span className="agent-switcher-note">App only</span>}
+                        {isAgentDef && <Star size={12} aria-hidden="true" />}
+                        {!isAgentOn && (
+                          <span className="agent-switcher-off-dot" title="Disabled for tasks" />
+                        )}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            ))}
+        </section>
       </div>
 
       {/* Hero Header: Interactive Animated Mascot + Agent Profile */}
@@ -369,6 +410,9 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
                   restricted={options.restrictModels}
                   onChange={update}
                 />
+                {desktop &&
+                  (('adapter' in selected ? selected.adapter : selected.id) ?? selected.id) ===
+                    'opencode' && <ManagedRuntimeSettings />}
               </>
             )}
           </div>

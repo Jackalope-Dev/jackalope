@@ -33,7 +33,7 @@ export const localAiFixture: LocalInspection = {
       description: 'A coding specialist for high-memory machines. GPU memory matters for speed.',
     },
   ],
-  installedModels: ['qwen3.5:4b'],
+  installedModels: ['qwen3.5:4b', 'qwen3.5:9b'],
   ollamaOnline: true,
   opencodeInstalled: true,
   canInstall: false,
