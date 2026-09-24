@@ -2,6 +2,89 @@ import type { BlogPost } from './blog-types.ts';
 
 export const recentPosts: BlogPost[] = [
   {
+    slug: 'coding-agents-from-the-terminal',
+    cover: { kind: 'agents', tone: 'indigo', label: 'Say it where you already are.' },
+    title: 'Run coding agents from your terminal without losing the thread.',
+    seoTitle: 'Run AI coding agents from the terminal',
+    category: 'Product notes',
+    date: '2026-09-24',
+    readingTime: '4 min read',
+    description:
+      'Start routed coding-agent conversations from any Git repository, answer agent questions in place, and move a conversation between the app and your terminal.',
+    sections: [
+      {
+        id: 'why-terminal',
+        title: 'Start where the idea shows up',
+        paragraphs: [
+          'Many coding tasks start in a terminal: a failing test, a stack trace, a TODO you just grepped. Switching to another window to describe the work breaks that moment. The jackalope command lets you describe it right there, in the repository you are already in.',
+          'Run jackalope in any Git repository and type what you need, the same way you would in a chat. The repository becomes a Jackalope project if it was not one already, and the conversation uses the same accounts, agents and approved access as the desktop app.',
+        ],
+        code: {
+          label: 'Common commands',
+          language: 'sh',
+          value:
+            'jackalope              # start a conversation in this repository\njackalope --continue   # rejoin the latest one here\njackalope ls           # list open conversations\njackalope attach 5cd0  # rejoin one by id prefix',
+        },
+      },
+      {
+        id: 'routing',
+        title: 'See which agent took the work, and why',
+        paragraphs: [
+          'You do not have to pick an agent first. Jackalope routes each conversation using your project’s decision preferences, the agents you allow and their reported capacity. The status line names the agent and model it chose, the branch, the step it is on and the reason for the choice, so a routing decision is never a mystery.',
+          'Prefer a specific agent? Use /agent to choose the one for your next conversation, or /agents to see which ones are installed and ready.',
+        ],
+        links: [{ label: 'How routing works', href: '/knowledge/task-routing-and-quotas/' }],
+      },
+      {
+        id: 'questions',
+        title: 'Answer questions without leaving the conversation',
+        paragraphs: [
+          'Agents sometimes need a decision: which API to keep, whether a setting is per device or per account. When one asks, its choices open in the terminal and you answer with one keypress. Open-ended questions are answered by typing a reply.',
+          'Output arrives as the agent works, including the files it reads and changes and the checks it runs. /stop stops the current work, /retry runs the last message again, and /pause holds queued messages until you are ready.',
+        ],
+      },
+      {
+        id: 'several-sessions',
+        title: 'Keep several conversations going',
+        paragraphs: [
+          'Each terminal can hold its own conversation, so a bug fix and a feature can run side by side. /sessions switches between conversations in the current project and /projects moves to another repository.',
+          'Leaving with /quit or Ctrl+C does not stop the work. The conversation keeps running in Jackalope, and you can rejoin it from any terminal or from the app.',
+        ],
+      },
+      {
+        id: 'app-and-terminal',
+        title: 'Move between the app and your own terminal',
+        paragraphs: [
+          'The same conversation is available in both places. In the app, choose Terminal in the bottom status bar or press Cmd+J (Ctrl+J on Windows and Linux) to open the command for the current project. Open in Terminal continues that conversation in your system terminal.',
+          'If Jackalope is not open when you run the command, it asks whether to open the app or run in the background, and remembers your answer. Opening the app later shows the same session rather than starting a second copy.',
+        ],
+      },
+      {
+        id: 'review',
+        title: 'Review the result where review belongs',
+        paragraphs: [
+          'A terminal is a good place to start and steer work; a diff with checks beside it is a better place to accept it. When the work is ready, /diff opens the changes in the app so you can inspect files and check output, then commit or merge deliberately.',
+          'The jackalope command installs with the app on macOS, Windows and Linux. Jackalope is in early access: running work requires an approved account and an installed, signed-in agent CLI or a connected API provider.',
+        ],
+        links: [
+          { label: 'Terminal command guide', href: '/knowledge/terminal-command/' },
+          { label: 'Review and merge AI changes', href: '/knowledge/review-and-merge/' },
+        ],
+      },
+    ],
+    related: [
+      {
+        label: 'Use Claude Code and Codex together',
+        href: '/blog/claude-code-and-codex-together/',
+      },
+      {
+        label: 'Git worktrees for coding agents',
+        href: '/blog/git-worktrees-for-ai-coding-agents/',
+      },
+      { label: 'Compare Jackalope and terminal tabs', href: '/compare/terminal-tabs/' },
+    ],
+  },
+  {
     slug: 'chat-to-reviewed-code-change',
     title: 'Keep the conversation. Review the change.',
     seoTitle: 'From coding-agent chat to a reviewed change',
