@@ -123,8 +123,10 @@ pub async fn app_release_status(
     }
     if check && status.configured {
         let updater = updater(&app, channel, 30)?;
-        if let Some(update) = updater.check().await.map_err(|_| {
-            "Could not reach the update service. Check your connection and try again.".to_string()
+        if let Some(update) = updater.check().await.map_err(|error| {
+            // Name the cause: an unpublished channel and a dropped connection
+            // need different actions from the user.
+            format!("Could not check for updates: {error}")
         })? {
             status.available_version = Some(update.version);
             status.notes = update.body;
