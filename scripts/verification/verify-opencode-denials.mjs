@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { startProviderMeter } from '../evaluation/provider-meter.mjs';
+import { gitEnvironment } from '../git-environment.mjs';
 
 const executable = process.argv[2];
 if (!executable || !path.isAbsolute(executable))
@@ -52,7 +53,12 @@ for (const scenario of ['continue', 'repeat', 'alternate', 'policy']) {
       }),
     ],
   ])
-    execFileSync('git', args, { cwd: repo, stdio: 'pipe', windowsHide: true });
+    execFileSync('git', args, {
+      cwd: repo,
+      stdio: 'pipe',
+      windowsHide: true,
+      env: gitEnvironment(),
+    });
   let calls = 0;
   const observations = [];
   const meter = await startProviderMeter({

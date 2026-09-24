@@ -50,8 +50,14 @@ pub enum Request {
     EnsureProject { path: String },
     /// Open conversations, newest first.
     Sessions,
-    /// Begin a conversation in a repository and send its first message.
-    StartSession { project_path: String, text: String },
+    /// Begin a conversation in a repository and send its first message. With
+    /// no agent, routing picks one.
+    StartSession {
+        project_path: String,
+        text: String,
+        #[serde(default)]
+        agent: Option<String>,
+    },
     /// Add a message to a conversation.
     Send { session_id: String, text: String },
     /// A conversation and the state of its current work.
@@ -85,6 +91,8 @@ pub enum Request {
         project_path: String,
         attribution: String,
     },
+    /// Open the app's Changes page on a checkout (the project or a worktree).
+    ShowChanges { path: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -114,7 +122,8 @@ pub struct SessionSummary {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Message {
-    /// `you` or `agent`.
+    /// `you` or `agent`. An agent message carries the output of the work the
+    /// preceding messages started.
     pub role: String,
     pub text: String,
     /// Whether this message has been dispatched to an agent yet.
@@ -187,7 +196,8 @@ pub enum Response {
     },
     Session {
         revision: u64,
-        session: SessionView,
+        // Boxed: far larger than every other response.
+        session: Box<SessionView>,
     },
     Started {
         session_id: String,

@@ -22,8 +22,12 @@ USAGE
   jackalope --continue           resume the latest conversation here
   jackalope ls                   list open conversations
   jackalope attach <id>          resume a conversation by id
-  jackalope status               show the running host
+  jackalope status               show the host, this project and your agents
   jackalope help                 show this message
+
+IN A CONVERSATION
+  /                              pick a command: /sessions, /projects, /agent,
+                                 /settings, /diff, /retry, /finish and more
 
 OPTIONS
   --open                         start the desktop app if nothing is running
@@ -182,31 +186,137 @@ fn latest(client: &mut Client, project: &Project) -> Result<Option<String>, Stri
 }
 
 fn status() -> Result<(), String> {
-    match attach() {
-        Some((handshake, _)) => {
-            println!("Running    pid {}", handshake.pid);
-            println!(
-                "Window     {}",
-                if handshake.windowed {
-                    "open"
-                } else {
-                    "background"
-                }
+    let Some((handshake, mut client)) = attach_or_wait() else {
+        println!("Jackalope is not running. Run 'jackalope' to start it.");
+        return Ok(());
+    };
+    let row = |label: &str, value: &str| println!("{label:<11}{value}");
+    row(
+        "Jackalope",
+        &format!(
+            "running {} (pid {})",
+            if handshake.windowed {
+                "with the app open"
+            } else {
+                "in the background"
+            },
+            handshake.pid
+        ),
+    );
+    // The project for this directory, when it is a repository.
+    if let Ok(here) = std::env::current_dir() {
+        if let Ok(Response::Project { project }) = client.send(&Request::EnsureProject {
+            path: here.to_string_lossy().into_owned(),
+        }) {
+            let branch = std::process::Command::new("git")
+                .args(["-C", &project.path, "rev-parse", "--abbrev-ref", "HEAD"])
+                .stderr(Stdio::null())
+                .output()
+                .ok()
+                .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+                .filter(|branch| !branch.is_empty());
+            row(
+                "Project",
+                &format!(
+                    "{}{}",
+                    project.name,
+                    branch
+                        .map(|branch| format!(" · {branch}"))
+                        .unwrap_or_default()
+                ),
             );
-            println!("Endpoint   {}", handshake.endpoint);
-            println!(
-                "Profile    {}",
-                profile_root()
-                    .map(|path| path.display().to_string())
-                    .unwrap_or_else(|| "unknown".into())
-            );
-            Ok(())
-        }
-        None => {
-            println!("Jackalope is not running.");
-            Ok(())
+            if let Ok(Response::Sessions { sessions }) = client.send(&Request::Sessions) {
+                let here = sessions
+                    .iter()
+                    .filter(|session| session.project_id == project.id)
+                    .count();
+                row("Open", &format!("{here} conversation(s) here"));
+            }
         }
     }
+    match client.send(&Request::Overview) {
+        Ok(Response::Overview {
+            agents,
+            default_agent,
+        }) => {
+            let mut first = true;
+            for agent in agents
+                .iter()
+                .filter(|agent| matches!(agent.state.as_str(), "ready" | "installed" | "sign-in"))
+            {
+                let state = match agent.state.as_str() {
+                    "ready" => agent.account.as_str(),
+                    "sign-in" => "sign-in needed",
+                    _ => "installed",
+                };
+                let default = if agent.id == default_agent {
+                    "  (default)"
+                } else {
+                    ""
+                };
+                row(
+                    if first { "Agents" } else { "" },
+                    &format!("{:<14}{state}{default}", agent.name),
+                );
+                first = false;
+            }
+            if first {
+                row("Agents", "none installed yet");
+            }
+        }
+        Ok(Response::Error { message }) => row("Agents", &message),
+        _ => {}
+    }
+    row(
+        "Profile",
+        &profile_root()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|| "unknown".into()),
+    );
+    Ok(())
+}
+
+/// Whether an app owns this profile but is not serving yet. The app holds an
+/// exclusive lock on its task history from the moment it starts loading, well
+/// before it can answer, so a refused shared lock means "starting". The probe
+/// releases immediately, and the app retries its lock briefly, so probing never
+/// stops an app from starting.
+fn host_starting() -> bool {
+    let Some(path) = profile_root().map(|root| root.join("task-runs-v1/runtime.lock")) else {
+        return false;
+    };
+    let Ok(file) = std::fs::File::open(path) else {
+        return false;
+    };
+    match file.try_lock_shared() {
+        Ok(()) => {
+            let _ = file.unlock();
+            false
+        }
+        Err(std::fs::TryLockError::WouldBlock) => true,
+        Err(_) => false,
+    }
+}
+
+/// Attaches, waiting for an app that is still starting rather than treating it
+/// as absent. When nothing owns the profile this returns at once.
+fn attach_or_wait() -> Option<(Handshake, Client)> {
+    if let Some(found) = attach() {
+        return Some(found);
+    }
+    let deadline = Instant::now() + Duration::from_secs(60);
+    let mut told = false;
+    while host_starting() && Instant::now() < deadline {
+        if !told {
+            eprintln!("Waiting for Jackalope to finish starting…");
+            told = true;
+        }
+        std::thread::sleep(Duration::from_millis(250));
+        if let Some(found) = attach() {
+            return Some(found);
+        }
+    }
+    None
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -217,7 +327,9 @@ pub(crate) enum ColdStart {
 
 /// Attaches to the running host, starting one when asked to.
 fn ensure_host(preference: Option<ColdStart>) -> Result<(Handshake, Client), String> {
-    if let Some(found) = attach() {
+    // A host that is still starting must not be mistaken for none at all, or
+    // this would try to start a second one.
+    if let Some(found) = attach_or_wait() {
         return Ok(found);
     }
     let choice = match preference.or_else(remembered_choice) {

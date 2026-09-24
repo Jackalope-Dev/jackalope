@@ -9,6 +9,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { observeWorkbenchPerformance } from '../../lib/workbench-performance';
+import { openChanges } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeHelper, useHelperStore } from '../../stores/helperStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
@@ -19,6 +20,7 @@ import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { observeWorkbenchPreferences, useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
+import { BranchIndicator } from './BranchIndicator';
 import { WorkSidebar } from './WorkSidebar';
 import { WorkspaceStatusBar } from './WorkspaceStatusBar';
 import './workspace-shell.css';
@@ -280,6 +282,17 @@ export function Shell({
       if (disposed) unlisten();
       else stops.push(unlisten);
     });
+    // `/diff` in the terminal: open Changes on that checkout, in its project.
+    void listen<string>('jackalope:open-changes', ({ payload: path }) => {
+      const owner = useProjectStore
+        .getState()
+        .projects.find((project) => path === project.path || path.startsWith(`${project.path}/`));
+      if (owner) useProjectStore.getState().selectProject(owner.id);
+      openChanges(path);
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else stops.push(unlisten);
+    });
     void listen<string>('jackalope-tray-open-task', ({ payload: taskId }) => {
       useWorkViewStore.getState().open(taskId);
     }).then((unlisten) => {
@@ -465,6 +478,7 @@ export function Shell({
               </Menu.Content>
             </Menu.Portal>
           </Menu.Root>
+          <BranchIndicator />
           <InvitationsButton
             onClick={() => {
               setSettingsProjectId(undefined);

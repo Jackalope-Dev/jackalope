@@ -11,6 +11,10 @@ impl FileLock {
         file.try_lock()?;
         Ok(Self(file))
     }
+    /// Wraps a file whose exclusive lock the caller already holds.
+    pub(super) fn owned(file: File) -> Self {
+        Self(file)
+    }
 }
 
 impl Drop for FileLock {

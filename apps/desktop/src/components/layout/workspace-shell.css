@@ -113,8 +113,24 @@
   border-radius: 8px;
   padding: 6px 8px;
 }
-.workspace-statusbar button:hover {
-  background: var(--color-surface-hover);
+/* Tinted from the text colour so the hover reads on any ground and theme. */
+.workspace-statusbar button {
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.workspace-statusbar button:hover,
+.workspace-statusbar button[data-state="open"] {
+  background: color-mix(in srgb, var(--color-accent-ink) 18%, transparent);
+  color: var(--color-accent-ink);
+}
+.workspace-statusbar button:active {
+  background: color-mix(in srgb, var(--color-accent-ink) 26%, transparent);
+}
+.workspace-statusbar button:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 1px;
 }
 .statusbar-branch {
   max-width: 180px;
@@ -206,4 +222,44 @@
 }
 .workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-item > span {
   display: none;
+}
+.workspace-statusbar .statusbar-changes {
+  color: var(--color-accent-ink);
+  font-weight: 500;
+}
+.workspace-statusbar .statusbar-changes:hover {
+  color: var(--color-accent-ink);
+}
+.chrome-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 220px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  /* The header spaces items 16px apart; the branch belongs with the project. */
+  margin-left: -10px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.chrome-branch > .chrome-branch-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chrome-branch:hover,
+.chrome-branch[data-state="open"] {
+  background: color-mix(in srgb, var(--color-accent-ink) 18%, transparent);
+  color: var(--color-accent-ink);
+}
+.chrome-branch:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 1px;
 }

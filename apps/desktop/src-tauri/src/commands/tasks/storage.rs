@@ -24,7 +24,20 @@ impl TaskRuntime {
             .write(true)
             .open(directory.join("runtime.lock"))
             .map_err(|e| e.to_string())?;
-        let owner = super::super::file_lock::FileLock::try_new(owner).map_err(|_| "Another Jackalope instance owns this task history. Close it before starting another instance.".to_string())?;
+        // The `jackalope` command briefly takes a shared lock to ask whether
+        // the app is starting, and a relaunch can overlap the previous exit;
+        // wait out either for a moment before declaring another owner.
+        let mut attempts = 0;
+        let owner = loop {
+            match owner.try_lock() {
+                Ok(()) => break super::super::file_lock::FileLock::owned(owner),
+                Err(std::fs::TryLockError::WouldBlock) if attempts < 20 => {
+                    attempts += 1;
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+                Err(_) => return Err("Another Jackalope instance owns this task history. Close it before starting another instance.".into()),
+            }
+        };
         let owner = Arc::new(owner);
         let writer = journal::Writer::new(directory.clone())?;
         let runtime = Self {

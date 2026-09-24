@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { characterMarkViewBox, characterPaths } from '@jackalope/brand/character';
-import { applyThemeTokens, hslToHex, PRESET_THEMES } from '@jackalope/brand/theme';
+import { applyThemeTokens, DEFAULT_THEME, hslToHex } from '@jackalope/brand/theme';
 import { Resvg } from '@resvg/resvg-js';
 
 const output = new URL('../src-tauri/installer/', import.meta.url);
@@ -11,7 +11,7 @@ function palette(isDark) {
   globalThis.document = {
     documentElement: { style: { setProperty: (key, value) => tokens.set(key, value) } },
   };
-  applyThemeTokens({ ...PRESET_THEMES[0], isDark });
+  applyThemeTokens({ ...DEFAULT_THEME, isDark });
   delete globalThis.document;
   return (name) => {
     const color = tokens.get(`--color-${name}`);
@@ -106,4 +106,6 @@ writeFileSync(
     '',
   ].join('\n'),
 );
-console.log('Generated Windows installer artwork from the Mojave theme and shared mascot paths.');
+console.log(
+  'Generated Windows installer artwork from the brand default theme and shared mascot paths.',
+);

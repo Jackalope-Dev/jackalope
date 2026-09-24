@@ -7,18 +7,21 @@
 
 use crate::brand;
 use crate::protocol::{
-    AgentStatus, Client, Handshake, Project, Request, Response, SessionSummary, SessionView,
+    AgentStatus, Client, Handshake, Project, Question, Request, Response, SessionSummary,
+    SessionView,
 };
 use crate::ColdStart;
 use crossterm::event::{
-    self, DisableMouseCapture, EnableMouseCapture, Event as TermEvent, KeyCode, KeyEvent,
-    KeyEventKind, KeyModifiers, MouseEventKind,
+    self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
+    Event as TermEvent, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEventKind,
 };
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 use ratatui::Frame;
+use std::cell::Cell;
+use std::collections::HashSet;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::Duration;
 
@@ -26,6 +29,7 @@ enum Event {
     Key(KeyEvent),
     /// Mouse wheel: positive scrolls back through the conversation.
     Scroll(i16),
+    Paste(String),
     Resize,
     Changed,
     Overview(Result<Overview, String>),
@@ -45,7 +49,11 @@ const COMMANDS: &[(&str, &str)] = &[
     ("agents", "see which agents are ready"),
     ("settings", "change how Jackalope behaves"),
     ("status", "show the project, host and agents"),
+    ("agent", "choose the agent for your next conversation"),
+    ("diff", "review and commit this work in the app"),
     ("stop", "stop the work that is running"),
+    ("retry", "run the last message again"),
+    ("finish", "mark this conversation done"),
     ("pause", "hold queued messages"),
     ("resume", "send held messages"),
     ("open", "show Jackalope's app window"),
@@ -63,6 +71,12 @@ enum Action {
     ColdStart,
     Attribution,
     OpenApp,
+    /// Route the next new conversation to this agent; `None` lets Jackalope choose.
+    NextAgent(Option<String>),
+    /// Answer the pending question with this option.
+    Answer(String),
+    /// Type a free-form answer instead of choosing an option.
+    TypeAnswer,
 }
 
 struct Item {
@@ -77,11 +91,13 @@ enum PickerKind {
     Projects,
     Agents,
     Settings,
+    NextAgent,
+    Question,
 }
 
 struct Picker {
     kind: PickerKind,
-    title: &'static str,
+    title: String,
     items: Vec<Item>,
     selected: usize,
 }
@@ -102,6 +118,15 @@ struct App {
     /// The highlighted row of the slash-command menu.
     slash: usize,
     input: String,
+    /// Cursor position in `input`, in characters.
+    cursor: usize,
+    /// The agent for the next new conversation, when the user chose one.
+    next_agent: Option<String>,
+    /// Questions already offered as a picker, so dismissing one does not
+    /// reopen it on every refresh.
+    offered: HashSet<String>,
+    /// Furthest the transcript can scroll back, measured while drawing.
+    max_scroll: Cell<u16>,
     history: Vec<String>,
     history_index: Option<usize>,
     /// Jackalope's own lines — help, errors, confirmations — shown under the
@@ -139,6 +164,10 @@ pub fn run(
         picker: None,
         slash: 0,
         input: String::new(),
+        cursor: 0,
+        next_agent: None,
+        offered: HashSet::new(),
+        max_scroll: Cell::new(0),
         history: Vec::new(),
         history_index: None,
         notices: Vec::new(),
@@ -153,9 +182,13 @@ pub fn run(
     // which from the alternate screen shows empty space above the interface.
     // Captured, it scrolls the conversation instead. Text can still be
     // selected with Option (macOS) or Shift held while dragging.
-    let _ = crossterm::execute!(std::io::stdout(), EnableMouseCapture);
+    let _ = crossterm::execute!(std::io::stdout(), EnableMouseCapture, EnableBracketedPaste);
     let result = event_loop(&mut terminal, &mut app, &inbox);
-    let _ = crossterm::execute!(std::io::stdout(), DisableMouseCapture);
+    let _ = crossterm::execute!(
+        std::io::stdout(),
+        DisableBracketedPaste,
+        DisableMouseCapture
+    );
     ratatui::restore();
     if let Some(id) = &app.session {
         // Leaving is not stopping: the work belongs to the host.
@@ -197,6 +230,12 @@ fn event_loop(
             }
             Ok(Event::Resize) => {}
             Ok(Event::Scroll(lines)) => app.scroll(lines),
+            Ok(Event::Paste(text)) => {
+                if app.picker.is_none() {
+                    // Normalise pasted line endings; keep the text multi-line.
+                    app.insert(&text.replace("\r\n", "\n").replace('\r', "\n"));
+                }
+            }
             Ok(Event::Tick) => {
                 // Only a visible spinner needs the extra frames.
                 if !app.working() {
@@ -218,6 +257,7 @@ fn spawn_input(events: Sender<Event>) {
                 events.send(Event::Key(key))
             }
             Ok(TermEvent::Resize(_, _)) => events.send(Event::Resize),
+            Ok(TermEvent::Paste(text)) => events.send(Event::Paste(text)),
             Ok(TermEvent::Mouse(mouse)) => match mouse.kind {
                 MouseEventKind::ScrollUp => events.send(Event::Scroll(3)),
                 MouseEventKind::ScrollDown => events.send(Event::Scroll(-3)),
@@ -372,7 +412,10 @@ impl App {
             return;
         }
         self.scroll_back = if lines > 0 {
-            self.scroll_back.saturating_add(lines as u16)
+            // Stop at the top of the conversation instead of scrolling into blank space.
+            self.scroll_back
+                .saturating_add(lines as u16)
+                .min(self.max_scroll.get())
         } else {
             self.scroll_back.saturating_sub(lines.unsigned_abs())
         };
@@ -403,8 +446,46 @@ impl App {
         if let Some(Response::Session { session, .. }) =
             self.request(Request::SessionDetail { session_id: id })
         {
-            self.view = Some(session);
+            self.view = Some(*session);
         }
+        self.offer_question();
+    }
+
+    /// The question an agent is waiting on, if any. Answers go to the oldest.
+    fn question(&self) -> Option<&Question> {
+        self.view.as_ref()?.questions.first()
+    }
+
+    /// Opens a question with options as a picker, once, so answering is one
+    /// keypress. Open questions are answered by typing into the input.
+    fn offer_question(&mut self) {
+        let Some(question) = self.question().cloned() else {
+            return;
+        };
+        if self.picker.is_some()
+            || question.options.is_empty()
+            || !self.offered.insert(question.id.clone())
+        {
+            return;
+        }
+        self.open_picker(PickerKind::Question);
+    }
+
+    fn answer(&mut self, text: String) {
+        let Some(question) = self.question().cloned() else {
+            return;
+        };
+        if self
+            .request(Request::Answer {
+                run_id: question.run_id,
+                prompt_id: question.id,
+                text,
+            })
+            .is_some()
+        {
+            self.notices.push("Answered.".into());
+        }
+        self.refresh();
     }
 
     fn sessions_here(&self) -> Vec<&SessionSummary> {
@@ -425,9 +506,12 @@ impl App {
             return;
         }
         let matches = slash_matches(&self.input);
+        let alt = key.modifiers.contains(KeyModifiers::ALT);
         match key.code {
             KeyCode::Char('l') if control => self.notices.clear(),
-            KeyCode::Enter if key.modifiers.contains(KeyModifiers::ALT) => self.input.push('\n'),
+            // Newline without sending: Alt+Enter, or Ctrl+J where Alt is taken.
+            KeyCode::Enter if alt => self.insert("\n"),
+            KeyCode::Char('j') if control => self.insert("\n"),
             KeyCode::Enter if !matches.is_empty() => {
                 // Run the highlighted command unless the input already names one.
                 let typed = &self.input[1..];
@@ -436,20 +520,17 @@ impl App {
                 } else {
                     matches[self.slash.min(matches.len() - 1)].0.to_string()
                 };
-                self.input = format!("/{chosen}");
+                self.set_input(format!("/{chosen}"));
                 self.submit();
             }
             KeyCode::Enter => self.submit(),
             KeyCode::Tab if !matches.is_empty() => {
-                self.input = format!("/{}", matches[self.slash.min(matches.len() - 1)].0);
+                let name = matches[self.slash.min(matches.len() - 1)].0;
+                self.set_input(format!("/{name} "));
                 self.slash = 0;
             }
             KeyCode::Esc => {
-                self.input.clear();
-                self.slash = 0;
-            }
-            KeyCode::Backspace => {
-                self.input.pop();
+                self.set_input(String::new());
                 self.slash = 0;
             }
             KeyCode::Up if !matches.is_empty() => self.slash = self.slash.saturating_sub(1),
@@ -458,15 +539,102 @@ impl App {
             }
             KeyCode::Up => self.recall(true),
             KeyCode::Down => self.recall(false),
-            KeyCode::PageUp => self.scroll_back = self.scroll_back.saturating_add(10),
-            KeyCode::PageDown => self.scroll_back = self.scroll_back.saturating_sub(10),
-            KeyCode::Char(character) => {
-                self.input.push(character);
+            KeyCode::PageUp => self.scroll(10),
+            KeyCode::PageDown => self.scroll(-10),
+            // Editing, with the shortcuts shells and editors share.
+            KeyCode::Left if alt => self.cursor = self.word_start(),
+            KeyCode::Right if alt => self.cursor = self.word_end(),
+            KeyCode::Left => self.cursor = self.cursor.saturating_sub(1),
+            KeyCode::Right => self.cursor = (self.cursor + 1).min(self.input_len()),
+            KeyCode::Home => self.cursor = 0,
+            KeyCode::End => self.cursor = self.input_len(),
+            KeyCode::Char('a') if control => self.cursor = 0,
+            KeyCode::Char('e') if control => self.cursor = self.input_len(),
+            KeyCode::Char('b') if control => self.cursor = self.cursor.saturating_sub(1),
+            KeyCode::Char('f') if control => self.cursor = (self.cursor + 1).min(self.input_len()),
+            KeyCode::Char('w') if control => self.delete_to(self.word_start()),
+            KeyCode::Backspace if alt => self.delete_to(self.word_start()),
+            KeyCode::Char('u') if control => self.delete_to(0),
+            KeyCode::Char('k') if control => {
+                let end = self.input_len();
+                let cursor = self.cursor;
+                self.cursor = end;
+                self.delete_to(cursor);
+            }
+            KeyCode::Backspace => {
+                if self.cursor > 0 {
+                    self.delete_to(self.cursor - 1);
+                }
+            }
+            KeyCode::Delete => {
+                if self.cursor < self.input_len() {
+                    self.cursor += 1;
+                    self.delete_to(self.cursor - 1);
+                }
+            }
+            KeyCode::Char(character) if !control => {
+                self.insert(&character.to_string());
                 self.history_index = None;
                 self.slash = 0;
             }
             _ => {}
         }
+    }
+
+    fn input_len(&self) -> usize {
+        self.input.chars().count()
+    }
+
+    /// Byte offset of character `index` in the input.
+    fn byte(&self, index: usize) -> usize {
+        self.input
+            .char_indices()
+            .nth(index)
+            .map_or(self.input.len(), |(offset, _)| offset)
+    }
+
+    fn insert(&mut self, text: &str) {
+        let at = self.byte(self.cursor);
+        self.input.insert_str(at, text);
+        self.cursor += text.chars().count();
+    }
+
+    /// Deletes from `start` to the cursor (either order), leaving the cursor at the start.
+    fn delete_to(&mut self, start: usize) {
+        let (from, to) = (start.min(self.cursor), start.max(self.cursor));
+        let (from_byte, to_byte) = (self.byte(from), self.byte(to));
+        self.input.replace_range(from_byte..to_byte, "");
+        self.cursor = from;
+        self.slash = 0;
+    }
+
+    fn set_input(&mut self, text: String) {
+        self.cursor = text.chars().count();
+        self.input = text;
+    }
+
+    fn word_start(&self) -> usize {
+        let characters: Vec<char> = self.input.chars().collect();
+        let mut index = self.cursor;
+        while index > 0 && characters[index - 1].is_whitespace() {
+            index -= 1;
+        }
+        while index > 0 && !characters[index - 1].is_whitespace() {
+            index -= 1;
+        }
+        index
+    }
+
+    fn word_end(&self) -> usize {
+        let characters: Vec<char> = self.input.chars().collect();
+        let mut index = self.cursor;
+        while index < characters.len() && characters[index].is_whitespace() {
+            index += 1;
+        }
+        while index < characters.len() && !characters[index].is_whitespace() {
+            index += 1;
+        }
+        index
     }
 
     fn picker_key(&mut self, key: KeyEvent) {
@@ -558,6 +726,28 @@ impl App {
                 }
                 self.open_picker(PickerKind::Settings);
             }
+            Action::NextAgent(agent) => {
+                self.picker = None;
+                let name = agent
+                    .as_ref()
+                    .map(|id| self.agent_name(id))
+                    .unwrap_or_else(|| "Jackalope's choice".into());
+                self.next_agent = agent;
+                self.notices.push(if self.session.is_some() {
+                    format!("{name} will take your next new conversation (/new). This one stays with its agent.")
+                } else {
+                    format!("{name} will take this conversation.")
+                });
+            }
+            Action::Answer(option) => {
+                self.picker = None;
+                self.answer(option);
+            }
+            Action::TypeAnswer => {
+                self.picker = None;
+                self.notices
+                    .push("Type your answer and press Enter.".into());
+            }
             Action::OpenApp => {
                 self.picker = None;
                 if self.request(Request::ShowWindow).is_some() {
@@ -565,6 +755,15 @@ impl App {
                 }
             }
         }
+    }
+
+    fn agent_name(&self, id: &str) -> String {
+        self.overview
+            .as_ref()
+            .and_then(|overview| overview.as_ref().ok())
+            .and_then(|overview| overview.agents.iter().find(|agent| agent.id == id))
+            .map(|agent| agent.name.clone())
+            .unwrap_or_else(|| id.to_string())
     }
 
     /// Builds (or rebuilds, keeping the highlighted row) a picker.
@@ -593,13 +792,18 @@ impl App {
                     } else {
                         "open"
                     };
+                    let queued = if session.pending > 0 {
+                        format!(" · {} queued", session.pending)
+                    } else {
+                        String::new()
+                    };
                     Item {
                         label: session.title.clone(),
-                        detail: format!("{state} · {}", &session.id[..8]),
+                        detail: format!("{state}{queued} · {}", &session.id[..8]),
                         action: Action::Session(session.id.clone()),
                     }
                 }));
-                ("Conversations in this project", items)
+                ("Conversations in this project".to_string(), items)
             }
             PickerKind::Projects => {
                 let projects = match self.request(Request::Projects) {
@@ -618,7 +822,7 @@ impl App {
                         action: Action::Project(project),
                     })
                     .collect();
-                ("Projects", items)
+                ("Projects".to_string(), items)
             }
             PickerKind::Agents => {
                 let mut items = Vec::new();
@@ -648,7 +852,7 @@ impl App {
                     detail: "sign in, accounts, models".into(),
                     action: Action::OpenApp,
                 });
-                ("Agents", items)
+                ("Agents".to_string(), items)
             }
             PickerKind::Settings => {
                 if self.attribution.is_none() {
@@ -695,7 +899,59 @@ impl App {
                         action: Action::OpenApp,
                     },
                 ];
-                ("Settings", items)
+                ("Settings".to_string(), items)
+            }
+            PickerKind::NextAgent => {
+                let mut items = vec![Item {
+                    label: "Let Jackalope choose".into(),
+                    detail: if self.next_agent.is_none() {
+                        "current".into()
+                    } else {
+                        "routes each conversation".into()
+                    },
+                    action: Action::NextAgent(None),
+                }];
+                if let Some(Ok(overview)) = &self.overview {
+                    for agent in overview
+                        .agents
+                        .iter()
+                        .filter(|agent| matches!(agent.state.as_str(), "ready" | "installed"))
+                    {
+                        items.push(Item {
+                            label: format!("{} {}", agent_glyph(&agent.state), agent.name),
+                            detail: if self.next_agent.as_deref() == Some(agent.id.as_str()) {
+                                "current".into()
+                            } else {
+                                agent_state_label(agent)
+                            },
+                            action: Action::NextAgent(Some(agent.id.clone())),
+                        });
+                    }
+                }
+                ("Agent for the next conversation".to_string(), items)
+            }
+            PickerKind::Question => {
+                let question = self.question().cloned();
+                let mut items: Vec<Item> = question
+                    .iter()
+                    .flat_map(|question| question.options.clone())
+                    .map(|option| Item {
+                        label: option.clone(),
+                        detail: String::new(),
+                        action: Action::Answer(option),
+                    })
+                    .collect();
+                items.push(Item {
+                    label: "Type a different answer…".into(),
+                    detail: String::new(),
+                    action: Action::TypeAnswer,
+                });
+                (
+                    question
+                        .map(|question| question.question)
+                        .unwrap_or_else(|| "Question".into()),
+                    items,
+                )
             }
         };
         let selected = selected.min(items.len().saturating_sub(1));
@@ -720,14 +976,15 @@ impl App {
             (_, false) => None,
         };
         self.history_index = next;
-        self.input = next
-            .map(|index| self.history[index].clone())
-            .unwrap_or_default();
+        self.set_input(
+            next.map(|index| self.history[index].clone())
+                .unwrap_or_default(),
+        );
     }
 
     fn submit(&mut self) {
         let text = self.input.trim().to_string();
-        self.input.clear();
+        self.set_input(String::new());
         self.history_index = None;
         self.scroll_back = 0;
         self.slash = 0;
@@ -737,6 +994,10 @@ impl App {
         self.history.push(text.clone());
         if let Some(command) = text.strip_prefix('/') {
             self.command(command.trim());
+            return;
+        }
+        if self.question().is_some() {
+            self.answer(text);
             return;
         }
         match self.session.clone() {
@@ -751,6 +1012,7 @@ impl App {
                     self.request(Request::StartSession {
                         project_path: self.project.path.clone(),
                         text,
+                        agent: self.next_agent.clone(),
                     })
                 {
                     self.session = Some(session_id);
@@ -788,6 +1050,37 @@ impl App {
                 self.notices
                     .push("Your conversation is still open; /sessions to go back.".into());
             }
+            "agent" | "model" => self.open_picker(PickerKind::NextAgent),
+            "diff" | "changes" => {
+                // The conversation's own worktree when it has one.
+                let path = self
+                    .view
+                    .as_ref()
+                    .and_then(|view| view.workspace.clone())
+                    .filter(|path| !path.is_empty())
+                    .unwrap_or_else(|| self.project.path.clone());
+                if self.request(Request::ShowChanges { path }).is_some() {
+                    self.notices.push("Opened Changes in Jackalope.".into());
+                }
+            }
+            "finish" | "retry" => match session {
+                Some(session_id) => {
+                    if self
+                        .request(Request::SessionAction {
+                            session_id,
+                            action: command.into(),
+                        })
+                        .is_some()
+                    {
+                        self.notices.push(if command == "retry" {
+                            "Retrying.".into()
+                        } else {
+                            "Marked done.".into()
+                        });
+                    }
+                }
+                None => self.notices.push("Start a conversation first.".into()),
+            },
             "stop" => match run {
                 Some(run_id) => {
                     if self.request(Request::Stop { run_id }).is_some() {
@@ -967,6 +1260,115 @@ fn welcome(app: &App) -> Vec<Line<'static>> {
     lines
 }
 
+/// A small Markdown renderer for agent replies: headings, lists, quotes, code
+/// blocks, and inline `code`, **bold** and *emphasis*. Anything else is shown
+/// as written, which is how Markdown reads anyway.
+fn markdown(text: &str) -> Vec<Line<'static>> {
+    let accent = Style::default().fg(brand::accent());
+    let muted = Style::default().fg(brand::muted());
+    let mut lines = Vec::new();
+    let mut in_code = false;
+    for raw in text.lines() {
+        let trimmed = raw.trim_start();
+        if trimmed.starts_with("```") {
+            in_code = !in_code;
+            if in_code {
+                let language = trimmed.trim_start_matches('`').trim();
+                lines.push(Line::styled(
+                    format!(
+                        "  ┌ {}",
+                        if language.is_empty() {
+                            "code"
+                        } else {
+                            language
+                        }
+                    ),
+                    muted,
+                ));
+            } else {
+                lines.push(Line::styled("  └", muted));
+            }
+            continue;
+        }
+        if in_code {
+            lines.push(Line::from(vec![
+                Span::styled("  │ ", muted),
+                Span::styled(raw.to_string(), accent),
+            ]));
+            continue;
+        }
+        let indent = " ".repeat(raw.len() - trimmed.len());
+        if let Some(heading) = ["### ", "## ", "# "]
+            .iter()
+            .find_map(|marker| trimmed.strip_prefix(marker))
+        {
+            lines.push(Line::styled(
+                heading.to_string(),
+                accent.add_modifier(Modifier::BOLD),
+            ));
+        } else if let Some(item) = trimmed
+            .strip_prefix("- ")
+            .or_else(|| trimmed.strip_prefix("* "))
+        {
+            let mut spans = vec![Span::raw(format!("{indent}  ")), Span::styled("• ", accent)];
+            spans.extend(inline(item));
+            lines.push(Line::from(spans));
+        } else if let Some(quote) = trimmed.strip_prefix("> ") {
+            let mut spans = vec![Span::styled("  ▎ ", muted)];
+            spans.extend(
+                inline(quote)
+                    .into_iter()
+                    .map(|span| span.patch_style(muted)),
+            );
+            lines.push(Line::from(spans));
+        } else if trimmed.chars().all(|c| matches!(c, '-' | '*' | '_')) && trimmed.len() >= 3 {
+            lines.push(Line::styled("  ⠒⠒⠒", muted));
+        } else {
+            let mut spans = vec![Span::raw(indent)];
+            spans.extend(inline(trimmed));
+            lines.push(Line::from(spans));
+        }
+    }
+    lines
+}
+
+/// Inline Markdown: `code`, **bold** and *emphasis*.
+fn inline(text: &str) -> Vec<Span<'static>> {
+    let accent = Style::default().fg(brand::accent());
+    let mut spans = Vec::new();
+    let mut plain = String::new();
+    let mut rest = text;
+    let flush = |plain: &mut String, spans: &mut Vec<Span<'static>>| {
+        if !plain.is_empty() {
+            spans.push(Span::raw(std::mem::take(plain)));
+        }
+    };
+    while let Some(character) = rest.chars().next() {
+        let marker = if rest.starts_with("**") {
+            Some(("**", Style::default().add_modifier(Modifier::BOLD)))
+        } else if character == '`' {
+            Some(("`", accent))
+        } else if character == '*' || character == '_' {
+            Some((&rest[..1], Style::default().add_modifier(Modifier::ITALIC)))
+        } else {
+            None
+        };
+        if let Some((marker, style)) = marker {
+            if let Some(end) = rest[marker.len()..].find(marker).filter(|end| *end > 0) {
+                flush(&mut plain, &mut spans);
+                let inner = &rest[marker.len()..marker.len() + end];
+                spans.push(Span::styled(inner.to_string(), style));
+                rest = &rest[marker.len() * 2 + end..];
+                continue;
+            }
+        }
+        plain.push(character);
+        rest = &rest[character.len_utf8()..];
+    }
+    flush(&mut plain, &mut spans);
+    spans
+}
+
 fn transcript(app: &App) -> Vec<Line<'static>> {
     let accent = Style::default().fg(brand::accent());
     let muted = Style::default().fg(brand::muted());
@@ -976,6 +1378,10 @@ fn transcript(app: &App) -> Vec<Line<'static>> {
             let mut lines = Vec::new();
             for message in &view.messages {
                 lines.push(Line::raw(""));
+                if message.role == "agent" {
+                    lines.extend(markdown(&message.text));
+                    continue;
+                }
                 let marker = if message.sent { "› " } else { "… " };
                 for (index, text) in message.text.lines().enumerate() {
                     let lead = if index == 0 { marker } else { "  " };
@@ -988,11 +1394,12 @@ fn transcript(app: &App) -> Vec<Line<'static>> {
                     ]));
                 }
             }
-            if !view.result.trim().is_empty() {
+            if view.messages.iter().all(|message| message.role != "agent")
+                && !view.result.trim().is_empty()
+            {
+                // A host that predates agent messages still sends the latest output.
                 lines.push(Line::raw(""));
-                for text in view.result.lines() {
-                    lines.push(Line::raw(text.to_string()));
-                }
+                lines.extend(markdown(&view.result));
             }
             for question in &view.questions {
                 lines.push(Line::raw(""));
@@ -1004,7 +1411,11 @@ fn transcript(app: &App) -> Vec<Line<'static>> {
                     ));
                 }
                 lines.push(Line::styled(
-                    "  Answer in the app for now; terminal answers are coming.",
+                    if question.options.is_empty() {
+                        "  Type your answer below and press Enter."
+                    } else {
+                        "  Choose an answer, or type your own below."
+                    },
                     muted,
                 ));
             }
@@ -1033,6 +1444,12 @@ fn status(app: &App) -> Line<'static> {
             parts.push(Span::styled(format!(" · {branch}"), muted));
         }
         parts.push(Span::styled(" · new conversation", muted));
+        if let Some(agent) = &app.next_agent {
+            parts.push(Span::styled(
+                format!(" · {}", app.agent_name(agent)),
+                accent,
+            ));
+        }
         return Line::from(parts);
     };
     let mut parts: Vec<Span> = vec![Span::raw(" ")];
@@ -1065,6 +1482,14 @@ fn status(app: &App) -> Line<'static> {
             .map(|model| format!(" {model}"))
             .unwrap_or_default();
         parts.push(Span::raw(format!("{agent}{model}")));
+    }
+    if let Some(detail) = view
+        .step_detail
+        .as_ref()
+        .filter(|detail| !detail.is_empty() && app.working())
+    {
+        let short: String = detail.chars().take(60).collect();
+        parts.push(Span::styled(format!(" · {short}"), muted));
     }
     if let Some(attempt) = view.attempt.filter(|attempt| *attempt > 1) {
         parts.push(Span::styled(format!(" · attempt {attempt}"), muted));
@@ -1102,6 +1527,7 @@ fn draw(frame: &mut Frame, app: &App) {
 
     let lines = transcript(app);
     let height = wrapped_height(&lines, body.width);
+    app.max_scroll.set(height.saturating_sub(body.height));
     let top = height
         .saturating_sub(body.height)
         .saturating_sub(app.scroll_back);
@@ -1117,7 +1543,9 @@ fn draw(frame: &mut Frame, app: &App) {
     let placeholder = app.input.is_empty();
     let shown = if placeholder {
         Text::styled(
-            if app.session.is_some() {
+            if app.question().is_some() {
+                "Type your answer, or / for commands"
+            } else if app.session.is_some() {
                 "Reply, or / for commands"
             } else {
                 "What should we work on?  / for commands"
@@ -1273,11 +1701,11 @@ fn draw_picker(frame: &mut Frame, picker: &Picker, area: Rect) {
 }
 
 fn place_cursor(frame: &mut Frame, app: &App, inner: Rect) {
-    let last = app.input.rsplit('\n').next().unwrap_or("");
-    let row = app.input.matches('\n').count() as u16;
-    let column = (last.chars().count() as u16).min(inner.width.saturating_sub(1));
+    let before: String = app.input.chars().take(app.cursor).collect();
+    let row = before.matches('\n').count() as u16;
+    let column = before.rsplit('\n').next().unwrap_or("").chars().count() as u16;
     frame.set_cursor_position((
-        inner.x + column,
+        inner.x + column.min(inner.width.saturating_sub(1)),
         inner.y + row.min(inner.height.saturating_sub(1)),
     ));
 }
@@ -1298,5 +1726,38 @@ mod tests {
         assert_eq!(names("/").len(), COMMANDS.len());
         assert!(names("/stop now").is_empty(), "arguments close the menu");
         assert!(names("hello").is_empty());
+    }
+
+    fn text(line: &Line) -> String {
+        line.spans
+            .iter()
+            .map(|span| span.content.as_ref())
+            .collect()
+    }
+
+    #[test]
+    fn inline_markdown_styles_code_bold_and_emphasis() {
+        let spans = inline("run `cargo test` then **ship** it _now_");
+        let shown: String = spans.iter().map(|span| span.content.as_ref()).collect();
+        assert_eq!(shown, "run cargo test then ship it now");
+        let bold = spans.iter().find(|span| span.content == "ship").unwrap();
+        assert!(bold.style.add_modifier.contains(Modifier::BOLD));
+        // An unmatched marker is left as written.
+        let plain: String = inline("2 * 3 = 6")
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert_eq!(plain, "2 * 3 = 6");
+    }
+
+    #[test]
+    fn markdown_frames_code_and_marks_lists() {
+        let lines = markdown("# Plan\n- one\n```rust\nlet x = 1;\n```");
+        let shown: Vec<String> = lines.iter().map(text).collect();
+        assert_eq!(shown[0], "Plan");
+        assert!(shown[1].contains("• one"));
+        assert!(shown[2].contains("rust"));
+        assert!(shown[3].ends_with("let x = 1;"));
+        assert_eq!(lines.len(), 5);
     }
 }

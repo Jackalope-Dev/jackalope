@@ -1,6 +1,6 @@
 {
   "name": "@jackalope/desktop",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,8 @@
     "test": "node --test \"scripts/*.test.mjs\" ../../scripts/release-config.test.mjs ../../scripts/update-manifest.test.mjs",
     "test:file": "node --test",
     "brand:generate": "node scripts/generate-brand.mjs && tauri icon src-tauri/icons/source-icon.svg --ios-color \"#1d1a18\" && node scripts/generate-brand.mjs --copy-icon && pnpm brand:installer",
-    "brand:installer": "node scripts/generate-installer-brand.mjs"
+    "brand:installer": "node scripts/generate-installer-brand.mjs",
+    "brand:dmg": "node scripts/generate-dmg-brand.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

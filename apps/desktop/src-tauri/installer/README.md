@@ -1,7 +1,7 @@
 # Windows installer branding
 
-The Windows packages use the shared Jackalope head silhouette and Mojave Sunset
-palette. Welcome artwork uses the dark palette; content and header backgrounds
+The Windows packages use the shared Jackalope head silhouette and the brand's
+default theme, matching the website. Welcome artwork uses the dark palette; content and header backgrounds
 use its light palette so native controls retain readable Windows focus/selection
 states. Installer artwork is static and does not read a user's saved app theme.
 
@@ -32,6 +32,16 @@ edits the `Path` registry value directly, preserving its expandable type, and
 broadcasts the change; new terminals see it, already-open ones do not. The MSI
 does not change `PATH`. Store packages expose the command through an execution
 alias instead.
+
+The macOS disk image opens on the website's light default theme with the mark's echo and
+an arrow from Jackalope to Applications. It stays light because Finder draws the
+icon labels in dark text. `dmg-background.tiff` holds 1x and 2x images so Retina
+displays stay sharp, and `bundle.macOS.dmg` in `tauri.conf.json` places the icons
+over the arrow. Regenerate it on macOS, which provides `tiffutil`:
+
+```sh
+pnpm --filter @jackalope/desktop brand:dmg
+```
 
 Build both packages with `pnpm tauri build`. Review EXE welcome, destination,
 progress and finish pages, and MSI welcome/destination pages, including keyboard

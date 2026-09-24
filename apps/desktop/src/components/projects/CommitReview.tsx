@@ -1,15 +1,33 @@
-import { Badge, Checkbox, IconButton, RefreshIcon } from '@jackalope/ui';
-import { Bot, FileDiff, FolderGit2, GitCommitHorizontal, Settings2, Sparkles } from 'lucide-react';
+import {
+  Badge,
+  Checkbox,
+  Disclosure,
+  DisclosureBody,
+  DisclosureSummary,
+  IconButton,
+  RefreshIcon,
+} from '@jackalope/ui';
+import {
+  Bot,
+  FileDiff,
+  FolderGit2,
+  GitCommitHorizontal,
+  Settings2,
+  Sparkles,
+  Undo2,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
-import { nativeTask } from '../../lib/task-runtime';
+import { isActive, nativeTask, type RunRequest, type TaskRun } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useCommitReviewStore } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
 import { navigateWorkspace } from '../layout/navigation';
 import { DiffPreview } from '../tasks/DiffPreview';
 import { Button } from '../ui/button';
+import { ConfirmAction } from '../ui/ConfirmAction';
 import { EmptyState } from '../ui/EmptyState';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
@@ -19,6 +37,114 @@ import { Textarea } from '../ui/Textarea';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import './commit-review.css';
+
+/** A commit refused by a hook, with the output needed to fix it. */
+interface HookFailure {
+  hook: string | null;
+  message: string;
+  output: string;
+  files: string[];
+}
+
+function HookFixStatus({
+  run,
+  agentName,
+  onStop,
+  onCommit,
+  canCommit,
+  onOpen,
+  onDismiss,
+}: {
+  run: TaskRun;
+  agentName: string;
+  onStop: () => void;
+  onCommit: () => void;
+  canCommit: boolean;
+  onOpen: () => void;
+  onDismiss: () => void;
+}) {
+  const open = (
+    <Button variant="ghost" onClick={onOpen}>
+      Open task
+    </Button>
+  );
+  if (isActive(run)) {
+    const detail = run.progress?.detail || run.activity.at(-1) || '';
+    return (
+      <InlineNotice
+        tone="info"
+        role="status"
+        className="commit-review-notice"
+        action={
+          <div className="commit-hook-fix-actions">
+            {open}
+            <Button variant="outline" onClick={onStop} disabled={run.status === 'stopping'}>
+              {run.status === 'stopping' ? 'Stopping…' : 'Stop'}
+            </Button>
+          </div>
+        }
+      >
+        <p>
+          <strong>{agentName || 'An agent'}</strong> is fixing the hook failure in this checkout
+          {run.progress?.label ? ` · ${run.progress.label}` : '…'}
+        </p>
+        {detail && <p className="commit-hook-fix-detail">{detail}</p>}
+      </InlineNotice>
+    );
+  }
+  if (run.status === 'review' || run.status === 'reviewed')
+    return (
+      <InlineNotice
+        tone="success"
+        role="status"
+        className="commit-review-notice"
+        action={
+          <div className="commit-hook-fix-actions">
+            {open}
+            <Button variant="ghost" onClick={onDismiss}>
+              Dismiss
+            </Button>
+            <Button onClick={onCommit} disabled={!canCommit}>
+              Commit again
+            </Button>
+          </div>
+        }
+      >
+        <p>{agentName || 'The agent'} finished. Review its changes below, then commit again.</p>
+      </InlineNotice>
+    );
+  return (
+    <InlineNotice
+      tone={run.status === 'stopped' ? 'warning' : 'error'}
+      className="commit-review-notice"
+      action={
+        <div className="commit-hook-fix-actions">
+          {open}
+          <Button variant="ghost" onClick={onDismiss}>
+            Dismiss
+          </Button>
+        </div>
+      }
+    >
+      <p>
+        {run.status === 'stopped'
+          ? 'The fix was stopped. Anything the agent already changed is still in your checkout.'
+          : run.error || 'The agent could not finish the fix. Open the task to see what happened.'}
+      </p>
+    </InlineNotice>
+  );
+}
+
+function failureOf(cause: unknown): {
+  kind: string;
+  hook?: string | null;
+  message: string;
+  output?: string;
+} {
+  if (cause && typeof cause === 'object' && 'kind' in cause && 'message' in cause)
+    return cause as { kind: string; hook?: string | null; message: string; output?: string };
+  return { kind: 'git', message: cause instanceof Error ? cause.message : String(cause) };
+}
 
 interface ChangedFile {
   path: string;
@@ -70,7 +196,14 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
   );
   const loadWorktrees = useProjectStore((state) => state.loadWorktreesForActiveProject);
   const runs = useExecutionStore((state) => state.runs);
-  const { checkout: chosen, choose } = useCommitReviewStore();
+  const {
+    checkout: chosen,
+    choose,
+    excluded: excludedByCheckout,
+    setExcluded,
+    hookFixes,
+    setHookFix,
+  } = useCommitReviewStore();
   const desktop = isTauriEnvironment();
   const projectPath = project?.path ?? '';
   const checkouts = useMemo(() => {
@@ -84,12 +217,15 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     ];
   }, [project, projectPath]);
   const checkout = checkouts.some((item) => item.path === chosen) ? chosen : projectPath;
+  const runners = useExecutionStore((state) => state.runners);
+  const fixRun = runs.find((run) => run.id === hookFixes[checkout]);
+  const fixing = Boolean(fixRun && isActive(fixRun));
 
   const [changes, setChanges] = useState<WorkingChanges | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [hookFailure, setHookFailure] = useState<HookFailure | null>(null);
   const [feedback, setFeedback] = useState('');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [focused, setFocused] = useState('');
   const [patch, setPatch] = useState<{ path: string; text: string } | null>(null);
   const [patchError, setPatchError] = useState('');
@@ -101,9 +237,12 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
   const [policy, setPolicy] = useState<CommitPolicy | null>(null);
   const current = useRef(checkout);
   current.current = checkout;
-  const known = useRef(new Set<string>());
 
   const files = changes?.files ?? [];
+  const excludedPaths = excludedByCheckout[checkout] ?? [];
+  const selected = new Set(
+    files.map((file) => file.path).filter((path) => !excludedPaths.includes(path)),
+  );
   const branch = changes?.branch ?? null;
   const agents = useMemo(() => {
     if (!branch || !project) return [];
@@ -116,6 +255,13 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     ].sort();
   }, [runs, branch, project]);
 
+  const wasFixing = useRef(false);
+  useEffect(() => {
+    // The agent edits files outside this view; reread them once it stops.
+    if (wasFixing.current && !fixing) void refreshRef.current();
+    wasFixing.current = fixing;
+  }, [fixing]);
+  const refreshRef = useRef<() => Promise<void>>(async () => {});
   const refresh = useCallback(async () => {
     if (!projectPath || !checkout || !desktop) return;
     const target = checkout;
@@ -128,13 +274,12 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       });
       if (current.current !== target) return;
       setChanges(next);
+      window.dispatchEvent(new Event('jackalope:changes-updated'));
       const paths = new Set(next.files.map((file) => file.path));
-      // Keep the user's choices across refreshes; new files start selected.
-      const seen = known.current;
-      setSelected(
-        (previous) => new Set([...paths].filter((path) => previous.has(path) || !seen.has(path))),
-      );
-      known.current = paths;
+      // Forget exclusions for files that no longer have changes.
+      const { excluded, setExcluded } = useCommitReviewStore.getState();
+      const kept = (excluded[target] ?? []).filter((path) => paths.has(path));
+      if (kept.length !== (excluded[target] ?? []).length) setExcluded(target, kept);
       setFocused((previous) => (paths.has(previous) ? previous : (next.files[0]?.path ?? '')));
     } catch (cause) {
       if (current.current === target) setError(String(cause));
@@ -145,8 +290,6 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
 
   useEffect(() => {
     setChanges(null);
-    known.current = new Set();
-    setSelected(new Set());
     setFocused('');
     setFeedback('');
     void refresh();
@@ -195,15 +338,32 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     { add: 0, del: 0 },
   );
   const allSelected = files.length > 0 && chosenFiles.length === files.length;
-  const busy = generating || committing;
+  const [fixError, setFixError] = useState('');
+  const busy = generating || committing || fixing;
+  refreshRef.current = refresh;
 
   const toggle = (path: string, on: boolean) =>
-    setSelected((previous) => {
-      const next = new Set(previous);
-      if (on) next.add(path);
-      else next.delete(path);
-      return next;
-    });
+    setExcluded(
+      checkout,
+      on ? excludedPaths.filter((item) => item !== path) : [...excludedPaths, path],
+    );
+
+  const discard = async (file: ChangedFile) => {
+    setError('');
+    setFeedback('');
+    try {
+      await nativeTask('git_discard_changes', {
+        repoPath: projectPath,
+        worktreePath: checkout,
+        paths: [file.path],
+      });
+      setFeedback(`Discarded changes to ${file.path}.`);
+    } catch (cause) {
+      setError(String(cause));
+    } finally {
+      await refresh();
+    }
+  };
 
   const generate = async () => {
     if (busy || !chosenFiles.length) return;
@@ -231,6 +391,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     if (busy || !chosenFiles.length || !title.trim()) return;
     setCommitting(true);
     setError('');
+    setHookFailure(null);
     setFeedback('');
     try {
       const sha = await nativeTask<string>('git_commit_changes', {
@@ -248,10 +409,73 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       setBody('');
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      const failure = failureOf(cause);
+      if (failure.kind === 'hook')
+        setHookFailure({
+          hook: failure.hook ?? null,
+          message: failure.message,
+          output: failure.output ?? '',
+          files: chosenFiles.map((file) => file.path),
+        });
+      else setError(failure.message);
     } finally {
       setCommitting(false);
     }
+  };
+
+  // Fixes the rejected files in this same checkout, in the background, so the
+  // user stays on Changes. The agent never commits or skips hooks; the user
+  // reviews the result here and commits again.
+  const fixWithAgent = async () => {
+    if (!project || !hookFailure || fixing) return;
+    const name = hookFailure.hook ?? 'commit';
+    const output =
+      hookFailure.output.length > 8000 ? `…${hookFailure.output.slice(-8000)}` : hookFailure.output;
+    const request: Omit<RunRequest, 'id'> = {
+      projectId: project.id,
+      projectName: project.name,
+      projectPath: checkout,
+      agent: 'auto',
+      targetBranch: branch || project.preferences?.baseBranch || project.gitBranch,
+      effort: 'balanced',
+      isolated: false,
+      prompt: [
+        `The ${name} hook rejected a commit in this checkout${branch ? ` (branch ${branch})` : ''}.`,
+        'Fix the problems it reports so the same commit would pass. Run the checks the hook runs to confirm.',
+        'Do not commit, amend, stage unrelated files, or bypass or edit the hooks (for example with --no-verify). Leave the fixes uncommitted for review.',
+        '',
+        'Files in the attempted commit:',
+        ...hookFailure.files.map((file) => `- ${file}`),
+        '',
+        'Hook output:',
+        '```',
+        output || '(the hook printed nothing)',
+        '```',
+      ].join('\n'),
+    };
+    setFixError('');
+    try {
+      const id = await useExecutionStore.getState().start(request, { background: true });
+      setHookFix(checkout, id);
+      setHookFailure(null);
+    } catch (cause) {
+      setFixError(failureOf(cause).message);
+    }
+  };
+
+  const stopFix = async () => {
+    if (!fixRun) return;
+    try {
+      await nativeTask('task_stop', { id: fixRun.id });
+    } catch (cause) {
+      setFixError(failureOf(cause).message);
+    }
+  };
+
+  const openFixTask = () => {
+    if (!fixRun) return;
+    useExecutionStore.getState().select(fixRun.id);
+    navigateWorkspace('kanban');
   };
 
   const askForReview = () => {
@@ -322,6 +546,43 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
           {error}
         </InlineNotice>
       )}
+      {hookFailure && !fixRun && (
+        <InlineNotice
+          tone="error"
+          className="commit-review-notice"
+          action={
+            <Button variant="outline" onClick={() => void fixWithAgent()} disabled={!project}>
+              Fix with agent
+            </Button>
+          }
+        >
+          <p>{hookFailure.message}</p>
+          {hookFailure.output && (
+            <Disclosure className="commit-hook-output">
+              <DisclosureSummary>Show hook output</DisclosureSummary>
+              <DisclosureBody>
+                <pre>{hookFailure.output}</pre>
+              </DisclosureBody>
+            </Disclosure>
+          )}
+        </InlineNotice>
+      )}
+      {fixError && (
+        <InlineNotice tone="error" className="commit-review-notice">
+          {fixError}
+        </InlineNotice>
+      )}
+      {fixRun && (
+        <HookFixStatus
+          run={fixRun}
+          agentName={runners.find((runner) => runner.id === fixRun.agent)?.name ?? fixRun.agent}
+          onStop={() => void stopFix()}
+          onCommit={() => void commit()}
+          canCommit={Boolean(title.trim()) && chosenFiles.length > 0}
+          onOpen={openFixTask}
+          onDismiss={() => setHookFix(checkout, null)}
+        />
+      )}
       <div role="status">
         {feedback && (
           <InlineNotice tone="success" className="commit-review-notice">
@@ -348,8 +609,9 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
                     indeterminate={chosenFiles.length > 0 && !allSelected}
                     disabled={busy}
                     onChange={(event) =>
-                      setSelected(
-                        event.target.checked ? new Set(files.map((file) => file.path)) : new Set(),
+                      setExcluded(
+                        checkout,
+                        event.target.checked ? [] : files.map((file) => file.path),
                       )
                     }
                   />
@@ -395,6 +657,28 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
                           </span>
                         )}
                       </button>
+                      <ConfirmAction
+                        title={`Discard changes to ${name}?`}
+                        description={
+                          file.status === 'untracked' || file.status === 'added'
+                            ? 'This new file will be deleted. This cannot be undone.'
+                            : 'The file goes back to its last committed version. This cannot be undone.'
+                        }
+                        label="Discard changes"
+                        busyLabel="Discarding…"
+                        onConfirm={() => discard(file)}
+                        trigger={
+                          <IconButton
+                            variant="ghost"
+                            className="commit-discard"
+                            label={`Discard changes to ${file.path}`}
+                            title="Discard changes"
+                            disabled={busy || file.status === 'conflicted'}
+                          >
+                            <Undo2 size={15} />
+                          </IconButton>
+                        }
+                      />
                     </li>
                   );
                 })}
@@ -422,19 +706,12 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
                   Generate
                 </Button>
               </div>
-              {generateError && (
-                <InlineNotice tone="error" className="commit-generate-error">
-                  <span>{generateError}</span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => navigateWorkspace('agents')}
-                  >
-                    Set up agents
-                  </Button>
-                </InlineNotice>
-              )}
+              {generateError &&
+                (isAgentSetupError(generateError) ? (
+                  <AgentSetupNotice message={generateError} />
+                ) : (
+                  <InlineNotice tone="error">{generateError}</InlineNotice>
+                ))}
               <label className="commit-field">
                 <span className="sr-only">Title</span>
                 <Input

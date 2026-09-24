@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gitEnvironment } from '../git-environment.mjs';
 import { assertVersions, compare, prepare, root, version } from './catalog.mjs';
 
 export function nextVersion(current, bump) {
@@ -16,17 +17,7 @@ export function nextVersion(current, bump) {
   return version(parts.join('.'));
 }
 
-/**
- * The environment without the repository a Git hook exported, so commands act on
- * `cwd` rather than the repository whose hook launched this script.
- */
-export function gitEnvironment() {
-  const env = { ...process.env };
-  for (const key of Object.keys(env))
-    if (/^GIT_(DIR|WORK_TREE|INDEX_FILE|COMMON_DIR|OBJECT_DIRECTORY|PREFIX)$/.test(key))
-      delete env[key];
-  return env;
-}
+export { gitEnvironment };
 
 export const gitAt =
   (directory) =>

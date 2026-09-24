@@ -219,3 +219,14 @@ test('an existing version is never duplicated and uncertain uploads are not repe
   await assert.rejects(uploadCandidate(directory, options), /upload is uncertain/);
   assert.equal(commands.filter((command) => command === 'upload').length, 1);
 });
+
+test('signed builds point feedback and usage reports at the account service', () => {
+  const plugin = cloudConfig({
+    mode: 'candidate',
+    channel: 'beta',
+    publicKey,
+    signScript: 'C:/repo/sign.ps1',
+  }).plugins.jackalope;
+  assert.equal(plugin.serviceUrl, 'https://api.jackalope.dev');
+  assert.equal(plugin.serviceUrl, plugin.accountServiceUrl);
+});

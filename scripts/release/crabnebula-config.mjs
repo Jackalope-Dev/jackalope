@@ -53,6 +53,9 @@ export function cloudConfig({ mode, channel, publicKey, signScript, target = 'wi
         channel,
         accountServiceUrl: 'https://api.jackalope.dev',
         accountWebUrl: 'https://jackalope.dev',
+        // Feedback and opt-in usage reports go to the same service; without it
+        // the app shows feedback as unavailable.
+        serviceUrl: 'https://api.jackalope.dev',
         ...(!preview
           ? { stableEndpoint: cloudEndpoint('stable'), betaEndpoint: cloudEndpoint('beta') }
           : {}),

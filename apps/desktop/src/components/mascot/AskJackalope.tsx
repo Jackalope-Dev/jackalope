@@ -5,6 +5,7 @@ import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useHelperStore } from '../../stores/helperStore';
+import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { HelperAction } from './HelperAction';
@@ -91,16 +92,20 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
                   </ul>
                 </Disclosure>
               )}
-              {turn.answer && (
-                <Suspense fallback={<p>{turn.answer}</p>}>
-                  <Markdown
-                    content={turn.answer}
-                    active={false}
-                    onOpenLink={(url) =>
-                      void openLink(url).catch((error) => setLocalError(String(error)))
-                    }
-                  />
-                </Suspense>
+              {turn.status === 'failed' && isAgentSetupError(turn.answer) ? (
+                <AgentSetupNotice message={turn.answer} onNavigate={onNavigate} />
+              ) : (
+                turn.answer && (
+                  <Suspense fallback={<p>{turn.answer}</p>}>
+                    <Markdown
+                      content={turn.answer}
+                      active={false}
+                      onOpenLink={(url) =>
+                        void openLink(url).catch((error) => setLocalError(String(error)))
+                      }
+                    />
+                  </Suspense>
+                )
               )}
               {turn.status === 'working' && <p role="status">Working with your agent…</p>}
               {turn.status === 'interrupted' && (
@@ -120,10 +125,14 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
             <HelperAction key={proposal.id} action={proposal} onNavigate={onNavigate} />
           ))}
         </div>
-        {(localError || helper.error || helper.syncError || helper.view.error) && (
-          <InlineNotice tone="error">
-            {localError || helper.error || helper.syncError || helper.view.error}
-          </InlineNotice>
+        {helper.error && isAgentSetupError(helper.error) ? (
+          <AgentSetupNotice message={helper.error} onNavigate={onNavigate} />
+        ) : (
+          (localError || helper.error || helper.syncError || helper.view.error) && (
+            <InlineNotice tone="error">
+              {localError || helper.error || helper.syncError || helper.view.error}
+            </InlineNotice>
+          )
         )}
       </div>
       <form

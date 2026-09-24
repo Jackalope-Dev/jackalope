@@ -79,6 +79,7 @@ fn luminance((r, g, b): (u8, u8, u8)) -> f64 {
     0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
 }
 
+#[cfg(test)]
 fn contrast(a: f64, b: f64) -> f64 {
     (a.max(b) + 0.05) / (a.min(b) + 0.05)
 }

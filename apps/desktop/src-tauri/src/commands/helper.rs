@@ -165,9 +165,10 @@ impl Helper {
     fn answer(
         &self,
         id: &str,
-        binding: agent_profiles::AccountBinding,
+        candidates: Vec<Candidate>,
         canceled: Arc<AtomicBool>,
     ) -> Result<String, String> {
+        let mut current = 0;
         let (turn, history, actions) = {
             let inner = self.inner.lock().unwrap();
             let turn = inner
@@ -210,39 +211,42 @@ impl Helper {
             if prompt.len() > 120_000 {
                 return Err("This conversation needs a shorter request. Start a new conversation to continue.".into());
             }
-            let response = super::tasks::helper_process::run(
-                &self.runtime,
-                &turn.agent,
-                &binding,
-                turn.model.as_deref(),
+            let (value, response) = self.first_success(
+                &candidates,
+                &mut current,
                 &prompt,
                 &canceled,
+                parse_response,
             )?;
+            let answering = &candidates[current];
             {
                 let mut inner = self.inner.lock().unwrap();
-                let current = inner
+                let entry = inner
                     .view
                     .turns
                     .iter_mut()
                     .find(|t| t.id == id)
                     .ok_or("Conversation unavailable")?;
-                current.usage.input = current.usage.input.saturating_add(response.usage.input);
-                current.usage.output = current.usage.output.saturating_add(response.usage.output);
-                current.usage.cache_read = current
+                entry.usage.input = entry.usage.input.saturating_add(response.usage.input);
+                entry.usage.output = entry.usage.output.saturating_add(response.usage.output);
+                entry.usage.cache_read = entry
                     .usage
                     .cache_read
                     .saturating_add(response.usage.cache_read);
-                current.usage.cache_write = current
+                entry.usage.cache_write = entry
                     .usage
                     .cache_write
                     .saturating_add(response.usage.cache_write);
-                current.usage.reported |= response.usage.reported;
+                entry.usage.reported |= response.usage.reported;
+                // Show who actually answered when a fallback took over.
+                entry.agent = answering.agent.clone();
+                entry.account = answering.binding.label.clone();
+                entry.model = answering.model.clone();
                 self.save(&mut inner)?;
             }
             if canceled.load(Ordering::SeqCst) {
                 return Err("Stopped.".into());
             }
-            let value = parse_response(&response.result)?;
             if let Some(answer) = value.get("answer").and_then(Value::as_str) {
                 if answer.trim().is_empty() || answer.len() > 24_000 {
                     return Err("The agent returned an invalid answer.".into());
@@ -277,15 +281,20 @@ impl Helper {
 
 const HELPER_ADAPTERS: [&str; 5] = ["claude", "codex", "opencode", "grok", "kimi"];
 
+/// An agent and account that can answer a tool-free request, in the order
+/// Jackalope tries them.
+#[derive(Clone)]
+pub(super) struct Candidate {
+    agent: String,
+    binding: agent_profiles::AccountBinding,
+    model: Option<String>,
+}
+
 impl Helper {
-    /// One tool-free completion outside the helper conversation. Tries the default agent
-    /// first, then every other installed helper-capable agent, and each of their usable
-    /// accounts, until one returns a response `accept` takes.
-    pub(super) fn complete<T>(
-        &self,
-        prompt: &str,
-        accept: impl Fn(&str) -> Result<T, String>,
-    ) -> Result<T, String> {
+    /// Everyone who could answer: the default agent first, then every other
+    /// installed helper-capable agent, each with all its usable accounts. Ask
+    /// Jackalope and generated text share this, so both pick agents the same way.
+    pub(super) fn candidates(&self) -> Result<Vec<Candidate>, String> {
         self.runtime.access.ensure()?;
         let policy = self.runtime.policy()?;
         let root = self.runtime.profiles_root();
@@ -294,7 +303,7 @@ impl Helper {
         agents.retain(|agent| !agent.is_empty());
         let mut seen = std::collections::HashSet::new();
         agents.retain(|agent| seen.insert(agent.clone()));
-        let mut failures = vec![];
+        let mut candidates = vec![];
         for agent in agents {
             let Ok((adapter, _)) = policy.resolve(&agent) else {
                 continue; // Not installed or disabled.
@@ -302,12 +311,8 @@ impl Helper {
             if !HELPER_ADAPTERS.contains(&adapter.as_str()) {
                 continue;
             }
-            let bindings = match agent_profiles::routing_accounts(&root, &adapter, None) {
-                Ok(bindings) => bindings,
-                Err(error) => {
-                    failures.push(format!("{agent}: {error}"));
-                    continue;
-                }
+            let Ok(bindings) = agent_profiles::routing_accounts(&root, &adapter, None) else {
+                continue;
             };
             for binding in bindings {
                 if agent_profiles::validate_binding(&root, &binding).is_err()
@@ -315,32 +320,73 @@ impl Helper {
                 {
                     continue;
                 }
-                let attempt = policy
-                    .model_for_account(&agent, None, &binding)
-                    .and_then(|model| {
-                        super::tasks::helper_process::run(
-                            &self.runtime,
-                            &agent,
-                            &binding,
-                            model.as_deref(),
-                            prompt,
-                            &AtomicBool::new(false),
-                        )
-                    })
-                    .and_then(|response| accept(&response.result));
-                match attempt {
-                    Ok(value) => return Ok(value),
-                    Err(error) => failures.push(format!("{agent} ({}): {error}", binding.label)),
-                }
+                let Ok(model) = policy.model_for_account(&agent, None, &binding) else {
+                    continue;
+                };
+                candidates.push(Candidate {
+                    agent: agent.clone(),
+                    binding,
+                    model,
+                });
             }
         }
-        if failures.is_empty() {
-            return Err("No installed agent can do this. Install and sign in to Claude Code, Codex, OpenCode, Grok or Kimi Code in Agents.".into());
+        if candidates.is_empty() {
+            return Err("No installed agent can answer. Install and sign in to Claude Code, Codex, OpenCode, Grok or Kimi Code in Agents.".into());
+        }
+        Ok(candidates)
+    }
+
+    /// Runs `prompt` on the candidates from `*current` on, until one returns a
+    /// response `accept` takes, and leaves `*current` on the one that did so a
+    /// multi-step exchange stays with the agent that is working.
+    fn first_success<T>(
+        &self,
+        candidates: &[Candidate],
+        current: &mut usize,
+        prompt: &str,
+        canceled: &AtomicBool,
+        accept: impl Fn(&str) -> Result<T, String>,
+    ) -> Result<(T, super::tasks::TaskRun), String> {
+        let mut failures = vec![];
+        for (index, candidate) in candidates.iter().enumerate().skip(*current) {
+            if canceled.load(Ordering::SeqCst) {
+                return Err("Stopped.".into());
+            }
+            let attempt = super::tasks::helper_process::run(
+                &self.runtime,
+                &candidate.agent,
+                &candidate.binding,
+                candidate.model.as_deref(),
+                prompt,
+                canceled,
+            )
+            .and_then(|response| accept(&response.result).map(|value| (value, response)));
+            match attempt {
+                Ok(done) => {
+                    *current = index;
+                    return Ok(done);
+                }
+                Err(error) => failures.push(format!(
+                    "{} ({}): {error}",
+                    candidate.agent, candidate.binding.label
+                )),
+            }
         }
         Err(format!(
             "No agent could finish this. Tried:\n{}",
             failures.join("\n")
         ))
+    }
+
+    /// One tool-free completion outside the helper conversation.
+    pub(super) fn complete<T>(
+        &self,
+        prompt: &str,
+        accept: impl Fn(&str) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let candidates = self.candidates()?;
+        self.first_success(&candidates, &mut 0, prompt, &AtomicBool::new(false), accept)
+            .map(|(value, _)| value)
     }
 }
 
@@ -394,26 +440,8 @@ pub fn helper_send(helper: State<'_, Helper>, prompt: String) -> Result<View, St
     if prompt.trim().is_empty() || prompt.len() > 8_000 {
         return Err("Use a message between 1 and 8,000 bytes.".into());
     }
-    helper.runtime.access.ensure()?;
-    let policy = helper.runtime.policy()?;
-    let agent = &policy.default_meta_agent;
-    if agent.is_empty() {
-        return Err(
-            "Choose a default agent in Agents configuration before asking Jackalope.".into(),
-        );
-    }
-    let (adapter, _) = policy.resolve(agent)?;
-    if !["codex", "claude", "grok", "opencode", "kimi"].contains(&adapter.as_str()) {
-        return Err("The helper supports Codex, Claude Code, Grok, OpenCode and Kimi Code. Choose one as the default agent in Agents configuration.".into());
-    }
-    let binding = agent_profiles::bind_account(&helper.runtime.profiles_root(), &adapter, None)?;
-    agent_profiles::validate_binding(&helper.runtime.profiles_root(), &binding)?;
-    if !policy.account_allowed("", agent, &binding) {
-        return Err(
-            "The selected account is disabled. Choose an enabled account in Agents.".into(),
-        );
-    }
-    let model = policy.model_for_account(agent, None, &binding)?;
+    let candidates = helper.candidates()?;
+    let first = candidates[0].clone();
     let id = uuid::Uuid::new_v4().to_string();
     let canceled = Arc::new(AtomicBool::new(false));
     {
@@ -428,9 +456,9 @@ pub fn helper_send(helper: State<'_, Helper>, prompt: String) -> Result<View, St
             id: id.clone(),
             prompt: prompt.trim().into(),
             status: "working".into(),
-            agent: agent.into(),
-            account: binding.label.clone(),
-            model,
+            agent: first.agent.clone(),
+            account: first.binding.label.clone(),
+            model: first.model.clone(),
             ..Default::default()
         });
         helper.save(&mut inner)?;
@@ -439,7 +467,7 @@ pub fn helper_send(helper: State<'_, Helper>, prompt: String) -> Result<View, St
     }
     let service = helper.inner().clone();
     std::thread::spawn(move || {
-        let result = service.answer(&id, binding, canceled.clone());
+        let result = service.answer(&id, candidates, canceled.clone());
         let mut inner = service.inner.lock().unwrap();
         if let Some(turn) = inner.view.turns.iter_mut().find(|t| t.id == id) {
             match result {

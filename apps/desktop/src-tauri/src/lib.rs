@@ -284,6 +284,7 @@ pub fn run(launch: Launch) {
             commands::commit_review::git_working_file_diff,
             commands::commit_review::git_generate_commit_message,
             commands::commit_review::git_commit_changes,
+            commands::commit_review::git_discard_changes,
             git_create_worktree,
             commands::worktree_cleanup::git_cleanup_worktree,
             commands::worktree_cleanup::git_archive_worktree,

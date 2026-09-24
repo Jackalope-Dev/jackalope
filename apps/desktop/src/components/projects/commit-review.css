@@ -222,12 +222,6 @@
   max-width: calc(100% - 24px);
   margin: 12px;
 }
-.commit-generate-error span {
-  display: block;
-  margin-bottom: 8px;
-  white-space: pre-line;
-  overflow-wrap: anywhere;
-}
 @container (max-width: 900px) {
   .commit-review {
     grid-template-columns: minmax(0, 1fr);
@@ -249,4 +243,40 @@
   .commit-files li {
     padding: 0 4px;
   }
+}
+.commit-discard {
+  flex-shrink: 0;
+  opacity: 0;
+}
+.commit-files li:hover .commit-discard,
+.commit-files li:focus-within .commit-discard {
+  opacity: 1;
+}
+
+.commit-hook-output {
+  margin-top: 8px;
+}
+.commit-hook-output pre {
+  max-height: 280px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.commit-hook-fix-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.commit-hook-fix-detail {
+  margin-top: 4px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
 }
