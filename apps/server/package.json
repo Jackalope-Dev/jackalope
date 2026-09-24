@@ -15,19 +15,19 @@
   "dependencies": {
     "@jackalope/brand": "workspace:*",
     "jose": "^6.2.12",
-    "zod": "4.5.4",
+    "zod": "4.6.5",
     "@jackalope/ui": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "lucide-react": "^1.46.0"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "1.1.7",
+    "@cloudflare/vitest-plugin": "1.2.0",
     "@types/node": "^26.5.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.0",
-    "wrangler": "4.131.0",
-    "esbuild": "0.28.1",
+    "wrangler": "4.136.0",
+    "esbuild": "0.28.2",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4"
   }
