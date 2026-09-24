@@ -346,75 +346,81 @@ export function LiveSessionView({
           </span>
           {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
-        <Button
-          variant="outline"
-          size={detached ? 'icon' : undefined}
-          aria-label={
-            integrated
-              ? 'Integrated'
-              : session.closed
-                ? 'Reopen session'
-                : session.paused
-                  ? 'Resume queue'
-                  : 'Pause queue'
-          }
-          disabled={busy || integrated}
-          onClick={() =>
-            void act(() =>
-              sessionCommand('action', {
-                id: session.id,
-                action: session.paused || session.closed ? 'resume' : 'pause',
-              }),
-            )
-          }
-        >
-          {detached ? (
-            session.paused || session.closed ? (
-              <Play size={16} />
-            ) : (
-              <Pause size={16} />
-            )
-          ) : integrated ? (
-            'Integrated'
-          ) : session.closed ? (
-            'Reopen session'
-          ) : session.paused ? (
-            'Resume queue'
-          ) : (
-            'Pause queue'
-          )}
-        </Button>
-        {active && (
+        <div className="live-status-actions">
           <Button
             variant="outline"
             size={detached ? 'icon' : undefined}
-            aria-label="Stop work"
-            disabled={busy}
+            aria-label={
+              integrated
+                ? 'Integrated'
+                : session.closed
+                  ? 'Reopen session'
+                  : session.paused
+                    ? 'Resume queue'
+                    : 'Pause queue'
+            }
+            disabled={busy || integrated}
             onClick={() =>
-              void act(async () => {
-                await sessionCommand('action', { id: session.id, action: 'pause' });
-                await nativeTask('task_stop', { id: active.id });
-              })
+              void act(() =>
+                sessionCommand('action', {
+                  id: session.id,
+                  action: session.paused || session.closed ? 'resume' : 'pause',
+                }),
+              )
             }
           >
-            {detached ? <Square size={16} /> : 'Stop work'}
+            {detached ? (
+              session.paused || session.closed ? (
+                <Play size={16} />
+              ) : (
+                <Pause size={16} />
+              )
+            ) : integrated ? (
+              'Integrated'
+            ) : session.closed ? (
+              'Reopen session'
+            ) : session.paused ? (
+              'Resume queue'
+            ) : (
+              'Pause queue'
+            )}
           </Button>
-        )}
-        {detached ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={collapsed ? 'Expand conversation' : 'Collapse conversation'}
-            aria-expanded={!collapsed}
-            onClick={() => setCollapsed(!collapsed)}
-          >
-            {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-          </Button>
-        ) : (
-          <Button variant="ghost" disabled={!latest || !!active || busy} onClick={showReview}>
-            Review changes
-          </Button>
-        )}
+          {active && (
+            <Button
+              variant="outline"
+              size={detached ? 'icon' : undefined}
+              aria-label="Stop work"
+              disabled={busy}
+              onClick={() =>
+                void act(async () => {
+                  await sessionCommand('action', { id: session.id, action: 'pause' });
+                  await nativeTask('task_stop', { id: active.id });
+                })
+              }
+            >
+              {detached ? <Square size={16} /> : 'Stop work'}
+            </Button>
+          )}
+          {detached ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={collapsed ? 'Expand conversation' : 'Collapse conversation'}
+              aria-expanded={!collapsed}
+              onClick={() => setCollapsed(!collapsed)}
+            >
+              {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+            </Button>
+          ) : (
+            <Button
+              variant={latest && !active && !integrated ? undefined : 'ghost'}
+              disabled={!latest || !!active || busy}
+              onClick={showReview}
+            >
+              Review changes
+            </Button>
+          )}
+        </div>
       </div>
       {(error || session.error) && (
         <div className="live-notice">

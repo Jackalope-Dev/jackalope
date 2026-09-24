@@ -404,16 +404,11 @@
   overflow: hidden;
 }
 .workbench .case-tabs button {
-  min-height: 72px;
   padding: 14px 18px;
   gap: 12px;
   border: 0;
-  border-right: 1px solid var(--color-border);
   background: var(--color-bg);
   text-align: left;
-}
-.workbench .case-tabs button:last-child {
-  border-right: 0;
 }
 .case-tab-index {
   font-family: "JetBrains Mono Variable", "JetBrains Mono", monospace;
@@ -877,11 +872,6 @@
   .workbench .case-tabs {
     grid-template-columns: 1fr;
     border-radius: 10px 10px 0 0;
-  }
-  .workbench .case-tabs button {
-    min-height: 52px;
-    border-right: 0;
-    border-bottom: 1px solid var(--color-border);
   }
   .case-stage {
     min-height: 660px;
