@@ -14,7 +14,6 @@ import {
   FolderGit2,
   GitCommitHorizontal,
   Settings2,
-  Sparkles,
   Undo2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -746,7 +745,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
                   loadingLabel="Writing…"
                   onClick={() => void generate()}
                 >
-                  <Sparkles size={16} aria-hidden="true" />
+                  <Bot size={16} aria-hidden="true" />
                   Generate
                 </Button>
               </div>

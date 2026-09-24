@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 import { DesktopExperience } from './components/layout/DesktopExperience';
+import { AppErrorBoundary } from './components/ui/AppErrorBoundary';
 
 const LiveSessionWindow = React.lazy(() => import('./components/sessions/LiveSessionWindow'));
 const liveSessionId = new URLSearchParams(window.location.search).get('liveSession');
@@ -13,27 +14,29 @@ const cliTerminalId = new URLSearchParams(window.location.search).get('cliTermin
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <DesktopExperience />
-    {cliTerminalId ? (
-      <React.Suspense fallback={<p>Loading terminal…</p>}>
-        <CliTerminalWindow
-          id={cliTerminalId}
-          directory={new URLSearchParams(window.location.search).get('directory') ?? ''}
-        />
-      </React.Suspense>
-    ) : workPaneId ? (
-      <React.Suspense fallback={<p>Loading task…</p>}>
-        <WorkPaneWindow
-          id={workPaneId}
-          pane={new URLSearchParams(window.location.search).get('pane') ?? 'result'}
-        />
-      </React.Suspense>
-    ) : liveSessionId ? (
-      <React.Suspense fallback={<p>Loading session…</p>}>
-        <LiveSessionWindow id={liveSessionId} />
-      </React.Suspense>
-    ) : (
-      <App />
-    )}
+    <AppErrorBoundary>
+      <DesktopExperience />
+      {cliTerminalId ? (
+        <React.Suspense fallback={<p>Loading terminal…</p>}>
+          <CliTerminalWindow
+            id={cliTerminalId}
+            directory={new URLSearchParams(window.location.search).get('directory') ?? ''}
+          />
+        </React.Suspense>
+      ) : workPaneId ? (
+        <React.Suspense fallback={<p>Loading task…</p>}>
+          <WorkPaneWindow
+            id={workPaneId}
+            pane={new URLSearchParams(window.location.search).get('pane') ?? 'result'}
+          />
+        </React.Suspense>
+      ) : liveSessionId ? (
+        <React.Suspense fallback={<p>Loading session…</p>}>
+          <LiveSessionWindow id={liveSessionId} />
+        </React.Suspense>
+      ) : (
+        <App />
+      )}
+    </AppErrorBoundary>
   </React.StrictMode>,
 );
