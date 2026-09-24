@@ -678,6 +678,9 @@ mod tests {
         git(&["init", "-q"]);
         git(&["config", "user.email", "t@example.invalid"]);
         git(&["config", "user.name", "T"]);
+        // Windows runners set core.autocrlf globally, which restores files with
+        // CRLF; the assertions compare exact bytes.
+        git(&["config", "core.autocrlf", "false"]);
         std::fs::write(root.join("kept.txt"), "one\n").unwrap();
         git(&["add", "."]);
         git(&["commit", "-q", "-m", "base"]);

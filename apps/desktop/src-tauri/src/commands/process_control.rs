@@ -432,7 +432,10 @@ mod tests {
         let mut command = Command::new("/bin/cat");
         command.env_remove("JACKALOPE_TASK_TOKEN");
         let input = b"fixture token\n$(echo must-not-execute) & quoted\"value\n".to_vec();
-        let result = run_with_input(command, Duration::from_secs(15), input.clone()).unwrap();
+        // PowerShell can take well over 15 seconds to start on a loaded CI
+        // runner; the deadline bounds the test, not the behavior under test.
+        let deadline = Duration::from_secs(if cfg!(windows) { 60 } else { 15 });
+        let result = run_with_input(command, deadline, input.clone()).unwrap();
         assert!(result.success, "{result:?}");
         assert_eq!(result.stdout.as_bytes(), input);
     }
