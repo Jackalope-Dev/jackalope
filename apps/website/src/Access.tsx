@@ -254,8 +254,11 @@ export function AccessPage() {
             <div>
               <h2>Make room for your first task.</h2>
               {member.download || member.macos?.length ? (
-                <a className="button button-primary button-download" href="/download/">
-                  <span className="access-progress-copy">Download Jackalope</span>
+                <a
+                  className="button button-primary button-download access-download-button"
+                  href="/download/"
+                >
+                  <span>Download Jackalope</span>
                   <ArrowDownToLine size={18} />
                 </a>
               ) : (
