@@ -1,5 +1,16 @@
 [
   {
+    "id": "project-agent-preferences-stay-with-each-project",
+    "date": "2026-09-24",
+    "status": "In development",
+    "title": "Project agent preferences stay with each project.",
+    "description": "Keep work and personal projects on their own agents and accounts.",
+    "items": [
+      "Agent switches, task defaults and account choices follow the selected project, including automatic routing.",
+      "The terminal follows saved project colors while open and uses closer matches on 256-color displays."
+    ]
+  },
+  {
     "id": "jackalope-in-your-terminal",
     "date": "2026-09-23",
     "status": "In development",

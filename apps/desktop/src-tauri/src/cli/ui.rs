@@ -440,6 +440,24 @@ impl App {
         if let Some(Response::Sessions { sessions }) = self.request(Request::Sessions) {
             self.sessions = sessions;
         }
+        if let Some(Response::Projects { projects }) = self.request(Request::Projects) {
+            let project_id = self
+                .session
+                .as_ref()
+                .and_then(|id| self.sessions.iter().find(|session| &session.id == id))
+                .map(|session| session.project_id.as_str())
+                .unwrap_or(&self.project.id);
+            if let Some(project) = projects
+                .into_iter()
+                .find(|project| project.id == project_id)
+            {
+                if project.path != self.project.path {
+                    self.branch = branch(&project.path);
+                }
+                brand::set_accent(project.accent.as_deref());
+                self.project = project;
+            }
+        }
         let Some(id) = self.session.clone() else {
             return;
         };

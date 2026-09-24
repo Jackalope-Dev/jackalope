@@ -35,6 +35,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import './local-ai.css';
 
@@ -116,6 +117,9 @@ export function LocalAiSteps({
   preview?: LocalInspection;
   projectSetup?: boolean;
 }) {
+  const [projectId] = useState(() =>
+    projectSetup ? undefined : (useProjectStore.getState().activeProjectId ?? undefined),
+  );
   const [inspection, setInspection] = useState<LocalInspection | null>(preview ?? null);
   const runner = useManagedRuntime();
   const [step, setStep] = useState(0);
@@ -222,6 +226,7 @@ export function LocalAiSteps({
       const profile = await nativeTask<{ id: string }>('local_ai_connect', {
         modelId: selected,
         helperModelId: helperModel || null,
+        activate: !projectId && !projectSetup,
       });
       const config = useAgentConfigStore.getState();
       const options = config.runnerOptions.opencode ?? {
@@ -230,7 +235,16 @@ export function LocalAiSteps({
         defaultModel: '',
       };
       const id = `jackalope-local/${selected}`;
-      config.toggleAgent('opencode', true);
+      config.toggleAgent('opencode', true, projectId);
+      if (projectId) {
+        const store = useProjectStore.getState();
+        const project = store.projects.find((item) => item.id === projectId);
+        if (!project) throw new Error('This project is no longer available.');
+        store.updateProjectPreferences(projectId, {
+          agentAccounts: { ...project.preferences?.agentAccounts, opencode: profile.id },
+          preferredRunner: 'opencode',
+        });
+      }
       config.setRunnerOptions('opencode', {
         ...options,
         models: [...new Set([...options.models, id])],
@@ -238,6 +252,8 @@ export function LocalAiSteps({
       await syncAgentConfig();
       await useExecutionStore.getState().discover();
       if (
+        !projectId &&
+        !projectSetup &&
         !useExecutionStore
           .getState()
           .runners.some((runner) => runner.id === config.defaultMetaAgent && runner.available)

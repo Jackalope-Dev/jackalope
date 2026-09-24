@@ -647,7 +647,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'work-personal-segregation',
         question: 'How do work and personal account profiles differ?',
         paragraphs: [
-          'Named Codex, Claude Code, Grok, OpenCode, and Kimi Code profiles use separate supported CLI directories. Choose project defaults in Project → Settings. Continuations retain their bound profile.',
+          'Named Codex, Claude Code, Grok, OpenCode, and Kimi Code profiles use separate supported CLI directories. The Agents page saves enable/disable, default task agent, and account choices for the selected project. Project agent settings offers Work/Personal group selection and allowed accounts. App settings retains app-wide limits. New work uses the project default; continuations retain their bound profile.',
           'Antigravity named profiles require Gemini API keys with separate API billing. Its existing subscription login is shared and can change outside Jackalope. Profiles organize credentials; they do not isolate OS permissions or inherited provider configuration.',
         ],
       },

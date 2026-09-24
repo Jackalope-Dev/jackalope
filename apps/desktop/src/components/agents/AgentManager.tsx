@@ -17,6 +17,7 @@ import { agentProvider } from '../../lib/agent-provider';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -33,13 +34,16 @@ import './agent-manager.css';
 
 export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
   const config = useAgentConfigStore();
+  const { projects, activeProjectId } = useProjectStore();
+  const project = projects.find((item) => item.id === activeProjectId);
+  const defaultAgent = project ? project.preferences?.preferredRunner : config.defaultMetaAgent;
   const { runners, discovering, discover } = useExecutionStore();
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [modelsRevision, setModelsRevision] = useState(0);
   const refreshModels = useCallback(() => setModelsRevision((value) => value + 1), []);
   const [busy, setBusy] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState(initialAgentId ?? config.defaultMetaAgent);
+  const [selectedAgent, setSelectedAgent] = useState(initialAgentId ?? defaultAgent);
   const desktop = isTauriEnvironment();
   const agents = [...builtinAgents, ...config.customAgents];
   const availableIds = new Set(
@@ -61,20 +65,21 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
   const selected =
     agents.find((agent) => agent.id === selectedAgent) ?? detectedAgents[0] ?? agents[0];
   const selectedRunner = runners.find((r) => r.id === selected?.id);
-  const selectedEnabled = selected ? config.isAgentEnabled(selected.id) : false;
-  const isDefault = !!selected && config.defaultMetaAgent === selected.id;
+  const selectedEnabled = selected ? config.isAgentEnabled(selected.id, project?.id) : false;
+  const isDefault = !!selected && defaultAgent === selected.id;
   const orchestrates =
     !!selected &&
     ['codex', 'claude', 'grok', 'opencode', 'kimi'].includes(
       ('adapter' in selected ? selected.adapter : undefined) ?? selected.id,
     );
-  const defaultBlockedReason = !orchestrates
-    ? `${selected?.name} cannot orchestrate routing. Choose Codex, Claude, Grok, OpenCode or Kimi Code.`
-    : !selectedEnabled
-      ? `Enable ${selected?.name} before making it the default.`
-      : !selectedRunner?.available
-        ? `${selected?.name} is not available on this computer yet.`
-        : undefined;
+  const defaultBlockedReason =
+    !project && !orchestrates
+      ? `${selected?.name} cannot orchestrate routing. Choose Codex, Claude, Grok, OpenCode or Kimi Code.`
+      : !selectedEnabled
+        ? `Enable ${selected?.name} before making it the default.`
+        : !selectedRunner?.available
+          ? `${selected?.name} is not available on this computer yet.`
+          : undefined;
 
   const mascotRef = useRef<HTMLDivElement>(null);
   const gaze = useAgentGaze(mascotRef);
@@ -139,8 +144,8 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
                 <div className="agent-switcher-strip">
                   {group.agents.map((agent) => {
                     const isCurrent = agent.id === selected?.id;
-                    const isAgentDef = config.defaultMetaAgent === agent.id;
-                    const isAgentOn = config.isAgentEnabled(agent.id);
+                    const isAgentDef = defaultAgent === agent.id;
+                    const isAgentOn = config.isAgentEnabled(agent.id, project?.id);
                     const runner = runners.find((runner) => runner.id === agent.id);
                     const appOnly = runner?.desktopInstalled && !runner.available;
                     return (
@@ -172,6 +177,12 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
             ))}
         </section>
       </div>
+
+      <p className="task-muted">
+        {project
+          ? `Agent and account choices for ${project.name}. Connections, models and executable settings are shared across projects.`
+          : 'App-wide agent settings'}
+      </p>
 
       {/* Hero Header: Interactive Animated Mascot + Agent Profile */}
       <div className="agent-hero-card" ref={mascotRef}>
@@ -231,13 +242,14 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
           <div className="agent-hero-toggle">
             <Switch
               checked={selectedEnabled}
+              disabled={!!project && !!selected && !config.isAgentEnabled(selected.id)}
               onCheckedChange={(value) => {
                 if (selected) {
-                  config.toggleAgent(selected.id, value);
+                  config.toggleAgent(selected.id, value, project?.id);
                   setSaved(false);
                 }
               }}
-              label={`Enable ${selected?.name}`}
+              label={`Enable ${selected?.name}${project ? ` for ${project.name}` : ' app-wide'}`}
             />
             <span className="agent-hero-toggle-label">
               {selectedEnabled ? 'Enabled' : 'Disabled'}
@@ -250,12 +262,15 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
               variant={isDefault ? 'secondary' : 'outline'}
               size="sm"
               disabled={
-                isDefault || !selectedEnabled || !selectedRunner?.available || !orchestrates
+                isDefault ||
+                !selectedEnabled ||
+                !selectedRunner?.available ||
+                (!project && !orchestrates)
               }
               title={isDefault ? undefined : defaultBlockedReason}
               onClick={() => {
                 if (!selected) return;
-                config.setDefaultMetaAgent(selected.id);
+                config.setDefaultMetaAgent(selected.id, project?.id);
                 setSaved(false);
               }}
             >
@@ -301,7 +316,7 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
           Agent settings saved. Existing runs keep their current configuration.
         </InlineNotice>
       )}
-      {!config.defaultMetaAgent && (
+      {!project && !config.defaultMetaAgent && (
         <InlineNotice tone="error">
           Choose an enabled default agent before starting internal agent work.
         </InlineNotice>
@@ -364,7 +379,8 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
           <div className="agent-settings-card-body agent-config-fields">
             {selected && (
               <AgentAccounts
-                key={selected.id}
+                key={`${project?.id ?? 'app'}:${selected.id}`}
+                projectId={project?.id}
                 agentId={('adapter' in selected ? selected.adapter : undefined) || selected.id}
                 agentName={selected.name}
                 onChanged={refreshModels}
@@ -405,6 +421,11 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
                   key={selected.id}
                   agentId={selected.id}
                   revision={modelsRevision}
+                  agentProfileId={
+                    project?.preferences?.agentAccounts?.[
+                      ('adapter' in selected ? selected.adapter : undefined) ?? selected.id
+                    ]
+                  }
                   selected={options.models}
                   defaultModel={options.defaultModel}
                   restricted={options.restrictModels}

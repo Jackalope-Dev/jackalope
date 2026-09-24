@@ -13,6 +13,7 @@ import { Switch } from '../ui/Switch';
 
 export function AgentModels({
   agentId,
+  agentProfileId,
   revision,
   selected,
   defaultModel,
@@ -20,6 +21,7 @@ export function AgentModels({
   onChange,
 }: {
   agentId: string;
+  agentProfileId?: string;
   revision: number;
   selected: string[];
   defaultModel: string;
@@ -29,11 +31,13 @@ export function AgentModels({
   const modelSelectId = useId();
   const accountModelId = useId();
   const accountView = useAgentAccountsStore((state) => state.agents[agentId]?.view);
-  const account = accountView?.profiles.find((profile) => profile.id === accountView.activeId);
+  const account = accountView?.profiles.find(
+    (profile) => profile.id === (agentProfileId ?? accountView.activeId),
+  );
   const [accountError, setAccountError] = useState('');
   const [savingAccount, setSavingAccount] = useState(false);
   const [showAll, setShowAll] = useState(false);
-  const { catalog, loading, error, refresh } = useAgentModels(agentId, revision);
+  const { catalog, loading, error, refresh } = useAgentModels(agentId, revision, agentProfileId);
   const [query, setQuery] = useState('');
   const models = catalog?.models ?? [];
   const detectedSelected = selected.filter((id) => models.some((model) => model.id === id));

@@ -8,12 +8,18 @@ import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccoun
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { accountForAgent, useCapacityStore } from '../../stores/capacityStore';
 import { useExecutionStore } from '../../stores/executionStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { AddAgentForm } from '../agents/AddAgentForm';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import { AgentInstallGuide } from '../agents/AgentInstallGuide';
 import { LocalAiSetup } from '../agents/LocalAiSetup';
 import { ProviderConnections } from '../agents/ProviderConnections';
-import { navigateWorkspace, openAgentConfiguration } from '../layout/navigation';
+import {
+  navigateWorkspace,
+  openAgentConfiguration,
+  openProjectSettings,
+  openSettings,
+} from '../layout/navigation';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { EmptyState } from '../ui/EmptyState';
@@ -34,6 +40,9 @@ export function RunnerConnections({
 }) {
   const { runners, runs, discovering, discover, error } = useExecutionStore();
   const config = useAgentConfigStore();
+  const { projects, activeProjectId } = useProjectStore();
+  const project = projects.find((item) => item.id === activeProjectId);
+  const defaultAgent = project ? project.preferences?.preferredRunner : config.defaultMetaAgent;
   const capacity = useCapacityStore();
   const accounts = useAgentAccountsStore((state) => state.agents);
   const accountAgents = JSON.stringify([
@@ -86,7 +95,7 @@ export function RunnerConnections({
     (runner) =>
       runner.available ||
       runner.desktopInstalled ||
-      !config.isAgentEnabled(runner.id) ||
+      !config.isAgentEnabled(runner.id, project?.id) ||
       config.customAgents.some((agent) => agent.id === runner.id) ||
       runs.some((run) => run.agent === runner.id && isActive(run)),
   );
@@ -107,8 +116,17 @@ export function RunnerConnections({
       <div className="agents-page-content workspace-stack">
         <WorkspaceHeading
           title="Agents"
+          description={project ? `Agent choices for ${project.name}` : 'App-wide agent settings'}
           action={
             <div className="agent-workspace-actions">
+              <Button
+                variant="outline"
+                onClick={() =>
+                  project ? openProjectSettings(project.id, 'Agents') : openSettings('Agents')
+                }
+              >
+                {project ? 'Project agent settings' : 'Agent settings'}
+              </Button>
               <Button variant="outline" onClick={() => setAdding(true)}>
                 <Plus size={18} />
                 Add agent
@@ -176,13 +194,15 @@ export function RunnerConnections({
             {identified.map((runner) => {
               const custom = config.customAgents.find((agent) => agent.id === runner.id);
               const provider = custom?.adapter ?? runner.id;
-              const agentRuns = runs.filter((run) => run.agent === runner.id);
+              const agentRuns = runs.filter(
+                (run) => run.agent === runner.id && (!project || run.projectId === project.id),
+              );
               const activeRuns = agentRuns.filter(isActive);
               const waitingRun = activeRuns.find((run) =>
                 run.prompts?.some((prompt) => prompt.status === 'pending'),
               );
               const reviewRun = agentRuns.find((run) => run.status === 'review');
-              const enabled = config.isAgentEnabled(runner.id);
+              const enabled = config.isAgentEnabled(runner.id, project?.id);
               const options = config.runnerOptions[runner.id];
               const blockedModels =
                 options?.restrictModels && !options.models.some((model) => model.trim());
@@ -211,7 +231,9 @@ export function RunnerConnections({
               const detail = working
                 ? `${activeRuns.length} active ${activeRuns.length === 1 ? 'task' : 'tasks'}`
                 : !enabled
-                  ? 'Enable this agent in Settings.'
+                  ? config.isAgentEnabled(runner.id)
+                    ? 'Enable this agent for this project.'
+                    : 'Disabled in app settings.'
                   : blockedModels
                     ? 'The allowed model list is empty.'
                     : !runner.available || needsSignIn
@@ -224,7 +246,13 @@ export function RunnerConnections({
               const identity = knownAccount ?? (genericAccount ? null : runner.account);
               const accountData = accounts[provider];
               const profiles = accountData?.view
-                ? accountProfiles(accountData.view, accountData.statuses)
+                ? accountProfiles(accountData.view, accountData.statuses).filter(
+                    (profile) =>
+                      !config.disabledAccounts[provider]?.includes(profile.id) &&
+                      !project?.preferences?.disabledAccounts?.[provider]?.includes(profile.id) &&
+                      (!project?.preferences?.agentAccounts?.[provider] ||
+                        project.preferences.agentAccounts[provider] === profile.id),
+                  )
                 : [];
               const accountLabels = profiles.map((profile) => {
                 const identity = accountData?.statuses[profile.id]?.identity;
@@ -237,7 +265,7 @@ export function RunnerConnections({
                   key={runner.id}
                   className="agent-roster-row"
                   data-provider={provider}
-                  data-default={(config.defaultMetaAgent === runner.id && enabled) || undefined}
+                  data-default={(defaultAgent === runner.id && enabled) || undefined}
                 >
                   <button
                     type="button"
@@ -256,7 +284,7 @@ export function RunnerConnections({
                   <div className="agent-roster-identity">
                     <div className="agent-roster-name">
                       <h2>{custom?.name ?? runner.name}</h2>
-                      {config.defaultMetaAgent === runner.id && enabled && (
+                      {defaultAgent === runner.id && enabled && (
                         <span className="agent-default">
                           <Star size={12} />
                           Default agent
@@ -314,13 +342,13 @@ export function RunnerConnections({
                     <div className="agent-enable">
                       <Switch
                         checked={enabled}
-                        disabled={!desktop}
+                        disabled={!desktop || (!!project && !config.isAgentEnabled(runner.id))}
                         onCheckedChange={(value) => {
                           setCheckError('');
-                          config.toggleAgent(runner.id, value);
+                          config.toggleAgent(runner.id, value, project?.id);
                           void syncAgentConfig().catch((cause) => setCheckError(String(cause)));
                         }}
-                        label={`Enable ${custom?.name ?? runner.name}`}
+                        label={`Enable ${custom?.name ?? runner.name}${project ? ` for ${project.name}` : ' app-wide'}`}
                       />
                       <span aria-hidden="true">{enabled ? 'Enabled' : 'Disabled'}</span>
                     </div>

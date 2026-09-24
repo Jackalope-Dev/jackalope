@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { BuiltinAgentId } from '../lib/agent-catalog';
+import { type BuiltinAgentId, builtinAgents } from '../lib/agent-catalog.ts';
 import { createPersistStorage } from '../lib/persist-storage.ts';
 import { nativeTask } from '../lib/task-runtime.ts';
-import { useProjectStore } from './projectStore.ts';
+import { isAgentAllowedForProject, useProjectStore } from './projectStore.ts';
 
 export interface CustomAgentConfig {
   id: string;
@@ -34,14 +34,14 @@ interface AgentConfigState {
   automaticQuotaHandoff: boolean;
   customAgents: CustomAgentConfig[];
 
-  toggleAgent: (agentId: string, enabled?: boolean) => void;
+  toggleAgent: (agentId: string, enabled?: boolean, projectId?: string) => void;
   toggleModel: (modelId: string, allowed?: boolean) => void;
-  setDefaultMetaAgent: (agentId: string) => void;
+  setDefaultMetaAgent: (agentId: string, projectId?: string) => void;
   addCustomAgent: (agent: Omit<CustomAgentConfig, 'isCustom'>) => void;
   updateCustomAgent: (id: string, patch: Partial<CustomAgentConfig>) => void;
   removeCustomAgent: (id: string) => void;
 
-  isAgentEnabled: (agentId: string) => boolean;
+  isAgentEnabled: (agentId: string, projectId?: string) => boolean;
   isModelAllowed: (modelId: string) => boolean;
 }
 
@@ -65,7 +65,29 @@ export const useAgentConfigStore = create<AgentConfigState>()(
       automaticQuotaHandoff: true,
       customAgents: [],
 
-      toggleAgent: (agentId, enabled) => {
+      toggleAgent: (agentId, enabled, projectId) => {
+        if (projectId) {
+          const store = useProjectStore.getState();
+          const project = store.projects.find((item) => item.id === projectId);
+          if (!project) throw new Error('This project is no longer available.');
+          const next = enabled ?? !get().isAgentEnabled(agentId, projectId);
+          if (next && !get().isAgentEnabled(agentId))
+            throw new Error('Enable this agent in app settings first.');
+          const current =
+            project.preferences?.allowedAgents ??
+            [...builtinAgents, ...get().customAgents]
+              .filter((agent) => get().isAgentEnabled(agent.id))
+              .map((agent) => agent.id);
+          store.updateProjectPreferences(projectId, {
+            allowedAgents: next
+              ? [...new Set([...current, agentId])]
+              : current.filter((id) => id !== agentId),
+            ...(!next && project.preferences?.preferredRunner === agentId
+              ? { preferredRunner: undefined }
+              : {}),
+          });
+          return;
+        }
         set((state) => {
           const current = state.enabledAgents[agentId] ?? true;
           const next = enabled !== undefined ? enabled : !current;
@@ -87,9 +109,15 @@ export const useAgentConfigStore = create<AgentConfigState>()(
         });
       },
 
-      setDefaultMetaAgent: (agentId) => {
-        if (!get().isAgentEnabled(agentId))
+      setDefaultMetaAgent: (agentId, projectId) => {
+        if (!get().isAgentEnabled(agentId, projectId))
           throw new Error('Enable this agent before making it the default.');
+        if (projectId) {
+          useProjectStore
+            .getState()
+            .updateProjectPreferences(projectId, { preferredRunner: agentId });
+          return;
+        }
         set({ defaultMetaAgent: agentId });
       },
 
@@ -122,8 +150,12 @@ export const useAgentConfigStore = create<AgentConfigState>()(
         });
       },
 
-      isAgentEnabled: (agentId) => {
-        return get().enabledAgents[agentId] ?? true;
+      isAgentEnabled: (agentId, projectId) => {
+        const project = useProjectStore.getState().projects.find((item) => item.id === projectId);
+        return (
+          (get().enabledAgents[agentId] ?? true) &&
+          (!projectId || (!!project && isAgentAllowedForProject(project, agentId)))
+        );
       },
 
       isModelAllowed: (modelId) => {

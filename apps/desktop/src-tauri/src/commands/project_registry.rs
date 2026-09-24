@@ -41,6 +41,19 @@ fn lock() -> &'static Mutex<()> {
     LOCK.get_or_init(|| Mutex::new(()))
 }
 
+fn changes() -> &'static tokio::sync::watch::Sender<u64> {
+    static CHANGES: OnceLock<tokio::sync::watch::Sender<u64>> = OnceLock::new();
+    CHANGES.get_or_init(|| tokio::sync::watch::channel(0).0)
+}
+
+pub fn revision() -> u64 {
+    *changes().borrow()
+}
+
+pub fn subscribe() -> tokio::sync::watch::Receiver<u64> {
+    changes().subscribe()
+}
+
 fn path(runtime: &TaskRuntime) -> PathBuf {
     runtime.preferences_directory().join("projects.json")
 }
@@ -55,8 +68,13 @@ fn read_ledger(path: &Path) -> Ledger {
 }
 
 fn write_ledger(path: &Path, ledger: &Ledger) -> Result<(), String> {
+    if read_ledger(path).projects == ledger.projects {
+        return Ok(());
+    }
     let encoded = serde_json::to_vec(ledger).map_err(|error| error.to_string())?;
-    super::history::write_atomic(path, &encoded)
+    super::history::write_atomic(path, &encoded)?;
+    changes().send_modify(|revision| *revision = revision.wrapping_add(1));
+    Ok(())
 }
 
 /// Compares paths the way the UI does, so the same repository is not recorded
@@ -132,6 +150,40 @@ pub fn project_registry_save(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn saved_project_accent_notifies_clients_and_preserves_other_projects() {
+        let directory = std::env::temp_dir().join(format!("jl-colours-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let file = directory.join("projects.json");
+        let mut ledger = Ledger {
+            projects: vec![
+                ProjectRecord {
+                    id: "work".into(),
+                    name: "Work".into(),
+                    path: "/work".into(),
+                    accent: Some("#00aa88".into()),
+                },
+                ProjectRecord {
+                    id: "personal".into(),
+                    name: "Personal".into(),
+                    path: "/personal".into(),
+                    accent: Some("#aa00ff".into()),
+                },
+            ],
+        };
+        let mut updates = subscribe();
+        write_ledger(&file, &ledger).unwrap();
+        assert!(updates.has_changed().unwrap());
+        updates.borrow_and_update();
+        ledger.projects[0].accent = Some("#112233".into());
+        write_ledger(&file, &ledger).unwrap();
+        assert!(updates.has_changed().unwrap());
+        assert_eq!(read_ledger(&file).projects, ledger.projects);
+        let legacy: ProjectRecord =
+            serde_json::from_str(r#"{"id":"old","name":"Old","path":"/old"}"#).unwrap();
+        assert_eq!(legacy.accent, None);
+    }
 
     #[test]
     fn a_repository_keeps_one_record_across_path_spellings() {

@@ -17,6 +17,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
 import { FormField } from '../ui/FormField';
@@ -27,6 +28,8 @@ import { ManagedRuntimeProgress } from './ManagedRuntimeProgress';
 
 function ConnectProvider({ provider, onClose }: { provider: ApiProvider; onClose: () => void }) {
   const focus = useDialogFocus();
+  const [projectId] = useState(() => useProjectStore.getState().activeProjectId ?? undefined);
+  const project = useProjectStore((state) => state.projects.find((item) => item.id === projectId));
   const runner = useManagedRuntime();
   const [name, setName] = useState(provider.name as string);
   const [key, setKey] = useState('');
@@ -105,11 +108,22 @@ function ConnectProvider({ provider, onClose }: { provider: ApiProvider; onClose
               }
               if (!profile.current || !models.some((item) => item.id === model))
                 throw new Error('Choose a discovered model.');
-              await completeProviderProfile(profile.current.id, model, useForTasks);
+              await completeProviderProfile(profile.current.id, model, useForTasks && !projectId);
               saved.current = true;
               if (useForTasks) {
                 const config = useAgentConfigStore.getState();
-                config.toggleAgent('opencode', true);
+                config.toggleAgent('opencode', true, projectId);
+                if (projectId) {
+                  const store = useProjectStore.getState();
+                  const current = store.projects.find((item) => item.id === projectId);
+                  if (!current) throw new Error('This project is no longer available.');
+                  store.updateProjectPreferences(projectId, {
+                    agentAccounts: {
+                      ...current.preferences?.agentAccounts,
+                      opencode: profile.current.id,
+                    },
+                  });
+                }
                 await syncAgentConfig();
               }
               await useAgentAccountsStore.getState().load('opencode', true);
@@ -181,6 +195,7 @@ function ConnectProvider({ provider, onClose }: { provider: ApiProvider; onClose
                       disabled={busy}
                     />
                     Use this account and model for new OpenCode tasks
+                    {project ? ` in ${project.name}` : ' app-wide'}
                   </label>
                   {!useForTasks && (
                     <p className="task-muted text-sm">
