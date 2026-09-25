@@ -185,16 +185,39 @@ export const useProjectStore = create<ProjectState>()(
           set({ loading: true, checkingWorktrees: false, worktreesError: null });
           const worktrees = await readWorktrees(active.path, targetBranch, false);
           if (request !== worktreeRequest || get().activeProjectId !== active.id) return;
+          const normActive = active.path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
+          const matchingWt =
+            worktrees.find(
+              (wt) =>
+                wt.path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase() === normActive,
+            ) ?? worktrees[0];
+          const currentBranch = matchingWt?.branch?.trim();
           set((state) => ({
             loading: false,
             checkingWorktrees: true,
-            projects: state.projects.map((p) => (p.id === active.id ? { ...p, worktrees } : p)),
+            projects: state.projects.map((p) =>
+              p.id === active.id
+                ? { ...p, worktrees, ...(currentBranch ? { gitBranch: currentBranch } : {}) }
+                : p,
+            ),
           }));
           const inspected = await readWorktrees(active.path, targetBranch, true);
           if (request !== worktreeRequest || get().activeProjectId !== active.id) return;
+          const matchingInspected =
+            inspected.find(
+              (wt) =>
+                wt.path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase() === normActive,
+            ) ?? inspected[0];
+          const inspectedBranch = matchingInspected?.branch?.trim();
           set((state) => ({
             projects: state.projects.map((p) =>
-              p.id === active.id ? { ...p, worktrees: inspected } : p,
+              p.id === active.id
+                ? {
+                    ...p,
+                    worktrees: inspected,
+                    ...(inspectedBranch ? { gitBranch: inspectedBranch } : {}),
+                  }
+                : p,
             ),
           }));
         } catch (e) {

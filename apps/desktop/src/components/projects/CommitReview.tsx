@@ -206,17 +206,34 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
   } = useCommitReviewStore();
   const desktop = isTauriEnvironment();
   const projectPath = project?.path ?? '';
+  const normalizedRoot = projectPath.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
   const checkouts = useMemo(() => {
-    const worktrees = (project?.worktrees ?? []).slice(1).filter((wt) => !wt.is_bare);
+    const allWorktrees = project?.worktrees ?? [];
+    const matchingRootWt =
+      allWorktrees.find(
+        (wt) => wt.path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase() === normalizedRoot,
+      ) ?? allWorktrees[0];
+    const rootBranch = matchingRootWt?.branch || project?.gitBranch || '';
+    const otherWorktrees = allWorktrees.filter(
+      (wt) =>
+        !wt.is_bare &&
+        wt.path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase() !== normalizedRoot,
+    );
     return [
       {
         path: projectPath,
-        label: `Project folder${project?.gitBranch ? ` · ${project.gitBranch}` : ''}`,
+        label: `Project folder${rootBranch ? ` · ${rootBranch}` : ''}`,
       },
-      ...worktrees.map((wt) => ({ path: wt.path, label: wt.branch || wt.path })),
+      ...otherWorktrees.map((wt) => ({ path: wt.path, label: wt.branch || wt.path })),
     ];
-  }, [project, projectPath]);
-  const checkout = checkouts.some((item) => item.path === chosen) ? chosen : projectPath;
+  }, [project, projectPath, normalizedRoot]);
+  const checkout = useMemo(() => {
+    const chosenNorm = (chosen || '').replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
+    const match = checkouts.find(
+      (item) => item.path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase() === chosenNorm,
+    );
+    return match ? match.path : projectPath;
+  }, [checkouts, chosen, projectPath]);
   const runners = useExecutionStore((state) => state.runners);
   const fixRun = runs.find((run) => run.id === hookFixes[checkout]);
   const fixing = Boolean(fixRun && isActive(fixRun));
@@ -277,6 +294,10 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       });
       if (current.current !== target) return;
       setChanges(next);
+      const active = useProjectStore.getState().projects.find((p) => p.path === projectPath);
+      if (target === projectPath && next.branch && active && next.branch !== active.gitBranch) {
+        useProjectStore.getState().updateProject(active.id, { gitBranch: next.branch });
+      }
       window.dispatchEvent(new Event('jackalope:changes-updated'));
       const paths = new Set(next.files.map((file) => file.path));
       // Forget exclusions for files that no longer have changes.
@@ -644,89 +665,6 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       ) : (
         <div className="commit-review">
           <aside className="commit-review-side">
-            <section className="commit-files" aria-label="Changed files">
-              <header>
-                <label>
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={chosenFiles.length > 0 && !allSelected}
-                    disabled={busy}
-                    onChange={(event) =>
-                      setExcluded(
-                        checkout,
-                        event.target.checked ? [] : files.map((file) => file.path),
-                      )
-                    }
-                  />
-                  <span>
-                    {chosenFiles.length} of {files.length} selected
-                  </span>
-                </label>
-                <span className="commit-stat">
-                  <ins>+{totals.add}</ins> <del>−{totals.del}</del>
-                </span>
-              </header>
-              <ul>
-                {files.map((file) => {
-                  const { dir, name } = splitPath(file.path);
-                  const status = STATUS[file.status];
-                  return (
-                    <li key={file.path} data-focused={file.path === focused || undefined}>
-                      <Checkbox
-                        aria-label={`Include ${file.path}`}
-                        checked={selected.has(file.path)}
-                        disabled={busy}
-                        onChange={(event) => toggle(file.path, event.target.checked)}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setFocused(file.path)}
-                        title={file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}
-                      >
-                        <span
-                          className="commit-status"
-                          data-status={file.status}
-                          title={status.label}
-                        >
-                          {status.letter}
-                        </span>
-                        <span className="commit-file-name">
-                          <strong>{name}</strong>
-                          {dir && <small>{dir}</small>}
-                        </span>
-                        {file.additions !== null && (
-                          <span className="commit-stat">
-                            <ins>+{file.additions}</ins> <del>−{file.deletions ?? 0}</del>
-                          </span>
-                        )}
-                      </button>
-                      <ConfirmAction
-                        title={`Discard changes to ${name}?`}
-                        description={
-                          file.status === 'untracked' || file.status === 'added'
-                            ? 'This new file will be deleted. This cannot be undone.'
-                            : 'The file goes back to its last committed version. This cannot be undone.'
-                        }
-                        label="Discard changes"
-                        busyLabel="Discarding…"
-                        onConfirm={() => discard(file)}
-                        trigger={
-                          <IconButton
-                            variant="ghost"
-                            className="commit-discard"
-                            label={`Discard changes to ${file.path}`}
-                            title="Discard changes"
-                            disabled={busy || file.status === 'conflicted'}
-                          >
-                            <Undo2 size={15} />
-                          </IconButton>
-                        }
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
             <form
               className="commit-compose"
               onSubmit={(event) => {
@@ -810,6 +748,89 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
                 Ask an agent to review
               </Button>
             </form>
+            <section className="commit-files" aria-label="Changed files">
+              <header>
+                <label>
+                  <Checkbox
+                    checked={allSelected}
+                    indeterminate={chosenFiles.length > 0 && !allSelected}
+                    disabled={busy}
+                    onChange={(event) =>
+                      setExcluded(
+                        checkout,
+                        event.target.checked ? [] : files.map((file) => file.path),
+                      )
+                    }
+                  />
+                  <span>
+                    {chosenFiles.length} of {files.length} selected
+                  </span>
+                </label>
+                <span className="commit-stat">
+                  <ins>+{totals.add}</ins> <del>−{totals.del}</del>
+                </span>
+              </header>
+              <ul>
+                {files.map((file) => {
+                  const { dir, name } = splitPath(file.path);
+                  const status = STATUS[file.status];
+                  return (
+                    <li key={file.path} data-focused={file.path === focused || undefined}>
+                      <Checkbox
+                        aria-label={`Include ${file.path}`}
+                        checked={selected.has(file.path)}
+                        disabled={busy}
+                        onChange={(event) => toggle(file.path, event.target.checked)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFocused(file.path)}
+                        title={file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}
+                      >
+                        <span
+                          className="commit-status"
+                          data-status={file.status}
+                          title={status.label}
+                        >
+                          {status.letter}
+                        </span>
+                        <span className="commit-file-name">
+                          <strong>{name}</strong>
+                          {dir && <small>{dir}</small>}
+                        </span>
+                        {file.additions !== null && (
+                          <span className="commit-stat">
+                            <ins>+{file.additions}</ins> <del>−{file.deletions ?? 0}</del>
+                          </span>
+                        )}
+                      </button>
+                      <ConfirmAction
+                        title={`Discard changes to ${name}?`}
+                        description={
+                          file.status === 'untracked' || file.status === 'added'
+                            ? 'This new file will be deleted. This cannot be undone.'
+                            : 'The file goes back to its last committed version. This cannot be undone.'
+                        }
+                        label="Discard changes"
+                        busyLabel="Discarding…"
+                        onConfirm={() => discard(file)}
+                        trigger={
+                          <IconButton
+                            variant="ghost"
+                            className="commit-discard"
+                            label={`Discard changes to ${file.path}`}
+                            title="Discard changes"
+                            disabled={busy || file.status === 'conflicted'}
+                          >
+                            <Undo2 size={15} />
+                          </IconButton>
+                        }
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           </aside>
           <section className="commit-diff" aria-label="Diff">
             {focusedFile && (
