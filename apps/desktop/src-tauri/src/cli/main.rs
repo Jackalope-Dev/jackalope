@@ -27,7 +27,7 @@ USAGE
 
 IN A CONVERSATION
   /                              pick a command: /sessions, /projects, /agent,
-                                 /settings, /diff, /retry, /finish and more
+                                 /settings, /learn, /diff, /retry, /finish and more
 
 OPTIONS
   --open                         start the desktop app if nothing is running

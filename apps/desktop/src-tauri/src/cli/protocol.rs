@@ -93,6 +93,9 @@ pub enum Request {
     },
     /// Open the app's Changes page on a checkout (the project or a worktree).
     ShowChanges { path: String },
+    /// Extract learnings from a conversation's history (up to the previous /learn,
+    /// if present) and save them to project context.
+    SessionLearn { session_id: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -214,6 +217,12 @@ pub enum Response {
         attribution: String,
         name: String,
         email: String,
+    },
+    /// Result of extracting and saving learnings from a session.
+    Learned {
+        count: usize,
+        lessons: Vec<String>,
+        message: String,
     },
 }
 

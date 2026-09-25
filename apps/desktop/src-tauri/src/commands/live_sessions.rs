@@ -3,6 +3,8 @@ pub use windows::*;
 mod changes;
 mod topics;
 pub use topics::*;
+mod learning;
+pub use learning::*;
 
 use super::{
     coordination::Coordinator,
@@ -69,6 +71,8 @@ pub struct LiveSession {
     pub integrated_run_id: Option<String>,
     #[serde(default)]
     pub pinned: bool,
+    #[serde(default)]
+    pub last_learned_message_id: Option<String>,
     pub id: String,
     pub title: String,
     pub request: RunRequest,
@@ -376,6 +380,7 @@ impl LiveSessions {
                 limits,
                 integrated_run_id: None,
                 pinned: false,
+                last_learned_message_id: None,
                 id: id.clone(),
                 title: title.trim().into(),
                 request,

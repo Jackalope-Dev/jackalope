@@ -23,7 +23,7 @@ use ratatui::Frame;
 use std::cell::Cell;
 use std::collections::HashSet;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 enum Event {
     Key(KeyEvent),
@@ -50,6 +50,10 @@ const COMMANDS: &[(&str, &str)] = &[
     ("settings", "change how Jackalope behaves"),
     ("status", "show the project, host and agents"),
     ("agent", "choose the agent for your next conversation"),
+    (
+        "learn",
+        "save learnings from this session to project context",
+    ),
     ("diff", "review and commit this work in the app"),
     ("stop", "stop the work that is running"),
     ("retry", "run the last message again"),
@@ -59,6 +63,24 @@ const COMMANDS: &[(&str, &str)] = &[
     ("open", "show Jackalope's app window"),
     ("help", "show these commands"),
     ("quit", "leave (work keeps running)"),
+];
+
+const TIPS: &[&str] = &[
+    "Run `/learn` to extract session history into reusable project context.",
+    "Type `/` to search all commands with arrow navigation and tab completion.",
+    "Run `/diff` to inspect changed files and review patches in the desktop app.",
+    "Use `/agent` to choose which AI coding agent handles your next conversation.",
+    "Switch between active conversations in this repository with `/sessions`.",
+    "Start a fresh conversation anytime with `/new`.",
+    "Press `Alt+Enter` (or `Ctrl+J`) to insert a newline without submitting.",
+    "Use `/stop` to halt running agent execution immediately.",
+    "Run `/retry` to re-execute the last message after an interruption or failure.",
+    "Open the full Jackalope desktop workspace anytime with `/open`.",
+    "Learned lessons from `/learn` are automatically applied to future relevant tasks.",
+    "Scroll conversation history with mouse wheel or `Page Up` / `Page Down`.",
+    "Use `/status` to inspect the host, connected agents, and current branch.",
+    "Manage Git commit attribution and host settings with `/settings`.",
+    "Clear notices from your terminal screen anytime with `Ctrl+L`.",
 ];
 
 /// What choosing a picker row does.
@@ -136,6 +158,9 @@ struct App {
     scroll_back: u16,
     /// Animation frame for the working indicator.
     tick: usize,
+    /// Currently displayed rotating tip.
+    tip_index: usize,
+    last_tip_change: Instant,
     quit: bool,
 }
 
@@ -173,6 +198,8 @@ pub fn run(
         notices: Vec::new(),
         scroll_back: 0,
         tick: 0,
+        tip_index: 0,
+        last_tip_change: Instant::now(),
         quit: false,
     };
     app.refresh();
@@ -237,8 +264,9 @@ fn event_loop(
                 }
             }
             Ok(Event::Tick) => {
-                // Only a visible spinner needs the extra frames.
-                if !app.working() {
+                let tip_changed = app.rotate_tip_if_elapsed();
+                // Only a visible spinner or tip rotation needs a redraw.
+                if !app.working() && !tip_changed {
                     continue;
                 }
                 app.tick = app.tick.wrapping_add(1);
@@ -400,6 +428,17 @@ impl App {
                     Some("starting" | "running" | "routing" | "queued" | "stopping")
                 )
         })
+    }
+
+    /// Rotates to the next tip every 8 seconds, returning true when changed.
+    fn rotate_tip_if_elapsed(&mut self) -> bool {
+        if self.last_tip_change.elapsed() >= Duration::from_secs(8) {
+            self.tip_index = (self.tip_index + 1) % TIPS.len();
+            self.last_tip_change = Instant::now();
+            true
+        } else {
+            false
+        }
     }
 
     fn scroll(&mut self, lines: i16) {
@@ -1069,6 +1108,26 @@ impl App {
                     .push("Your conversation is still open; /sessions to go back.".into());
             }
             "agent" | "model" => self.open_picker(PickerKind::NextAgent),
+            "learn" => match session {
+                Some(session_id) => {
+                    if let Some(Response::Learned {
+                        count,
+                        lessons,
+                        message,
+                    }) = self.request(Request::SessionLearn { session_id })
+                    {
+                        if count == 0 {
+                            self.notices.push(message);
+                        } else {
+                            self.notices.push(format!("{message}:"));
+                            for lesson in lessons {
+                                self.notices.push(format!("  • {lesson}"));
+                            }
+                        }
+                    }
+                }
+                None => self.notices.push("Start a conversation first.".into()),
+            },
             "diff" | "changes" => {
                 // The conversation's own worktree when it has one.
                 let path = self
@@ -1530,12 +1589,15 @@ fn draw(frame: &mut Frame, app: &App) {
     } else {
         Text::from(brand::compact())
     };
+    let show_tip = area.height >= 18;
+    let tip_height = if show_tip { 1 } else { 0 };
     let input_rows = (app.input.lines().count().max(1) as u16).min(6) + 2;
-    let [header_area, body, status_area, input_area] = Layout::vertical([
+    let [header_area, body, status_area, input_area, tip_area] = Layout::vertical([
         Constraint::Length(header.height() as u16 + 1),
         Constraint::Min(3),
         Constraint::Length(1),
         Constraint::Length(input_rows),
+        Constraint::Length(tip_height),
     ])
     .areas(area);
 
@@ -1584,6 +1646,10 @@ fn draw(frame: &mut Frame, app: &App) {
         input_area,
     );
 
+    if show_tip {
+        draw_tip(frame, app, tip_area);
+    }
+
     if let Some(picker) = &app.picker {
         draw_picker(frame, picker, area);
         return;
@@ -1593,6 +1659,17 @@ fn draw(frame: &mut Frame, app: &App) {
         draw_slash_menu(frame, &matches, app.slash, input_area);
     }
     place_cursor(frame, app, inner);
+}
+
+fn draw_tip(frame: &mut Frame, app: &App, area: Rect) {
+    if area.height == 0 || area.width < 10 {
+        return;
+    }
+    let accent = Style::default().fg(brand::accent());
+    let tip = TIPS[app.tip_index % TIPS.len()];
+    let mut spans = vec![Span::styled("  Tip: ", accent.add_modifier(Modifier::BOLD))];
+    spans.extend(inline(tip));
+    frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
 /// The command menu, floating just above the input like an editor's completions.
@@ -1741,9 +1818,21 @@ mod tests {
                 .collect()
         };
         assert_eq!(names("/se"), ["sessions", "settings"]);
+        assert_eq!(names("/le"), ["learn"]);
         assert_eq!(names("/").len(), COMMANDS.len());
         assert!(names("/stop now").is_empty(), "arguments close the menu");
         assert!(names("hello").is_empty());
+    }
+
+    #[test]
+    fn rotating_tips_are_non_empty_and_render_cleanly() {
+        assert!(!TIPS.is_empty());
+        for tip in TIPS {
+            let spans = inline(tip);
+            assert!(!spans.is_empty(), "every tip should produce spans");
+            let line = Line::from(spans);
+            assert!(line.width() > 10, "tip should be substantive: {tip}");
+        }
     }
 
     fn text(line: &Line) -> String {

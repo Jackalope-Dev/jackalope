@@ -52,14 +52,19 @@ terminal and the app together. Leaving a terminal does not stop work.
 | `jackalope ls` | Lists open conversations |
 | `jackalope status` | Shows the host, its endpoint and profile |
 
-Inside a conversation, `/help` lists commands: `/new`, `/sessions`, `/stop`,
-`/pause`, `/resume`, `/open` and `/quit`. Alt+Enter adds a line, Up and Down
-recall input, and Page Up and Page Down scroll. Ctrl+C leaves and prints how to
-rejoin. `JACKALOPE_PROFILE_DIR` or `--profile=<dir>` selects a non-default
-profile. The terminal follows its project's saved accent, including theme changes
-while it is open and the project of an attached conversation. Colour is adjusted
-for readability; 256-colour terminals use the nearest palette match. `NO_COLOR`
-disables colour; without `COLORTERM=truecolor` the banner uses one colour.
+Inside a conversation, typing `/` opens an interactive command menu, and `/help`
+lists commands: `/new`, `/sessions`, `/projects`, `/agents`, `/settings`,
+`/status`, `/agent`, `/learn`, `/diff`, `/stop`, `/retry`, `/finish`, `/pause`,
+`/resume`, `/open` and `/quit`. `/learn` inspects conversation history since the
+previous learn command (or session start) and saves relevant learnings, preferences
+and check commands to project knowledge. Alt+Enter (or Ctrl+J) adds a line, Up and
+Down recall input, and Page Up and Page Down scroll. A rotating tips bar below the
+composer periodically highlights commands and shortcuts when terminal height permits.
+Ctrl+C leaves and prints how to rejoin. `JACKALOPE_PROFILE_DIR` or `--profile=<dir>`
+selects a non-default profile. The terminal follows its project's saved accent,
+including theme changes while it is open and the project of an attached conversation.
+Colour is adjusted for readability; 256-colour terminals use the nearest palette match.
+`NO_COLOR` disables colour; without `COLORTERM=truecolor` the banner uses one colour.
 
 Agent questions appear in the terminal but are answered in the app. The
 transcript shows the conversation's messages followed by the latest attempt's

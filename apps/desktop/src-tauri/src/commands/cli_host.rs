@@ -546,6 +546,17 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             let _ = app.emit("jackalope:open-changes", path);
             Ok(response)
         }
+        Request::SessionLearn { session_id } => {
+            let sessions = app.state::<LiveSessions>();
+            let runtime = app.state::<TaskRuntime>();
+            let result =
+                super::live_sessions::learn_from_session(&sessions, &runtime, &session_id)?;
+            Ok(Response::Learned {
+                count: result.count,
+                lessons: result.lessons,
+                message: result.message,
+            })
+        }
         Request::Ping => Ok(Response::Ok),
         Request::ShowWindow => Ok(show_window(app)),
     }

@@ -24,7 +24,9 @@ task. Write one concise fact or decision and the words or phrases that should
 match future task instructions. Task-derived entries retain a link to the source
 attempt. Manual entries stay under your control. Jackalope also derives bounded local lessons
 from saved user feedback and repository evidence; it does not rewrite repository
-instructions or make background model calls.
+instructions or make background model calls. In terminal conversations, `/learn`
+extracts stated preferences, corrections and verified check commands from recent session
+history into project knowledge.
 
 The composer previews matching lessons under **Saved project context**. Skip an
 individual lesson or disable matching for that task. The native launcher applies
