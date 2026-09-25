@@ -3,9 +3,10 @@ import { Gauge } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import { capacityWindowDisplay, capacityWindowName } from '../../lib/capacity-display';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useCapacityStore } from '../../stores/capacityStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { isAgentAllowedForProject, useProjectStore } from '../../stores/projectStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import { Button } from '../ui/button';
 import { navigateWorkspace } from './navigation';
@@ -59,14 +60,22 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
     };
   }, [fetch]);
   const projectId = useProjectStore((state) => state.activeProjectId);
+  const project = useProjectStore((state) =>
+    state.projects.find((item) => item.id === state.activeProjectId),
+  );
+  const enabledAgents = useAgentConfigStore((state) => state.enabledAgents);
   const runs = useExecutionStore((state) => state.runs);
   const projectAgents = new Set(
     runs.filter((run) => run.projectId === projectId).map((run) => run.agent),
   );
-  // Only agents that report allowance data or have run in this project.
+  const isAgentEnabled = (agentId: string) =>
+    (enabledAgents[agentId] ?? true) &&
+    (!projectId || (Boolean(project) && isAgentAllowedForProject(project, agentId)));
+  // Only agents enabled on the current project that report allowance data or have run in this project.
   const accounts = records.filter(
     (record) =>
       record.status !== 'notInstalled' &&
+      isAgentEnabled(record.agent) &&
       (record.windows.length > 0 || projectAgents.has(record.agent)),
   );
   const summaries = accounts.map((record) => {
