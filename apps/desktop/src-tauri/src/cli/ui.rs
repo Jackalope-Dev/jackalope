@@ -421,7 +421,10 @@ impl App {
     /// Whether an agent is working, so the status line animates.
     fn working(&self) -> bool {
         self.view.as_ref().is_some_and(|view| {
-            view.error.is_none()
+            view.error
+                .as_deref()
+                .filter(|e| !e.trim().is_empty() && *e != "null")
+                .is_none()
                 && view.questions.is_empty()
                 && matches!(
                     view.status.as_deref(),
@@ -1496,7 +1499,11 @@ fn transcript(app: &App) -> Vec<Line<'static>> {
                     muted,
                 ));
             }
-            if let Some(error) = &view.error {
+            if let Some(error) = &view
+                .error
+                .as_deref()
+                .filter(|e| !e.trim().is_empty() && *e != "null")
+            {
                 lines.push(Line::raw(""));
                 lines.push(Line::styled(format!("! {error}"), accent));
             }
@@ -1536,7 +1543,11 @@ fn status(app: &App) -> Line<'static> {
             accent,
         ));
     }
-    let state = if view.error.is_some() {
+    let state = if view
+        .error
+        .as_deref()
+        .is_some_and(|e| !e.trim().is_empty() && e != "null")
+    {
         "needs you".to_string()
     } else {
         view.step

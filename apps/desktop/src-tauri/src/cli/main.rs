@@ -128,7 +128,11 @@ fn list(preference: Option<ColdStart>) -> Result<(), String> {
     for session in sessions {
         let state = if session.paused { "paused" } else { "active" };
         println!("{}  {:<7}  {}", &session.id[..8], state, session.title);
-        if let Some(error) = session.error {
+        if let Some(error) = session
+            .error
+            .as_deref()
+            .filter(|e| !e.trim().is_empty() && *e != "null")
+        {
             println!("{:10}{error}", "");
         }
     }

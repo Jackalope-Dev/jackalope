@@ -562,14 +562,17 @@ impl LiveSessions {
                             || run.verification.as_ref().is_some_and(|v| !v.result.success)
                         {
                             session.paused = true;
-                            session.error = Some(
-                                run.error
-                                    .clone()
-                                    .or(run.verification_error.clone())
-                                    .unwrap_or_else(|| {
-                                        "Review the last attempt before continuing.".into()
-                                    }),
-                            );
+                            let err = run
+                                .error
+                                .as_deref()
+                                .filter(|e| !e.trim().is_empty() && *e != "null")
+                                .or(run
+                                    .verification_error
+                                    .as_deref()
+                                    .filter(|e| !e.trim().is_empty() && *e != "null"))
+                                .or(run.quota_failure.as_ref().map(|q| q.message.as_str()))
+                                .unwrap_or("Review the last attempt before continuing.");
+                            session.error = Some(err.to_string());
                         }
                         Ok(())
                     })?;

@@ -283,11 +283,29 @@ fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionVie
     let decision = run
         .and_then(|run| run.routing.as_ref())
         .and_then(|routing| routing.decisions.last());
+    let run_error = run
+        .filter(|run| !["review", "reviewed", "running", "starting"].contains(&run.status.as_str()))
+        .and_then(|run| {
+            run.error
+                .as_deref()
+                .filter(|e| !e.trim().is_empty() && *e != "null")
+                .or(run
+                    .verification_error
+                    .as_deref()
+                    .filter(|e| !e.trim().is_empty() && *e != "null"))
+                .or(run.quota_failure.as_ref().map(|q| q.message.as_str()))
+        });
+    let error = session
+        .error
+        .as_deref()
+        .filter(|error| !error.trim().is_empty() && *error != "null")
+        .or(run_error)
+        .map(str::to_string);
     protocol::SessionView {
         id: session.id.clone(),
         title: session.title.clone(),
         paused: session.paused,
-        error: session.error.clone(),
+        error,
         messages: transcript(session, runs),
         run_id: run.map(|run| run.id.clone()),
         status: run.map(|run| run.status.clone()),
@@ -360,7 +378,11 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                         .iter()
                         .filter(|message| !message.canceled && message.run_id.is_none())
                         .count(),
-                    error: session.error.clone(),
+                    error: session
+                        .error
+                        .as_deref()
+                        .filter(|e| !e.trim().is_empty() && *e != "null")
+                        .map(str::to_string),
                     updated_at: session.updated_at.clone(),
                 })
                 .collect();
