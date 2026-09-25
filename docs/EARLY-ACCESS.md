@@ -57,6 +57,7 @@ older mail remains readable without a delivery lookup reference.
 | `ACCESS_EMAIL_REPLY_TO` | `contact@jackalope.dev` |
 | `ACCESS_AUDIENCE_LIST` | Sequenzy list ID for confirmed subscribers; empty disables audience syncing |
 | `ACCESS_INSTALLER_KEY` | Empty until a reviewed installer exists |
+| `ACCESS_MAC_CHANNELS`, `ACCESS_LINUX_CHANNELS` | Comma-separated `stable`/`beta` CrabNebula channels offered to members; empty hides that platform |
 | `ADMIN_EMAIL`, `ACCESS_ISSUER`, `ACCESS_AUD` | Exact owner and Cloudflare Access application |
 | `ACCESS_SECRET` | Worker secret, independent random 32+ characters for each environment |
 | `SEQUENZY_API_KEY` | Worker secret with `transactional:send`; verify minimum permission for email-send lookups before enabling admin delivery checks |

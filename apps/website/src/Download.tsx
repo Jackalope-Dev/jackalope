@@ -24,10 +24,11 @@ const platformIcons = { windows: Monitor, macos: Command, linux: Terminal };
 interface DownloadMember {
   email: string;
   download?: { kind?: 'store' } | null;
-  /** macOS builds this member can download while they are not public. */
-  macos?: MacBuild[];
+  /** Builds this member can download while they are not public. */
+  macos?: ReleaseBuild[];
+  linux?: ReleaseBuild[];
 }
-interface MacBuild {
+interface ReleaseBuild {
   id: string;
   label: string;
   channel: 'stable' | 'beta';
@@ -35,8 +36,8 @@ interface MacBuild {
 }
 const channelNames = { stable: 'Stable', beta: 'Beta' } as const;
 
-/** The member's macOS builds, with a release channel choice when several are offered. */
-function MacDownloads({ builds }: { builds: MacBuild[] }) {
+/** The member's builds for one platform, with a release channel choice when several are offered. */
+function ReleaseDownloads({ builds }: { builds: ReleaseBuild[] }) {
   const channels = [...new Set(builds.map((build) => build.channel))];
   const [channel, setChannel] = useState(channels[0]);
   const selected = channels.includes(channel) ? channel : channels[0];
@@ -46,7 +47,7 @@ function MacDownloads({ builds }: { builds: MacBuild[] }) {
         <Select
           aria-label="Release channel"
           value={selected}
-          onValueChange={(value) => setChannel(value as MacBuild['channel'])}
+          onValueChange={(value) => setChannel(value as ReleaseBuild['channel'])}
         >
           {channels.map((option) => (
             <SelectItem key={option} value={option}>
@@ -208,6 +209,7 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
       <section className="download-platforms" aria-label="Desktop downloads">
         {ordered.map((option) => {
           const Icon = platformIcons[option.id];
+          const builds = option.id === 'windows' ? undefined : member?.[option.id];
           return (
             <article
               className={`download-platform${option.id === platform ? ' download-platform-detected' : ''}`}
@@ -221,8 +223,8 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
               <h2>{option.name}</h2>
               <p>{option.detail}</p>
               <div className="download-platform-action">
-                {!option.url && option.id === 'macos' && member?.macos?.length ? (
-                  <MacDownloads builds={member.macos} />
+                {!option.url && builds?.length ? (
+                  <ReleaseDownloads builds={builds} />
                 ) : option.url ? (
                   <a
                     className="button button-primary"
@@ -258,7 +260,7 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
             </h2>
             <p>
               {email && !token
-                ? `You’re signed in as ${email}. ${downloads.some((option) => option.url) || member?.macos?.length ? 'Choose your platform above to get started.' : 'Downloads are coming soon. Your early access is ready when they arrive.'}`
+                ? `You’re signed in as ${email}. ${downloads.some((option) => option.url) || member?.macos?.length || member?.linux?.length ? 'Choose your platform above to get started.' : 'Downloads are coming soon. Your early access is ready when they arrive.'}`
                 : 'Jackalope is in early access. You’ll need to be accepted from the waitlist or claim a friend’s Instant Access Pass to start using the app.'}
             </p>
             {email && !token ? (

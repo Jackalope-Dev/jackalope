@@ -40,6 +40,7 @@ test('deployment rejects unknown settings, unprotected admin and public installe
     { ACCESS_AUD: '' },
     { ACCESS_INSTALLER_KEY: 'stable/Jackalope.exe' },
     { ACCESS_MAC_CHANNELS: 'stable,nightly' },
+    { ACCESS_LINUX_CHANNELS: 'nightly' },
     { EARLY_ACCESS_ENABLED: true },
   ]) {
     assert.throws(() =>
