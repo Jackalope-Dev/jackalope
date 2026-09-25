@@ -646,30 +646,31 @@ describe('private monitoring and feedback delivery', () => {
     const send = vi
       .fn()
       .mockRejectedValueOnce(new Error('private provider details'))
-      .mockResolvedValue({ messageId: 'test' });
+      .mockImplementation(async () => Response.json({ success: true, jobId: 'job' }));
     const bindings = testEnv({
       FEEDBACK_EMAIL_ENABLED: 'true',
       FEEDBACK_EMAIL_FROM: 'feedback@example.com',
       FEEDBACK_EMAIL_TO: 'inbox@example.com',
-      FEEDBACK_EMAIL: { send } as unknown as SendEmail,
+      SEQUENZY_API_KEY: 'test-key',
     });
-    await deliverFeedback(bindings, now);
+    await deliverFeedback(bindings, now, send);
     expect(await count('feedback')).toBe(1);
     expect(await env.DB.prepare('SELECT email_state FROM feedback').first('email_state')).toBe(
       'failed',
     );
-    await deliverFeedback(bindings, now + 1);
+    await deliverFeedback(bindings, now + 1, send);
     expect(send).toHaveBeenCalledTimes(1);
     await Promise.all([
-      deliverFeedback(bindings, now + 300000),
-      deliverFeedback(bindings, now + 300000),
+      deliverFeedback(bindings, now + 300000, send),
+      deliverFeedback(bindings, now + 300000, send),
     ]);
     expect(send).toHaveBeenCalledTimes(2);
-    expect(send.mock.calls[1][0]).toMatchObject({
+    expect(send.mock.calls[1][0]).toBe('https://api.sequenzy.com/api/v1/transactional/send');
+    expect(JSON.parse(send.mock.calls[1][1].body)).toMatchObject({
       to: 'inbox@example.com',
       from: 'feedback@example.com',
     });
-    await deliverFeedback(bindings, now + 600000);
+    await deliverFeedback(bindings, now + 600000, send);
     expect(send).toHaveBeenCalledTimes(2);
     expect(await env.DB.prepare('SELECT email_state FROM feedback').first('email_state')).toBe(
       'sent',
@@ -683,12 +684,12 @@ describe('private monitoring and feedback delivery', () => {
       FEEDBACK_EMAIL_ENABLED: 'true',
       FEEDBACK_EMAIL_FROM: 'feedback@example.com',
       FEEDBACK_EMAIL_TO: 'inbox@example.com',
-      FEEDBACK_EMAIL: { send } as unknown as SendEmail,
+      SEQUENZY_API_KEY: 'test-key',
     });
-    for (let i = 0; i < 7; i++) await deliverFeedback(bindings, now + i * 86400000);
+    for (let i = 0; i < 7; i++) await deliverFeedback(bindings, now + i * 86400000, send);
     expect(send).toHaveBeenCalledTimes(5);
     await saveFeedback(testEnv(), feedback(), now - 91 * 86400000);
-    await deliverFeedback(bindings, now + 8 * 86400000);
+    await deliverFeedback(bindings, now + 8 * 86400000, send);
     expect(send).toHaveBeenCalledTimes(5);
   });
 });

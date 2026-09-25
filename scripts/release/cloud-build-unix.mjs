@@ -169,7 +169,11 @@ try {
       ]);
     }
   }
-  run('pnpm', ['tauri', 'bundle', ...common, '--bundles', mac ? 'app,dmg' : 'appimage']);
+  // Tauri skips the Finder layout pass (background, window size, icon
+  // positions) when CI is set, which leaves the DMG unstyled.
+  run('pnpm', ['tauri', 'bundle', ...common, '--bundles', mac ? 'app,dmg' : 'appimage'], {
+    env: { ...process.env, CI: undefined },
+  });
   const name = candidate ? 'Jackalope' : 'Jackalope Rehearsal';
   if (mac) {
     const app = resolve(native, 'bundle/macos', `${name}.app`);

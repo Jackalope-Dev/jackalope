@@ -123,13 +123,13 @@ Set deployment configuration, never app source:
 | `ACCESS_AUD` | Access application's audience tag |
 | `INGESTION_ENABLED` | `true` only after migration and acceptance |
 | `FEEDBACK_EMAIL_ENABLED` | `true` only after sender setup |
-| `FEEDBACK_EMAIL_FROM` | Address on an onboarded sending domain |
+| `FEEDBACK_EMAIL_FROM` | Sender on a Sequenzy-verified domain; delivery uses `SEQUENZY_API_KEY` |
 | `FEEDBACK_EMAIL_TO` | Private inbox recipient |
 
 For generated deployment config, use `STAGING_` or `PRODUCTION_` prefixes on those
 environment variables. `apps/server/scripts/community-config.mjs` validates/copies
 them into that environment; native Builds and GitHub deployment use the same helper.
-Generated deployment configuration omits the email binding while sending is disabled.
+Feedback email sends through Sequenzy, so enabling it requires the `SEQUENZY_API_KEY` secret.
 Keep `RATE_SECRET` in Worker secrets and resource IDs in private deployment settings.
 An unset admin identity/issuer/audience fails closed. Public configuration uses blank
 admin values and disabled ingestion/email; it contains no owner's login address.

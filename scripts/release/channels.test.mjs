@@ -30,14 +30,12 @@ test('private deployment settings stay scoped to their environment and require c
   assert.equal(production.vars.ADMIN_EMAIL, '');
   assert.equal(staging.vars.INGESTION_ENABLED, 'true');
   assert.equal(production.vars.INGESTION_ENABLED, 'false');
-  assert.deepEqual(staging.send_email, []);
   applyCommunityConfig(staging, 'staging', {
     STAGING_FEEDBACK_EMAIL_ENABLED: 'true',
     STAGING_FEEDBACK_EMAIL_FROM: 'feedback@example.com',
   });
-  assert.deepEqual(staging.send_email, [
-    { name: 'FEEDBACK_EMAIL', allowed_destination_addresses: ['inbox@example.com'] },
-  ]);
+  assert.equal(staging.send_email, undefined);
+  assert.ok(staging.secrets.required.includes('SEQUENZY_API_KEY'));
   assert.throws(() =>
     applyCommunityConfig(settings(), 'staging', { STAGING_ADMIN_EMAIL: 'owner@example.com' }),
   );

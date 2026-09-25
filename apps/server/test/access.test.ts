@@ -47,6 +47,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   bindings.ACCESS_STORE_URL = '';
   bindings.ACCESS_MAC_CHANNELS = '';
+  bindings.ACCESS_LINUX_CHANNELS = '';
   for (const table of [
     'access_sessions',
     'access_tokens',
@@ -427,6 +428,23 @@ it('sends approved members to the macOS release channel and hides it when disabl
     ).first(),
   ).toEqual({ first_download_at: expect.any(Number) });
   bindings.ACCESS_MAC_CHANNELS = '';
+});
+it('sends approved members to the Linux release channel only when it is enabled', async () => {
+  const { session } = await admitted('linux-owner@example.com');
+  expect(await (await request('me', undefined, session)).json()).toMatchObject({ linux: [] });
+  expect((await request('download/linux-x86_64/beta', undefined, session)).status).toBe(404);
+  bindings.ACCESS_LINUX_CHANNELS = 'beta';
+  expect(await (await request('me', undefined, session)).json()).toMatchObject({
+    macos: [],
+    linux: [{ id: 'linux-x86_64', label: 'x64 AppImage', channel: 'beta' }],
+  });
+  expect((await request('download/linux-x86_64/stable', undefined, session)).status).toBe(404);
+  const response = await request('download/linux-x86_64/beta', undefined, session);
+  expect(response.status).toBe(302);
+  expect(response.headers.get('location')).toBe(
+    'https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/appimage-x86_64?channel=beta',
+  );
+  bindings.ACCESS_LINUX_CHANNELS = '';
 });
 it('offers an approved member a Store link without a private installer and still rejects signed-out users', async () => {
   const { session } = await admitted('store-owner@example.com');

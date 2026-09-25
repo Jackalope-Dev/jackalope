@@ -43,23 +43,34 @@ const macDownloads = {
   'macos-aarch64': { platform: 'dmg-aarch64', label: 'Apple silicon' },
   'macos-x86_64': { platform: 'dmg-x86_64', label: 'Intel' },
 } as const;
+const linuxDownloads = {
+  'linux-x86_64': { platform: 'appimage-x86_64', label: 'x64 AppImage' },
+} as const;
+const releaseDownloads = { ...macDownloads, ...linuxDownloads };
 
-/**
- * The CrabNebula release channels macOS members may download, in the order the
- * website offers them; the first is the default.
- */
-export function macChannels(env: Env) {
+function releaseChannels(value: string | undefined) {
   return [
     ...new Set(
-      (env.ACCESS_MAC_CHANNELS ?? '')
+      (value ?? '')
         .split(',')
         .map((channel) => channel.trim())
         .filter((channel) => channel === 'stable' || channel === 'beta'),
     ),
   ];
 }
-function macDownloadUrl(channel: string, id: keyof typeof macDownloads) {
-  return `https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/${macDownloads[id].platform}?channel=${channel}`;
+/**
+ * The CrabNebula release channels macOS members may download, in the order the
+ * website offers them; the first is the default.
+ */
+export function macChannels(env: Env) {
+  return releaseChannels(env.ACCESS_MAC_CHANNELS);
+}
+/** The CrabNebula release channels Linux members may download, ordered like macOS. */
+export function linuxChannels(env: Env) {
+  return releaseChannels(env.ACCESS_LINUX_CHANNELS);
+}
+function releaseDownloadUrl(channel: string, id: keyof typeof releaseDownloads) {
+  return `https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/${releaseDownloads[id].platform}?channel=${channel}`;
 }
 
 export function storeUrl(env: Env) {
@@ -274,17 +285,20 @@ export async function accessRoutes(
       const store = storeUrl(env);
       const key = installerKey(env);
       const installer = !store && key ? await env.RELEASES.head(key) : null;
-      return json({
-        email: member.email,
-        ...(await invitations(env, member)),
-        macos: macChannels(env).flatMap((channel) =>
-          Object.entries(macDownloads).map(([id, { label }]) => ({
+      const builds = (channels: string[], downloads: Record<string, { label: string }>) =>
+        channels.flatMap((channel) =>
+          Object.entries(downloads).map(([id, { label }]) => ({
             id,
             label,
             channel,
             url: `${url.origin}/v1/access/download/${id}/${channel}`,
           })),
-        ),
+        );
+      return json({
+        email: member.email,
+        ...(await invitations(env, member)),
+        macos: builds(macChannels(env), macDownloads),
+        linux: builds(linuxChannels(env), linuxDownloads),
         download: store
           ? { url: `${url.origin}/v1/access/download`, kind: 'store' }
           : installer
@@ -292,11 +306,14 @@ export async function accessRoutes(
             : null,
       });
     }
-    const macPath = path.match(/^\/v1\/access\/download\/(macos-(?:aarch64|x86_64))\/([a-z]+)$/);
-    if (['GET', 'HEAD'].includes(request.method) && macPath) {
-      const macId = macPath[1] as keyof typeof macDownloads;
-      const channel = macPath[2] as 'stable' | 'beta';
-      if (!macChannels(env).includes(channel)) throw new AccessError(404, 'download_not_ready');
+    const releasePath = path.match(
+      /^\/v1\/access\/download\/(macos-(?:aarch64|x86_64)|linux-x86_64)\/([a-z]+)$/,
+    );
+    if (['GET', 'HEAD'].includes(request.method) && releasePath) {
+      const id = releasePath[1] as keyof typeof releaseDownloads;
+      const channel = releasePath[2] as 'stable' | 'beta';
+      const channels = id.startsWith('linux-') ? linuxChannels(env) : macChannels(env);
+      if (!channels.includes(channel)) throw new AccessError(404, 'download_not_ready');
       if (request.method === 'GET')
         await env.DB.prepare(
           'UPDATE access_members SET first_download_at=coalesce(first_download_at,?) WHERE id=?',
@@ -305,7 +322,7 @@ export async function accessRoutes(
           .run();
       return new Response(null, {
         status: 302,
-        headers: { ...headers, ...cors, location: macDownloadUrl(channel, macId) },
+        headers: { ...headers, ...cors, location: releaseDownloadUrl(channel, id) },
       });
     }
     if (['GET', 'HEAD'].includes(request.method) && path === '/v1/access/download') {
