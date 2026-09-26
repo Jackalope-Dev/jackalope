@@ -47,26 +47,65 @@ terminal and the app together. Leaving a terminal does not stop work.
 | Command | Behavior |
 | --- | --- |
 | `jackalope` | Starts a conversation in this repository |
+| `jackalope -p "<message>"` | Runs one message and prints the reply; `run` is an alias |
 | `jackalope --continue` | Rejoins this repository's latest conversation |
 | `jackalope attach <id>` | Rejoins a conversation; any unambiguous id prefix works |
 | `jackalope ls` | Lists open conversations |
 | `jackalope status` | Shows the host, its endpoint and profile |
 
 Inside a conversation, typing `/` opens an interactive command menu, and `/help`
-lists commands: `/new`, `/sessions`, `/projects`, `/agents`, `/settings`,
+lists commands: `/new`, `/bg`, `/sessions`, `/projects`, `/agents`, `/settings`,
 `/status`, `/agent`, `/learn`, `/diff`, `/stop`, `/retry`, `/finish`, `/pause`,
-`/resume`, `/open` and `/quit`. `/learn` inspects conversation history since the
-previous learn command (or session start) and saves relevant learnings, preferences
-and check commands to project knowledge. Alt+Enter (or Ctrl+J) adds a line, Up and
-Down recall input, and Page Up and Page Down scroll. A rotating tips bar below the
-composer periodically highlights commands and shortcuts when terminal height permits.
-Ctrl+C leaves and prints how to rejoin. `JACKALOPE_PROFILE_DIR` or `--profile=<dir>`
+`/resume`, `/copy`, `/history`, `/kill`, `/clear`, `/open` and `/quit`. Pickers
+filter as you type. `/new <message>` starts
+and shows a conversation; `/bg <message>` starts one and stays on the current one.
+`/learn` inspects conversation history since the previous learn command (or session
+start) and saves relevant learnings, preferences and check commands to project
+knowledge. Messages sent while an agent works queue behind it.
+
+A line starting with `!` runs in the user's shell (`cmd` on Windows) in the
+conversation's worktree, or the project when it has none. Output streams below the
+conversation and never reaches an agent; stdin is closed and pagers are disabled.
+`/kill` stops running commands and their children (the process group on Unix,
+`taskkill /T` on Windows), and leaving the terminal stops them too. `@` opens fuzzy
+completion over the workspace's files that Git does not ignore.
+
+While a conversation is open, the header shows the small mark beside the project and
+branch, the conversation's routing, other open conversations (with any that need
+you) and agent readiness. The mark and status text animate only while work runs;
+`JACKALOPE_REDUCED_MOTION=1` keeps them still. The status line shows elapsed time,
+queued messages, running commands and brief confirmations.
+
+The input soft-wraps and grows to a third of the screen. Shift+Enter (where the
+terminal supports the keyboard protocol), Alt+Enter, Ctrl+J or a trailing `\` adds a
+line. Up and Down move between rows, then recall input; history persists in
+`preferences/cli-history.json` (1000 entries) and Ctrl+R searches it. Esc clears the
+draft (Ctrl+Y restores it), returns to the latest output when scrolled back, and
+pressed twice stops running work. Readline keys work: Ctrl+A/E, Ctrl+W, Alt or Ctrl
+with Backspace, Left and Right, Ctrl+U/K and Ctrl+Y. Page Up and Page Down scroll,
+and Ctrl+N and Ctrl+P step through open conversations across projects. Ctrl+Z
+suspends to the shell on macOS and Linux. The window title shows the conversation's
+state, and the bell rings when work finishes or needs you (`JACKALOPE_BELL=0`
+silences it). Dragging selects and copies text through the platform
+clipboard tool, or OSC 52 over SSH; Shift or Option while dragging uses the
+terminal's own selection. Ctrl+C clears the input, then stops running commands, then
+leaves and prints how to rejoin. A rotating tips bar below the composer highlights
+commands and shortcuts when terminal height permits.
+`JACKALOPE_PROFILE_DIR` or `--profile=<dir>`
 selects a non-default profile. The terminal follows its project's saved accent,
 including theme changes while it is open and the project of an attached conversation.
 Colour is adjusted for readability; 256-colour terminals use the nearest palette match.
+Success, attention and failure use fixed green, amber and red tones.
 `NO_COLOR` disables colour; without `COLORTERM=truecolor` the banner uses one colour.
 
-Agent questions appear in the terminal but are answered in the app. The
+`jackalope -p "<message>"` (or `jackalope run`) starts a conversation, waits for it
+to settle and prints the reply; piped stdin is appended to the message, `--json`
+prints a JSON object and `--agent=<id>` skips routing. Progress goes to stderr when
+it is a terminal. Exit status is 0 when done, 1 on failure and 2 when an agent asks
+a question, which can be answered after `jackalope attach <id>`.
+
+Agent questions open a picker of their options once; choosing one, or typing a
+reply and pressing Enter, answers the oldest open question. The
 transcript shows the conversation's messages followed by the latest attempt's
 output. Errors raised before an agent starts, such as missing account access,
 update the view without further input.

@@ -5,7 +5,12 @@
 //! attaches to the running host, or offers to start one.
 
 mod brand;
+mod clipboard;
+mod files;
+mod history;
+mod once;
 mod protocol;
+mod shell;
 mod ui;
 
 use protocol::{attach, profile_root, Client, Handshake, Project, Request, Response};
@@ -19,6 +24,8 @@ jackalope — talk to your agents from the terminal
 
 USAGE
   jackalope                      start a conversation in this repository
+  jackalope -p \"<message>\"       run once, print the reply and exit
+  jackalope run \"<message>\"      the same as -p
   jackalope --continue           resume the latest conversation here
   jackalope ls                   list open conversations
   jackalope attach <id>          resume a conversation by id
@@ -28,6 +35,18 @@ USAGE
 IN A CONVERSATION
   /                              pick a command: /sessions, /projects, /agent,
                                  /settings, /learn, /diff, /retry, /finish and more
+  !<command>                     run a shell command in the workspace
+  @<file>                        mention a file, with fuzzy completion
+  Esc Esc                        stop the agent        Ctrl+R  search history
+  Shift+Enter, \\ Enter, Ctrl+J   new line              Ctrl+N/P  switch conversation
+
+RUNNING ONCE
+  -p, --print                    send the message, wait, and print the reply;
+                                 piped stdin is appended to the message
+  --json                         print the result as JSON
+  --agent=<id>                   use this agent instead of routing
+  Exit status: 0 done, 1 failed, 2 an agent asked a question (answer it with
+  jackalope attach <id>).
 
 OPTIONS
   --open                         start the desktop app if nothing is running
@@ -77,6 +96,28 @@ fn main() {
     };
 
     let resume = flags.contains(&"--continue") || flags.contains(&"-c");
+    let print = flags.contains(&"-p") || flags.contains(&"--print");
+    if print || command == Some("run") {
+        let words: Vec<&str> = arguments
+            .iter()
+            .map(String::as_str)
+            .filter(|argument| !argument.starts_with('-'))
+            .skip(usize::from(!print))
+            .collect();
+        let agent = arguments
+            .iter()
+            .find_map(|argument| argument.strip_prefix("--agent="))
+            .map(String::from);
+        let json = flags.contains(&"--json");
+        let code = match once::run(words.join(" "), agent, json, preference) {
+            Ok(code) => code,
+            Err(error) => {
+                eprintln!("{error}");
+                1
+            }
+        };
+        std::process::exit(code);
+    }
     if let Err(error) = run(command, argument, preference, resume) {
         eprintln!("{error}");
         std::process::exit(1);
@@ -105,7 +146,7 @@ fn run(
 
 /// The repository this command was run in. A terminal tool should work where
 /// the user already is rather than asking them to pick from a list.
-fn project(client: &mut Client) -> Result<Project, String> {
+pub(crate) fn project(client: &mut Client) -> Result<Project, String> {
     let here = std::env::current_dir().map_err(|error| error.to_string())?;
     match client.send(&Request::EnsureProject {
         path: here.to_string_lossy().into_owned(),
@@ -330,7 +371,7 @@ pub(crate) enum ColdStart {
 }
 
 /// Attaches to the running host, starting one when asked to.
-fn ensure_host(preference: Option<ColdStart>) -> Result<(Handshake, Client), String> {
+pub(crate) fn ensure_host(preference: Option<ColdStart>) -> Result<(Handshake, Client), String> {
     // A host that is still starting must not be mistaken for none at all, or
     // this would try to start a second one.
     if let Some(found) = attach_or_wait() {

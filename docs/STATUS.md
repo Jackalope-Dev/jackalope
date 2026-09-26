@@ -61,11 +61,14 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - The `jackalope` terminal command holds routed conversations in the current Git
   repository, lists and rejoins sessions, and streams status from the process that
   owns the profile, starting a windowed or headless host when none runs. A second app
-  launch raises the running host. Inside conversations, `/learn` extracts session
-  learnings into project knowledge, and a rotating tips footer highlights commands
-  and shortcuts. The status bar, command search and Cmd/Ctrl+J open it in an app
-  window that can hand the conversation to the system terminal. Release builds link
-  the command onto PATH; agent questions are still answered in the app.
+  launch raises the running host. Inside conversations, `!` runs shell commands with
+  streamed output, follow-ups queue behind running work, `/bg` starts parallel
+  conversations, a live header shows other open work and agent readiness, the input
+  wraps and grows, and dragging copies text. `/learn` extracts session learnings into
+  project knowledge, and a rotating tips footer highlights commands and shortcuts.
+  The status bar, command search and Cmd/Ctrl+J open it in an app window that can
+  hand the conversation to the system terminal. Release builds link the command onto
+  PATH; agent questions can be answered in the terminal.
   See [terminal command](CLI.md).
 - Chat topics are reversible, revision-checked groups of source messages. Local
   suggestions use headings and opening lines; a saved topic can prepare a separate task

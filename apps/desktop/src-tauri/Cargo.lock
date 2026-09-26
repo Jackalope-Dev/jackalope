@@ -3347,6 +3347,7 @@ dependencies = [
  "tree-sitter-javascript",
  "tree-sitter-rust",
  "tree-sitter-typescript",
+ "unicode-width",
  "uuid",
  "windows 0.62.2",
  "windows-collections 0.3.2",

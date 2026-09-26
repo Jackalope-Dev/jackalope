@@ -299,18 +299,26 @@ pub fn divider(width: u16) -> Line<'static> {
     Line::styled(dot.repeat(width as usize), Style::default().fg(muted()))
 }
 
-pub fn accent() -> Color {
-    if !colored() {
-        return Color::Reset;
-    }
-    let (r, g, b) = current_accent();
+/// The shared fallback chain: the tone adjusted to the terminal's ground,
+/// then true colour, the 256-colour palette, or the basic ANSI set.
+fn tone(color: (u8, u8, u8), basic: Color) -> Color {
+    let (r, g, b) = readable(color, background());
     if truecolor() {
         Color::Rgb(r, g, b)
     } else if std::env::var("TERM").is_ok_and(|term| term.contains("256color")) {
         indexed((r, g, b))
     } else {
-        basic((r, g, b))
+        basic
     }
+}
+
+/// The project's accent, adjusted to read on this terminal; Reset when colour
+/// is disabled.
+pub fn accent() -> Color {
+    if !colored() {
+        return Color::Reset;
+    }
+    tone(current_accent(), basic(current_accent()))
 }
 
 pub fn muted() -> Color {
@@ -319,6 +327,30 @@ pub fn muted() -> Color {
     } else {
         Color::Reset
     }
+}
+
+/// Completed work and confirmed input.
+pub fn success() -> Color {
+    if !colored() {
+        return Color::Reset;
+    }
+    tone((0x2e, 0xbc, 0x7e), Color::Green)
+}
+
+/// Work that needs attention: an open question, a sign-in, a stalled action.
+pub fn warning() -> Color {
+    if !colored() {
+        return Color::Reset;
+    }
+    tone((0xf5, 0x9e, 0x0b), Color::Yellow)
+}
+
+/// Failures and errors.
+pub fn danger() -> Color {
+    if !colored() {
+        return Color::Reset;
+    }
+    tone((0xe5, 0x48, 0x4d), Color::Red)
 }
 
 /// How much of the accent echo `step` carries. The last step is the solid
@@ -414,6 +446,108 @@ pub fn banner() -> Vec<Line<'static>> {
     lines
 }
 
+/// Rows in the small mark shown above a conversation.
+pub const SMALL_MARK_ROWS: usize = 4;
+
+/// The same head at half size: each dot is on when at least two of the four
+/// dots it covers in `mark()` are, which keeps the ears and antler readable.
+fn small_mark() -> [&'static str; SMALL_MARK_ROWS] {
+    if unicode() {
+        ["⢴⣦⢸⣷ ⣶⠄ ", "⠈⠻⣿⣿⣼⠷  ", "  ⢿⣿⣿⣦⣄ ", "  ⢾⣿⡟⠛⠁ "]
+    } else {
+        ["o#.## #.", " o####o ", "  #####o", "  o##o' "]
+    }
+}
+
+/// Whether to animate. `JACKALOPE_REDUCED_MOTION=1` keeps every indicator
+/// still; state is then carried by glyphs and colour alone.
+pub fn motion() -> bool {
+    std::env::var_os("JACKALOPE_REDUCED_MOTION").is_none_or(|value| value.is_empty())
+}
+
+/// The accent lifted toward the foreground by `amount` (0–1): white on dark
+/// and unknown grounds, black on light ones.
+fn lifted(amount: f32) -> Color {
+    if !colored() {
+        return Color::Reset;
+    }
+    if !truecolor() {
+        return accent();
+    }
+    let (r, g, b) = current_accent();
+    let toward = if background() == Background::Light {
+        0.0
+    } else {
+        255.0
+    };
+    let blend = |channel: u8| (channel as f32 + (toward - channel as f32) * amount).round() as u8;
+    Color::Rgb(blend(r), blend(g), blend(b))
+}
+
+/// How brightly column `column` catches a highlight sweeping left to right
+/// across `width` columns at animation frame `tick`. Zero when still.
+fn glint(column: usize, width: usize, tick: usize) -> f32 {
+    const BAND: f32 = 3.0;
+    // The sweep travels past both edges so it enters and leaves smoothly.
+    let span = width as f32 + BAND * 4.0;
+    let position = (tick as f32 * 0.8) % span - BAND * 2.0;
+    let distance = (column as f32 - position).abs();
+    (1.0 - distance / BAND).max(0.0)
+}
+
+fn glinting(column: usize, width: usize, tick: usize, base: Style) -> Style {
+    let weight = glint(column, width, tick);
+    if weight <= 0.0 {
+        base
+    } else if truecolor() {
+        base.fg(lifted(weight * 0.7))
+    } else {
+        base.add_modifier(Modifier::BOLD)
+    }
+}
+
+/// Text with a highlight sweeping across it while work runs, the way the
+/// desktop mascot moves only when an agent is busy.
+pub fn shimmer(text: &str, tick: usize, base: Style) -> Vec<Span<'static>> {
+    if !motion() || !colored() {
+        return vec![Span::styled(text.to_string(), base)];
+    }
+    let width = text.chars().count();
+    text.chars()
+        .enumerate()
+        .map(|(column, character)| {
+            Span::styled(character.to_string(), glinting(column, width, tick, base))
+        })
+        .collect()
+}
+
+/// The conversation header: the small mark beside up to four lines of
+/// context. The mark catches a sweeping highlight only while `working`.
+pub fn header(info: Vec<Line<'static>>, working: bool, tick: usize) -> Vec<Line<'static>> {
+    let mark = small_mark();
+    let base = Style::default().fg(accent());
+    let mut info = info.into_iter();
+    mark.iter()
+        .map(|row| {
+            let mut spans = vec![Span::raw(" ")];
+            if working && motion() {
+                let width = row.chars().count();
+                spans.extend(row.chars().enumerate().map(|(column, glyph)| {
+                    // The mark's sweep runs ahead of the status text's.
+                    Span::styled(glyph.to_string(), glinting(column, width, tick / 2, base))
+                }));
+            } else {
+                spans.push(Span::styled(*row, base));
+            }
+            spans.push(Span::raw("  "));
+            if let Some(line) = info.next() {
+                spans.extend(line.spans);
+            }
+            Line::from(spans)
+        })
+        .collect()
+}
+
 /// A single-line version for short terminals and once a conversation is under
 /// way, where eight lines of banner would crowd out the conversation.
 pub fn compact() -> Line<'static> {
@@ -503,6 +637,23 @@ mod tests {
         let pale = parse_hex("#ffe066").unwrap();
         let adjusted = readable(pale, Background::Unknown);
         assert!((to_hsl(adjusted).0 - to_hsl(pale).0).abs() < 3.0);
+    }
+
+    #[test]
+    fn small_mark_rows_share_a_width_and_the_glint_passes_every_column() {
+        for row in small_mark() {
+            assert_eq!(row.chars().count(), 8, "{row:?}");
+        }
+        for column in 0..8 {
+            assert!(
+                (0..200).any(|tick| glint(column, 8, tick) > 0.5),
+                "column {column} never lights"
+            );
+        }
+        assert!(
+            (0..200).any(|tick| glint(4, 8, tick) == 0.0),
+            "the glint rests"
+        );
     }
 
     #[test]

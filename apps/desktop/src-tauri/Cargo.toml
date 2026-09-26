@@ -69,6 +69,8 @@ ratatui = { version = "0.30.2", default-features = false, features = [
     "underline-color",
 ] }
 crossterm = "0.29.0"
+# Already in the graph through ratatui; the CLI measures input columns with it.
+unicode-width = "0.2.2"
 
 [features]
 default = ["custom-protocol"]

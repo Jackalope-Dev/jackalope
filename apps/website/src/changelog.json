@@ -1,5 +1,20 @@
 [
   {
+    "id": "faster-terminal-conversations",
+    "date": "2026-09-26",
+    "status": "In development",
+    "title": "Faster terminal conversations",
+    "description": "The jackalope command keeps you moving while agents work.",
+    "items": [
+      "Run shell commands inline with ! and watch their output stream beside the conversation.",
+      "Select any text with the mouse to copy it, or use /copy for the latest reply.",
+      "The input wraps and grows as you type, and follow-ups queue behind running work.",
+      "A live header shows the conversation, other open work and agent readiness; Ctrl+N and Ctrl+P switch conversations and /bg starts one in the background.",
+      "Mention files with @, search input history with Ctrl+R, filter any picker by typing, and press Esc twice to stop an agent.",
+      "Run a single message from scripts and CI with jackalope -p, with JSON output and meaningful exit codes."
+    ]
+  },
+  {
     "id": "project-agent-preferences-stay-with-each-project",
     "date": "2026-09-24",
     "status": "In development",
