@@ -46,7 +46,8 @@ cut: an uncommitted local preparation does not reserve a version for other check
 In the printed worktree:
 
 1. Review the merged source and version changes. Replace release-note placeholders,
-   use an appropriate date and set `Status: ready`.
+   use an appropriate date and set `Status: ready`. The app shows the Highlights,
+   Improvements and Fixes of a ready file once after updating, so write them for users.
 2. Run `pnpm install --frozen-lockfile`, `pnpm verify` and `pnpm check:secrets`.
 3. Commit the reviewed result yourself, including the merge and version changes.
 4. Push `HEAD:beta` or `HEAD:stable` as an administrator, or push the preparation

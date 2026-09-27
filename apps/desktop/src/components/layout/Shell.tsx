@@ -22,6 +22,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { observeWorkbenchPreferences, useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { BranchIndicator } from './BranchIndicator';
+import { WhatsNewDialog } from './WhatsNewDialog';
 import { WorkSidebar } from './WorkSidebar';
 import { WorkspaceStatusBar } from './WorkspaceStatusBar';
 import './workspace-shell.css';
@@ -746,6 +747,7 @@ export function Shell({
           />
         )}
       </Suspense>
+      <WhatsNewDialog />
     </div>
   );
 }

@@ -263,3 +263,36 @@
   outline: 2px solid var(--color-accent-ink);
   outline-offset: 1px;
 }
+
+.whats-new-body {
+  display: grid;
+  gap: 16px;
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: 4px;
+}
+.whats-new-body h3 {
+  margin-bottom: 6px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.whats-new-body ul {
+  display: grid;
+  gap: 6px;
+  padding-left: 18px;
+  list-style: disc;
+  color: var(--color-text-secondary);
+}
+.whats-new-body li::marker {
+  color: var(--color-accent-ink);
+}
+.whats-new-body code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--color-surface-sunken);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
