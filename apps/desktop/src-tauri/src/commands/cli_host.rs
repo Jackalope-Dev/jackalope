@@ -250,6 +250,7 @@ fn transcript(session: &LiveSession, runs: &[TaskRun]) -> Vec<protocol::Message>
             role: "you".into(),
             text: message.text.clone(),
             sent: message.run_id.is_some(),
+            attempt: None,
         });
         // A reply follows the last message its run carried.
         let Some(run_id) = &message.run_id else {
@@ -261,17 +262,38 @@ fn transcript(session: &LiveSession, runs: &[TaskRun]) -> Vec<protocol::Message>
         if !last_of_batch {
             continue;
         }
-        if let Some(run) = runs.iter().find(|run| &run.id == run_id) {
+        let attempts = attempts(run_id, runs);
+        let numbered = attempts.len() > 1;
+        for (number, run) in (1..).zip(&attempts) {
             if !run.result.trim().is_empty() {
                 messages.push(protocol::Message {
                     role: "agent".into(),
                     text: run.result.clone(),
                     sent: true,
+                    attempt: numbered.then_some(number),
                 });
             }
         }
     }
     messages
+}
+
+/// The run a batch started followed by each retry of it, oldest first.
+fn attempts<'a>(run_id: &str, runs: &'a [TaskRun]) -> Vec<&'a TaskRun> {
+    let mut chain = Vec::new();
+    let mut next = runs.iter().find(|run| run.id == run_id);
+    while let Some(run) = next {
+        // A malformed history must not loop forever.
+        if chain.iter().any(|seen: &&TaskRun| seen.id == run.id) {
+            break;
+        }
+        chain.push(run);
+        next = runs
+            .iter()
+            .filter(|candidate| candidate.retry_of.as_deref() == Some(run.id.as_str()))
+            .min_by(|left, right| left.started_at.cmp(&right.started_at));
+    }
+    chain
 }
 
 /// Projects the newest attempt in a conversation into what a terminal renders.
@@ -286,19 +308,11 @@ fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionVie
     let run_error = run
         .filter(|run| !["review", "reviewed", "running", "starting"].contains(&run.status.as_str()))
         .and_then(|run| {
-            run.error
-                .as_deref()
-                .filter(|e| !e.trim().is_empty() && *e != "null")
-                .or(run
-                    .verification_error
-                    .as_deref()
-                    .filter(|e| !e.trim().is_empty() && *e != "null"))
+            protocol::present(run.error.as_deref())
+                .or(protocol::present(run.verification_error.as_deref()))
                 .or(run.quota_failure.as_ref().map(|q| q.message.as_str()))
         });
-    let error = session
-        .error
-        .as_deref()
-        .filter(|error| !error.trim().is_empty() && *error != "null")
+    let error = protocol::present(session.error.as_deref())
         .or(run_error)
         .map(str::to_string);
     protocol::SessionView {
@@ -378,11 +392,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                         .iter()
                         .filter(|message| !message.canceled && message.run_id.is_none())
                         .count(),
-                    error: session
-                        .error
-                        .as_deref()
-                        .filter(|e| !e.trim().is_empty() && *e != "null")
-                        .map(str::to_string),
+                    error: protocol::present(session.error.as_deref()).map(str::to_string),
                     updated_at: session.updated_at.clone(),
                 })
                 .collect();
@@ -638,5 +648,38 @@ impl CliHost {
         if let Ok(encoded) = serde_json::to_vec(&handshake) {
             let _ = super::history::write_atomic(&self.handshake, &encoded);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run(id: &str, retry_of: Option<&str>, started_at: &str) -> TaskRun {
+        TaskRun {
+            id: id.into(),
+            retry_of: retry_of.map(String::from),
+            started_at: started_at.into(),
+            ..TaskRun::default()
+        }
+    }
+
+    #[test]
+    fn a_batch_lists_its_run_and_every_retry_in_order() {
+        let runs = [
+            run("b", Some("a"), "2"),
+            run("a", None, "1"),
+            run("other", None, "0"),
+            run("c", Some("b"), "3"),
+        ];
+        let ids: Vec<&str> = attempts("a", &runs)
+            .iter()
+            .map(|run| run.id.as_str())
+            .collect();
+        assert_eq!(ids, ["a", "b", "c"]);
+        assert!(attempts("missing", &runs).is_empty());
+        // A cycle in stored history ends rather than looping.
+        let looped = [run("x", Some("y"), "1"), run("y", Some("x"), "2")];
+        assert_eq!(attempts("x", &looped).len(), 2);
     }
 }

@@ -12,6 +12,7 @@
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::Duration;
 
 /// Bumped when a request or response shape changes incompatibly. A client that
@@ -131,6 +132,10 @@ pub struct Message {
     pub text: String,
     /// Whether this message has been dispatched to an agent yet.
     pub sent: bool,
+    /// For an agent message, which attempt produced it when the work was
+    /// retried; absent when there was only one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attempt: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -234,6 +239,23 @@ impl Response {
     }
 }
 
+/// Run statuses that mean an agent is still going.
+pub const WORKING: &[&str] = &["starting", "running", "routing", "queued", "stopping"];
+/// Run statuses for work someone stopped before it finished.
+pub const STOPPED: &[&str] = &["stopped", "cancelled", "canceled", "interrupted"];
+/// Run statuses for work that ended in failure.
+pub const FAILED: &[&str] = &["failed", "error"];
+
+pub fn working(status: Option<&str>) -> bool {
+    status.is_some_and(|status| WORKING.contains(&status))
+}
+
+/// An error worth showing. Stored errors can be blank, and older records hold
+/// the literal text `null`.
+pub fn present(error: Option<&str>) -> Option<&str> {
+    error.filter(|error| !error.trim().is_empty() && *error != "null")
+}
+
 /// The profile root: the explicit override when set, else the platform's
 /// per-user application data directory. Mirrors the resolution in `lib.rs`.
 pub fn profile_root() -> Option<PathBuf> {
@@ -273,56 +295,144 @@ type Stream = std::os::unix::net::UnixStream;
 #[cfg(windows)]
 type Stream = std::fs::File;
 
+/// Longest wait for one response. The host answers `watch` within 25 seconds
+/// even when nothing changes, so anything slower means it is wedged.
+const RESPONSE_TIMEOUT: Duration = Duration::from_secs(40);
+
 #[cfg(unix)]
 fn open(endpoint: &str) -> std::io::Result<Stream> {
-    let stream = std::os::unix::net::UnixStream::connect(endpoint)?;
-    // A wedged host must not hang the terminal indefinitely.
-    stream.set_read_timeout(Some(Duration::from_secs(30)))?;
-    Ok(stream)
+    std::os::unix::net::UnixStream::connect(endpoint)
 }
 
 #[cfg(windows)]
 fn open(endpoint: &str) -> std::io::Result<Stream> {
-    std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(endpoint)
+    // ERROR_PIPE_BUSY: every instance is taken for a moment while the host
+    // stands up the next one. Waiting briefly beats reporting it as absent.
+    const PIPE_BUSY: i32 = 231;
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    loop {
+        match std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(endpoint)
+        {
+            Err(error)
+                if error.raw_os_error() == Some(PIPE_BUSY)
+                    && std::time::Instant::now() < deadline =>
+            {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            result => return result,
+        }
+    }
 }
 
 /// A connection to the running host. One request per line, one response per
 /// line, in order.
+///
+/// A thread of its own writes each request and reads its response, so a
+/// wedged host times out on every platform: Windows pipes opened as files have
+/// no read timeout. The same thread does both because synchronous I/O on a
+/// Windows pipe is serialised, so a read waiting on one thread would hold up a
+/// write from another.
 pub struct Client {
-    reader: BufReader<Stream>,
-    writer: Stream,
+    requests: Option<mpsc::Sender<Vec<u8>>>,
+    responses: Receiver<std::io::Result<String>>,
+    /// Set once a response is lost, since any later line would answer the
+    /// wrong request.
+    broken: bool,
+    worker: std::thread::JoinHandle<()>,
+    /// Shut down on drop to end a read the worker is blocked in.
+    #[cfg(unix)]
+    socket: Stream,
 }
 
 impl Client {
     pub fn connect(endpoint: &str) -> Result<Self, String> {
-        let writer = open(endpoint).map_err(|error| error.to_string())?;
-        let reader = writer.try_clone().map_err(|error| error.to_string())?;
+        let stream = open(endpoint).map_err(|error| error.to_string())?;
+        #[cfg(unix)]
+        let socket = stream.try_clone().map_err(|error| error.to_string())?;
+        let (requests, pending) = mpsc::channel::<Vec<u8>>();
+        let (answer, responses) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let mut stream = BufReader::new(stream);
+            while let Ok(request) = pending.recv() {
+                let exchanged = stream
+                    .get_mut()
+                    .write_all(&request)
+                    .and_then(|()| stream.get_mut().flush())
+                    .and_then(|()| {
+                        let mut line = String::new();
+                        match stream.read_line(&mut line)? {
+                            0 => Err(std::io::ErrorKind::UnexpectedEof.into()),
+                            _ => Ok(line),
+                        }
+                    });
+                let failed = exchanged.is_err();
+                if answer.send(exchanged).is_err() || failed {
+                    return;
+                }
+            }
+        });
         Ok(Self {
-            reader: BufReader::new(reader),
-            writer,
+            requests: Some(requests),
+            responses,
+            broken: false,
+            worker,
+            #[cfg(unix)]
+            socket,
         })
     }
 
     pub fn send(&mut self, request: &Request) -> Result<Response, String> {
+        if self.broken {
+            return Err("The connection to Jackalope was lost.".into());
+        }
         let mut encoded = serde_json::to_vec(request).map_err(|error| error.to_string())?;
         encoded.push(b'\n');
-        self.writer
-            .write_all(&encoded)
-            .map_err(|error| error.to_string())?;
-        self.writer.flush().map_err(|error| error.to_string())?;
-        let mut line = String::new();
-        if self
-            .reader
-            .read_line(&mut line)
-            .map_err(|error| error.to_string())?
-            == 0
-        {
-            return Err("The Jackalope host closed the connection.".into());
-        }
+        let sent = self
+            .requests
+            .as_ref()
+            .is_some_and(|requests| requests.send(encoded).is_ok());
+        let line = match sent.then(|| self.responses.recv_timeout(RESPONSE_TIMEOUT)) {
+            Some(Ok(Ok(line))) => line,
+            Some(Ok(Err(error))) if error.kind() != std::io::ErrorKind::UnexpectedEof => {
+                self.broken = true;
+                return Err(error.to_string());
+            }
+            Some(Err(RecvTimeoutError::Timeout)) => {
+                self.broken = true;
+                return Err("Jackalope did not answer in time.".into());
+            }
+            _ => {
+                self.broken = true;
+                return Err("The Jackalope host closed the connection.".into());
+            }
+        };
         serde_json::from_str(&line).map_err(|error| error.to_string())
+    }
+}
+
+impl Drop for Client {
+    fn drop(&mut self) {
+        // An idle worker ends when its requests stop; one blocked on a
+        // wedged host is interrupted so the connection closes now.
+        self.requests = None;
+        if self.worker.is_finished() {
+            return;
+        }
+        #[cfg(unix)]
+        let _ = self.socket.shutdown(std::net::Shutdown::Both);
+        #[cfg(windows)]
+        {
+            use std::os::windows::io::AsRawHandle;
+            // SAFETY: the join handle keeps the thread handle valid, and
+            // cancelling a thread's synchronous I/O only makes that call
+            // return an error, which ends the worker.
+            unsafe {
+                windows_sys::Win32::System::IO::CancelSynchronousIo(self.worker.as_raw_handle());
+            }
+        }
     }
 }
 

@@ -2,49 +2,39 @@
 //! in the host like any conversation, so it also appears in the app and can be
 //! rejoined with `jackalope attach`.
 
-use crate::protocol::{Client, Request, Response, SessionView};
-use crate::ColdStart;
+use crate::connection::{short, Connection};
+use crate::host::{self, ColdStart};
+use crate::protocol::{self, SessionView};
+use crate::subcommands;
 use std::io::{IsTerminal, Read};
+use std::time::{Duration, Instant};
 
-/// Statuses that mean the agent is still going.
-const WORKING: &[&str] = &["starting", "running", "routing", "queued", "stopping"];
+pub struct Options {
+    pub agent: Option<String>,
+    pub json: bool,
+    pub timeout: Option<Duration>,
+    pub cold_start: Option<ColdStart>,
+}
 
 /// Runs `message` and returns the process exit status.
-pub fn run(
-    message: String,
-    agent: Option<String>,
-    json: bool,
-    preference: Option<ColdStart>,
-) -> Result<i32, String> {
+pub fn run(message: String, options: Options) -> Result<i32, String> {
     let message = with_stdin(message)?;
     if message.trim().is_empty() {
         return Err(
             "Nothing to send. Pass a message: jackalope -p \"fix the failing test\"".into(),
         );
     }
-    let (handshake, mut client) = crate::ensure_host(preference)?;
-    let project = crate::project(&mut client)?;
-    let session_id = match client.send(&Request::StartSession {
-        project_path: project.path.clone(),
-        text: message,
-        agent,
-    })? {
-        Response::Started { session_id } => session_id,
-        Response::Error { message } => return Err(message),
-        _ => return Err("The host answered unexpectedly.".into()),
-    };
-    let progress = std::io::stderr().is_terminal() && !json;
-    let mut watcher = Client::connect(&handshake.endpoint)?;
+    let mut connection = host::ensure(options.cold_start)?;
+    let project = subcommands::here(&mut connection)?;
+    let session_id = connection.start(&project.path, message, options.agent)?;
+    let progress = std::io::stderr().is_terminal() && !options.json;
+    // The watch blocks, so it gets a connection of its own.
+    let mut watcher = Connection::lazy(connection.handshake().clone());
+    let deadline = options.timeout.map(|timeout| Instant::now() + timeout);
     let mut since = 0;
     let mut last_step = String::new();
     loop {
-        let view = match client.send(&Request::SessionDetail {
-            session_id: session_id.clone(),
-        })? {
-            Response::Session { session, .. } => *session,
-            Response::Error { message } => return Err(message),
-            _ => return Err("The host answered unexpectedly.".into()),
-        };
+        let view = connection.session(&session_id)?;
         if progress {
             let step = view
                 .step
@@ -56,16 +46,19 @@ pub fn run(
                 last_step = step;
             }
         }
-        if let Some(outcome) = outcome(&view) {
-            return Ok(finish(&view, &session_id, outcome, json));
+        let outcome = outcome(&view).or_else(|| {
+            deadline
+                .filter(|deadline| Instant::now() >= *deadline)
+                .map(|_| Outcome::TimedOut)
+        });
+        if let Some(outcome) = outcome {
+            return Ok(finish(&view, &session_id, outcome, options.json));
         }
-        // Blocks until work moves. A timed-out or dropped watch just re-reads.
-        match watcher.send(&Request::Watch { since }) {
-            Ok(Response::Changed { revision }) => since = revision,
-            _ => {
-                std::thread::sleep(std::time::Duration::from_millis(500));
-                watcher = Client::connect(&handshake.endpoint)?;
-            }
+        // Blocks until work moves. A dropped watch waits briefly and re-reads;
+        // the connection finds a restarted host on its own.
+        match watcher.watch(since) {
+            Ok(revision) => since = revision,
+            Err(_) => std::thread::sleep(Duration::from_millis(500)),
         }
     }
 }
@@ -93,30 +86,43 @@ enum Outcome {
     Done,
     Failed(String),
     Asked(String),
+    TimedOut,
 }
 
 /// Whether the conversation has settled, and how.
 fn outcome(view: &SessionView) -> Option<Outcome> {
-    if let Some(error) = view
-        .error
-        .as_deref()
-        .filter(|error| !error.trim().is_empty() && *error != "null")
-    {
+    if let Some(error) = protocol::present(view.error.as_deref()) {
         return Some(Outcome::Failed(error.to_string()));
     }
     if let Some(question) = view.questions.first() {
         return Some(Outcome::Asked(question.question.clone()));
     }
-    let working = view
-        .status
-        .as_deref()
-        .is_some_and(|status| WORKING.contains(&status));
-    let answered = view
-        .messages
-        .last()
-        .is_some_and(|message| message.role == "agent");
-    let all_sent = view.messages.iter().all(|message| message.sent);
-    (!working && all_sent && answered).then_some(Outcome::Done)
+    let status = view.status.as_deref();
+    if protocol::working(status) {
+        return None;
+    }
+    if view.paused {
+        return Some(Outcome::Failed(
+            "The conversation was paused before it finished.".into(),
+        ));
+    }
+    // Queued messages dispatch shortly, and no status means routing has not
+    // started a run yet.
+    if !view.messages.iter().all(|message| message.sent) {
+        return None;
+    }
+    let status = status?;
+    if protocol::STOPPED.contains(&status) {
+        return Some(Outcome::Failed(
+            "The work was stopped before it finished.".into(),
+        ));
+    }
+    if protocol::FAILED.contains(&status) {
+        return Some(Outcome::Failed(
+            "The agent could not finish the work.".into(),
+        ));
+    }
+    Some(Outcome::Done)
 }
 
 fn reply(view: &SessionView) -> String {
@@ -133,6 +139,7 @@ fn finish(view: &SessionView, session_id: &str, outcome: Outcome, json: bool) ->
         Outcome::Done => ("done", 0, None),
         Outcome::Failed(error) => ("failed", 1, Some(error.clone())),
         Outcome::Asked(question) => ("question", 2, Some(question.clone())),
+        Outcome::TimedOut => ("timeout", 3, None),
     };
     if json {
         let value = serde_json::json!({
@@ -153,15 +160,16 @@ fn finish(view: &SessionView, session_id: &str, outcome: Outcome, json: bool) ->
     if !text.trim().is_empty() {
         println!("{}", text.trim_end());
     }
+    let rejoin = format!("jackalope attach {}", short(session_id));
     match outcome {
         Outcome::Done => {}
         Outcome::Failed(error) => eprintln!("Failed: {error}"),
         Outcome::Asked(question) => {
             eprintln!("The agent asked: {question}");
-            eprintln!(
-                "Answer with: jackalope attach {}",
-                session_id.get(..8).unwrap_or(session_id)
-            );
+            eprintln!("Answer with: {rejoin}");
+        }
+        Outcome::TimedOut => {
+            eprintln!("Timed out; the work continues. Follow it with: {rejoin}");
         }
     }
     code
@@ -184,6 +192,7 @@ mod tests {
                     role: (*role).into(),
                     text: format!("{role} text"),
                     sent: *sent,
+                    attempt: None,
                 })
                 .collect(),
             run_id: None,
@@ -203,16 +212,22 @@ mod tests {
     }
 
     #[test]
-    fn a_run_settles_only_once_the_agent_has_answered_everything() {
+    fn a_run_settles_once_its_work_has_ended() {
         assert_eq!(outcome(&view(None, &[("you", false)])), None);
-        assert_eq!(outcome(&view(Some("running"), &[("you", true)])), None);
         assert_eq!(
-            outcome(&view(Some("running"), &[("you", true), ("agent", true)])),
-            None
+            outcome(&view(None, &[("you", true)])),
+            None,
+            "not routed yet"
         );
+        assert_eq!(outcome(&view(Some("running"), &[("you", true)])), None);
         assert_eq!(
             outcome(&view(Some("completed"), &[("you", true), ("agent", true)])),
             Some(Outcome::Done)
+        );
+        assert_eq!(
+            outcome(&view(Some("completed"), &[("you", true), ("you", false)])),
+            None,
+            "a queued follow-up still has to run"
         );
         let mut failed = view(Some("failed"), &[("you", true)]);
         failed.error = Some("no account".into());
@@ -232,5 +247,24 @@ mod tests {
             reply(&view(None, &[("you", true), ("agent", true)])),
             "agent text"
         );
+    }
+
+    #[test]
+    fn stopped_paused_and_silent_failures_do_not_wait_forever() {
+        for status in ["stopped", "cancelled", "canceled", "interrupted", "failed"] {
+            assert!(
+                matches!(
+                    outcome(&view(Some(status), &[("you", true)])),
+                    Some(Outcome::Failed(_))
+                ),
+                "{status}"
+            );
+        }
+        let mut paused = view(Some("completed"), &[("you", true), ("you", false)]);
+        paused.paused = true;
+        assert!(matches!(outcome(&paused), Some(Outcome::Failed(_))));
+        let mut error = view(Some("completed"), &[("you", true)]);
+        error.error = Some("null".into());
+        assert_eq!(outcome(&error), Some(Outcome::Done), "a null error is none");
     }
 }

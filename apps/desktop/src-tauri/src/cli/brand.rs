@@ -235,7 +235,7 @@ pub fn colored() -> bool {
 /// the check trusts a UTF-8 locale or a terminal known to render Unicode, and
 /// `JACKALOPE_ASCII=1` forces plain characters for anything else.
 pub fn unicode() -> bool {
-    if std::env::var_os("JACKALOPE_ASCII").is_some_and(|value| !value.is_empty()) {
+    if crate::prefs::env_flag("JACKALOPE_ASCII") == Some(true) {
         return false;
     }
     if std::env::var("TERM").is_ok_and(|term| term == "linux") {
@@ -462,7 +462,7 @@ fn small_mark() -> [&'static str; SMALL_MARK_ROWS] {
 /// Whether to animate. `JACKALOPE_REDUCED_MOTION=1` keeps every indicator
 /// still; state is then carried by glyphs and colour alone.
 pub fn motion() -> bool {
-    std::env::var_os("JACKALOPE_REDUCED_MOTION").is_none_or(|value| value.is_empty())
+    crate::prefs::env_flag("JACKALOPE_REDUCED_MOTION") != Some(true)
 }
 
 /// The accent lifted toward the foreground by `amount` (0–1): white on dark

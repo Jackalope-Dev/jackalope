@@ -68,7 +68,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   project knowledge, and a rotating tips footer highlights commands and shortcuts.
   The status bar, command search and Cmd/Ctrl+J open it in an app window that can
   hand the conversation to the system terminal. Release builds link the command onto
-  PATH; agent questions can be answered in the terminal.
+  PATH; agent questions can be answered in the terminal. The transcript shows every
+  retried attempt, the view reconnects after a host restart, `jackalope -p` settles on
+  stopped or paused work and takes a timeout, and `ls`, `status` and `stop` serve
+  scripts with `--json`.
   See [terminal command](CLI.md).
 - Chat topics are reversible, revision-checked groups of source messages. Local
   suggestions use headings and opening lines; a saved topic can prepare a separate task

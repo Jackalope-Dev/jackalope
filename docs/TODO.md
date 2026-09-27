@@ -54,8 +54,6 @@ release dates.
   (pbcopy, Wayland/X11, WSL, PowerShell, OSC 52 over SSH), Shift+Enter under the
   keyboard protocol, Ctrl+Z suspend, the bell and window title, and `jackalope -p`
   exit codes on each platform.
-- [ ] Interleave earlier attempts' output in the terminal transcript; the protocol
-  currently carries only the latest attempt's output.
 - [ ] Validate bulk task archiving, undo, restore and restart recovery in installed
   builds, including unsaved history and interrupted attempts.
 - [ ] Validate live sessions with installed providers: rapid capture, concurrent window

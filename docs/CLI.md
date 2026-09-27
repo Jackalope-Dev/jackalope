@@ -29,7 +29,15 @@ The endpoint is a Unix domain socket in a private `0700` directory under `/tmp`
 or a named pipe on Windows. Messages are newline-delimited JSON defined in
 `apps/desktop/src-tauri/src/cli/protocol.rs`, which both binaries compile. The
 `jackalope` binary does not link `jackalope_lib`; bump `VERSION` in that file
-when a request or response changes incompatibly.
+when a request or response changes incompatibly. Clients ignore response fields
+they do not know, so adding an optional field is compatible.
+
+In the command's source, `main.rs` dispatches what `args.rs` parses; `host.rs`
+finds or starts the host and `connection.rs` keeps a reconnecting connection to
+it. `subcommands.rs` and `once.rs` hold the commands that print and exit. The
+interactive view lives in `ui/`: `mod.rs` holds its state, and `events`,
+`refresh`, `keys`, `commands`, `pickers`, `conversation`, `feed`, `selection`
+and `editor` each add one concern, with drawing under `ui/render/`.
 
 ## Projects and sessions
 
@@ -50,8 +58,13 @@ terminal and the app together. Leaving a terminal does not stop work.
 | `jackalope -p "<message>"` | Runs one message and prints the reply; `run` is an alias |
 | `jackalope --continue` | Rejoins this repository's latest conversation |
 | `jackalope attach <id>` | Rejoins a conversation; any unambiguous id prefix works |
-| `jackalope ls` | Lists open conversations |
+| `jackalope ls` | Lists open conversations with their project, state and age |
+| `jackalope stop <id>` | Stops the work a conversation is running |
 | `jackalope status` | Shows the host, its endpoint and profile |
+
+`ls` and `status` accept `--json`. Options take a value as `--agent codex` or
+`--agent=codex`; `--` ends options, and an argument containing a space is
+always message text. Unknown or misplaced options are refused with exit status 64.
 
 Inside a conversation, typing `/` opens an interactive command menu, and `/help`
 lists commands: `/new`, `/bg`, `/sessions`, `/projects`, `/agents`, `/settings`,
@@ -68,12 +81,15 @@ conversation's worktree, or the project when it has none. Output streams below t
 conversation and never reaches an agent; stdin is closed and pagers are disabled.
 `/kill` stops running commands and their children (the process group on Unix,
 `taskkill /T` on Windows), and leaving the terminal stops them too. `@` opens fuzzy
-completion over the workspace's files that Git does not ignore.
+completion over the workspace's files that Git does not ignore; the list is read in
+the background and again after 15 seconds, so new files appear.
 
 While a conversation is open, the header shows the small mark beside the project and
 branch, the conversation's routing, other open conversations (with any that need
 you) and agent readiness. The mark and status text animate only while work runs;
-`JACKALOPE_REDUCED_MOTION=1` keeps them still. The status line shows elapsed time,
+`JACKALOPE_REDUCED_MOTION=1` keeps them still. Switches such as this one and
+`JACKALOPE_BELL` read `1`, `true`, `yes` or `on` as on and `0`, `false`, `no`
+or `off` as off. The status line shows elapsed time,
 queued messages, running commands and brief confirmations.
 
 The input soft-wraps and grows to a third of the screen. Shift+Enter (where the
@@ -82,7 +98,9 @@ line. Up and Down move between rows, then recall input; history persists in
 `preferences/cli-history.json` (1000 entries) and Ctrl+R searches it. Esc clears the
 draft (Ctrl+Y restores it), returns to the latest output when scrolled back, and
 pressed twice stops running work. Readline keys work: Ctrl+A/E, Ctrl+W, Alt or Ctrl
-with Backspace, Left and Right, Ctrl+U/K and Ctrl+Y. Page Up and Page Down scroll,
+with Backspace, Left and Right, Ctrl+U/K and Ctrl+Y. A line starting with a space
+is not saved to history. Page Up and Page Down scroll a screen at a time; while
+scrolled back the view stays put as output arrives,
 and Ctrl+N and Ctrl+P step through open conversations across projects. Ctrl+Z
 suspends to the shell on macOS and Linux. The window title shows the conversation's
 state, and the bell rings when work finishes or needs you (`JACKALOPE_BELL=0`
@@ -100,15 +118,26 @@ Success, attention and failure use fixed green, amber and red tones.
 
 `jackalope -p "<message>"` (or `jackalope run`) starts a conversation, waits for it
 to settle and prints the reply; piped stdin is appended to the message, `--json`
-prints a JSON object and `--agent=<id>` skips routing. Progress goes to stderr when
-it is a terminal. Exit status is 0 when done, 1 on failure and 2 when an agent asks
-a question, which can be answered after `jackalope attach <id>`.
+prints a JSON object and `--agent <id>` skips routing. The run settles when its work
+finishes, fails, is stopped or interrupted, or the conversation is paused.
+`--timeout <seconds>` stops waiting (checked at least every 25 seconds) and leaves
+the work running. Progress goes to stderr when it is a terminal. Exit status is 0
+when done, 1 on failure or when the work was stopped, 2 when an agent asks a
+question, which can be answered after `jackalope attach <id>`, and 3 on timeout.
 
 Agent questions open a picker of their options once; choosing one, or typing a
 reply and pressing Enter, answers the oldest open question. The
-transcript shows the conversation's messages followed by the latest attempt's
-output. Errors raised before an agent starts, such as missing account access,
-update the view without further input.
+transcript shows the conversation's messages with each reply; when work was
+retried, every attempt's output appears in order under an attempt label. Errors
+raised before an agent starts, such as missing account access, update the view
+without further input.
+
+The terminal re-reads the conversation in the background when the host reports a
+change, so typing never waits on it. Every request times out after 40 seconds. If
+the host stops, the status line says contact was lost; when a host is running
+again the terminal finds its new endpoint and reconnects. Requests that only read
+are retried on the new connection; sending, stopping and other changes are not,
+since the first attempt may have landed.
 
 ## In the app
 
@@ -154,7 +183,8 @@ then:
    host.
 3. With no host, confirm both cold-start answers and that the answer is
    remembered. Launch the app while a headless host runs and confirm one process
-   and one window.
+   and one window. Quit the host during a conversation, confirm the status line
+   reports lost contact, then start it again and confirm the view reconnects.
 4. Open the app terminal, move it to the system terminal and confirm the same
    conversation continues.
 5. On installed packages for each platform, confirm the command resolves from a
