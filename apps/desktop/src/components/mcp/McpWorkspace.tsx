@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
 import { connectionFailure, redactConnection } from '../../lib/mcp-connection';
 import { nativeTask } from '../../lib/task-runtime';
@@ -24,7 +25,6 @@ import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { EmptyState } from '../ui/EmptyState';
 import { InlineNotice } from '../ui/InlineNotice';
-
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { FilterGroup, WorkspaceToolbar } from '../ui/WorkspaceToolbar';
@@ -77,9 +77,34 @@ export function McpWorkspace({
     setSelectedCategory,
     searchMarketplace,
     inspectServer,
-  } = useMcpStore();
+  } = useMcpStore(
+    useShallow((s) => ({
+      servers: s.servers,
+      loadingServers: s.loadingServers,
+      serversError: s.serversError,
+      probeResults: s.probeResults,
+      probingIds: s.probingIds,
+      marketplaceServers: s.marketplaceServers,
+      loadingMarketplace: s.loadingMarketplace,
+      marketplaceError: s.marketplaceError,
+      searchQuery: s.searchQuery,
+      selectedCategory: s.selectedCategory,
+      loadServers: s.loadServers,
+      deleteServer: s.deleteServer,
+      probeServer: s.probeServer,
+      setSearchQuery: s.setSearchQuery,
+      setSelectedCategory: s.setSelectedCategory,
+      searchMarketplace: s.searchMarketplace,
+      inspectServer: s.inspectServer,
+    })),
+  );
 
-  const { useMcpMarketplace, setUseMcpMarketplace } = useSettingsStore();
+  const { useMcpMarketplace, setUseMcpMarketplace } = useSettingsStore(
+    useShallow((s) => ({
+      useMcpMarketplace: s.useMcpMarketplace,
+      setUseMcpMarketplace: s.setUseMcpMarketplace,
+    })),
+  );
 
   const [localTab, setLocalTab] = useState<'configured' | 'marketplace'>('configured');
   const activeTab = view ?? localTab;

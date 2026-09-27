@@ -61,17 +61,23 @@ export const isTauriEnvironment = (): boolean => {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 };
 
-export async function openExternalUrl(url: string): Promise<void> {
-  if (isTauriEnvironment()) {
-    try {
-      const { open } = await import('@tauri-apps/plugin-shell');
-      await open(url);
-      return;
-    } catch {
-      // Fall through to window.open if plugin-shell fails
-    }
+/** Opens a URL in the system browser, rejecting when the desktop opener fails. */
+export async function openInBrowser(url: string): Promise<void> {
+  if (!isTauriEnvironment()) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+    return;
   }
-  window.open(url, '_blank', 'noopener,noreferrer');
+  const { open } = await import('@tauri-apps/plugin-shell');
+  await open(url);
+}
+
+/** Like openInBrowser, but falls back to a webview window instead of failing. */
+export async function openExternalUrl(url: string): Promise<void> {
+  try {
+    await openInBrowser(url);
+  } catch {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
 }
 
 export async function listWorktrees(

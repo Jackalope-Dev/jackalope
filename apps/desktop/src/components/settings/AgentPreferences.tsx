@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
 import {
   type AgentProfilesView,
@@ -19,7 +20,12 @@ import { Setting } from './Setting';
 
 export function AgentPreferences({ projectId }: { projectId?: string }) {
   const agents = useAgentConfigStore();
-  const { projects, updateProjectPreferences } = useProjectStore();
+  const { projects, updateProjectPreferences } = useProjectStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      updateProjectPreferences: s.updateProjectPreferences,
+    })),
+  );
   const project = projects.find((item) => item.id === projectId);
   const available = [...builtinAgents, ...agents.customAgents];
   const [error, setError] = useState('');
@@ -200,7 +206,12 @@ function AccountPreferences({
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   const agents = useAgentConfigStore();
-  const { projects, updateProjectPreferences } = useProjectStore();
+  const { projects, updateProjectPreferences } = useProjectStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      updateProjectPreferences: s.updateProjectPreferences,
+    })),
+  );
   const project = projects.find((item) => item.id === projectId);
   // biome-ignore lint/correctness/useExhaustiveDependencies: Account mutations and retry refresh the profile list.
   useEffect(() => {

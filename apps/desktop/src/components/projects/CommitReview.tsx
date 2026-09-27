@@ -17,6 +17,7 @@ import {
   Undo2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
 import { isActive, nativeTask, type RunRequest, type TaskRun } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -203,7 +204,16 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     setExcluded,
     hookFixes,
     setHookFix,
-  } = useCommitReviewStore();
+  } = useCommitReviewStore(
+    useShallow((s) => ({
+      checkout: s.checkout,
+      choose: s.choose,
+      excluded: s.excluded,
+      setExcluded: s.setExcluded,
+      hookFixes: s.hookFixes,
+      setHookFix: s.setHookFix,
+    })),
+  );
   const desktop = isTauriEnvironment();
   const projectPath = project?.path ?? '';
   const normalizedRoot = projectPath.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();

@@ -120,6 +120,7 @@ impl Connection {
             project_path: project_path.into(),
             text,
             agent,
+            model: None,
         })? {
             Response::Started { session_id } => Ok(session_id),
             _ => Err(unexpected()),

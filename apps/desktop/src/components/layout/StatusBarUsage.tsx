@@ -1,6 +1,7 @@
 import { Popover, RefreshIcon } from '@jackalope/ui';
 import { Gauge } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import { capacityWindowDisplay, capacityWindowName } from '../../lib/capacity-display';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -42,7 +43,9 @@ function AllowanceMeter({
 }
 
 export function StatusBarUsage({ remote }: { remote: boolean }) {
-  const { records, loading, error, fetch } = useCapacityStore();
+  const { records, loading, error, fetch } = useCapacityStore(
+    useShallow((s) => ({ records: s.records, loading: s.loading, error: s.error, fetch: s.fetch })),
+  );
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const refreshIfVisible = () => {

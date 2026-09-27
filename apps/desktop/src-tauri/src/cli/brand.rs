@@ -293,6 +293,42 @@ pub fn mark_glyph(mark: Mark) -> &'static str {
     }
 }
 
+/// The dotted rule while an agent works: a short accent comet runs along it,
+/// brightest at its head. Still (the plain rule) under reduced motion or
+/// without colour.
+pub fn divider_active(width: u16, tick: usize) -> Line<'static> {
+    if !motion() || !colored() {
+        return divider(width);
+    }
+    let (dot, head) = if unicode() {
+        ("⠒", "━")
+    } else {
+        ("-", "=")
+    };
+    let width = width as usize;
+    // One pass every few seconds regardless of width, so wide terminals are
+    // not slower.
+    let span = width + 16;
+    let position = (tick * span / 40) % span;
+    let spans = (0..width)
+        .map(|column| {
+            let behind = position as isize - column as isize;
+            if (0..12).contains(&behind) {
+                let weight = 1.0 - behind as f32 / 12.0;
+                let color = if truecolor() {
+                    lifted(weight * 0.6)
+                } else {
+                    accent()
+                };
+                Span::styled(head, Style::default().fg(color))
+            } else {
+                Span::styled(dot, Style::default().fg(muted()))
+            }
+        })
+        .collect::<Vec<_>>();
+    Line::from(spans)
+}
+
 /// A dotted rule across `width` columns.
 pub fn divider(width: u16) -> Line<'static> {
     let dot = if unicode() { "⠒" } else { "-" };
@@ -321,12 +357,73 @@ pub fn accent() -> Color {
     tone(current_accent(), basic(current_accent()))
 }
 
+/// Secondary text: a neutral grey held to the same contrast target as the
+/// accent, since ANSI dark grey falls near 3:1 on many dark themes.
 pub fn muted() -> Color {
-    if colored() {
-        Color::DarkGray
-    } else {
-        Color::Reset
+    if !colored() {
+        return Color::Reset;
     }
+    tone((0x8b, 0x90, 0x99), Color::DarkGray)
+}
+
+/// Behind the highlighted row of a menu or picker: the accent faded most of the
+/// way into the terminal's ground. Terminals without true colour reverse the
+/// row instead.
+pub fn selection() -> Style {
+    if !colored() || !truecolor() {
+        return Style::default().add_modifier(Modifier::REVERSED);
+    }
+    let (r, g, b) = current_accent();
+    let ground = if background() == Background::Light {
+        255.0
+    } else {
+        30.0
+    };
+    let weight = if background() == Background::Light {
+        0.16
+    } else {
+        0.28
+    };
+    let blend = |channel: u8| (ground + (channel as f32 - ground) * weight).round() as u8;
+    Style::default().bg(Color::Rgb(blend(r), blend(g), blend(b)))
+}
+
+/// Rounded corners where box-drawing arcs are available.
+pub fn border() -> ratatui::widgets::BorderType {
+    if unicode() {
+        ratatui::widgets::BorderType::Rounded
+    } else {
+        ratatui::widgets::BorderType::Plain
+    }
+}
+
+/// `text` cut to `width` columns, ending in an ellipsis when shortened.
+pub fn ellipsize(text: &str, width: usize) -> String {
+    if text.chars().count() <= width {
+        return text.to_string();
+    }
+    let ellipsis = if unicode() { "…" } else { "." };
+    let kept: String = text.chars().take(width.saturating_sub(1)).collect();
+    format!("{}{ellipsis}", kept.trim_end())
+}
+
+/// A branch name with long generated ids (task worktrees use UUIDs) cut to
+/// their first eight characters, so the readable part stays visible.
+pub fn short_branch(branch: &str) -> String {
+    branch
+        .split('/')
+        .map(|part| {
+            let generated = part.len() > 16
+                && part.chars().all(|ch| ch.is_ascii_hexdigit() || ch == '-')
+                && part.contains('-');
+            if generated {
+                part.chars().take(8).collect()
+            } else {
+                part.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 /// Completed work and confirmed input.
@@ -490,7 +587,7 @@ fn glint(column: usize, width: usize, tick: usize) -> f32 {
     const BAND: f32 = 3.0;
     // The sweep travels past both edges so it enters and leaves smoothly.
     let span = width as f32 + BAND * 4.0;
-    let position = (tick as f32 * 0.8) % span - BAND * 2.0;
+    let position = (tick as f32 * 0.55) % span - BAND * 2.0;
     let distance = (column as f32 - position).abs();
     (1.0 - distance / BAND).max(0.0)
 }
@@ -664,6 +761,34 @@ mod tests {
         let last = echo_color(ECHOES);
         if let (Color::Rgb(r1, _, _), Color::Rgb(r2, _, _)) = (first, last) {
             assert!(r1 < r2, "echo should brighten toward the wordmark");
+        }
+    }
+
+    #[test]
+    fn long_text_and_generated_branches_shorten_readably() {
+        assert_eq!(
+            short_branch("jackalope/df4d8ac2-3ec5-4d56-9ffb-adce79da1bf0"),
+            "jackalope/df4d8ac2"
+        );
+        assert_eq!(short_branch("feature/login-form"), "feature/login-form");
+        assert_eq!(ellipsize("short", 10), "short");
+        let cut = ellipsize("start a fresh conversation", 10);
+        assert_eq!(cut.chars().count(), 10.min(cut.chars().count()));
+        assert!(cut.starts_with("start a f") || cut.starts_with("start a"));
+    }
+
+    #[test]
+    fn the_working_rule_keeps_its_width_and_moves() {
+        let rule = |tick| -> String {
+            divider_active(40, tick)
+                .spans
+                .iter()
+                .map(|span| span.content.to_string())
+                .collect()
+        };
+        assert_eq!(rule(5).chars().count(), 40);
+        if motion() && colored() {
+            assert_ne!(rule(5), rule(15), "the comet advances between frames");
         }
     }
 }

@@ -31,7 +31,7 @@ import {
 } from '../../lib/local-ai';
 import { useManagedRuntime } from '../../lib/managed-runtime';
 import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openInBrowser } from '../../lib/tauri-bridge';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -203,10 +203,7 @@ export function LocalAiSteps({
   const openLink = async (url: string, target: SetupActivity) => {
     setActivity(target);
     try {
-      if (desktop) {
-        const { open } = await import('@tauri-apps/plugin-shell');
-        await open(url);
-      } else window.open(url, '_blank', 'noopener,noreferrer');
+      await openInBrowser(url);
     } catch (cause) {
       setError(String(cause));
     }

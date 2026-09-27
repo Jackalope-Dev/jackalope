@@ -30,6 +30,7 @@ import { Setting, SettingGroup } from './Setting';
 import { SystemInfoView } from './SystemInfo';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
+import { useShallow } from 'zustand/react/shallow';
 import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
 import { RemoteAccess } from './RemoteAccess';
@@ -79,8 +80,10 @@ export function SettingsPage({
   }, []);
   const settings = useSettingsStore();
   const agents = useAgentConfigStore();
-  const { currentTheme } = useThemeStore();
-  const { projects, activeProjectId } = useProjectStore();
+  const { currentTheme } = useThemeStore(useShallow((s) => ({ currentTheme: s.currentTheme })));
+  const { projects, activeProjectId } = useProjectStore(
+    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
+  );
   const [scope, setScope] = useState<'app' | 'project'>(initialScope);
   const [selectedProjectId, setSelectedProjectId] = useState(
     initialProjectId ?? activeProjectId ?? '',
@@ -294,44 +297,50 @@ export function SettingsPage({
               )}
               {c === 'General' && (
                 <>
-                  <Setting title="Guided setup">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        onClose();
-                        useOnboardingStore.getState().begin();
-                      }}
-                    >
-                      Open guided setup
-                    </Button>
-                  </Setting>
+                  <SettingGroup>
+                    <Setting title="Guided setup">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          onClose();
+                          useOnboardingStore.getState().begin();
+                        }}
+                      >
+                        Open guided setup
+                      </Button>
+                    </Setting>
+                  </SettingGroup>
                   <WindowBehaviorSettings />
-                  <Setting
-                    title="Companion notifications"
-                    description="All notices remain in the helper."
-                  >
-                    <Select
-                      aria-label="Companion notifications"
-                      value={settings.notifications}
-                      onValueChange={(value) =>
-                        settings.updateSettings({ notifications: value as NotificationLevel })
-                      }
+                  <SettingGroup className="mt-6">
+                    <Setting
+                      title="Companion notifications"
+                      description="All notices remain in the helper."
                     >
-                      <SelectItem value="all">All notifications</SelectItem>
-                      <SelectItem value="failures-only">Needs attention only</SelectItem>
-                      <SelectItem value="none">Quiet</SelectItem>
-                    </Select>
-                  </Setting>
+                      <Select
+                        aria-label="Companion notifications"
+                        value={settings.notifications}
+                        onValueChange={(value) =>
+                          settings.updateSettings({ notifications: value as NotificationLevel })
+                        }
+                      >
+                        <SelectItem value="all">All notifications</SelectItem>
+                        <SelectItem value="failures-only">Needs attention only</SelectItem>
+                        <SelectItem value="none">Quiet</SelectItem>
+                      </Select>
+                    </Setting>
+                  </SettingGroup>
                   <NotificationSettings />
-                  <Setting title="Companion animations">
-                    <Switch
-                      label="Companion animations"
-                      checked={settings.mascotReactions}
-                      onCheckedChange={(mascotReactions) =>
-                        settings.updateSettings({ mascotReactions })
-                      }
-                    />
-                  </Setting>
+                  <SettingGroup className="mt-6">
+                    <Setting title="Companion animations">
+                      <Switch
+                        label="Companion animations"
+                        checked={settings.mascotReactions}
+                        onCheckedChange={(mascotReactions) =>
+                          settings.updateSettings({ mascotReactions })
+                        }
+                      />
+                    </Setting>
+                  </SettingGroup>
                 </>
               )}
               {c === 'Appearance' && (scope === 'app' || project) && (

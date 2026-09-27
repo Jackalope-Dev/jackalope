@@ -9,6 +9,8 @@ pub enum Command {
     Converse {
         resume: bool,
         attach: Option<String>,
+        /// Open the conversation picker first (`--resume` without an id).
+        pick: bool,
     },
     /// `-p` / `run`: one message, one reply.
     Once {
@@ -46,6 +48,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
     let mut words: Vec<String> = Vec::new();
     let (mut print, mut json, mut resume, mut help, mut version) =
         (false, false, false, false, false);
+    let mut pick = false;
     let mut cold_start = None;
     let (mut agent, mut profile, mut timeout) = (None, None, None);
     let mut only_words = false;
@@ -72,6 +75,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
             "-p" | "--print" => print = true,
             "--json" => json = true,
             "-c" | "--continue" => resume = true,
+            "-r" | "--resume" => pick = true,
             "-h" | "--help" => help = true,
             "-V" | "--version" => version = true,
             "--open" => cold_start = Some(ColdStart::Open),
@@ -92,6 +96,10 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
         }
     }
 
+    // `--resume [id]` reads like Claude Code and Codex: the same as `resume [id]`.
+    if pick && words.first().map(String::as_str) != Some("resume") {
+        words.insert(0, "resume".into());
+    }
     let first = words.first().map(String::as_str);
     let command = if help || (!print && first == Some("help")) {
         Command::Help
@@ -117,7 +125,23 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
             None => Command::Converse {
                 resume,
                 attach: None,
+                pick: false,
             },
+            Some("resume") => {
+                extra(2)?;
+                match argument() {
+                    Some(id) => Command::Converse {
+                        resume: false,
+                        attach: Some(id),
+                        pick: false,
+                    },
+                    None => Command::Converse {
+                        resume: false,
+                        attach: None,
+                        pick: true,
+                    },
+                }
+            }
             Some("ls" | "sessions") => {
                 extra(1)?;
                 Command::List { json }
@@ -133,6 +157,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
                     attach: Some(
                         argument().ok_or("Which conversation? Run 'jackalope ls' to see them.")?,
                     ),
+                    pick: false,
                 }
             }
             Some("stop") => {
@@ -185,23 +210,46 @@ mod tests {
             command(&[]),
             Command::Converse {
                 resume: false,
-                attach: None
+                attach: None,
+                pick: false
             }
         );
         assert_eq!(
             command(&["-c"]),
             Command::Converse {
                 resume: true,
-                attach: None
+                attach: None,
+                pick: false
             }
         );
         assert_eq!(
             command(&["attach", "abc"]),
             Command::Converse {
                 resume: false,
-                attach: Some("abc".into())
+                attach: Some("abc".into()),
+                pick: false
             }
         );
+    }
+
+    #[test]
+    fn resume_matches_other_agent_clis() {
+        let picker = Command::Converse {
+            resume: false,
+            attach: None,
+            pick: true,
+        };
+        let attach = Command::Converse {
+            resume: false,
+            attach: Some("ab".into()),
+            pick: false,
+        };
+        assert_eq!(command(&["--resume"]), picker);
+        assert_eq!(command(&["-r"]), picker);
+        assert_eq!(command(&["resume"]), picker);
+        assert_eq!(command(&["--resume", "ab"]), attach);
+        assert_eq!(command(&["resume", "ab"]), attach);
+        assert!(parse_line(&["resume", "ab", "cd"]).is_err());
     }
 
     #[test]

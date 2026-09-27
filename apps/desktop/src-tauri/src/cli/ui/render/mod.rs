@@ -85,7 +85,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
     app.body_area.set(body);
 
     let mut header_lines = header;
-    header_lines.push(brand::divider(header_area.width));
+    header_lines.push(if app.working() {
+        brand::divider_active(header_area.width, app.tick)
+    } else {
+        brand::divider(header_area.width)
+    });
     frame.render_widget(Paragraph::new(header_lines), header_area);
 
     let (lines, offset, bottom) = transcript::visible(app, body.width, body.height);
@@ -116,6 +120,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
     };
     let mut block = Block::default()
         .borders(Borders::ALL)
+        .border_type(brand::border())
         .border_style(Style::default().fg(mode_color));
     if !mode_title.is_empty() {
         block = block.title(Span::styled(mode_title, Style::default().fg(mode_color)));
@@ -319,11 +324,7 @@ fn header_info(app: &App) -> Vec<Line<'static>> {
     let bold = Style::default().add_modifier(Modifier::BOLD);
     let mut lines = Vec::new();
 
-    let mut place = vec![
-        Span::styled("jackalope", accent.add_modifier(Modifier::BOLD)),
-        Span::styled("  ", muted),
-        Span::styled(app.project.name.clone(), bold),
-    ];
+    let mut place = vec![Span::styled(app.project.name.clone(), bold)];
     let branch = app
         .view
         .as_ref()
@@ -331,7 +332,10 @@ fn header_info(app: &App) -> Vec<Line<'static>> {
         .filter(|branch| !branch.is_empty())
         .or_else(|| app.branch.clone());
     if let Some(branch) = branch {
-        place.push(Span::styled(format!("  {branch}"), accent));
+        place.push(Span::styled(
+            format!("  {}", brand::short_branch(&branch)),
+            accent,
+        ));
     }
     lines.push(Line::from(place));
 

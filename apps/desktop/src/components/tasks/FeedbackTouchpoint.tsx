@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { isActive } from '../../lib/task-runtime';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -8,7 +9,9 @@ import { FeedbackForm } from '../settings/FeedbackForm';
 import { Button } from '../ui/button';
 
 export function FeedbackTouchpoint({ runId, paused }: { runId: string; paused: boolean }) {
-  const { view, request } = useFeedbackStore();
+  const { view, request } = useFeedbackStore(
+    useShallow((s) => ({ view: s.view, request: s.request })),
+  );
   const configured = useCommunityStore((state) => state.settings?.configured);
   const working = useExecutionStore((state) => state.submitting || state.runs.some(isActive));
   const [invitation, setInvitation] = useState<string | null>(null);

@@ -33,7 +33,7 @@ use crossterm::event::{
 use crossterm::terminal::SetTitle;
 use editor::Editor;
 use feed::{Entry, Tone};
-use pickers::Picker;
+use pickers::{Picker, PickerKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use selection::Selection;
@@ -115,6 +115,8 @@ struct App {
     editor: Editor,
     /// The agent for the next new conversation, when the user chose one.
     next_agent: Option<String>,
+    /// The model for the next new conversation; `None` uses the agent's default.
+    next_model: Option<String>,
     /// Questions already offered as a picker, so dismissing one does not
     /// reopen it on every refresh.
     offered: HashSet<String>,
@@ -165,6 +167,7 @@ pub fn run(
     connection: Connection,
     project: Project,
     session: Option<String>,
+    pick: bool,
 ) -> Result<(), String> {
     let handshake = connection.handshake().clone();
     let (events, inbox) = mpsc::channel();
@@ -195,6 +198,7 @@ pub fn run(
         slash: 0,
         editor: Editor::default(),
         next_agent: None,
+        next_model: None,
         offered: HashSet::new(),
         history: history::load(),
         history_index: None,
@@ -224,6 +228,9 @@ pub fn run(
     // The first read happens here rather than on the refresher, so the
     // conversation is on screen from the first frame.
     app.refresh_now();
+    if pick {
+        app.open_picker(PickerKind::Sessions);
+    }
 
     let mut terminal = ratatui::init();
     let enhanced = enter_modes();

@@ -119,9 +119,18 @@ fn conversation(view: &SessionView) -> Vec<Line<'static>> {
     for message in &view.messages {
         lines.push(Line::raw(""));
         if message.role == "agent" {
+            // Who is speaking, so replies stand apart from your messages.
+            let mut label = vec![
+                Span::styled(format!("{} ", brand::mark_glyph(brand::Mark::Full)), accent),
+                Span::styled(
+                    view.agent.clone().unwrap_or_else(|| "agent".into()),
+                    accent.add_modifier(Modifier::BOLD),
+                ),
+            ];
             if let Some(attempt) = message.attempt {
-                lines.push(Line::styled(format!("  attempt {attempt}"), muted));
+                label.push(Span::styled(format!(" · attempt {attempt}"), muted));
             }
+            lines.push(Line::from(label));
             lines.extend(markdown(&message.text));
             continue;
         }
@@ -347,8 +356,14 @@ mod tests {
             questions: Vec::new(),
         };
         let shown: Vec<String> = conversation(&view).iter().map(text).collect();
-        let first = shown.iter().position(|line| line == "  attempt 1").unwrap();
-        let second = shown.iter().position(|line| line == "  attempt 2").unwrap();
+        let first = shown
+            .iter()
+            .position(|line| line.ends_with("agent · attempt 1"))
+            .unwrap();
+        let second = shown
+            .iter()
+            .position(|line| line.ends_with("agent · attempt 2"))
+            .unwrap();
         assert!(first < second);
         assert_eq!(shown[second + 1], "second try");
     }

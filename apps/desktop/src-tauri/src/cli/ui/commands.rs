@@ -13,12 +13,16 @@ pub const COMMANDS: &[(&str, &str)] = &[
         "start a fresh conversation, optionally with a message",
     ),
     ("bg", "start another conversation and stay on this one"),
+    ("init", "write or refresh AGENTS.md for this repository"),
     ("sessions", "switch to any open conversation"),
+    ("resume", "pick up an earlier conversation"),
     ("projects", "switch to another project"),
     ("agents", "see which agents are ready"),
     ("settings", "change how Jackalope behaves"),
     ("status", "show the project, host and agents"),
     ("agent", "choose the agent for your next conversation"),
+    ("model", "choose the model for your next conversation"),
+    ("usage", "show account quota and when it resets"),
     (
         "learn",
         "save learnings from this session to project context",
@@ -28,11 +32,11 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("retry", "run the last message again"),
     ("finish", "mark this conversation done"),
     ("pause", "hold queued messages"),
-    ("resume", "send held messages"),
+    ("unpause", "send held messages"),
     ("copy", "copy the latest reply"),
     ("history", "search what you have typed before"),
     ("kill", "stop running ! commands"),
-    ("clear", "clear notes and finished ! output"),
+    ("clear", "start fresh (Ctrl+L clears notes instead)"),
     ("open", "show Jackalope's app window"),
     ("help", "show these commands"),
     ("quit", "leave (work keeps running)"),
@@ -54,12 +58,67 @@ pub fn slash_matches(input: &str) -> Vec<(&'static str, &'static str)> {
         .collect()
 }
 
-fn capitalize(word: &str) -> String {
-    let mut characters = word.chars();
-    characters
-        .next()
-        .map(|first| first.to_uppercase().chain(characters).collect())
-        .unwrap_or_default()
+/// What `/init` asks for, matching the instruction files other agent CLIs write.
+const INIT_PROMPT: &str =
+    "Create or update AGENTS.md at the repository root so coding agents can work \
+here effectively. Inspect the repository first. Cover the build, test, lint and format commands; \
+the architecture and where things live; code conventions; and anything non-obvious a new \
+contributor would get wrong. Keep existing guidance that is still accurate, stay concise, and \
+do not invent commands you have not confirmed.";
+
+/// One quota window: how much is used and when it resets.
+fn usage_line(window: &crate::protocol::UsageWindow, now: i64) -> String {
+    let used = window
+        .used_percent
+        .map(|used| format!("{}% used", used.round() as i64))
+        .unwrap_or_else(|| "usage unknown".into());
+    let reset = window
+        .resets_at
+        .filter(|at| *at > now)
+        .map(|at| {
+            let minutes = (at - now) / 60;
+            if minutes >= 60 * 24 {
+                format!(" · resets in {}d {}h", minutes / 1440, minutes % 1440 / 60)
+            } else if minutes >= 60 {
+                format!(" · resets in {}h {}m", minutes / 60, minutes % 60)
+            } else {
+                format!(" · resets in {}m", minutes.max(1))
+            }
+        })
+        .unwrap_or_default();
+    format!("{}: {used}{reset}", window.name)
+}
+
+/// The command a mistyped name most likely meant: a unique prefix match, or
+/// the nearest name within two single-character edits.
+fn closest_command(typed: &str) -> Option<&'static str> {
+    let prefixed: Vec<_> = COMMANDS
+        .iter()
+        .filter(|(name, _)| name.starts_with(typed))
+        .collect();
+    if let [(name, _)] = prefixed.as_slice() {
+        return Some(name);
+    }
+    COMMANDS
+        .iter()
+        .map(|(name, _)| (edit_distance(typed, name), *name))
+        .filter(|(distance, _)| *distance <= 2)
+        .min_by_key(|(distance, _)| *distance)
+        .map(|(_, name)| name)
+}
+
+fn edit_distance(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    let mut previous: Vec<usize> = (0..=b.len()).collect();
+    for (i, left) in a.chars().enumerate() {
+        let mut current = vec![i + 1];
+        for (j, right) in b.iter().enumerate() {
+            let substitution = previous[j] + usize::from(left != *right);
+            current.push(substitution.min(previous[j + 1] + 1).min(current[j] + 1));
+        }
+        previous = current;
+    }
+    previous[b.len()]
 }
 
 impl App {
@@ -106,7 +165,7 @@ impl App {
                     if busy {
                         self.flash("Queued · runs after the current work", Tone::Muted);
                     } else if self.view.as_ref().is_some_and(|view| view.paused) {
-                        self.flash("Held · /resume to send", Tone::Warning);
+                        self.flash("Held · /unpause to send", Tone::Warning);
                     }
                 }
                 self.refresh();
@@ -124,6 +183,7 @@ impl App {
             project_path: self.project.path.clone(),
             text,
             agent: self.next_agent.clone(),
+            model: self.next_model.clone(),
         }) {
             Some(Response::Started { session_id }) => Some(session_id),
             _ => None,
@@ -181,9 +241,14 @@ impl App {
                     self.show(Some(id));
                 }
             }
-            "new" => {
+            "new" | "clear" => {
                 self.show(None);
                 self.note("New conversation. Type a message to begin.");
+            }
+            "init" => {
+                if let Some(id) = self.start_conversation(INIT_PROMPT.into()) {
+                    self.show(Some(id));
+                }
             }
             "bg" if argument.is_empty() => self.note("Add the message: /bg <what to do>"),
             "bg" => {
@@ -219,10 +284,9 @@ impl App {
                     self.flash("No commands running", Tone::Muted);
                 }
             }
-            "clear" => self.clear_feed(),
             "help" | "?" => self.help(),
             "quit" | "exit" | "q" => self.quit = true,
-            "sessions" => self.open_picker(PickerKind::Sessions),
+            "sessions" | "resume" => self.open_picker(PickerKind::Sessions),
             "history" => self.open_picker(PickerKind::History),
             "projects" => self.open_picker(PickerKind::Projects),
             "agents" => self.open_picker(PickerKind::Agents),
@@ -231,7 +295,16 @@ impl App {
                 self.show(None);
                 self.note("Your conversation is still open; /sessions to go back.");
             }
-            "agent" | "model" => self.open_picker(PickerKind::NextAgent),
+            "agent" => self.open_picker(PickerKind::NextAgent),
+            "model" if !argument.is_empty() => self.choose_model(Some(argument.into())),
+            "model" => {
+                if self.model_agent().is_some() {
+                    self.open_picker(PickerKind::NextModel);
+                } else {
+                    self.note("Jackalope chooses the agent, so pick one with /agent first. Or type /model <name>.");
+                }
+            }
+            "usage" | "cost" => self.usage(),
             "learn" => self.learn(),
             "diff" | "changes" => {
                 if self
@@ -245,10 +318,8 @@ impl App {
             }
             "retry" => self.session_action("retry", "Retrying", Tone::Muted),
             "finish" => self.session_action("finish", "Marked done", Tone::Success),
-            "pause" | "resume" => {
-                let done = format!("{}d", capitalize(command));
-                self.session_action(command, &done, Tone::Muted);
-            }
+            "pause" => self.session_action("pause", "Paused", Tone::Muted),
+            "unpause" => self.session_action("resume", "Resumed", Tone::Muted),
             "stop" => {
                 let run = self
                     .view
@@ -265,9 +336,46 @@ impl App {
                 }
             }
             "open" => self.open_app(),
-            other => self.note(format!("Unknown command /{other}. Type / to see the list.")),
+            other => match closest_command(other) {
+                Some(name) => self.note(format!("Unknown command /{other}. Did you mean /{name}?")),
+                None => self.note(format!("Unknown command /{other}. Type / to see the list.")),
+            },
         }
         self.refresh();
+    }
+
+    fn usage(&mut self) {
+        let Some(Response::Usage { accounts }) = self.request(Request::Usage) else {
+            return;
+        };
+        if accounts.is_empty() {
+            self.note("No account quota is available yet.");
+            return;
+        }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|elapsed| elapsed.as_secs() as i64)
+            .unwrap_or_default();
+        for account in accounts {
+            let who = if account.account.is_empty() {
+                account.agent.clone()
+            } else {
+                format!("{} · {}", account.agent, account.account)
+            };
+            if account.windows.is_empty() {
+                let detail = if account.detail.is_empty() {
+                    account.status.clone()
+                } else {
+                    account.detail.clone()
+                };
+                self.note_tone(format!("{who}: {detail}"), Tone::Muted);
+                continue;
+            }
+            self.note(who);
+            for window in &account.windows {
+                self.note(format!("  {}", usage_line(window, now)));
+            }
+        }
     }
 
     fn learn(&mut self) {
@@ -318,6 +426,39 @@ mod tests {
         assert!(COMMANDS.iter().any(|(name, _)| *name == "bg"));
         assert!(names("/bg fix it").is_empty());
         assert_eq!(names("/co"), ["copy"]);
-        assert_eq!(capitalize("pause"), "Pause");
+    }
+
+    #[test]
+    fn familiar_commands_follow_other_agent_clis() {
+        assert_eq!(names("/res"), ["resume"]);
+        assert_eq!(names("/unp"), ["unpause"]);
+        assert!(COMMANDS.iter().any(|(name, _)| *name == "clear"));
+    }
+
+    #[test]
+    fn usage_lines_read_briefly() {
+        let window = |used, resets_at| crate::protocol::UsageWindow {
+            name: "5h".into(),
+            used_percent: used,
+            resets_at,
+        };
+        assert_eq!(
+            usage_line(&window(Some(42.4), Some(1000 + 90 * 60)), 1000),
+            "5h: 42% used · resets in 1h 30m"
+        );
+        assert_eq!(usage_line(&window(None, None), 0), "5h: usage unknown");
+        assert_eq!(
+            usage_line(&window(Some(10.0), Some(100)), 1000),
+            "5h: 10% used",
+            "a reset in the past is stale"
+        );
+    }
+
+    #[test]
+    fn unknown_commands_suggest_the_closest_name() {
+        assert_eq!(closest_command("sesions"), Some("sessions"));
+        assert_eq!(closest_command("stpo"), Some("stop"));
+        assert_eq!(closest_command("hist"), Some("history"));
+        assert_eq!(closest_command("deploy"), None);
     }
 }

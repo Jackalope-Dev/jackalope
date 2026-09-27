@@ -1,3 +1,6 @@
+/** The longest instruction a task, follow-up or schedule accepts. */
+export const PROMPT_MAX_CHARS = 24_000;
+
 import { isTauriEnvironment } from './tauri-bridge.ts';
 import { invokeNative } from './telemetry-client.ts';
 

@@ -2,9 +2,10 @@ import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { type ScheduleTemplate, scheduleTemplateDraft } from '../../lib/schedule-templates';
 import { type ScheduleDefinition as Definition, savedPlanDraft } from '../../lib/schedules';
-import { nativeTask, type RunRequest } from '../../lib/task-runtime';
+import { nativeTask, PROMPT_MAX_CHARS, type RunRequest } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -55,7 +56,13 @@ export function ScheduleManager(props: {
   sourceRunId?: string;
   onSourceHandled?: () => void;
 }) {
-  const { projects, activeProjectId, selectProject } = useProjectStore();
+  const { projects, activeProjectId, selectProject } = useProjectStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      activeProjectId: s.activeProjectId,
+      selectProject: s.selectProject,
+    })),
+  );
   const runners = useExecutionStore((s) => s.runners);
   const runs = useExecutionStore((s) => s.runs);
   const legacy = useScheduleStore((s) => s.schedules);
@@ -572,7 +579,7 @@ export function ScheduleManager(props: {
                             id="schedule-instructions"
                             required={!monitorOnly}
                             disabled={monitorOnly}
-                            maxLength={24000}
+                            maxLength={PROMPT_MAX_CHARS}
                             rows={10}
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}

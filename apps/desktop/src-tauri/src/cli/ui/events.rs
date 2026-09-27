@@ -168,7 +168,7 @@ pub fn spawn_watcher(handshake: Handshake, events: Sender<Event>) {
 pub fn spawn_ticker(events: Sender<Event>) {
     std::thread::spawn(move || {
         while events.send(Event::Tick).is_ok() {
-            std::thread::sleep(Duration::from_millis(120));
+            std::thread::sleep(Duration::from_millis(80));
         }
     });
 }

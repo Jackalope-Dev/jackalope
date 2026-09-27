@@ -22,6 +22,8 @@ pub enum Action {
     OpenApp,
     /// Route the next new conversation to this agent; `None` lets Jackalope choose.
     NextAgent(Option<String>),
+    /// Use this model for the next new conversation; `None` uses the default.
+    NextModel(Option<String>),
     /// Answer the pending question with this option.
     Answer(String),
     /// Type a free-form answer instead of choosing an option.
@@ -43,6 +45,7 @@ pub enum PickerKind {
     Agents,
     Settings,
     NextAgent,
+    NextModel,
     Question,
     History,
 }
@@ -231,6 +234,10 @@ impl App {
                     .as_ref()
                     .map(|id| self.agent_name(id))
                     .unwrap_or_else(|| "Jackalope's choice".into());
+                if self.next_agent != agent {
+                    // Models belong to an agent.
+                    self.next_model = None;
+                }
                 self.next_agent = agent;
                 self.note(if self.session.is_some() {
                     format!("{name} will take your next new conversation (/new). This one stays with its agent.")
@@ -238,6 +245,7 @@ impl App {
                     format!("{name} will take this conversation.")
                 });
             }
+            Action::NextModel(model) => self.choose_model(model),
             Action::Answer(option) => self.answer(option),
             Action::TypeAnswer => self.note("Type your answer and press Enter."),
             Action::Recall(entry) => {
@@ -353,6 +361,67 @@ impl App {
         ]
     }
 
+    /// The agent the next conversation will use, when one is chosen or set as
+    /// the default; routing ("auto") has no single model list.
+    pub(super) fn model_agent(&self) -> Option<&AgentStatus> {
+        let Some(Ok(overview)) = &self.overview else {
+            return None;
+        };
+        let id = self
+            .next_agent
+            .as_deref()
+            .unwrap_or(overview.default_agent.as_str());
+        overview.agents.iter().find(|agent| agent.id == id)
+    }
+
+    fn next_model_items(&self) -> Vec<Item> {
+        let default = self
+            .model_agent()
+            .map(|agent| agent.default_model.trim())
+            .filter(|model| !model.is_empty())
+            .map(|model| format!("uses {model}"))
+            .unwrap_or_else(|| "the agent decides".into());
+        let mut items = vec![Item {
+            label: "Agent default".into(),
+            detail: if self.next_model.is_none() {
+                "current".into()
+            } else {
+                default
+            },
+            action: Action::NextModel(None),
+        }];
+        if let Some(agent) = self.model_agent() {
+            for model in &agent.models {
+                items.push(Item {
+                    label: model.clone(),
+                    detail: if self.next_model.as_deref() == Some(model.as_str()) {
+                        "current".into()
+                    } else {
+                        agent.name.clone()
+                    },
+                    action: Action::NextModel(Some(model.clone())),
+                });
+            }
+        }
+        items
+    }
+
+    pub(super) fn choose_model(&mut self, model: Option<String>) {
+        let agent = self
+            .model_agent()
+            .map(|agent| agent.name.clone())
+            .unwrap_or_else(|| "the agent".into());
+        let name = model
+            .clone()
+            .unwrap_or_else(|| format!("{agent}'s default model"));
+        self.next_model = model;
+        self.note(if self.session.is_some() {
+            format!("{name} will run your next new conversation (/new). This one keeps its model.")
+        } else {
+            format!("{name} will run this conversation.")
+        });
+    }
+
     fn next_agent_items(&self) -> Vec<Item> {
         let mut items = vec![Item {
             label: "Let Jackalope choose".into(),
@@ -438,6 +507,10 @@ impl App {
             PickerKind::NextAgent => (
                 "Agent for the next conversation".to_string(),
                 self.next_agent_items(),
+            ),
+            PickerKind::NextModel => (
+                "Model for the next conversation".to_string(),
+                self.next_model_items(),
             ),
             PickerKind::History => {
                 // Newest first.

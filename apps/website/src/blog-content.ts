@@ -2,6 +2,136 @@ import type { BlogPost } from './blog-types.ts';
 
 export const practicalPosts: BlogPost[] = [
   {
+    slug: 'agents-md-claude-md-project-instructions',
+    cover: { kind: 'context', tone: 'honey', label: 'Write it down once.' },
+    title: 'AGENTS.md and CLAUDE.md: writing project instructions agents follow',
+    seoTitle: 'AGENTS.md vs CLAUDE.md: a practical guide',
+    category: 'Practical guides',
+    date: '2026-09-27',
+    readingTime: '7 min read',
+    description:
+      'Write an AGENTS.md or CLAUDE.md coding agents follow: what to include, sharing one file across Codex, Claude Code and Gemini CLI, and testing it.',
+    sections: [
+      {
+        id: 'why-instruction-files',
+        title: 'Stop repeating the same correction',
+        paragraphs: [
+          'Every coding agent starts a session knowing nothing about your repository. It guesses the package manager, runs the wrong test command, and formats files the way it saw most often in training. You correct it, the session ends, and the next one makes the same guess.',
+          'A project instruction file fixes that at the source. It is a Markdown file in the repository that the agent reads before it starts work. Written well, it replaces the first ten minutes of every conversation. Written badly, it becomes a long list of rules the agent skims, half follows or applies in the wrong place.',
+        ],
+      },
+      {
+        id: 'which-file',
+        title: 'Know which file each agent reads',
+        paragraphs: [
+          'AGENTS.md is an open format supported by many tools, including Codex and OpenCode. Claude Code reads CLAUDE.md. Gemini CLI reads GEMINI.md by default, and its context file name can be configured. Check each tool’s documentation for the version you run, because loading rules change.',
+          'You rarely need three copies. Keep the shared guidance in AGENTS.md and make the other files thin pointers. Claude Code supports importing another file with an @ reference, so a one-line CLAUDE.md can pull in AGENTS.md and add only what is specific to Claude. Copies drift; one source with small agent-specific additions does not.',
+        ],
+        table: {
+          caption: 'Default instruction files by agent',
+          headers: ['Agent', 'Reads by default', 'Sharing approach'],
+          rows: [
+            ['Codex', 'AGENTS.md', 'Use AGENTS.md as the source'],
+            ['OpenCode', 'AGENTS.md', 'Use AGENTS.md as the source'],
+            ['Claude Code', 'CLAUDE.md', 'Import @AGENTS.md from CLAUDE.md'],
+            ['Gemini CLI', 'GEMINI.md', 'Configure the context file name, or point to AGENTS.md'],
+          ],
+        },
+        code: {
+          label: 'CLAUDE.md that reuses the shared file',
+          language: 'markdown',
+          value:
+            '@AGENTS.md\n\n## Claude Code only\n- Prefer the project skills in .claude/skills when one fits.',
+        },
+        links: [
+          { label: 'AGENTS.md format', href: 'https://agents.md/' },
+          {
+            label: 'Claude Code: memory and CLAUDE.md',
+            href: 'https://code.claude.com/docs/en/memory',
+          },
+        ],
+      },
+      {
+        id: 'what-to-include',
+        title: 'Write what the agent cannot discover',
+        paragraphs: [
+          'An agent can read your code. It cannot read the reasons behind it. The most useful lines describe commands, boundaries and decisions that are not obvious from the files: which check proves a change works, which directories are generated, which API must stay backward compatible.',
+          'Leave out what the repository already says. Restating the folder structure or listing every dependency costs context on every task and goes stale quickly. If a rule matters only for one package, put it in a nested file in that directory instead of the root file; tools that support nested files apply the closest one to the files being edited.',
+        ],
+        bullets: [
+          'Setup, build and test commands, including the fast targeted check and the full one.',
+          'Boundaries: generated files, vendored code, migrations or data that must not be edited.',
+          'Conventions that differ from the ecosystem default, with a one-line reason.',
+          'What done means: which checks must pass and what the agent should report back.',
+          'Actions that need a person, such as committing, deploying or changing credentials.',
+        ],
+        code: {
+          label: 'A compact AGENTS.md',
+          language: 'markdown',
+          value:
+            '# Agent guidance\n\n## Commands\n- Install: pnpm install --frozen-lockfile\n- Fast check: pnpm test --filter <package>\n- Before finishing: pnpm verify\n\n## Boundaries\n- Do not edit src/generated/; run pnpm codegen instead.\n- Keep saved-data formats backward compatible.\n\n## Conventions\n- Styling comes from packages/brand tokens, not hard-coded colors.\n- Comments explain non-obvious behavior, not what the code does.\n\n## Finishing\n- Do not commit. Report changed files, checks run and open questions.',
+        },
+      },
+      {
+        id: 'write-for-following',
+        title: 'Phrase rules so they can be followed',
+        paragraphs: [
+          'Agents follow specific, checkable instructions far better than general advice. “Write clean code” changes nothing. “Run pnpm verify before reporting a task as done” changes behavior, and you can tell whether it happened.',
+          'Give the reason when a rule looks arbitrary. An agent that knows why generated files are off limits will regenerate them instead of editing them by hand, and will ask when the situation is unclear. Keep the file short enough to read in full; if it grows past a page or two, move detail into linked guides and keep only the pointers at the top level.',
+        ],
+        table: {
+          caption: 'Vague instructions and followable ones',
+          headers: ['Instead of', 'Write'],
+          rows: [
+            [
+              'Test your changes.',
+              'Run pnpm test --filter <package> while working and pnpm verify before finishing.',
+            ],
+            [
+              'Be careful with the database.',
+              'Never edit files in migrations/; create a new migration instead.',
+            ],
+            [
+              'Follow our style.',
+              'Use the shared Button component; do not add page-specific button styles.',
+            ],
+            ['Don’t break things.', 'Keep exported function signatures in packages/api stable.'],
+          ],
+        },
+      },
+      {
+        id: 'test-the-file',
+        title: 'Test the file like any other change',
+        paragraphs: [
+          'After editing the file, start a fresh session and give the agent a small, real task. Watch for the specific behavior the new line was meant to change: did it run the right check, avoid the generated folder, stop before committing? If not, the instruction is too vague, too buried, or contradicted somewhere else.',
+          'Review the file when it changes, the same way you review code. Remove lines that no longer match the repository, and resolve contradictions between the root file and nested ones. A stale instruction is worse than none, because the agent will follow it confidently.',
+        ],
+      },
+      {
+        id: 'where-jackalope-fits',
+        title: 'Keep guidance with every task',
+        paragraphs: [
+          'Jackalope keeps project guidance, reusable workflows and editable lessons with each project, and shows the context that carries into a new task before it starts. The jackalope command’s /init asks an agent to write or refresh AGENTS.md for the current repository.',
+          'An instruction file shapes what an agent tries. It does not guarantee the result. Keep reviewing the changes and checks, and fold what you learn back into the file.',
+        ],
+        links: [
+          {
+            label: 'Project context in Jackalope',
+            href: '/features/project-context-for-coding-agents/',
+          },
+        ],
+      },
+    ],
+    related: [
+      { label: 'MCP for coding agents', href: '/blog/mcp-for-coding-agents/' },
+      {
+        label: 'Use Claude Code and Codex together',
+        href: '/blog/claude-code-and-codex-together/',
+      },
+      { label: 'Review AI-generated code', href: '/blog/review-ai-generated-code-checklist/' },
+    ],
+  },
+  {
     slug: 'git-worktrees-for-ai-coding-agents',
     cover: { kind: 'parallel', tone: 'indigo', label: 'Separate spaces. Shared purpose.' },
     title: 'Git worktrees for AI coding agents: from setup to cleanup',

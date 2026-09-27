@@ -11,6 +11,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Check, Circle, FileText, ListTodo, Pencil, Play, Plus, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { useShallow } from 'zustand/react/shallow';
 import {
   appendRepoTodo,
   parseRepoTodos,
@@ -44,7 +45,9 @@ export function RepoTodos({
   onOpenProject: () => void;
   onCapture: (draftKey: string) => void;
 }) {
-  const { projects, activeProjectId } = useProjectStore();
+  const { projects, activeProjectId } = useProjectStore(
+    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
+  );
   const project = projects.find((item) => item.id === activeProjectId);
   const [documents, setDocuments] = useState<RepoTodoDocument[]>([]);
   const [selected, setSelected] = useState('');
@@ -65,7 +68,21 @@ export function RepoTodos({
   const addInput = useRef<HTMLInputElement>(null);
   const filterButton = useRef<HTMLButtonElement>(null);
   const dialogFocus = useDialogFocus();
-  const { drafts, setDraft, saving: savingFiles, setSaving, revision } = useRepoTodoStore();
+  const {
+    drafts,
+    setDraft,
+    saving: savingFiles,
+    setSaving,
+    revision,
+  } = useRepoTodoStore(
+    useShallow((s) => ({
+      drafts: s.drafts,
+      setDraft: s.setDraft,
+      saving: s.saving,
+      setSaving: s.setSaving,
+      revision: s.revision,
+    })),
+  );
   const key = todoDraftKey(project?.path ?? '', selected);
   const saving = savingFiles[key] ?? false;
   const draft = drafts[key];

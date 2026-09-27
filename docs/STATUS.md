@@ -65,7 +65,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   streamed output, follow-ups queue behind running work, `/bg` starts parallel
   conversations, a live header shows other open work and agent readiness, the input
   wraps and grows, and dragging copies text. `/learn` extracts session learnings into
-  project knowledge, and a rotating tips footer highlights commands and shortcuts.
+  project knowledge, `/model` and `/usage` choose a model and show account quota,
+  `/init` writes `AGENTS.md`, `--resume` picks or rejoins a conversation, and a rotating tips footer highlights commands and shortcuts.
   The status bar, command search and Cmd/Ctrl+J open it in an app window that can
   hand the conversation to the system terminal. Release builds link the command onto
   PATH; agent questions can be answered in the terminal. The transcript shows every

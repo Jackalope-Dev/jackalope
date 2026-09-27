@@ -1,5 +1,6 @@
 import { Popover } from '@jackalope/ui';
 import { GitBranch } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { sessionWork } from '../../lib/live-session';
 import { managedTaskWork } from '../../lib/managed-task';
 import { openChanges } from '../../stores/commitReviewStore';
@@ -19,8 +20,16 @@ export function useFocusedWork() {
   const host = useHostContextStore((state) => state.host);
   const runs = useExecutionStore((state) => state.runs);
   const selectedId = useExecutionStore((state) => state.selectedId);
-  const { sessions, selectedId: selectedSession, runs: sessionRuns } = useLiveSessionStore();
-  const { queue, selectedId: selectedManaged } = useManagedTaskStore();
+  const {
+    sessions,
+    selectedId: selectedSession,
+    runs: sessionRuns,
+  } = useLiveSessionStore(
+    useShallow((s) => ({ sessions: s.sessions, selectedId: s.selectedId, runs: s.runs })),
+  );
+  const { queue, selectedId: selectedManaged } = useManagedTaskStore(
+    useShallow((s) => ({ queue: s.queue, selectedId: s.selectedId })),
+  );
   const project = useProjectStore((state) =>
     state.projects.find((item) => item.id === state.activeProjectId),
   );

@@ -2,6 +2,7 @@ import { applyThemeTokens, DEFAULT_THEME, startThemeClock } from '@jackalope/bra
 import { Checkbox } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { useShallow } from 'zustand/react/shallow';
 import { AgentAvatar } from './components/agents/AgentAvatar';
 import { LocalAiSetup } from './components/agents/LocalAiSetup';
 import { JackalopeMascot } from './components/mascot/JackalopeMascot';
@@ -24,7 +25,9 @@ function DesignLab() {
   const [reduceMotion, setReduceMotion] = useState(false);
   const [period, setPeriod] = useState('30');
   const [agentState, setAgentState] = useState('idle');
-  const { mood, setMood } = useMascotStore();
+  const { mood, setMood } = useMascotStore(
+    useShallow((s) => ({ mood: s.mood, setMood: s.setMood })),
+  );
   useEffect(() => applyThemeTokens(theme), [theme]);
 
   return (
@@ -33,7 +36,9 @@ function DesignLab() {
         <p className="mb-3 text-sm">
           Local setup fixture: browser state only; no installation, download or native tasks.
         </p>
-        <LocalAiSetup preview={localAiFixture} />
+        <div className="mb-10">
+          <LocalAiSetup preview={localAiFixture} />
+        </div>
         <WorkspaceHeading
           title="Design library"
           description="The same character, colors, and controls used in the app. Explore the details here."

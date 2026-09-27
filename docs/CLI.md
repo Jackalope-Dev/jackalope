@@ -56,7 +56,8 @@ terminal and the app together. Leaving a terminal does not stop work.
 | --- | --- |
 | `jackalope` | Starts a conversation in this repository |
 | `jackalope -p "<message>"` | Runs one message and prints the reply; `run` is an alias |
-| `jackalope --continue` | Rejoins this repository's latest conversation |
+| `jackalope --continue`, `-c` | Rejoins this repository's latest conversation |
+| `jackalope --resume [id]`, `-r` | Opens the conversation picker, or rejoins by id |
 | `jackalope attach <id>` | Rejoins a conversation; any unambiguous id prefix works |
 | `jackalope ls` | Lists open conversations with their project, state and age |
 | `jackalope stop <id>` | Stops the work a conversation is running |
@@ -67,14 +68,19 @@ terminal and the app together. Leaving a terminal does not stop work.
 always message text. Unknown or misplaced options are refused with exit status 64.
 
 Inside a conversation, typing `/` opens an interactive command menu, and `/help`
-lists commands: `/new`, `/bg`, `/sessions`, `/projects`, `/agents`, `/settings`,
-`/status`, `/agent`, `/learn`, `/diff`, `/stop`, `/retry`, `/finish`, `/pause`,
-`/resume`, `/copy`, `/history`, `/kill`, `/clear`, `/open` and `/quit`. Pickers
+lists commands: `/new`, `/bg`, `/init`, `/sessions`, `/projects`, `/agents`, `/settings`,
+`/status`, `/agent`, `/model`, `/usage`, `/learn`, `/diff`, `/stop`, `/retry`, `/finish`, `/resume`, `/pause`,
+`/unpause`, `/copy`, `/history`, `/kill`, `/clear`, `/open` and `/quit`. Pickers
 filter as you type. `/new <message>` starts
 and shows a conversation; `/bg <message>` starts one and stays on the current one.
 `/learn` inspects conversation history since the previous learn command (or session
 start) and saves relevant learnings, preferences and check commands to project
-knowledge. Messages sent while an agent works queue behind it.
+knowledge. Messages sent while an agent works queue behind it; `/pause` holds
+the queue and `/unpause` sends it. `/clear` starts a fresh conversation like `/new`,
+`/resume` opens the conversation picker, and Ctrl+L clears notes and finished `!` output.
+`/model` picks from the models configured for the next conversation's agent, or
+`/model <name>` sets one directly. `/usage` (or `/cost`) lists account quota
+windows and resets. `/init` asks an agent to write or refresh `AGENTS.md`.
 
 A line starting with `!` runs in the user's shell (`cmd` on Windows) in the
 conversation's worktree, or the project when it has none. Output streams below the

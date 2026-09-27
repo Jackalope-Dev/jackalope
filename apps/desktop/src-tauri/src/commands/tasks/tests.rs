@@ -124,9 +124,9 @@ fn live_tool_activity_is_concrete_bounded_and_provider_independent() {
     let mut run = sample("codex");
     consume_event(
         &mut run,
-        r#"{"type":"item.started","item":{"type":"command_execution","command":"secret command"}}"#,
+        r#"{"type":"item.started","item":{"type":"command_execution","command":"pnpm secret-argument"}}"#,
     );
-    assert_eq!(run.activity, ["Running a command"]);
+    assert_eq!(run.activity, ["Running pnpm"]);
     consume_event(
         &mut run,
         r#"{"type":"item.completed","item":{"type":"command_execution","command":"private command","exit_code":1,"aggregated_output":"private output"}}"#,

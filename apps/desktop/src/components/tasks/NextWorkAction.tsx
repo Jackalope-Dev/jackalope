@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { collectWorkspaceWork } from '../../lib/task-collection';
 import type { TaskRun } from '../../lib/task-runtime';
 import { taskDecision } from '../../lib/task-workflow';
@@ -13,7 +14,9 @@ import { Button } from '../ui/button';
 
 export function NextWorkAction({ run }: { run: TaskRun }) {
   const runs = useExecutionStore((state) => state.runs);
-  const { sessions, runs: sessionRuns } = useLiveSessionStore();
+  const { sessions, runs: sessionRuns } = useLiveSessionStore(
+    useShallow((s) => ({ sessions: s.sessions, runs: s.runs })),
+  );
   const queue = useManagedTaskStore((state) => state.queue);
   const next = useMemo(
     () =>

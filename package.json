@@ -37,6 +37,7 @@
     "evaluate:jev": "node scripts/evaluation/jev.mjs",
     "evaluate:routing": "node scripts/evaluation/routing.mjs",
     "check:docs": "node scripts/check-docs.mjs",
+    "check:tokens": "node scripts/check-color-tokens.mjs",
     "check:links:website": "node apps/website/scripts/audit-links.mjs",
     "check:changelog": "node scripts/changelog.mjs check",
     "changelog:add": "node scripts/changelog.mjs add",

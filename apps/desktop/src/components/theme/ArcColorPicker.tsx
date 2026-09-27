@@ -41,12 +41,12 @@ export function ArcColorPicker({
         setOpen(next);
       }}
     >
-      <Tooltip content="Personalize your workspace">
+      <Tooltip content="Change theme">
         <Popover.Trigger asChild>
           <button
             type="button"
             className={variant === 'titlebar' ? 'app-titlebar-button' : 'appearance-trigger'}
-            aria-label="Personalize your workspace"
+            aria-label="Change theme"
             onMouseDown={(event) => event.stopPropagation()}
             onDoubleClick={(event) => event.stopPropagation()}
             onClick={() => {

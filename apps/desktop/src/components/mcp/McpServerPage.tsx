@@ -2,6 +2,7 @@ import { Disclosure, DisclosureSummary, SearchField, Tabs } from '@jackalope/ui'
 import { ArrowLeft } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import remarkGfm from 'remark-gfm';
+import { useShallow } from 'zustand/react/shallow';
 import { type AllMcpsServer, useMcpStore } from '../../stores/mcpStore';
 import { Button } from '../ui/button';
 import { LoadingState } from '../ui/LoadingState';
@@ -53,7 +54,16 @@ export function McpServerPage({
     loadingMarkdown,
     inspectServer,
     servers,
-  } = useMcpStore();
+  } = useMcpStore(
+    useShallow((s) => ({
+      inspectingServer: s.inspectingServer,
+      inspectingDetails: s.inspectingDetails,
+      inspectError: s.inspectError,
+      loadingMarkdown: s.loadingMarkdown,
+      inspectServer: s.inspectServer,
+      servers: s.servers,
+    })),
+  );
   const [toolQuery, setToolQuery] = useState('');
   const scroll = useRef<HTMLDivElement>(null);
   if (!server) return null;

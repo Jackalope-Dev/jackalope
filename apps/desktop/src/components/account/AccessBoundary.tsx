@@ -189,6 +189,16 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
                     onCheckedChange={settings.setUseMcpMarketplace}
                   />
                 </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span>Theme picker in the top bar</span>
+                  <Switch
+                    label="Show theme picker in top bar"
+                    checked={settings.showThemePickerInToolbar}
+                    onCheckedChange={(checked) =>
+                      settings.updateSettings({ showThemePickerInToolbar: checked })
+                    }
+                  />
+                </div>
               </div>
             </Disclosure>
             <div className="access-connection">

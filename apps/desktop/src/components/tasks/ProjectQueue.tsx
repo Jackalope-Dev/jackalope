@@ -13,6 +13,7 @@ import {
   Play,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   type QueueCommand,
   type QueueItem,
@@ -51,7 +52,9 @@ const emptyQueue: QueueView = {
 
 export function ProjectQueue({ project, onBack }: { project: Project; onBack: () => void }) {
   useFeatureTelemetry('queue');
-  const { runs, select, refresh } = useExecutionStore();
+  const { runs, select, refresh } = useExecutionStore(
+    useShallow((s) => ({ runs: s.runs, select: s.select, refresh: s.refresh })),
+  );
   const [queue, setQueue] = useState<QueueView>(emptyQueue);
   const [adding, setAdding] = useState(false);
   const [planningFeature, setPlanningFeature] = useState(false);

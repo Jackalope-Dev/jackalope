@@ -1,6 +1,7 @@
 import { Disclosure, DisclosureBody, DisclosureSummary, Table } from '@jackalope/ui';
 import { ChartNoAxesColumn, Download } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { countedTaskDecisions } from '../../lib/decision-usage';
 import { taskTitle } from '../../lib/task-title';
 import { usageEntries } from '../../lib/usage-entries';
@@ -29,8 +30,19 @@ import { JevConnectionUsage } from './JevConnectionUsage';
 import { tokenLabel, UsageInsights } from './UsageInsights';
 import { WorkflowPerformance } from './WorkflowPerformance';
 export function UsageDashboard({ onTask }: { onTask: () => void }) {
-  const { runs, select, loading, error, historyError, refresh } = useExecutionStore();
-  const { projects, selectProject } = useProjectStore();
+  const { runs, select, loading, error, historyError, refresh } = useExecutionStore(
+    useShallow((s) => ({
+      runs: s.runs,
+      select: s.select,
+      loading: s.loading,
+      error: s.error,
+      historyError: s.historyError,
+      refresh: s.refresh,
+    })),
+  );
+  const { projects, selectProject } = useProjectStore(
+    useShallow((s) => ({ projects: s.projects, selectProject: s.selectProject })),
+  );
   const [project, setProject] = useState('all');
   const [period, setPeriod] = useState('30');
   const [account, setAccount] = useState('all');

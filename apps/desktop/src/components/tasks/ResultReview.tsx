@@ -1,6 +1,7 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { ArrowRight, Check, FileDiff, GitMerge, ListChecks, RefreshCw } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { reviewFingerprint } from '../../lib/review-fingerprint';
 import { nativeTask, type Review, type TaskRun } from '../../lib/task-runtime';
 import { useProjectStore } from '../../stores/projectStore';
@@ -52,7 +53,7 @@ export function ResultReview({
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const review = suppliedReview ?? loadedReview;
-  const { projects } = useProjectStore();
+  const { projects } = useProjectStore(useShallow((s) => ({ projects: s.projects })));
   const project = projects.find((p) => p.id === run.projectId);
   const changeSection = (value: ReviewSection) => {
     setSelected(value);

@@ -15,11 +15,14 @@ export function WorkContext({
   run,
   allowNavigation = true,
   onTerminal,
+  hideTerminal = false,
   children,
 }: {
   run: TaskRun;
   allowNavigation?: boolean;
   onTerminal?: () => void;
+  /** The host shows its own Terminal tab, so the context row omits the button. */
+  hideTerminal?: boolean;
   children?: ReactNode;
 }) {
   const summary = useMemo(() => workSummary(run), [run]);
@@ -83,7 +86,12 @@ export function WorkContext({
           </DialogContent>
         </Dialog.Root>
         {children}
-        <WorkTools run={run} requestRevision={requested} onTerminal={onTerminal} />
+        <WorkTools
+          run={run}
+          requestRevision={requested}
+          onTerminal={onTerminal}
+          hideTerminal={hideTerminal}
+        />
       </div>
     </section>
   );

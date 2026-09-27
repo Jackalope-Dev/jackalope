@@ -30,9 +30,10 @@ USAGE
   jackalope                      start a conversation in this repository
   jackalope -p \"<message>\"       run once, print the reply and exit
   jackalope run \"<message>\"      the same as -p
-  jackalope --continue           resume the latest conversation here
+  jackalope -c, --continue       continue the latest conversation here
+  jackalope -r, --resume [id]    pick a conversation to resume, or resume by id
   jackalope ls                   list open conversations
-  jackalope attach <id>          resume a conversation by id
+  jackalope attach <id>          the same as --resume <id>
   jackalope stop <id>            stop the work a conversation is running
   jackalope status               show the host, this project and your agents
   jackalope help                 show this message
@@ -103,7 +104,11 @@ fn main() {
         Command::List { json } => subcommands::list(cli.cold_start, json),
         Command::Status { json } => subcommands::status(json),
         Command::Stop { id } => subcommands::stop(cli.cold_start, &id),
-        Command::Converse { resume, attach } => converse(cli.cold_start, attach, resume),
+        Command::Converse {
+            resume,
+            attach,
+            pick,
+        } => converse(cli.cold_start, attach, resume, pick),
     };
     if let Err(error) = result {
         eprintln!("{error}");
@@ -115,6 +120,7 @@ fn converse(
     preference: Option<ColdStart>,
     attach: Option<String>,
     resume: bool,
+    pick: bool,
 ) -> Result<(), String> {
     if !std::io::stdout().is_terminal() {
         return Err("The conversation needs an interactive terminal.".into());
@@ -130,5 +136,5 @@ fn converse(
         ),
         None => None,
     };
-    ui::run(connection, project, session_id)
+    ui::run(connection, project, session_id, pick)
 }

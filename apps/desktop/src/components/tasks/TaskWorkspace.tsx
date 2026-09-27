@@ -7,6 +7,7 @@ import './core-workflow.css';
 import { DropdownMenu as Menu } from '@jackalope/ui';
 import { FolderOpen, ListTodo, MoreHorizontal, Plus, Radio, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   collectWorkspaceWork,
   matchesWorkFilter,
@@ -46,9 +47,18 @@ export function TaskWorkspace({
   composerVisible?: boolean;
   composerFocus?: number;
 }) {
-  const { projects, activeProjectId } = useProjectStore();
+  const { projects, activeProjectId } = useProjectStore(
+    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
+  );
   const preset = useWorkbenchStore((state) => state.presets[activeProjectId ?? ''] ?? 'focus');
-  const managed = useManagedTaskStore();
+  const managed = useManagedTaskStore(
+    useShallow((s) => ({
+      error: s.error,
+      queue: s.queue,
+      selectedId: s.selectedId,
+      select: s.select,
+    })),
+  );
   const runs = useExecutionStore((state) => state.runs);
   const sessions = useLiveSessionStore((state) => state.sessions);
   const selectedSessionId = useLiveSessionStore((state) => state.selectedId);
@@ -70,7 +80,16 @@ export function TaskWorkspace({
     setView: saveView,
     listRequest,
     clearListRequest,
-  } = useWorkViewStore();
+  } = useWorkViewStore(
+    useShallow((s) => ({
+      scope: s.scope,
+      setScope: s.setScope,
+      views: s.views,
+      setView: s.setView,
+      listRequest: s.listRequest,
+      clearListRequest: s.clearListRequest,
+    })),
+  );
   const projectFilter = scope === 'all' ? 'all' : (activeProjectId ?? 'unassigned');
   const [archived, setArchived] = useState(false);
   const [cleanupBusy, setCleanupBusy] = useState(false);
@@ -388,6 +407,7 @@ export function TaskWorkspace({
       />
       {preset !== 'focus' && !archived && (
         <WorkspaceModeHome
+          key={preset}
           preset={preset}
           items={items}
           filter={view.filter}
@@ -409,6 +429,7 @@ export function TaskWorkspace({
         )}
       {preset === 'focus' && !browsing && (
         <WorkspaceModeHome
+          key={preset}
           preset={preset}
           items={items}
           filter={view.filter}

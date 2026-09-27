@@ -403,6 +403,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             project_path,
             text,
             agent,
+            model,
         } => {
             let project = ensure_project(app, &project_path)?;
             let sessions = app.state::<LiveSessions>();
@@ -420,7 +421,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 "projectName": project.name,
                 "projectPath": project.path,
                 "agent": agent.as_deref().filter(|agent| !agent.is_empty()).unwrap_or(default_agent),
-                "model": null,
+                "model": model.filter(|model| !model.trim().is_empty()),
                 "prompt": "",
                 "isolated": true,
                 "previousRunId": null,
@@ -521,6 +522,39 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             }
             Ok(Response::Ok)
         }
+        Request::Usage => {
+            let records = super::capacity::capacity_snapshot(
+                app.state::<super::capacity::CapacityService>(),
+                app.state::<TaskRuntime>(),
+                Some(true),
+            )
+            .await?;
+            Ok(Response::Usage {
+                accounts: records
+                    .into_iter()
+                    .map(|record| protocol::UsageAccount {
+                        agent: record.agent,
+                        account: record.account,
+                        status: record.status,
+                        detail: record.detail,
+                        observed_at: record.observed_at,
+                        windows: record
+                            .windows
+                            .into_iter()
+                            .map(|window| protocol::UsageWindow {
+                                name: if window.pool_name.is_empty() {
+                                    window.window
+                                } else {
+                                    format!("{} · {}", window.pool_name, window.window)
+                                },
+                                used_percent: window.used_percent,
+                                resets_at: window.resets_at,
+                            })
+                            .collect(),
+                    })
+                    .collect(),
+            })
+        }
         Request::Overview => {
             let runtime = app.state::<TaskRuntime>();
             let policy = runtime.policy()?;
@@ -540,7 +574,21 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                         // Agents whose sign-in cannot be probed report as installed.
                         "installed"
                     };
+                    let options = policy.runner_options.get(&runner.id);
                     protocol::AgentStatus {
+                        models: options
+                            .map(|options| {
+                                options
+                                    .models
+                                    .iter()
+                                    .map(|model| model.trim().to_string())
+                                    .filter(|model| !model.is_empty())
+                                    .collect()
+                            })
+                            .unwrap_or_default(),
+                        default_model: options
+                            .map(|options| options.default_model.clone())
+                            .unwrap_or_default(),
                         id: runner.id,
                         name: runner.name,
                         state: state.into(),

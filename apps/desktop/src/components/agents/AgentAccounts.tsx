@@ -2,6 +2,7 @@ import { RefreshIcon } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check, Circle, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   type AgentProfile,
   accountStatusLabel,
@@ -162,9 +163,14 @@ export function AgentAccounts({
   onChanged?: () => void;
   projectId?: string;
 }) {
-  const { projects, updateProjectPreferences } = useProjectStore();
+  const { projects, updateProjectPreferences } = useProjectStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      updateProjectPreferences: s.updateProjectPreferences,
+    })),
+  );
   const project = projects.find((item) => item.id === projectId);
-  const config = useAgentConfigStore();
+  const config = useAgentConfigStore(useShallow((s) => ({ disabledAccounts: s.disabledAccounts })));
   const saveProject = async (change: () => void) => {
     if (!project) throw new Error('This project is no longer available.');
     const before = project.preferences;

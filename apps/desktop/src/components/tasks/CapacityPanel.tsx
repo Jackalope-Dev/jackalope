@@ -3,6 +3,7 @@ import { Badge, Panel, RefreshIcon } from '@jackalope/ui';
 import { Zap } from 'lucide-react';
 
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import { capacityWindowName } from '../../lib/capacity-display';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
@@ -76,7 +77,15 @@ function CapacityGauge({ remaining }: { remaining: number | null }) {
 }
 
 export function CapacityPanel() {
-  const { records, loading, error, lastFetched, fetch } = useCapacityStore();
+  const { records, loading, error, lastFetched, fetch } = useCapacityStore(
+    useShallow((s) => ({
+      records: s.records,
+      loading: s.loading,
+      error: s.error,
+      lastFetched: s.lastFetched,
+      fetch: s.fetch,
+    })),
+  );
   const [now, setNow] = useState(Date.now());
   const nextRefresh = lastFetched ? lastFetched + 60_000 : 0;
   const refresh = () => void fetch(true);

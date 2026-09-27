@@ -1,6 +1,7 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { useShallow } from 'zustand/react/shallow';
+import { isTauriEnvironment, openInBrowser } from '../../lib/tauri-bridge';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { Button } from '../ui/button';
@@ -8,8 +9,21 @@ import { Switch } from '../ui/Switch';
 import { SettingsSync } from './SettingsSync';
 
 export function PrivacySettings() {
-  const community = useCommunityStore();
-  const legacy = useSettingsStore();
+  const community = useCommunityStore(
+    useShallow((s) => ({
+      settings: s.settings,
+      load: s.load,
+      save: s.save,
+      busy: s.busy,
+      error: s.error,
+    })),
+  );
+  const legacy = useSettingsStore(
+    useShallow((s) => ({
+      telemetryEnabled: s.telemetryEnabled,
+      crashReportingEnabled: s.crashReportingEnabled,
+    })),
+  );
   const [noticeError, setNoticeError] = useState(false);
   const [usage, setUsage] = useState(
     community.settings?.reviewed ? community.settings.telemetry : legacy.telemetryEnabled,
@@ -83,8 +97,7 @@ export function PrivacySettings() {
             if (!isTauriEnvironment()) return;
             event.preventDefault();
             try {
-              const { open } = await import('@tauri-apps/plugin-shell');
-              await open('https://jackalope.dev/privacy/');
+              await openInBrowser('https://jackalope.dev/privacy/');
               setNoticeError(false);
             } catch {
               setNoticeError(true);

@@ -43,7 +43,7 @@ impl App {
         let state = view
             .step
             .clone()
-            .or_else(|| view.status.clone())
+            .or_else(|| view.status.as_deref().map(status_label))
             .unwrap_or_else(|| "ready".into());
         let status = view.status.as_deref().unwrap_or_default();
         let tone = if self.working() {
@@ -207,4 +207,22 @@ impl App {
             .map(|agent| agent.name.clone())
             .unwrap_or_else(|| id.to_string())
     }
+}
+
+/// A run status in words for the status line.
+fn status_label(status: &str) -> String {
+    match status {
+        "review" => "done · ready to review",
+        "reviewed" => "done · reviewed",
+        "running" => "working",
+        "starting" => "starting",
+        "routing" => "choosing an agent",
+        "queued" => "queued",
+        "stopping" => "stopping",
+        "stopped" | "cancelled" | "canceled" => "stopped",
+        "interrupted" => "interrupted",
+        "failed" | "error" => "failed",
+        other => other,
+    }
+    .into()
 }

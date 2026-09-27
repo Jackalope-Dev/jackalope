@@ -84,7 +84,9 @@ requiring Tailwind. Keep native bridges, API clients and app state out of this p
 Desktop compatibility exports can retain existing import paths. Use the local font stacks and established size tokens. Favor clear
 hierarchy, generous space and restrained surfaces over repeated metric cards.
 
-Use semantic action and accent tokens with their matching text colors. Keep
+Use semantic action and accent tokens with their matching text colors, and
+success, warning and danger for status. `pnpm check:tokens` rejects undefined
+color tokens and fixed Tailwind palette shades. Keep
 normal text contrast at least 4.5:1. Selection and status need non-color cues,
 and focus must remain visible in every theme. Use shared Select, input and button
 primitives so opened menus, disabled states and keyboard behavior stay consistent.

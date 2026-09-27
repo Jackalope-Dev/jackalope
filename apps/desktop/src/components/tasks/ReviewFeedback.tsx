@@ -2,6 +2,7 @@ import { Button, FormField, Input, Select, SelectItem, Textarea } from '@jackalo
 import * as Dialog from '@radix-ui/react-dialog';
 import { MessageSquarePlus } from 'lucide-react';
 import { createContext, type ReactNode, useContext, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { type ReviewAnchor, type ReviewComment, reviewFeedback } from '../../lib/review-feedback';
 import { useReviewFeedbackStore } from '../../stores/reviewFeedbackStore';
 import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
@@ -31,7 +32,13 @@ export function ReviewFeedback({
   children: ReactNode;
 }) {
   const comments = useReviewFeedbackStore((state) => state.threads[taskId] ?? empty);
-  const { save, remove, error: storageError } = useReviewFeedbackStore();
+  const {
+    save,
+    remove,
+    error: storageError,
+  } = useReviewFeedbackStore(
+    useShallow((s) => ({ save: s.save, remove: s.remove, error: s.error })),
+  );
   const [editing, setEditing] = useState<ReviewComment | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);

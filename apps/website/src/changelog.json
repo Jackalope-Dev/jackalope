@@ -1,5 +1,20 @@
 [
   {
+    "id": "terminal-commands-that-match-other-agent-clis",
+    "date": "2026-09-27",
+    "status": "In development",
+    "title": "Terminal commands that match other agent CLIs",
+    "description": "The jackalope terminal command now works the way people coming from other agent CLIs expect.",
+    "items": [
+      "Resume any conversation with --resume, or pick one from a list",
+      "Choose a model for the next conversation with /model",
+      "See account quota and reset times with /usage",
+      "Generate or refresh AGENTS.md with /init",
+      "/clear starts fresh, and mistyped commands suggest the closest match",
+      "A clearer look: rounded menus with a highlighted row, readable secondary text, labelled replies and a working indicator along the header"
+    ]
+  },
+  {
     "id": "faster-terminal-conversations",
     "date": "2026-09-26",
     "status": "In development",

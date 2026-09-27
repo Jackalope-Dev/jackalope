@@ -2,7 +2,7 @@ import { Disclosure, DisclosureSummary, Textarea } from '@jackalope/ui';
 import { Square } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openInBrowser } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useHelperStore } from '../../stores/helperStore';
 import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
@@ -14,10 +14,7 @@ import './helper.css';
 const Markdown = lazy(() => import('../tasks/TaskMarkdown'));
 async function openLink(url: string) {
   if (!/^https:\/\//i.test(url)) return;
-  if (isTauriEnvironment()) {
-    const { open } = await import('@tauri-apps/plugin-shell');
-    await open(url);
-  } else window.open(url, '_blank', 'noopener,noreferrer');
+  await openInBrowser(url);
 }
 
 export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {

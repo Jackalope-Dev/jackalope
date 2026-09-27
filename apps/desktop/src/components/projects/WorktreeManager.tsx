@@ -13,6 +13,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { nativeTask } from '../../lib/task-runtime';
 import {
   archiveWorktree,
@@ -138,7 +139,17 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     loading,
     checkingWorktrees,
     worktreesError,
-  } = useProjectStore();
+  } = useProjectStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      activeProjectId: s.activeProjectId,
+      loadWorktreesForActiveProject: s.loadWorktreesForActiveProject,
+      spawnTaskWorktree: s.spawnTaskWorktree,
+      loading: s.loading,
+      checkingWorktrees: s.checkingWorktrees,
+      worktreesError: s.worktreesError,
+    })),
+  );
   const project = projects.find((p) => p.id === activeProjectId);
   const [creating, setCreating] = useState(false);
   const [slug, setSlug] = useState('');

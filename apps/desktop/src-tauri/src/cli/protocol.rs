@@ -58,6 +58,10 @@ pub enum Request {
         text: String,
         #[serde(default)]
         agent: Option<String>,
+        /// A model for the agent; absent uses the agent's default. Omitted
+        /// when unset so hosts that predate it still accept the request.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
     },
     /// Add a message to a conversation.
     Send { session_id: String, text: String },
@@ -97,6 +101,8 @@ pub enum Request {
     /// Extract learnings from a conversation's history (up to the previous /learn,
     /// if present) and save them to project context.
     SessionLearn { session_id: String },
+    /// Account quota windows, as the app's status bar shows them.
+    Usage,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -184,6 +190,33 @@ pub struct AgentStatus {
     pub state: String,
     pub account: String,
     pub detail: String,
+    /// Models configured for this agent in the app; empty when none are listed.
+    #[serde(default)]
+    pub models: Vec<String>,
+    #[serde(default)]
+    pub default_model: String,
+}
+
+/// One account's quota, as last observed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageAccount {
+    pub agent: String,
+    pub account: String,
+    /// The capacity reader's status, such as `available` or `unavailable`.
+    pub status: String,
+    pub detail: String,
+    pub observed_at: Option<String>,
+    pub windows: Vec<UsageWindow>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageWindow {
+    pub name: String,
+    pub used_percent: Option<f64>,
+    /// Unix seconds.
+    pub resets_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -228,6 +261,9 @@ pub enum Response {
         count: usize,
         lessons: Vec<String>,
         message: String,
+    },
+    Usage {
+        accounts: Vec<UsageAccount>,
     },
 }
 
