@@ -124,9 +124,9 @@ fn live_tool_activity_is_concrete_bounded_and_provider_independent() {
     let mut run = sample("codex");
     consume_event(
         &mut run,
-        r#"{"type":"item.started","item":{"type":"command_execution","command":"secret command"}}"#,
+        r#"{"type":"item.started","item":{"type":"command_execution","command":"pnpm secret-argument"}}"#,
     );
-    assert_eq!(run.activity, ["Running a command"]);
+    assert_eq!(run.activity, ["Running pnpm"]);
     consume_event(
         &mut run,
         r#"{"type":"item.completed","item":{"type":"command_execution","command":"private command","exit_code":1,"aggregated_output":"private output"}}"#,
@@ -805,6 +805,39 @@ fn final_usage_replaces_replayed_totals_and_cache_is_counted_once() {
         assert_eq!(run.usage.input + run.usage.output, 135);
         assert_eq!(run.usage.estimated_cost_usd, Some(0.012));
     }
+}
+
+#[test]
+fn claude_result_with_error_extracts_message_and_never_serializes_null() {
+    let mut run = sample("claude");
+    consume_event(
+        &mut run,
+        r#"{"type":"result","is_error":true,"result":"You've hit your limit · resets 10pm","errors":null}"#,
+    );
+    assert_eq!(
+        run.error.as_deref(),
+        Some("You've hit your limit · resets 10pm")
+    );
+    assert!(run.quota_failure.is_some());
+    assert_ne!(run.error.as_deref(), Some("null"));
+
+    let mut run_array = sample("claude");
+    consume_event(
+        &mut run_array,
+        r#"{"type":"result","is_error":true,"result":"","errors":["Usage limit reached"]}"#,
+    );
+    assert_eq!(run_array.error.as_deref(), Some("Usage limit reached"));
+    assert!(run_array.quota_failure.is_some());
+
+    let mut run_empty = sample("claude");
+    consume_event(
+        &mut run_empty,
+        r#"{"type":"result","is_error":true,"result":""}"#,
+    );
+    assert_eq!(
+        run_empty.error.as_deref(),
+        Some("Claude reported an error.")
+    );
 }
 
 #[test]

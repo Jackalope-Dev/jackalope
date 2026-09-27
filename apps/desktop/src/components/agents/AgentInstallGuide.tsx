@@ -1,6 +1,6 @@
 import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { openInBrowser } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import './agent-manager.css';
@@ -30,10 +30,7 @@ export function AgentInstallGuide({
         onClick={async () => {
           const url = 'https://antigravity.google/docs/cli/install/';
           try {
-            if (isTauriEnvironment()) {
-              const { open } = await import('@tauri-apps/plugin-shell');
-              await open(url);
-            } else window.open(url, '_blank', 'noopener,noreferrer');
+            await openInBrowser(url);
           } catch (cause) {
             setError(String(cause));
           }

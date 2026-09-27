@@ -1,4 +1,5 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { useShallow } from 'zustand/react/shallow';
 import { VETTED_SKILLS } from '../../lib/skills/catalog';
 import { useProjectStore } from '../../stores/projectStore';
 import { openProjectSettings } from '../layout/navigation';
@@ -21,7 +22,14 @@ export function ProjectPreferences({
   embedded?: boolean;
   projectId?: string;
 }) {
-  const { projects, activeProjectId, updateProject, updateProjectPreferences } = useProjectStore();
+  const { projects, activeProjectId, updateProject, updateProjectPreferences } = useProjectStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      activeProjectId: s.activeProjectId,
+      updateProject: s.updateProject,
+      updateProjectPreferences: s.updateProjectPreferences,
+    })),
+  );
   const project = projects.find((p) => p.id === (projectId ?? activeProjectId));
   const Container = embedded ? 'section' : WorkspacePage;
   return (

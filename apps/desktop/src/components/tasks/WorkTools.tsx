@@ -17,10 +17,12 @@ export function WorkTools({
   run,
   requestRevision,
   onTerminal,
+  hideTerminal = false,
 }: {
   run: TaskRun;
   requestRevision?: number;
   onTerminal?: () => void;
+  hideTerminal?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
@@ -39,7 +41,7 @@ export function WorkTools({
   return (
     <>
       <Dialog.Root open={open} onOpenChange={setOpen}>
-        {onTerminal ? (
+        {hideTerminal ? null : onTerminal ? (
           <Button variant="outline" onClick={onTerminal}>
             <SquareTerminal size={16} aria-hidden="true" /> Terminal
           </Button>

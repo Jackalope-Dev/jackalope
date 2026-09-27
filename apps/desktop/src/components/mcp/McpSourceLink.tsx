@@ -1,6 +1,6 @@
 import { ExternalLink } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openInBrowser } from '../../lib/tauri-bridge';
 import { safeMarketplaceUrl } from './marketplace-info';
 
 export function SourceLink({ url, children }: { url?: string | null; children: ReactNode }) {
@@ -16,8 +16,7 @@ export function SourceLink({ url, children }: { url?: string | null; children: R
           if (!isTauriEnvironment()) return;
           event.preventDefault();
           try {
-            const { open } = await import('@tauri-apps/plugin-shell');
-            await open(href);
+            await openInBrowser(href);
             setError(false);
           } catch {
             setError(true);

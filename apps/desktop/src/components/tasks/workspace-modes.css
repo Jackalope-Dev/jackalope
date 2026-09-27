@@ -128,6 +128,8 @@
 .build-tool-shelf {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  grid-auto-rows: min-content;
   gap: 8px;
   margin-bottom: 24px;
 }
@@ -166,6 +168,8 @@
 .oversee-counts {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-content: start;
+  grid-auto-rows: min-content;
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -198,6 +202,8 @@
 .oversee-priorities {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  align-content: start;
+  grid-auto-rows: min-content;
   gap: 10px;
 }
 .oversee-inbox {

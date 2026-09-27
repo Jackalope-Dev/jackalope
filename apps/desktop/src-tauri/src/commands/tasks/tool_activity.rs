@@ -53,6 +53,48 @@ pub(super) fn workspace_path(raw: &str, workspace: &str) -> Option<String> {
     Some(parts.join("/"))
 }
 
+/// The program a shell command runs, without its arguments, which can hold
+/// secrets. Skips `cd … &&`, environment assignments and `sh -c` wrappers.
+fn program(command: &Value) -> Option<String> {
+    let text = match command {
+        Value::String(text) => text.clone(),
+        Value::Array(parts) => parts
+            .iter()
+            .filter_map(Value::as_str)
+            .collect::<Vec<_>>()
+            .join(" "),
+        _ => return None,
+    };
+    let segment = text
+        .split("&&")
+        .map(str::trim)
+        .find(|segment| !segment.starts_with("cd ") && *segment != "cd")?;
+    let mut words = segment
+        .split_whitespace()
+        .skip_while(|word| word.contains('=') && !word.starts_with('-'));
+    let first = words.next()?;
+    let name = first.rsplit(['/', '\\']).next()?.trim_matches(['"', '\'']);
+    if matches!(name, "bash" | "sh" | "zsh" | "pwsh" | "powershell" | "cmd") {
+        let rest: Vec<_> = words.collect();
+        if let Some(index) = rest
+            .iter()
+            .position(|word| matches!(*word, "-c" | "-lc" | "-Command" | "/c" | "/C"))
+        {
+            let inner = rest[index + 1..].join(" ");
+            let inner = inner.trim_matches(['"', '\'']);
+            if !inner.is_empty() {
+                return program(&Value::String(inner.into()));
+            }
+        }
+    }
+    let valid = !name.is_empty()
+        && name.len() <= 32
+        && name
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-' | '+'));
+    valid.then(|| name.to_string())
+}
+
 pub(super) fn label(name: &str, input: &Value, workspace: &str) -> String {
     let verb = match name.to_ascii_lowercase().as_str() {
         "read" | "read_file" | "readfile" => Some("Reading"),
@@ -62,7 +104,10 @@ pub(super) fn label(name: &str, input: &Value, workspace: &str) -> String {
             return "Searching the project".into()
         }
         "bash" | "powershell" | "shell" | "execute" | "command_execution" | "run_shell_command" => {
-            return "Running a command".into()
+            return program(&input["command"]).map_or_else(
+                || "Running a command".into(),
+                |program| format!("Running {program}"),
+            );
         }
         "mcp__jackalope__computer_verify" | "computer_verify" => {
             return "Running project checks".into()
@@ -133,8 +178,25 @@ mod tests {
         );
         assert_eq!(
             label("Bash", &json!({"command":"echo secret"}), ""),
-            "Running a command"
+            "Running echo"
         );
+        for (command, expected) in [
+            (json!("TOKEN=secret pnpm test --filter x"), "Running pnpm"),
+            (json!("cd /private && cargo test"), "Running cargo"),
+            (json!("bash -lc 'git status --short'"), "Running git"),
+            (
+                json!(["/usr/bin/python3", "-c", "print(1)"]),
+                "Running python3",
+            ),
+            (json!("$(cat secret)"), "Running a command"),
+            (json!(42), "Running a command"),
+        ] {
+            assert_eq!(
+                label("shell", &json!({ "command": command }), ""),
+                expected,
+                "{command}"
+            );
+        }
         assert_eq!(
             label("Read", &json!({"file_path":"/private/secret"}), "/work"),
             "Reading a file"

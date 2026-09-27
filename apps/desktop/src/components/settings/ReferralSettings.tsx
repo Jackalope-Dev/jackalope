@@ -2,8 +2,9 @@ import { PassTickets } from '@jackalope/brand/passes';
 import { CopyButton, ExternalLinkIcon, Input, MailIcon, RefreshIcon } from '@jackalope/ui';
 import { Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { openInBrowser } from '../../lib/tauri-bridge';
 import { useMascotStore } from '../../stores/mascotStore';
 import { useReferralStore } from '../../stores/referralStore';
 import { Button } from '../ui/button';
@@ -12,15 +13,20 @@ import { LoadingState } from '../ui/LoadingState';
 const invitationMessage =
   'I’ve been trying Jackalope, a local desktop workspace for running coding agents in isolated Git worktrees and reviewing their changes. I have an Instant Access Pass for you to skip the waitlist after email verification, while a pass is available.';
 
-async function openExternal(url: string) {
-  if (isTauriEnvironment()) {
-    const { open } = await import('@tauri-apps/plugin-shell');
-    await open(url);
-  } else window.open(url, '_blank', 'noopener,noreferrer');
-}
-
 export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
-  const { referrals, loading, error: fetchError, load } = useReferralStore();
+  const {
+    referrals,
+    loading,
+    error: fetchError,
+    load,
+  } = useReferralStore(
+    useShallow((s) => ({
+      referrals: s.referrals,
+      loading: s.loading,
+      error: s.error,
+      load: s.load,
+    })),
+  );
   const [error, setError] = useState('');
   const [copiedPass, setCopiedPass] = useState<{ number: number } | null>(null);
   useEffect(() => {
@@ -53,7 +59,7 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
             ? `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referrals.shareUrl)}`
             : `https://bsky.app/intent/compose?text=${encodeURIComponent(complete)}`;
     try {
-      await openExternal(url);
+      await openInBrowser(url);
     } catch {
       setError('Could not open that sharing option. Copy the invitation message instead.');
     }

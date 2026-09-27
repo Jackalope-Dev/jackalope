@@ -12,6 +12,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { returnToProject } from '../../lib/project-return';
 import type { WorkItem } from '../../lib/task-collection';
 import { nativeTask } from '../../lib/task-runtime';
@@ -41,8 +42,16 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
   );
   const runs = useExecutionStore((state) => state.runs);
   const historyError = useExecutionStore((state) => state.historyError);
-  const { sessions, runs: sessionRuns, error: sessionError } = useLiveSessionStore();
-  const { queue, error: queueError } = useManagedTaskStore();
+  const {
+    sessions,
+    runs: sessionRuns,
+    error: sessionError,
+  } = useLiveSessionStore(
+    useShallow((s) => ({ sessions: s.sessions, runs: s.runs, error: s.error })),
+  );
+  const { queue, error: queueError } = useManagedTaskStore(
+    useShallow((s) => ({ queue: s.queue, error: s.error })),
+  );
   const ideas = useTaskStore((state) => state.tasks);
   const integrated = queue.mergedRunIds;
   const allRuns = useMemo(
@@ -226,7 +235,9 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                       {busyReadiness ? 'Checking repository…' : 'Repository status unavailable'}
                     </span>
                   ) : readiness.changes ? (
-                    <span className="text-amber-500 font-medium">Uncommitted changes</span>
+                    <span className="text-[var(--color-warning)] font-medium">
+                      Uncommitted changes
+                    </span>
                   ) : (
                     <span className="project-stat-desc">Working tree clean</span>
                   )
@@ -363,9 +374,11 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                       Inspect the workspace before running work
                     </span>
                   ) : readiness.dependenciesMissing ? (
-                    <span className="text-amber-500 font-medium">node_modules not found</span>
+                    <span className="text-[var(--color-warning)] font-medium">
+                      node_modules not found
+                    </span>
                   ) : readiness?.missingConfiguration?.length ? (
-                    <span className="text-amber-500 font-medium">
+                    <span className="text-[var(--color-warning)] font-medium">
                       {readiness.missingConfiguration.length} missing env key
                       {readiness.missingConfiguration.length > 1 ? 's' : ''}
                     </span>

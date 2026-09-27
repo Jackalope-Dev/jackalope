@@ -1,11 +1,14 @@
 import { useEffect } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useFeedbackStore } from '../../stores/feedbackStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
 
 export function FeedbackPreferences() {
-  const { view, busy, error, request } = useFeedbackStore();
+  const { view, busy, error, request } = useFeedbackStore(
+    useShallow((s) => ({ view: s.view, busy: s.busy, error: s.error, request: s.request })),
+  );
   useEffect(() => {
     void request({ action: 'status' });
   }, [request]);

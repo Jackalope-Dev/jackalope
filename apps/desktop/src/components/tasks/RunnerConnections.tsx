@@ -2,6 +2,7 @@ import { RefreshIcon } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, CircleAlert, Plus, Settings2, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { isActive, type Runner, type TaskRun } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
@@ -38,9 +39,28 @@ export function RunnerConnections({
   onNewTask: (agent: string) => void;
   onRun: (run: TaskRun) => void;
 }) {
-  const { runners, runs, discovering, discover, error } = useExecutionStore();
-  const config = useAgentConfigStore();
-  const { projects, activeProjectId } = useProjectStore();
+  const { runners, runs, discovering, discover, error } = useExecutionStore(
+    useShallow((s) => ({
+      runners: s.runners,
+      runs: s.runs,
+      discovering: s.discovering,
+      discover: s.discover,
+      error: s.error,
+    })),
+  );
+  const config = useAgentConfigStore(
+    useShallow((s) => ({
+      defaultMetaAgent: s.defaultMetaAgent,
+      customAgents: s.customAgents,
+      isAgentEnabled: s.isAgentEnabled,
+      runnerOptions: s.runnerOptions,
+      disabledAccounts: s.disabledAccounts,
+      toggleAgent: s.toggleAgent,
+    })),
+  );
+  const { projects, activeProjectId } = useProjectStore(
+    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
+  );
   const project = projects.find((item) => item.id === activeProjectId);
   const defaultAgent = project ? project.preferences?.preferredRunner : config.defaultMetaAgent;
   const capacity = useCapacityStore();
@@ -111,6 +131,16 @@ export function RunnerConnections({
       });
     }
   }
+  const checkAll = async () => {
+    await checkAgents();
+    void capacity.fetch(false);
+    for (const agent of JSON.parse(accountAgents) as string[]) {
+      const entry = useAgentAccountsStore.getState().agents[agent];
+      if (!entry?.view) continue;
+      for (const profile of accountProfiles(entry.view, entry.statuses))
+        void useAgentAccountsStore.getState().check(agent, profile.id);
+    }
+  };
   return (
     <WorkspacePage className="agents-page">
       <div className="agents-page-content workspace-stack">
@@ -119,6 +149,10 @@ export function RunnerConnections({
           description={project ? `Agent choices for ${project.name}` : 'App-wide agent settings'}
           action={
             <div className="agent-workspace-actions">
+              <Button onClick={() => setAdding(true)}>
+                <Plus size={18} />
+                Add agent
+              </Button>
               <Button
                 variant="outline"
                 onClick={() =>
@@ -127,11 +161,7 @@ export function RunnerConnections({
               >
                 {project ? 'Project agent settings' : 'Agent settings'}
               </Button>
-              <Button variant="outline" onClick={() => setAdding(true)}>
-                <Plus size={18} />
-                Add agent
-              </Button>
-              <Button variant="ghost" onClick={() => navigateWorkspace('mcps')}>
+              <Button variant="outline" onClick={() => navigateWorkspace('mcps')}>
                 Connections
               </Button>
             </div>
@@ -139,38 +169,17 @@ export function RunnerConnections({
         />
         <div className="agent-roster-heading">
           <span>On this computer</span>
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              disabled={!desktop || capacity.loading}
-              onClick={() => {
-                void capacity.fetch(false);
-                for (const agent of JSON.parse(accountAgents) as string[]) {
-                  const entry = useAgentAccountsStore.getState().agents[agent];
-                  if (entry?.view) {
-                    for (const profile of accountProfiles(entry.view, entry.statuses))
-                      void useAgentAccountsStore.getState().check(agent, profile.id);
-                  } else void useAgentAccountsStore.getState().load(agent, true);
-                }
-              }}
-              title="Reads each signed-in agent's account identity and remaining capacity."
-              loading={capacity.loading}
-              loadingLabel="Checking…"
-            >
-              <RefreshIcon size={16} />
-              Check accounts
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={!desktop || checking || discovering}
-              onClick={() => void checkAgents()}
-              loading={checking || discovering}
-              loadingLabel="Checking…"
-            >
-              <RefreshIcon size={16} />
-              Check agents
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            disabled={!desktop || checking || discovering || capacity.loading}
+            onClick={() => void checkAll()}
+            title="Finds installed agents, then reads each account's identity and remaining capacity."
+            loading={checking || discovering || capacity.loading}
+            loadingLabel="Checking…"
+          >
+            <RefreshIcon size={16} />
+            Check again
+          </Button>
         </div>
         {(checkError || error || capacity.error) && (
           <InlineNotice tone="error">{checkError || error || capacity.error}</InlineNotice>
@@ -333,8 +342,8 @@ export function RunnerConnections({
                         onClick={() => onRun(taskToOpen)}
                       >
                         {waitingRun ? 'Respond to task' : working ? 'View task' : 'Review task'}
+                        {taskToOpen.projectId !== project?.id && ` in ${taskToOpen.projectName}`}
                         <ArrowRight size={14} />
-                        <span className="task-muted text-xs">({taskToOpen.projectName})</span>
                       </Button>
                     )}
                   </div>

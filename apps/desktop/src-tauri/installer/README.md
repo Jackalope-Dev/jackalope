@@ -14,8 +14,12 @@ pnpm --filter @jackalope/desktop brand:installer
 The full `brand:generate` command also regenerates these files. The generator
 reads `@jackalope/brand/theme` and `@jackalope/brand/character`, renders the artwork with
 `@resvg/resvg-js`, and writes opaque 24-bit BMPs using NSIS/WiX's documented
-layouts. NSIS artwork is rendered at 3x and fitted to its controls for sharper
-display scaling; WiX artwork uses its required pixel dimensions.
+layouts. NSIS stretches bitmaps with nearest-neighbour sampling, so its welcome
+and header artwork is rendered at each control's exact pixel size for Windows
+display scales from 100% to 300% (`nsis-*-<dpi>.bmp`; the unsuffixed files are
+100%). `hooks.nsh` selects the set for the window's DPI at startup. The control
+sizes follow from the dialog font; update the generator's size table if
+`SetFont` changes. WiX artwork uses its required pixel dimensions.
 Segoe UI is used for the wordmark and native EXE dialog text. Generated BMPs and
 `theme.nsh` are checked in so packaging does not require font rendering.
 The renderer is an MPL-2.0 development dependency; it is not bundled into the app.

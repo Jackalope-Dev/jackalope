@@ -2,6 +2,7 @@ import { Checkbox, Input, Textarea } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
 import type { QueueItem } from '../../lib/queue';
 import { queueCommand } from '../../lib/queue';
@@ -28,7 +29,7 @@ export function AddWork({
   onClose: () => void;
 }) {
   const dialogFocus = useDialogFocus();
-  const { runners } = useExecutionStore();
+  const { runners } = useExecutionStore(useShallow((s) => ({ runners: s.runners })));
   const key = `jackalope-plan-draft:${project.id}`;
   const [draft, setDraft] = useState(() => {
     try {

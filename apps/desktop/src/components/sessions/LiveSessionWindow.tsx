@@ -1,6 +1,7 @@
 import { applyThemeTokens, startThemeClock } from '@jackalope/brand/theme';
 import { MotionConfig } from 'motion/react';
 import { useEffect } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { observeUiTelemetry } from '../../lib/observe-telemetry';
 import { observeCommunity } from '../../stores/communityStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -18,7 +19,9 @@ export default function LiveSessionWindow({ id }: { id: string }) {
   useEffect(observeCommunity, []);
   useEffect(observeUiTelemetry, []);
   useEffect(() => observeLiveSessions(id), [id]);
-  const { sessions, runs, loading } = useLiveSessionStore();
+  const { sessions, runs, loading } = useLiveSessionStore(
+    useShallow((s) => ({ sessions: s.sessions, runs: s.runs, loading: s.loading })),
+  );
   const session = sessions.find((s) => s.id === id);
   const appTheme = useThemeStore((state) => state.appTheme);
   const projectTheme = useProjectStore(

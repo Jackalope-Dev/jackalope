@@ -51,7 +51,8 @@ export function WorkspaceStatusBar({
       <button type="button" onClick={activity}>
         <ListTodo size={15} />
         {host ? 'This computer: ' : ''}
-        {active} running{attention ? ` · ${attention} needs you` : ''}
+        {active} running
+        {attention ? ` · ${attention} ${attention === 1 ? 'needs' : 'need'} you` : ''}
       </button>
       {project && !host && (
         <button

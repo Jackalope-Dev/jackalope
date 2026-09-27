@@ -346,7 +346,7 @@ fn bind_account_selection(
             directory,
             entry
                 .and_then(|entry| entry.default_name.clone())
-                .unwrap_or_else(|| "CLI account (identity not reported)".to_string()),
+                .unwrap_or_else(|| "Your CLI sign-in".to_string()),
         )
     };
     if !directory.is_absolute() {

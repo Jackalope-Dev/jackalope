@@ -98,7 +98,7 @@ export function DetectedKeysModal({
         >
           <div className="flex items-center justify-between pb-3 border-b border-[var(--color-border)]">
             <div className="flex items-center gap-2">
-              <KeyRound size={20} className="text-[var(--color-brand)]" />
+              <KeyRound size={20} className="text-[var(--color-accent-ink)]" />
               <Dialog.Title className="text-lg font-semibold text-[var(--color-text-primary)]">
                 Local Models & Ambient Key Discovery
               </Dialog.Title>
@@ -106,7 +106,7 @@ export function DetectedKeysModal({
             <Dialog.Close asChild>
               <button
                 type="button"
-                className="p-1 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)]"
+                className="p-1 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
                 aria-label="Close"
               >
                 <X size={18} />
@@ -121,10 +121,10 @@ export function DetectedKeysModal({
 
           <div className="my-4 space-y-4">
             {/* Privacy Guarantee Banner */}
-            <div className="privacy-guarantee-banner p-3 rounded-lg border flex gap-3 items-start bg-emerald-500/10 border-emerald-500/30 text-[var(--color-text-primary)]">
-              <ShieldCheck size={22} className="text-emerald-500 shrink-0 mt-0.5" />
+            <div className="privacy-guarantee-banner p-3 rounded-lg border flex gap-3 items-start bg-[var(--color-success)]/10 border-[var(--color-success)]/30 text-[var(--color-text-primary)]">
+              <ShieldCheck size={22} className="text-[var(--color-success)] shrink-0 mt-0.5" />
               <div className="text-xs space-y-1">
-                <strong className="block font-medium text-emerald-400">
+                <strong className="block font-medium text-[var(--color-success)]">
                   Local-Only Privacy Guarantee
                 </strong>
                 <p className="text-[var(--color-text-secondary)] leading-relaxed">
@@ -138,13 +138,13 @@ export function DetectedKeysModal({
             </div>
 
             {error && (
-              <div className="p-3 text-xs rounded-md bg-red-500/10 border border-red-500/30 text-red-400">
+              <div className="p-3 text-xs rounded-md bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/30 text-[var(--color-danger)]">
                 {error}
               </div>
             )}
 
             {successMessage && (
-              <div className="p-3 text-xs rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center gap-2">
+              <div className="p-3 text-xs rounded-md bg-[var(--color-success)]/10 border border-[var(--color-success)]/30 text-[var(--color-success)] flex items-center gap-2">
                 <CheckCircle2 size={16} />
                 {successMessage}
               </div>
@@ -177,15 +177,15 @@ export function DetectedKeysModal({
                     key={ep.service}
                     className={`p-3 rounded-lg border transition-all ${
                       ep.online
-                        ? 'border-emerald-500/40 bg-emerald-500/5'
-                        : 'border-[var(--color-border)] bg-[var(--color-bg-secondary)] opacity-70'
+                        ? 'border-[var(--color-success)]/40 bg-[var(--color-success)]/5'
+                        : 'border-[var(--color-border)] bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold">{ep.service}</span>
                       <span
                         className={`inline-block w-2 h-2 rounded-full ${
-                          ep.online ? 'bg-emerald-400 animate-pulse' : 'bg-gray-400'
+                          ep.online ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-muted)]'
                         }`}
                         title={ep.online ? 'Online' : 'Offline'}
                       />
@@ -195,7 +195,7 @@ export function DetectedKeysModal({
                     </p>
                     <div className="mt-2 text-[11px]">
                       {ep.online ? (
-                        <span className="text-emerald-400 font-medium">
+                        <span className="text-[var(--color-success)] font-medium">
                           {ep.models.length > 0
                             ? `${ep.models.length} model(s) loaded`
                             : 'Ready for connection'}
@@ -209,14 +209,14 @@ export function DetectedKeysModal({
                         {ep.models.slice(0, 2).map((m) => (
                           <span
                             key={m}
-                            className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] font-mono truncate max-w-[120px]"
+                            className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--color-surface-sunken)] text-[var(--color-text-secondary)] font-mono truncate max-w-[120px]"
                             title={m}
                           >
                             {m}
                           </span>
                         ))}
                         {ep.models.length > 2 && (
-                          <span className="text-[9px] px-1 rounded bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)]">
+                          <span className="text-[11px] px-1 rounded bg-[var(--color-surface-sunken)] text-[var(--color-text-muted)]">
                             +{ep.models.length - 2}
                           </span>
                         )}
@@ -254,26 +254,26 @@ export function DetectedKeysModal({
                         key={k.keyName}
                         className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition-colors ${
                           isChecked
-                            ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/5'
-                            : 'border-[var(--color-border)] hover:bg-[var(--color-bg-secondary)]'
+                            ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/5'
+                            : 'border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]'
                         }`}
                       >
                         <div className="flex items-center gap-3">
                           <Checkbox
                             checked={isChecked}
                             onChange={() => toggleKey(k.keyName)}
-                            className="rounded border-[var(--color-border)] text-[var(--color-brand)] focus:ring-[var(--color-brand)]"
+                            className="rounded border-[var(--color-border)] text-[var(--color-accent-ink)] focus:ring-[var(--color-accent)]"
                           />
                           <div>
                             <div className="flex items-center gap-2">
                               <strong className="text-xs text-[var(--color-text-primary)]">
                                 {k.provider}
                               </strong>
-                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)]">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-surface-sunken)] text-[var(--color-text-muted)]">
                                 {k.targetAgent}
                               </span>
                               {k.isConfigured && (
-                                <span className="text-[10px] text-emerald-400 flex items-center gap-0.5">
+                                <span className="text-[10px] text-[var(--color-success)] flex items-center gap-0.5">
                                   <Check size={10} /> Already configured
                                 </span>
                               )}

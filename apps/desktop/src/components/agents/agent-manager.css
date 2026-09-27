@@ -217,8 +217,8 @@
 
 .agent-hero-badge-default {
   background: var(--color-accent-subtle, rgba(234, 179, 8, 0.12));
-  color: var(--color-accent-text, #b45309);
-  border: 1px solid var(--color-accent-border, rgba(234, 179, 8, 0.3));
+  color: var(--color-warning);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
 }
 
 .agent-hero-badge-ready {
@@ -315,7 +315,7 @@
   width: 36px;
   height: 36px;
   border-radius: var(--radius-md, 8px);
-  background: var(--color-surface-subtle, rgba(0, 0, 0, 0.04));
+  background: var(--color-surface-sunken);
   color: var(--color-text-secondary);
   flex-shrink: 0;
 }

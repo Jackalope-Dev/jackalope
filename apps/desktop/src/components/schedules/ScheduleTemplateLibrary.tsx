@@ -95,7 +95,12 @@ export function ScheduleTemplateLibrary({
         </div>
       )}
       {!query.trim() && category === 'All' && (
-        <Button variant="ghost" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+        <Button
+          variant="outline"
+          className="self-start"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(!expanded)}
+        >
           {expanded ? 'Show fewer templates' : `Browse all ${scheduleTemplates.length} templates`}
         </Button>
       )}

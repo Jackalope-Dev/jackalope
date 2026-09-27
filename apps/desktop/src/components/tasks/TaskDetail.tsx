@@ -1,14 +1,6 @@
-import {
-  Checkbox,
-  DefinitionList,
-  Disclosure,
-  DisclosureSummary,
-  DropdownMenu as Menu,
-  Textarea,
-} from '@jackalope/ui';
+import { Checkbox, Disclosure, DisclosureSummary, DropdownMenu as Menu } from '@jackalope/ui';
 import {
   ArrowLeft,
-  ArrowRight,
   CalendarClock,
   Check,
   Copy,
@@ -18,22 +10,23 @@ import {
   Square,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { waitForStoppedAttempt } from '../../lib/continue-task';
+import { projectConnections } from '../../lib/mcp-connection';
 import { recoveryHandoff } from '../../lib/project-return';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
-import type { TaskFollowUp } from '../../lib/task-followups';
 import {
   canRetry,
   isActive,
   nativeTask,
+  PROMPT_MAX_CHARS,
   retryTask,
   statusLabel,
   type TaskRun,
 } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
 import { latestAttempt, taskDecision } from '../../lib/task-workflow';
-import { isTauriEnvironment, listMcpServers, type McpServerConfig } from '../../lib/tauri-bridge';
-import { describeRunUsage } from '../../lib/usage-insights';
+import { listMcpServers, type McpServerConfig, openInBrowser } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
@@ -52,14 +45,16 @@ import { ScreenshotPreview } from './ScreenshotPreview';
 import { TaskActivity } from './TaskActivity';
 import { TaskDelivery } from './TaskDelivery';
 import { TaskFailure } from './TaskFailure';
+import { TaskFollowUpPanel } from './TaskFollowUpPanel';
 import { TaskIntegration } from './TaskIntegration';
 import { TaskOutcomes } from './TaskOutcomes';
 import { TaskPreview } from './TaskPreview';
 import { TaskProgress } from './TaskProgress';
+import { TaskRunDetails } from './TaskRunDetails';
 import { TaskSaveRecovery } from './TaskSaveRecovery';
-import { TaskTiming } from './TaskTiming';
 import { UserPromptCard } from './UserPromptCard';
 import { useManagedPreview } from './useManagedPreview';
+import { useTaskFollowUps } from './useTaskFollowUps';
 import { ValidationJourney } from './ValidationJourney';
 import { WorkContext } from './WorkContext';
 import { WorkFeedbackInbox } from './WorkFeedbackInbox';
@@ -88,7 +83,16 @@ export function TaskDetail({
   onSchedule: () => void;
   onCapture: (ideaId?: string) => void;
 }) {
-  const { runs, start, submitting, refresh, drafts, draft } = useExecutionStore();
+  const { runs, start, submitting, refresh, drafts, draft } = useExecutionStore(
+    useShallow((s) => ({
+      runs: s.runs,
+      start: s.start,
+      submitting: s.submitting,
+      refresh: s.refresh,
+      drafts: s.drafts,
+      draft: s.draft,
+    })),
+  );
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (!run.detailsOmitted) heading.current?.focus();
@@ -96,11 +100,6 @@ export function TaskDetail({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [acting, setActing] = useState(false);
-  const [followups, setFollowups] = useState<TaskFollowUp[]>([]);
-  const [queueError, setQueueError] = useState('');
-  const queueRequest = useRef<{ key: string; id: string } | null>(null);
-  const queuedHere = useRef(false);
-  const [queueing, setQueueing] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const workRequest = useWorkViewStore((state) => state.request);
   const preset = useWorkbenchStore((state) => state.presets[run.projectId] ?? 'focus');
@@ -160,55 +159,11 @@ export function TaskDetail({
   const reply = drafts[key]?.prompt ?? '';
   const active = isActive(run);
   const previewRunning = useManagedPreview(run.id, !active && !integrated);
-  const routing = run.routing;
   const attempts = runs
     .filter((r) => r.taskId === run.taskId)
     .sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt));
   const latest = latestAttempt(runs, run.taskId);
   const isLatest = latest?.id === run.id;
-  useEffect(() => {
-    if (!isTauriEnvironment()) return;
-    let alive = true;
-    let pending = false;
-    const load = async () => {
-      if (pending) return;
-      pending = true;
-      try {
-        const value = await nativeTask<TaskFollowUp[]>('task_followup_snapshot', {
-          taskId: run.taskId,
-        });
-        if (alive) {
-          setFollowups(value ?? []);
-          setQueueError('');
-          if (queuedHere.current && !value?.length) {
-            await refresh();
-            const state = useExecutionStore.getState();
-            const next = latestAttempt(state.runs, run.taskId);
-            if (
-              alive &&
-              queuedHere.current &&
-              next &&
-              next.id !== run.id &&
-              state.selectedId === run.id
-            ) {
-              queuedHere.current = false;
-              state.select(next.id);
-            }
-          }
-        }
-      } catch (cause) {
-        if (alive) setQueueError(String(cause));
-      } finally {
-        pending = false;
-      }
-    };
-    void load();
-    const interval = setInterval(() => void load(), 1000);
-    return () => {
-      alive = false;
-      clearInterval(interval);
-    };
-  }, [run.id, run.taskId, refresh]);
   const sourceIdea = useTaskStore((state) =>
     state.tasks.find(
       (idea) =>
@@ -220,6 +175,12 @@ export function TaskDetail({
     sourceIdea?.rawPrompt ?? attempts[0]?.prompt ?? run.prompt,
     sourceIdea?.title,
   );
+  /** Adds review or preview feedback to the follow-up draft, keeping what is typed. */
+  const addToReply = (text: string, focus = false) => {
+    const current = useExecutionStore.getState().drafts[key]?.prompt ?? '';
+    draft(key, { prompt: appendFeedbackDraft(current, text, PROMPT_MAX_CHARS) });
+    if (focus) document.getElementById('task-reply')?.focus();
+  };
   const pending = run.prompts?.filter((p) => p.status === 'pending') ?? [];
   const isolated =
     !!run.workspace &&
@@ -228,6 +189,15 @@ export function TaskDetail({
   const finished = !active && ['review', 'reviewed'].includes(run.status);
   const canContinue = isLatest && !!run.sessionId && run.status !== 'interrupted' && !integrated;
   const decision = taskDecision(run, integrated, currentProject?.preferences?.verifyCommand);
+  const { followups, queueError, queueing, queueFollowUp, updateFollowUp } = useTaskFollowUps({
+    run,
+    draftKey: key,
+    reply,
+    canContinue,
+    blocked: acting || submitting,
+    busy: active,
+    onError: setError,
+  });
   const inspect = (section: string) => {
     if (section === 'question' || section === 'recovery') {
       document
@@ -268,16 +238,11 @@ export function TaskDetail({
   };
 
   useEffect(() => {
-    if (tab !== 'context' || !isLatest || connections !== null) return;
+    if (tab !== 'activity' || !detailsOpen || !isLatest || connections !== null) return;
     let alive = true;
     void listMcpServers(run.projectId)
       .then((servers) => {
-        if (alive)
-          setConnections(
-            servers.filter(
-              (server) => server.enabled !== false && server.scope === `project:${run.projectId}`,
-            ),
-          );
+        if (alive) setConnections(projectConnections(servers, run.projectId));
       })
       .catch((cause) => {
         if (alive) setError(String(cause));
@@ -285,7 +250,7 @@ export function TaskDetail({
     return () => {
       alive = false;
     };
-  }, [tab, isLatest, connections, run.projectId]);
+  }, [tab, detailsOpen, isLatest, connections, run.projectId]);
   const act = async (command: string) => {
     if (acting) return;
     setActing(true);
@@ -353,62 +318,11 @@ export function TaskDetail({
       setActing(false);
     }
   };
-  const queueFollowUp = async (interrupt = false) => {
-    if (!reply.trim() || acting || submitting || queueing || !canContinue) return;
-    setQueueing(true);
-    setError('');
-    const prompt = reply.trim();
-    const connectionIds = drafts[key]?.connectionIds;
-    const requestKey = JSON.stringify([run.id, prompt, connectionIds, interrupt]);
-    if (queueRequest.current?.key !== requestKey)
-      queueRequest.current = { key: requestKey, id: crypto.randomUUID() };
-    try {
-      await nativeTask('task_followup_queue', {
-        id: queueRequest.current.id,
-        runId: run.id,
-        prompt,
-        connectionIds: connectionIds ?? null,
-        interrupt,
-      });
-      queuedHere.current = true;
-      if (useExecutionStore.getState().drafts[key]?.prompt.trim() === prompt)
-        draft(key, { prompt: '' });
-      queueRequest.current = null;
-      setFollowups(
-        (await nativeTask<TaskFollowUp[]>('task_followup_snapshot', { taskId: run.taskId })) ?? [],
-      );
-      await refresh();
-    } catch (cause) {
-      setError(String(cause));
-    } finally {
-      setQueueing(false);
-    }
-  };
-  const updateFollowUp = async (id: string, action: 'resume' | 'cancel') => {
-    if (queueing) return;
-    setQueueing(true);
-    setError('');
-    try {
-      await nativeTask('task_followup_action', { id, action });
-      if (action === 'resume') queuedHere.current = true;
-      const remaining =
-        (await nativeTask<TaskFollowUp[]>('task_followup_snapshot', { taskId: run.taskId })) ?? [];
-      if (action === 'cancel' && !remaining.length) queuedHere.current = false;
-      setFollowups(remaining);
-    } catch (cause) {
-      setError(String(cause));
-    } finally {
-      setQueueing(false);
-    }
-  };
   const sendFollowUp = () =>
     active || followups.length ? queueFollowUp() : continueTask(previewRunning);
   const openLink = useCallback(async (href: string) => {
     try {
-      if (isTauriEnvironment()) {
-        const { open } = await import('@tauri-apps/plugin-shell');
-        await open(href);
-      } else window.open(href, '_blank', 'noopener,noreferrer');
+      await openInBrowser(href);
     } catch (cause) {
       setError(String(cause));
     }
@@ -450,7 +364,7 @@ export function TaskDetail({
         key={`${run.id}:${run.verification?.checkedAt ?? 'unchecked'}`}
         run={run}
         canReview={finished && isLatest && !integrated}
-        onCorrect={(prompt) => draft(key, { prompt: appendFeedbackDraft(reply, prompt, 24000) })}
+        onCorrect={(prompt) => addToReply(prompt)}
         onAdvance={async () => {
           await start({
             projectId: run.projectId,
@@ -500,20 +414,13 @@ export function TaskDetail({
           key={`context:${run.taskId}`}
           run={run}
           onTerminal={() => setTab('terminal')}
+          hideTerminal
         />
         {isLatest && !integrated && (
           <WorkFeedbackInbox
             key={`feedback:${run.taskId}`}
             taskId={run.taskId}
-            onFeedback={(text) =>
-              draft(key, {
-                prompt: appendFeedbackDraft(
-                  useExecutionStore.getState().drafts[key]?.prompt ?? '',
-                  text,
-                  24000,
-                ),
-              })
-            }
+            onFeedback={(text) => addToReply(text)}
           />
         )}
         <div className="task-detail-utilities">
@@ -791,15 +698,7 @@ export function TaskDetail({
                     </p>
                   ) : undefined
                 }
-                onCorrect={
-                  canContinue
-                    ? (text) => {
-                        const prompt = appendFeedbackDraft(reply, text, 24000);
-                        draft(key, { prompt });
-                        document.getElementById('task-reply')?.focus();
-                      }
-                    : undefined
-                }
+                onCorrect={canContinue ? (text) => addToReply(text, true) : undefined}
                 delivery={
                   finished && (
                     <>
@@ -837,140 +736,7 @@ export function TaskDetail({
               className="my-4"
             >
               <DisclosureSummary>Task details</DisclosureSummary>
-              <section className="task-environment" aria-label="Context, history and usage">
-                {run.status !== 'reviewed' && (
-                  <TaskLearning key={`knowledge:${run.id}`} run={run} />
-                )}
-                <DefinitionList
-                  items={[
-                    { label: 'Agent', value: run.agent },
-                    { label: 'Model', value: run.model || 'Agent default' },
-                    { label: 'Account', value: run.accountBinding?.label || run.account },
-                    { label: 'Started', value: new Date(run.startedAt).toLocaleString() },
-                    ...(run.endedAt
-                      ? [{ label: 'Ended', value: new Date(run.endedAt).toLocaleString() }]
-                      : []),
-                    {
-                      label: 'Workspace',
-                      value: run.workspace || (active ? 'Preparing' : 'Not recorded'),
-                    },
-                    { label: 'Branch', value: run.branch || 'Not recorded' },
-                    { label: 'Target', value: run.targetBranch || 'Not recorded' },
-                  ]}
-                />
-                {!!run.dependencySnapshot?.sources.length && (
-                  <Disclosure className="task-notice">
-                    <DisclosureSummary>
-                      Verified feature inputs ({run.dependencySnapshot.sources.length})
-                    </DisclosureSummary>
-                    {run.dependencySnapshot.sources.map((source) => (
-                      <p key={source.runId}>
-                        {source.runId} · {source.tree.slice(0, 12)}
-                      </p>
-                    ))}
-                  </Disclosure>
-                )}
-                <Disclosure className="my-4">
-                  <DisclosureSummary>Original request</DisclosureSummary>
-                  <p className="task-request whitespace-pre-wrap">
-                    {attempts[0]?.prompt ?? run.prompt}
-                  </p>
-                </Disclosure>
-                {attempts.length > 1 && (
-                  <Disclosure className="my-4">
-                    <DisclosureSummary>Instruction for this attempt</DisclosureSummary>
-                    <p className="task-request whitespace-pre-wrap">{run.prompt}</p>
-                  </Disclosure>
-                )}
-                {routing && (
-                  <Disclosure className="my-4">
-                    <DisclosureSummary>Agent selection and handoffs</DisclosureSummary>
-                    {!routing.decisions.length && (
-                      <p className="task-muted">
-                        Checking available agents, models and account quotas.
-                      </p>
-                    )}
-                    <ol className="space-y-3 mt-3">
-                      {routing.decisions.map((decision, index) => (
-                        <li key={decision.checkedAt}>
-                          <p>
-                            {decision.agent} · {decision.model || 'CLI default model'} ·{' '}
-                            {decision.account}
-                          </p>
-                          <p className="task-muted">{decision.reason}</p>
-                          <p className="task-muted">
-                            Selected by {decision.orchestrator} ·{' '}
-                            {decision.remainingPercent === null
-                              ? 'Quota unknown'
-                              : `${Math.round(decision.remainingPercent)}% headroom after local reservations at selection`}{' '}
-                            · Routing usage:{' '}
-                            {decision.usage.reported
-                              ? `${(decision.usage.input + decision.usage.output).toLocaleString()} tokens`
-                              : 'not reported'}
-                          </p>
-                          {routing.handoffs[index] && (
-                            <p className="task-muted">
-                              Quota handoff · {routing.handoffs[index].failure.message} · Worker
-                              usage:{' '}
-                              {routing.handoffs[index].usage.reported
-                                ? `${(routing.handoffs[index].usage.input + routing.handoffs[index].usage.output).toLocaleString()} tokens`
-                                : 'not reported'}
-                            </p>
-                          )}
-                        </li>
-                      ))}
-                    </ol>
-                  </Disclosure>
-                )}
-                {run.prompts
-                  ?.filter((p) => p.status === 'answered')
-                  .map((p) => (
-                    <UserPromptCard key={p.id} runId={run.id} prompt={p} active={false} />
-                  ))}
-                <p className="task-muted mt-3">
-                  {run.requestedServiceTier && (
-                    <>
-                      Codex processing requested:{' '}
-                      {run.requestedServiceTier === 'fast' ? 'Fast · higher usage' : 'Standard'}.
-                      Provider confirmation is unavailable.
-                      <br />
-                    </>
-                  )}
-                  {run.effort && (
-                    <>
-                      Task approach: {run.effort} · Model effort:{' '}
-                      {run.reasoningEffort ? `${run.reasoningEffort} requested` : 'Agent default'}
-                      <br />
-                    </>
-                  )}
-                  Reported usage:{' '}
-                  {run.usage.reported ? describeRunUsage(run) : 'Unavailable for this attempt'}
-                </p>
-                <TaskTiming run={run} />
-                {run.mcpUsage && (
-                  <Disclosure className="my-3">
-                    <DisclosureSummary>
-                      Tool discovery · {run.mcpUsage.calls}{' '}
-                      {run.mcpUsage.calls === 1 ? 'call' : 'calls'}
-                    </DisclosureSummary>
-                    <p className="task-muted mt-2">
-                      Searches: {run.mcpUsage.searches} · Catalog tools: {run.mcpUsage.catalogTools}{' '}
-                      · Failed calls: {run.mcpUsage.failures}
-                    </p>
-                    <p className="task-muted">
-                      {(run.mcpUsage.schemaBytesReturned / 1024).toFixed(1)} KB tool definitions
-                      returned across searches (catalog size:{' '}
-                      {(run.mcpUsage.catalogBytes / 1024).toFixed(1)} KB).
-                    </p>
-                  </Disclosure>
-                )}
-                {!!run.diagnostics.length && (
-                  <Disclosure>
-                    <DisclosureSummary>Agent diagnostics</DisclosureSummary>
-                    <pre className="task-output">{run.diagnostics.join('\n\n')}</pre>
-                  </Disclosure>
-                )}
-              </section>
+              <TaskRunDetails run={run} attempts={attempts} active={active} />
               {isLatest && (
                 <Disclosure className="my-4">
                   <DisclosureSummary>Connections for the next step</DisclosureSummary>
@@ -1036,15 +802,7 @@ export function TaskDetail({
               <TaskPreview
                 key={`preview:${run.id}`}
                 run={run}
-                onFeedback={
-                  canContinue
-                    ? (text) => {
-                        const prompt = appendFeedbackDraft(reply, text, 24000);
-                        draft(key, { prompt });
-                        document.getElementById('task-reply')?.focus();
-                      }
-                    : undefined
-                }
+                onFeedback={canContinue ? (text) => addToReply(text, true) : undefined}
               />
             ) : (
               <p className="task-muted">
@@ -1057,132 +815,24 @@ export function TaskDetail({
         </div>
       </Tabs.Root>
       {isLatest && (
-        <div className="task-next">
-          <h2 className="task-followup-heading">
-            {integrated ? 'Start a follow-up' : 'Follow-up'}
-          </h2>
-          {queueError && <InlineNotice tone="error">{queueError}</InlineNotice>}
-          {followups.length > 0 && (
-            <ul className="task-followup-queue" aria-label="Queued follow-ups">
-              {followups.map((item) => (
-                <li key={item.id}>
-                  <p>{item.prompt}</p>
-                  <div className="task-followup-footer">
-                    <p className="task-muted">
-                      {item.error ??
-                        (item.paused
-                          ? 'Queue paused. Resume when ready.'
-                          : 'Queued for the next attempt.')}
-                    </p>
-                    {item.paused && !item.runId && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={queueing}
-                        onClick={() => void updateFollowUp(item.id, 'resume')}
-                      >
-                        Resume
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={queueing}
-                      onClick={() => void updateFollowUp(item.id, 'cancel')}
-                    >
-                      Cancel follow-up
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          {canContinue ? (
-            <form
-              className="task-followup-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void sendFollowUp();
-              }}
-            >
-              <Textarea
-                id="task-reply"
-                aria-label="Follow-up instructions"
-                className="task-reply"
-                rows={2}
-                value={reply}
-                onChange={(event) => draft(key, { prompt: event.target.value })}
-                placeholder="Tell Jackalope what to do next…"
-                maxLength={24000}
-                onKeyDown={(event) => {
-                  if (
-                    (event.ctrlKey || event.metaKey) &&
-                    event.key === 'Enter' &&
-                    !event.nativeEvent.isComposing
-                  ) {
-                    event.preventDefault();
-                    void sendFollowUp();
-                  }
-                }}
-              />
-              <div className="task-followup-footer">
-                <p className="task-muted">
-                  {followups.length && previewRunning
-                    ? 'Queued follow-ups wait until the managed preview stops.'
-                    : previewRunning
-                      ? 'Stops the managed preview, saves its logs, then continues in this workspace.'
-                      : active
-                        ? 'Queue for the next attempt, or stop current work and send now.'
-                        : `Continues with ${run.agent} in the same workspace and account.`}
-                </p>
-                {active && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={
-                      !reply.trim() || submitting || acting || queueing || run.status === 'stopping'
-                    }
-                    onClick={() => void queueFollowUp(true)}
-                  >
-                    Stop &amp; send
-                  </Button>
-                )}
-                <Button
-                  type="submit"
-                  disabled={
-                    !reply.trim() || submitting || acting || queueing || run.status === 'stopping'
-                  }
-                  loading={acting || submitting || queueing}
-                  loadingLabel={active || followups.length ? 'Queuing…' : 'Continuing…'}
-                >
-                  {active || followups.length
-                    ? 'Queue follow-up'
-                    : previewRunning
-                      ? 'Stop preview and continue'
-                      : 'Continue task'}
-                  <ArrowRight size={15} />
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <>
-              <p className="task-muted mb-3">
-                {run.status === 'interrupted'
-                  ? 'Inspect the agent session and workspace before starting more work; ownership could not be confirmed after interruption.'
-                  : integrated
-                    ? 'Start a new task from the updated target branch, with this result attached.'
-                    : active
-                      ? 'A follow-up becomes available when the agent reports a resumable session.'
-                      : 'This attempt has no resumable session. Carry its context into a new task to continue.'}
-              </p>
-              {!active && run.status !== 'interrupted' && (
-                <Button variant="outline" onClick={captureRecovery}>
-                  Continue in a new task
-                </Button>
-              )}
-            </>
-          )}
-        </div>
+        <TaskFollowUpPanel
+          run={run}
+          active={active}
+          integrated={integrated}
+          canContinue={canContinue}
+          previewRunning={previewRunning}
+          reply={reply}
+          followups={followups}
+          queueError={queueError}
+          queueing={queueing}
+          acting={acting}
+          submitting={submitting}
+          onReply={(text) => draft(key, { prompt: text })}
+          onSend={() => void sendFollowUp()}
+          onStopAndSend={() => void queueFollowUp(true)}
+          onUpdate={(id, action) => void updateFollowUp(id, action)}
+          onRecover={captureRecovery}
+        />
       )}
       {toolsOpen && (
         <Suspense fallback={null}>
@@ -1190,13 +840,7 @@ export function TaskDetail({
             onClose={() => {
               setToolsOpen(false);
               void listMcpServers(run.projectId)
-                .then((servers) =>
-                  setConnections(
-                    servers.filter(
-                      (s) => s.enabled !== false && s.scope === `project:${run.projectId}`,
-                    ),
-                  ),
-                )
+                .then((servers) => setConnections(projectConnections(servers, run.projectId)))
                 .catch((cause) => setError(String(cause)));
             }}
           />

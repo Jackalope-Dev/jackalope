@@ -79,8 +79,10 @@ cross-platform acceptance and repeatable quality or efficiency gains remain open
 
 The `jackalope` terminal command runs routed conversations from any Git repository
 through the desktop host, which it can start headless, and the app can hand a
-conversation to the system terminal. Installed PATH setup, hand-off on each
-platform and terminal answers to agent questions remain in progress.
+conversation to the system terminal. Conversations run inline shell commands, mention
+files and queue follow-ups, and `jackalope -p` runs one message for scripts and CI.
+Agent questions can be answered in the terminal. Installed PATH setup and hand-off
+on each platform remain in progress.
 
 Codex speed controls, fresh context for changed workspaces, dependency-priority
 dispatch and CPU-based check capacity are implemented. Execution timings and offline

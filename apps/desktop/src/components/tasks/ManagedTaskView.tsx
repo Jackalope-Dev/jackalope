@@ -1,6 +1,7 @@
 import { FormField, IconButton, Panel, Select, SelectItem, Textarea } from '@jackalope/ui';
 import { Activity, ArrowLeft, RefreshCw } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import type { FeatureStep } from '../../lib/feature-plan';
 import {
@@ -44,8 +45,16 @@ import { WorkSourceLink } from './WorkSourceLink';
 const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
 
 export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: () => void }) {
-  const { queue, refresh, error: queueError } = useManagedTaskStore();
-  const { runs, select, start } = useExecutionStore();
+  const {
+    queue,
+    refresh,
+    error: queueError,
+  } = useManagedTaskStore(
+    useShallow((s) => ({ queue: s.queue, refresh: s.refresh, error: s.error })),
+  );
+  const { runs, select, start } = useExecutionStore(
+    useShallow((s) => ({ runs: s.runs, select: s.select, start: s.start })),
+  );
   const work = managedTaskWork(task, queue, runs);
   const project = useProjectStore((state) =>
     state.projects.find((item) => item.id === task.request.projectId),

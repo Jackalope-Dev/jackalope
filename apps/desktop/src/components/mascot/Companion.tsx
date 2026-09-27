@@ -1,6 +1,7 @@
 import { ExternalLinkIcon, Popover, SearchIcon } from '@jackalope/ui';
 import { ArrowLeft, Check, CircleCheck, CircleHelp, Info, Settings2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { isActive, nativeTask, statusLabel } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -50,7 +51,14 @@ export function Companion({
   const interactedOutside = useRef(false);
   const pendingAction = useRef<(() => void) | null>(null);
   const [hint, setHint] = useState<Pick<CompanionNotice, 'id' | 'title' | 'kind'> | null>(null);
-  const { sources, readIds, markRead, markUnread } = useCompanionStore();
+  const { sources, readIds, markRead, markUnread } = useCompanionStore(
+    useShallow((s) => ({
+      sources: s.sources,
+      readIds: s.readIds,
+      markRead: s.markRead,
+      markUnread: s.markUnread,
+    })),
+  );
   const runs = useExecutionStore((state) => state.runs);
   const loading = useExecutionStore((state) => state.loading);
   const error = useExecutionStore((state) => state.error);

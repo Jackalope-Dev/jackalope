@@ -331,6 +331,26 @@ fn quota_detection_requires_provider_errors_not_task_text() {
         &serde_json::json!({"type":"turn.failed","error":{"message":"usage limit reached"}})
     )
     .is_some());
+    assert!(quota_failure(
+        &serde_json::json!({"type":"result","is_error":true,"result":"You've hit your limit · resets 10pm","errors":null})
+    )
+    .is_some());
+    assert!(quota_failure(
+        &serde_json::json!({"type":"result","is_error":true,"result":"You have reached your limit"})
+    )
+    .is_some());
+    assert!(quota_failure(
+        &serde_json::json!({"type":"result","is_error":true,"result":"Claude was at limit"})
+    )
+    .is_some());
+    assert!(quota_failure(
+        &serde_json::json!({"type":"result","is_error":true,"result":"The limit was hit"})
+    )
+    .is_some());
+    assert!(quota_failure(
+        &serde_json::json!({"type":"result","is_error":true,"subtype":"error_limit_reached","result":""})
+    )
+    .is_some());
 }
 
 #[test]

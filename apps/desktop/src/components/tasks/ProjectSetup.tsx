@@ -2,6 +2,7 @@ import { Checkbox, Input } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, FolderOpen } from 'lucide-react';
 import { useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { openProject } from '../../lib/project-setup';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -17,7 +18,12 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
   const [path, setPath] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const { useMcpMarketplace, setUseMcpMarketplace } = useSettingsStore();
+  const { useMcpMarketplace, setUseMcpMarketplace } = useSettingsStore(
+    useShallow((s) => ({
+      useMcpMarketplace: s.useMcpMarketplace,
+      setUseMcpMarketplace: s.setUseMcpMarketplace,
+    })),
+  );
   const desktop = isTauriEnvironment();
   const browse = async () => {
     setError('');

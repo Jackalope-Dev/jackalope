@@ -13,6 +13,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { nativeTask } from '../../lib/task-runtime';
 import {
   archiveWorktree,
@@ -138,7 +139,17 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     loading,
     checkingWorktrees,
     worktreesError,
-  } = useProjectStore();
+  } = useProjectStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      activeProjectId: s.activeProjectId,
+      loadWorktreesForActiveProject: s.loadWorktreesForActiveProject,
+      spawnTaskWorktree: s.spawnTaskWorktree,
+      loading: s.loading,
+      checkingWorktrees: s.checkingWorktrees,
+      worktreesError: s.worktreesError,
+    })),
+  );
   const project = projects.find((p) => p.id === activeProjectId);
   const [creating, setCreating] = useState(false);
   const [slug, setSlug] = useState('');
@@ -151,8 +162,13 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   const [progress, setProgress] = useState('');
   const pending = busy || removing !== null;
   const refreshing = loading || checkingWorktrees;
+  const projectPath = project?.path ?? '';
+  const normalizedRoot = projectPath.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
   const worktrees = (project?.worktrees ?? []).filter(
-    (wt, index) => index > 0 && !['main', 'master'].includes(wt.branch),
+    (wt, index) =>
+      index > 0 &&
+      !['main', 'master'].includes(wt.branch) &&
+      wt.path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase() !== normalizedRoot,
   );
   const ready = worktrees.filter(isReady);
   const active = worktrees.filter((wt) => !isReady(wt));
@@ -168,7 +184,6 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   }, [feedback, loading, pending]);
   const branchName = branch ?? `feat/${slug.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   const desktop = isTauriEnvironment();
-  const projectPath = project?.path;
   const [sizes, setSizes] = useState<
     Record<string, { bytes: number; files: number; partial: boolean; skippedLinks: number }>
   >({});

@@ -1,5 +1,36 @@
 [
   {
+    "id": "terminal-commands-that-match-other-agent-clis",
+    "date": "2026-09-27",
+    "status": "In development",
+    "title": "Terminal commands that match other agent CLIs",
+    "description": "The jackalope terminal command now works the way people coming from other agent CLIs expect.",
+    "items": [
+      "Resume any conversation with --resume, or pick one from a list",
+      "Choose a model for the next conversation with /model",
+      "See account quota and reset times with /usage",
+      "Generate or refresh AGENTS.md with /init",
+      "/clear starts fresh, and mistyped commands suggest the closest match",
+      "A clearer look: rounded menus with a highlighted row, readable secondary text, labelled replies and a working indicator along the header"
+    ]
+  },
+  {
+    "id": "faster-terminal-conversations",
+    "date": "2026-09-26",
+    "status": "In development",
+    "title": "Faster terminal conversations",
+    "description": "The jackalope command keeps you moving while agents work.",
+    "items": [
+      "Run shell commands inline with ! and watch their output stream beside the conversation.",
+      "Select any text with the mouse to copy it, or use /copy for the latest reply.",
+      "The input wraps and grows as you type, and follow-ups queue behind running work.",
+      "A live header shows the conversation, other open work and agent readiness; Ctrl+N and Ctrl+P switch conversations and /bg starts one in the background.",
+      "Mention files with @, search input history with Ctrl+R, filter any picker by typing, and press Esc twice to stop an agent.",
+      "Run a single message from scripts and CI with jackalope -p, with JSON output, a --timeout and meaningful exit codes; ls, status and the new stop command also print JSON.",
+      "Retried work shows every attempt's output, the conversation stays readable while you scroll back, and the terminal reconnects on its own when Jackalope restarts."
+    ]
+  },
+  {
     "id": "project-agent-preferences-stay-with-each-project",
     "date": "2026-09-24",
     "status": "In development",

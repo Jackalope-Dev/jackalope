@@ -11,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
 import { builtinAgents } from '../../lib/agent-catalog';
 import { agentProvider } from '../../lib/agent-provider';
@@ -34,10 +35,14 @@ import './agent-manager.css';
 
 export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
   const config = useAgentConfigStore();
-  const { projects, activeProjectId } = useProjectStore();
+  const { projects, activeProjectId } = useProjectStore(
+    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
+  );
   const project = projects.find((item) => item.id === activeProjectId);
   const defaultAgent = project ? project.preferences?.preferredRunner : config.defaultMetaAgent;
-  const { runners, discovering, discover } = useExecutionStore();
+  const { runners, discovering, discover } = useExecutionStore(
+    useShallow((s) => ({ runners: s.runners, discovering: s.discovering, discover: s.discover })),
+  );
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [modelsRevision, setModelsRevision] = useState(0);

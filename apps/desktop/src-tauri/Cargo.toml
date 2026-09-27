@@ -1,6 +1,6 @@
 [package]
 name = "jackalope-desktop"
-version = "0.1.7"
+version = "0.1.8"
 description = "Jackalope - Ultra-performant desktop shell and harness for agentic workflows"
 authors = ["Jackalope Contributors"]
 edition = "2021"
@@ -63,12 +63,16 @@ flate2 = "1.1.10"
 tar = "0.4.46"
 # Terminal UI for the `jackalope` binary. Only the crossterm backend is used;
 # the termwiz and termina backends would add dependencies and licence notices
-# for code that never runs.
+# for code that never runs. `unstable-rendered-line-info` measures wrapped
+# rows exactly, so the transcript can pin to its newest line.
 ratatui = { version = "0.30.2", default-features = false, features = [
     "crossterm",
     "underline-color",
+    "unstable-rendered-line-info",
 ] }
 crossterm = "0.29.0"
+# Already in the graph through ratatui; the CLI measures input columns with it.
+unicode-width = "0.2.2"
 
 [features]
 default = ["custom-protocol"]
@@ -87,7 +91,7 @@ windows = { version = "0.62.2", optional = true, features = ["ApplicationModel",
 windows-collections = { version = "0.3.2", optional = true }
 windows-future = { version = "0.3.2", optional = true }
 tauri-winrt-notification = "0.8.1"
-windows-sys = { version = "0.61", features = ["Win32_Storage_Packaging_Appx", "Win32_System_JobObjects", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_Threading"] }
+windows-sys = { version = "0.61", features = ["Win32_Storage_Packaging_Appx", "Win32_System_JobObjects", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_Threading", "Win32_Foundation", "Win32_System_IO"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

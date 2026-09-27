@@ -103,7 +103,7 @@ export const roadmapStages = [
         title: 'Your agents, from the terminal.',
         summary: 'A jackalope command that picks up where the app leaves off.',
         detail:
-          'Run jackalope in any repository to describe work, let Jackalope choose the agent, and watch progress in a terminal conversation. It shares sessions and account access with the app and can start it in the background. Open it from the status bar, then move the conversation to your own terminal. Installed setup on each platform and answering agent questions from the terminal are still in progress.',
+          'Run jackalope in any repository to describe work, let Jackalope choose the agent, and watch progress in a terminal conversation. It shares sessions and account access with the app and can start it in the background. Run shell commands inline, mention files, queue follow-ups while agents work, or send a single message from scripts with jackalope -p. Open it from the status bar, then move the conversation to your own terminal. Answer agent questions without leaving the terminal. Installed setup on each platform is still in progress.',
       },
       {
         title: 'A first run worth coming back to.',

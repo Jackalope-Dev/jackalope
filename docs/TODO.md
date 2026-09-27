@@ -49,10 +49,11 @@ release dates.
   PATH linking and the macOS system link, NSIS PATH hooks, the Store execution alias,
   AppImage relaunch, updates and uninstall. Exercise cold start, second-launch window
   promotion, several terminals, app-to-terminal hand-off on each platform's terminals,
-  narrow terminals, Unicode, `NO_COLOR` and reconnect after a host restart.
-- [ ] Answer agent questions from the terminal, interleave earlier attempts' output in
-  its transcript, and add a non-interactive `jackalope run` with machine-readable
-  output for scripts and CI.
+  narrow terminals, Unicode, `NO_COLOR` and reconnect after a host restart. Exercise
+  `!` commands and their interruption (process groups, `taskkill`), clipboard copy
+  (pbcopy, Wayland/X11, WSL, PowerShell, OSC 52 over SSH), Shift+Enter under the
+  keyboard protocol, Ctrl+Z suspend, the bell and window title, and `jackalope -p`
+  exit codes on each platform.
 - [ ] Validate bulk task archiving, undo, restore and restart recovery in installed
   builds, including unsaved history and interrupted attempts.
 - [ ] Validate live sessions with installed providers: rapid capture, concurrent window

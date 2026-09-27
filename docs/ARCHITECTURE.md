@@ -134,7 +134,15 @@ and integration review. Browser-safe controls live in packages/ui, consumed as
 @jackalope/ui by desktop, website and admin. Desktop components/ui retains
 compatibility exports and app-specific compositions such as workspace navigation
 and task state mapping. System information belongs to Settings; saved task editing
-belongs to Tasks.
+belongs to Tasks. TaskDetail composes TaskRunDetails, TaskFollowUpPanel and the
+useTaskFollowUps queue hook; OnboardingFlow composes one component per step.
+
+Subscribe to native events with hooks/useTauriEvent and to app `jackalope:*` window
+events with hooks/useWindowEvent; both handle late-resolving cleanup and stale
+handlers. Open links through openInBrowser in lib/tauri-bridge, which reports
+failures to the caller. Select store fields with useShallow rather than
+subscribing to a whole store. PROMPT_MAX_CHARS bounds task, follow-up and
+schedule instructions.
 
 The UI package owns portable styling, accessible controls, overlays, feedback
 states and basic layout/data primitives. It has no native bridge, stores, routing

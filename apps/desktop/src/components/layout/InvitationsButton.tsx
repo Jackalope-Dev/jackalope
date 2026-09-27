@@ -1,5 +1,6 @@
 import { Ticket, X } from 'lucide-react';
 import { useEffect } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useReferralStore } from '../../stores/referralStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 export function InvitationsButton({
@@ -9,7 +10,9 @@ export function InvitationsButton({
   onClick: () => void;
   onDismiss: () => void;
 }) {
-  const { referrals, load } = useReferralStore();
+  const { referrals, load } = useReferralStore(
+    useShallow((s) => ({ referrals: s.referrals, load: s.load })),
+  );
   const visible = useSettingsStore((state) => state.showTrialPassesInToolbar);
   useEffect(() => {
     if (!visible) return;

@@ -1165,7 +1165,15 @@ impl TaskRuntime {
         self.update(id, |r| {
             r.finishing = false; r.exit_code = exit.code(); r.ended_at = Some(Utc::now().to_rfc3339());
             r.status = if canceled || r.status == "stopping" { "stopped" } else if r.routing.is_some() && r.quota_failure.is_some() { r.ended_at = None; "starting" } else if success && r.error.is_none() && !r.result.is_empty() { "review" } else { "failed" }.into();
-            if r.status == "failed" && r.error.is_none() { r.error = Some(format!("Agent exited with {}. Inspect activity for details; no successful result was reported.", exit.code().map_or("no exit code".into(), |c| c.to_string()))); }
+            if r.status == "failed" {
+                if r.error.as_deref().is_none_or(|e| e.trim().is_empty() || e == "null") {
+                    if let Some(failure) = &r.quota_failure {
+                        r.error = Some(failure.message.clone());
+                    } else {
+                        r.error = Some(format!("Agent exited with {}. Inspect activity for details; no successful result was reported.", exit.code().map_or("no exit code".into(), |c| c.to_string())));
+                    }
+                }
+            }
         });
         Ok(())
     }

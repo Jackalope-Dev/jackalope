@@ -195,47 +195,110 @@ pub(super) fn quota_failure(event: &Value) -> Option<QuotaFailure> {
         });
     }
     let provider_error = matches!(kind, Some("error" | "turn.failed"))
-        || (kind == Some("result") && event["is_error"] == true);
+        || (kind == Some("result")
+            && (event["is_error"] == true
+                || event["subtype"]
+                    .as_str()
+                    .is_some_and(|s| s.starts_with("error"))));
     if !provider_error {
         return None;
     }
     let error = event.get("error").unwrap_or(event);
     let mut parts = vec![
+        error.as_str().unwrap_or(""),
         error["message"].as_str().unwrap_or(""),
         error["data"]["message"].as_str().unwrap_or(""),
         error["code"].as_str().unwrap_or(""),
         error["type"].as_str().unwrap_or(""),
+        error["subtype"].as_str().unwrap_or(""),
+        event["message"].as_str().unwrap_or(""),
+        event["subtype"].as_str().unwrap_or(""),
         event["result"].as_str().unwrap_or(""),
+        event["errors"].as_str().unwrap_or(""),
     ];
     if let Some(errors) = event["errors"].as_array() {
-        parts.extend(errors.iter().filter_map(Value::as_str));
+        for err in errors {
+            if let Some(text) = err
+                .as_str()
+                .or_else(|| err["message"].as_str())
+                .or_else(|| err["text"].as_str())
+            {
+                parts.push(text);
+            }
+        }
     }
     let text = parts
         .into_iter()
-        .filter(|part| !part.is_empty())
+        .filter(|part| !part.trim().is_empty() && *part != "null")
         .collect::<Vec<_>>()
         .join(" ");
     let lower = text.to_lowercase();
-    if ![
+    let patterns = [
         "quota_exceeded",
         "insufficient_quota",
         "usage_limit_reached",
         "rate_limit_exceeded",
         "rate_limit_error",
+        "rate_limit",
+        "rate limit",
         "usage limit",
+        "usage_limit",
         "quota exceeded",
         "quota exhausted",
+        "out of quota",
+        "quota limit",
         "out of credits",
+        "credit limit",
+        "no credits",
         "hit your limit",
-    ]
-    .iter()
-    .any(|code| lower.contains(code))
-    {
+        "hit the limit",
+        "hit a limit",
+        "hit limit",
+        "hit its limit",
+        "the limit was hit",
+        "limit was hit",
+        "limit hit",
+        "reached your limit",
+        "reached the limit",
+        "reached limit",
+        "limit reached",
+        "limit_reached",
+        "limit has been reached",
+        "at your limit",
+        "at the limit",
+        "at its limit",
+        "at limit",
+        "exceeded your limit",
+        "exceeded the limit",
+        "exceeded limit",
+        "limit exceeded",
+        "limit_exceeded",
+        "over your limit",
+        "over the limit",
+        "over limit",
+        "resets at",
+        "resets in",
+        "resets tomorrow",
+        "capacity exceeded",
+        "exhausted your capacity",
+        "resource_exhausted",
+        "too many requests",
+        "daily quota",
+        "daily limit",
+        "weekly limit",
+        "monthly limit",
+        "billing limit",
+    ];
+    if !patterns.iter().any(|code| lower.contains(code)) {
         return None;
     }
     Some(QuotaFailure {
         model_only: error["scope"] == "model",
-        message: text.chars().take(2000).collect(),
+        message: if text.trim().is_empty() {
+            "The provider reported that its usage or rate limit was reached.".into()
+        } else {
+            text.chars().take(2000).collect()
+        },
     })
 }
 

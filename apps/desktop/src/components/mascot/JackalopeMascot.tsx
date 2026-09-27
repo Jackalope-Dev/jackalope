@@ -1,6 +1,7 @@
 import { characterMarkViewBox, characterPaths as paths } from '@jackalope/brand/character';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useId, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useReducedMotionPreference } from '../../hooks/useReducedMotionPreference';
 import { type MascotMood, useMascotStore } from '../../stores/mascotStore';
 import { useMascotIdle } from './useMascotIdle';
@@ -83,7 +84,9 @@ export function JackalopeMascot({
   nodding = false,
   onNodComplete,
 }: JackalopeMascotProps) {
-  const { mood, message, pet } = useMascotStore();
+  const { mood, message, pet } = useMascotStore(
+    useShallow((s) => ({ mood: s.mood, message: s.message, pet: s.pet })),
+  );
   const faceMask = useId();
   const button = useRef<HTMLButtonElement>(null);
   const [hovered, setHovered] = useState(false);

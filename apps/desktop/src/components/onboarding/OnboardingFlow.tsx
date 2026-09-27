@@ -1,19 +1,11 @@
 import { applyThemeTokens, type ThemePalette } from '@jackalope/brand/theme';
-import { Disclosure, DisclosureSummary, Input, RefreshIcon, Textarea } from '@jackalope/ui';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  Copy,
-  ExternalLink,
-  FolderOpen,
-  FolderPlus,
-} from 'lucide-react';
+import { RefreshIcon, Textarea } from '@jackalope/ui';
+import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents, getAgentMetadata } from '../../lib/agent-catalog';
 import { missingProjectDefaults, type ProjectDefaults } from '../../lib/context/project-defaults';
 import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
-import { createProject, openProject } from '../../lib/project-setup';
 import { routingSettings } from '../../lib/routing-settings';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -34,7 +26,9 @@ import { RoutingSetup } from '../settings/RoutingSetup';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
+import { AgentInstallCatalog, CommandCopy } from './AgentInstallCatalog';
 import { OnboardingAgentAccount } from './OnboardingAgentAccount';
+import { OnboardingProjectStep } from './OnboardingProjectStep';
 import { ProjectThemeStep } from './ProjectThemeStep';
 import './onboarding.css';
 
@@ -74,21 +68,31 @@ export function OnboardingFlow({
   onSkip: () => void;
 }) {
   const onboarding = useOnboardingStore();
-  const { projects } = useProjectStore();
+  const { projects } = useProjectStore(useShallow((s) => ({ projects: s.projects })));
   const project =
     onboarding.pendingProject ?? projects.find((item) => item.id === onboarding.projectId);
   const appTheme = useThemeStore((state) => state.appTheme);
   const [commitPolicy, setCommitPolicy] = useState<CommitPolicy>();
   const [themePreview, setThemePreview] = useState<ThemePalette>();
-  const execution = useExecutionStore();
-  const config = useAgentConfigStore();
+  const execution = useExecutionStore(
+    useShallow((s) => ({
+      drafts: s.drafts,
+      runners: s.runners,
+      discovering: s.discovering,
+      discover: s.discover,
+      error: s.error,
+    })),
+  );
+  const config = useAgentConfigStore(
+    useShallow((s) => ({
+      defaultMetaAgent: s.defaultMetaAgent,
+      customAgents: s.customAgents,
+      runnerOptions: s.runnerOptions,
+      isAgentEnabled: s.isAgentEnabled,
+      disabledAccounts: s.disabledAccounts,
+    })),
+  );
   const accounts = useAgentAccountsStore((state) => state.agents);
-  const [path, setPath] = useState(project?.path ?? '');
-  const [projectMode, setProjectMode] = useState<'existing' | 'new'>('existing');
-  const [projectName, setProjectName] = useState('');
-  const [parentPath, setParentPath] = useState<string | null>(null);
-  const [defaultDirectory, setDefaultDirectory] = useState('');
-  const [directoryError, setDirectoryError] = useState('');
   const [agent, setAgent] = useState(
     onboarding.pendingProject?.preferences?.preferredRunner ||
       (project && execution.drafts[project.id]?.agent) ||
@@ -105,12 +109,6 @@ export function OnboardingFlow({
   const busy = working || nodding;
   const [error, setError] = useState('');
   const [routingReady, setRoutingReady] = useState(false);
-  const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
-  const copyToClipboard = (text: string) => {
-    void navigator.clipboard.writeText(text);
-    setCopiedCommand(text);
-    setTimeout(() => setCopiedCommand((curr) => (curr === text ? null : curr)), 2500);
-  };
   const heading = useRef<HTMLHeadingElement>(null);
   const errorMessage = useRef<HTMLDivElement>(null);
   const tipIndex = useRef(0);
@@ -218,16 +216,8 @@ export function OnboardingFlow({
     else if (enabled && !agent) setAgent(id);
   };
   useEffect(() => {
-    if (!desktop || projectMode !== 'new') return;
-    void nativeTask<string>('task_project_directory')
-      .then((directory) => {
-        setDefaultDirectory(directory);
-        setDirectoryError('');
-      })
-      .catch(() => setDirectoryError('Choose a folder for your new project.'));
-  }, [desktop, projectMode]);
-  useEffect(() => {
-    if (heading.current?.dataset.step === step) heading.current.focus();
+    heading.current?.closest('.onboarding-content')?.scrollTo({ top: 0 });
+    if (heading.current?.dataset.step === step) heading.current.focus({ preventScroll: true });
     setError('');
     tipIndex.current = 0;
     useMascotStore.getState().clearMessage();
@@ -375,168 +365,29 @@ export function OnboardingFlow({
                       : 'Describe your first task'}
           </h2>
           {step === 'project' && (
-            <>
-              <fieldset className="onboarding-project-options" aria-label="Project setup">
-                <Button
-                  variant={projectMode === 'existing' ? 'primary' : 'outline'}
-                  aria-pressed={projectMode === 'existing'}
-                  disabled={busy}
-                  onClick={() => {
-                    setProjectMode('existing');
-                    setError('');
-                  }}
-                >
-                  <FolderOpen size={16} />
-                  Open existing
-                </Button>
-                <Button
-                  variant={projectMode === 'new' ? 'primary' : 'outline'}
-                  aria-pressed={projectMode === 'new'}
-                  disabled={busy}
-                  onClick={() => {
-                    setProjectMode('new');
-                    setError('');
-                  }}
-                >
-                  <FolderPlus size={16} />
-                  Create new project
-                </Button>
-              </fieldset>
-              {!desktop && (
-                <InlineNotice>
-                  Open the desktop app to create or choose a project and discover agents.
-                </InlineNotice>
-              )}
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void attempt(async () => {
-                    const opened =
-                      projectMode === 'new'
-                        ? await createProject(projectName, parentPath, { provisional: true })
-                        : await openProject(path, {
-                            provisional: true,
-                            pending: onboarding.pendingProject,
-                          });
-                    onboarding.stageProject(
-                      opened,
-                      projectMode === 'new'
-                        ? 'Help me plan what to build in this new project. Ask about my goals, then suggest a small first milestone.'
-                        : opened.id === onboarding.projectId
-                          ? draft
-                          : (execution.drafts[opened.id]?.prompt ?? ''),
-                    );
-                    setAgent(opened.preferences?.preferredRunner ?? config.defaultMetaAgent);
-                    setAllowedAgents(opened.preferences?.allowedAgents ?? null);
-                    setPath(opened.path);
-                    setProjectMode('existing');
-                    setThemePreview(undefined);
-                    await execution.discover();
-                    advance(() => onboarding.go('agent'));
-                  });
-                }}
-              >
-                {projectMode === 'new' ? (
-                  <>
-                    <label className="task-label" htmlFor="onboarding-project-name">
-                      Project name
-                    </label>
-                    <Input
-                      id="onboarding-project-name"
-                      className="task-input onboarding-project-name"
-                      placeholder="My new project"
-                      maxLength={80}
-                      required
-                      value={projectName}
-                      disabled={!desktop || busy}
-                      onChange={(event) => setProjectName(event.target.value)}
-                    />
-                    <div className="onboarding-project-location">
-                      <div>
-                        <span className="task-label">Create in</span>
-                        <p>
-                          {parentPath ?? (defaultDirectory || 'Documents / Jackalope Projects')}
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={!desktop || busy}
-                        onClick={() =>
-                          void attempt(async () => {
-                            const selected = await nativeTask<string | null>('task_pick_project');
-                            if (selected) {
-                              setParentPath(selected);
-                              setDirectoryError('');
-                            }
-                          })
-                        }
-                      >
-                        Change folder
-                      </Button>
-                    </div>
-                    {directoryError && !parentPath && (
-                      <InlineNotice tone="error">{directoryError}</InlineNotice>
-                    )}
-                    <p className="onboarding-note">
-                      Creates a new folder with Git ready for your first task.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <label className="task-label" htmlFor="onboarding-path">
-                      Repository folder
-                    </label>
-                    <div className="onboarding-folder">
-                      <Input
-                        id="onboarding-path"
-                        className="task-input"
-                        placeholder="Paste a repository path"
-                        value={path}
-                        required
-                        disabled={!desktop || busy}
-                        onChange={(event) => setPath(event.target.value)}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={!desktop || busy}
-                        onClick={() =>
-                          void attempt(async () => {
-                            const selected = await nativeTask<string | null>('task_pick_project');
-                            if (selected) setPath(selected);
-                          })
-                        }
-                      >
-                        <FolderOpen size={16} />
-                        Browse
-                      </Button>
-                    </div>
-                  </>
-                )}
-                <div className="onboarding-actions">
-                  <Button
-                    type="submit"
-                    disabled={
-                      !desktop ||
-                      busy ||
-                      (projectMode === 'new'
-                        ? !projectName.trim() || (!parentPath && !defaultDirectory)
-                        : !path.trim())
-                    }
-                    loading={busy}
-                    loadingLabel={
-                      projectMode === 'new' ? 'Creating project…' : 'Checking repository…'
-                    }
-                  >
-                    {projectMode === 'new'
-                      ? 'Create project and continue'
-                      : 'Continue with this project'}
-                    <ArrowRight size={16} />
-                  </Button>
-                </div>
-              </form>
-            </>
+            <OnboardingProjectStep
+              initialPath={project?.path ?? ''}
+              pendingProject={onboarding.pendingProject}
+              desktop={desktop}
+              busy={busy}
+              attempt={attempt}
+              clearError={() => setError('')}
+              onOpened={async (opened, created) => {
+                onboarding.stageProject(
+                  opened,
+                  created
+                    ? 'Help me plan what to build in this new project. Ask about my goals, then suggest a small first milestone.'
+                    : opened.id === onboarding.projectId
+                      ? draft
+                      : (execution.drafts[opened.id]?.prompt ?? ''),
+                );
+                setAgent(opened.preferences?.preferredRunner ?? config.defaultMetaAgent);
+                setAllowedAgents(opened.preferences?.allowedAgents ?? null);
+                setThemePreview(undefined);
+                await execution.discover();
+                advance(() => onboarding.go('agent'));
+              }}
+            />
           )}
           {step === 'agent' && (
             <>
@@ -641,61 +492,6 @@ export function OnboardingFlow({
                   </div>
                 );
 
-                const installCatalog = installableAgents.length > 0 && (
-                  <Disclosure className="onboarding-install-catalog">
-                    <DisclosureSummary>
-                      Install other supported agents ({installableAgents.length} available)
-                    </DisclosureSummary>
-                    <div className="onboarding-catalog-grid">
-                      {installableAgents.map((b) => (
-                        <div key={b.id} className="onboarding-catalog-card">
-                          <div className="onboarding-catalog-head">
-                            <div className="flex items-center gap-2.5">
-                              <AgentAvatar provider={b.id} size="xs" />
-                              <div>
-                                <strong>{b.name}</strong>
-                                <span className="onboarding-vendor">{b.vendor}</span>
-                              </div>
-                            </div>
-                            <a
-                              href={b.installUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="onboarding-catalog-link"
-                              title={`Open ${b.name} docs`}
-                            >
-                              <ExternalLink size={14} />
-                            </a>
-                          </div>
-                          <p className="onboarding-catalog-desc">{b.description}</p>
-                          {b.installCommand &&
-                            (() => {
-                              const instCmd = b.installCommand;
-                              return (
-                                <div className="onboarding-command-box">
-                                  <code>{instCmd}</code>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => copyToClipboard(instCmd)}
-                                  >
-                                    {copiedCommand === instCmd ? (
-                                      <Check size={13} />
-                                    ) : (
-                                      <Copy size={13} />
-                                    )}
-                                    {copiedCommand === instCmd ? 'Copied' : 'Copy'}
-                                  </Button>
-                                </div>
-                              );
-                            })()}
-                        </div>
-                      ))}
-                    </div>
-                  </Disclosure>
-                );
-
                 return (
                   <>
                     <fieldset
@@ -712,7 +508,7 @@ export function OnboardingFlow({
                       )}
                     </fieldset>
                     {localAi}
-                    {installCatalog}
+                    <AgentInstallCatalog agents={installableAgents} />
                   </>
                 );
               })()}
@@ -730,27 +526,9 @@ export function OnboardingFlow({
                   <p className="onboarding-note">
                     Sign in through {runner.name} before starting a task.
                   </p>
-                  {(() => {
-                    const meta = getAgentMetadata(runner.id);
-                    if (meta?.loginCommand) {
-                      const loginCmd = meta.loginCommand;
-                      return (
-                        <div className="onboarding-command-box">
-                          <code>{loginCmd}</code>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => copyToClipboard(loginCmd)}
-                          >
-                            {copiedCommand === loginCmd ? <Check size={13} /> : <Copy size={13} />}
-                            {copiedCommand === loginCmd ? 'Copied' : 'Copy'}
-                          </Button>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
+                  {getAgentMetadata(runner.id)?.loginCommand && (
+                    <CommandCopy command={getAgentMetadata(runner.id)?.loginCommand ?? ''} />
+                  )}
                 </div>
               )}
 

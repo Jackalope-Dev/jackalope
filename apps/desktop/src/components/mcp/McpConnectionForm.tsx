@@ -1,6 +1,7 @@
 import { Checkbox } from '@jackalope/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { connectionSupport } from '../../lib/agent-capabilities';
 import { builtinAgents } from '../../lib/agent-catalog';
 import { bearerToken, withBearerToken, withoutBearerToken } from '../../lib/mcp-connection';
@@ -32,7 +33,9 @@ export function McpConnectionForm({
   onSaved: (saved: SavedMcpConnection) => void;
   onBusyChange?: (busy: boolean) => void;
 }) {
-  const { projects, activeProjectId } = useProjectStore();
+  const { projects, activeProjectId } = useProjectStore(
+    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
+  );
   const project = projects.find((project) => project.id === activeProjectId);
   const initialToken = bearerToken(initial?.extra);
   const defaultsToAgentSignIn =
