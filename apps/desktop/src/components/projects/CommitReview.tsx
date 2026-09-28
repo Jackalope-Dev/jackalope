@@ -1,6 +1,5 @@
 import {
   Badge,
-  Checkbox,
   Disclosure,
   DisclosureBody,
   DisclosureSummary,
@@ -14,12 +13,11 @@ import {
   FolderGit2,
   GitCommitHorizontal,
   Settings2,
-  Undo2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
-import { isActive, nativeTask, type RunRequest, type TaskRun } from '../../lib/task-runtime';
+import { isActive, nativeTask, type RunRequest } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useCommitReviewStore } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -28,7 +26,6 @@ import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice'
 import { navigateWorkspace } from '../layout/navigation';
 import { DiffPreview } from '../tasks/DiffPreview';
 import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
 import { EmptyState } from '../ui/EmptyState';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
@@ -38,146 +35,16 @@ import { Textarea } from '../ui/Textarea';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import './commit-review.css';
+import { type ChangedFile, CommitFilesList, STATUS } from './CommitFilesList';
+import { failureOf, type HookFailure, HookFixStatus } from './HookFixStatus';
 
-/** A commit refused by a hook, with the output needed to fix it. */
-interface HookFailure {
-  hook: string | null;
-  message: string;
-  output: string;
-  files: string[];
-}
-
-function HookFixStatus({
-  run,
-  agentName,
-  onStop,
-  onCommit,
-  canCommit,
-  onOpen,
-  onDismiss,
-}: {
-  run: TaskRun;
-  agentName: string;
-  onStop: () => void;
-  onCommit: () => void;
-  canCommit: boolean;
-  onOpen: () => void;
-  onDismiss: () => void;
-}) {
-  const open = (
-    <Button variant="ghost" onClick={onOpen}>
-      Open task
-    </Button>
-  );
-  if (isActive(run)) {
-    const detail = run.progress?.detail || run.activity.at(-1) || '';
-    return (
-      <InlineNotice
-        tone="info"
-        role="status"
-        className="commit-review-notice"
-        action={
-          <div className="commit-hook-fix-actions">
-            {open}
-            <Button variant="outline" onClick={onStop} disabled={run.status === 'stopping'}>
-              {run.status === 'stopping' ? 'Stopping…' : 'Stop'}
-            </Button>
-          </div>
-        }
-      >
-        <p>
-          <strong>{agentName || 'An agent'}</strong> is fixing the hook failure in this checkout
-          {run.progress?.label ? ` · ${run.progress.label}` : '…'}
-        </p>
-        {detail && <p className="commit-hook-fix-detail">{detail}</p>}
-      </InlineNotice>
-    );
-  }
-  if (run.status === 'review' || run.status === 'reviewed')
-    return (
-      <InlineNotice
-        tone="success"
-        role="status"
-        className="commit-review-notice"
-        action={
-          <div className="commit-hook-fix-actions">
-            {open}
-            <Button variant="ghost" onClick={onDismiss}>
-              Dismiss
-            </Button>
-            <Button onClick={onCommit} disabled={!canCommit}>
-              Commit again
-            </Button>
-          </div>
-        }
-      >
-        <p>{agentName || 'The agent'} finished. Review its changes below, then commit again.</p>
-      </InlineNotice>
-    );
-  return (
-    <InlineNotice
-      tone={run.status === 'stopped' ? 'warning' : 'error'}
-      className="commit-review-notice"
-      action={
-        <div className="commit-hook-fix-actions">
-          {open}
-          <Button variant="ghost" onClick={onDismiss}>
-            Dismiss
-          </Button>
-        </div>
-      }
-    >
-      <p>
-        {run.status === 'stopped'
-          ? 'The fix was stopped. Anything the agent already changed is still in your checkout.'
-          : run.error || 'The agent could not finish the fix. Open the task to see what happened.'}
-      </p>
-    </InlineNotice>
-  );
-}
-
-function failureOf(cause: unknown): {
-  kind: string;
-  hook?: string | null;
-  message: string;
-  output?: string;
-} {
-  if (cause && typeof cause === 'object' && 'kind' in cause && 'message' in cause)
-    return cause as { kind: string; hook?: string | null; message: string; output?: string };
-  return { kind: 'git', message: cause instanceof Error ? cause.message : String(cause) };
-}
-
-interface ChangedFile {
-  path: string;
-  oldPath: string | null;
-  status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflicted';
-  staged: boolean;
-  additions: number | null;
-  deletions: number | null;
-}
 interface WorkingChanges {
   branch: string | null;
   head: string | null;
   files: ChangedFile[];
 }
 
-const STATUS = {
-  modified: { letter: 'M', label: 'Modified' },
-  added: { letter: 'A', label: 'Added' },
-  untracked: { letter: 'A', label: 'New file' },
-  deleted: { letter: 'D', label: 'Deleted' },
-  renamed: { letter: 'R', label: 'Renamed' },
-  conflicted: { letter: '!', label: 'Conflict' },
-} as const;
-
 const TITLE_LIMIT = 72;
-
-function splitPath(path: string) {
-  const index = path.lastIndexOf('/');
-  return index < 0
-    ? { dir: '', name: path }
-    : { dir: path.slice(0, index + 1), name: path.slice(index + 1) };
-}
 
 function authorLine(policy: CommitPolicy | null, agents: string[]) {
   if (!policy) return 'Loading commit settings…';
@@ -758,89 +625,20 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
                 Ask an agent to review
               </Button>
             </form>
-            <section className="commit-files" aria-label="Changed files">
-              <header>
-                <label>
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={chosenFiles.length > 0 && !allSelected}
-                    disabled={busy}
-                    onChange={(event) =>
-                      setExcluded(
-                        checkout,
-                        event.target.checked ? [] : files.map((file) => file.path),
-                      )
-                    }
-                  />
-                  <span>
-                    {chosenFiles.length} of {files.length} selected
-                  </span>
-                </label>
-                <span className="commit-stat">
-                  <ins>+{totals.add}</ins> <del>−{totals.del}</del>
-                </span>
-              </header>
-              <ul>
-                {files.map((file) => {
-                  const { dir, name } = splitPath(file.path);
-                  const status = STATUS[file.status];
-                  return (
-                    <li key={file.path} data-focused={file.path === focused || undefined}>
-                      <Checkbox
-                        aria-label={`Include ${file.path}`}
-                        checked={selected.has(file.path)}
-                        disabled={busy}
-                        onChange={(event) => toggle(file.path, event.target.checked)}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setFocused(file.path)}
-                        title={file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}
-                      >
-                        <span
-                          className="commit-status"
-                          data-status={file.status}
-                          title={status.label}
-                        >
-                          {status.letter}
-                        </span>
-                        <span className="commit-file-name">
-                          <strong>{name}</strong>
-                          {dir && <small>{dir}</small>}
-                        </span>
-                        {file.additions !== null && (
-                          <span className="commit-stat">
-                            <ins>+{file.additions}</ins> <del>−{file.deletions ?? 0}</del>
-                          </span>
-                        )}
-                      </button>
-                      <ConfirmAction
-                        title={`Discard changes to ${name}?`}
-                        description={
-                          file.status === 'untracked' || file.status === 'added'
-                            ? 'This new file will be deleted. This cannot be undone.'
-                            : 'The file goes back to its last committed version. This cannot be undone.'
-                        }
-                        label="Discard changes"
-                        busyLabel="Discarding…"
-                        onConfirm={() => discard(file)}
-                        trigger={
-                          <IconButton
-                            variant="ghost"
-                            className="commit-discard"
-                            label={`Discard changes to ${file.path}`}
-                            title="Discard changes"
-                            disabled={busy || file.status === 'conflicted'}
-                          >
-                            <Undo2 size={15} />
-                          </IconButton>
-                        }
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
+            <CommitFilesList
+              files={files}
+              chosenFiles={chosenFiles}
+              allSelected={allSelected}
+              busy={busy}
+              selected={selected}
+              focused={focused}
+              totals={totals}
+              checkout={checkout}
+              setExcluded={setExcluded}
+              toggle={toggle}
+              setFocused={setFocused}
+              discard={discard}
+            />
           </aside>
           <section className="commit-diff" aria-label="Diff">
             {focusedFile && (

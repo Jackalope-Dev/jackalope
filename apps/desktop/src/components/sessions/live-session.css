@@ -365,16 +365,13 @@
 }
 .live-start-composer {
   position: relative;
-  padding: 16px;
+  padding: 16px 18px 14px;
   border: 1px solid var(--color-border-subtle);
   border-radius: 16px;
   background: var(--color-surface-elevated);
   text-align: left;
 }
 .live-start-toolbar {
-  position: absolute;
-  top: 8px;
-  right: 8px;
   display: flex;
 }
 .chat-options-dialog {
@@ -393,17 +390,38 @@
   border: 0;
   background: transparent;
   box-shadow: none;
-  padding: 4px;
-  padding-right: 44px;
+  padding: 4px 6px;
+  line-height: 1.5;
 }
 .live-start-composer textarea:focus-visible {
   outline: none;
   box-shadow: none;
 }
+.live-start-composer .inline-notice,
+.live-start-composer .task-assessment {
+  margin-top: 12px;
+}
 .live-start-actions {
   display: flex;
-  justify-content: flex-end;
-  padding-top: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.live-start-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.live-start-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
 }
 .live-history {
   padding: 24px 14px;

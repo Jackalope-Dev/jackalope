@@ -201,14 +201,24 @@
 }
 
 .agent-setup-box {
+  grid-column: 1 / -1;
+  width: 100%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 4px;
   padding: 10px 12px;
   border-radius: 12px;
   background: var(--color-surface-sunken);
   border: 1px solid var(--color-border-subtle);
+}
+
+.agent-setup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .agent-setup-label {
@@ -220,23 +230,27 @@
 .agent-setup-cmd-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  width: 100%;
   min-width: 0;
 }
 
 .agent-setup-cmd {
-  flex: 1;
+  width: 100%;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: monospace;
+  box-sizing: border-box;
+  overflow-x: auto;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+  font-family: var(--font-mono, monospace);
   font-size: var(--text-xs);
+  line-height: 1.5;
   color: var(--color-text-primary);
   background: var(--color-surface);
   border: 1px solid var(--color-border-subtle);
-  padding: 4px 8px;
+  padding: 6px 10px;
   border-radius: 6px;
+  user-select: all;
 }
 
 .agent-setup-actions {

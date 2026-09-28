@@ -68,11 +68,8 @@ function SetupCommandBox({
   };
   return (
     <div className="agent-setup-box">
-      <span className="agent-setup-label">{label}</span>
-      <div className="agent-setup-cmd-row">
-        <code className="agent-setup-cmd" title={command}>
-          {command}
-        </code>
+      <div className="agent-setup-header">
+        <span className="agent-setup-label">{label}</span>
         <div className="agent-setup-actions">
           <button
             type="button"
@@ -97,6 +94,11 @@ function SetupCommandBox({
             </button>
           ) : null}
         </div>
+      </div>
+      <div className="agent-setup-cmd-row">
+        <code className="agent-setup-cmd" title={command}>
+          {command}
+        </code>
       </div>
     </div>
   );
@@ -330,22 +332,6 @@ export function RunnerConnections({
           )}
           {detail && <p className="task-muted">{detail}</p>}
 
-          {/* Setup guidance for missing CLI or sign-in */}
-          {isSetupCard && !runner.available && builtin?.installCommand ? (
-            <SetupCommandBox
-              command={builtin.installCommand}
-              label="Install command"
-              workingDir={project?.path}
-            />
-          ) : null}
-          {isSetupCard && runner.available && needsSignIn && builtin?.loginCommand ? (
-            <SetupCommandBox
-              command={builtin.loginCommand}
-              label="Sign-in command"
-              workingDir={project?.path}
-            />
-          ) : null}
-
           {profiles.length > 0 ? (
             <button
               type="button"
@@ -383,6 +369,23 @@ export function RunnerConnections({
             </Button>
           )}
         </div>
+
+        {/* Setup guidance for missing CLI or sign-in */}
+        {isSetupCard && !runner.available && builtin?.installCommand ? (
+          <SetupCommandBox
+            command={builtin.installCommand}
+            label="Install command"
+            workingDir={project?.path}
+          />
+        ) : null}
+        {isSetupCard && runner.available && needsSignIn && builtin?.loginCommand ? (
+          <SetupCommandBox
+            command={builtin.loginCommand}
+            label="Sign-in command"
+            workingDir={project?.path}
+          />
+        ) : null}
+
         <div className="agent-roster-action">
           <div className="agent-enable">
             <Switch

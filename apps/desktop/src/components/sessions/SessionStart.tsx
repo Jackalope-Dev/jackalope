@@ -20,6 +20,7 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { ChatOptions } from './ChatOptions';
 import { SessionLimits } from './SessionLimits';
 import { WorkflowStarter } from './WorkflowStarter';
+import './live-session.css';
 
 export function SessionStart({
   project,
@@ -185,75 +186,6 @@ export function SessionStart({
             void send();
           }}
         >
-          <div className="live-start-toolbar">
-            <ChatOptions
-              onClose={() => input.current?.focus()}
-              items={[
-                {
-                  id: 'speed',
-                  label: 'Codex speed',
-                  content: () => (
-                    <CodexSpeedSelect
-                      disabled={busy}
-                      value={codexSpeed}
-                      onChange={(value) => {
-                        assessment.clear();
-                        pending.current = null;
-                        setCodexSpeed(value);
-                      }}
-                    />
-                  ),
-                },
-                {
-                  id: 'limits',
-                  label: 'Session limits',
-                  content: () => (
-                    <SessionLimits
-                      embedded
-                      initial={limits}
-                      onSave={(next) => {
-                        assessment.clear();
-                        setLimits(next);
-                      }}
-                    />
-                  ),
-                },
-                {
-                  id: 'workflow',
-                  label: 'Start from a repeatable workflow',
-                  content: (close) => (
-                    <WorkflowStarter
-                      embedded
-                      projectPath={project.path}
-                      onDraft={(prompt) => {
-                        assessment.clear();
-                        setText((current) => (current.trim() ? `${current}\n\n${prompt}` : prompt));
-                        close();
-                      }}
-                    />
-                  ),
-                },
-                {
-                  id: 'context',
-                  label: 'Saved project context',
-                  content: () => (
-                    <TaskKnowledge
-                      embedded
-                      projectId={project.id}
-                      projectPath={project.path}
-                      prompt={text}
-                      selection={context}
-                      onChange={(next) => {
-                        assessment.clear();
-                        setContext(next);
-                      }}
-                      allowWorkflows={false}
-                    />
-                  ),
-                },
-              ]}
-            />
-          </div>
           <Textarea
             ref={input}
             aria-label="Message"
@@ -283,30 +215,105 @@ export function SessionStart({
             onPlan={() => void send('plan')}
           />
           <div className="live-start-actions">
-            <PromptPresets
-              projectId={project.id}
-              onInsert={(prompt) => {
-                assessment.clear();
-                setText((current) => (current.trim() ? `${current}\n\n${prompt}` : prompt));
-                input.current?.focus();
-              }}
-            />
-            <DictationButton
-              disabled={busy}
-              onText={(value) => {
-                assessment.clear();
-                setText((current) => (current.trim() ? `${current}\n${value}` : value));
-                input.current?.focus();
-              }}
-            />
-            <Button
-              type="submit"
-              disabled={!text.trim() || busy || !isTauriEnvironment()}
-              loading={busy}
-              loadingLabel="Starting…"
-            >
-              Send
-            </Button>
+            <div className="live-start-tools">
+              <PromptPresets
+                projectId={project.id}
+                onInsert={(prompt) => {
+                  assessment.clear();
+                  setText((current) => (current.trim() ? `${current}\n\n${prompt}` : prompt));
+                  input.current?.focus();
+                }}
+              />
+              <DictationButton
+                disabled={busy}
+                onText={(value) => {
+                  assessment.clear();
+                  setText((current) => (current.trim() ? `${current}\n${value}` : value));
+                  input.current?.focus();
+                }}
+              />
+            </div>
+            <div className="live-start-buttons">
+              <ChatOptions
+                triggerVariant="button"
+                triggerLabel="Options"
+                onClose={() => input.current?.focus()}
+                items={[
+                  {
+                    id: 'speed',
+                    label: 'Codex speed',
+                    content: () => (
+                      <CodexSpeedSelect
+                        disabled={busy}
+                        value={codexSpeed}
+                        onChange={(value) => {
+                          assessment.clear();
+                          pending.current = null;
+                          setCodexSpeed(value);
+                        }}
+                      />
+                    ),
+                  },
+                  {
+                    id: 'limits',
+                    label: 'Session limits',
+                    content: () => (
+                      <SessionLimits
+                        embedded
+                        initial={limits}
+                        onSave={(next) => {
+                          assessment.clear();
+                          setLimits(next);
+                        }}
+                      />
+                    ),
+                  },
+                  {
+                    id: 'workflow',
+                    label: 'Start from a repeatable workflow',
+                    content: (close) => (
+                      <WorkflowStarter
+                        embedded
+                        projectPath={project.path}
+                        onDraft={(prompt) => {
+                          assessment.clear();
+                          setText((current) =>
+                            current.trim() ? `${current}\n\n${prompt}` : prompt,
+                          );
+                          close();
+                        }}
+                      />
+                    ),
+                  },
+                  {
+                    id: 'context',
+                    label: 'Saved project context',
+                    content: () => (
+                      <TaskKnowledge
+                        embedded
+                        projectId={project.id}
+                        projectPath={project.path}
+                        prompt={text}
+                        selection={context}
+                        onChange={(next) => {
+                          assessment.clear();
+                          setContext(next);
+                        }}
+                        allowWorkflows={false}
+                      />
+                    ),
+                  },
+                ]}
+              />
+              <Button
+                type="submit"
+                disabled={!text.trim() || busy || !isTauriEnvironment()}
+                loading={busy}
+                loadingLabel="Starting…"
+              >
+                Send
+              </Button>
+            </div>
           </div>
         </form>
       ) : (
