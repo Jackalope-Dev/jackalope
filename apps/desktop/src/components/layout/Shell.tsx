@@ -28,12 +28,11 @@ import { WorkspaceStatusBar } from './WorkspaceStatusBar';
 import './workspace-shell.css';
 import { useShallow } from 'zustand/react/shallow';
 import { CompanionSources } from '../mascot/CompanionSources';
-import { RemoveProjectAction } from '../projects/RemoveProjectAction';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
 import type { SettingsCategory } from '../settings/SettingsPage';
 import { UpdateNotice } from '../settings/UpdateNotice';
-import { CaptureTask } from '../tasks/CaptureTask';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
+
 import { UnsavedTasksNotice } from '../tasks/TaskSaveRecovery';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
@@ -105,6 +104,12 @@ const SettingsPage = lazy(() =>
 );
 const CommandPalette = lazy(() =>
   import('./CommandPalette').then((m) => ({ default: m.CommandPalette })),
+);
+const CaptureTask = lazy(() =>
+  import('../tasks/CaptureTask').then((m) => ({ default: m.CaptureTask })),
+);
+const RemoveProjectAction = lazy(() =>
+  import('../projects/RemoveProjectAction').then((m) => ({ default: m.RemoveProjectAction })),
 );
 
 export function Shell({
@@ -700,29 +705,34 @@ export function Shell({
         </main>
       </div>
       {capture && (
-        <CaptureTask
-          key={capture.ideaId ?? 'capture'}
-          {...capture}
-          onClose={() => setCapture(null)}
-          onStarted={() => {
-            setCapture(null);
-            setActiveTab('kanban');
-          }}
-        />
+        <Suspense fallback={null}>
+          <CaptureTask
+            key={capture.ideaId ?? 'capture'}
+            {...capture}
+            onClose={() => setCapture(null)}
+            onStarted={() => {
+              setCapture(null);
+              setActiveTab('kanban');
+            }}
+          />
+        </Suspense>
       )}
       <UpdateNotice />
       {removingProject && (
-        <RemoveProjectAction
-          project={removingProject}
-          open
-          onOpenChange={(open) => {
-            if (!open) {
-              setRemovingProject(null);
-              requestAnimationFrame(() => projectSwitcher.current?.focus());
-            }
-          }}
-        />
+        <Suspense fallback={null}>
+          <RemoveProjectAction
+            project={removingProject}
+            open
+            onOpenChange={(open) => {
+              if (!open) {
+                setRemovingProject(null);
+                requestAnimationFrame(() => projectSwitcher.current?.focus());
+              }
+            }}
+          />
+        </Suspense>
       )}
+
       <ScheduleNotice />
       <HistoryRecoveryNotice />
       <UnsavedTasksNotice />

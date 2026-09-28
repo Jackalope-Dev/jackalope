@@ -11,8 +11,18 @@ export default defineConfig(({ mode }) => ({
         companion: path.resolve(import.meta.dirname, 'companion.html'),
         ...(mode === 'lab' ? { design: path.resolve(import.meta.dirname, 'design-lab.html') } : {}),
       },
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('@xyflow') || id.includes('@dagrejs')) {
+              return 'vendor-xyflow';
+            }
+          }
+        },
+      },
     },
   },
+
   worker: { format: 'es' },
   plugins: [react(), tailwindcss()],
   resolve: {

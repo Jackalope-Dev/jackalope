@@ -77,8 +77,8 @@ release dates.
   Include direct Usage & quota navigation, filters, export and the quota-handoff setting.
 - [ ] Validate helper actions, notifications and external links in installed builds,
   including Ask context defaults, saved opt-outs and its settings navigation.
-- [ ] Exercise checkpoints, commit attribution, edited merge messages and cleanup
-  recovery with staged changes, locked folders and active tasks.
+- [ ] Validate checkpoints, commit attribution, edited merge messages and cleanup
+  recovery with staged changes, locked folders and active tasks in installed builds.
 - [ ] Verify rich results and diffs in installed WebViews. Preserve the Streamdown
   cache regression when upgrading dependencies.
 - [ ] Complete installed startup, CPU/memory and responsiveness measurements using
@@ -178,7 +178,7 @@ release dates.
   coordination with installed agents. Exercise ownership handoffs, rejected interfaces,
   scope review, automatic reconciliation/merge opt-ins and restart recovery in the installed app; measure duplicate work and
   conflict frequency before claiming an improvement.
-- [ ] Validate hourly schedules, timezones, missed runs and restart recovery.
+- [ ] Validate hourly schedules, timezones, missed runs and restart recovery in installed builds.
 - [ ] Complete packaged desktop-control checks, including multiple monitors,
   interruption, indicator failure and permission renewal.
 - [ ] Validate Gemini CLI task execution with installed profiles: login and account switching,
@@ -199,7 +199,7 @@ release dates.
   weakening process ownership, usage accounting or saved-session compatibility.
 - [ ] Add isolated Antigravity subscription accounts only when its CLI supports
   a verified credential-store override.
-- [ ] Extend reconnect/failover with explicit process ownership and recovery.
+- [ ] Validate reconnect and failover with explicit process ownership and recovery in installed profiles.
 
 ## Context, usage and integrations
 
