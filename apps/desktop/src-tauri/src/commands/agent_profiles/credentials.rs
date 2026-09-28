@@ -1,5 +1,6 @@
 use super::{AccountBinding, TaskRuntime};
 use serde::{Deserialize, Serialize};
+use std::{fs, path::Path};
 use tauri::State;
 
 #[derive(Serialize, Deserialize)]
@@ -11,7 +12,7 @@ pub(super) struct ApiKey {
 fn allowed(agent: &str, name: &str) -> bool {
     match agent {
         "antigravity" => name == "GEMINI_API_KEY",
-        "opencode" => provider(name).is_some(),
+        "opencode" => provider(name).is_some() || name == "JACKALOPE_ENDPOINT_KEY",
         _ => false,
     }
 }
@@ -64,6 +65,26 @@ pub(super) fn read(binding: &AccountBinding) -> Result<Option<ApiKey>, String> {
         crate::commands::account_storage::write(&path, &bytes)?;
     }
     Ok(Some(key))
+}
+
+pub(super) fn write_endpoint_key(directory: &Path, value: Option<&str>) -> Result<(), String> {
+    let path = directory.join("api-key.bin");
+    match value.map(str::trim).filter(|value| !value.is_empty()) {
+        None => {
+            if path.exists() {
+                fs::remove_file(&path).map_err(|error| error.to_string())?;
+            }
+            Ok(())
+        }
+        Some(value) => {
+            let bytes = serde_json::to_vec(&ApiKey {
+                name: "JACKALOPE_ENDPOINT_KEY".into(),
+                value: value.to_string(),
+            })
+            .map_err(|_| "Could not prepare the API key.".to_string())?;
+            crate::commands::account_storage::write(&path, &bytes)
+        }
+    }
 }
 
 #[tauri::command]

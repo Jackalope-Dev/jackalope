@@ -38,6 +38,7 @@ pub mod jev;
 pub mod local_ai;
 pub mod local_detection;
 pub mod managed_runtime;
+pub mod openai_endpoint;
 mod retrieval;
 
 pub mod history;

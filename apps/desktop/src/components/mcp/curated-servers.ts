@@ -127,6 +127,21 @@ const recommendations: Recommendation[] = [
     registryId: 'atlassian-mcp-server',
   },
   {
+    id: 'composio-mcp',
+    name: 'Composio',
+    publisher: 'Composio',
+    group: 'Plan & collaborate',
+    description:
+      'Connect 250+ tools and SaaS apps including Slack, Jira, GitHub, Gmail, and Salesforce.',
+    source: 'https://github.com/ComposioHQ/composio',
+    documentation: 'https://docs.composio.dev/framework/mcp',
+    command: 'npx',
+    args: ['-y', 'composio-core@0.5.39', 'mcp', '--isolated'],
+    authentication: 'token',
+    setup: 'Add your COMPOSIO_API_KEY to access your connected workspace apps and integrations.',
+    registryId: 'composio-mcp',
+  },
+  {
     id: 'figma-mcp-server',
     name: 'Figma',
     publisher: 'Figma',

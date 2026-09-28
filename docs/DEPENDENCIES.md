@@ -103,10 +103,10 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | @tailwindcss/oxide | 4.3.3 | MIT |
 | @tailwindcss/oxide-win32-x64-msvc | 4.3.3 | MIT |
 | @tailwindcss/vite | 4.3.3 | MIT |
-| @tauri-apps/api | 2.11.1 | Apache-2.0 OR MIT |
+| @tauri-apps/api | 2.11.1, 2.12.0 | Apache-2.0 OR MIT |
 | @tauri-apps/cli | 2.11.4 | Apache-2.0 OR MIT |
 | @tauri-apps/cli-win32-x64-msvc | 2.11.4 | Apache-2.0 OR MIT |
-| @tauri-apps/plugin-shell | 2.3.6 | MIT OR Apache-2.0 |
+| @tauri-apps/plugin-opener | 2.5.5 | MIT OR Apache-2.0 |
 | @types/chai | 5.2.3 | MIT |
 | @types/d3-color | 3.1.3 | MIT |
 | @types/d3-drag | 3.0.7 | MIT |
@@ -368,6 +368,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | arrayvec | 0.7.8 | MIT OR Apache-2.0 |
 | async-broadcast | 0.7.2 | MIT OR Apache-2.0 |
 | async-channel | 2.5.0 | Apache-2.0 OR MIT |
+| async-executor | 1.14.0 | Apache-2.0 OR MIT |
 | async-io | 2.6.0 | Apache-2.0 OR MIT |
 | async-lock | 3.4.2 | Apache-2.0 OR MIT |
 | async-process | 2.5.0 | Apache-2.0 OR MIT |
@@ -765,7 +766,6 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | option-ext | 0.2.0 | MPL-2.0 |
 | ordered-float | 4.6.0 | MIT |
 | ordered-stream | 0.2.0 | MIT OR Apache-2.0 |
-| os_pipe | 1.2.3 | MIT |
 | osakit | 0.3.1 | MIT OR Apache-2.0 |
 | oxc_resolver | 11.24.3 | MIT |
 | palette | 0.7.7 | MIT OR Apache-2.0 |
@@ -899,13 +899,10 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | sha1-checked | 0.10.0 | MIT OR Apache-2.0 |
 | sha2 | 0.10.9 | MIT OR Apache-2.0 |
 | sha2 | 0.11.0 | MIT OR Apache-2.0 |
-| shared_child | 1.1.2 | MIT |
 | shared_library | 0.1.9 | Apache-2.0/MIT |
 | shell-words | 1.1.1 | MIT/Apache-2.0 |
 | shlex | 2.0.1 | MIT OR Apache-2.0 |
-| sigchld | 0.2.5 | MIT |
 | signal-hook | 0.3.18 | Apache-2.0/MIT |
-| signal-hook | 0.4.4 | MIT OR Apache-2.0 |
 | signal-hook-mio | 0.2.5 | MIT OR Apache-2.0 |
 | signal-hook-registry | 1.4.8 | MIT OR Apache-2.0 |
 | simd_cesu8 | 1.2.0 | Apache-2.0 OR MIT |
@@ -950,7 +947,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | tauri-plugin-autostart | 2.5.1 | Apache-2.0 OR MIT |
 | tauri-plugin-dialog | 2.7.3 | Apache-2.0 OR MIT |
 | tauri-plugin-fs | 2.5.2 | Apache-2.0 OR MIT |
-| tauri-plugin-shell | 2.3.6 | Apache-2.0 OR MIT |
+| tauri-plugin-opener | 2.5.5 | Apache-2.0 OR MIT |
 | tauri-plugin-updater | 2.11.0 | Apache-2.0 OR MIT |
 | tauri-runtime | 2.11.3 | Apache-2.0 OR MIT |
 | tauri-runtime-wry | 2.11.4 | Apache-2.0 OR MIT |

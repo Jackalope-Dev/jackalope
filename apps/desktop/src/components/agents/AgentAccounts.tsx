@@ -13,6 +13,7 @@ import {
   setActiveAgentProfile,
   setAgentProfileGroup,
   setAgentProfileTag,
+  setConfigDir,
 } from '../../lib/agent-profiles';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import {
@@ -70,10 +71,12 @@ function AccountGroup({
 }
 function EditAccount({
   profile,
+  agentId,
   onSave,
   onClose,
 }: {
   profile: AgentProfile;
+  agentId: string;
   onSave: (name: string, group: AgentProfile['group'], tag: string | null) => Promise<void>;
   onClose: () => void;
 }) {
@@ -81,6 +84,7 @@ function EditAccount({
   const [name, setName] = useState(profile.name);
   const [group, setGroup] = useState(profile.group);
   const [tag, setTag] = useState(profile.tag ?? '');
+  const [configDirValue, setConfigDirValue] = useState(profile.configDir ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   return (
@@ -103,6 +107,10 @@ function EditAccount({
             setError('');
             try {
               await onSave(name.trim(), group, tag.trim() || null);
+              const dir = configDirValue.trim() || null;
+              if (dir !== (profile.configDir ?? null)) {
+                await setConfigDir(agentId, profile.id, dir);
+              }
               onClose();
             } catch (e) {
               setError(String(e));
@@ -133,6 +141,24 @@ function EditAccount({
             <span aria-hidden="true">Account group</span>
             <AccountGroup value={group} onChange={setGroup} label="Account group" disabled={busy} />
           </div>
+          <details className="mt-2">
+            <summary className="task-muted text-sm cursor-pointer select-none">
+              Advanced · Custom config directory
+            </summary>
+            <FormField label="Config directory override">
+              <Input
+                value={configDirValue}
+                onChange={(e) => setConfigDirValue(e.target.value)}
+                disabled={busy}
+                placeholder="Leave empty for default"
+                maxLength={512}
+              />
+            </FormField>
+            <p className="task-muted text-xs mt-1">
+              Override the directory where this agent stores its configuration and credentials. Uses
+              the agent's default path when empty.
+            </p>
+          </details>
           {error && <InlineNotice tone="error">{error}</InlineNotice>}
           <DialogFooter>
             <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
@@ -545,6 +571,7 @@ export function AgentAccounts({
       {editing && (
         <EditAccount
           profile={editing}
+          agentId={agentId}
           onClose={() => setEditing(undefined)}
           onSave={async (name, group, tag) => {
             await renameAgentProfile(agentId, profileId(editing.id), name);

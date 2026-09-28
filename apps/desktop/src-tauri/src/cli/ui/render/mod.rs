@@ -24,7 +24,7 @@ pub const TIPS: &[&str] = &[
     "Type `/` to search all commands with arrow navigation and tab completion.",
     "Run `/diff` to inspect changed files and review patches in the desktop app.",
     "Use `/agent` to choose which AI coding agent handles your next conversation.",
-    "Switch between active conversations in this repository with `/sessions`.",
+    "Switch between active conversations in this directory with `/sessions`.",
     "Start a fresh conversation anytime with `/new`.",
     "Press `Shift+Enter`, `Alt+Enter` or `Ctrl+J` to insert a newline without submitting.",
     "Use `/stop` to halt running agent execution immediately.",

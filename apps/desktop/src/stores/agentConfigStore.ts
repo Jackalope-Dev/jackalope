@@ -9,7 +9,7 @@ export interface CustomAgentConfig {
   id: string;
   name: string;
   command: string;
-  adapter?: BuiltinAgentId;
+  adapter?: BuiltinAgentId | 'acp';
   args?: string[];
   models: {
     id: string;

@@ -24,6 +24,7 @@ import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
 import { CodexSpeedSelect } from './CodexSpeedSelect';
+import { DictationButton } from './DictationButton';
 import { OutcomeEditor } from './OutcomeEditor';
 import { TaskContextPanel } from './TaskContextPanel';
 import './task-composer.css';
@@ -187,6 +188,12 @@ export function TaskComposer({
               else onSave();
             }
           }}
+        />
+        <DictationButton
+          disabled={submitting}
+          onText={(value) =>
+            onChange({ prompt: current.prompt.trim() ? `${current.prompt}\n${value}` : value })
+          }
         />
         <p className="composer-launch-summary task-muted">
           {compact && `${projectName || 'Choose a project in Customize'} · `}

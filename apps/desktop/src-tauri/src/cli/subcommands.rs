@@ -8,8 +8,8 @@ use crate::protocol::{
 };
 use serde_json::json;
 
-/// The repository this command was run in. A terminal tool should work where
-/// the user already is rather than asking them to pick from a list.
+/// The project for this directory. A terminal tool should work where the user
+/// already is rather than asking them to pick from a list.
 pub fn here(connection: &mut Connection) -> Result<Project, String> {
     let directory = std::env::current_dir().map_err(|error| error.to_string())?;
     connection.project(&directory.to_string_lossy())

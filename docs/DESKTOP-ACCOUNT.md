@@ -99,6 +99,13 @@ the app is open; their timestamp does not establish human activity or task execu
 Settings checks record successful server reads/writes, not confirmation that the
 renderer applied a setting. Projects and task history remain local.
 
+Apply `0017_device_machine.sql` before expecting one computer to share a device
+slot. Desktop connections send an opaque machine key: a hash of the platform
+machine identifier, scoped to Jackalope. The raw identifier stays on the machine.
+The ten-device limit counts distinct keys, so extra profiles, reinstalls and data
+resets on one computer share a slot. Older clients omit the key, and each of those
+connections still counts as its own machine.
+
 Apply `0015_desktop_metadata.sql` before deploying the matching Worker and website.
 Older records show unreported metadata until a compatible desktop checks in. The
 native response advertises `deviceMetadata`; older services remain supported.

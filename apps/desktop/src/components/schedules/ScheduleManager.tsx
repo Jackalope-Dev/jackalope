@@ -37,6 +37,7 @@ import { ScheduleTiming } from './ScheduleTiming';
 interface SavedSchedule {
   localChecks?: number;
   quietChecks?: number;
+  webhook?: { createdAt: string } | null;
   definition: Definition;
   nextAt: string;
   history: {
@@ -77,6 +78,13 @@ export function ScheduleManager(props: {
   const [template, setTemplate] = useState<ScheduleTemplate | null>(null);
   const [templateContext, setTemplateContext] = useState('');
   const [changePreview, setChangePreview] = useState<{ title: string; text: string } | null>(null);
+  const [webhook, setWebhook] = useState<{
+    id: string;
+    name: string;
+    active: boolean;
+    url?: string;
+    token?: string;
+  } | null>(null);
   const focus = useDialogFocus();
   const newSchedule = useRef<HTMLButtonElement>(null);
   const imported = useRef(false);
@@ -275,118 +283,134 @@ export function ScheduleManager(props: {
       )}
       {desktop && !ledger && !error && <LoadingState label={'Loading schedules…'} />}
       <div className="schedule-list">
-        {visible.map(({ definition: d, nextAt, history, localChecks, quietChecks }) => (
-          <article className="schedule-row" key={d.id}>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-base font-medium">{d.name}</h2>
-              <p className="task-muted">
-                {d.request.projectName} ·{' '}
-                {d.monitor?.action === 'notify' ? 'Local monitor' : d.request.agent} · {d.timezone}
-              </p>
-              <p className="task-muted">
-                {d.enabled ? `Next: ${new Date(nextAt).toLocaleString()}` : 'Paused'} ·{' '}
-                {d.expression}
-              </p>
-              {d.monitor && (
-                <div className="task-muted mt-2">
-                  <p>
-                    Watching {d.monitor.path || 'all tracked files'} on {d.request.targetBranch}.{' '}
-                    {d.monitor.action === 'notify'
-                      ? 'Notify on change; no agent used.'
-                      : 'Run agent only when committed content changes.'}
-                  </p>
-                  <p>
-                    {localChecks ?? 0} local checks · {quietChecks ?? 0} quiet checks
-                  </p>
-                </div>
-              )}
-              <Disclosure className="mt-3">
-                <DisclosureSummary className="min-h-11 py-3">
-                  Instructions and run history ({history.length})
-                </DisclosureSummary>
-                <p className="whitespace-pre-wrap my-3">{d.request.prompt}</p>
-                {[...history].reverse().map((event) => {
-                  const run = runs.find((r) => r.id === event.runId);
-                  return (
-                    <div key={event.dueAt} className="flex flex-wrap items-center gap-3 py-2">
-                      <span>
-                        {new Date(event.dueAt).toLocaleString()} · {run?.status ?? event.outcome}
-                      </span>
-                      {event.change && (
-                        <Button
-                          variant="ghost"
-                          disabled={busy}
-                          onClick={() =>
-                            void act(async () => {
-                              const text = await nativeTask<string>('schedule_inspect_change', {
-                                id: d.id,
-                                dueAt: event.dueAt,
-                              });
-                              setChangePreview({
-                                title: `${d.name} · ${new Date(event.dueAt).toLocaleString()}`,
-                                text,
-                              });
-                            })
-                          }
-                        >
-                          Inspect change
-                        </Button>
-                      )}
-                      {run && (
-                        <Button
-                          variant="ghost"
-                          onClick={() => {
-                            selectProject(run.projectId);
-                            props.onPlanning();
-                            useExecutionStore.getState().select(run.id);
-                          }}
-                        >
-                          View run
-                        </Button>
-                      )}
-                      {run && ['starting', 'running'].includes(run.status) && (
-                        <Button
-                          variant="ghost"
-                          disabled={busy}
-                          onClick={() => void act(() => nativeTask('task_stop', { id: run.id }))}
-                        >
-                          Stop run
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
-                {!history.length && <p className="task-muted">No occurrences yet.</p>}
-              </Disclosure>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" disabled={busy} onClick={() => open(d)}>
-                Edit
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={busy}
-                onClick={() =>
-                  void act(() =>
-                    nativeTask('schedule_set_enabled', { id: d.id, enabled: !d.enabled }),
-                  )
-                }
-              >
-                {d.enabled ? 'Pause' : 'Enable'}
-              </Button>
-              <ConfirmAction
-                title="Delete schedule?"
-                description="Future occurrences stop. Existing tasks and worktrees are kept."
-                onConfirm={() => act(() => nativeTask('schedule_remove', { id: d.id }))}
-                trigger={
-                  <Button variant="ghost" disabled={busy}>
-                    Delete
-                  </Button>
-                }
-              />
-            </div>
-          </article>
-        ))}
+        {visible.map(
+          ({ definition: d, nextAt, history, localChecks, quietChecks, webhook: hook }) => (
+            <article className="schedule-row" key={d.id}>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-base font-medium">{d.name}</h2>
+                <p className="task-muted">
+                  {d.request.projectName} ·{' '}
+                  {d.monitor?.action === 'notify' ? 'Local monitor' : d.request.agent} ·{' '}
+                  {d.timezone}
+                </p>
+                <p className="task-muted">
+                  {d.enabled ? `Next: ${new Date(nextAt).toLocaleString()}` : 'Paused'} ·{' '}
+                  {d.expression}
+                </p>
+                {d.monitor && (
+                  <div className="task-muted mt-2">
+                    <p>
+                      Watching {d.monitor.path || 'all tracked files'} on {d.request.targetBranch}.{' '}
+                      {d.monitor.action === 'notify'
+                        ? 'Notify on change; no agent used.'
+                        : 'Run agent only when committed content changes.'}
+                    </p>
+                    <p>
+                      {localChecks ?? 0} local checks · {quietChecks ?? 0} quiet checks
+                    </p>
+                  </div>
+                )}
+                <Disclosure className="mt-3">
+                  <DisclosureSummary className="min-h-11 py-3">
+                    Instructions and run history ({history.length})
+                  </DisclosureSummary>
+                  <p className="whitespace-pre-wrap my-3">{d.request.prompt}</p>
+                  {[...history].reverse().map((event) => {
+                    const run = runs.find((r) => r.id === event.runId);
+                    return (
+                      <div key={event.dueAt} className="flex flex-wrap items-center gap-3 py-2">
+                        <span>
+                          {new Date(event.dueAt).toLocaleString()} · {run?.status ?? event.outcome}
+                        </span>
+                        {event.change && (
+                          <Button
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() =>
+                              void act(async () => {
+                                const text = await nativeTask<string>('schedule_inspect_change', {
+                                  id: d.id,
+                                  dueAt: event.dueAt,
+                                });
+                                setChangePreview({
+                                  title: `${d.name} · ${new Date(event.dueAt).toLocaleString()}`,
+                                  text,
+                                });
+                              })
+                            }
+                          >
+                            Inspect change
+                          </Button>
+                        )}
+                        {run && (
+                          <Button
+                            variant="ghost"
+                            onClick={() => {
+                              selectProject(run.projectId);
+                              props.onPlanning();
+                              useExecutionStore.getState().select(run.id);
+                            }}
+                          >
+                            View run
+                          </Button>
+                        )}
+                        {run && ['starting', 'running'].includes(run.status) && (
+                          <Button
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => void act(() => nativeTask('task_stop', { id: run.id }))}
+                          >
+                            Stop run
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {!history.length && <p className="task-muted">No occurrences yet.</p>}
+                </Disclosure>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" disabled={busy} onClick={() => open(d)}>
+                  Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={busy || !desktop}
+                  onClick={() =>
+                    setWebhook({
+                      id: d.id,
+                      name: d.name,
+                      active: Boolean(hook),
+                    })
+                  }
+                >
+                  Webhook
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() =>
+                    void act(() =>
+                      nativeTask('schedule_set_enabled', { id: d.id, enabled: !d.enabled }),
+                    )
+                  }
+                >
+                  {d.enabled ? 'Pause' : 'Enable'}
+                </Button>
+                <ConfirmAction
+                  title="Delete schedule?"
+                  description="Future occurrences stop. Existing tasks and worktrees are kept."
+                  onConfirm={() => act(() => nativeTask('schedule_remove', { id: d.id }))}
+                  trigger={
+                    <Button variant="ghost" disabled={busy}>
+                      Delete
+                    </Button>
+                  }
+                />
+              </div>
+            </article>
+          ),
+        )}
       </div>
       {visible.length > 0 && (
         <p className="task-muted mt-5">
@@ -454,6 +478,84 @@ export function ScheduleManager(props: {
             rows={14}
             value={changePreview?.text || 'No text diff available.'}
           />
+        </DialogContent>
+      </Dialog.Root>
+      <Dialog.Root
+        open={!!webhook}
+        onOpenChange={(open) => {
+          if (!open) setWebhook(null);
+        }}
+      >
+        <DialogContent {...focus}>
+          <DialogCloseButton label="Close webhook" />
+          <DialogHeader
+            title={webhook ? `Webhook for ${webhook.name}` : 'Webhook'}
+            description="This app receives the request on this computer. The token is shown once. A call while the previous run is still active is skipped and is not queued."
+          />
+          {webhook?.token && webhook.url ? (
+            <div className="workspace-stack">
+              <FormField label="Address">
+                <Input readOnly value={webhook.url} />
+              </FormField>
+              <FormField label="Token">
+                <Input readOnly value={webhook.token} />
+              </FormField>
+              <p className="task-muted">
+                Send POST with header Authorization: Bearer and this token. It will not be shown
+                again.
+              </p>
+            </div>
+          ) : (
+            <p className="task-muted">
+              {webhook?.active
+                ? 'A webhook is already active. Replacing it creates a new token and the previous one stops working.'
+                : 'Create a link that runs this schedule when something on this computer calls it.'}
+            </p>
+          )}
+          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <div className="flex flex-wrap gap-2">
+            {webhook?.token ? (
+              <Button onClick={() => setWebhook(null)}>Done</Button>
+            ) : (
+              <Button
+                disabled={busy || !webhook}
+                onClick={() =>
+                  void act(async () => {
+                    if (!webhook) return;
+                    const revealed = await nativeTask<{ url: string; token: string }>(
+                      'schedule_webhook_enable',
+                      { id: webhook.id },
+                    );
+                    setWebhook({
+                      ...webhook,
+                      active: true,
+                      url: revealed.url,
+                      token: revealed.token,
+                    });
+                    setLedger(await nativeTask<Ledger>('schedule_list'));
+                  })
+                }
+              >
+                {webhook?.active ? 'Replace token' : 'Create link'}
+              </Button>
+            )}
+            {webhook?.active && !webhook?.token && (
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() =>
+                  void act(async () => {
+                    if (!webhook) return;
+                    await nativeTask('schedule_webhook_disable', { id: webhook.id });
+                    setWebhook(null);
+                    setLedger(await nativeTask<Ledger>('schedule_list'));
+                  })
+                }
+              >
+                Remove webhook
+              </Button>
+            )}
+          </div>
         </DialogContent>
       </Dialog.Root>
       <Dialog.Root

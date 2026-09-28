@@ -45,7 +45,9 @@ release dates.
   Include parent-task links, unified Needs you counts, shared file browsing, preview
   setup explanations and evidence attachment, and blocked-result review. Include optional
   file markers, outcome approval, and real agent-review requests from the review toolbar.
-- [ ] Accept the `jackalope` command in installed macOS, Windows and Linux packages:
+- [ ] Accept the `jackalope` command in installed macOS, Windows and Linux packages,
+  including a folder that is not a Git repository (direct edits, no patch or merge)
+  and `--init` (initial commit, starter ignore, refusal of a home directory or drive root):
   PATH linking and the macOS system link, NSIS PATH hooks, the Store execution alias,
   AppImage relaunch, updates and uninstall. Exercise cold start, second-launch window
   promotion, several terminals, app-to-terminal hand-off on each platform's terminals,
@@ -201,6 +203,9 @@ release dates.
 
 ## Context, usage and integrations
 
+- [ ] Validate an added ACP CLI, a loopback OpenAI-compatible model server, and a schedule
+  webhook in installed profiles: sign-in stays with the CLI, the model list comes from the
+  server, the webhook token is not stored in clear text, and an overlapping call is skipped.
 - [ ] Validate curated MCP presets with installed agents and intended service accounts,
   including account-specific OAuth, revocation, local browser prerequisites and restart.
   Keep publisher endpoints and pinned local packages current; fixtures do not verify
@@ -209,8 +214,9 @@ release dates.
 - [ ] Verify automatic lessons across tasks, queues, schedules and restart,
   including evidence, edits, removal and frozen task context. Measure outcomes.
 - [ ] Extend codebase semantic coverage, project knowledge and scheduled continuation.
-- [ ] Add dated, project-attributed helper accounting and verify usage/outcome
-  drilldowns against installed history, including archived and unavailable records.
+- [ ] Verify Usage & quota drilldowns against installed history, including dated
+  project-attributed Ask Jackalope turns, archived helper conversations and
+  unreadable helper files.
 - [ ] Improve provider reporting, model inventory, capacity and monetary budgets.
   Keep reported, estimated, stale and unavailable data distinct.
 - [ ] Evaluate protocol and credential-store migrations against real providers

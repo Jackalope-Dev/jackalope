@@ -87,6 +87,10 @@ fn history_restart_preserves_conversation_and_expires_unapplied_actions() {
     }
     let text = std::fs::read_to_string(&helper.path).unwrap();
     assert!(!text.contains("secret-connection-token"));
+    let saved: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert!(saved["turns"][0].get("createdAt").is_none());
+    assert!(saved["turns"][0].get("projectId").is_none());
+    assert!(saved["turns"][0].get("accountKey").is_none());
     let root = helper
         .path
         .parent()
@@ -97,9 +101,73 @@ fn history_restart_preserves_conversation_and_expires_unapplied_actions() {
     let loaded = Helper::new(root, helper.runtime.clone());
     let view = loaded.snapshot();
     assert_eq!(view.turns[0].status, "interrupted");
+    assert!(view.turns[0].created_at.is_none());
+    assert!(view.turns[0].project_id.is_none());
+    assert!(view.turns[0].account_key.is_none());
     assert_eq!(view.actions[0].status, "expired");
     assert!(!view.connected);
     assert!(helper.runtime.integration_runs().unwrap().is_empty());
+}
+
+#[test]
+fn fresh_context_attributes_the_open_project_and_stale_context_does_not() {
+    let context = json!({
+        "activeProjectId": "project-a",
+        "projects": [{ "id": "project-a", "name": "Alpha" }]
+    });
+    assert_eq!(
+        recorded_project(&context, Some(Instant::now() - Duration::from_secs(16))),
+        (None, None)
+    );
+    assert_eq!(
+        recorded_project(&json!({}), Some(Instant::now())),
+        (None, None)
+    );
+    assert_eq!(
+        recorded_project(&context, Some(Instant::now())),
+        (Some("project-a".into()), Some("Alpha".into()))
+    );
+}
+
+#[test]
+fn usage_report_attributes_turns_and_reports_unreadable_archives() {
+    let helper = helper();
+    {
+        let mut inner = helper.inner.lock().unwrap();
+        inner.view.turns.push(Turn {
+            id: "current".into(),
+            prompt: "secret prompt".into(),
+            answer: "secret answer".into(),
+            status: "complete".into(),
+            agent: "codex".into(),
+            account: "Work".into(),
+            account_key: Some("codex:work".into()),
+            created_at: Some(1_700_000_000_000),
+            project_id: Some("project-a".into()),
+            project_name: Some("Alpha".into()),
+            ..Default::default()
+        });
+    }
+    let directory = helper.path.parent().unwrap();
+    std::fs::write(
+        directory.join("helper-old.json"),
+        r#"{"turns":[{"id":"old","prompt":"archived secret","answer":"","status":"complete","agent":"claude","account":"Personal","model":null,"usage":{"input":2,"output":1,"cacheRead":0,"cacheWrite":0,"reported":true,"estimatedCostUsd":null},"steps":[],"createdAt":1700000000001,"projectId":"project-b","projectName":"Beta"}],"actions":[]}"#,
+    )
+    .unwrap();
+    std::fs::write(directory.join("helper-broken.json"), b"{").unwrap();
+    let report = helper.usage_report();
+    let encoded = serde_json::to_string(&report).unwrap();
+    assert!(!encoded.contains("secret"));
+    assert!(report
+        .unavailable
+        .iter()
+        .any(|name| name == "helper-broken.json"));
+    assert_eq!(report.turns.len(), 2);
+    assert_eq!(report.turns[0].project_id.as_deref(), Some("project-a"));
+    assert!(!report.turns[0].archived);
+    assert!(report.turns[1].archived);
+    assert_eq!(report.turns[1].project_name.as_deref(), Some("Beta"));
+    assert_eq!(report.turns[1].created_at, Some(1_700_000_000_001));
 }
 
 #[tokio::test]

@@ -5,9 +5,34 @@ use std::process::{Command, Stdio};
 /// More files than this and the list stops growing; matching stays instant.
 const MOST: usize = 50_000;
 
-/// Tracked and untracked files that Git does not ignore, relative to
-/// `directory`, with `/` separators on every platform.
+/// Files in `directory` that a mention can name, with `/` separators.
+/// A Git repository uses its own ignore rules. Any other directory is walked,
+/// skipping dependency and build folders.
 pub fn list(directory: &str) -> Vec<String> {
+    if let Some(files) = git_files(directory) {
+        return files;
+    }
+    walk(directory)
+}
+
+/// Directories `@` completion skips. They are large, generated, or not the
+/// project the user is naming.
+const SKIPPED: &[&str] = &[
+    ".git",
+    "node_modules",
+    "target",
+    "dist",
+    ".next",
+    ".worktrees",
+    "vendor",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "coverage",
+    ".turbo",
+];
+
+fn git_files(directory: &str) -> Option<Vec<String>> {
     let output = Command::new("git")
         .args([
             "-C",
@@ -21,9 +46,7 @@ pub fn list(directory: &str) -> Vec<String> {
         .stdin(Stdio::null())
         .stderr(Stdio::null())
         .output();
-    let Some(output) = output.ok().filter(|output| output.status.success()) else {
-        return Vec::new();
-    };
+    let output = output.ok().filter(|output| output.status.success())?;
     let mut files: Vec<String> = output
         .stdout
         .split(|byte| *byte == 0)
@@ -31,6 +54,59 @@ pub fn list(directory: &str) -> Vec<String> {
         .take(MOST)
         .map(|path| String::from_utf8_lossy(path).into_owned())
         .collect();
+    files.sort();
+    files.dedup();
+    Some(files)
+}
+
+/// Files under `directory` when it is not a Git repository. Symlinks are not
+/// followed, and the list stops at [`MOST`] entries or eight levels down.
+fn walk(directory: &str) -> Vec<String> {
+    let root = std::path::PathBuf::from(directory);
+    let mut files = Vec::new();
+    let mut pending = vec![root.clone()];
+    while let Some(dir) = pending.pop() {
+        if files.len() >= MOST {
+            break;
+        }
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            if files.len() >= MOST {
+                break;
+            }
+            let path = entry.path();
+            if path.is_symlink() {
+                continue;
+            }
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if SKIPPED.contains(&name.as_ref()) {
+                continue;
+            }
+            let Ok(kind) = entry.file_type() else {
+                continue;
+            };
+            if kind.is_dir() {
+                let depth = path
+                    .strip_prefix(&root)
+                    .map(|relative| relative.components().count())
+                    .unwrap_or(0);
+                if depth < 8 {
+                    pending.push(path);
+                }
+            } else if kind.is_file() {
+                let Ok(relative) = path.strip_prefix(&root) else {
+                    continue;
+                };
+                let text = relative.to_string_lossy().replace('\\', "/");
+                if !text.is_empty() {
+                    files.push(text);
+                }
+            }
+        }
+    }
     files.sort();
     files.dedup();
     files
@@ -118,6 +194,24 @@ mod tests {
         assert_eq!(matches(&files, "guide", 1), ["docs/UI-GUIDELINES.md"]);
         assert!(score("src/cli/ui.rs", "zz").is_none());
         assert_eq!(matches(&files, "", 10).len(), 4);
+    }
+
+    #[test]
+    fn a_plain_folder_lists_its_files_and_skips_dependency_trees() {
+        let root = std::env::temp_dir().join(format!("jackalope-mentions-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::create_dir_all(root.join("node_modules").join("pkg")).unwrap();
+        std::fs::write(root.join("src").join("main.rs"), "fn main() {}\n").unwrap();
+        std::fs::write(root.join("notes.txt"), "hello").unwrap();
+        std::fs::write(root.join("node_modules").join("pkg").join("index.js"), "").unwrap();
+        let files = list(&root.to_string_lossy());
+        assert!(files.iter().any(|path| path == "notes.txt"));
+        assert!(files
+            .iter()
+            .any(|path| path.replace('\\', "/") == "src/main.rs"));
+        assert!(files.iter().all(|path| !path.contains("node_modules")));
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

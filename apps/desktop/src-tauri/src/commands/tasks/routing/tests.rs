@@ -221,6 +221,7 @@ fn main() {
                 name: id.into(),
                 command: executable.to_string_lossy().into_owned(),
                 adapter: Some(adapter.into()),
+                args: Vec::new(),
             });
     }
     let policy_path = runtime.policy_path();

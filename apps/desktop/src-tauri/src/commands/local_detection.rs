@@ -240,6 +240,7 @@ pub fn agent_import_detected_key(
         name,
         Some("personal".to_string()),
         None,
+        None,
     )?;
 
     let _ = agent_profiles::agent_profile_set_tag(

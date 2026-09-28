@@ -221,11 +221,12 @@ async fn dispatch(request: Request, app: &AppHandle) -> Response {
     }
 }
 
-/// Resolves the repository containing `path` and the project it belongs to,
-/// registering the repository when the workspace has not seen it before.
+/// Resolves the directory containing `path` and the project it belongs to,
+/// registering it when the workspace has not seen it before. A Git repository
+/// uses its root. Any other directory is the project itself; creating a
+/// repository stays in the terminal command, and only after the user asks.
 fn ensure_project(app: &AppHandle, path: &str) -> Result<protocol::Project, String> {
-    let root = super::tasks::git(path, &["rev-parse", "--show-toplevel"])
-        .map_err(|_| format!("{path} is not inside a Git repository."))?;
+    let root = super::tasks::project_directory(path)?;
     let runtime = app.state::<TaskRuntime>();
     let record = super::project_registry::ensure(&runtime, &root)?;
     Ok(protocol::Project {
