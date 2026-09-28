@@ -21,13 +21,13 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | @biomejs/biome | 2.5.14 | MIT OR Apache-2.0 |
 | @biomejs/cli-win32-x64 | 2.5.14 | MIT OR Apache-2.0 |
 | @cloudflare/kv-asset-handler | 0.5.0 | MIT OR Apache-2.0 |
-| @cloudflare/unenv-preset | 2.16.1 | MIT OR Apache-2.0 |
-| @cloudflare/vitest-plugin | 1.1.7 | MIT |
-| @cloudflare/workerd-windows-64 | 1.20260910.1 | Apache-2.0 |
+| @cloudflare/unenv-preset | 2.16.2 | MIT OR Apache-2.0 |
+| @cloudflare/vitest-plugin | 1.2.5 | MIT |
+| @cloudflare/workerd-windows-64 | 1.20260921.1 | Apache-2.0 |
 | @cspotcode/source-map-support | 0.8.1 | MIT |
 | @dagrejs/dagre | 3.1.1 | MIT |
 | @dagrejs/graphlib | 4.0.5 | MIT |
-| @esbuild/win32-x64 | 0.28.1 | MIT |
+| @esbuild/win32-x64 | 0.28.1, 0.28.2 | MIT |
 | @floating-ui/core | 1.8.0 | MIT |
 | @floating-ui/dom | 1.8.0 | MIT |
 | @floating-ui/react-dom | 2.1.9 | MIT |
@@ -140,7 +140,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | @xterm/xterm | 6.0.0 | MIT |
 | @xyflow/react | 12.11.6 | MIT |
 | @xyflow/system | 0.0.82 | MIT |
-| agent-browser | 0.37.1 | Apache-2.0 |
+| agent-browser | 0.38.1 | Apache-2.0 |
 | aria-hidden | 1.2.6 | MIT |
 | assertion-error | 2.0.1 | MIT |
 | bail | 2.0.2 | MIT |
@@ -178,7 +178,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | entities | 6.0.1 | BSD-2-Clause |
 | error-stack-parser-es | 1.0.5 | MIT |
 | es-module-lexer | 2.3.2 | MIT |
-| esbuild | 0.28.1 | MIT |
+| esbuild | 0.28.1, 0.28.2 | MIT |
 | escape-string-regexp | 5.0.0 | MIT |
 | estree-util-is-identifier-name | 3.0.0 | MIT |
 | estree-walker | 3.0.3 | MIT |
@@ -261,7 +261,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | micromark-util-subtokenize | 2.1.0 | MIT |
 | micromark-util-symbol | 2.0.1 | MIT |
 | micromark-util-types | 2.0.2 | MIT |
-| miniflare | 5.20260910.0-alpha | MIT |
+| miniflare | 5.20260921.1-alpha | MIT |
 | motion | 13.4.0 | MIT |
 | motion-dom | 13.3.0 | MIT |
 | motion-utils | 13.3.0 | MIT |
@@ -341,12 +341,12 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | vitest | 4.1.11 | MIT |
 | web-namespaces | 2.0.1 | MIT |
 | why-is-node-running | 2.3.0 | MIT |
-| workerd | 1.20260910.1 | Apache-2.0 |
-| wrangler | 4.131.0 | MIT OR Apache-2.0 |
+| workerd | 1.20260921.1 | Apache-2.0 |
+| wrangler | 4.138.0 | MIT OR Apache-2.0 |
 | ws | 8.21.0 | MIT |
 | youch | 4.1.0-beta.10 | MIT |
 | youch-core | 0.3.3 | MIT |
-| zod | 4.4.3, 4.5.4 | MIT |
+| zod | 4.4.3, 4.6.5 | MIT |
 | zustand | 4.5.7, 5.0.15 | MIT |
 | zwitch | 2.0.4 | MIT |
 
@@ -418,7 +418,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | cargo-platform | 0.1.9 | MIT OR Apache-2.0 |
 | castaway | 0.2.4 | MIT |
 | cbc | 0.1.2 | MIT OR Apache-2.0 |
-| cc | 1.4.5 | MIT OR Apache-2.0 |
+| cc | 1.5.1 | MIT OR Apache-2.0 |
 | cesu8 | 1.1.0 | Apache-2.0/MIT |
 | cfb | 0.7.3 | MIT |
 | cfg_aliases | 0.1.1 | MIT |
@@ -519,7 +519,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | field-offset | 0.3.6 | MIT OR Apache-2.0 |
 | filedescriptor | 0.8.3 | MIT |
 | filetime | 0.2.29 | MIT/Apache-2.0 |
-| find-msvc-tools | 0.1.12 | MIT OR Apache-2.0 |
+| find-msvc-tools | 0.1.14 | MIT OR Apache-2.0 |
 | finl_unicode | 1.5.0 | (MIT OR Apache-2.0) AND Unicode-DFS-2016 |
 | fixedbitset | 0.4.2 | MIT/Apache-2.0 |
 | fixedbitset | 0.5.7 | MIT OR Apache-2.0 |
@@ -815,7 +815,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | proc-macro-error | 1.0.4 | MIT OR Apache-2.0 |
 | proc-macro-error-attr | 1.0.4 | MIT OR Apache-2.0 |
 | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 |
-| process-wrap | 9.1.0 | Apache-2.0 OR MIT |
+| process-wrap | 10.0.1 | Apache-2.0 OR MIT |
 | prodash | 31.0.0 | MIT |
 | pxfm | 0.1.30 | BSD-3-Clause OR Apache-2.0 |
 | quick-xml | 0.41.0 | MIT |
@@ -849,8 +849,8 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | reqwest | 0.13.5 | MIT OR Apache-2.0 |
 | rfd | 0.16.0 | MIT |
 | ring | 0.17.14 | Apache-2.0 AND ISC |
-| rmcp | 3.2.0 | Apache-2.0 |
-| rmcp-macros | 3.2.0 | Apache-2.0 |
+| rmcp | 3.4.1 | Apache-2.0 |
+| rmcp-macros | 3.5.0 | Apache-2.0 |
 | rustc_version | 0.4.1 | MIT OR Apache-2.0 |
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT |
 | rustix | 1.1.4 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
@@ -939,7 +939,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | tao-macros | 0.1.4 | MIT OR Apache-2.0 |
 | tar | 0.4.46 | MIT OR Apache-2.0 |
 | target-lexicon | 0.12.16 | Apache-2.0 WITH LLVM-exception |
-| tauri | 2.11.5 | Apache-2.0 OR MIT |
+| tauri | 2.11.6 | Apache-2.0 OR MIT |
 | tauri-build | 2.6.3 | Apache-2.0 OR MIT |
 | tauri-codegen | 2.6.3 | Apache-2.0 OR MIT |
 | tauri-macros | 2.6.3 | Apache-2.0 OR MIT |
