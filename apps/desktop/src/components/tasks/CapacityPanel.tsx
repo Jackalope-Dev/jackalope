@@ -163,7 +163,7 @@ export function CapacityPanel() {
                   <div className="capacity-card-identity">
                     <h3>{name}</h3>
                     <p className="task-muted text-xs" title={record.account}>
-                      {record.account}
+                      {shortAccount(record.account)}
                     </p>
                   </div>
                   {stale && <Badge variant="warning">Stale</Badge>}
@@ -237,4 +237,10 @@ export function CapacityPanel() {
       )}
     </section>
   );
+}
+
+/** Shortens opaque account identifiers; the full value stays in the tooltip. */
+function shortAccount(account: string) {
+  const match = /^(.*?)\s*([0-9a-f]{8}-[0-9a-f-]{20,})$/i.exec(account);
+  return match ? `${match[1] || 'Account'} …${match[2].slice(-6)}` : account;
 }

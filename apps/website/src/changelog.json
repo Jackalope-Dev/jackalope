@@ -1,5 +1,18 @@
 [
   {
+    "id": "compare-agents-and-attach-files-to-requests",
+    "date": "2026-09-29",
+    "status": "In development",
+    "title": "Compare agents and attach files to requests",
+    "description": "Send one request to several agents at once, keep the best result, and give agents screenshots and files without copying paths.",
+    "items": [
+      "Choose Automatic, one agent, or up to four agents to compare from the agent button beside Send",
+      "Compared tasks link to each other and show status, time, checks, changed lines and tokens side by side. Keeping one archives the other finished attempts",
+      "Paste an image, drop files or pick files to attach them. Pasted images stay in the project's ignored .jackalope folder",
+      "Command search finds project files to open in your editor or attach to new work"
+    ]
+  },
+  {
     "id": "ask-jackalope-usage-date-and-project",
     "date": "2026-09-28",
     "status": "In development",

@@ -309,9 +309,12 @@
   flex: 1 1 240px;
   margin-bottom: 0;
 }
+/* Context and tools sit in the title row; the branch is already in the top bar. */
 .task-detail-navigation > .work-toolbar {
-  order: 1;
-  flex: 1 0 100%;
+  flex: 0 1 auto;
+}
+.task-detail-navigation > .work-toolbar .work-branch {
+  display: none;
 }
 .task-detail-navigation .workspace-heading h1 {
   font-size: var(--text-xl);
@@ -319,4 +322,24 @@
 }
 .task-detail-navigation .workspace-heading p {
   margin-top: 4px;
+}
+.task-followup-form > .inline-notice {
+  grid-column: 1 / -1;
+}
+.task-followup-form[data-dragging] {
+  border-radius: 12px;
+  outline: 2px dashed var(--color-accent);
+  outline-offset: 4px;
+}
+/* One rhythm for the task page: sections are separated by the gap, not their own margins. */
+.workspace-page-layout.task-detail {
+  gap: 16px;
+}
+.task-detail > :is(.task-detail-navigation, .task-failure),
+.task-status-stack > :is(.task-comparison, .task-progress),
+.task-detail > .task-next {
+  margin-block: 0;
+}
+.task-detail > :empty {
+  display: none;
 }

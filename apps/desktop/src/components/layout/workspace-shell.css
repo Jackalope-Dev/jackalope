@@ -296,3 +296,12 @@
   font-family: var(--font-mono);
   font-size: 0.9em;
 }
+.work-sidebar-item > span:not(.agent-stack, .work-signals) {
+  flex: 1;
+}
+.work-sidebar-item[data-unread] strong {
+  font-weight: 700;
+}
+.work-sidebar-item .work-signals {
+  align-self: center;
+}

@@ -257,8 +257,8 @@ export function ScheduleManager(props: {
   return (
     <WorkspacePage className="">
       <WorkspaceHeading
-        title="Recurring tasks"
-        description="Runs while Jackalope is open, including in the tray."
+        title="Automations"
+        description="Recurring tasks run on a schedule while Jackalope is open, including in the tray."
         action={
           <Button
             ref={newSchedule}

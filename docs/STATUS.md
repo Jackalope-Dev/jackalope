@@ -94,7 +94,16 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Work combines a new-conversation composer and the project-scoped work list,
   with remembered filters, compact capture and keyboard row navigation. Work rows show
   each agent's character, live or next-action status and who is working now. Task and
-  project command search covers both.
+  project command search covers both, and also finds Git-listed project files to open in
+  the preferred editor or attach to new work.
+  The composer shows its agent choice beside Send: Automatic, one agent, or up to four
+  agents that each receive the prompt as a separate isolated task. Compared tasks link to
+  each other and show status, time, check, changed lines and reported tokens side by side;
+  keeping one archives the other finished attempts. Composers accept pasted images, dropped
+  files and picked files as editable path lines. Pasted images are saved under the
+  project's Git-excluded `.jackalope/attachments`; project files are referenced relative
+  to the project so isolated worktrees read their own copy. Empty projects offer editable
+  starter requests.
   Active task, plan and chat views show recent tool activity, workspace file labels and
   native check output from existing events, without extra model calls.
   Project opens an overview with unfinished work, setup and recorded local deliveries.

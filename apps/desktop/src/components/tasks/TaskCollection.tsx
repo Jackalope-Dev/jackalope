@@ -30,12 +30,14 @@ import {
 } from '../../lib/task-collection';
 import type { Runner } from '../../lib/task-runtime';
 import { useProjectStore } from '../../stores/projectStore';
+import { type ChangeStats, useChangeStats } from '../../stores/workSignalsStore';
 import { AgentStack } from '../agents/AgentAvatar';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { RunStatus } from './RunStatus';
+import { isUnread, useOpenSignalKey, useWorkSignals, WorkSignals } from './WorkSignals';
 import './task-collection.css';
 
 export interface TaskCollectionView {
@@ -134,6 +136,10 @@ export function TaskCollection({
       setFocusReturn((value) => value + 1);
     }
   };
+  const signals = useWorkSignals();
+  const openKey = useOpenSignalKey();
+  // Bounded so a long history does not trigger many Git reads at once.
+  const stats = useChangeStats(archived ? [] : filtered.slice(0, 60).map((item) => item.run));
   const card = (item: WorkItem) => (
     <div key={item.id} className="work-item-row">
       {selecting && (
@@ -150,7 +156,15 @@ export function TaskCollection({
           />
         </label>
       )}
-      <WorkCard item={item} runners={runners} projects={projects} onOpen={onOpen} disabled={busy} />
+      <WorkCard
+        item={item}
+        runners={runners}
+        projects={projects}
+        onOpen={onOpen}
+        disabled={busy}
+        unread={isUnread(item, signals, openKey)}
+        stats={item.run ? stats[item.run.id]?.value : undefined}
+      />
       {onArchive && !selecting && (
         <Button
           variant="ghost"
@@ -457,7 +471,11 @@ const WorkCard = memo(
     projects,
     onOpen,
     disabled,
+    unread,
+    stats,
   }: {
+    unread: boolean;
+    stats?: ChangeStats;
     item: WorkItem;
     runners: Runner[];
     projects: ReturnType<typeof useProjectStore.getState>['projects'];
@@ -485,6 +503,7 @@ const WorkCard = memo(
         type="button"
         disabled={disabled}
         className="work-item"
+        data-unread={unread || undefined}
         onClick={() => onOpen(item)}
       >
         {presence.agents.length ? (
@@ -517,6 +536,7 @@ const WorkCard = memo(
                 </time>
               </>
             )}
+            <WorkSignals item={item} unread={unread} stats={stats} />
           </span>
         </span>
         {item.session || item.managed ? (
@@ -563,6 +583,8 @@ const WorkCard = memo(
   (before, after) =>
     before.onOpen === after.onOpen &&
     before.disabled === after.disabled &&
+    before.unread === after.unread &&
+    before.stats === after.stats &&
     before.runners === after.runners &&
     before.projects === after.projects &&
     before.item.id === after.item.id &&

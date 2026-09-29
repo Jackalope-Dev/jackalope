@@ -320,7 +320,6 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
         }
       />
       <div className="workspace-sections">
-        <WorkflowPerformance />
         <CapacityPanel />
         <section className="workspace-section workspace-stack" aria-label="Task usage">
           <WorkspaceSectionHeading
@@ -733,6 +732,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
           </section>
         )}
         {project === 'all' && agent === 'all' && account === 'all' && <JevConnectionUsage />}
+        <WorkflowPerformance />
       </div>
     </WorkspacePage>
   );

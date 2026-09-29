@@ -5,6 +5,7 @@ import {
   Check,
   Copy,
   GitMerge,
+  MailPlus,
   MoreHorizontal,
   Play,
   Square,
@@ -31,6 +32,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useWorkbenchStore } from '../../stores/workbenchStore';
+import { useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { Button } from '../ui/button';
@@ -43,6 +45,7 @@ import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview, type ReviewSection } from './ResultReview';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import { TaskActivity } from './TaskActivity';
+import { TaskComparison } from './TaskComparison';
 import { TaskDelivery } from './TaskDelivery';
 import { TaskFailure } from './TaskFailure';
 import { TaskFollowUpPanel } from './TaskFollowUpPanel';
@@ -493,6 +496,15 @@ export function TaskDetail({
                 >
                   Task details
                 </Menu.Item>
+                <Menu.Item
+                  className="workspace-menu-item"
+                  onSelect={() => {
+                    useWorkSignalsStore.getState().markUnread(run.taskId);
+                    onBack();
+                  }}
+                >
+                  <MailPlus size={16} /> Mark unread
+                </Menu.Item>
                 {finished && (
                   <Menu.Item
                     className="workspace-menu-item"
@@ -509,47 +521,50 @@ export function TaskDetail({
           </Menu.Root>
         </div>
       </div>
-      <TaskProgress
-        run={run}
-        integrated={integrated}
-        pending={pending.length}
-        verifyCommand={currentProject?.preferences?.verifyCommand}
-        onActivity={() => setTab('activity')}
-        action={
-          active ? (
-            <div className="task-detail-utilities">
-              {!!pending.length && (
-                <Button onClick={() => inspect('question')}>Answer question</Button>
-              )}
-              <Button
-                variant="outline"
-                disabled={acting || run.status === 'stopping'}
-                onClick={() => void act('task_stop')}
-              >
-                <Square size={14} />
-                Stop
-              </Button>
-            </div>
-          ) : isLatest ? (
-            <div className="task-detail-utilities">
-              {run.workspace && run.status !== 'interrupted' && !integrated && (
-                <Button variant="outline" onClick={() => setTab('preview')}>
-                  <Play size={16} />
-                  Try result
+      <div className="task-status-stack">
+        <TaskComparison run={run} />
+        <TaskProgress
+          run={run}
+          integrated={integrated}
+          pending={pending.length}
+          verifyCommand={currentProject?.preferences?.verifyCommand}
+          onActivity={() => setTab('activity')}
+          action={
+            active ? (
+              <div className="task-detail-utilities">
+                {!!pending.length && (
+                  <Button onClick={() => inspect('question')}>Answer question</Button>
+                )}
+                <Button
+                  variant="outline"
+                  disabled={acting || run.status === 'stopping'}
+                  onClick={() => void act('task_stop')}
+                >
+                  <Square size={14} />
+                  Stop
                 </Button>
-              )}
-              <Button
-                disabled={acting || submitting}
-                loading={acting}
-                loadingLabel="Working…"
-                onClick={() => void primaryAction()}
-              >
-                {decision.action}
-              </Button>
-            </div>
-          ) : undefined
-        }
-      />
+              </div>
+            ) : isLatest ? (
+              <div className="task-detail-utilities">
+                {run.workspace && run.status !== 'interrupted' && !integrated && (
+                  <Button variant="outline" onClick={() => setTab('preview')}>
+                    <Play size={16} />
+                    Try result
+                  </Button>
+                )}
+                <Button
+                  disabled={acting || submitting}
+                  loading={acting}
+                  loadingLabel="Working…"
+                  onClick={() => void primaryAction()}
+                >
+                  {decision.action}
+                </Button>
+              </div>
+            ) : undefined
+          }
+        />
+      </div>
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {notice && (
         <p role="status" className="task-muted">

@@ -7,6 +7,7 @@ import { builtinAgents, getAgentMetadata } from '../../lib/agent-catalog';
 import { missingProjectDefaults, type ProjectDefaults } from '../../lib/context/project-defaults';
 import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
 import { routingSettings } from '../../lib/routing-settings';
+import { STARTER_PROMPTS } from '../../lib/starter-prompts';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
@@ -676,6 +677,24 @@ export function OnboardingFlow({
                   onboarding.setFirstTask(event.target.value);
                 }}
               />
+              {!draft.trim() && (
+                <fieldset className="starter-chips" aria-label="Task ideas">
+                  {STARTER_PROMPTS.map((starter) => (
+                    <button
+                      key={starter.label}
+                      type="button"
+                      className="starter-chip"
+                      disabled={busy}
+                      onClick={() => {
+                        onboarding.setFirstTask(starter.prompt);
+                        document.getElementById('onboarding-prompt')?.focus();
+                      }}
+                    >
+                      {starter.label}
+                    </button>
+                  ))}
+                </fieldset>
+              )}
               <div className="onboarding-actions">
                 <Button
                   variant="ghost"

@@ -505,3 +505,67 @@ pre,
 img[src="/mascot.svg"] {
   filter: brightness(var(--brand-brightness));
 }
+.command-file-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.command-file-row > .workspace-menu-item {
+  flex: 1;
+  min-width: 0;
+}
+.command-file-attach {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+}
+/* Editable prompt suggestions shown while a draft is empty. */
+.starter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+.starter-chip {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  transition:
+    border-color 150ms,
+    color 150ms;
+}
+.starter-chip:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+}
+.starter-chip:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+/* Sized for pointer use but kept visually light against the bubble. */
+.mascot-bubble-close {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: -4px 0 -4px;
+  border-radius: 8px;
+  color: inherit;
+  opacity: 0.7;
+}
+.mascot-bubble-close:hover {
+  opacity: 1;
+}
+.mascot-bubble-close:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  opacity: 1;
+}

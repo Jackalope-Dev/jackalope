@@ -1,10 +1,16 @@
 import { Textarea } from '@jackalope/ui';
 import { ArrowRight } from 'lucide-react';
+import { useRef } from 'react';
+import { usePromptAttachments } from '../../hooks/usePromptAttachments';
+import { appendAttachments } from '../../lib/prompt-attachments';
 import type { TaskFollowUp } from '../../lib/task-followups';
 import type { TaskRun } from '../../lib/task-runtime';
 import { PROMPT_MAX_CHARS } from '../../lib/task-runtime';
+import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
+import { DismissButton } from '../ui/DismissButton';
 import { InlineNotice } from '../ui/InlineNotice';
+import { AttachButton } from './AttachButton';
 
 /** The task's single follow-up composer with its queued follow-ups. */
 export function TaskFollowUpPanel({
@@ -42,6 +48,16 @@ export function TaskFollowUpPanel({
   onUpdate: (id: string, action: 'resume' | 'cancel') => void;
   onRecover: () => void;
 }) {
+  const form = useRef<HTMLFormElement>(null);
+  const agentName = useExecutionStore(
+    (state) => state.runners.find((runner) => runner.id === run.agent)?.name ?? run.agent,
+  );
+  const attachments = usePromptAttachments({
+    projectPath: run.projectPath,
+    target: form,
+    disabled: !canContinue,
+    onAttach: (references) => onReply(appendAttachments(reply, references)),
+  });
   return (
     <div className="task-next">
       <h2 className="task-followup-heading">{integrated ? 'Start a follow-up' : 'Follow-up'}</h2>
@@ -83,7 +99,9 @@ export function TaskFollowUpPanel({
       )}
       {canContinue ? (
         <form
+          ref={form}
           className="task-followup-form"
+          data-dragging={attachments.dragging || undefined}
           onSubmit={(event) => {
             event.preventDefault();
             onSend();
@@ -96,6 +114,7 @@ export function TaskFollowUpPanel({
             rows={2}
             value={reply}
             onChange={(event) => onReply(event.target.value)}
+            onPaste={attachments.onPaste}
             placeholder="Tell Jackalope what to do next…"
             maxLength={PROMPT_MAX_CHARS}
             onKeyDown={(event) => {
@@ -109,7 +128,22 @@ export function TaskFollowUpPanel({
               }
             }}
           />
+          {attachments.error && (
+            <InlineNotice
+              tone="error"
+              action={<DismissButton onDismiss={attachments.clearError} />}
+            >
+              {attachments.error}
+            </InlineNotice>
+          )}
           <div className="task-followup-footer">
+            {attachments.available && (
+              <AttachButton
+                onPick={() => void attachments.pick()}
+                busy={attachments.busy}
+                disabled={submitting || acting}
+              />
+            )}
             <p className="task-muted">
               {followups.length && previewRunning
                 ? 'Queued follow-ups wait until the managed preview stops.'
@@ -117,7 +151,7 @@ export function TaskFollowUpPanel({
                   ? 'Stops the managed preview, saves its logs, then continues in this workspace.'
                   : active
                     ? 'Queue for the next attempt, or stop current work and send now.'
-                    : `Continues with ${run.agent} in the same workspace and account.`}
+                    : `Continues with ${agentName} in the same workspace and account.`}
             </p>
             {active && (
               <Button

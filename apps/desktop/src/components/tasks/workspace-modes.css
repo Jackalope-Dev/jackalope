@@ -22,9 +22,21 @@
   border-color: transparent;
   box-shadow: none;
 }
-.workspace-shell[data-mode="focus"] :is(.task-home, .task-detail, .managed-task-page) {
+.workspace-shell[data-mode="focus"] .task-home {
   max-width: 960px;
   margin-inline: auto;
+}
+/* Results and reviews need room for diffs; the composer stays at reading width. */
+.workspace-shell[data-mode="focus"] :is(.task-detail, .managed-task-page) {
+  max-width: 1200px;
+  margin-inline: auto;
+}
+.workspace-shell[data-mode="focus"] .work-tabs {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 32px;
+  border-bottom: 0;
 }
 .task-home[data-mode="focus"]:not([data-browsing]) {
   padding-top: clamp(24px, 6vh, 72px);
@@ -125,45 +137,27 @@
   min-height: 44px;
   margin-top: 8px;
 }
+/* Quick links to project tools: one compact row, since the Project tabs hold the full views. */
 .build-tool-shelf {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-content: start;
-  grid-auto-rows: min-content;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 24px;
 }
 .build-tool-shelf > button {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
-  padding: 14px;
-  min-width: 0;
+  min-height: 44px;
+  padding: 0 14px;
   border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
-  text-align: left;
   background: var(--color-surface);
+  font-size: var(--text-sm);
 }
 .build-tool-shelf svg {
   flex-shrink: 0;
   color: var(--color-text-secondary);
-}
-.build-tool-shelf span {
-  flex: 1;
-  min-width: 0;
-}
-.build-tool-shelf strong,
-.build-tool-shelf small {
-  display: block;
-}
-.build-tool-shelf strong {
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-.build-tool-shelf small {
-  margin-top: 3px;
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
 }
 .oversee-counts {
   display: grid;

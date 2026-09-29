@@ -337,13 +337,9 @@ export function TaskWorkspace({
               : `Build in ${project?.name ?? 'your workspace'}`
         }
         description={
-          preset === 'focus' ? (
-            'One conversation or task at a time. Everything else is within reach.'
-          ) : preset === 'oversee' ? (
-            'See what is moving, answer questions and keep reviews moving.'
-          ) : hasWork ? (
-            'Keep your conversation beside changes, previews and terminals.'
-          ) : (
+          preset === 'focus' ? undefined : preset === 'oversee' ? (
+            'Answer questions, unblock work and review results.'
+          ) : hasWork ? undefined : (
             <span>
               Describe what to build, fix, or explore, or{' '}
               <button
@@ -430,6 +426,18 @@ export function TaskWorkspace({
           </div>
         }
       />
+      {composerVisible &&
+        ((!hasWork && preset !== 'oversee') ||
+          composerExpanded ||
+          (preset === 'focus' && !browsing)) && (
+          <SessionStart
+            embedded
+            key={project?.id ?? 'none'}
+            project={project}
+            starters={!hasWork}
+            onOpenProject={() => useOnboardingStore.getState().begin()}
+          />
+        )}
       {preset !== 'focus' && !archived && (
         <WorkspaceModeHome
           key={preset}
@@ -441,17 +449,6 @@ export function TaskWorkspace({
           onPlan={() => setParallel(true)}
         />
       )}
-      {composerVisible &&
-        ((!hasWork && preset !== 'oversee') ||
-          composerExpanded ||
-          (preset === 'focus' && !browsing)) && (
-          <SessionStart
-            embedded
-            key={project?.id ?? 'none'}
-            project={project}
-            onOpenProject={() => useOnboardingStore.getState().begin()}
-          />
-        )}
       {preset === 'focus' && !browsing && (
         <WorkspaceModeHome
           key={preset}
@@ -513,11 +510,11 @@ export function TaskWorkspace({
                 description={
                   archived
                     ? 'Tasks you archive will appear here.'
-                    : 'Describe a change above, or browse repository TODOs to find tasks.'
+                    : 'Start new work, or browse repository TODOs to find tasks.'
                 }
                 action={
                   <div className="flex items-center gap-2">
-                    {projectFilter !== 'all' && (
+                    {projectFilter !== 'all' && projects.length > 1 && (
                       <Button variant="outline" onClick={() => setScope('all')}>
                         Show all projects
                       </Button>

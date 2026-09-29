@@ -38,6 +38,12 @@ release dates.
   disconnect/retry without duplicate sends and host restart. Cover protected storage and
   Tailscale Serve coexistence on each platform; validate access boundaries independently.
 
+- [ ] Run agent comparisons with installed providers: partial start failures, mixed
+  finish times, stopped attempts, keep-one archiving and restore, and later follow-ups on
+  the kept task. Check that each provider reads attached image and file paths, including
+  absolute paths outside isolated worktrees, and that native file drops, pastes and the
+  file picker work on macOS and Linux. Measure command-search file listing on large
+  repositories and editor protocol handling for opened files.
 - [ ] Validate the unified work list, project scope, command search, persistent follow-up,
   preview readiness/cancellation/evidence capture and PR/CI reads in installed WebViews.
   Test first-result, visual correction, failed-check recovery, project return and delivery

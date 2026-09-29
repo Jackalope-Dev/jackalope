@@ -69,11 +69,12 @@
   font-weight: 500;
 }
 .onboarding-content {
+  --onboarding-padding: 32px;
   min-width: 0;
   max-height: 100%;
   overflow: auto;
   scrollbar-gutter: stable;
-  padding: 32px;
+  padding: var(--onboarding-padding);
   border-radius: 24px;
   background: linear-gradient(160deg, var(--color-surface-elevated), var(--color-surface));
   box-shadow: 0 16px 60px color-mix(in srgb, var(--color-accent) 7%, transparent);
@@ -145,19 +146,20 @@
   margin-top: 20px;
 }
 .onboarding-actions {
+  /* Pinned flush to the card's bottom edge so scrolled content never shows
+     beneath or through the actions. */
   position: sticky;
-  bottom: -12px;
+  bottom: calc(-1 * var(--onboarding-padding));
   z-index: 1;
-  padding-block: 12px;
-  /* Blurs content that scrolls behind the actions without painting a
-     visible box over the card's gradient. */
-  backdrop-filter: blur(10px);
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 28px;
-  margin-left: auto;
   flex-wrap: wrap;
+  margin: 28px calc(-1 * var(--onboarding-padding)) calc(-1 * var(--onboarding-padding));
+  padding: 16px var(--onboarding-padding);
+  border-top: 1px solid var(--color-border-subtle);
+  border-radius: 0 0 24px 24px;
+  background: var(--color-surface);
 }
 .onboarding-theme-editor {
   width: 100%;
@@ -363,7 +365,7 @@
     gap: 32px;
   }
   .onboarding-content {
-    padding: 24px;
+    --onboarding-padding: 24px;
   }
   .onboarding-steps {
     margin-top: 24px;
@@ -552,7 +554,7 @@
 }
 @media (max-height: 740px) {
   .onboarding-content {
-    padding: 20px;
+    --onboarding-padding: 20px;
   }
   .onboarding-step-meta {
     margin-bottom: 8px;
@@ -575,7 +577,6 @@
   }
   .onboarding-actions {
     margin-top: 16px;
-    padding-block: 8px;
-    bottom: -8px;
+    padding-block: 12px;
   }
 }

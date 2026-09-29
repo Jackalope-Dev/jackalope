@@ -25,6 +25,9 @@ representative benefit and installed-platform acceptance remain open.
   ignored-file setup and bounded worktree size inspection support isolated work.
 - Per-project Focus, Build and Oversee modes provide a quiet conversation canvas,
   a workspace with tools beside work, or a full-width activity and attention board.
+  One prompt can go to several agents in separate isolated tasks for side-by-side
+  comparison. Composers accept pasted images and dropped or picked files, and command
+  search opens or attaches project files.
   Task terminals, detachable task views and reversible chat topics prepare source-linked drafts. Local timing exports
   and incremental session updates support performance investigation; installed acceptance
   and representative comparisons remain in progress.

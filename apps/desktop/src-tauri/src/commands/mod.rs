@@ -1,4 +1,6 @@
+pub mod attachments;
 pub mod capacity;
+pub mod change_stats;
 pub mod cli_host;
 pub mod cli_install;
 pub mod cli_terminal;
@@ -16,6 +18,7 @@ pub mod live_sessions;
 pub mod mcp;
 pub mod mcp_broker;
 pub mod platform;
+pub mod project_files;
 pub mod project_registry;
 pub mod pty;
 pub mod repo_todos;

@@ -365,7 +365,7 @@
 }
 .live-start-composer {
   position: relative;
-  padding: 16px 18px 14px;
+  padding: 14px 14px 12px 16px;
   border: 1px solid var(--color-border-subtle);
   border-radius: 16px;
   background: var(--color-surface-elevated);
@@ -383,10 +383,12 @@
   outline-offset: 0;
 }
 .live-start-composer textarea {
+  /* Starts at two lines and grows with the draft. */
+  field-sizing: content;
   width: 100%;
-  min-height: 110px;
-  max-height: 240px;
-  resize: vertical;
+  min-height: 56px;
+  max-height: min(320px, 40vh);
+  resize: none;
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -407,9 +409,7 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--color-border-subtle);
+  margin-top: 8px;
 }
 .live-start-tools {
   display: flex;
@@ -643,4 +643,67 @@
 /* The overlay title bar draws the traffic lights over the top-left corner. */
 .live-session-detached .live-header-native-mac {
   padding-top: 34px;
+}
+.composer-agent-trigger > span:not(.agent-avatar, .agent-stack) {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer-agent-menu {
+  min-width: 18rem;
+  max-width: min(22rem, calc(100vw - 24px));
+}
+.composer-agent-copy {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.composer-agent-copy strong {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.composer-agent-copy small {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer-agent-box {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+.composer-agent-box[data-checked] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.composer-agent-menu [data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.composer-agent-hint {
+  max-width: 20rem;
+  padding: 4px 12px 8px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.composer-agent-menu .workspace-menu-item {
+  min-height: 44px;
+  padding-block: 8px;
+}
+.live-start-composer[data-dragging] {
+  border-color: var(--color-accent);
+  outline: 2px dashed var(--color-accent);
+  outline-offset: 4px;
+}
+.live-composer[data-dragging] {
+  outline: 2px dashed var(--color-accent);
+  outline-offset: 4px;
 }

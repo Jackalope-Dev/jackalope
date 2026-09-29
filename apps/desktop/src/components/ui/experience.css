@@ -264,7 +264,7 @@ button:disabled {
   min-height: 44px;
 }
 .workspace-chrome {
-  height: 72px;
+  height: 60px;
 }
 .project-switcher,
 .command-trigger {
@@ -295,6 +295,14 @@ button:disabled {
     var(--color-header-search, var(--color-surface-sunken)) 75%,
     transparent
   );
+}
+.command-trigger.command-new {
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+.command-trigger.command-new:hover {
+  background: var(--color-surface-hover);
 }
 .quiet-icon,
 .appearance-trigger {
@@ -649,4 +657,13 @@ button:disabled {
   color: var(--color-accent-ink);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+/* Inside notices a disclosure is inline detail, so its chevron follows the label. */
+.inline-notice .ui-disclosure-summary {
+  width: fit-content;
+  gap: 6px;
+}
+.inline-notice .ui-disclosure-indicator {
+  margin-left: 0;
 }
