@@ -1,6 +1,6 @@
 {
   "name": "jackalope-monorepo",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "description": "Jackalope - Ultra-performant desktop shell and harness for agentic workflows",
   "scripts": {

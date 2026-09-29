@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Jackalope social preview</title>
+    <!-- Values follow themeTokens() for the website theme: Electric Indigo, light, atmosphere 18. -->
+    <style>
+      @font-face {
+        font-family: 'Plus Jakarta Sans Variable';
+        font-weight: 200 800;
+        src: url('../../../node_modules/.pnpm/@fontsource-variable+plus-jakarta-sans@5.3.0/node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2')
+          format('woff2');
+      }
+      @font-face {
+        font-family: 'JetBrains Mono Variable';
+        font-weight: 100 800;
+        src: url('../../../node_modules/.pnpm/@fontsource-variable+jetbrains-mono@5.3.0/node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2')
+          format('woff2');
+      }
+      :root {
+        --color-accent: hsl(245 88% 64%);
+        --color-accent-ink: hsl(245 72% 52%);
+        --color-bg: hsl(245 8.1% 99%);
+        --color-shell: hsl(245 11.7% 94%);
+        --color-border-subtle: hsl(245 8.1% 90%);
+        --color-text-primary: hsl(245 4% 14%);
+        --color-text-secondary: hsl(245 4% 32%);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+      }
+      body {
+        position: relative;
+        font-family: 'Plus Jakarta Sans Variable', sans-serif;
+        color: var(--color-text-primary);
+        background:
+          radial-gradient(640px 420px at 88% 18%, hsl(245 88% 64% / 0.16), transparent 70%),
+          radial-gradient(520px 360px at 0% 100%, hsl(245 88% 64% / 0.08), transparent 70%),
+          linear-gradient(145deg, var(--color-bg), var(--color-shell));
+      }
+      .copy {
+        position: absolute;
+        left: 72px;
+        top: 64px;
+        bottom: 64px;
+        width: 560px;
+        display: flex;
+        flex-direction: column;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-size: 30px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .brand svg {
+        width: 46px;
+        height: 51px;
+        fill: var(--color-text-primary);
+      }
+      h1 {
+        margin-top: auto;
+        font-size: 70px;
+        line-height: 1.04;
+        font-weight: 750;
+        letter-spacing: -0.035em;
+      }
+      h1 span {
+        display: block;
+        color: var(--color-accent-ink);
+      }
+      p {
+        margin-top: 22px;
+        font-size: 23px;
+        line-height: 1.42;
+        color: var(--color-text-secondary);
+      }
+      .url {
+        margin-top: auto;
+        font-family: 'JetBrains Mono Variable', monospace;
+        font-size: 22px;
+        font-weight: 500;
+        color: var(--color-text-secondary);
+      }
+      .shot {
+        position: absolute;
+        left: 664px;
+        top: 72px;
+        width: 1080px;
+        border-radius: 18px;
+        overflow: hidden;
+        border: 1px solid var(--color-border-subtle);
+        box-shadow:
+          0 40px 90px -24px hsl(245 60% 30% / 0.32),
+          0 4px 14px hsl(0 0% 0% / 0.06);
+      }
+      .shot img {
+        display: block;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="copy">
+      <div class="brand">
+        <svg viewBox="38 4 105 117" aria-hidden="true">
+          <path d="M85 65 C77 48 74 16 84 9 C94 3 97 20 95 34 L93 62 Z" />
+          <path d="M80 68 C64 58 43 23 51 17 C60 9 79 32 88 61 Z" />
+          <path
+            d="M99 64 C100 49 111 40 115 28 C117 23 115 17 117 14 C121 10 124 16 123 23 C128 22 131 17 134 19 C139 24 128 32 121 32 C119 39 115 44 113 48 C122 47 127 43 130 45 C135 50 122 57 108 57 L107 67 Z"
+          />
+          <path
+            d="M78 59 C86 53 100 53 109 60 C116 65 116 73 124 76 L132 80 C139 85 132 96 122 98 L109 100 C102 103 100 110 102 116 C84 116 73 108 69 99 C80 98 80 89 76 81 C72 73 71 65 78 59 Z"
+          />
+        </svg>
+        Jackalope
+      </div>
+      <h1>Many agents.<span>One workspace.</span></h1>
+      <p>Codex, Claude Code, Grok and OpenCode in parallel worktrees, with review before merge.</p>
+      <div class="url">jackalope.dev</div>
+    </div>
+    <div class="shot"><img src="../public/media/tasks-light.png" alt="" /></div>
+  </body>
+</html>

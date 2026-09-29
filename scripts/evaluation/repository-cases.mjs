@@ -10,7 +10,7 @@ const charMap = {
   '\u2029': '\\u2029',
 };
 
-function sanitizeForCode(value) {
+export function sanitizeForCode(value) {
   return JSON.stringify(value).replace(/[<>\u2028\u2029]/g, (char) => charMap[char] || char);
 }
 

@@ -154,7 +154,18 @@ def trial(helper):
             snapshot = operation('snapshot')
             assert any(node.get('value') == text for node in snapshot['controls']), snapshot
             operation('press', bounds=snapshot['bounds'], key='Control+a')
-            operation('type', bounds=operation('snapshot')['bounds'], text='replacement')
+
+            def settled_snapshot():
+                # GTK briefly withdraws the window from AT-SPI while it announces the selection.
+                try:
+                    return operation('snapshot')
+                except AssertionError as error:
+                    if 'does not expose an accessible window' in str(error):
+                        return None
+                    raise
+
+            snapshot = wait(settled_snapshot, 'accessible window after selecting all text')
+            operation('type', bounds=snapshot['bounds'], text='replacement')
             wait(lambda: (directory / 'text').read_text() == 'replacement', 'replace selected text')
             snapshot = operation('snapshot')
             button = next(node for node in snapshot['controls'] if node.get('name') == 'Fixture click')
