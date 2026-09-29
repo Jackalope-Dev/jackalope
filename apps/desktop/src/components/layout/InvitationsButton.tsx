@@ -37,9 +37,15 @@ export function InvitationsButton({
   if (!visible) return null;
   if (compact)
     return (
-      <button type="button" onClick={onClick} title="Share trial passes">
+      <button
+        type="button"
+        onClick={onClick}
+        title="Share trial passes"
+        aria-label="Trial passes"
+        className="statusbar-invitations"
+      >
         <Ticket size={15} aria-hidden="true" />
-        Trial passes
+        <span className="statusbar-label">Trial passes</span>
         {referrals ? ` ${referrals.remaining}/${referrals.limit}` : ''}
       </button>
     );

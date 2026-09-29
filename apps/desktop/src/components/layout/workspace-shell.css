@@ -95,7 +95,8 @@
 }
 .workspace-statusbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
   align-items: center;
   gap: 4px;
   border-top: 1px solid var(--color-border-subtle);
@@ -305,4 +306,20 @@
 }
 .work-sidebar-item .work-signals {
   align-self: center;
+}
+/* Narrow windows keep one status row: secondary entries drop their labels. */
+@media (max-width: 1100px) {
+  .workspace-statusbar .statusbar-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+@media (max-width: 820px) {
+  .workspace-statusbar .statusbar-invitations {
+    display: none;
+  }
 }

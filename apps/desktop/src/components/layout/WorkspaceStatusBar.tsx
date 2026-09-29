@@ -66,7 +66,7 @@ export function WorkspaceStatusBar({
           aria-describedby={terminalError ? 'statusbar-terminal-error' : undefined}
         >
           <SquareTerminal size={15} aria-hidden="true" />
-          Terminal
+          <span className="statusbar-label">Terminal</span>
         </button>
       )}
       {terminalError && (

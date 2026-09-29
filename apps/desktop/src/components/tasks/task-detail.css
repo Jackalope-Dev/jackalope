@@ -313,13 +313,6 @@
   flex: 1 1 240px;
   margin-bottom: 0;
 }
-/* Context and tools sit in the title row; the branch is already in the top bar. */
-.task-detail-navigation > .work-toolbar {
-  flex: 0 1 auto;
-}
-.task-detail-navigation > .work-toolbar .work-branch {
-  display: none;
-}
 .task-detail-navigation .workspace-heading h1 {
   font-size: var(--text-xl);
   line-height: 1.3;
@@ -355,4 +348,23 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+.task-heading-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+/* Task context and workspace tools sit with the section tabs; the branch is in the top bar. */
+.task-view-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.task-view-tools > .work-toolbar {
+  margin: 0;
+}
+.task-view-tools .work-branch {
+  display: none;
 }
