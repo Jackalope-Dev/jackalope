@@ -8,7 +8,7 @@ use super::{
 use serde::Serialize;
 use serde_json::Value;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::Write,
     path::{Path, PathBuf},
     process::Stdio,
@@ -511,9 +511,22 @@ pub async fn git_commit_changes(
         };
         let message = policy.message(&text, &agents);
 
-        let mut add = vec!["add", "-A", "--"];
-        add.extend(&pathspecs);
-        git(&root, &add, Policy::Isolated)?;
+        // A deletion or rename source already staged exists in neither the index nor
+        // the worktree, and `git add` rejects it; `commit --only` still records it.
+        let mut listed = vec!["ls-files", "-z", "--"];
+        listed.extend(&pathspecs);
+        let indexed = git(&root, &listed, Policy::Isolated)?;
+        let indexed: HashSet<&str> = indexed.split('\0').collect();
+        let additions: Vec<&str> = pathspecs
+            .iter()
+            .copied()
+            .filter(|path| indexed.contains(path) || root.join(path).symlink_metadata().is_ok())
+            .collect();
+        if !additions.is_empty() {
+            let mut add = vec!["add", "-A", "--"];
+            add.extend(&additions);
+            git(&root, &add, Policy::Isolated)?;
+        }
 
         let mut args = vec!["commit", "--only", "-F", "-", "--"];
         args.extend(&pathspecs);
@@ -746,6 +759,44 @@ mod tests {
         git(&["add", "."]);
         git(&["commit", "-q", "-m", "base"]);
         root
+    }
+
+    #[tokio::test]
+    async fn commit_includes_deletions_already_staged() {
+        let root = fixture();
+        std::fs::write(root.join("gone.txt"), "old\n").unwrap();
+        let git = |args: &[&str]| {
+            assert!(
+                command(&root, args, Policy::Isolated)
+                    .status()
+                    .unwrap()
+                    .success(),
+                "{args:?}"
+            )
+        };
+        git(&["add", "gone.txt"]);
+        git(&["commit", "-q", "-m", "add gone"]);
+        git(&["rm", "-q", "gone.txt"]);
+        std::fs::write(root.join("kept.txt"), "two\n").unwrap();
+        let path = root.to_string_lossy().to_string();
+        git_commit_changes(
+            path.clone(),
+            path,
+            vec!["gone.txt".into(), "kept.txt".into()],
+            "Remove gone".into(),
+            String::new(),
+            vec![],
+        )
+        .await
+        .map_err(|failure| failure.message)
+        .unwrap();
+        let committed = super::git(
+            &root,
+            &["show", "--name-status", "--format=", "HEAD"],
+            Policy::Inspection,
+        )
+        .unwrap();
+        assert_eq!(committed.trim(), "D\tgone.txt\nM\tkept.txt");
     }
 
     #[tokio::test]
