@@ -179,7 +179,12 @@ export function SessionStart({
         });
         localStorage.removeItem(draftKey);
         localStorage.removeItem(`${draftKey}:context`);
-        if (mounted.current) setText(latest.current.trim() === value ? '' : latest.current);
+        // A comparison is a one-off choice; the next message goes back to the project default.
+        localStorage.removeItem(`${draftKey}:agents`);
+        if (mounted.current) {
+          setText(latest.current.trim() === value ? '' : latest.current);
+          setAgents(null);
+        }
         // The composer can unmount once work exists, so open the first attempt regardless.
         const first = useExecutionStore
           .getState()

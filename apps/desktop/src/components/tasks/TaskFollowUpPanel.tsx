@@ -2,6 +2,7 @@ import { Textarea } from '@jackalope/ui';
 import { ArrowRight } from 'lucide-react';
 import { useRef } from 'react';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
+import { getAgentMetadata } from '../../lib/agent-catalog';
 import { appendAttachments } from '../../lib/prompt-attachments';
 import type { TaskFollowUp } from '../../lib/task-followups';
 import type { TaskRun } from '../../lib/task-runtime';
@@ -50,7 +51,10 @@ export function TaskFollowUpPanel({
 }) {
   const form = useRef<HTMLFormElement>(null);
   const agentName = useExecutionStore(
-    (state) => state.runners.find((runner) => runner.id === run.agent)?.name ?? run.agent,
+    (state) =>
+      state.runners.find((runner) => runner.id === run.agent)?.name ??
+      getAgentMetadata(run.agent)?.name ??
+      run.agent,
   );
   const attachments = usePromptAttachments({
     projectPath: run.projectPath,

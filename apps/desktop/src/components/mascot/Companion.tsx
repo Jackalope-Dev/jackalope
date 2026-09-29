@@ -131,7 +131,15 @@ export function Companion({
               !readIds.includes(hint.id) &&
               shouldNotify(hint.kind, level) && (
                 <div key={hint.id} className="companion-hint" data-motion={reactions} role="status">
-                  {hint.title}
+                  <span>{hint.title}</span>
+                  <button
+                    type="button"
+                    className="mascot-bubble-close"
+                    aria-label="Dismiss notification preview"
+                    onClick={() => setHint(null)}
+                  >
+                    <X size={14} aria-hidden="true" />
+                  </button>
                 </div>
               )}
             <JackalopeMascot

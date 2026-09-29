@@ -354,6 +354,7 @@ pub fn run(launch: Launch) {
             commands::project_files::project_files_list,
             commands::project_files::project_file_open,
             commands::change_stats::task_change_stats,
+            commands::commit_graph::project_commit_graph,
             task_validate_project,
             task_project_directory,
             task_create_project,

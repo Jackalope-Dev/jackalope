@@ -34,6 +34,7 @@ import { Select, SelectItem } from '../ui/Select';
 import { Textarea } from '../ui/Textarea';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
+import { CommitHistory } from './CommitHistory';
 import './commit-review.css';
 import { type ChangedFile, CommitFilesList, STATUS } from './CommitFilesList';
 import { failureOf, type HookFailure, HookFixStatus } from './HookFixStatus';
@@ -667,6 +668,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
           </section>
         </div>
       )}
+      <CommitHistory key={checkout} projectPath={checkout} />
     </WorkspacePage>
   );
 }

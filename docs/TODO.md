@@ -44,6 +44,8 @@ release dates.
   absolute paths outside isolated worktrees, and that native file drops, pastes and the
   file picker work on macOS and Linux. Measure command-search file listing on large
   repositories and editor protocol handling for opened files.
+  Check unread markers and open-work tabs across restarts, deleted work, several windows
+  and remote hosts, and change counts on large worktrees and while agents write files.
 - [ ] Validate the unified work list, project scope, command search, persistent follow-up,
   preview readiness/cancellation/evidence capture and PR/CI reads in installed WebViews.
   Test first-result, visual correction, failed-check recovery, project return and delivery

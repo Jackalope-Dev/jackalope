@@ -1,5 +1,18 @@
 [
   {
+    "id": "tabs-unread-work-and-live-change-counts",
+    "date": "2026-09-29",
+    "status": "In development",
+    "title": "Tabs, unread work and live change counts",
+    "description": "Keep several tasks open at once and see what changed, what is still running and what you have not read yet.",
+    "items": [
+      "Recently opened tasks and chats stay as tabs. Switch with Ctrl+1 to 9 or Ctrl+Tab",
+      "Work rows show how long an agent has been running, how many lines changed and a dot for results you have not opened",
+      "Changes shows recent commits across your local branches",
+      "Press ? to see keyboard shortcuts"
+    ]
+  },
+  {
     "id": "compare-agents-and-attach-files-to-requests",
     "date": "2026-09-29",
     "status": "In development",

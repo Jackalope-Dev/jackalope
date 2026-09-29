@@ -2,6 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Columns2, Trophy } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { getAgentMetadata } from '../../lib/agent-catalog';
 import {
   elapsedLabel,
   isActive,
@@ -70,7 +71,11 @@ export function TaskComparison({ run }: { run: TaskRun }) {
   if (members.length < 2 && !comparison.failures?.length) return null;
   const adapter = (agent: string) =>
     customAgents.find((custom) => custom.id === agent)?.adapter ?? agent;
-  const name = (agent: string) => runners.find((runner) => runner.id === agent)?.name ?? agent;
+  const name = (agent: string) =>
+    runners.find((runner) => runner.id === agent)?.name ??
+    customAgents.find((custom) => custom.id === agent)?.name ??
+    getAgentMetadata(agent)?.name ??
+    agent;
   const running = members.filter(isActive).length;
   return (
     <section className="task-comparison" aria-label="Compared agents">

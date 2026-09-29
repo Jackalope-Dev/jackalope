@@ -6,6 +6,7 @@ pub mod cli_install;
 pub mod cli_terminal;
 pub mod codebase;
 pub mod codebase_watch;
+pub mod commit_graph;
 pub mod coordination;
 pub mod coordination_mcp;
 pub mod desktop_integration;

@@ -311,7 +311,12 @@ export function RunnerConnections({
         >
           <Settings2 size={16} />
         </button>
-        <AgentAvatar provider={provider} working={working && !waitingRun} waiting={!!waitingRun} />
+        <AgentAvatar
+          provider={provider}
+          size="md"
+          working={working && !waitingRun}
+          waiting={!!waitingRun}
+        />
         <div className="agent-roster-identity">
           <div className="agent-roster-name">
             <h2>{custom?.name ?? runner.name}</h2>

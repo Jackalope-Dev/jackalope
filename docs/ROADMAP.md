@@ -27,7 +27,8 @@ representative benefit and installed-platform acceptance remain open.
   a workspace with tools beside work, or a full-width activity and attention board.
   One prompt can go to several agents in separate isolated tasks for side-by-side
   comparison. Composers accept pasted images and dropped or picked files, and command
-  search opens or attaches project files.
+  search opens or attaches project files. Work rows show elapsed time, changed lines and
+  unread results; recently opened work stays in tabs.
   Task terminals, detachable task views and reversible chat topics prepare source-linked drafts. Local timing exports
   and incremental session updates support performance investigation; installed acceptance
   and representative comparisons remain in progress.

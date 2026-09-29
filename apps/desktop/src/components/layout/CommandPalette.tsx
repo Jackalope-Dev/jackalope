@@ -4,6 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import {
   FileText,
   Folder,
+  Keyboard,
   LifeBuoy,
   MessageSquare,
   Paperclip,
@@ -386,6 +387,23 @@ export function CommandPalette({
               >
                 <Settings2 className="size-4 text-[var(--color-accent-ink)]" />
                 <span>Settings & Preferences</span>
+              </button>
+            )}
+            {'keyboard shortcuts keys hotkeys'.split(' ').some((kw) => kw.includes(search)) && (
+              <button
+                data-command
+                type="button"
+                className="workspace-menu-item w-full text-left hover:bg-[var(--color-surface-hover)]"
+                onClick={() => {
+                  onClose();
+                  requestAnimationFrame(() =>
+                    window.dispatchEvent(new CustomEvent('jackalope:open-shortcuts')),
+                  );
+                }}
+              >
+                <Keyboard className="size-4 text-[var(--color-accent-ink)]" />
+                <span>Keyboard shortcuts</span>
+                <kbd>?</kbd>
               </button>
             )}
             {showHelp && (

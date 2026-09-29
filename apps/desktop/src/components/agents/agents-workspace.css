@@ -290,3 +290,76 @@
   color: var(--color-text-primary);
   border-color: var(--color-accent);
 }
+
+/* Compact roster: one row per agent with identity, then enable and actions. */
+.agent-roster {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.agent-roster-row {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 12px 12px 16px;
+  border-radius: 12px;
+}
+.agent-roster-row > .agent-configure {
+  position: static;
+  grid-column: 4;
+  grid-row: 1;
+  width: 44px;
+  height: 44px;
+}
+.agent-roster-row .agent-roster-name {
+  margin-bottom: 0;
+  padding-right: 0;
+}
+.agent-roster-row .agent-roster-name h2 {
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.agent-roster-row .agent-default {
+  font-size: var(--text-xs);
+}
+.agent-roster-row .agent-presence {
+  margin-bottom: 0;
+}
+.agent-roster-row .agent-account-summary {
+  min-height: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.agent-roster-row > .agent-roster-action {
+  grid-column: 3;
+  grid-row: 1;
+  flex-wrap: nowrap;
+  align-items: center;
+  align-self: center;
+  padding-top: 0;
+}
+.agent-roster-row .agent-enable {
+  flex: 0 0 auto;
+}
+.agent-roster-row .agent-roster-action > button {
+  flex: 0 0 auto;
+}
+/* Install and sign-in commands need the full row. */
+.agent-roster-row > .agent-setup-box {
+  grid-column: 1 / -1;
+}
+@media (max-width: 860px) {
+  .agent-roster-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .agent-roster-row > .agent-configure {
+    grid-column: 3;
+  }
+  .agent-roster-row > .agent-roster-action {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    flex-wrap: wrap;
+  }
+}

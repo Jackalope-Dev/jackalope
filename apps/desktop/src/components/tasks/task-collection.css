@@ -279,3 +279,16 @@
     transition: none;
   }
 }
+/* In narrow columns the search takes its own row so filters and view controls stay together. */
+.task-collection {
+  container-type: inline-size;
+}
+@container (max-width: 820px) {
+  .task-collection .work-toolbar {
+    justify-content: flex-start;
+  }
+  .task-collection .work-toolbar > .work-search {
+    order: -1;
+    flex-basis: 100%;
+  }
+}

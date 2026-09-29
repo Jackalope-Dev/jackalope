@@ -100,6 +100,8 @@ export function WorkspaceModeHome({
         </button>
       </nav>
     );
+  // Counts only help once there is work to filter; an empty project shows its empty state.
+  if (!items.length) return null;
   return (
     <div className="oversee-summary">
       <nav className="oversee-counts" aria-label="Project activity">
@@ -113,6 +115,7 @@ export function WorkspaceModeHome({
             type="button"
             key={group}
             aria-pressed={filter === group}
+            title={detail}
             onClick={() => onFilter(group)}
           >
             <span>{label}</span>
@@ -121,32 +124,30 @@ export function WorkspaceModeHome({
           </button>
         ))}
       </nav>
-      {(attention.length > 0 || items.length > 0) && (
-        <section className="oversee-inbox" aria-label="Next decisions">
-          <div className="mode-section-heading">
-            <div>
-              <h2>{attention.length ? 'Next decisions' : 'Nothing waiting on you'}</h2>
-              <p>
-                {attention.length
-                  ? 'Questions and blockers first, then the oldest reviews.'
-                  : 'New questions, blockers and reviews will appear here.'}
-              </p>
-            </div>
-            {!!attention.length && (
-              <Button variant="outline" onClick={() => onOpen(attention[0])}>
-                Review next <ArrowRight size={16} />
-              </Button>
-            )}
+      <section className="oversee-inbox" aria-label="Next decisions">
+        <div className="mode-section-heading">
+          <div>
+            <h2>{attention.length ? 'Next decisions' : 'Nothing waiting on you'}</h2>
+            <p>
+              {attention.length
+                ? 'Questions and blockers first, then the oldest reviews.'
+                : 'New questions, blockers and reviews will appear here.'}
+            </p>
           </div>
           {!!attention.length && (
-            <div className="oversee-priorities">
-              {attention.slice(0, 3).map((item) => (
-                <ModeWorkItem key={item.id} item={item} onOpen={onOpen} />
-              ))}
-            </div>
+            <Button variant="outline" onClick={() => onOpen(attention[0])}>
+              Review next <ArrowRight size={16} />
+            </Button>
           )}
-        </section>
-      )}
+        </div>
+        {!!attention.length && (
+          <div className="oversee-priorities">
+            {attention.slice(0, 3).map((item) => (
+              <ModeWorkItem key={item.id} item={item} onOpen={onOpen} />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

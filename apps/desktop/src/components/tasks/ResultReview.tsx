@@ -1,6 +1,7 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { ArrowRight, Check, FileDiff, GitMerge, ListChecks, RefreshCw } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { reviewFingerprint } from '../../lib/review-fingerprint';
 import { nativeTask, type Review, type TaskRun } from '../../lib/task-runtime';
@@ -49,6 +50,9 @@ export function ResultReview({
   const hasChecks = !unavailable || !!outcomes || !!evidence;
   const requested = section ?? selected;
   const current = requested === 'checks' && !hasChecks ? 'changes' : requested;
+  const [feedbackSlot, setFeedbackSlot] = useState<HTMLDivElement | null>(null);
+  // Review actions share the section switcher's row instead of adding a toolbar row.
+  const [actionSlot, setActionSlot] = useState<HTMLDivElement | null>(null);
   const [loadedReview, setReview] = useState<Review | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -87,44 +91,43 @@ export function ResultReview({
           changeSection(value as ReviewSection);
         }}
       >
-        <Tabs.List aria-label="Review sections">
-          <Tabs.Trigger value="changes">
-            <FileDiff size={16} aria-hidden="true" /> Changes
-          </Tabs.Trigger>
-          {hasChecks && (
-            <Tabs.Trigger value="checks">
-              <ListChecks size={16} aria-hidden="true" /> Checks{' '}
-              {checkFailed && <span className="review-check-warning">Need attention</span>}
+        <div className="review-header">
+          <Tabs.List aria-label="Review sections" className="review-sections">
+            <Tabs.Trigger value="changes">
+              <FileDiff size={16} aria-hidden="true" /> Changes
+              {review ? <span className="review-section-count">{review.files.length}</span> : null}
             </Tabs.Trigger>
-          )}
-          {delivery && (
-            <Tabs.Trigger value="delivery">
-              <GitMerge size={16} aria-hidden="true" /> Merge
-            </Tabs.Trigger>
-          )}
-        </Tabs.List>
+            {hasChecks && (
+              <Tabs.Trigger value="checks">
+                <ListChecks size={16} aria-hidden="true" /> Checks{' '}
+                {checkFailed && <span className="review-check-warning">Need attention</span>}
+              </Tabs.Trigger>
+            )}
+            {delivery && (
+              <Tabs.Trigger value="delivery">
+                <GitMerge size={16} aria-hidden="true" /> Merge
+              </Tabs.Trigger>
+            )}
+          </Tabs.List>
+          <div ref={setActionSlot} className="review-header-actions" />
+        </div>
         <ReviewPanel current={current} value="changes">
           {unavailable || (
             <>
-              <div className="task-review-toolbar">
-                <h3 className="flex items-center gap-2 font-medium">
-                  <FileDiff size={16} />
-                  Changes{' '}
-                  {review
-                    ? `· ${review.files.length} ${review.files.length === 1 ? 'file' : 'files'}`
-                    : ''}
-                </h3>
+              {portalActions(
                 <div className="task-review-actions">
+                  <div ref={setFeedbackSlot} className="review-feedback-slot" />
                   {review && <ReviewActions run={run} review={review} />}
                   <Button
-                    variant="outline"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Refresh changes"
+                    title="Refresh changes"
                     disabled={loading}
+                    aria-busy={loading || undefined}
                     onClick={() => void load()}
-                    loading={loading}
-                    loadingLabel="Reading…"
                   >
-                    <RefreshCw size={14} /> Refresh changes
+                    <RefreshCw size={16} aria-hidden="true" />
                   </Button>
                   {canApprove && run.status === 'review' && !unfinishedWorkflow && (
                     <ApproveWork
@@ -148,8 +151,9 @@ export function ResultReview({
                         <Check size={16} /> Work approved
                       </span>
                     ))}
-                </div>
-              </div>
+                </div>,
+                current === 'changes' ? actionSlot : null,
+              )}
               {error && (
                 <InlineNotice tone="error" className="mt-3">
                   {error}
@@ -168,6 +172,7 @@ export function ResultReview({
                       revision={reviewFingerprint(review.diff)}
                       files={review.files}
                       onFeedback={onCorrect}
+                      toolbarTarget={feedbackSlot}
                     >
                       <ChangedFiles
                         files={review.files}
@@ -231,4 +236,9 @@ function ReviewPanel({
       {(visited || current === value) && children}
     </Tabs.Content>
   );
+}
+
+/** Renders into the section header when it is available, otherwise in place. */
+function portalActions(actions: ReactNode, target: HTMLElement | null) {
+  return target ? createPortal(actions, target) : actions;
 }

@@ -98,12 +98,11 @@
   white-space: nowrap;
   min-width: 0;
 }
+/* Task sections use the standard workspace tab row: full-width divider, pill selection. */
 .task-detail .result-tabs {
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: var(--color-surface-sunken);
   gap: 4px;
-  padding: 4px;
+  padding: 0;
+  border: 0;
 }
 .task-detail .result-canvas {
   padding-block: 16px;
@@ -120,6 +119,8 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
 }
 .task-view-controls .result-tabs {
   min-width: 0;
@@ -190,10 +191,13 @@
   overflow-y: auto;
 }
 .task-detail .task-reply {
+  /* One line at rest, growing with the draft so results keep the height. */
+  field-sizing: content;
   margin: 0;
-  min-height: 48px;
-  max-height: 120px;
+  min-height: 44px;
+  max-height: 160px;
   padding: 10px 12px;
+  resize: none;
 }
 .task-followup-heading {
   font-size: var(--text-xs);
@@ -342,4 +346,13 @@
 }
 .task-detail > :empty {
   display: none;
+}
+/* The placeholder already names the field; the visible heading only costs height. */
+.task-detail .task-next > .task-followup-heading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

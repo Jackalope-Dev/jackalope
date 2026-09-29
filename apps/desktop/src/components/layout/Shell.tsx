@@ -24,6 +24,7 @@ import { useWorkViewStore } from '../../stores/workViewStore';
 import { AccessNoticeSlot } from '../account/AccessBoundary';
 import { useTrackOpenWork } from '../tasks/WorkSignals';
 import { BranchIndicator } from './BranchIndicator';
+import { ShortcutSheet } from './ShortcutSheet';
 import { WhatsNewDialog } from './WhatsNewDialog';
 import { WorkSidebar } from './WorkSidebar';
 import { WorkspaceStatusBar } from './WorkspaceStatusBar';
@@ -745,6 +746,7 @@ export function Shell({
         )}
       </Suspense>
       <WhatsNewDialog />
+      <ShortcutSheet />
     </div>
   );
 }

@@ -104,6 +104,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   project's Git-excluded `.jackalope/attachments`; project files are referenced relative
   to the project so isolated worktrees read their own copy. Empty projects offer editable
   starter requests.
+  Work rows show elapsed time while an attempt runs, changed lines from a bounded native
+  Git count, and an unread marker for finished work not yet opened; work can be marked
+  unread again. Recently opened tasks, chats and plans stay as up to eight tabs with
+  Mod+1–9 and Ctrl+Tab switching; closing a tab never stops or archives work. Changes shows
+  recent commits across local branches with Git's graph, and ? lists keyboard shortcuts.
+  Returning users with current access open directly to their work.
   Active task, plan and chat views show recent tool activity, workspace file labels and
   native check output from existing events, without extra model calls.
   Project opens an overview with unfinished work, setup and recorded local deliveries.
