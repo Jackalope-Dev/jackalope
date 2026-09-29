@@ -58,9 +58,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Feedback from separate panes is saved locally for explicit addition to the reply draft.
   Separate panes retain their own task drafts; their refreshes do not replace the main
   window's draft or selection. Queue pause and stop remain visible in Focus mode.
-- The `jackalope` terminal command holds routed conversations in the current Git
-  repository, lists and rejoins sessions, and streams status from the process that
-  owns the profile, starting a windowed or headless host when none runs. A second app
+- The `jackalope` terminal command holds routed conversations in the current
+  directory, lists and rejoins sessions, and streams status from the process that
+  owns the profile, starting a windowed or headless host when none runs. Outside a
+  repository, an interactive session asks before creating one; declining, or a
+  non-interactive run without `--init`, edits that folder directly. `--init` skips
+  the question, and a home directory or drive root is refused. A second app
   launch raises the running host. Inside conversations, `!` runs shell commands with
   streamed output, follow-ups queue behind running work, `/bg` starts parallel
   conversations, a live header shows other open work and agent readiness, the input
@@ -83,13 +86,30 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Installed multi-window acceptance and comparative workflow measurements remain open.
 
 - Projects, saved task drafts, queues, recurring schedules and local change monitors.
+  A schedule can also expose a loopback webhook. The token is shown once, and a call
+  while an earlier run is still active is skipped instead of queued.
 - Project setup includes agents, decisions, Git behavior, appearance and an optional
   first task. Background command detection fills unset preferences without running
   commands or replacing explicit choices; inspection failure does not block setup.
 - Work combines a new-conversation composer and the project-scoped work list,
   with remembered filters, compact capture and keyboard row navigation. Work rows show
   each agent's character, live or next-action status and who is working now. Task and
-  project command search covers both.
+  project command search covers both, and also finds Git-listed project files to open in
+  the preferred editor or attach to new work.
+  The composer shows its agent choice beside Send: Automatic, one agent, or up to four
+  agents that each receive the prompt as a separate isolated task. Compared tasks link to
+  each other and show status, time, check, changed lines and reported tokens side by side;
+  keeping one archives the other finished attempts. Composers accept pasted images, dropped
+  files and picked files as editable path lines. Pasted images are saved under the
+  project's Git-excluded `.jackalope/attachments`; project files are referenced relative
+  to the project so isolated worktrees read their own copy. Empty projects offer editable
+  starter requests.
+  Work rows show elapsed time while an attempt runs, changed lines from a bounded native
+  Git count, and an unread marker for finished work not yet opened; work can be marked
+  unread again. Recently opened tasks, chats and plans stay as up to eight tabs with
+  Mod+1–9 and Ctrl+Tab switching; closing a tab never stops or archives work. Changes shows
+  recent commits across local branches with Git's graph, and ? lists keyboard shortcuts.
+  Returning users with current access open directly to their work.
   Active task, plan and chat views show recent tool activity, workspace file labels and
   native check output from existing events, without extra model calls.
   Project opens an overview with unfinished work, setup and recorded local deliveries.
@@ -141,7 +161,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded
   quota handoff. Explicit assignments and continuation identities remain pinned.
   The Agents page connects API providers directly, including DeepSeek and OpenRouter,
-  using protected OpenCode account keys and discovered models. First connection can
+  using protected OpenCode account keys and discovered models. A local OpenAI-compatible
+  server on this computer can be saved the same way after its model list is read.
+  An ACP CLI can be added by its executable path and arguments; sign-in stays with that CLI.
+  First connection can
   prepare a pinned private runner with progress and retry; no separate OpenCode
   installation is needed. Local AI setup shares that runner. It also supports local
   key import alongside provider CLI sign-in. Saved keys do not prove model access.
@@ -212,6 +235,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - A single Usage & quota page with account limits, app-wide usage trends,
   project/agent/task breakdowns, measured routing overhead
   and usage by saved outcome, with missing reports and helper usage kept explicit.
+  Ask Jackalope turns record a date and, when project sharing is current, the open
+  project. Archived conversations stay in that ledger. Older turns have no date.
+  Unreadable helper files stay on disk and are reported as unavailable.
   Usage separates context a provider read as new from cached re-reads, and reports
   model calls and average context, because cumulative tokens track turn count rather
   than work done. Per-message usage is recorded for Claude, Grok and OpenCode.

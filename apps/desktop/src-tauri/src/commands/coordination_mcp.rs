@@ -846,14 +846,14 @@ impl ServerHandler for CoordinationTools {
         std::borrow::Cow::Borrowed(rmcp::model::ProtocolVersion::KNOWN_VERSIONS)
     }
 
-    fn get_info(&self) -> rmcp::model::ServerInfo {
+    fn get_info(&self) -> rmcp::model::ServerConfig {
         let mut capabilities = rmcp::model::ServerCapabilities::builder()
             .enable_tools()
             .build();
         if crate::commands::experiments::is("JACKALOPE_TOOL_SURFACE", "deferred") {
             capabilities.tools.as_mut().unwrap().list_changed = Some(true);
         }
-        rmcp::model::ServerInfo::new(capabilities)
+        rmcp::model::ServerConfig::new(capabilities)
             .with_server_info(rmcp::model::Implementation::new("jackalope", "0.1.0"))
             .with_instructions("Use supplied launch context. Refresh project for shared-interface changes, scope uncertainty or new coordination needs. Use harness tools for relevant evidence, user questions and final verification.")
     }

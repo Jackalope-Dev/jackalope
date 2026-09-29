@@ -41,8 +41,19 @@ and `editor` each add one concern, with drawing under `ui/render/`.
 
 ## Projects and sessions
 
-The command works in the Git repository containing the current directory. The
-desktop app mirrors its project list to `preferences/projects.json` and merges it
+The command works in the current directory. Inside a Git repository it uses that
+repository's root, and each conversation gets an isolated worktree. When the
+directory is not a repository yet, an interactive session asks before creating
+one. Saying no, or running non-interactively without `--init`, edits files in
+that folder directly. There is no worktree, patch or merge for that folder.
+`--init` creates the repository without asking. The new repository gets an initial
+commit of the current files, and a `.gitignore` for dependency and secret files
+when the directory does not already have one, so an isolated worktree contains
+the project. The initial commit is unsigned, so setup does not wait on a signing
+prompt. Home directories and drive roots are refused. A `.git` entry that is not
+a usable repository is left for Git to repair.
+
+The desktop app mirrors its project list to `preferences/projects.json` and merges it
 back on load, so a repository gets the same project id in the app and the
 terminal. A repository first used from a terminal is registered and then appears
 in the app.
@@ -54,9 +65,9 @@ terminal and the app together. Leaving a terminal does not stop work.
 
 | Command | Behavior |
 | --- | --- |
-| `jackalope` | Starts a conversation in this repository |
+| `jackalope` | Starts a conversation in this directory |
 | `jackalope -p "<message>"` | Runs one message and prints the reply; `run` is an alias |
-| `jackalope --continue`, `-c` | Rejoins this repository's latest conversation |
+| `jackalope --continue`, `-c` | Rejoins this directory's latest conversation |
 | `jackalope --resume [id]`, `-r` | Opens the conversation picker, or rejoins by id |
 | `jackalope attach <id>` | Rejoins a conversation; any unambiguous id prefix works |
 | `jackalope ls` | Lists open conversations with their project, state and age |
@@ -87,8 +98,9 @@ conversation's worktree, or the project when it has none. Output streams below t
 conversation and never reaches an agent; stdin is closed and pagers are disabled.
 `/kill` stops running commands and their children (the process group on Unix,
 `taskkill /T` on Windows), and leaving the terminal stops them too. `@` opens fuzzy
-completion over the workspace's files that Git does not ignore; the list is read in
-the background and again after 15 seconds, so new files appear.
+completion over the workspace's files that Git does not ignore. Outside a repository
+the list is a walk of the directory, skipping dependency and build folders. The list
+is read in the background and again after 15 seconds, so new files appear.
 
 While a conversation is open, the header shows the small mark beside the project and
 branch, the conversation's routing, other open conversations (with any that need
@@ -115,7 +127,9 @@ clipboard tool, or OSC 52 over SSH; Shift or Option while dragging uses the
 terminal's own selection. Ctrl+C clears the input, then stops running commands, then
 leaves and prints how to rejoin. A rotating tips bar below the composer highlights
 commands and shortcuts when terminal height permits.
-`JACKALOPE_PROFILE_DIR` or `--profile=<dir>`
+`--init` creates a Git repository in the current directory when it does not
+have one, so the conversation can use a worktree. Without it, a folder that is
+not a repository is edited directly. `JACKALOPE_PROFILE_DIR` or `--profile=<dir>`
 selects a non-default profile. The terminal follows its project's saved accent,
 including theme changes while it is open and the project of an attached conversation.
 Colour is adjusted for readability; 256-colour terminals use the nearest palette match.
@@ -195,3 +209,6 @@ then:
    conversation continues.
 5. On installed packages for each platform, confirm the command resolves from a
    new terminal, survives an update and is removed or left harmless on uninstall.
+6. In an empty temporary directory, confirm the command asks before creating a
+   repository, declining edits the folder directly, `--init` creates one with an
+   initial commit, and creating one in a home directory or drive root refuses.

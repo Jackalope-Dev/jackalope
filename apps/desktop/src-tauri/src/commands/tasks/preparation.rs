@@ -24,7 +24,7 @@ const EXCLUDE: &str = "/.jackalope/";
 /// Keep the marker out of `git status`. A non-isolated task prepares the user's own
 /// checkout, so an untracked file there is something an agent could notice or commit.
 /// info/exclude is per-clone and never committed, unlike a tracked .gitignore.
-fn exclude_marker(workspace: &Path) {
+pub(in crate::commands) fn exclude_marker(workspace: &Path) {
     let Ok(path) = git(
         &workspace.to_string_lossy(),
         &[

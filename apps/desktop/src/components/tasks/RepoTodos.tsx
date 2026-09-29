@@ -198,7 +198,7 @@ export function RepoTodos({
       <WorkspaceHeading
         title="Repo TODOs"
         action={
-          project && available && !loading && !error && creatable.length > 0 ? (
+          project && available && !loading && !error && files.length > 0 && creatable.length > 0 ? (
             <Button
               variant="secondary"
               disabled={saving}

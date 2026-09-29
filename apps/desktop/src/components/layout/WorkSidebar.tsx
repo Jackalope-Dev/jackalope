@@ -5,8 +5,10 @@ import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
+import { useChangeStats } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AgentStack } from '../agents/AgentAvatar';
+import { isUnread, useOpenSignalKey, useWorkSignals, WorkSignals } from '../tasks/WorkSignals';
 
 export function useWorkspaceWork() {
   const runs = useExecutionStore((state) => state.runs);
@@ -29,6 +31,18 @@ export function useWorkspaceWork() {
   );
 }
 
+/** Opens a work item in the main view, switching to its project. */
+export function selectWorkItem(item: WorkItem) {
+  useExecutionStore
+    .getState()
+    .select(item.run && !item.session && !item.managed ? item.run.id : null);
+  useLiveSessionStore.getState().select(item.session?.id ?? null);
+  useManagedTaskStore.getState().select(item.managed?.id ?? null);
+  const projectId =
+    item.run?.projectId ?? item.session?.request.projectId ?? item.managed?.request.projectId;
+  if (projectId) useProjectStore.getState().selectProject(projectId);
+}
+
 export function WorkSidebar({ onOpen }: { onOpen: () => void }) {
   const work = useWorkspaceWork();
   const selectedRun = useExecutionStore((state) => state.selectedId);
@@ -44,15 +58,11 @@ export function WorkSidebar({ onOpen }: { onOpen: () => void }) {
         item.managed?.request.projectId ??
         item.idea?.projectId) === activeProject,
   );
+  const signals = useWorkSignals();
+  const openKey = useOpenSignalKey();
+  const stats = useChangeStats(items.slice(0, 36).map((item) => item.run));
   const open = (item: WorkItem) => {
-    useExecutionStore
-      .getState()
-      .select(item.run && !item.session && !item.managed ? item.run.id : null);
-    useLiveSessionStore.getState().select(item.session?.id ?? null);
-    useManagedTaskStore.getState().select(item.managed?.id ?? null);
-    const projectId =
-      item.run?.projectId ?? item.session?.request.projectId ?? item.managed?.request.projectId;
-    if (projectId) useProjectStore.getState().selectProject(projectId);
+    selectWorkItem(item);
     onOpen();
   };
   return (
@@ -79,12 +89,14 @@ export function WorkSidebar({ onOpen }: { onOpen: () => void }) {
                 : item.session
                   ? item.session.id === selectedSession
                   : item.run?.id === selectedRun;
+              const unread = isUnread(item, signals, openKey);
               return (
                 <button
                   type="button"
                   key={item.id}
                   aria-current={selected ? 'page' : undefined}
                   className="work-sidebar-item"
+                  data-unread={unread || undefined}
                   onClick={() => open(item)}
                 >
                   <AgentStack agents={presence.agents} state={presence.state} size="xs" />
@@ -92,6 +104,11 @@ export function WorkSidebar({ onOpen }: { onOpen: () => void }) {
                     <strong>{item.title}</strong>
                     <small>{item.statusLabel ?? presence.action}</small>
                   </span>
+                  <WorkSignals
+                    item={item}
+                    unread={unread}
+                    stats={item.run ? stats[item.run.id]?.value : undefined}
+                  />
                 </button>
               );
             })}

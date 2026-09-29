@@ -102,6 +102,19 @@ export const builtinAgents = [
     accountEnvVar: 'GEMINI_CLI_HOME',
     loginCommand: 'gemini',
   },
+  {
+    id: 'acp',
+    name: 'ACP (Generic)',
+    vendor: 'Agent Client Protocol',
+    description:
+      'Connect any agent that speaks the Agent Client Protocol (ACP) over stdio JSON-RPC.',
+    strengths: ['interop', 'custom-agents', 'protocol-standard'],
+    installCommand: '',
+    installUrl: 'https://github.com/anthropics/agent-client-protocol',
+    defaultBinary: '',
+    accountEnvVar: '',
+    loginCommand: '',
+  },
 ] as const;
 
 export type BuiltinAgentId = (typeof builtinAgents)[number]['id'];

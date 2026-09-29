@@ -175,3 +175,33 @@ export function usageInsights(
   };
 }
 export type UsageInsights = ReturnType<typeof usageInsights>;
+
+export interface HelperAccountingTurn {
+  id: string;
+  createdAt?: number | null;
+  projectId?: string | null;
+  projectName?: string | null;
+  agent: string;
+  account: string;
+  accountKey?: string | null;
+  model?: string | null;
+  status: string;
+  usage: RunUsage;
+  archived?: boolean;
+}
+
+/** Dated, attributed helper turns follow the Usage filters. Undated turns stay
+ * in All time, and turns without a project or account stay in the All choice. */
+export function selectHelperTurns(
+  turns: HelperAccountingTurn[],
+  filters: { project: string; agent: string; account: string; period: string; cutoff: number },
+): HelperAccountingTurn[] {
+  return turns.filter((turn) => {
+    if (filters.project !== 'all' && turn.projectId !== filters.project) return false;
+    if (filters.agent !== 'all' && turn.agent !== filters.agent) return false;
+    if (filters.account !== 'all' && turn.accountKey !== filters.account) return false;
+    if (filters.period !== 'all' && (turn.createdAt == null || turn.createdAt < filters.cutoff))
+      return false;
+    return true;
+  });
+}

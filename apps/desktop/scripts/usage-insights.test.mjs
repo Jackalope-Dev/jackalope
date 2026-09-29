@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { usageEntries } from '../src/lib/usage-entries.ts';
 import {
+  selectHelperTurns,
   summarizeUsage,
   usageCutoff,
   usageDateKey,
@@ -165,4 +166,72 @@ test('calendar buckets include quiet days, preserve missing days and keep task i
   assert.equal(result.tasks.length, 2);
   assert.equal(usageDateKey('invalid'), 'Undated');
   assert.equal(usageInsights(usageEntries(runs), runs, 'all').trend.length, 1);
+});
+
+test('helper turns follow project, account and period filters without inventing a date', () => {
+  const now = new Date(2026, 8, 10, 18).getTime();
+  const turns = [
+    {
+      id: 'dated',
+      createdAt: now,
+      projectId: 'p1',
+      projectName: 'One',
+      agent: 'codex',
+      account: 'Work',
+      accountKey: 'codex:one',
+      status: 'complete',
+      usage: usage(10),
+    },
+    {
+      id: 'other',
+      createdAt: now,
+      projectId: 'p2',
+      projectName: 'Two',
+      agent: 'claude',
+      account: 'Personal',
+      accountKey: 'claude:cli-default',
+      status: 'complete',
+      usage: usage(3),
+      archived: true,
+    },
+    {
+      id: 'undated',
+      createdAt: null,
+      projectId: null,
+      agent: 'grok',
+      account: 'CLI',
+      accountKey: null,
+      status: 'complete',
+      usage: usage(0, false),
+    },
+  ];
+  const filters = {
+    project: 'all',
+    agent: 'all',
+    account: 'all',
+    period: '30',
+    cutoff: now - 86_400_000,
+  };
+  assert.deepEqual(
+    selectHelperTurns(turns, filters).map((turn) => turn.id),
+    ['dated', 'other'],
+  );
+  assert.deepEqual(
+    selectHelperTurns(turns, { ...filters, period: 'all' }).map((turn) => turn.id),
+    ['dated', 'other', 'undated'],
+  );
+  assert.deepEqual(
+    selectHelperTurns(turns, { ...filters, project: 'p1' }).map((turn) => turn.id),
+    ['dated'],
+  );
+  assert.deepEqual(
+    selectHelperTurns(turns, { ...filters, account: 'codex:one', period: 'all' }).map(
+      (turn) => turn.id,
+    ),
+    ['dated'],
+  );
+  assert.deepEqual(
+    selectHelperTurns(turns, { ...filters, period: '7', cutoff: now + 1 }).map((turn) => turn.id),
+    [],
+  );
 });

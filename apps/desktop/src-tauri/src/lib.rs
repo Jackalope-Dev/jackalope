@@ -114,7 +114,7 @@ pub fn run(launch: Launch) {
     }
     let builder = tauri::Builder::default();
     builder
-        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
@@ -240,6 +240,7 @@ pub fn run(launch: Launch) {
             commands::live_sessions::live_session_review,
             commands::live_sessions::live_session_recover,
             commands::helper::helper_snapshot,
+            commands::helper::helper_usage,
             commands::helper::helper_sync,
             commands::helper::helper_send,
             commands::helper::helper_stop,
@@ -332,6 +333,8 @@ pub fn run(launch: Launch) {
             schedule_save,
             schedule_remove,
             schedule_set_enabled,
+            schedule_webhook_enable,
+            schedule_webhook_disable,
             task_runners,
             agent_save_policy,
             task_read_context,
@@ -346,6 +349,12 @@ pub fn run(launch: Launch) {
             commands::project_registry::project_registry_list,
             commands::project_registry::project_registry_save,
             task_pick_project,
+            commands::attachments::prompt_attachment_save,
+            commands::attachments::prompt_attachment_pick,
+            commands::project_files::project_files_list,
+            commands::project_files::project_file_open,
+            commands::change_stats::task_change_stats,
+            commands::commit_graph::project_commit_graph,
             task_validate_project,
             task_project_directory,
             task_create_project,
@@ -423,6 +432,10 @@ pub fn run(launch: Launch) {
             mcp_probe_server,
             agent_profile_list,
             agent_profile_create,
+            commands::openai_endpoint::openai_endpoint_models,
+            commands::openai_endpoint::openai_endpoint_connect,
+            agent_profile_set_config_dir,
+            agent_probe_executable,
             agent_profile_save_key,
             agent_profile_complete_provider,
             commands::jev::routing_settings,

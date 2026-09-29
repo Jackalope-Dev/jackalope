@@ -25,6 +25,10 @@ representative benefit and installed-platform acceptance remain open.
   ignored-file setup and bounded worktree size inspection support isolated work.
 - Per-project Focus, Build and Oversee modes provide a quiet conversation canvas,
   a workspace with tools beside work, or a full-width activity and attention board.
+  One prompt can go to several agents in separate isolated tasks for side-by-side
+  comparison. Composers accept pasted images and dropped or picked files, and command
+  search opens or attaches project files. Work rows show elapsed time, changed lines and
+  unread results; recently opened work stays in tabs.
   Task terminals, detachable task views and reversible chat topics prepare source-linked drafts. Local timing exports
   and incremental session updates support performance investigation; installed acceptance
   and representative comparisons remain in progress.
@@ -36,6 +40,8 @@ representative benefit and installed-platform acceptance remain open.
 - Provider accounts, model/effort choices, capacity-aware routing and usage reporting.
   OpenCode accepts protected provider keys, including DeepSeek, alongside CLI sign-in.
   Guided API and local-model setup can prepare a private runner without a separate CLI install.
+  A loopback OpenAI-compatible server and an ACP CLI can be connected from Agents.
+  A schedule can receive a loopback webhook; an overlapping call is skipped.
   Decisions can use local rules, an agent or optional Jev assistance. Jev supports
   repository/model evidence, cost objectives and opt-in context, result, monitor and
   assignment assistance; live calibration and installed acceptance remain open.
@@ -77,9 +83,11 @@ to task review while retaining session ownership and usage. Provider-advertised
 effort requests and output filtering have separate validation; installed
 cross-platform acceptance and repeatable quality or efficiency gains remain open.
 
-The `jackalope` terminal command runs routed conversations from any Git repository
-through the desktop host, which it can start headless, and the app can hand a
-conversation to the system terminal. Conversations run inline shell commands, mention
+The `jackalope` terminal command runs routed conversations from the current
+directory through the desktop host, which it can start headless, and the app can hand a
+conversation to the system terminal. When the directory is not a repository yet,
+the command can create one after confirmation so the conversation has a worktree,
+or edit the folder directly. Conversations run inline shell commands, mention
 files and queue follow-ups, and `jackalope -p` runs one message for scripts and CI.
 Agent questions can be answered in the terminal. Installed PATH setup and hand-off
 on each platform remain in progress.

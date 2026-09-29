@@ -1,6 +1,6 @@
 {
   "name": "jackalope-monorepo",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "description": "Jackalope - Ultra-performant desktop shell and harness for agentic workflows",
   "scripts": {
@@ -60,7 +60,7 @@
   "packageManager": "pnpm@10.11.0",
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
-    "agent-browser": "0.37.1",
+    "agent-browser": "0.38.1",
     "lefthook": "2.1.14",
     "playwright-core": "1.63.0"
   },

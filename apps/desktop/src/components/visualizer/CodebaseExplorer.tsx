@@ -203,8 +203,10 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
                 <strong>{node.id === '.' ? 'Root files' : node.id.split('/').pop()}</strong>
                 <small>
                   {node.directory
-                    ? `${node.count} ${node.count === 1 ? 'file' : 'files'} · ${node.id}`
-                    : directoryOf(node.id)}
+                    ? `${node.count} ${node.count === 1 ? 'file' : 'files'}${node.id === '.' ? '' : ` · ${node.id}`}`
+                    : directoryOf(node.id) === '.'
+                      ? 'Project root'
+                      : directoryOf(node.id)}
                 </small>
               </span>
             </div>
@@ -424,7 +426,7 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
                       <FileCode2 size={16} />
                       <span>
                         <strong>{file.path.split('/').pop()}</strong>
-                        <small>{directoryOf(file.path)}</small>
+                        {directoryOf(file.path) !== '.' && <small>{directoryOf(file.path)}</small>}
                       </span>
                       {cycleFiles.has(file.path) && (
                         <span

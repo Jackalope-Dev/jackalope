@@ -32,3 +32,4 @@ export * as Tabs from './Tabs';
 export * from './Textarea';
 export * from './Tooltip';
 export * from './useDialogFocus';
+export * from './utils';

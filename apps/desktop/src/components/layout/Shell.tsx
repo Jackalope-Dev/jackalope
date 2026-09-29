@@ -21,19 +21,22 @@ import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { observeWorkbenchPreferences, useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
+import { AccessNoticeSlot } from '../account/AccessBoundary';
+import { useTrackOpenWork } from '../tasks/WorkSignals';
 import { BranchIndicator } from './BranchIndicator';
+import { ShortcutSheet } from './ShortcutSheet';
 import { WhatsNewDialog } from './WhatsNewDialog';
 import { WorkSidebar } from './WorkSidebar';
 import { WorkspaceStatusBar } from './WorkspaceStatusBar';
+import { WorkTabs } from './WorkTabs';
 import './workspace-shell.css';
 import { useShallow } from 'zustand/react/shallow';
 import { CompanionSources } from '../mascot/CompanionSources';
-import { RemoveProjectAction } from '../projects/RemoveProjectAction';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
 import type { SettingsCategory } from '../settings/SettingsPage';
 import { UpdateNotice } from '../settings/UpdateNotice';
-import { CaptureTask } from '../tasks/CaptureTask';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
+
 import { UnsavedTasksNotice } from '../tasks/TaskSaveRecovery';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
@@ -43,12 +46,10 @@ import { Tooltip } from '../ui/Tooltip';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
-import { InvitationsButton } from './InvitationsButton';
 import {
   type ActiveTab,
   AGENT_VIEWS,
   DEFAULT_WORKSPACE_TAB,
-  MCP_VIEWS,
   type ProjectSettingsDestination,
   WORKSPACE_VIEWS,
 } from './navigation';
@@ -105,6 +106,12 @@ const SettingsPage = lazy(() =>
 );
 const CommandPalette = lazy(() =>
   import('./CommandPalette').then((m) => ({ default: m.CommandPalette })),
+);
+const CaptureTask = lazy(() =>
+  import('../tasks/CaptureTask').then((m) => ({ default: m.CaptureTask })),
+);
+const RemoveProjectAction = lazy(() =>
+  import('../projects/RemoveProjectAction').then((m) => ({ default: m.RemoveProjectAction })),
 );
 
 export function Shell({
@@ -267,6 +274,7 @@ export function Shell({
     useManagedTaskStore.getState().select(null);
     selectProject(id);
   };
+  useTrackOpenWork();
   const selectedTaskId = useExecutionStore((state) => state.selectedId);
   const selectedSessionId = useLiveSessionStore((state) => state.selectedId);
   const selectedManagedId = useManagedTaskStore((state) => state.selectedId);
@@ -363,6 +371,7 @@ export function Shell({
       </a>
       <ResizeHandles />
       <TitleBar onSettings={() => navigate('preferences')} />
+      <AccessNoticeSlot />
       <header className="workspace-chrome">
         <div className="flex items-center gap-4 min-w-0">
           <img src="/mascot.svg" alt="Jackalope" className="size-8 shrink-0" />
@@ -412,14 +421,6 @@ export function Shell({
             </Menu.Portal>
           </Menu.Root>
           <BranchIndicator />
-          <InvitationsButton
-            onClick={() => {
-              setSettingsProjectId(undefined);
-              setSettingsCategory('Invitations');
-              setActiveTab('preferences');
-            }}
-            onDismiss={() => projectSwitcher.current?.focus()}
-          />
         </div>
         <div className="flex items-center gap-3">
           {project && <WorkspacePresetPicker projectId={project.id} />}
@@ -427,7 +428,7 @@ export function Shell({
             <Tooltip content={`New work (${displayShortcut(shortcuts.newWork)})`}>
               <button
                 type="button"
-                className="command-trigger"
+                className="command-trigger command-new"
                 onClick={focusComposer}
                 aria-label="New work"
               >
@@ -530,13 +531,7 @@ export function Shell({
             <WorkspaceSubnavigation
               label="Agents views"
               items={AGENT_VIEWS}
-              value={
-                activeTab === 'agent-settings'
-                  ? 'agents'
-                  : activeTab === 'mcp-marketplace'
-                    ? 'mcps'
-                    : activeTab
-              }
+              value={activeTab === 'agent-settings' ? 'agents' : activeTab}
               onChange={navigate}
             />
           )}
@@ -571,14 +566,7 @@ export function Shell({
                 }))}
               />
             )}
-          {(activeTab === 'mcps' || activeTab === 'mcp-marketplace') && (
-            <WorkspaceSubnavigation
-              label="MCP views"
-              items={MCP_VIEWS}
-              value={activeTab}
-              onChange={navigate}
-            />
-          )}
+          {activeTab === 'kanban' && <WorkTabs />}
           <PageErrorBoundary
             feature={features[activeTab]}
             key={`${activeTab}:${activeProjectId}:${settingsCategory}`}
@@ -700,29 +688,34 @@ export function Shell({
         </main>
       </div>
       {capture && (
-        <CaptureTask
-          key={capture.ideaId ?? 'capture'}
-          {...capture}
-          onClose={() => setCapture(null)}
-          onStarted={() => {
-            setCapture(null);
-            setActiveTab('kanban');
-          }}
-        />
+        <Suspense fallback={null}>
+          <CaptureTask
+            key={capture.ideaId ?? 'capture'}
+            {...capture}
+            onClose={() => setCapture(null)}
+            onStarted={() => {
+              setCapture(null);
+              setActiveTab('kanban');
+            }}
+          />
+        </Suspense>
       )}
       <UpdateNotice />
       {removingProject && (
-        <RemoveProjectAction
-          project={removingProject}
-          open
-          onOpenChange={(open) => {
-            if (!open) {
-              setRemovingProject(null);
-              requestAnimationFrame(() => projectSwitcher.current?.focus());
-            }
-          }}
-        />
+        <Suspense fallback={null}>
+          <RemoveProjectAction
+            project={removingProject}
+            open
+            onOpenChange={(open) => {
+              if (!open) {
+                setRemovingProject(null);
+                requestAnimationFrame(() => projectSwitcher.current?.focus());
+              }
+            }}
+          />
+        </Suspense>
       )}
+
       <ScheduleNotice />
       <HistoryRecoveryNotice />
       <UnsavedTasksNotice />
@@ -731,6 +724,11 @@ export function Shell({
         onSearch={() => setCommandsOpen(true)}
         onSettings={() => {
           setSettingsCategory('General');
+          setActiveTab('preferences');
+        }}
+        onInvitations={() => {
+          setSettingsProjectId(undefined);
+          setSettingsCategory('Invitations');
           setActiveTab('preferences');
         }}
       />
@@ -748,6 +746,7 @@ export function Shell({
         )}
       </Suspense>
       <WhatsNewDialog />
+      <ShortcutSheet />
     </div>
   );
 }

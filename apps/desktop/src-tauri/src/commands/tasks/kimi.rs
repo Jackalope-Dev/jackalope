@@ -876,6 +876,7 @@ setInterval(()=>{},1000);
             name: "Kimi fixture".into(),
             command: executable.to_string_lossy().into(),
             adapter: Some("kimi".into()),
+            args: Vec::new(),
         });
         std::fs::create_dir_all(runtime.policy_path().parent().unwrap()).unwrap();
         std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();

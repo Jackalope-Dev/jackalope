@@ -38,6 +38,14 @@ release dates.
   disconnect/retry without duplicate sends and host restart. Cover protected storage and
   Tailscale Serve coexistence on each platform; validate access boundaries independently.
 
+- [ ] Run agent comparisons with installed providers: partial start failures, mixed
+  finish times, stopped attempts, keep-one archiving and restore, and later follow-ups on
+  the kept task. Check that each provider reads attached image and file paths, including
+  absolute paths outside isolated worktrees, and that native file drops, pastes and the
+  file picker work on macOS and Linux. Measure command-search file listing on large
+  repositories and editor protocol handling for opened files.
+  Check unread markers and open-work tabs across restarts, deleted work, several windows
+  and remote hosts, and change counts on large worktrees and while agents write files.
 - [ ] Validate the unified work list, project scope, command search, persistent follow-up,
   preview readiness/cancellation/evidence capture and PR/CI reads in installed WebViews.
   Test first-result, visual correction, failed-check recovery, project return and delivery
@@ -45,7 +53,9 @@ release dates.
   Include parent-task links, unified Needs you counts, shared file browsing, preview
   setup explanations and evidence attachment, and blocked-result review. Include optional
   file markers, outcome approval, and real agent-review requests from the review toolbar.
-- [ ] Accept the `jackalope` command in installed macOS, Windows and Linux packages:
+- [ ] Accept the `jackalope` command in installed macOS, Windows and Linux packages,
+  including a folder that is not a Git repository (direct edits, no patch or merge)
+  and `--init` (initial commit, starter ignore, refusal of a home directory or drive root):
   PATH linking and the macOS system link, NSIS PATH hooks, the Store execution alias,
   AppImage relaunch, updates and uninstall. Exercise cold start, second-launch window
   promotion, several terminals, app-to-terminal hand-off on each platform's terminals,
@@ -75,8 +85,8 @@ release dates.
   Include direct Usage & quota navigation, filters, export and the quota-handoff setting.
 - [ ] Validate helper actions, notifications and external links in installed builds,
   including Ask context defaults, saved opt-outs and its settings navigation.
-- [ ] Exercise checkpoints, commit attribution, edited merge messages and cleanup
-  recovery with staged changes, locked folders and active tasks.
+- [ ] Validate checkpoints, commit attribution, edited merge messages and cleanup
+  recovery with staged changes, locked folders and active tasks in installed builds.
 - [ ] Verify rich results and diffs in installed WebViews. Preserve the Streamdown
   cache regression when upgrading dependencies.
 - [ ] Complete installed startup, CPU/memory and responsiveness measurements using
@@ -176,7 +186,7 @@ release dates.
   coordination with installed agents. Exercise ownership handoffs, rejected interfaces,
   scope review, automatic reconciliation/merge opt-ins and restart recovery in the installed app; measure duplicate work and
   conflict frequency before claiming an improvement.
-- [ ] Validate hourly schedules, timezones, missed runs and restart recovery.
+- [ ] Validate hourly schedules, timezones, missed runs and restart recovery in installed builds.
 - [ ] Complete packaged desktop-control checks, including multiple monitors,
   interruption, indicator failure and permission renewal.
 - [ ] Validate Gemini CLI task execution with installed profiles: login and account switching,
@@ -197,10 +207,13 @@ release dates.
   weakening process ownership, usage accounting or saved-session compatibility.
 - [ ] Add isolated Antigravity subscription accounts only when its CLI supports
   a verified credential-store override.
-- [ ] Extend reconnect/failover with explicit process ownership and recovery.
+- [ ] Validate reconnect and failover with explicit process ownership and recovery in installed profiles.
 
 ## Context, usage and integrations
 
+- [ ] Validate an added ACP CLI, a loopback OpenAI-compatible model server, and a schedule
+  webhook in installed profiles: sign-in stays with the CLI, the model list comes from the
+  server, the webhook token is not stored in clear text, and an overlapping call is skipped.
 - [ ] Validate curated MCP presets with installed agents and intended service accounts,
   including account-specific OAuth, revocation, local browser prerequisites and restart.
   Keep publisher endpoints and pinned local packages current; fixtures do not verify
@@ -209,8 +222,9 @@ release dates.
 - [ ] Verify automatic lessons across tasks, queues, schedules and restart,
   including evidence, edits, removal and frozen task context. Measure outcomes.
 - [ ] Extend codebase semantic coverage, project knowledge and scheduled continuation.
-- [ ] Add dated, project-attributed helper accounting and verify usage/outcome
-  drilldowns against installed history, including archived and unavailable records.
+- [ ] Verify Usage & quota drilldowns against installed history, including dated
+  project-attributed Ask Jackalope turns, archived helper conversations and
+  unreadable helper files.
 - [ ] Improve provider reporting, model inventory, capacity and monetary budgets.
   Keep reported, estimated, stale and unavailable data distinct.
 - [ ] Evaluate protocol and credential-store migrations against real providers

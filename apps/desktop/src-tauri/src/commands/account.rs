@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::{path::PathBuf, time::Duration};
 use tauri::Manager;
 use tauri::{AppHandle, State};
-use tauri_plugin_shell::ShellExt;
+use tauri_plugin_opener::OpenerExt;
 pub mod feedback;
 pub mod settings_sync;
 mod waitlist;
@@ -565,7 +565,7 @@ pub async fn app_account_connect(
         .join(&format!("/access/#desktop={}", record.verification))
         .map_err(|_| "Invalid account page.")?;
     // Saving first lets the user reopen the browser or resume after a restart.
-    let _ = app.shell().open(url.as_str(), None);
+    let _ = app.opener().open_url(url.as_str(), None::<&str>);
     Ok(status("pending", Some(&record)))
 }
 #[tauri::command]
@@ -584,12 +584,12 @@ pub async fn app_account_open_browser(
     } else {
         format!("/access/#desktop={}", record.verification)
     };
-    app.shell()
-        .open(
+    app.opener()
+        .open_url(
             web.join(&path)
                 .map_err(|_| "Invalid account page.")?
                 .as_str(),
-            None,
+            None::<&str>,
         )
         .map_err(|_| {
             "Could not open your browser. Check your default browser and try again.".into()
@@ -641,12 +641,12 @@ pub async fn app_account_open_referrals(
     if record.email.is_none() {
         return Err("Finish connecting your Jackalope account first.".into());
     }
-    app.shell()
-        .open(
+    app.opener()
+        .open_url(
             web.join("/access/#invitations")
                 .map_err(|_| "Invalid account page.")?
                 .as_str(),
-            None,
+            None::<&str>,
         )
         .map_err(|_| {
             "Could not open your browser. Check your default browser and try again.".into()

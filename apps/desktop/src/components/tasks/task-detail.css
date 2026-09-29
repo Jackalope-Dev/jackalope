@@ -98,12 +98,11 @@
   white-space: nowrap;
   min-width: 0;
 }
+/* Task sections use the standard workspace tab row: full-width divider, pill selection. */
 .task-detail .result-tabs {
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: var(--color-surface-sunken);
   gap: 4px;
-  padding: 4px;
+  padding: 0;
+  border: 0;
 }
 .task-detail .result-canvas {
   padding-block: 16px;
@@ -120,6 +119,8 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
 }
 .task-view-controls .result-tabs {
   min-width: 0;
@@ -190,10 +191,13 @@
   overflow-y: auto;
 }
 .task-detail .task-reply {
+  /* One line at rest, growing with the draft so results keep the height. */
+  field-sizing: content;
   margin: 0;
-  min-height: 48px;
-  max-height: 120px;
+  min-height: 44px;
+  max-height: 160px;
   padding: 10px 12px;
+  resize: none;
 }
 .task-followup-heading {
   font-size: var(--text-xs);
@@ -309,14 +313,58 @@
   flex: 1 1 240px;
   margin-bottom: 0;
 }
-.task-detail-navigation > .work-toolbar {
-  order: 1;
-  flex: 1 0 100%;
-}
 .task-detail-navigation .workspace-heading h1 {
   font-size: var(--text-xl);
   line-height: 1.3;
 }
 .task-detail-navigation .workspace-heading p {
   margin-top: 4px;
+}
+.task-followup-form > .inline-notice {
+  grid-column: 1 / -1;
+}
+.task-followup-form[data-dragging] {
+  border-radius: 12px;
+  outline: 2px dashed var(--color-accent);
+  outline-offset: 4px;
+}
+/* One rhythm for the task page: sections are separated by the gap, not their own margins. */
+.workspace-page-layout.task-detail {
+  gap: 16px;
+}
+.task-detail > :is(.task-detail-navigation, .task-failure),
+.task-status-stack > :is(.task-comparison, .task-progress),
+.task-detail > .task-next {
+  margin-block: 0;
+}
+.task-detail > :empty {
+  display: none;
+}
+/* The placeholder already names the field; the visible heading only costs height. */
+.task-detail .task-next > .task-followup-heading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.task-heading-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+/* Task context and workspace tools sit with the section tabs; the branch is in the top bar. */
+.task-view-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.task-view-tools > .work-toolbar {
+  margin: 0;
+}
+.task-view-tools .work-branch {
+  display: none;
 }

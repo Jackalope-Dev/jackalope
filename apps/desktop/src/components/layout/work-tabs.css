@@ -1,0 +1,62 @@
+/* Matches WorkspaceSubnavigation: rounded items, subtle fill for the current one. */
+.work-tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+  padding: 8px 24px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  border-bottom: 1px solid var(--color-border);
+}
+.work-tab {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  max-width: 240px;
+  border-radius: 10px;
+  color: var(--color-text-secondary);
+}
+.work-tab:hover {
+  background: var(--color-surface-hover);
+}
+.work-tab[data-current] {
+  color: var(--color-accent-ink);
+  background: var(--color-accent-subtle);
+}
+.work-tab-open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 4px 0 12px;
+  font-size: var(--text-sm);
+}
+.work-tab[data-current] .work-tab-open {
+  font-weight: 600;
+}
+.work-tab-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-tab-close {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 44px;
+  border-radius: 10px;
+  color: var(--color-text-muted);
+}
+.work-tab-close:hover {
+  color: var(--color-text-primary);
+}
+.work-tab-open:focus-visible,
+.work-tab-close:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+  border-radius: 10px;
+}

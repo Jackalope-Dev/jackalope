@@ -39,6 +39,8 @@ pub struct Cli {
     /// `--profile=<dir>`, which the app passes when opening a system terminal,
     /// since a terminal that is already running will not inherit its environment.
     pub profile: Option<String>,
+    /// `--init`: create a repository in the current directory when it has none.
+    pub init: bool,
 }
 
 const USAGE: &str = "Run 'jackalope help' to see what is available.";
@@ -46,8 +48,8 @@ const USAGE: &str = "Run 'jackalope help' to see what is available.";
 pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String> {
     let mut arguments = arguments.into_iter();
     let mut words: Vec<String> = Vec::new();
-    let (mut print, mut json, mut resume, mut help, mut version) =
-        (false, false, false, false, false);
+    let (mut print, mut json, mut resume, mut help, mut version, mut init) =
+        (false, false, false, false, false, false);
     let mut pick = false;
     let mut cold_start = None;
     let (mut agent, mut profile, mut timeout) = (None, None, None);
@@ -80,6 +82,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
             "-V" | "--version" => version = true,
             "--open" => cold_start = Some(ColdStart::Open),
             "--background" => cold_start = Some(ColdStart::Background),
+            "--init" => init = true,
             "--agent" => agent = Some(value("--agent")?),
             "--profile" => profile = Some(value("--profile")?),
             "--timeout" => {
@@ -185,10 +188,21 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
     if resume && !matches!(command, Command::Converse { attach: None, .. }) {
         return Err(format!("--continue starts the conversation view. {USAGE}"));
     }
+    if init
+        && !matches!(
+            command,
+            Command::Converse { .. } | Command::Once { .. } | Command::Help | Command::Version
+        )
+    {
+        return Err(format!(
+            "--init applies when starting a conversation. {USAGE}"
+        ));
+    }
     Ok(Cli {
         command,
         cold_start,
         profile,
+        init,
     })
 }
 
@@ -302,6 +316,14 @@ mod tests {
         assert!(parse_line(&["--json=1", "ls"]).is_err());
         assert!(parse_line(&["frobnicate"]).is_err());
         assert!(parse_line(&["stop"]).is_err());
+        assert!(parse_line(&["--init", "ls"]).is_err());
+    }
+
+    #[test]
+    fn init_applies_to_starting_a_conversation() {
+        assert!(parse_line(&["--init"]).unwrap().init);
+        assert!(parse_line(&["-p", "--init", "fix it"]).unwrap().init);
+        assert!(!parse_line(&["-p", "fix it"]).unwrap().init);
     }
 
     #[test]

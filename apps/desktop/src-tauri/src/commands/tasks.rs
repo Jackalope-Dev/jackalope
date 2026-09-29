@@ -124,6 +124,55 @@ pub(super) fn resolve_target_branch(path: &str, requested: Option<&str>) -> Resu
     Ok(branch)
 }
 
+/// Git reported that `path` is not a repository, or Git itself is not installed.
+/// A missing directory is Git's own `fatal:` message and stays an error.
+fn outside_repository(error: &str) -> bool {
+    let lower = error.to_ascii_lowercase();
+    lower.contains("not a git repository")
+        || lower.contains("program not found")
+        || (!lower.contains("fatal:")
+            && (lower.contains("cannot find the file specified")
+                || lower.contains("no such file or directory")))
+}
+
+fn located_directory(path: &str) -> Result<String, String> {
+    let candidate = Path::new(path);
+    let directory = if candidate.is_file() {
+        candidate
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .ok_or_else(|| format!("{path} is not a directory."))?
+    } else {
+        candidate
+    };
+    let canonical =
+        dunce::canonicalize(directory).map_err(|_| format!("{path} is not a directory."))?;
+    if !canonical.is_dir() {
+        return Err(format!("{path} is not a directory."));
+    }
+    Ok(canonical.to_string_lossy().into_owned())
+}
+
+/// The canonical directory when `path` is not inside a Git repository.
+/// `Ok(None)` when it is, so a repository keeps its worktree.
+pub(super) fn plain_folder(path: &str) -> Result<Option<String>, String> {
+    match git(path, &["rev-parse", "--show-toplevel"]) {
+        Ok(_) => Ok(None),
+        Err(error) if outside_repository(&error) => Ok(Some(located_directory(path)?)),
+        Err(error) => Err(error),
+    }
+}
+
+/// The project directory for a terminal: the repository root, or the folder itself
+/// when it is not a repository. This does not create a repository.
+pub(super) fn project_directory(path: &str) -> Result<String, String> {
+    match git(path, &["rev-parse", "--show-toplevel"]) {
+        Ok(root) => Ok(root),
+        Err(error) if outside_repository(&error) => located_directory(path),
+        Err(error) => Err(error),
+    }
+}
+
 fn valid_id(id: &str) -> bool {
     (8..=80).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
 }
@@ -533,8 +582,15 @@ pub async fn task_review(id: String, state: State<'_, TaskRuntime>) -> Result<Re
 }
 
 pub(super) fn review_run(run: &TaskRun) -> Result<Review, String> {
-    if run.workspace.is_empty() || run.base_head.is_empty() {
+    if run.workspace.is_empty() {
         return Err("Workspace is not available yet.".into());
+    }
+    if run.base_head.is_empty() {
+        return Ok(Review {
+            files: Vec::new(),
+            diff: String::new(),
+            note: "This folder is not a Git repository. Jackalope edited it in place and cannot show a patch or merge it. Run jackalope --init when you want a separate worktree.".into(),
+        });
     }
     let changed = git(
         &run.workspace,
@@ -583,4 +639,28 @@ pub(super) fn review_run(run: &TaskRun) -> Result<Review, String> {
         }
     }
     Ok(Review { files, diff: diff.chars().take(120_000).collect(), note: "Current workspace compared with the task's starting commit, including new files. Existing working changes may be included when isolation is off. Preview is limited to 120,000 characters; binary files are listed only.".into() })
+}
+
+#[cfg(test)]
+mod folder_workspace {
+    use super::*;
+
+    #[test]
+    fn a_plain_folder_is_not_turned_into_a_repository() {
+        let folder = std::env::temp_dir().join(format!("jl-folder-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(folder.join("src")).unwrap();
+        std::fs::write(folder.join("src").join("main.txt"), "hello").unwrap();
+        let path = folder.to_string_lossy().into_owned();
+        let found = plain_folder(&path).unwrap().expect("folder");
+        assert!(!std::path::Path::new(&found).join(".git").exists());
+        assert_eq!(project_directory(&path).unwrap(), found);
+
+        let repo = std::env::temp_dir().join(format!("jl-repo-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&repo).unwrap();
+        git(&repo.to_string_lossy(), &["init"]).unwrap();
+        assert!(plain_folder(&repo.to_string_lossy()).unwrap().is_none());
+
+        let _ = std::fs::remove_dir_all(&folder);
+        let _ = std::fs::remove_dir_all(&repo);
+    }
 }

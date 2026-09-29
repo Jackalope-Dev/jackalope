@@ -630,6 +630,7 @@ process.stdin.on('end',()=>{
         name: "Live fixture".into(),
         command: executable.to_string_lossy().into_owned(),
         adapter: Some("codex".into()),
+        args: Vec::new(),
     });
     std::fs::create_dir_all(service.runtime.policy_path().parent().unwrap()).unwrap();
     std::fs::write(

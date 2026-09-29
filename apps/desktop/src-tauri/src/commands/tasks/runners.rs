@@ -34,6 +34,9 @@ pub(super) fn discover_runner(
         account: "Current CLI account".into(),
         detail: String::new(),
     };
+    if let Some(custom) = policy.custom_agents.iter().find(|agent| agent.id == id) {
+        runner.name = custom.name.clone();
+    }
     let mut discovery = policy.clone();
     discovery.enabled_agents.clear();
     match discovery.resolve(id) {
@@ -59,6 +62,10 @@ pub(super) fn discover_runner(
                 }
             };
             runner.account = binding.label.clone();
+            if adapter == "acp" {
+                runner.detail = "Ready. Sign in with this CLI in a terminal first. Jackalope starts it over ACP.".into();
+                return runner;
+            }
             if adapter == "antigravity" {
                 runner.detail =
                     "Ready. Uses your agy sign-in or a Gemini API key added in Agents.".into();

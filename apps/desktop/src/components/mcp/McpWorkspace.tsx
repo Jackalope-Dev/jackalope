@@ -424,47 +424,6 @@ export function McpWorkspace({
                           <div className="mcp-card-header">
                             <h3 className="mcp-card-title">{server.name}</h3>
                             <div className="mcp-card-badges">
-                              {!server.discovery &&
-                                server.transport === 'http' &&
-                                (server.scope === 'codex' ||
-                                  server.scope === 'claude' ||
-                                  server.scope.startsWith('project:') ||
-                                  server.scope === 'global') &&
-                                (server.scope === 'codex' || server.scope === 'claude'
-                                  ? [server.scope]
-                                  : ['codex', 'claude']
-                                )
-                                  .filter(
-                                    (agent) => !server.agents || server.agents.includes(agent),
-                                  )
-                                  .map((agent) => (
-                                    <Button
-                                      key={agent}
-                                      variant="ghost"
-                                      onClick={() =>
-                                        void nativeTask('mcp_authenticate', {
-                                          id: server.id,
-                                          scope: server.scope,
-                                          agent,
-                                          profileId: agentAccountFor(project, agent),
-                                        })
-                                          .then(() => {
-                                            setNoticeTone('info');
-                                            setCopyError(
-                                              'Sign-in opened in your CLI. Complete authorization and check access there. Connection probes use configured headers or environment tokens.',
-                                            );
-                                          })
-                                          .catch(() => {
-                                            setNoticeTone('error');
-                                            setCopyError(
-                                              'Could not open sign-in. Use the selected agent account’s MCP sign-in flow in a terminal.',
-                                            );
-                                          })
-                                      }
-                                    >
-                                      Sign in with {agent === 'claude' ? 'Claude' : 'Codex'}
-                                    </Button>
-                                  ))}
                               <Badge
                                 variant={
                                   ['global', 'claude', 'codex'].includes(server.scope)
@@ -482,6 +441,47 @@ export function McpWorkspace({
                               {server.enabled === false && <Badge>Disabled</Badge>}
                               {server.discovery && <Badge>On demand</Badge>}
                             </div>
+                          </div>
+                          <div className="mcp-card-signin">
+                            {!server.discovery &&
+                              server.transport === 'http' &&
+                              (server.scope === 'codex' ||
+                                server.scope === 'claude' ||
+                                server.scope.startsWith('project:') ||
+                                server.scope === 'global') &&
+                              (server.scope === 'codex' || server.scope === 'claude'
+                                ? [server.scope]
+                                : ['codex', 'claude']
+                              )
+                                .filter((agent) => !server.agents || server.agents.includes(agent))
+                                .map((agent) => (
+                                  <Button
+                                    key={agent}
+                                    variant="ghost"
+                                    onClick={() =>
+                                      void nativeTask('mcp_authenticate', {
+                                        id: server.id,
+                                        scope: server.scope,
+                                        agent,
+                                        profileId: agentAccountFor(project, agent),
+                                      })
+                                        .then(() => {
+                                          setNoticeTone('info');
+                                          setCopyError(
+                                            'Sign-in opened in your CLI. Complete authorization and check access there. Connection probes use configured headers or environment tokens.',
+                                          );
+                                        })
+                                        .catch(() => {
+                                          setNoticeTone('error');
+                                          setCopyError(
+                                            'Could not open sign-in. Use the selected agent account’s MCP sign-in flow in a terminal.',
+                                          );
+                                        })
+                                    }
+                                  >
+                                    Sign in with {agent === 'claude' ? 'Claude' : 'Codex'}
+                                  </Button>
+                                ))}
                           </div>
 
                           {server.managed && (

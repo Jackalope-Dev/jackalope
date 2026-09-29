@@ -22,9 +22,27 @@
   border-color: transparent;
   box-shadow: none;
 }
-.workspace-shell[data-mode="focus"] :is(.task-home, .task-detail, .managed-task-page) {
+.workspace-shell[data-mode="focus"] .task-home {
   max-width: 960px;
   margin-inline: auto;
+}
+/* Results and reviews need room for diffs; the composer stays at reading width. */
+.workspace-shell[data-mode="focus"] :is(.task-detail, .managed-task-page) {
+  max-width: 1200px;
+  margin-inline: auto;
+}
+/* Tabs line up with the column below them: the composer home or a wider result. */
+.workspace-shell[data-mode="focus"] .work-tabs {
+  width: 100%;
+  max-width: 960px;
+  margin-inline: auto;
+  padding-inline: 48px;
+  border-bottom: 0;
+}
+.workspace-shell[data-mode="focus"]
+  .workspace-canvas:has(:is(.task-detail, .managed-task-page))
+  .work-tabs {
+  max-width: 1200px;
 }
 .task-home[data-mode="focus"]:not([data-browsing]) {
   padding-top: clamp(24px, 6vh, 72px);
@@ -125,45 +143,27 @@
   min-height: 44px;
   margin-top: 8px;
 }
+/* Quick links to project tools: one compact row, since the Project tabs hold the full views. */
 .build-tool-shelf {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-content: start;
-  grid-auto-rows: min-content;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 24px;
 }
 .build-tool-shelf > button {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
-  padding: 14px;
-  min-width: 0;
+  min-height: 44px;
+  padding: 0 14px;
   border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
-  text-align: left;
   background: var(--color-surface);
+  font-size: var(--text-sm);
 }
 .build-tool-shelf svg {
   flex-shrink: 0;
   color: var(--color-text-secondary);
-}
-.build-tool-shelf span {
-  flex: 1;
-  min-width: 0;
-}
-.build-tool-shelf strong,
-.build-tool-shelf small {
-  display: block;
-}
-.build-tool-shelf strong {
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-.build-tool-shelf small {
-  margin-top: 3px;
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
 }
 .oversee-counts {
   display: grid;
@@ -173,11 +173,16 @@
   gap: 12px;
   margin-bottom: 20px;
 }
+/* Label and count on one line; the description stays available as a tooltip. */
 .oversee-counts button {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   min-width: 0;
-  padding: 16px;
+  position: relative;
+  min-height: 56px;
+  padding: 12px 16px;
   text-align: left;
   border-radius: 12px;
   border: 1px solid var(--color-border-subtle);
@@ -187,14 +192,17 @@
   font-size: var(--text-sm);
 }
 .oversee-counts strong {
-  font-size: 32px;
+  font-size: var(--text-2xl);
   font-weight: 500;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
 }
 .oversee-counts small {
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 .oversee-counts button[aria-pressed="true"] {
   border-color: var(--color-text-secondary);
@@ -227,7 +235,7 @@
   width: 19px;
   height: 19px;
 }
-@media (max-width: 1000px) {
+@media (max-width: 720px) {
   .oversee-counts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

@@ -30,8 +30,12 @@ agent/account failover. Execution-access and agent/model/account restrictions
 apply. Provider sign-ins and CLI configuration remain owned by installed agents;
 this is not an OS sandbox.
 
-Each turn records its actual agent, model, account label and reported tokens.
-Helper usage stays in helper history rather than project task usage. Kimi uses a
+Each turn records when it happened, its agent, model, account label, account key
+and reported tokens. It records the open project when project sharing is current. A stale
+or disabled project context leaves the project unset. Turns saved before those
+fields existed stay undated and unattributed. Helper usage stays in helper history
+rather than project task usage, including archived conversations. A file that cannot
+be read is reported and left in place. Kimi uses a
 private tool-free agent definition; its print output does not include token totals,
 so that helper usage remains unknown. The prompt
 includes up to eight prior replies and recent action IDs/statuses so the agent

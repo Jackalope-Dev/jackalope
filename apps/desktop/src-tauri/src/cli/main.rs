@@ -27,7 +27,7 @@ const HELP: &str = "\
 jackalope — talk to your agents from the terminal
 
 USAGE
-  jackalope                      start a conversation in this repository
+  jackalope                      start a conversation in this directory
   jackalope -p \"<message>\"       run once, print the reply and exit
   jackalope run \"<message>\"      the same as -p
   jackalope -c, --continue       continue the latest conversation here
@@ -58,12 +58,20 @@ RUNNING ONCE
 OPTIONS
   --open                         start the desktop app if nothing is running
   --background                   start a headless host if nothing is running
+  --init                         create a Git repository here when there is none
   --profile <dir>                use another Jackalope profile
   --version                      print the version
   --                             treat everything after as the message
 ";
 
 fn main() {
+    if let Err(error) = run() {
+        eprintln!("{error}");
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<(), String> {
     let cli = match args::parse(std::env::args().skip(1)) {
         Ok(cli) => cli,
         Err(error) => {
@@ -74,7 +82,8 @@ fn main() {
     if let Some(directory) = &cli.profile {
         std::env::set_var("JACKALOPE_PROFILE_DIR", directory);
     }
-    let result = match cli.command {
+    let init = cli.init;
+    match cli.command {
         Command::Help => {
             print!("{HELP}");
             Ok(())
@@ -89,6 +98,7 @@ fn main() {
             json,
             timeout,
         } => {
+            announce_repository(init)?;
             let options = once::Options {
                 agent,
                 json,
@@ -108,12 +118,18 @@ fn main() {
             resume,
             attach,
             pick,
-        } => converse(cli.cold_start, attach, resume, pick),
-    };
-    if let Err(error) = result {
-        eprintln!("{error}");
-        std::process::exit(1);
+        } => {
+            announce_repository(init)?;
+            converse(cli.cold_start, attach, resume, pick)
+        }
     }
+}
+
+fn announce_repository(init: bool) -> Result<(), String> {
+    if let Some(notice) = git::prepare(init)? {
+        eprintln!("{notice}");
+    }
+    Ok(())
 }
 
 fn converse(
@@ -132,7 +148,7 @@ fn converse(
         Some(prefix) => Some(connection::resolve(&connection.sessions()?, &prefix)?),
         None if resume => Some(
             subcommands::latest(&mut connection, &project)?
-                .ok_or("No conversation to continue in this repository.")?,
+                .ok_or("No conversation to continue in this directory.")?,
         ),
         None => None,
     };

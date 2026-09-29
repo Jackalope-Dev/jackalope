@@ -57,3 +57,6 @@
   margin-left: -12px;
   box-shadow: 0 0 0 2px var(--color-surface);
 }
+.agent-stack .agent-avatar[data-size="xs"] + .agent-avatar {
+  margin-left: -6px;
+}

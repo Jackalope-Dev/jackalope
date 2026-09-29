@@ -1,0 +1,58 @@
+.commit-graph {
+  margin: 0;
+  padding: 12px 16px;
+  list-style: none;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  background: var(--color-surface);
+  overflow-x: auto;
+}
+.commit-graph li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 32px;
+  font-size: var(--text-sm);
+}
+.commit-graph li[data-connector] {
+  min-height: 16px;
+}
+.commit-graph-lanes {
+  flex-shrink: 0;
+  min-width: 2ch;
+  color: var(--color-accent-ink);
+  font-family: var(--font-mono, monospace);
+  white-space: pre;
+}
+.commit-graph-commit {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.commit-graph-commit code {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.commit-graph-subject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commit-graph-ref {
+  flex-shrink: 0;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.commit-graph-commit small {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}

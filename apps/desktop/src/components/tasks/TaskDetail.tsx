@@ -1,16 +1,24 @@
-import { Checkbox, Disclosure, DisclosureSummary, DropdownMenu as Menu } from '@jackalope/ui';
+import {
+  Badge,
+  Checkbox,
+  Disclosure,
+  DisclosureSummary,
+  DropdownMenu as Menu,
+} from '@jackalope/ui';
 import {
   ArrowLeft,
   CalendarClock,
   Check,
   Copy,
   GitMerge,
+  MailPlus,
   MoreHorizontal,
   Play,
   Square,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { getAgentMetadata } from '../../lib/agent-catalog';
 import { waitForStoppedAttempt } from '../../lib/continue-task';
 import { projectConnections } from '../../lib/mcp-connection';
 import { recoveryHandoff } from '../../lib/project-return';
@@ -31,6 +39,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useWorkbenchStore } from '../../stores/workbenchStore';
+import { useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { Button } from '../ui/button';
@@ -43,6 +52,7 @@ import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview, type ReviewSection } from './ResultReview';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import { TaskActivity } from './TaskActivity';
+import { TaskComparison } from './TaskComparison';
 import { TaskDelivery } from './TaskDelivery';
 import { TaskFailure } from './TaskFailure';
 import { TaskFollowUpPanel } from './TaskFollowUpPanel';
@@ -409,12 +419,24 @@ export function TaskDetail({
           <ArrowLeft size={16} />
           All tasks
         </Button>
-        <WorkspaceHeading title={title} titleRef={heading} description={run.projectName} />
-        <WorkContext
-          key={`context:${run.taskId}`}
-          run={run}
-          onTerminal={() => setTab('terminal')}
-          hideTerminal
+        <WorkspaceHeading
+          title={title}
+          titleRef={heading}
+          description={
+            active ? (
+              run.projectName
+            ) : (
+              <span className="task-heading-meta">
+                <Badge appearance="plain" variant={decision.tone}>
+                  {decision.label}
+                </Badge>
+                <span>
+                  {run.projectName} · {getAgentMetadata(run.agent)?.name ?? run.agent} ·{' '}
+                  {run.accountBinding?.label || run.account}
+                </span>
+              </span>
+            )
+          }
         />
         {isLatest && !integrated && (
           <WorkFeedbackInbox
@@ -424,6 +446,24 @@ export function TaskDetail({
           />
         )}
         <div className="task-detail-utilities">
+          {!active && isLatest && (
+            <>
+              {run.workspace && run.status !== 'interrupted' && !integrated && (
+                <Button variant="outline" onClick={() => setTab('preview')}>
+                  <Play size={16} />
+                  Try result
+                </Button>
+              )}
+              <Button
+                disabled={acting || submitting}
+                loading={acting}
+                loadingLabel="Working…"
+                onClick={() => void primaryAction()}
+              >
+                {decision.action}
+              </Button>
+            </>
+          )}
           <WorkSourceLink prompts={attempts.map((attempt) => attempt.prompt)} />
           {attempts.length > 1 && (
             <Select
@@ -493,6 +533,15 @@ export function TaskDetail({
                 >
                   Task details
                 </Menu.Item>
+                <Menu.Item
+                  className="workspace-menu-item"
+                  onSelect={() => {
+                    useWorkSignalsStore.getState().markUnread(run.taskId);
+                    onBack();
+                  }}
+                >
+                  <MailPlus size={16} /> Mark unread
+                </Menu.Item>
                 {finished && (
                   <Menu.Item
                     className="workspace-menu-item"
@@ -509,47 +558,35 @@ export function TaskDetail({
           </Menu.Root>
         </div>
       </div>
-      <TaskProgress
-        run={run}
-        integrated={integrated}
-        pending={pending.length}
-        verifyCommand={currentProject?.preferences?.verifyCommand}
-        onActivity={() => setTab('activity')}
-        action={
-          active ? (
-            <div className="task-detail-utilities">
-              {!!pending.length && (
-                <Button onClick={() => inspect('question')}>Answer question</Button>
-              )}
-              <Button
-                variant="outline"
-                disabled={acting || run.status === 'stopping'}
-                onClick={() => void act('task_stop')}
-              >
-                <Square size={14} />
-                Stop
-              </Button>
-            </div>
-          ) : isLatest ? (
-            <div className="task-detail-utilities">
-              {run.workspace && run.status !== 'interrupted' && !integrated && (
-                <Button variant="outline" onClick={() => setTab('preview')}>
-                  <Play size={16} />
-                  Try result
-                </Button>
-              )}
-              <Button
-                disabled={acting || submitting}
-                loading={acting}
-                loadingLabel="Working…"
-                onClick={() => void primaryAction()}
-              >
-                {decision.action}
-              </Button>
-            </div>
-          ) : undefined
-        }
-      />
+      <div className="task-status-stack">
+        <TaskComparison run={run} />
+        {active && (
+          <TaskProgress
+            run={run}
+            integrated={integrated}
+            pending={pending.length}
+            verifyCommand={currentProject?.preferences?.verifyCommand}
+            onActivity={() => setTab('activity')}
+            action={
+              active ? (
+                <div className="task-detail-utilities">
+                  {!!pending.length && (
+                    <Button onClick={() => inspect('question')}>Answer question</Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    disabled={acting || run.status === 'stopping'}
+                    onClick={() => void act('task_stop')}
+                  >
+                    <Square size={14} />
+                    Stop
+                  </Button>
+                </div>
+              ) : undefined
+            }
+          />
+        )}
+      </div>
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {notice && (
         <p role="status" className="task-muted">
@@ -610,16 +647,24 @@ export function TaskDetail({
               </Tabs.Trigger>
             ))}
           </Tabs.List>
-          {['changes', 'preview', 'terminal', 'activity'].includes(tab) && (
-            <Button
-              variant="ghost"
-              className="conversation-toggle"
-              aria-pressed={split}
-              onClick={() => useWorkViewStore.getState().setSplit(run.taskId, !split)}
-            >
-              {split ? 'Hide conversation' : 'Show conversation'}
-            </Button>
-          )}
+          <div className="task-view-tools">
+            {['changes', 'preview', 'terminal', 'activity'].includes(tab) && (
+              <Button
+                variant="ghost"
+                className="conversation-toggle"
+                aria-pressed={split}
+                onClick={() => useWorkViewStore.getState().setSplit(run.taskId, !split)}
+              >
+                {split ? 'Hide conversation' : 'Show conversation'}
+              </Button>
+            )}
+            <WorkContext
+              key={`context:${run.taskId}`}
+              run={run}
+              onTerminal={() => setTab('terminal')}
+              hideTerminal
+            />
+          </div>
         </div>
         <div className="result-canvas" data-alongside={alongside || undefined}>
           <Tabs.Content value="result" forceMount hidden={tab !== 'result' && !alongside}>

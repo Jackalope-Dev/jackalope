@@ -388,6 +388,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
                 name: "Lifecycle fixture".into(),
                 command: executable.to_string_lossy().into_owned(),
                 adapter: Some(agent.into()),
+                args: Vec::new(),
             });
         std::fs::create_dir_all(runtime.policy_path().parent().unwrap()).unwrap();
         std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
@@ -901,6 +902,7 @@ process.stdin.on('end', () => {
         name: "Fixture".into(),
         command: executable.to_string_lossy().into(),
         adapter: Some("codex".into()),
+        args: Vec::new(),
     });
     policy.runner_options.insert(
         "custom-fixture".into(),

@@ -6,7 +6,8 @@ import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
 import { DropdownMenu as Menu } from '@jackalope/ui';
 import { FolderOpen, ListTodo, MoreHorizontal, Plus, Radio, Workflow } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import { useShallow } from 'zustand/react/shallow';
 import {
   collectWorkspaceWork,
@@ -24,17 +25,28 @@ import { useTaskStore } from '../../stores/taskStore';
 import { useWorkbenchStore } from '../../stores/workbenchStore';
 import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
-import { LiveSessionView } from '../sessions/LiveSessionView';
 import { SessionStart } from '../sessions/SessionStart';
-import { ArchivedHistory } from '../settings/ArchivedHistory';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
-import { ManagedTaskView } from './ManagedTaskView';
-import { ProjectQueue } from './ProjectQueue';
-import { TaskCollection } from './TaskCollection';
-import { TaskDetail } from './TaskDetail';
 import { WorkspaceModeHome } from './WorkspaceModeHome';
+
+const ManagedTaskView = lazy(() =>
+  import('./ManagedTaskView').then((m) => ({ default: m.ManagedTaskView })),
+);
+const LiveSessionView = lazy(() =>
+  import('../sessions/LiveSessionView').then((m) => ({ default: m.LiveSessionView })),
+);
+const TaskDetail = lazy(() => import('./TaskDetail').then((m) => ({ default: m.TaskDetail })));
+const ProjectQueue = lazy(() =>
+  import('./ProjectQueue').then((m) => ({ default: m.ProjectQueue })),
+);
+const TaskCollection = lazy(() =>
+  import('./TaskCollection').then((m) => ({ default: m.TaskCollection })),
+);
+const ArchivedHistory = lazy(() =>
+  import('../settings/ArchivedHistory').then((m) => ({ default: m.ArchivedHistory })),
+);
 
 export function TaskWorkspace({
   onCapture,
@@ -252,34 +264,40 @@ export function TaskWorkspace({
   }, [owningSession, select]);
   if (managedTask)
     return (
-      <ManagedTaskView
-        key={managedTask.id}
-        task={managedTask}
-        onBack={() => {
-          managed.select(null);
-          select(null);
-        }}
-      />
+      <Suspense fallback={<LoadingState label="Loading task…" />}>
+        <ManagedTaskView
+          key={managedTask.id}
+          task={managedTask}
+          onBack={() => {
+            managed.select(null);
+            select(null);
+          }}
+        />
+      </Suspense>
     );
   if (owningSession)
     return (
-      <LiveSessionView
-        key={owningSession.id}
-        session={owningSession}
-        runs={sessionRuns}
-        onBack={() => useLiveSessionStore.getState().select(null)}
-      />
+      <Suspense fallback={<LoadingState label="Loading conversation…" />}>
+        <LiveSessionView
+          key={owningSession.id}
+          session={owningSession}
+          runs={sessionRuns}
+          onBack={() => useLiveSessionStore.getState().select(null)}
+        />
+      </Suspense>
     );
   if (selected)
     return (
-      <TaskDetail
-        key={selected.id}
-        run={selected}
-        onBack={() => select(null)}
-        onSchedule={() => onSchedule(selected.id)}
-        onCapture={onCapture}
-        integrated={integratedIds.includes(selected.id)}
-      />
+      <Suspense fallback={<LoadingState label="Loading task details…" />}>
+        <TaskDetail
+          key={selected.id}
+          run={selected}
+          onBack={() => select(null)}
+          onSchedule={() => onSchedule(selected.id)}
+          onCapture={onCapture}
+          integrated={integratedIds.includes(selected.id)}
+        />
+      </Suspense>
     );
   const selectedSession = sessions.find(
     (session) =>
@@ -288,15 +306,22 @@ export function TaskWorkspace({
   );
   if (selectedSession)
     return (
-      <LiveSessionView
-        key={selectedSession.id}
-        session={selectedSession}
-        runs={sessionRuns}
-        onBack={() => useLiveSessionStore.getState().select(null)}
-      />
+      <Suspense fallback={<LoadingState label="Loading conversation…" />}>
+        <LiveSessionView
+          key={selectedSession.id}
+          session={selectedSession}
+          runs={sessionRuns}
+          onBack={() => useLiveSessionStore.getState().select(null)}
+        />
+      </Suspense>
     );
   if (parallel && project)
-    return <ProjectQueue project={project} onBack={() => setParallel(false)} />;
+    return (
+      <Suspense fallback={<LoadingState label="Loading queue…" />}>
+        <ProjectQueue project={project} onBack={() => setParallel(false)} />
+      </Suspense>
+    );
+
   return (
     <WorkspacePage className="task-home" data-mode={preset} data-browsing={browsing || undefined}>
       <WorkspaceHeading
@@ -312,13 +337,9 @@ export function TaskWorkspace({
               : `Build in ${project?.name ?? 'your workspace'}`
         }
         description={
-          preset === 'focus' ? (
-            'One conversation or task at a time. Everything else is within reach.'
-          ) : preset === 'oversee' ? (
-            'See what is moving, answer questions and keep reviews moving.'
-          ) : hasWork ? (
-            'Keep your conversation beside changes, previews and terminals.'
-          ) : (
+          preset === 'focus' ? undefined : preset === 'oversee' ? (
+            'Answer questions, unblock work and review results.'
+          ) : hasWork ? undefined : (
             <span>
               Describe what to build, fix, or explore, or{' '}
               <button
@@ -405,6 +426,18 @@ export function TaskWorkspace({
           </div>
         }
       />
+      {composerVisible &&
+        ((!hasWork && preset !== 'oversee') ||
+          composerExpanded ||
+          (preset === 'focus' && !browsing)) && (
+          <SessionStart
+            embedded
+            key={project?.id ?? 'none'}
+            project={project}
+            starters={!hasWork}
+            onOpenProject={() => useOnboardingStore.getState().begin()}
+          />
+        )}
       {preset !== 'focus' && !archived && (
         <WorkspaceModeHome
           key={preset}
@@ -416,17 +449,6 @@ export function TaskWorkspace({
           onPlan={() => setParallel(true)}
         />
       )}
-      {composerVisible &&
-        ((!hasWork && preset !== 'oversee') ||
-          composerExpanded ||
-          (preset === 'focus' && !browsing)) && (
-          <SessionStart
-            embedded
-            key={project?.id ?? 'none'}
-            project={project}
-            onOpenProject={() => useOnboardingStore.getState().begin()}
-          />
-        )}
       {preset === 'focus' && !browsing && (
         <WorkspaceModeHome
           key={preset}
@@ -446,74 +468,80 @@ export function TaskWorkspace({
       {loading && <LoadingState label={'Loading task history…'} />}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {(preset !== 'focus' || browsing) && (hasWork || preset === 'oversee') ? (
-        <TaskCollection
-          key={String(archived)}
-          archived={archived}
-          onArchive={archiveItems}
-          onBusyChange={setCleanupBusy}
-          history={
-            <Select
-              aria-label="Task history"
-              disabled={cleanupBusy}
-              value={archived ? 'archive' : 'current'}
-              onValueChange={(value) => setArchived(value === 'archive')}
-            >
-              <SelectItem value="current">Current work</SelectItem>
-              <SelectItem value="archive">Archived work</SelectItem>
-            </Select>
-          }
-          scope={
-            <Select
-              aria-label="Filter by project"
-              value={scope}
-              onValueChange={(value) => setScope(value as 'all' | 'project')}
-            >
-              <SelectItem value="all">All work · every project</SelectItem>
-              <SelectItem value="project">
-                {project?.name ?? 'No project yet'} · project work
-              </SelectItem>
-            </Select>
-          }
-          emptyState={
-            <EmptyState
-              icon={FolderOpen}
-              title={
-                archived
-                  ? 'No archived tasks'
-                  : projectFilter === 'all'
-                    ? 'No current tasks'
-                    : 'No tasks in this project'
-              }
-              description={
-                archived
-                  ? 'Tasks you archive will appear here.'
-                  : 'Describe a change above, or browse repository TODOs to find tasks.'
-              }
-              action={
-                <div className="flex items-center gap-2">
-                  {projectFilter !== 'all' && (
-                    <Button variant="outline" onClick={() => setScope('all')}>
-                      Show all projects
-                    </Button>
-                  )}
-                  {!archived && (
-                    <Button variant="outline" onClick={() => navigateWorkspace('repo-todos')}>
-                      <ListTodo size={16} />
-                      Browse Repo TODOs
-                    </Button>
-                  )}
-                </div>
-              }
-            />
-          }
-          view={view}
-          onViewChange={setView}
-          items={items}
-          runners={runners}
-          onOpen={openItem}
-        />
+        <Suspense fallback={<LoadingState label="Loading work list…" />}>
+          <TaskCollection
+            key={String(archived)}
+            archived={archived}
+            onArchive={archiveItems}
+            onBusyChange={setCleanupBusy}
+            history={
+              <Select
+                aria-label="Task history"
+                disabled={cleanupBusy}
+                value={archived ? 'archive' : 'current'}
+                onValueChange={(value) => setArchived(value === 'archive')}
+              >
+                <SelectItem value="current">Current work</SelectItem>
+                <SelectItem value="archive">Archived work</SelectItem>
+              </Select>
+            }
+            scope={
+              <Select
+                aria-label="Filter by project"
+                value={scope}
+                onValueChange={(value) => setScope(value as 'all' | 'project')}
+              >
+                <SelectItem value="all">All work · every project</SelectItem>
+                <SelectItem value="project">
+                  {project?.name ?? 'No project yet'} · project work
+                </SelectItem>
+              </Select>
+            }
+            emptyState={
+              <EmptyState
+                icon={FolderOpen}
+                title={
+                  archived
+                    ? 'No archived tasks'
+                    : projectFilter === 'all'
+                      ? 'No current tasks'
+                      : 'No tasks in this project'
+                }
+                description={
+                  archived
+                    ? 'Tasks you archive will appear here.'
+                    : 'Start new work, or browse repository TODOs to find tasks.'
+                }
+                action={
+                  <div className="flex items-center gap-2">
+                    {projectFilter !== 'all' && projects.length > 1 && (
+                      <Button variant="outline" onClick={() => setScope('all')}>
+                        Show all projects
+                      </Button>
+                    )}
+                    {!archived && (
+                      <Button variant="outline" onClick={() => navigateWorkspace('repo-todos')}>
+                        <ListTodo size={16} />
+                        Browse Repo TODOs
+                      </Button>
+                    )}
+                  </div>
+                }
+              />
+            }
+            view={view}
+            onViewChange={setView}
+            items={items}
+            runners={runners}
+            onOpen={openItem}
+          />
+        </Suspense>
       ) : null}
-      {archived && <ArchivedHistory />}
+      {archived && (
+        <Suspense fallback={<LoadingState label="Loading archive…" />}>
+          <ArchivedHistory />
+        </Suspense>
+      )}
     </WorkspacePage>
   );
 }

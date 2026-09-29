@@ -156,14 +156,14 @@ export const knowledgeGuides: KnowledgeGuide[] = [
     title: 'Work with Jackalope from the terminal',
     shortTitle: 'Terminal command',
     description:
-      'Use the jackalope command to start and rejoin conversations from any Git repository, and move a conversation between the app and your terminal.',
+      'Use the jackalope command to start and rejoin conversations from the current directory, and move a conversation between the app and your terminal.',
     readingTime: '3 min read',
     sections: [
       {
         id: 'start-terminal',
         question: 'How do I start a conversation from the terminal?',
         paragraphs: [
-          'Open a terminal in a Git repository and run jackalope. Describe the work; Jackalope chooses the agent and shows which one it picked and why, the step it is on and the output as it arrives. The repository becomes a project in the app if it was not one already.',
+          'Open a terminal in your project and run jackalope. Describe the work; Jackalope chooses the agent and shows which one it picked and why, the step it is on and the output as it arrives. The directory becomes a project in the app if it was not one already. In a directory that is not a Git repository yet, jackalope asks before creating one and making an initial commit of the current files. Answering no edits that folder directly, with no separate worktree or patch. jackalope --init creates the repository without the question. Home directories and drive roots are left unchanged.',
           'The command uses the same sessions, accounts and approved access as the app. Replies go to the same conversation. When an agent asks a question, its choices open in the terminal so you can answer with one keypress. Type /help for commands such as /agent to choose the next agent, /diff to review and commit in the app, /stop and /sessions.',
         ],
         codeBox: {
@@ -356,7 +356,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Open the Jackalope companion at the bottom right and choose Ask. Ask a question, request an appearance change, or prepare a task. Activity retains notifications, feedback and task shortcuts.',
           'The helper uses your default agent, configured model and active account. Codex, Claude Code, Grok, OpenCode and Kimi Code have helper adapters; unsupported defaults show a configuration message. Messages and shared context go to that provider and may count toward its usage limits. A question can require several model requests as the helper reads tools and documentation.',
-          'The helper works without an open project. It uses an app-owned working directory and does not attach repository files. It retains its own local conversation and reported token usage. Stop ends the active response; interrupted requests are never automatically replayed. New conversation archives the previous record locally.',
+          'The helper works without an open project. It uses an app-owned working directory and does not attach repository files. It retains its own local conversation and reported token usage. Usage & quota lists those turns separately from tasks. New turns record the date and, when project sharing is on, the open project. Older turns have no date. Stop ends the active response; interrupted requests are never automatically replayed. New conversation archives the previous record locally, and those turns stay in Usage.',
         ],
       },
       {

@@ -182,10 +182,7 @@ export const AGENT_VIEWS = [
   { id: 'agents', label: 'Runners' },
   { id: 'usage', label: 'Usage & quota' },
   { id: 'mcps', label: 'MCP tools' },
-] as const;
-export const MCP_VIEWS = [
-  { id: 'mcps', label: 'Connections' },
-  { id: 'mcp-marketplace', label: 'Marketplace' },
+  { id: 'mcp-marketplace', label: 'Tool marketplace' },
 ] as const;
 export function navigateWorkspace(tab: ActiveTab) {
   window.dispatchEvent(new CustomEvent('jackalope:navigate', { detail: tab }));

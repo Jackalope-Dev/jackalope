@@ -53,7 +53,8 @@ Use outlined buttons for secondary actions, visible selected tabs, and open sect
 for results, checks and next actions. Keep follow-up compact so the result remains usable
 at 960 by 640. Existing work should be visible before opening new-task capture.
 Chat leads with its composer and places work needing attention underneath. Keep
-optional session limits, workflow starters and context controls in its options menu.
+optional session limits, workflow starters and context controls in its options menu;
+keep the agent choice, including comparisons, and attachments visible beside Send.
 
 Visible content is the default. Use short headings, spacing, compact lists and clear
 buttons to make a page scannable. Do not build pages from stacks of accordions or
@@ -97,6 +98,12 @@ saved overrides and automatic light/dark switching. Preview is temporary;
 confirming persists it, while cancellation or leaving an unconfirmed preview
 restores the saved appearance. Invalid color input must not change global styles.
 
+Show selection with a full outline or subtle fill; do not use one-sided accent borders.
+Surfaces that belong together join as one card with a divider and no inner corner
+radius; separate surfaces keep the page gap. Pages use one vertical rhythm from their
+layout gap rather than per-section margins. Transient notices, previews and errors the
+user can clear have a visible close control.
+
 Interactive content targets are at least 44 by 44 CSS pixels. Native window
 chrome can follow platform sizing. Dialogs retain viewport space and scroll on
 small windows. Respect reduced motion, including preference changes while open.
@@ -109,9 +116,8 @@ has no cancel exit; users reach the final step before entering the workspace.
 The first task remains optional on that final step. Give slow or failed checks a
 clear retry path.
 
-Essential project setup is project → agents → behavior → first task. Optional
-customization adds decisions before behavior and appearance before the first task.
-Show the chosen steps in the progress list and preserve saved advanced setup on reload.
+Project setup is project → agents → decisions → behavior → appearance → first task.
+Show every step in the progress list and preserve saved setup on reload.
 Detect workspace command defaults in
 the background without a manual inspection step. Preserve explicit choices, including
 empty commands, and ignore stale results after changing projects or leaving setup.

@@ -242,15 +242,130 @@ function ConnectProvider({ provider, onClose }: { provider: ApiProvider; onClose
   );
 }
 
+function ConnectEndpoint({ onClose }: { onClose: () => void }) {
+  const focus = useDialogFocus();
+  const [name, setName] = useState('Local');
+  const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:1234/v1');
+  const [apiKey, setApiKey] = useState('');
+  const [models, setModels] = useState<string[]>([]);
+  const [model, setModel] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  return (
+    <Dialog.Root open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent {...focus}>
+        <form
+          className="contents"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setBusy(true);
+            setError('');
+            try {
+              if (!model) {
+                const found = await nativeTask<string[]>('openai_endpoint_models', {
+                  baseUrl,
+                  apiKey: apiKey.trim() || null,
+                });
+                setModels(found);
+                setModel(found[0] ?? '');
+                return;
+              }
+              await nativeTask('openai_endpoint_connect', {
+                name,
+                baseUrl,
+                model,
+                apiKey: apiKey.trim() || null,
+              });
+              await useAgentAccountsStore.getState().load('opencode', true);
+              await useExecutionStore.getState().discover();
+              onClose();
+            } catch (cause) {
+              setError(String(cause));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <DialogHeader
+            title="Local model server"
+            description="LM Studio, vLLM, or another OpenAI-compatible server on this computer. Jackalope reads its model list and saves the connection as an OpenCode account."
+          />
+          <FormField label="Name">
+            <Input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+              maxLength={80}
+            />
+          </FormField>
+          <FormField
+            label="Address"
+            description="http://127.0.0.1, localhost, or ::1, with a port."
+          >
+            <Input
+              value={baseUrl}
+              onChange={(event) => {
+                setBaseUrl(event.target.value);
+                setModels([]);
+                setModel('');
+              }}
+              required
+              spellCheck={false}
+            />
+          </FormField>
+          <FormField
+            label="API key"
+            description="Optional. Stored with this account and not shown again."
+          >
+            <Input
+              type="password"
+              autoComplete="off"
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+              maxLength={8192}
+            />
+          </FormField>
+          {models.length > 0 && (
+            <FormField label="Model">
+              <Select aria-label="Endpoint model" value={model} onValueChange={setModel}>
+                {models.map((item) => (
+                  <SelectItem key={item} value={item}>
+                    {item}
+                  </SelectItem>
+                ))}
+              </Select>
+            </FormField>
+          )}
+          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={busy || !name.trim() || !baseUrl.trim()}
+              loading={busy}
+              loadingLabel="Connecting…"
+            >
+              {model ? 'Save connection' : 'Find models'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog.Root>
+  );
+}
+
 export function ProviderConnections() {
   const [provider, setProvider] = useState<ApiProvider>();
+  const [endpoint, setEndpoint] = useState(false);
   return (
     <section className="workspace-stack" aria-label="Connect an API provider">
       <div>
         <h2 className="text-base font-medium">Connect an API provider</h2>
         <p className="task-muted">
-          Bring your own key for DeepSeek and other providers. No separate OpenCode installation or
-          account is needed.
+          Bring your own key for DeepSeek and other providers, or a local OpenAI-compatible server.
+          No separate OpenCode installation or account is needed.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -264,6 +379,13 @@ export function ProviderConnections() {
             <KeyRound size={16} /> {provider.name}
           </Button>
         ))}
+        <Button
+          variant="outline"
+          disabled={!isTauriEnvironment()}
+          onClick={() => setEndpoint(true)}
+        >
+          Local server
+        </Button>
       </div>
       {provider && (
         <ConnectProvider
@@ -272,6 +394,7 @@ export function ProviderConnections() {
           onClose={() => setProvider(undefined)}
         />
       )}
+      {endpoint && <ConnectEndpoint onClose={() => setEndpoint(false)} />}
     </section>
   );
 }

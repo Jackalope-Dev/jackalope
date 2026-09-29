@@ -47,5 +47,12 @@
     "discovery": true,
     "accounts": true,
     "capacity": false
+  },
+  "acp": {
+    "bridge": "mcp",
+    "direct": ["stdio", "http"],
+    "discovery": false,
+    "accounts": false,
+    "capacity": false
   }
 }

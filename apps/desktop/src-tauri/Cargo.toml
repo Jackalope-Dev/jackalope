@@ -1,11 +1,12 @@
 [package]
 name = "jackalope-desktop"
-version = "0.1.8"
+version = "0.1.9"
 description = "Jackalope - Ultra-performant desktop shell and harness for agentic workflows"
 authors = ["Jackalope Contributors"]
 edition = "2021"
 license = "Apache-2.0"
 rust-version = "1.98"
+default-run = "jackalope-desktop"
 
 [lib]
 name = "jackalope_lib"
@@ -30,7 +31,7 @@ pkg-config = "0.3"
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
-tauri-plugin-shell = "2"
+tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-autostart = "2"
@@ -42,7 +43,7 @@ chrono = { version = "0.4", features = ["serde"] }
 portable-pty = "0.9"
 axum = "0.8"
 uuid = { version = "1", features = ["v4"] }
-rmcp = { version = "=3.2.0", default-features = false, features = ["server", "macros", "transport-streamable-http-server", "client", "transport-child-process", "transport-streamable-http-client-reqwest", "reqwest"] }
+rmcp = { version = "=3.4.1", default-features = false, features = ["server", "macros", "transport-streamable-http-server", "client", "transport-child-process", "transport-streamable-http-client-reqwest", "reqwest"] }
 
 toml_edit = { version = "0.25", features = ["serde"] }
 toml = "1"
@@ -88,8 +89,8 @@ glib = { path = "../../../patches/glib" }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62.2", optional = true, features = ["ApplicationModel", "Services_Store", "Win32_UI_Shell"] }
-windows-collections = { version = "0.3.2", optional = true }
-windows-future = { version = "0.3.2", optional = true }
+windows-collections = { version = "0.100.0", optional = true }
+windows-future = { version = "0.100.0", optional = true }
 tauri-winrt-notification = "0.8.1"
 windows-sys = { version = "0.61", features = ["Win32_Storage_Packaging_Appx", "Win32_System_JobObjects", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_Threading", "Win32_Foundation", "Win32_System_IO"] }
 

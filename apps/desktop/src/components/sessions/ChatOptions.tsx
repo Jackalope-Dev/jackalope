@@ -1,6 +1,6 @@
 import { DropdownMenu as Menu } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, SlidersHorizontal } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
@@ -8,9 +8,13 @@ import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 export function ChatOptions({
   items,
   onClose,
+  triggerVariant = 'icon',
+  triggerLabel = 'Options',
 }: {
   items: { id: string; label: string; content: (close: () => void) => ReactNode }[];
   onClose?: () => void;
+  triggerVariant?: 'icon' | 'button';
+  triggerLabel?: string;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -19,15 +23,22 @@ export function ChatOptions({
     <>
       <Menu.Root>
         <Menu.Trigger asChild>
-          <Button
-            ref={trigger}
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label="Chat options"
-          >
-            <MoreHorizontal size={18} aria-hidden="true" />
-          </Button>
+          {triggerVariant === 'button' ? (
+            <Button ref={trigger} type="button" variant="outline" aria-label="Chat options">
+              <SlidersHorizontal size={16} aria-hidden="true" />
+              <span>{triggerLabel}</span>
+            </Button>
+          ) : (
+            <Button
+              ref={trigger}
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label="Chat options"
+            >
+              <MoreHorizontal size={18} aria-hidden="true" />
+            </Button>
+          )}
         </Menu.Trigger>
         <Menu.Portal>
           <Menu.Content

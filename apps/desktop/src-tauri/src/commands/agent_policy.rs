@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    process::Command,
 };
 use tauri::State;
 static POLICY_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -23,6 +24,9 @@ pub struct CustomAgent {
     pub name: String,
     pub command: String,
     pub adapter: Option<String>,
+    /// Arguments passed to an ACP CLI. Empty means `acp`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -85,12 +89,15 @@ impl AgentPolicy {
                 .and_then(|custom| custom.adapter.as_deref())
                 .unwrap_or(agent);
             if self.agent_allowed(project, agent)
-                && matches!(adapter, "codex" | "claude" | "grok" | "opencode" | "kimi")
+                && matches!(
+                    adapter,
+                    "codex" | "claude" | "grok" | "opencode" | "kimi" | "acp"
+                )
             {
                 return Ok(agent);
             }
         }
-        Err("Choose an enabled Codex, Claude, Grok, OpenCode or Kimi Code agent for this project in Settings → Agents.".into())
+        Err("Choose an enabled Codex, Claude, Grok, OpenCode, Kimi Code or ACP agent for this project in Settings → Agents.".into())
     }
 
     pub(super) fn model_for_account(
@@ -162,7 +169,7 @@ impl AgentPolicy {
         }
         let custom = self.custom_agents.iter().find(|a| a.id == agent);
         let adapter = custom.and_then(|a| a.adapter.as_deref()).unwrap_or(agent);
-        if !super::tasks::BUILTIN_AGENTS.contains(&adapter) {
+        if !super::tasks::BUILTIN_AGENTS.contains(&adapter) && adapter != "acp" {
             return Err("Choose a supported CLI adapter for this manually added agent.".into());
         }
         let configured = self
@@ -321,6 +328,78 @@ pub async fn agent_save_policy(
     )
     .map_err(|e| e.to_string())?;
     std::fs::rename(temp, path).map_err(|e| e.to_string())
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentProbeResponse {
+    pub valid: bool,
+    pub version: Option<String>,
+    pub error: Option<String>,
+}
+
+#[tauri::command]
+pub fn agent_probe_executable(path: String) -> Result<AgentProbeResponse, String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Ok(AgentProbeResponse {
+            valid: false,
+            version: None,
+            error: Some("Executable path cannot be empty.".into()),
+        });
+    }
+    let target = PathBuf::from(trimmed);
+    let resolved = if target.is_absolute() {
+        target
+    } else if let Ok(found) = super::tasks::executable(trimmed) {
+        found
+    } else {
+        target
+    };
+
+    if !resolved.is_file() {
+        return Ok(AgentProbeResponse {
+            valid: false,
+            version: None,
+            error: Some(format!("No executable file found at \"{trimmed}\".")),
+        });
+    }
+    if !super::platform::is_executable(&resolved) {
+        return Ok(AgentProbeResponse {
+            valid: false,
+            version: None,
+            error: Some("File exists but does not have execute permissions.".into()),
+        });
+    }
+
+    let mut cmd = Command::new(&resolved);
+    cmd.arg("--version");
+    cmd.stdin(std::process::Stdio::null());
+    let output = match cmd.output() {
+        Ok(out) if out.status.success() => Some(out),
+        _ => {
+            let mut alt = Command::new(&resolved);
+            alt.arg("version");
+            alt.stdin(std::process::Stdio::null());
+            alt.output().ok().filter(|out| out.status.success())
+        }
+    };
+
+    let version = output.and_then(|out| {
+        let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if text.is_empty() {
+            let err_text = String::from_utf8_lossy(&out.stderr).trim().to_string();
+            (!err_text.is_empty()).then_some(err_text)
+        } else {
+            text.lines().next().map(|l| l.trim().to_string())
+        }
+    });
+
+    Ok(AgentProbeResponse {
+        valid: true,
+        version,
+        error: None,
+    })
 }
 
 #[cfg(test)]
