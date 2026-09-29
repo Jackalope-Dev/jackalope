@@ -511,12 +511,10 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
         {feedback && (
           <InlineNotice
             tone="success"
-            className="commit-review-notice"
+            className="commit-review-notice commit-review-committed"
             action={
               pushable && (
                 <Button
-                  size="sm"
-                  variant="outline"
                   onClick={() => void push()}
                   loading={pushing}
                   loadingLabel="Pushing…"

@@ -1,6 +1,13 @@
 .commit-review-notice {
   margin-bottom: 16px;
 }
+.commit-review-committed {
+  align-items: center;
+  font-size: var(--text-base, 1rem);
+}
+.commit-review-committed > svg {
+  margin-top: 0;
+}
 .commit-review-page {
   container-type: inline-size;
   min-width: 0;
