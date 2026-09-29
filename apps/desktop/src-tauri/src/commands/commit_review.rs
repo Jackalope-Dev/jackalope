@@ -8,7 +8,7 @@ use super::{
 use serde::Serialize;
 use serde_json::Value;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::Write,
     path::{Path, PathBuf},
     process::Stdio,
@@ -511,9 +511,22 @@ pub async fn git_commit_changes(
         };
         let message = policy.message(&text, &agents);
 
-        let mut add = vec!["add", "-A", "--"];
-        add.extend(&pathspecs);
-        git(&root, &add, Policy::Isolated)?;
+        // A deletion or rename source already staged exists in neither the index nor
+        // the worktree, and `git add` rejects it; `commit --only` still records it.
+        let mut listed = vec!["ls-files", "-z", "--"];
+        listed.extend(&pathspecs);
+        let indexed = git(&root, &listed, Policy::Isolated)?;
+        let indexed: HashSet<&str> = indexed.split('\0').collect();
+        let additions: Vec<&str> = pathspecs
+            .iter()
+            .copied()
+            .filter(|path| indexed.contains(path) || root.join(path).symlink_metadata().is_ok())
+            .collect();
+        if !additions.is_empty() {
+            let mut add = vec!["add", "-A", "--"];
+            add.extend(&additions);
+            git(&root, &add, Policy::Isolated)?;
+        }
 
         let mut args = vec!["commit", "--only", "-F", "-", "--"];
         args.extend(&pathspecs);
@@ -547,6 +560,67 @@ pub async fn git_commit_changes(
             ));
         }
         head(&root).ok_or_else(|| "The commit finished but HEAD could not be read.".into())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Pushes the checkout's current branch: to its upstream when it has one,
+/// otherwise to `origin`, which then becomes its upstream. Git never prompts,
+/// so missing credentials fail with Git's own message instead of hanging, and
+/// the push runs the repository's pre-push hooks like a terminal push would.
+#[tauri::command]
+pub async fn git_push_changes(repo_path: String, worktree_path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = checkout(&repo_path, &worktree_path)?;
+        let branch = git(
+            &root,
+            &["symbolic-ref", "--quiet", "--short", "HEAD"],
+            Policy::Inspection,
+        )
+        .map(|branch| branch.trim().to_string())
+        .map_err(|_| "Check out a branch before pushing.".to_string())?;
+        let upstream = git(
+            &root,
+            &[
+                "rev-parse",
+                "--abbrev-ref",
+                "--symbolic-full-name",
+                "@{upstream}",
+            ],
+            Policy::Inspection,
+        )
+        .ok()
+        .map(|upstream| upstream.trim().to_string())
+        .filter(|upstream| !upstream.is_empty());
+        let remotes = git(&root, &["remote"], Policy::Inspection)?;
+        let (args, destination) = match &upstream {
+            Some(upstream) => (vec!["push"], upstream.clone()),
+            None if remotes.lines().any(|remote| remote.trim() == "origin") => (
+                vec!["push", "--set-upstream", "origin", branch.as_str()],
+                format!("origin/{branch}"),
+            ),
+            None => return Err("This repository has no origin remote to push to.".into()),
+        };
+        let mut push = command(&root, &args, Policy::Isolated);
+        push.env("GIT_TERMINAL_PROMPT", "0")
+            .env("GCM_INTERACTIVE", "never")
+            .stdin(Stdio::null());
+        let result = super::process_control::run(push, std::time::Duration::from_secs(600))?;
+        if result.timed_out {
+            return Err("The push took longer than 10 minutes and was stopped.".into());
+        }
+        if !result.success {
+            let output = bounded(&strip_ansi(
+                format!("{}\n{}", result.stdout.trim(), result.stderr.trim()).trim(),
+            ));
+            return Err(if output.is_empty() {
+                "Git could not push this branch.".into()
+            } else {
+                format!("Git could not push this branch:\n{output}")
+            });
+        }
+        Ok(format!("Pushed {branch} to {destination}."))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -685,6 +759,88 @@ mod tests {
         git(&["add", "."]);
         git(&["commit", "-q", "-m", "base"]);
         root
+    }
+
+    #[tokio::test]
+    async fn commit_includes_deletions_already_staged() {
+        let root = fixture();
+        std::fs::write(root.join("gone.txt"), "old\n").unwrap();
+        let git = |args: &[&str]| {
+            assert!(
+                command(&root, args, Policy::Isolated)
+                    .status()
+                    .unwrap()
+                    .success(),
+                "{args:?}"
+            )
+        };
+        git(&["add", "gone.txt"]);
+        git(&["commit", "-q", "-m", "add gone"]);
+        git(&["rm", "-q", "gone.txt"]);
+        std::fs::write(root.join("kept.txt"), "two\n").unwrap();
+        let path = root.to_string_lossy().to_string();
+        git_commit_changes(
+            path.clone(),
+            path,
+            vec!["gone.txt".into(), "kept.txt".into()],
+            "Remove gone".into(),
+            String::new(),
+            vec![],
+        )
+        .await
+        .map_err(|failure| failure.message)
+        .unwrap();
+        let committed = super::git(
+            &root,
+            &["show", "--name-status", "--format=", "HEAD"],
+            Policy::Inspection,
+        )
+        .unwrap();
+        assert_eq!(committed.trim(), "D\tgone.txt\nM\tkept.txt");
+    }
+
+    #[tokio::test]
+    async fn push_sets_origin_upstream_then_pushes_to_it() {
+        let root = fixture();
+        let remote = std::env::temp_dir().join(format!("jl-push-{}.git", uuid::Uuid::new_v4()));
+        let git = |dir: &Path, args: &[&str]| {
+            assert!(
+                command(dir, args, Policy::Isolated)
+                    .status()
+                    .unwrap()
+                    .success(),
+                "{args:?}"
+            )
+        };
+        git(&root, &["init", "-q", "--bare", &remote.to_string_lossy()]);
+        let path = root.to_string_lossy().to_string();
+        assert!(git_push_changes(path.clone(), path.clone()).await.is_err());
+        git(
+            &root,
+            &["remote", "add", "origin", &remote.to_string_lossy()],
+        );
+        let branch = super::git(
+            &root,
+            &["symbolic-ref", "--short", "HEAD"],
+            Policy::Inspection,
+        )
+        .unwrap()
+        .trim()
+        .to_string();
+        assert_eq!(
+            git_push_changes(path.clone(), path.clone()).await.unwrap(),
+            format!("Pushed {branch} to origin/{branch}.")
+        );
+        std::fs::write(root.join("kept.txt"), "two\n").unwrap();
+        git(&root, &["commit", "-qam", "next"]);
+        assert_eq!(
+            git_push_changes(path.clone(), path).await.unwrap(),
+            format!("Pushed {branch} to origin/{branch}.")
+        );
+        let pushed = super::git(&remote, &["rev-parse", &branch], Policy::Inspection).unwrap();
+        assert_eq!(Some(pushed.trim().to_string()), head(&root));
+        std::fs::remove_dir_all(root).ok();
+        std::fs::remove_dir_all(remote).ok();
     }
 
     #[tokio::test]

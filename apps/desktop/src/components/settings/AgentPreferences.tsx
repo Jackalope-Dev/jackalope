@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
 import {
   type AgentProfilesView,
@@ -19,7 +20,12 @@ import { Setting } from './Setting';
 
 export function AgentPreferences({ projectId }: { projectId?: string }) {
   const agents = useAgentConfigStore();
-  const { projects, updateProjectPreferences } = useProjectStore();
+  const { projects, updateProjectPreferences } = useProjectStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      updateProjectPreferences: s.updateProjectPreferences,
+    })),
+  );
   const project = projects.find((item) => item.id === projectId);
   const available = [...builtinAgents, ...agents.customAgents];
   const [error, setError] = useState('');
@@ -49,15 +55,15 @@ export function AgentPreferences({ projectId }: { projectId?: string }) {
   return (
     <div className="agent-preferences">
       <Setting
-        title={project ? 'Preferred task agent' : 'Default orchestration agent'}
+        title={project ? 'Default task agent' : 'Default orchestration agent'}
         description={
           project
-            ? 'Automatic routing considers this preference alongside task fit and quota.'
+            ? 'Used for new work in this project. Individual tasks can choose another enabled agent or automatic routing.'
             : 'Coordinates tasks and chooses among enabled agents and accounts.'
         }
       >
         <Select
-          aria-label={project ? 'Preferred task agent' : 'Default orchestration agent'}
+          aria-label={project ? 'Default task agent' : 'Default orchestration agent'}
           value={defaultAgent}
           disabled={busy}
           onValueChange={(value) =>
@@ -142,16 +148,7 @@ export function AgentPreferences({ projectId }: { projectId?: string }) {
                   disabled={busy || (!!project && !appEnabled)}
                   onCheckedChange={(checked) =>
                     void save(() => {
-                      if (!project) agents.toggleAgent(agent.id, checked);
-                      else {
-                        const current =
-                          project.preferences?.allowedAgents ?? available.map((agent) => agent.id);
-                        updateProjectPreferences(project.id, {
-                          allowedAgents: checked
-                            ? [...new Set([...current, agent.id])]
-                            : current.filter((id) => id !== agent.id),
-                        });
-                      }
+                      agents.toggleAgent(agent.id, checked, project?.id);
                     })
                   }
                 />
@@ -209,7 +206,12 @@ function AccountPreferences({
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   const agents = useAgentConfigStore();
-  const { projects, updateProjectPreferences } = useProjectStore();
+  const { projects, updateProjectPreferences } = useProjectStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      updateProjectPreferences: s.updateProjectPreferences,
+    })),
+  );
   const project = projects.find((item) => item.id === projectId);
   // biome-ignore lint/correctness/useExhaustiveDependencies: Account mutations and retry refresh the profile list.
   useEffect(() => {

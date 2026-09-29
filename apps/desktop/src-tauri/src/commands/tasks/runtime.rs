@@ -14,10 +14,11 @@ pub(super) const EXECUTABLE_ADAPTERS: &[&str] = &[
     "opencode",
     "grok",
     "gemini",
+    "acp",
 ];
 
 pub(super) fn unimplemented_adapter(adapter: &str) -> String {
-    format!("The {adapter} task adapter is not implemented yet. Account setup is available in Settings; choose Codex, Claude, Grok, OpenCode, Kimi Code, Antigravity or Gemini CLI to run this task.")
+    format!("The {adapter} task adapter is not implemented yet. Account setup is available in Settings; choose Codex, Claude, Grok, OpenCode, Kimi Code, Antigravity, Gemini CLI or an ACP agent to run this task.")
 }
 
 /// Launch the agent, retrying a transient failure (an antivirus or indexer lock
@@ -270,6 +271,9 @@ impl TaskRuntime {
         req: &RunRequest,
         previous: Option<TaskRun>,
     ) -> Result<(), String> {
+        if let Some(folder) = plain_folder(&req.project_path)? {
+            return self.prepare_plain_folder(id, req, previous, &folder);
+        }
         let root = git(&req.project_path, &["rev-parse", "--show-toplevel"])?;
         let base_ref = format!(
             "refs/heads/{}",
@@ -402,6 +406,60 @@ impl TaskRuntime {
         Ok(())
     }
 
+    /// A directory that is not a Git repository. The agent edits it directly;
+    /// there is no worktree to create or remove.
+    fn prepare_plain_folder(
+        &self,
+        id: &str,
+        req: &RunRequest,
+        previous: Option<TaskRun>,
+        folder: &str,
+    ) -> Result<(), String> {
+        self.update(id, |run| {
+            run.progress = Some(StepProgress::new("workspace", "Using this folder", 1))
+        });
+        let workspace = if let Some(old) = &previous {
+            if old.session_id.is_none() && req.live_session_id.is_none() {
+                return Err("This attempt has no resumable agent session. Start a new task with the relevant context.".into());
+            }
+            let folder_path = dunce::canonicalize(folder).map_err(|error| error.to_string())?;
+            let continued = dunce::canonicalize(&old.workspace)
+                .unwrap_or_else(|_| PathBuf::from(&old.workspace));
+            if continued != folder_path && !continued.starts_with(&folder_path) {
+                return Err("This folder workspace is no longer available.".into());
+            }
+            old.workspace.clone()
+        } else {
+            folder.to_string()
+        };
+        self.update_checked(id, |run| {
+            run.workspace = workspace.clone();
+            run.branch.clear();
+            run.base_head.clear();
+        })?;
+        if previous.is_none() {
+            let command = req
+                .prepare_command
+                .as_deref()
+                .filter(|command| !command.trim().is_empty());
+            let Some(command) = command else {
+                return Ok(());
+            };
+            let record = crate::commands::verification::prepare(self, id, command, &workspace)?;
+            if !self.is_running(id) {
+                self.update(id, |run| {
+                    run.status = "stopped".into();
+                    run.ended_at = Some(Utc::now().to_rfc3339());
+                });
+                return Ok(());
+            }
+            if !record.success {
+                return Err(preparation_failure(&record));
+            }
+        }
+        Ok(())
+    }
+
     fn execute_agent(
         &self,
         id: &str,
@@ -525,6 +583,27 @@ impl TaskRuntime {
             if let Some(ref old) = previous {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
             }
+        } else if adapter == "acp" {
+            let args = policy
+                .custom_agents
+                .iter()
+                .find(|agent| agent.id == req.agent)
+                .map(|agent| agent.args.clone())
+                .filter(|args| !args.is_empty())
+                .unwrap_or_else(|| vec!["acp".into()]);
+            if args.len() > 8
+                || args.iter().any(|arg| {
+                    arg.is_empty() || arg.len() > 80 || arg.chars().any(char::is_control)
+                })
+            {
+                return Err(
+                    "ACP arguments must be 1 to 8 values, each up to 80 characters.".into(),
+                );
+            }
+            cmd.args(&args);
+            if let Some(ref old) = previous {
+                crate::commands::previews::ensure_idle(&old.workspace)?;
+            }
         } else if adapter == "antigravity" {
             antigravity::configure(
                 &mut cmd,
@@ -579,7 +658,7 @@ impl TaskRuntime {
             run.requested_service_tier = tier;
         })?;
         if let Some(model) = &selected_model {
-            if adapter != "kimi" && opencode_connection.is_none() {
+            if adapter != "kimi" && adapter != "acp" && opencode_connection.is_none() {
                 cmd.args(["--model", model]);
             }
             self.update_checked(id, |run| run.model = Some(model.clone()))?;
@@ -781,7 +860,7 @@ impl TaskRuntime {
         if adapter == "antigravity" {
             input = antigravity::input(&input, &workspace);
         }
-        if ["kimi", "opencode"].contains(&adapter.as_str()) {
+        if ["kimi", "opencode", "acp"].contains(&adapter.as_str()) {
             if let Some(context) = &req.coordination {
                 project_mcp.insert(
                     "jackalope".into(),
@@ -792,7 +871,7 @@ impl TaskRuntime {
                 );
             }
         }
-        let acp_servers = if adapter == "kimi" {
+        let acp_servers = if adapter == "kimi" || adapter == "acp" {
             crate::commands::mcp::acp_servers(&project_mcp, &cmd)?
         } else {
             Vec::new()
@@ -900,12 +979,13 @@ impl TaskRuntime {
             }
         })?;
         let server_transport = opencode_connection.is_some();
-        let input_result = if adapter == "grok" || adapter == "kimi" || server_transport {
-            Ok(())
-        } else {
-            stdin.write_all(input.as_bytes())
-        };
-        let mut acp_input = (adapter == "kimi").then_some(stdin);
+        let input_result =
+            if adapter == "grok" || adapter == "kimi" || adapter == "acp" || server_transport {
+                Ok(())
+            } else {
+                stdin.write_all(input.as_bytes())
+            };
+        let mut acp_input = (adapter == "kimi" || adapter == "acp").then_some(stdin);
         if let Err(error) = input_result {
             let _ = self.stop(id);
             return Err(format!("Could not deliver task: {error}"));
@@ -940,7 +1020,7 @@ impl TaskRuntime {
                 return;
             }
             let stdout = stdout.unwrap();
-            if output_adapter == "kimi" {
+            if output_adapter == "kimi" || output_adapter == "acp" {
                 let result = kimi::drive_with_servers(
                     BufReader::new(stdout),
                     &mut acp_input.take().unwrap(),
@@ -1041,7 +1121,7 @@ impl TaskRuntime {
             {
                 break exit;
             }
-            if (adapter == "kimi" || server_transport) && reader.is_finished() {
+            if (adapter == "kimi" || adapter == "acp" || server_transport) && reader.is_finished() {
                 tree.terminate();
                 let mut child = process.lock().unwrap();
                 let _ = child.kill();
@@ -1056,7 +1136,8 @@ impl TaskRuntime {
                     let _ = process.lock().unwrap().kill();
                 }
             }
-            if (matches!(adapter.as_str(), "antigravity" | "kimi" | "gemini") || server_transport)
+            if (matches!(adapter.as_str(), "antigravity" | "kimi" | "acp" | "gemini")
+                || server_transport)
                 && !timed_out
                 && started.elapsed() > antigravity::TIMEOUT
             {
@@ -1091,7 +1172,7 @@ impl TaskRuntime {
             });
         }
         // ACP completion is the turn receipt; its persistent server is stopped by the owner.
-        let success = if adapter == "kimi" || server_transport {
+        let success = if adapter == "kimi" || adapter == "acp" || server_transport {
             acp_success.load(std::sync::atomic::Ordering::SeqCst) && !timed_out
         } else {
             exit.success()
@@ -1165,7 +1246,15 @@ impl TaskRuntime {
         self.update(id, |r| {
             r.finishing = false; r.exit_code = exit.code(); r.ended_at = Some(Utc::now().to_rfc3339());
             r.status = if canceled || r.status == "stopping" { "stopped" } else if r.routing.is_some() && r.quota_failure.is_some() { r.ended_at = None; "starting" } else if success && r.error.is_none() && !r.result.is_empty() { "review" } else { "failed" }.into();
-            if r.status == "failed" && r.error.is_none() { r.error = Some(format!("Agent exited with {}. Inspect activity for details; no successful result was reported.", exit.code().map_or("no exit code".into(), |c| c.to_string()))); }
+            if r.status == "failed" {
+                if r.error.as_deref().is_none_or(|e| e.trim().is_empty() || e == "null") {
+                    if let Some(failure) = &r.quota_failure {
+                        r.error = Some(failure.message.clone());
+                    } else {
+                        r.error = Some(format!("Agent exited with {}. Inspect activity for details; no successful result was reported.", exit.code().map_or("no exit code".into(), |c| c.to_string())));
+                    }
+                }
+            }
         });
         Ok(())
     }
@@ -1456,7 +1545,7 @@ impl TaskRuntime {
         }
         let policy = self.policy()?;
         let (adapter, _) = policy.resolve(if request.agent == "auto" {
-            &policy.default_meta_agent
+            policy.routing_agent(&request.project_id)?
         } else {
             &request.agent
         })?;
@@ -1579,11 +1668,19 @@ impl TaskRuntime {
                     "This account is disabled in Settings. Choose an enabled account.".into(),
                 );
             }
-            request.target_branch = Some(if let Some(old) = &previous {
-                old.target_branch.clone().unwrap_or_else(|| "master".into())
+            if let Some(folder) = plain_folder(&request.project_path)? {
+                request.project_path = folder;
+                request.isolated = false;
+                request.target_branch = None;
+            } else if let Some(old) = &previous {
+                request.target_branch =
+                    Some(old.target_branch.clone().unwrap_or_else(|| "master".into()));
             } else {
-                resolve_target_branch(&request.project_path, request.target_branch.as_deref())?
-            });
+                request.target_branch = Some(resolve_target_branch(
+                    &request.project_path,
+                    request.target_branch.as_deref(),
+                )?);
+            }
             request.account_binding = Some(binding.clone());
             if let Some(old) = &previous {
                 request.effort = request.effort.or(old.effort);

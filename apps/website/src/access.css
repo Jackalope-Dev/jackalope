@@ -251,6 +251,11 @@
 .access-places small {
   margin-top: 6px;
 }
+.access-download-button {
+  min-height: 52px;
+  padding: 14px 24px;
+  font-size: 15px;
+}
 .access-progress-copy {
   display: block;
   margin-top: 5px;

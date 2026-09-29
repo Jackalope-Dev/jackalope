@@ -1,4 +1,4 @@
-import { SearchField } from '@jackalope/ui';
+import { EmptyState, SearchField } from '@jackalope/ui';
 import {
   AlertTriangle,
   Bot,
@@ -14,6 +14,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import type { AuditCategory, AuditSeverity } from '../../lib/audit';
 import { useAuditStore } from '../../stores/auditStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -21,8 +22,16 @@ import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
 
 export function AuditLogWorkspace() {
-  const { entries, clearEntries, clearProjectEntries } = useAuditStore();
-  const { projects, activeProjectId } = useProjectStore();
+  const { entries, clearEntries, clearProjectEntries } = useAuditStore(
+    useShallow((s) => ({
+      entries: s.entries,
+      clearEntries: s.clearEntries,
+      clearProjectEntries: s.clearProjectEntries,
+    })),
+  );
+  const { projects, activeProjectId } = useProjectStore(
+    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
+  );
 
   const [selectedCategory, setSelectedCategory] = useState<AuditCategory | 'all'>('all');
   const [selectedSeverity, setSelectedSeverity] = useState<AuditSeverity | 'all'>('all');
@@ -90,25 +99,25 @@ export function AuditLogWorkspace() {
     switch (severity) {
       case 'error':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-500/15 text-[var(--color-danger)] dark:text-[var(--color-danger)] border border-rose-500/30">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-danger)]/15 text-[var(--color-danger)] dark:text-[var(--color-danger)] border border-[var(--color-danger)]/30">
             <AlertTriangle size={10} /> Error
           </span>
         );
       case 'warning':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-[var(--color-warning)] border border-amber-500/30">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-warning)]/15 text-[var(--color-warning)] border border-[var(--color-warning)]/30">
             <AlertTriangle size={10} /> Warning
           </span>
         );
       case 'success':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-[var(--color-success)] border border-emerald-500/30">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-success)]/15 text-[var(--color-success)] border border-[var(--color-success)]/30">
             <CheckCircle2 size={10} /> Success
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-sky-500/15 text-[var(--color-accent-ink)] dark:text-[var(--color-accent-ink)] border border-sky-500/30">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-accent)]/15 text-[var(--color-accent-ink)] dark:text-[var(--color-accent-ink)] border border-[var(--color-accent)]/30">
             <Info size={10} /> Info
           </span>
         );
@@ -244,17 +253,16 @@ export function AuditLogWorkspace() {
       {/* Events List */}
       <div className="p-6 space-y-3">
         {filteredEntries.length === 0 ? (
-          <div className="text-center py-16">
-            <History size={36} className="mx-auto text-[var(--color-text-muted)] opacity-40 mb-3" />
-            <h3 className="text-sm font-medium text-[var(--color-text-primary)]">
-              No audit events match
-            </h3>
-            <p className="text-xs text-[var(--color-text-muted)] mt-1 max-w-sm mx-auto">
-              {searchQuery || selectedCategory !== 'all' || selectedProjectFilter !== 'all'
-                ? 'Try adjusting your filters or search query.'
-                : 'No activity recorded.'}
-            </p>
-          </div>
+          searchQuery || selectedCategory !== 'all' || selectedProjectFilter !== 'all' ? (
+            <EmptyState
+              icon={History}
+              level={3}
+              title="No audit events match"
+              description="Try adjusting your filters or search query."
+            />
+          ) : (
+            <EmptyState icon={History} level={3} title="No activity recorded yet" />
+          )
         ) : (
           filteredEntries.map((entry) => {
             const isExpanded = expandedIds.has(entry.id);

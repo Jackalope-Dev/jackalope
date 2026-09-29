@@ -14,6 +14,7 @@ import {
   writeSignIn,
 } from '../../lib/agent-profiles';
 import { isClaudeAuthorizationUrl, signInUrl, terminalSignInLinks } from '../../lib/sign-in-links';
+import { openInBrowser } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import { DialogContent, DialogHeader } from '../ui/Dialog';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -64,9 +65,8 @@ export function AgentSignIn({
     const url = signInUrl(uri);
     if (!url) return;
     try {
-      const { open } = await import('@tauri-apps/plugin-shell');
       if (generation !== linkSession.current) return;
-      await open(url);
+      await openInBrowser(url);
       if (generation === linkSession.current) setLinkMessage('Opened in your browser.');
     } catch {
       if (generation === linkSession.current)

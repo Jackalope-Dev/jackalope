@@ -2,6 +2,7 @@ import { Checkbox, Input, Textarea } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { featureDraftKey } from '../../lib/feature-draft';
 import {
   type FeatureStep,
@@ -45,8 +46,15 @@ export function FeaturePlanner({
   onAdded: () => Promise<void>;
 }) {
   const focus = useDialogFocus();
-  const { runners, runs, start, submitting } = useExecutionStore();
-  const config = useAgentConfigStore();
+  const { runners, runs, start, submitting } = useExecutionStore(
+    useShallow((s) => ({
+      runners: s.runners,
+      runs: s.runs,
+      start: s.start,
+      submitting: s.submitting,
+    })),
+  );
+  const config = useAgentConfigStore(useShallow((s) => ({ isAgentEnabled: s.isAgentEnabled })));
   const available = runners.filter(
     (r) => r.available && config.isAgentEnabled(r.id) && isAgentAllowedForProject(project, r.id),
   );
@@ -70,7 +78,7 @@ export function FeaturePlanner({
     return {
       featureId: crypto.randomUUID(),
       goal: initialGoal,
-      agent: 'auto',
+      agent: project.preferences?.preferredRunner || 'auto',
       steps: [],
     };
   });

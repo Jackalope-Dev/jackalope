@@ -55,3 +55,35 @@
 .task-verification > div:first-child {
   flex-wrap: wrap;
 }
+/* One header row: section switcher on the left, the section's actions on the right. */
+.review-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.task-review .review-sections {
+  gap: 2px;
+  padding: 3px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--color-surface-sunken);
+}
+.task-review .review-sections .workspace-nav-item {
+  min-height: 38px;
+  padding-inline: 12px;
+}
+.review-section-count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+.review-header-actions {
+  display: contents;
+}

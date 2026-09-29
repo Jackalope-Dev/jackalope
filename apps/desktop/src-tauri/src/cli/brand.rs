@@ -33,6 +33,9 @@ pub fn set_accent(hex: Option<&str>) {
 
 fn parse_hex(hex: &str) -> Option<(u8, u8, u8)> {
     let hex = hex.strip_prefix('#')?;
+    if !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
     let expanded: String = match hex.len() {
         3 => hex.chars().flat_map(|c| [c, c]).collect(),
         6 => hex.into(),
@@ -181,6 +184,31 @@ fn basic((r, g, b): (u8, u8, u8)) -> Color {
     }
 }
 
+/// Use the fixed xterm palette instead of the terminal's six configurable hues.
+fn indexed(color: (u8, u8, u8)) -> Color {
+    let distance = |candidate: (u8, u8, u8)| {
+        let channel = |a: u8, b: u8| (i32::from(a) - i32::from(b)).pow(2);
+        channel(color.0, candidate.0)
+            + channel(color.1, candidate.1)
+            + channel(color.2, candidate.2)
+    };
+    let palette = |index: u8| {
+        if index >= 232 {
+            let level = 8 + 10 * (index - 232);
+            (level, level, level)
+        } else {
+            let index = index - 16;
+            let level = |value: u8| if value == 0 { 0 } else { 55 + value * 40 };
+            (level(index / 36), level((index / 6) % 6), level(index % 6))
+        }
+    };
+    Color::Indexed(
+        (16..=255)
+            .min_by_key(|index| distance(palette(*index)))
+            .unwrap_or(16),
+    )
+}
+
 /// How many echo lines sit above the wordmark.
 const ECHOES: usize = 4;
 
@@ -207,7 +235,7 @@ pub fn colored() -> bool {
 /// the check trusts a UTF-8 locale or a terminal known to render Unicode, and
 /// `JACKALOPE_ASCII=1` forces plain characters for anything else.
 pub fn unicode() -> bool {
-    if std::env::var_os("JACKALOPE_ASCII").is_some_and(|value| !value.is_empty()) {
+    if crate::prefs::env_flag("JACKALOPE_ASCII") == Some(true) {
         return false;
     }
     if std::env::var("TERM").is_ok_and(|term| term == "linux") {
@@ -265,30 +293,161 @@ pub fn mark_glyph(mark: Mark) -> &'static str {
     }
 }
 
+/// The dotted rule while an agent works: a short accent comet runs along it,
+/// brightest at its head. Still (the plain rule) under reduced motion or
+/// without colour.
+pub fn divider_active(width: u16, tick: usize) -> Line<'static> {
+    if !motion() || !colored() {
+        return divider(width);
+    }
+    let (dot, head) = if unicode() {
+        ("⠒", "━")
+    } else {
+        ("-", "=")
+    };
+    let width = width as usize;
+    // One pass every few seconds regardless of width, so wide terminals are
+    // not slower.
+    let span = width + 16;
+    let position = (tick * span / 40) % span;
+    let spans = (0..width)
+        .map(|column| {
+            let behind = position as isize - column as isize;
+            if (0..12).contains(&behind) {
+                let weight = 1.0 - behind as f32 / 12.0;
+                let color = if truecolor() {
+                    lifted(weight * 0.6)
+                } else {
+                    accent()
+                };
+                Span::styled(head, Style::default().fg(color))
+            } else {
+                Span::styled(dot, Style::default().fg(muted()))
+            }
+        })
+        .collect::<Vec<_>>();
+    Line::from(spans)
+}
+
 /// A dotted rule across `width` columns.
 pub fn divider(width: u16) -> Line<'static> {
     let dot = if unicode() { "⠒" } else { "-" };
     Line::styled(dot.repeat(width as usize), Style::default().fg(muted()))
 }
 
+/// The shared fallback chain: the tone adjusted to the terminal's ground,
+/// then true colour, the 256-colour palette, or the basic ANSI set.
+fn tone(color: (u8, u8, u8), basic: Color) -> Color {
+    let (r, g, b) = readable(color, background());
+    if truecolor() {
+        Color::Rgb(r, g, b)
+    } else if std::env::var("TERM").is_ok_and(|term| term.contains("256color")) {
+        indexed((r, g, b))
+    } else {
+        basic
+    }
+}
+
+/// The project's accent, adjusted to read on this terminal; Reset when colour
+/// is disabled.
 pub fn accent() -> Color {
     if !colored() {
         return Color::Reset;
     }
+    tone(current_accent(), basic(current_accent()))
+}
+
+/// Secondary text: a neutral grey held to the same contrast target as the
+/// accent, since ANSI dark grey falls near 3:1 on many dark themes.
+pub fn muted() -> Color {
+    if !colored() {
+        return Color::Reset;
+    }
+    tone((0x8b, 0x90, 0x99), Color::DarkGray)
+}
+
+/// Behind the highlighted row of a menu or picker: the accent faded most of the
+/// way into the terminal's ground. Terminals without true colour reverse the
+/// row instead.
+pub fn selection() -> Style {
+    if !colored() || !truecolor() {
+        return Style::default().add_modifier(Modifier::REVERSED);
+    }
     let (r, g, b) = current_accent();
-    if truecolor() {
-        Color::Rgb(r, g, b)
+    let ground = if background() == Background::Light {
+        255.0
     } else {
-        basic((r, g, b))
+        30.0
+    };
+    let weight = if background() == Background::Light {
+        0.16
+    } else {
+        0.28
+    };
+    let blend = |channel: u8| (ground + (channel as f32 - ground) * weight).round() as u8;
+    Style::default().bg(Color::Rgb(blend(r), blend(g), blend(b)))
+}
+
+/// Rounded corners where box-drawing arcs are available.
+pub fn border() -> ratatui::widgets::BorderType {
+    if unicode() {
+        ratatui::widgets::BorderType::Rounded
+    } else {
+        ratatui::widgets::BorderType::Plain
     }
 }
 
-pub fn muted() -> Color {
-    if colored() {
-        Color::DarkGray
-    } else {
-        Color::Reset
+/// `text` cut to `width` columns, ending in an ellipsis when shortened.
+pub fn ellipsize(text: &str, width: usize) -> String {
+    if text.chars().count() <= width {
+        return text.to_string();
     }
+    let ellipsis = if unicode() { "…" } else { "." };
+    let kept: String = text.chars().take(width.saturating_sub(1)).collect();
+    format!("{}{ellipsis}", kept.trim_end())
+}
+
+/// A branch name with long generated ids (task worktrees use UUIDs) cut to
+/// their first eight characters, so the readable part stays visible.
+pub fn short_branch(branch: &str) -> String {
+    branch
+        .split('/')
+        .map(|part| {
+            let generated = part.len() > 16
+                && part.chars().all(|ch| ch.is_ascii_hexdigit() || ch == '-')
+                && part.contains('-');
+            if generated {
+                part.chars().take(8).collect()
+            } else {
+                part.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+/// Completed work and confirmed input.
+pub fn success() -> Color {
+    if !colored() {
+        return Color::Reset;
+    }
+    tone((0x2e, 0xbc, 0x7e), Color::Green)
+}
+
+/// Work that needs attention: an open question, a sign-in, a stalled action.
+pub fn warning() -> Color {
+    if !colored() {
+        return Color::Reset;
+    }
+    tone((0xf5, 0x9e, 0x0b), Color::Yellow)
+}
+
+/// Failures and errors.
+pub fn danger() -> Color {
+    if !colored() {
+        return Color::Reset;
+    }
+    tone((0xe5, 0x48, 0x4d), Color::Red)
 }
 
 /// How much of the accent echo `step` carries. The last step is the solid
@@ -384,6 +543,108 @@ pub fn banner() -> Vec<Line<'static>> {
     lines
 }
 
+/// Rows in the small mark shown above a conversation.
+pub const SMALL_MARK_ROWS: usize = 4;
+
+/// The same head at half size: each dot is on when at least two of the four
+/// dots it covers in `mark()` are, which keeps the ears and antler readable.
+fn small_mark() -> [&'static str; SMALL_MARK_ROWS] {
+    if unicode() {
+        ["⢴⣦⢸⣷ ⣶⠄ ", "⠈⠻⣿⣿⣼⠷  ", "  ⢿⣿⣿⣦⣄ ", "  ⢾⣿⡟⠛⠁ "]
+    } else {
+        ["o#.## #.", " o####o ", "  #####o", "  o##o' "]
+    }
+}
+
+/// Whether to animate. `JACKALOPE_REDUCED_MOTION=1` keeps every indicator
+/// still; state is then carried by glyphs and colour alone.
+pub fn motion() -> bool {
+    crate::prefs::env_flag("JACKALOPE_REDUCED_MOTION") != Some(true)
+}
+
+/// The accent lifted toward the foreground by `amount` (0–1): white on dark
+/// and unknown grounds, black on light ones.
+fn lifted(amount: f32) -> Color {
+    if !colored() {
+        return Color::Reset;
+    }
+    if !truecolor() {
+        return accent();
+    }
+    let (r, g, b) = current_accent();
+    let toward = if background() == Background::Light {
+        0.0
+    } else {
+        255.0
+    };
+    let blend = |channel: u8| (channel as f32 + (toward - channel as f32) * amount).round() as u8;
+    Color::Rgb(blend(r), blend(g), blend(b))
+}
+
+/// How brightly column `column` catches a highlight sweeping left to right
+/// across `width` columns at animation frame `tick`. Zero when still.
+fn glint(column: usize, width: usize, tick: usize) -> f32 {
+    const BAND: f32 = 3.0;
+    // The sweep travels past both edges so it enters and leaves smoothly.
+    let span = width as f32 + BAND * 4.0;
+    let position = (tick as f32 * 0.55) % span - BAND * 2.0;
+    let distance = (column as f32 - position).abs();
+    (1.0 - distance / BAND).max(0.0)
+}
+
+fn glinting(column: usize, width: usize, tick: usize, base: Style) -> Style {
+    let weight = glint(column, width, tick);
+    if weight <= 0.0 {
+        base
+    } else if truecolor() {
+        base.fg(lifted(weight * 0.7))
+    } else {
+        base.add_modifier(Modifier::BOLD)
+    }
+}
+
+/// Text with a highlight sweeping across it while work runs, the way the
+/// desktop mascot moves only when an agent is busy.
+pub fn shimmer(text: &str, tick: usize, base: Style) -> Vec<Span<'static>> {
+    if !motion() || !colored() {
+        return vec![Span::styled(text.to_string(), base)];
+    }
+    let width = text.chars().count();
+    text.chars()
+        .enumerate()
+        .map(|(column, character)| {
+            Span::styled(character.to_string(), glinting(column, width, tick, base))
+        })
+        .collect()
+}
+
+/// The conversation header: the small mark beside up to four lines of
+/// context. The mark catches a sweeping highlight only while `working`.
+pub fn header(info: Vec<Line<'static>>, working: bool, tick: usize) -> Vec<Line<'static>> {
+    let mark = small_mark();
+    let base = Style::default().fg(accent());
+    let mut info = info.into_iter();
+    mark.iter()
+        .map(|row| {
+            let mut spans = vec![Span::raw(" ")];
+            if working && motion() {
+                let width = row.chars().count();
+                spans.extend(row.chars().enumerate().map(|(column, glyph)| {
+                    // The mark's sweep runs ahead of the status text's.
+                    Span::styled(glyph.to_string(), glinting(column, width, tick / 2, base))
+                }));
+            } else {
+                spans.push(Span::styled(*row, base));
+            }
+            spans.push(Span::raw("  "));
+            if let Some(line) = info.next() {
+                spans.extend(line.spans);
+            }
+            Line::from(spans)
+        })
+        .collect()
+}
+
 /// A single-line version for short terminals and once a conversation is under
 /// way, where eight lines of banner would crowd out the conversation.
 pub fn compact() -> Line<'static> {
@@ -438,6 +699,17 @@ mod tests {
     }
 
     #[test]
+    fn project_accents_use_matching_indexed_colours_and_reject_invalid_hex() {
+        assert_eq!(indexed((0, 175, 135)), Color::Indexed(36));
+        assert_eq!(indexed((175, 95, 215)), Color::Indexed(134));
+        assert_eq!(indexed((128, 128, 128)), Color::Indexed(244));
+        assert_eq!(parse_hex("#0a8"), Some((0, 170, 136)));
+        for invalid in ["#éabc", "#ééé", "#gg0000", "#12345", "00aa88"] {
+            assert_eq!(parse_hex(invalid), None);
+        }
+    }
+
+    #[test]
     fn project_colours_keep_their_hue_and_reach_readable_contrast() {
         let dark = DARK_GROUND;
         let light = LIGHT_GROUND;
@@ -465,6 +737,23 @@ mod tests {
     }
 
     #[test]
+    fn small_mark_rows_share_a_width_and_the_glint_passes_every_column() {
+        for row in small_mark() {
+            assert_eq!(row.chars().count(), 8, "{row:?}");
+        }
+        for column in 0..8 {
+            assert!(
+                (0..200).any(|tick| glint(column, 8, tick) > 0.5),
+                "column {column} never lights"
+            );
+        }
+        assert!(
+            (0..200).any(|tick| glint(4, 8, tick) == 0.0),
+            "the glint rests"
+        );
+    }
+
+    #[test]
     fn echoes_ramp_toward_the_accent() {
         // Guards the gradient direction: a reversed ramp would leave the
         // brightest line at the top and the wordmark invisible.
@@ -472,6 +761,34 @@ mod tests {
         let last = echo_color(ECHOES);
         if let (Color::Rgb(r1, _, _), Color::Rgb(r2, _, _)) = (first, last) {
             assert!(r1 < r2, "echo should brighten toward the wordmark");
+        }
+    }
+
+    #[test]
+    fn long_text_and_generated_branches_shorten_readably() {
+        assert_eq!(
+            short_branch("jackalope/df4d8ac2-3ec5-4d56-9ffb-adce79da1bf0"),
+            "jackalope/df4d8ac2"
+        );
+        assert_eq!(short_branch("feature/login-form"), "feature/login-form");
+        assert_eq!(ellipsize("short", 10), "short");
+        let cut = ellipsize("start a fresh conversation", 10);
+        assert_eq!(cut.chars().count(), 10.min(cut.chars().count()));
+        assert!(cut.starts_with("start a f") || cut.starts_with("start a"));
+    }
+
+    #[test]
+    fn the_working_rule_keeps_its_width_and_moves() {
+        let rule = |tick| -> String {
+            divider_active(40, tick)
+                .spans
+                .iter()
+                .map(|span| span.content.to_string())
+                .collect()
+        };
+        assert_eq!(rule(5).chars().count(), 40);
+        if motion() && colored() {
+            assert_ne!(rule(5), rule(15), "the comet advances between frames");
         }
     }
 }

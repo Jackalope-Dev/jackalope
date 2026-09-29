@@ -34,12 +34,16 @@ pub(super) fn discover_runner(
         account: "Current CLI account".into(),
         detail: String::new(),
     };
+    if let Some(custom) = policy.custom_agents.iter().find(|agent| agent.id == id) {
+        runner.name = custom.name.clone();
+    }
     let mut discovery = policy.clone();
     discovery.enabled_agents.clear();
     match discovery.resolve(id) {
         Err(error) => {
             runner.detail = if runner.desktop_installed {
-                "Antigravity desktop app found. Install the separate agy CLI to run tasks in Jackalope, then open agy to sign in and check agents again.".into()
+                "Install the agy command-line tool to use Antigravity, then check agents again."
+                    .into()
             } else {
                 error
             };
@@ -58,24 +62,31 @@ pub(super) fn discover_runner(
                 }
             };
             runner.account = binding.label.clone();
+            if adapter == "acp" {
+                runner.detail = "Ready. Sign in with this CLI in a terminal first. Jackalope starts it over ACP.".into();
+                return runner;
+            }
             if adapter == "antigravity" {
-                runner.detail = "Uses agy. Add separate Gemini API-key accounts in Jackalope, or use the existing CLI subscription login. Access is checked when a task starts; multiple subscription logins are not isolated.".into();
+                runner.detail =
+                    "Ready. Uses your agy sign-in or a Gemini API key added in Agents.".into();
                 return runner;
             }
             if adapter == "kimi" {
-                runner.detail = "Uses Kimi Code CLI through ACP. Sign in with kimi login; credentials and model access are checked when a task starts. Legacy Python kimi-cli accounts must be migrated using Kimi Code CLI.".into();
+                runner.detail =
+                    "Ready. Run kimi login once to sign in; access is checked when a task starts."
+                        .into();
                 return runner;
             }
             if adapter == "grok" {
-                runner.detail = "Installed. Check the selected account in Agents to read Grok's signed-in identity. Model access is checked at task launch.".into();
+                runner.detail = "Ready. Access is checked when a task starts.".into();
                 return runner;
             }
             if adapter == "opencode" {
-                runner.detail = "Installed. OpenCode validates the selected provider on launch; saved credentials do not prove current access. Free and local models may not require sign-in. Managed profiles isolate its saved credentials and sessions.".into();
+                runner.detail = "Ready. Works with local and free models; provider access is checked when a task starts.".into();
                 return runner;
             }
             if adapter == "gemini" {
-                runner.detail = "Uses gemini in headless mode with automatic edit approval. Add separate accounts and complete sign-in in Jackalope; access and quota are checked when a task starts.".into();
+                runner.detail = "Ready. Add and sign in to accounts in Agents; access is checked when a task starts.".into();
                 return runner;
             }
             let args = if adapter == "codex" {
@@ -97,8 +108,7 @@ pub(super) fn discover_runner(
                         runner.signed_in = out.status.success();
                     }
                     runner.detail = if runner.signed_in {
-                        "Uses your existing CLI sign-in. Model follows your agent configuration."
-                            .into()
+                        "Signed in and ready.".into()
                     } else if binding.profile_id.is_some() {
                         // A managed account keeps its own credentials, separate from the
                         // login the CLI uses in a terminal.

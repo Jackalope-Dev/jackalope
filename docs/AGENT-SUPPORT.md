@@ -227,7 +227,13 @@ Sources: [Kimi ACP](https://www.kimi.com/code/docs/en/kimi-code-cli/reference/ki
 
 ## Other candidates
 
-Copilot and other agents without a native adapter cannot execute tasks.
+An installed CLI that speaks the Agent Client Protocol can be added from Agents with its
+executable path and arguments. Jackalope starts that process over ACP and keeps the CLI's
+own sign-in. It does not probe that sign-in. Copilot and other agents without ACP or a
+native adapter cannot execute tasks.
+
+A loopback OpenAI-compatible server, such as LM Studio or vLLM, is saved as an OpenCode
+account after `GET /v1/models` succeeds. Only `127.0.0.1`, `localhost` and `::1` are accepted.
 
 ## Private OpenCode runner
 

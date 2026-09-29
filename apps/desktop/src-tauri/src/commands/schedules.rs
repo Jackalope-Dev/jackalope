@@ -40,7 +40,16 @@ pub struct Occurrence {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ScheduleWebhook {
+    pub token_hash: String,
+    pub created_at: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SavedSchedule {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub webhook: Option<ScheduleWebhook>,
     #[serde(default)]
     pub last_notice: Option<Occurrence>,
     #[serde(default)]
@@ -113,6 +122,7 @@ pub struct Scheduler {
     path: PathBuf,
     coordinator: Coordinator,
     alive: Arc<AtomicBool>,
+    webhook_port: Arc<std::sync::atomic::AtomicU16>,
 }
 
 impl Scheduler {
@@ -143,6 +153,7 @@ impl Scheduler {
             path,
             coordinator,
             alive: Arc::new(AtomicBool::new(true)),
+            webhook_port: Arc::new(std::sync::atomic::AtomicU16::new(0)),
         }
     }
 
@@ -166,6 +177,8 @@ impl Scheduler {
                 std::thread::sleep(Duration::from_secs(2));
             }
         });
+        let service = self.clone();
+        std::thread::spawn(move || service.serve_webhooks());
     }
 
     pub fn ensure_paused(&self) -> Result<(), String> {
@@ -590,6 +603,7 @@ fn save_definition(mut definition: ScheduleDefinition, service: &Scheduler) -> R
             history: vec![],
             last_run_id: None,
             account,
+            webhook: None,
         });
     }
     service.persist(&updated)?;
@@ -633,11 +647,286 @@ pub fn schedule_set_enabled(
     Ok(())
 }
 
+fn token_hash(token: &str) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(token.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn same_text(left: &str, right: &str) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut difference = 0u8;
+    for (left, right) in left.bytes().zip(right.bytes()) {
+        difference |= left ^ right;
+    }
+    difference == 0
+}
+
+fn webhook_request(bytes: &[u8]) -> Option<(String, String)> {
+    let text = std::str::from_utf8(bytes).ok()?;
+    let (start, headers) = text.split_once("\r\n")?;
+    let mut parts = start.split_whitespace();
+    if parts.next() != Some("POST") {
+        return None;
+    }
+    let path = parts.next()?;
+    let id = path.strip_prefix("/hooks/").filter(|id| !id.is_empty())?;
+    uuid::Uuid::parse_str(id).ok()?;
+    let token = headers.lines().find_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        name.eq_ignore_ascii_case("authorization")
+            .then(|| value.trim().strip_prefix("Bearer "))
+            .flatten()
+    })?;
+    if token.len() != 64 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    Some((id.to_string(), token.to_string()))
+}
+
+impl Scheduler {
+    fn serve_webhooks(&self) {
+        let listener = match std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)) {
+            Ok(listener) => listener,
+            Err(_) => return,
+        };
+        let Ok(address) = listener.local_addr() else {
+            return;
+        };
+        self.webhook_port.store(address.port(), Ordering::SeqCst);
+        listener.set_nonblocking(true).ok();
+        while self.alive.load(Ordering::SeqCst) {
+            match listener.accept() {
+                Ok((stream, address)) if address.ip().is_loopback() => {
+                    let _ = self.answer_webhook(stream);
+                }
+                Ok(_) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(Duration::from_millis(200));
+                }
+                Err(_) => std::thread::sleep(Duration::from_millis(500)),
+            }
+        }
+    }
+
+    fn answer_webhook(&self, mut stream: std::net::TcpStream) -> Result<(), String> {
+        use std::io::{Read, Write};
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .map_err(|error| error.to_string())?;
+        stream
+            .set_write_timeout(Some(Duration::from_secs(2)))
+            .map_err(|error| error.to_string())?;
+        let mut bytes = [0u8; 4096];
+        let read = stream.read(&mut bytes).unwrap_or(0);
+        let response = match webhook_request(&bytes[..read]) {
+            Some((id, token)) => match self.trigger_webhook(&id, &token) {
+                Ok(outcome) => {
+                    let status = if outcome.starts_with("Started") {
+                        "200 OK"
+                    } else {
+                        "202 Accepted"
+                    };
+                    http_json(status, &outcome)
+                }
+                Err(error)
+                    if error == "Schedule not found"
+                        || error == "This schedule has no webhook." =>
+                {
+                    http_json("404 Not Found", "Not found")
+                }
+                Err(error) if error == "Unauthorized" => {
+                    http_json("401 Unauthorized", "Unauthorized")
+                }
+                Err(_) => http_json("500 Internal Server Error", "Could not run the schedule."),
+            },
+            None => http_json(
+                "400 Bad Request",
+                "Send POST /hooks/<schedule> with Authorization: Bearer.",
+            ),
+        };
+        stream
+            .write_all(response.as_bytes())
+            .map_err(|error| error.to_string())
+    }
+
+    fn trigger_webhook(&self, id: &str, token: &str) -> Result<String, String> {
+        let mut ledger = self.ledger.lock().map_err(|error| error.to_string())?;
+        let index = ledger
+            .schedules
+            .iter()
+            .position(|saved| saved.definition.id == id)
+            .ok_or("Schedule not found")?;
+        let saved = &ledger.schedules[index];
+        let hash = saved
+            .webhook
+            .as_ref()
+            .map(|webhook| webhook.token_hash.as_str())
+            .ok_or("This schedule has no webhook.")?;
+        if !same_text(hash, &token_hash(token)) {
+            return Err("Unauthorized".into());
+        }
+        if !saved.definition.enabled {
+            return Ok("Skipped: schedule is paused".into());
+        }
+        let runs = self.coordinator.runtime.integration_runs()?;
+        let overlap = saved.last_run_id.iter().any(|run_id| {
+            runs.iter().any(|run| {
+                (&run.id == run_id || &run.task_id == run_id)
+                    && ["starting", "running", "stopping", "interrupted"]
+                        .contains(&run.status.as_str())
+            })
+        });
+        let mut request = saved.definition.request.clone();
+        request.id = uuid::Uuid::new_v4().to_string();
+        let skipped = overlap || saved.account.is_none();
+        let outcome = if overlap {
+            "Skipped: earlier run is active or interrupted"
+        } else if saved.account.is_none() {
+            "Skipped: re-save this schedule to bind its account"
+        } else {
+            "Reserved"
+        };
+        let mut updated = ledger.clone();
+        let current = &mut updated.schedules[index];
+        current.history.push(Occurrence {
+            change: None,
+            due_at: Utc::now(),
+            run_id: (!skipped).then(|| request.id.clone()),
+            outcome: outcome.into(),
+        });
+        if !skipped {
+            current.last_run_id = Some(request.id.clone());
+        }
+        if current.history.len() > 200 {
+            current.history.remove(0);
+        }
+        self.persist(&updated)?;
+        *ledger = updated;
+        if skipped {
+            return Ok(ledger.schedules[index]
+                .history
+                .last()
+                .map(|event| event.outcome.clone())
+                .unwrap_or_else(|| "Skipped".into()));
+        }
+        let start = (|| {
+            let account = ledger.schedules[index]
+                .account
+                .as_ref()
+                .ok_or("Re-save this schedule to bind its account.")?;
+            super::agent_profiles::validate_binding(
+                &self.coordinator.runtime.profiles_root(),
+                account,
+            )?;
+            let current = super::agent_profiles::bind_account(
+                &self.coordinator.runtime.profiles_root(),
+                &account.adapter,
+                request.agent_profile_id.as_deref(),
+            )?;
+            if current.directory != account.directory || current.profile_id != account.profile_id {
+                return Err(
+                    "The selected account changed. Re-save the schedule to approve this account."
+                        .into(),
+                );
+            }
+            self.coordinator.start_manual(request)
+        })();
+        let outcome = match start {
+            Ok(_) => "Started".to_string(),
+            Err(error) => format!("Failed to start: {error}"),
+        };
+        ledger.schedules[index].history.last_mut().unwrap().outcome = outcome.clone();
+        self.persist(&ledger)?;
+        Ok(outcome)
+    }
+}
+
+fn http_json(status: &str, message: &str) -> String {
+    let body = serde_json::json!({ "outcome": message }).to_string();
+    format!(
+        "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    )
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WebhookReveal {
+    pub url: String,
+    pub token: String,
+}
+
+#[tauri::command]
+pub fn schedule_webhook_enable(
+    id: String,
+    service: State<'_, Scheduler>,
+) -> Result<WebhookReveal, String> {
+    let port = service.webhook_port.load(Ordering::SeqCst);
+    if port == 0 {
+        return Err("The webhook listener is not running.".into());
+    }
+    let token = format!(
+        "{}{}",
+        uuid::Uuid::new_v4().simple(),
+        uuid::Uuid::new_v4().simple()
+    );
+    let mut ledger = service.ledger.lock().map_err(|error| error.to_string())?;
+    let mut updated = ledger.clone();
+    let saved = updated
+        .schedules
+        .iter_mut()
+        .find(|saved| saved.definition.id == id)
+        .ok_or("Schedule not found")?;
+    saved.webhook = Some(ScheduleWebhook {
+        token_hash: token_hash(&token),
+        created_at: Utc::now().to_rfc3339(),
+    });
+    service.persist(&updated)?;
+    *ledger = updated;
+    Ok(WebhookReveal {
+        url: format!("http://127.0.0.1:{port}/hooks/{id}"),
+        token,
+    })
+}
+
+#[tauri::command]
+pub fn schedule_webhook_disable(id: String, service: State<'_, Scheduler>) -> Result<(), String> {
+    let mut ledger = service.ledger.lock().map_err(|error| error.to_string())?;
+    let mut updated = ledger.clone();
+    let saved = updated
+        .schedules
+        .iter_mut()
+        .find(|saved| saved.definition.id == id)
+        .ok_or("Schedule not found")?;
+    saved.webhook = None;
+    service.persist(&updated)?;
+    *ledger = updated;
+    Ok(())
+}
+
 #[cfg(test)]
 mod monitor_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn a_webhook_request_needs_a_schedule_id_and_bearer_token() {
+        let id = uuid::Uuid::new_v4();
+        let token = "a".repeat(64);
+        let request = format!("POST /hooks/{id} HTTP/1.1\r\nAuthorization: Bearer {token}\r\n\r\n");
+        let (parsed, presented) = webhook_request(request.as_bytes()).unwrap();
+        assert_eq!(parsed, id.to_string());
+        assert_eq!(presented, token);
+        assert!(webhook_request(b"GET /hooks/nope HTTP/1.1\r\n\r\n").is_none());
+        assert!(same_text(&token_hash("secret"), &token_hash("secret")));
+        assert!(!same_text(&token_hash("secret"), &token_hash("other")));
+    }
+
     pub(super) fn fixture(missed: &str) -> (PathBuf, Scheduler) {
         let directory =
             std::env::temp_dir().join(format!("jackalope-schedule-{}", uuid::Uuid::new_v4()));
@@ -666,6 +955,7 @@ mod tests {
                 history: vec![],
                 last_run_id: None,
                 account: None,
+                webhook: None,
             });
         (directory, scheduler)
     }
@@ -737,6 +1027,7 @@ mod tests {
             name: "Fixture".into(),
             command: executable.to_string_lossy().into(),
             adapter: Some("codex".into()),
+            args: Vec::new(),
         });
         std::fs::create_dir_all(
             scheduler

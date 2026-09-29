@@ -2,7 +2,7 @@ import { EchoMark } from '@jackalope/brand/echo';
 import { Disclosure, DisclosureSummary, DiscordIcon } from '@jackalope/ui';
 import { ArrowRight, FolderOpen, ShieldCheck } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { DISCORD_URL } from '../../lib/community';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
@@ -19,6 +19,13 @@ import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
 import './access.css';
+
+const AccessNoticeContext = createContext<ReactNode>(null);
+
+/** Renders the reconnect notice inside the workspace, below its title bar. */
+export function AccessNoticeSlot() {
+  return useContext(AccessNoticeContext);
+}
 
 interface AccessStatus {
   required: boolean;
@@ -40,6 +47,8 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
   const [verified, setVerified] = useState(false);
   const [admitted, setAdmitted] = useState(false);
   const entered = useRef(false);
+  // Set once access was missing during this launch, so a new connection is celebrated.
+  const wasDenied = useRef(false);
   const successHeading = useRef<HTMLHeadingElement>(null);
   const needsSetup = onboarding === 'new' || onboarding === 'active';
   useEffect(() => {
@@ -53,7 +62,10 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
         const value = isTauriEnvironment()
           ? await nativeTask<AccessStatus>('app_execution_access')
           : { required: true, allowed: false, validUntil: null };
-        if (!canceled) setAccess(value);
+        if (!canceled) {
+          if (!value.allowed) wasDenied.current = true;
+          setAccess(value);
+        }
       } catch {
         if (!canceled) {
           setAccess(null);
@@ -83,12 +95,16 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
         }
         if (privacy.busy || (isTauriEnvironment() && !privacy.settings?.reviewed)) return;
         setError('');
-        setVerified(true);
+        // Returning users with valid access go straight to their work.
+        if (!needsSetup && !connecting && !wasDenied.current) {
+          entered.current = true;
+          setAdmitted(true);
+        } else setVerified(true);
       });
     return () => {
       canceled = true;
     };
-  }, [access, connecting, verified]);
+  }, [access, connecting, verified, needsSetup]);
   useEffect(() => {
     if (!verified) return;
     if (!access?.allowed) {
@@ -110,26 +126,29 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
   if (admitted) entered.current = true;
   if (!connecting && (admitted || reviewing))
     return (
-      <div className="access-frame">
-        {!access?.allowed && (
-          <div className="access-notice">
-            <p role="status">
-              Connect an approved account to start new work. Saved work and running tasks remain
-              available.
-            </p>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setVerified(false);
-                setConnecting(true);
-              }}
-            >
-              Connect account
-            </Button>
-          </div>
-        )}
-        <div className="access-workspace">{children}</div>
-      </div>
+      <AccessNoticeContext.Provider
+        value={
+          access?.allowed ? null : (
+            <div className="access-notice">
+              <p role="status">
+                Connect an approved account to start new work. Saved work and running tasks remain
+                available.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setVerified(false);
+                  setConnecting(true);
+                }}
+              >
+                Connect account
+              </Button>
+            </div>
+          )
+        }
+      >
+        {children}
+      </AccessNoticeContext.Provider>
     );
   return (
     <div className="access-frame">
@@ -187,6 +206,16 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
                     label="Allow MCP marketplace"
                     checked={settings.useMcpMarketplace}
                     onCheckedChange={settings.setUseMcpMarketplace}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span>Theme picker in the top bar</span>
+                  <Switch
+                    label="Show theme picker in top bar"
+                    checked={settings.showThemePickerInToolbar}
+                    onCheckedChange={(checked) =>
+                      settings.updateSettings({ showThemePickerInToolbar: checked })
+                    }
                   />
                 </div>
               </div>

@@ -102,5 +102,30 @@ export default defineConfig(({ mode }) => {
     ],
     server: { port: 5180, strictPort: true },
     preview: { port: 5180, strictPort: true },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/'))
+                return 'vendor-react';
+              if (id.includes('motion')) return 'vendor-motion';
+              if (id.includes('lucide-react')) return 'vendor-icons';
+              if (id.includes('@radix-ui')) return 'vendor-radix';
+            }
+
+            if (
+              id.includes('benchmark-summary.json') ||
+              id.includes('changelog.json') ||
+              id.includes('comparison-content.ts') ||
+              id.includes('marketing-content.ts') ||
+              id.includes('blog-content.ts')
+            ) {
+              return 'site-content';
+            }
+          },
+        },
+      },
+    },
   };
 });

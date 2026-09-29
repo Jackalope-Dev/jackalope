@@ -329,10 +329,13 @@ fn agent_assessment(
 ) -> Result<(Option<StrategyChoice>, Usage), String> {
     let policy = runtime.policy()?;
     let agent = if request.agent == "auto" {
-        &policy.default_meta_agent
+        policy.routing_agent(&request.project_id)?
     } else {
         &request.agent
     };
+    if !policy.agent_allowed(&request.project_id, agent) {
+        return Err("This agent is disabled for this project.".into());
+    }
     let (adapter, _) = policy.resolve(agent)?;
     let explicit = if request.agent == "auto" {
         policy

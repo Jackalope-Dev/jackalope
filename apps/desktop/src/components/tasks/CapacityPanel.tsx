@@ -3,6 +3,7 @@ import { Badge, Panel, RefreshIcon } from '@jackalope/ui';
 import { Zap } from 'lucide-react';
 
 import { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import { capacityWindowName } from '../../lib/capacity-display';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
@@ -76,7 +77,15 @@ function CapacityGauge({ remaining }: { remaining: number | null }) {
 }
 
 export function CapacityPanel() {
-  const { records, loading, error, lastFetched, fetch } = useCapacityStore();
+  const { records, loading, error, lastFetched, fetch } = useCapacityStore(
+    useShallow((s) => ({
+      records: s.records,
+      loading: s.loading,
+      error: s.error,
+      lastFetched: s.lastFetched,
+      fetch: s.fetch,
+    })),
+  );
   const [now, setNow] = useState(Date.now());
   const nextRefresh = lastFetched ? lastFetched + 60_000 : 0;
   const refresh = () => void fetch(true);
@@ -154,7 +163,7 @@ export function CapacityPanel() {
                   <div className="capacity-card-identity">
                     <h3>{name}</h3>
                     <p className="task-muted text-xs" title={record.account}>
-                      {record.account}
+                      {shortAccount(record.account)}
                     </p>
                   </div>
                   {stale && <Badge variant="warning">Stale</Badge>}
@@ -228,4 +237,10 @@ export function CapacityPanel() {
       )}
     </section>
   );
+}
+
+/** Shortens opaque account identifiers; the full value stays in the tooltip. */
+function shortAccount(account: string) {
+  const match = /^(.*?)\s*([0-9a-f]{8}-[0-9a-f-]{20,})$/i.exec(account);
+  return match ? `${match[1] || 'Account'} …${match[2].slice(-6)}` : account;
 }

@@ -1,0 +1,165 @@
+.task-comparison {
+  margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-elevated);
+}
+.task-comparison > .inline-notice {
+  flex-basis: 100%;
+}
+.task-comparison-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.task-comparison-members {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.task-comparison-member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  transition: border-color 150ms;
+}
+.task-comparison-member small {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.task-comparison-member:hover {
+  border-color: var(--color-accent);
+}
+.task-comparison-member[aria-current="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+.task-comparison-member:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+.task-comparison-kept {
+  color: var(--color-success);
+}
+.task-comparison-dialog {
+  width: min(1100px, calc(100vw - 48px));
+}
+.task-comparison-prompt {
+  display: -webkit-box;
+  margin-bottom: 16px;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.task-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.task-comparison-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+.task-comparison-card[data-kept] {
+  border-color: var(--color-success);
+}
+.task-comparison-card header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.task-comparison-card h3 {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+.task-comparison-card header p {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-comparison-card dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.task-comparison-card dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.task-comparison-card dt {
+  color: var(--color-text-muted);
+}
+.task-comparison-card dd {
+  margin: 0;
+  text-align: right;
+}
+.task-comparison-card dd[data-tone="danger"] {
+  color: var(--color-danger);
+}
+.task-comparison-added {
+  color: var(--color-success);
+}
+.task-comparison-removed {
+  color: var(--color-danger);
+}
+.task-comparison-result {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+.task-comparison-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+}
+.task-comparison-footnote {
+  margin-right: auto;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+/* The comparison and this attempt's progress read as one card. */
+.task-comparison:has(+ .task-progress) {
+  margin-bottom: 0;
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  background: var(--color-surface);
+}
+.task-comparison + .task-progress {
+  border-top-color: var(--color-border-subtle);
+  border-radius: 0 0 12px 12px;
+}

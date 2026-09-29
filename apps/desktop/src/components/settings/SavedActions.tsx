@@ -1,5 +1,6 @@
 import { FormField, Input, Textarea } from '@jackalope/ui';
 import { useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../stores/projectStore';
 import { type SavedAction, useSavedActionsStore } from '../../stores/savedActionsStore';
 import { Button } from '../ui/button';
@@ -14,7 +15,9 @@ const empty = (): SavedAction => ({
   projectId: null,
 });
 export function SavedActions() {
-  const { actions, save, remove } = useSavedActionsStore();
+  const { actions, save, remove } = useSavedActionsStore(
+    useShallow((s) => ({ actions: s.actions, save: s.save, remove: s.remove })),
+  );
   const projects = useProjectStore((state) => state.projects);
   const [draft, setDraft] = useState(empty);
   const [error, setError] = useState('');

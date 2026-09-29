@@ -1,6 +1,7 @@
 import { Badge } from '@jackalope/ui';
 import { ArrowUpRight } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { getAgentMetadata } from '../../lib/agent-catalog';
 import { taskAgents } from '../../lib/agent-provider';
 import { isActive, type TaskRun } from '../../lib/task-runtime';
 import { taskDecision } from '../../lib/task-workflow';
@@ -39,7 +40,8 @@ export function TaskProgress({
             </Badge>
           </div>
           <p className="task-muted">
-            {run.agent} · {run.accountBinding?.label || run.account}
+            {getAgentMetadata(run.agent)?.name ?? run.agent} ·{' '}
+            {run.accountBinding?.label || run.account}
             {agents.length > 1 ? ` · ${agents.length} agents on this task` : ''}
           </p>
         </div>

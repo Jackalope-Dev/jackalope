@@ -3,6 +3,8 @@ pub use windows::*;
 mod changes;
 mod topics;
 pub use topics::*;
+mod learning;
+pub use learning::*;
 
 use super::{
     coordination::Coordinator,
@@ -69,6 +71,8 @@ pub struct LiveSession {
     pub integrated_run_id: Option<String>,
     #[serde(default)]
     pub pinned: bool,
+    #[serde(default)]
+    pub last_learned_message_id: Option<String>,
     pub id: String,
     pub title: String,
     pub request: RunRequest,
@@ -332,13 +336,19 @@ impl LiveSessions {
         if title.trim().is_empty() || title.chars().count() > 160 {
             return Err("Use a session title up to 160 characters.".into());
         }
-        let target = super::tasks::resolve_target_branch(
-            &request.project_path,
-            request.target_branch.as_deref(),
-        )?;
-        request.isolated = true;
+        if let Some(folder) = super::tasks::plain_folder(&request.project_path)? {
+            request.project_path = folder;
+            request.isolated = false;
+            request.target_branch = None;
+        } else {
+            let target = super::tasks::resolve_target_branch(
+                &request.project_path,
+                request.target_branch.as_deref(),
+            )?;
+            request.isolated = true;
+            request.target_branch = Some(target);
+        }
         request.previous_run_id = None;
-        request.target_branch = Some(target);
         request.prompt = "Live session".into();
         request.id = id.clone();
         request.live_session_id = None;
@@ -376,6 +386,7 @@ impl LiveSessions {
                 limits,
                 integrated_run_id: None,
                 pinned: false,
+                last_learned_message_id: None,
                 id: id.clone(),
                 title: title.trim().into(),
                 request,
@@ -557,14 +568,17 @@ impl LiveSessions {
                             || run.verification.as_ref().is_some_and(|v| !v.result.success)
                         {
                             session.paused = true;
-                            session.error = Some(
-                                run.error
-                                    .clone()
-                                    .or(run.verification_error.clone())
-                                    .unwrap_or_else(|| {
-                                        "Review the last attempt before continuing.".into()
-                                    }),
-                            );
+                            let err = run
+                                .error
+                                .as_deref()
+                                .filter(|e| !e.trim().is_empty() && *e != "null")
+                                .or(run
+                                    .verification_error
+                                    .as_deref()
+                                    .filter(|e| !e.trim().is_empty() && *e != "null"))
+                                .or(run.quota_failure.as_ref().map(|q| q.message.as_str()))
+                                .unwrap_or("Review the last attempt before continuing.");
+                            session.error = Some(err.to_string());
                         }
                         Ok(())
                     })?;
@@ -792,6 +806,9 @@ impl LiveSessions {
 
 fn batch_prompt(session: &LiveSession, messages: &[&SessionMessage]) -> String {
     let mut prompt = format!("Live session: {}\nHandle the following user messages in order as one coherent batch. Group related changes; later corrections override earlier requests. Answer questions without assuming they authorize unrelated edits. Implement requested changes fully, preserving prior session work. Do not commit, push, reset, change branches, or create another worktree. Leave cumulative changes for review. Use the existing harness for tools, checks and user questions. Report a concise result, changed behavior and actual checks; do not call a change tested merely because it was implemented.\n", session.title);
+    if !session.request.isolated && session.request.target_branch.is_none() {
+        prompt.push_str("This folder is not a Git repository. Edit files in place. Do not create a repository unless the user asks.\n");
+    }
     for message in messages {
         prompt.push_str(&format!(
             "\nUser message {}:\n{}\n",

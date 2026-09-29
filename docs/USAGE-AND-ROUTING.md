@@ -217,10 +217,13 @@ snapshot; process exit does not establish acceptance. The selected period limits
 usage, not the date of that latest review. Account/agent filters show their
 contribution to those tasks, not exclusive credit for accepted work.
 
-Ask Jackalope's retained conversation appears separately in the all-project,
-all-account, all-agent view. Its turns have no timestamps or project bindings,
-so they are excluded from task totals and period filters. Deleted helper history
-cannot be reconstructed. Connected capacity remains a separate account-wide view
+Ask Jackalope appears separately from task totals. New turns record a date and the
+account, and, when project sharing is current, the open project. The project, account,
+agent and period filters apply to those turns. Turns saved before a date existed
+appear only in All time, and turns without a project or account appear only under
+the matching All choice. Archived conversations stay in the ledger. Unreadable
+helper files are named and left on disk. Deleted helper history cannot be
+reconstructed. Connected capacity remains a separate account-wide view
 that may include other applications. Opening Usage and reading capacity do not
 send model prompts. Unreadable task history hides summaries until reload succeeds.
 
@@ -228,14 +231,17 @@ Task assessments have a separate project/period-scoped ledger, including calls t
 never launched work and failed calls with unavailable reports. Immutable receipt IDs
 deduplicate reused assessments. They are excluded from worker and routing totals and
 hidden under agent/account filters because assessment history has no account attribution.
-Jev connection checks appear as a compact setup-usage row under Other app activity,
+Jev connection checks appear as a compact setup-usage row in the unfiltered view,
 with device-wide, all-time totals separate from task and period totals.
 
-JSON export schema 5 preserves the earlier attempt and usage-breakdown fields,
-filters, task/outcome summaries, trends and helper data, and adds task assessments.
-The export covers the project/account/agent/period scope, not the temporary chart
-bucket inspection. It omits prompts, provider transcripts and account directories.
-Only loaded history is covered; archived or deleted work is not reconstructed.
+JSON export schema 6 preserves the schema 5 attempt, usage-breakdown, filter,
+task/outcome, trend, assessment and helper fields, and adds helper turn dates,
+projects, account keys, archive markers and unreadable-file names. The export
+covers the project/account/agent/period scope, including filtered helper turns, not
+the temporary chart bucket inspection. It omits prompts, provider transcripts and
+account directories.
+Only loaded task history is covered; archived or deleted tasks are not reconstructed.
+Ask Jackalope archives are included.
 
 ## Task-strategy decisions
 

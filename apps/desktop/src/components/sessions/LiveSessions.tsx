@@ -10,6 +10,7 @@ import { LiveSessionView } from './LiveSessionView';
 import { SessionRecovery } from './SessionRecovery';
 import { SessionStart } from './SessionStart';
 import './live-session.css';
+import { useShallow } from 'zustand/react/shallow';
 import { managedTaskWork } from '../../lib/managed-task';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
@@ -22,9 +23,19 @@ export function LiveSessions({
   project?: Project;
   onOpenProject: () => void;
 }) {
-  const { sessions, runs, selectedId, select, loading } = useLiveSessionStore();
+  const { sessions, runs, selectedId, select, loading } = useLiveSessionStore(
+    useShallow((s) => ({
+      sessions: s.sessions,
+      runs: s.runs,
+      selectedId: s.selectedId,
+      select: s.select,
+      loading: s.loading,
+    })),
+  );
   const [fresh, setFresh] = useState(0);
-  const managed = useManagedTaskStore();
+  const managed = useManagedTaskStore(
+    useShallow((s) => ({ queue: s.queue, selectedId: s.selectedId, select: s.select })),
+  );
   const taskRuns = useExecutionStore((state) => state.runs);
   const managedTasks = (managed.queue.managedTasks ?? []).filter(
     (task) => !project || task.request.projectId === project.id,

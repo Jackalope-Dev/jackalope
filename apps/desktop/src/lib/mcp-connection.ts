@@ -127,3 +127,13 @@ export function effectiveConnections(servers: McpServerConfig[], projectId?: str
   }
   return [...entries.values()].filter((server) => server.enabled !== false);
 }
+
+/** Enabled connections scoped to one project, as a task continuation offers them. */
+export function projectConnections<T extends { enabled?: boolean; scope?: string }>(
+  servers: T[],
+  projectId: string,
+): T[] {
+  return servers.filter(
+    (server) => server.enabled !== false && server.scope === `project:${projectId}`,
+  );
+}

@@ -26,7 +26,7 @@ pub(super) fn api_provider(binding: &AccountBinding) -> Result<Option<&'static s
     api_key_name(binding).map(|name| name.and_then(|name| credentials::provider(&name)))
 }
 
-static PROFILE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+pub(super) static PROFILE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AgentProfile {
@@ -42,6 +42,8 @@ pub struct AgentProfile {
         skip_serializing_if = "Option::is_none"
     )]
     pub preferred_model: Option<String>,
+    #[serde(default, rename = "configDir", skip_serializing_if = "Option::is_none")]
+    pub config_dir: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -137,7 +139,7 @@ fn save(root: &Path, manifest: &Manifest) -> Result<(), String> {
     fs::rename(temporary, manifest_path(root)).map_err(|e| e.to_string())
 }
 
-fn dir_for(root: &Path, agent: &str, id: &str) -> PathBuf {
+pub(super) fn dir_for(root: &Path, agent: &str, id: &str) -> PathBuf {
     root.join(agent).join(id)
 }
 
@@ -290,6 +292,18 @@ fn bind_account_selection(
             .get(adapter)
             .and_then(|entry| entry.active.as_deref())
     });
+    if adapter == "acp" && selected.is_none() {
+        let directory = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+            .map(PathBuf::from)
+            .filter(|path| path.is_absolute())
+            .ok_or("Cannot locate the home directory for this CLI's own sign-in.")?;
+        return Ok(AccountBinding {
+            adapter: adapter.into(),
+            profile_id: None,
+            directory,
+            label: "This CLI's own sign-in".into(),
+        });
+    }
     if adapter == "antigravity" && selected.is_none() {
         let directory = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
             .map(|home| PathBuf::from(home).join(".gemini"))
@@ -318,11 +332,13 @@ fn bind_account_selection(
             .ok_or(
                 "The selected account was removed. Choose another account before running work.",
             )?;
-        (
-            Some(id.to_string()),
-            dir_for(root, adapter, id),
-            profile.name.clone(),
-        )
+        let directory = profile
+            .config_dir
+            .as_ref()
+            .map(|d| PathBuf::from(d.trim()))
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or_else(|| dir_for(root, adapter, id));
+        (Some(id.to_string()), directory, profile.name.clone())
     } else {
         let directory = std::env::var_os(env_name)
             .map(PathBuf::from)
@@ -346,7 +362,7 @@ fn bind_account_selection(
             directory,
             entry
                 .and_then(|entry| entry.default_name.clone())
-                .unwrap_or_else(|| "CLI account (identity not reported)".to_string()),
+                .unwrap_or_else(|| "Your CLI sign-in".to_string()),
         )
     };
     if !directory.is_absolute() {
@@ -457,6 +473,29 @@ pub fn apply_binding(
             command.env("OPENCODE_DISABLE_PROJECT_CONFIG", "true");
             command.env_remove("OPENCODE_CONFIG");
             command.env_remove("OPENCODE_CONFIG_DIR");
+        } else if let Some(overlay) = super::openai_endpoint::runtime_overlay(binding)? {
+            let mut configuration = command
+                .get_envs()
+                .find(|(name, _)| *name == "OPENCODE_CONFIG_CONTENT")
+                .and_then(|(_, value)| value)
+                .and_then(|value| value.to_str())
+                .map(serde_json::from_str::<serde_json::Value>)
+                .transpose()
+                .map_err(|_| "Invalid OpenCode process configuration.")?
+                .unwrap_or_else(|| serde_json::json!({}));
+            if !configuration.is_object() {
+                return Err("Invalid OpenCode process configuration.".into());
+            }
+            for (key, value) in overlay
+                .as_object()
+                .ok_or("Invalid endpoint configuration")?
+            {
+                configuration[key] = value.clone();
+            }
+            command.env("OPENCODE_CONFIG_CONTENT", configuration.to_string());
+            command.env("OPENCODE_DISABLE_PROJECT_CONFIG", "true");
+            command.env_remove("OPENCODE_CONFIG");
+            command.env_remove("OPENCODE_CONFIG_DIR");
         }
     }
     if binding.adapter == "kimi" {
@@ -494,9 +533,68 @@ fn local_verification(
     Ok(Some(verification))
 }
 
+pub(super) fn endpoint_api_key(binding: &AccountBinding) -> Result<Option<String>, String> {
+    Ok(credentials::read(binding)?
+        .filter(|key| key.name == "JACKALOPE_ENDPOINT_KEY")
+        .map(|key| key.value))
+}
+
+pub(super) fn install_endpoint(
+    root: &Path,
+    name: &str,
+    base_url: &str,
+    provider_id: &str,
+    model: &str,
+    models: &[String],
+    api_key: Option<&str>,
+) -> Result<AgentProfile, String> {
+    let _guard = PROFILE_LOCK.lock().map_err(|error| error.to_string())?;
+    let mut manifest = load_checked(root)?;
+    let entry = manifest.agents.entry("opencode".into()).or_default();
+    let tag = format!("endpoint:{provider_id}");
+    let mut profile = entry
+        .profiles
+        .iter()
+        .find(|profile| profile.tag.as_deref() == Some(tag.as_str()))
+        .cloned()
+        .unwrap_or_else(|| AgentProfile {
+            preferred_model: None,
+            id: uuid::Uuid::new_v4().to_string(),
+            name: name.to_string(),
+            group: None,
+            tag: Some(tag.clone()),
+            config_dir: None,
+        });
+    profile.name = name.to_string();
+    profile.preferred_model = Some(format!("{provider_id}/{}", model.replace('/', "-")));
+    let directory = dir_for(root, "opencode", &profile.id);
+    fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    let record = super::openai_endpoint::EndpointRecord {
+        name: name.to_string(),
+        base_url: base_url.to_string(),
+        provider_id: provider_id.to_string(),
+        model: model.to_string(),
+        models: models.to_vec(),
+    };
+    super::history::write_atomic(
+        &directory.join("jackalope-endpoint.json"),
+        &serde_json::to_vec(&record).map_err(|error| error.to_string())?,
+    )?;
+    credentials::write_endpoint_key(&directory, api_key)?;
+    entry.pending.retain(|id| id != &profile.id);
+    if let Some(existing) = entry.profiles.iter_mut().find(|item| item.id == profile.id) {
+        *existing = profile.clone();
+    } else {
+        entry.profiles.push(profile.clone());
+    }
+    save(root, &manifest)?;
+    Ok(profile)
+}
+
 pub(in crate::commands) fn create_local(
     root: &Path,
     verification: &super::local_ai::Verification,
+    activate: bool,
 ) -> Result<AgentProfile, String> {
     let _guard = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
     let mut manifest = load_checked(root)?;
@@ -513,6 +611,7 @@ pub(in crate::commands) fn create_local(
             name: format!("Local · {}", verification.model),
             group: None,
             tag: Some(tag),
+            config_dir: None,
         });
     let directory = dir_for(root, "opencode", &profile.id);
     fs::create_dir_all(directory.join("config/opencode")).map_err(|e| e.to_string())?;
@@ -528,7 +627,9 @@ pub(in crate::commands) fn create_local(
     if !entry.profiles.iter().any(|p| p.id == profile.id) {
         entry.profiles.push(profile.clone());
     }
-    entry.active = Some(profile.id.clone());
+    if activate {
+        entry.active = Some(profile.id.clone());
+    }
     save(root, &manifest)?;
     Ok(profile)
 }
@@ -586,6 +687,7 @@ pub fn agent_profile_create(
     name: String,
     group: Option<String>,
     pending: Option<bool>,
+    config_dir: Option<String>,
 ) -> Result<AgentProfile, String> {
     validate_group(group.as_deref())?;
     env_var_for(&agent).ok_or(
@@ -594,6 +696,16 @@ pub fn agent_profile_create(
     let name = name.trim();
     if name.is_empty() {
         return Err("Give the account a name.".into());
+    }
+    let cleaned_dir = config_dir
+        .map(|d| d.trim().to_string())
+        .filter(|d| !d.is_empty());
+    if let Some(ref path_str) = cleaned_dir {
+        let path = PathBuf::from(path_str);
+        if !path.is_absolute() {
+            return Err("Custom config directory must be an absolute path.".into());
+        }
+        fs::create_dir_all(&path).map_err(|e| format!("Could not create config directory: {e}"))?;
     }
     let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
     let root = runtime.profiles_root();
@@ -606,12 +718,15 @@ pub fn agent_profile_create(
         name: name.to_string(),
         group,
         tag: None,
+        config_dir: cleaned_dir.clone(),
     };
     entry.profiles.push(profile.clone());
     if pending.unwrap_or(false) {
         entry.pending.push(id.clone());
     }
-    let directory = dir_for(&root, &agent, &id);
+    let directory = cleaned_dir
+        .map(PathBuf::from)
+        .unwrap_or_else(|| dir_for(&root, &agent, &id));
     fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
     #[cfg(unix)]
     {
@@ -630,6 +745,37 @@ pub fn agent_profile_create(
     }
     save(&root, &manifest)?;
     Ok(profile)
+}
+
+#[tauri::command]
+pub fn agent_profile_set_config_dir(
+    runtime: State<'_, TaskRuntime>,
+    agent: String,
+    id: String,
+    config_dir: Option<String>,
+) -> Result<(), String> {
+    let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
+    let root = runtime.profiles_root();
+    let mut manifest = load_checked(&root)?;
+    let entry = manifest.agents.get_mut(&agent).ok_or("Unknown agent")?;
+    let profile = entry
+        .profiles
+        .iter_mut()
+        .find(|p| p.id == id)
+        .ok_or("Account not found.")?;
+    let cleaned = config_dir
+        .map(|d| d.trim().to_string())
+        .filter(|d| !d.is_empty());
+    if let Some(ref path_str) = cleaned {
+        let path = PathBuf::from(path_str);
+        if !path.is_absolute() {
+            return Err("Custom config directory must be an absolute path.".into());
+        }
+        fs::create_dir_all(&path).map_err(|e| format!("Could not create config directory: {e}"))?;
+    }
+    profile.config_dir = cleaned;
+    save(&root, &manifest)?;
+    Ok(())
 }
 
 pub(super) fn confirm_profile(root: &Path, agent: &str, id: &str) -> Result<(), String> {
@@ -972,8 +1118,18 @@ mod tests {
         .unwrap();
         save(&root, &other).unwrap();
         let paid = bind_account(&root, "opencode", None).unwrap();
-        let profile = create_local(&root, &verification).unwrap();
-        assert_eq!(create_local(&root, &verification).unwrap().id, profile.id);
+        let profile = create_local(&root, &verification, false).unwrap();
+        assert_eq!(
+            bind_account(&root, "opencode", None)
+                .unwrap()
+                .profile_id
+                .as_deref(),
+            Some("paid")
+        );
+        assert_eq!(
+            create_local(&root, &verification, true).unwrap().id,
+            profile.id
+        );
         assert_eq!(
             load_checked(&root).unwrap().agents["opencode"]
                 .profiles
@@ -1298,6 +1454,7 @@ mod tests {
             name: "Work".into(),
             group: None,
             tag: None,
+            config_dir: None,
         });
         entry.profiles.push(AgentProfile {
             preferred_model: None,
@@ -1305,6 +1462,7 @@ mod tests {
             name: "Personal".into(),
             group: None,
             tag: None,
+            config_dir: None,
         });
         entry.active = Some("personal".into());
         save(&root, &manifest).unwrap();
@@ -1340,6 +1498,7 @@ mod tests {
                         name: "Work".into(),
                         group: None,
                         tag: None,
+                        config_dir: None,
                     },
                     AgentProfile {
                         preferred_model: None,
@@ -1347,6 +1506,7 @@ mod tests {
                         name: "Personal".into(),
                         group: None,
                         tag: None,
+                        config_dir: None,
                     },
                 ],
                 active: Some("work".into()),
@@ -1403,6 +1563,7 @@ mod tests {
             name: "Work".into(),
             group: None,
             tag: None,
+            config_dir: None,
         });
         entry.profiles.push(AgentProfile {
             preferred_model: None,
@@ -1410,6 +1571,7 @@ mod tests {
             name: "Personal".into(),
             group: None,
             tag: None,
+            config_dir: None,
         });
         entry.active = Some("a".into());
         save(&root, &manifest).unwrap();
@@ -1438,6 +1600,26 @@ mod tests {
         entry.active = Some("ghost".into());
         save(&root, &manifest).unwrap();
         assert!(active_profile_dir(&root, "claude").is_none());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn custom_config_dir_is_bound_when_specified() {
+        let root = temp_root();
+        let custom_dir = root.join("custom_config");
+        let mut manifest = Manifest::default();
+        let entry = manifest.agents.entry("claude".into()).or_default();
+        entry.profiles.push(AgentProfile {
+            preferred_model: None,
+            id: "custom".into(),
+            name: "Custom Claude".into(),
+            group: None,
+            tag: None,
+            config_dir: Some(custom_dir.to_str().unwrap().to_string()),
+        });
+        save(&root, &manifest).unwrap();
+        let binding = bind_account(&root, "claude", Some("custom")).unwrap();
+        assert_eq!(binding.directory, custom_dir);
         let _ = fs::remove_dir_all(&root);
     }
 }

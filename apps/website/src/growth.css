@@ -398,22 +398,23 @@
 .workbench .case-tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  align-items: stretch;
   gap: 0;
+  padding-bottom: 0;
   border: 1px solid var(--color-border);
   border-radius: 10px 10px 0 0;
   overflow: hidden;
 }
 .workbench .case-tabs button {
-  min-height: 72px;
   padding: 14px 18px;
   gap: 12px;
   border: 0;
-  border-right: 1px solid var(--color-border);
+  border-radius: 0;
   background: var(--color-bg);
   text-align: left;
 }
-.workbench .case-tabs button:last-child {
-  border-right: 0;
+.workbench .case-tabs button:focus-visible {
+  outline-offset: -3px;
 }
 .case-tab-index {
   font-family: "JetBrains Mono Variable", "JetBrains Mono", monospace;
@@ -427,10 +428,13 @@
 }
 .workbench .case-tabs button[data-state="active"] {
   color: var(--color-text-primary);
-  background: color-mix(in srgb, var(--color-accent) 11%, var(--color-bg));
-  box-shadow: inset 0 -3px 0 var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-bg));
+}
+.workbench .case-tabs button:not([data-state="active"]):hover {
+  background: var(--color-surface-hover);
 }
 .workbench [role="tabpanel"] {
+  padding-top: 0;
   outline: none;
 }
 .case-stage {
@@ -875,14 +879,6 @@
   .workbench .case-tabs {
     grid-template-columns: 1fr;
     border-radius: 10px 10px 0 0;
-  }
-  .workbench .case-tabs button {
-    min-height: 52px;
-    border-right: 0;
-    border-bottom: 1px solid var(--color-border);
-  }
-  .workbench .case-tabs button[data-state="active"] {
-    box-shadow: inset 3px 0 0 var(--color-accent);
   }
   .case-stage {
     min-height: 660px;

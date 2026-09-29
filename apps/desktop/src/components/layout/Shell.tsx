@@ -1,7 +1,8 @@
 import { DropdownMenu as Menu, SearchIcon } from '@jackalope/ui';
-import { listen } from '@tauri-apps/api/event';
 import { Check, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useTauriEvent } from '../../hooks/useTauriEvent';
+import { useWindowEvent } from '../../hooks/useWindowEvent';
 import { captureDraftForProject } from '../../lib/capture-draft';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { displayShortcut, matchesShortcut, resolveShortcuts } from '../../lib/shortcuts';
@@ -20,17 +21,22 @@ import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { observeWorkbenchPreferences, useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
+import { AccessNoticeSlot } from '../account/AccessBoundary';
+import { useTrackOpenWork } from '../tasks/WorkSignals';
 import { BranchIndicator } from './BranchIndicator';
+import { ShortcutSheet } from './ShortcutSheet';
+import { WhatsNewDialog } from './WhatsNewDialog';
 import { WorkSidebar } from './WorkSidebar';
 import { WorkspaceStatusBar } from './WorkspaceStatusBar';
+import { WorkTabs } from './WorkTabs';
 import './workspace-shell.css';
+import { useShallow } from 'zustand/react/shallow';
 import { CompanionSources } from '../mascot/CompanionSources';
-import { RemoveProjectAction } from '../projects/RemoveProjectAction';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
 import type { SettingsCategory } from '../settings/SettingsPage';
 import { UpdateNotice } from '../settings/UpdateNotice';
-import { CaptureTask } from '../tasks/CaptureTask';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
+
 import { UnsavedTasksNotice } from '../tasks/TaskSaveRecovery';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
@@ -40,12 +46,10 @@ import { Tooltip } from '../ui/Tooltip';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
-import { InvitationsButton } from './InvitationsButton';
 import {
   type ActiveTab,
   AGENT_VIEWS,
   DEFAULT_WORKSPACE_TAB,
-  MCP_VIEWS,
   type ProjectSettingsDestination,
   WORKSPACE_VIEWS,
 } from './navigation';
@@ -103,6 +107,12 @@ const SettingsPage = lazy(() =>
 const CommandPalette = lazy(() =>
   import('./CommandPalette').then((m) => ({ default: m.CommandPalette })),
 );
+const CaptureTask = lazy(() =>
+  import('../tasks/CaptureTask').then((m) => ({ default: m.CaptureTask })),
+);
+const RemoveProjectAction = lazy(() =>
+  import('../projects/RemoveProjectAction').then((m) => ({ default: m.RemoveProjectAction })),
+);
 
 export function Shell({
   initialTaskAgent,
@@ -133,64 +143,37 @@ export function Shell({
       setActiveTab('kanban');
     }
   }, [activeTab]);
-  useEffect(() => {
-    if (!isTauriEnvironment()) return;
-    let disposed = false;
-    let stop: (() => void) | undefined;
-    void listen<{ id: string; pane: string; sessionId?: string }>(
-      'work-pane-open',
-      async ({ payload }) => {
-        if (payload.sessionId) {
-          await useLiveSessionStore.getState().refresh(payload.sessionId);
-          if (disposed) return;
-          const session = useLiveSessionStore
-            .getState()
-            .sessions.find((session) => session.id === payload.sessionId);
-          if (session) useProjectStore.getState().selectProject(session.request.projectId);
-          useLiveSessionStore.getState().select(payload.sessionId);
-          useWorkViewStore.getState().open(`session:${payload.sessionId}`, payload.pane);
-          setActiveTab('live-sessions');
-        } else {
-          useLiveSessionStore.getState().select(null);
-          useExecutionStore.getState().select(payload.id);
-          await useExecutionStore.getState().refresh();
-          if (disposed) return;
-          const run = useExecutionStore.getState().runs.find((run) => run.id === payload.id);
-          if (run) useProjectStore.getState().selectProject(run.projectId);
-          useManagedTaskStore.getState().select(null);
-          useWorkViewStore.getState().open(payload.id, payload.pane);
-          setActiveTab('kanban');
-        }
-      },
-    ).then((unlisten) => {
-      if (disposed) unlisten();
-      else stop = unlisten;
-    });
-    return () => {
-      disposed = true;
-      stop?.();
-    };
-  }, []);
-  useEffect(() => {
-    if (!isTauriEnvironment()) return;
-    let disposed = false;
-    let stop: (() => void) | undefined;
-    void listen<string>('live-session-open', async ({ payload }) => {
-      await useLiveSessionStore.getState().refresh(payload);
-      if (disposed) return;
-      const session = useLiveSessionStore.getState().sessions.find((item) => item.id === payload);
-      if (session) useProjectStore.getState().selectProject(session.request.projectId);
-      useLiveSessionStore.getState().select(payload);
-      setActiveTab('live-sessions');
-    }).then((unlisten) => {
-      if (disposed) unlisten();
-      else stop = unlisten;
-    });
-    return () => {
-      disposed = true;
-      stop?.();
-    };
-  }, []);
+  useTauriEvent<{ id: string; pane: string; sessionId?: string }>(
+    'work-pane-open',
+    async (payload) => {
+      if (payload.sessionId) {
+        await useLiveSessionStore.getState().refresh(payload.sessionId);
+        const session = useLiveSessionStore
+          .getState()
+          .sessions.find((session) => session.id === payload.sessionId);
+        if (session) useProjectStore.getState().selectProject(session.request.projectId);
+        useLiveSessionStore.getState().select(payload.sessionId);
+        useWorkViewStore.getState().open(`session:${payload.sessionId}`, payload.pane);
+        setActiveTab('live-sessions');
+      } else {
+        useLiveSessionStore.getState().select(null);
+        useExecutionStore.getState().select(payload.id);
+        await useExecutionStore.getState().refresh();
+        const run = useExecutionStore.getState().runs.find((run) => run.id === payload.id);
+        if (run) useProjectStore.getState().selectProject(run.projectId);
+        useManagedTaskStore.getState().select(null);
+        useWorkViewStore.getState().open(payload.id, payload.pane);
+        setActiveTab('kanban');
+      }
+    },
+  );
+  useTauriEvent<string>('live-session-open', async (payload) => {
+    await useLiveSessionStore.getState().refresh(payload);
+    const session = useLiveSessionStore.getState().sessions.find((item) => item.id === payload);
+    if (session) useProjectStore.getState().selectProject(session.request.projectId);
+    useLiveSessionStore.getState().select(payload);
+    setActiveTab('live-sessions');
+  });
   useEffect(observeHelper, []);
   useEffect(observeWorkbenchPreferences, []);
   useEffect(observeWorkbenchPerformance, []);
@@ -202,14 +185,10 @@ export function Shell({
     if (activeTab !== 'preferences') previousView.current = activeTab;
   }, [activeTab]);
   const [configuredAgent, setConfiguredAgent] = useState<string>();
-  useEffect(() => {
-    const handle = (event: Event) => {
-      setConfiguredAgent((event as CustomEvent<string>).detail);
-      setActiveTab('agent-settings');
-    };
-    window.addEventListener('jackalope:configure-agent', handle);
-    return () => window.removeEventListener('jackalope:configure-agent', handle);
-  }, []);
+  useWindowEvent<string>('jackalope:configure-agent', (agent) => {
+    setConfiguredAgent(agent);
+    setActiveTab('agent-settings');
+  });
   const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>('General');
   const [settingsProjectId, setSettingsProjectId] = useState<string>();
   const features: Partial<Record<ActiveTab, Feature>> = {
@@ -249,15 +228,10 @@ export function Shell({
         : null,
   );
   const [scheduleRunId, setScheduleRunId] = useState<string>();
-  useEffect(() => {
-    const handle = (event: Event) => {
-      const key = (event as CustomEvent<string>).detail;
-      const draft = useExecutionStore.getState().drafts[key];
-      if (key.startsWith('helper-') && draft) setCapture({ draftKey: key });
-    };
-    window.addEventListener('jackalope:helper-draft', handle);
-    return () => window.removeEventListener('jackalope:helper-draft', handle);
-  }, []);
+  useWindowEvent<string>('jackalope:helper-draft', (key) => {
+    if (key.startsWith('helper-') && useExecutionStore.getState().drafts[key])
+      setCapture({ draftKey: key });
+  });
   const [composerFocus, setComposerFocus] = useState(0);
   const focusComposer = useCallback(() => {
     setCapture(null);
@@ -267,43 +241,28 @@ export function Shell({
     setActiveTab('kanban');
     setComposerFocus((value) => value + 1);
   }, []);
-  const { projects, activeProjectId, selectProject } = useProjectStore();
-  useEffect(() => {
-    if (!isTauriEnvironment()) return;
-    let disposed = false;
-    const stops: Array<() => void> = [];
-    void listen('jackalope-tray-new-task', () => focusComposer()).then((unlisten) => {
-      if (disposed) unlisten();
-      else stops.push(unlisten);
-    });
-    void listen('jackalope-tray-settings', () => {
-      window.dispatchEvent(new CustomEvent('jackalope:open-settings', { detail: 'General' }));
-    }).then((unlisten) => {
-      if (disposed) unlisten();
-      else stops.push(unlisten);
-    });
-    // `/diff` in the terminal: open Changes on that checkout, in its project.
-    void listen<string>('jackalope:open-changes', ({ payload: path }) => {
-      const owner = useProjectStore
-        .getState()
-        .projects.find((project) => path === project.path || path.startsWith(`${project.path}/`));
-      if (owner) useProjectStore.getState().selectProject(owner.id);
-      openChanges(path);
-    }).then((unlisten) => {
-      if (disposed) unlisten();
-      else stops.push(unlisten);
-    });
-    void listen<string>('jackalope-tray-open-task', ({ payload: taskId }) => {
-      useWorkViewStore.getState().open(taskId);
-    }).then((unlisten) => {
-      if (disposed) unlisten();
-      else stops.push(unlisten);
-    });
-    return () => {
-      disposed = true;
-      for (const stop of stops) stop();
-    };
-  }, [focusComposer]);
+  const { projects, activeProjectId, selectProject } = useProjectStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      activeProjectId: s.activeProjectId,
+      selectProject: s.selectProject,
+    })),
+  );
+  useTauriEvent('jackalope-tray-new-task', () => focusComposer());
+  useTauriEvent('jackalope-tray-settings', () =>
+    window.dispatchEvent(new CustomEvent('jackalope:open-settings', { detail: 'General' })),
+  );
+  // `/diff` in the terminal: open Changes on that checkout, in its project.
+  useTauriEvent<string>('jackalope:open-changes', (path) => {
+    const owner = useProjectStore
+      .getState()
+      .projects.find((project) => path === project.path || path.startsWith(`${project.path}/`));
+    if (owner) useProjectStore.getState().selectProject(owner.id);
+    openChanges(path);
+  });
+  useTauriEvent<string>('jackalope-tray-open-task', (taskId) =>
+    useWorkViewStore.getState().open(taskId),
+  );
   const switchProject = (id: string) => {
     if (id === activeProjectId) return;
     const project = projects.find((item) => item.id === id);
@@ -315,6 +274,7 @@ export function Shell({
     useManagedTaskStore.getState().select(null);
     selectProject(id);
   };
+  useTrackOpenWork();
   const selectedTaskId = useExecutionStore((state) => state.selectedId);
   const selectedSessionId = useLiveSessionStore((state) => state.selectedId);
   const selectedManagedId = useManagedTaskStore((state) => state.selectedId);
@@ -356,44 +316,25 @@ export function Shell({
       setActiveTab('preferences');
     } else setActiveTab(tab);
   }, []);
-  useEffect(() => {
-    const handle = (event: Event) => navigate((event as CustomEvent<ActiveTab>).detail);
-    window.addEventListener('jackalope:navigate', handle);
-    return () => window.removeEventListener('jackalope:navigate', handle);
-  }, [navigate]);
-  useEffect(() => {
-    const handle = (event: Event) => {
-      const destination = (event as CustomEvent<SettingsCategory | ProjectSettingsDestination>)
-        .detail;
+  useWindowEvent<ActiveTab>('jackalope:navigate', navigate);
+  useWindowEvent<SettingsCategory | ProjectSettingsDestination>(
+    'jackalope:open-settings',
+    (destination) => {
       setSettingsCategory(typeof destination === 'string' ? destination : destination.category);
       setSettingsProjectId(typeof destination === 'string' ? undefined : destination.projectId);
       setActiveTab('preferences');
-    };
-    window.addEventListener('jackalope:open-settings', handle);
-    return () => window.removeEventListener('jackalope:open-settings', handle);
-  }, []);
+    },
+  );
   const shortcutSettings = useSettingsStore((state) => state.shortcuts);
   const shortcuts = resolveShortcuts(shortcutSettings);
   const navCollapsed = useWorkViewStore((state) => state.navCollapsed) && preset === 'build';
   const toggleNav = useWorkViewStore((state) => state.toggleNav);
   const shortcut = displayShortcut(shortcuts.search);
-  useEffect(() => {
-    if (!isTauriEnvironment()) return;
-    let disposed = false;
-    let stop: (() => void) | undefined;
-    void listen<string>('desktop-action', ({ payload }) => {
-      if (payload === 'settings') navigate('preferences');
-      if (payload === 'newWork') focusComposer();
-      if (payload === 'search') setCommandsOpen(true);
-    }).then((unlisten) => {
-      if (disposed) unlisten();
-      else stop = unlisten;
-    });
-    return () => {
-      disposed = true;
-      stop?.();
-    };
-  }, [navigate, focusComposer]);
+  useTauriEvent<string>('desktop-action', (action) => {
+    if (action === 'settings') navigate('preferences');
+    if (action === 'newWork') focusComposer();
+    if (action === 'search') setCommandsOpen(true);
+  });
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const bindings = resolveShortcuts(shortcutSettings);
@@ -430,6 +371,7 @@ export function Shell({
       </a>
       <ResizeHandles />
       <TitleBar onSettings={() => navigate('preferences')} />
+      <AccessNoticeSlot />
       <header className="workspace-chrome">
         <div className="flex items-center gap-4 min-w-0">
           <img src="/mascot.svg" alt="Jackalope" className="size-8 shrink-0" />
@@ -479,14 +421,6 @@ export function Shell({
             </Menu.Portal>
           </Menu.Root>
           <BranchIndicator />
-          <InvitationsButton
-            onClick={() => {
-              setSettingsProjectId(undefined);
-              setSettingsCategory('Invitations');
-              setActiveTab('preferences');
-            }}
-            onDismiss={() => projectSwitcher.current?.focus()}
-          />
         </div>
         <div className="flex items-center gap-3">
           {project && <WorkspacePresetPicker projectId={project.id} />}
@@ -494,7 +428,7 @@ export function Shell({
             <Tooltip content={`New work (${displayShortcut(shortcuts.newWork)})`}>
               <button
                 type="button"
-                className="command-trigger"
+                className="command-trigger command-new"
                 onClick={focusComposer}
                 aria-label="New work"
               >
@@ -597,13 +531,7 @@ export function Shell({
             <WorkspaceSubnavigation
               label="Agents views"
               items={AGENT_VIEWS}
-              value={
-                activeTab === 'agent-settings'
-                  ? 'agents'
-                  : activeTab === 'mcp-marketplace'
-                    ? 'mcps'
-                    : activeTab
-              }
+              value={activeTab === 'agent-settings' ? 'agents' : activeTab}
               onChange={navigate}
             />
           )}
@@ -638,14 +566,7 @@ export function Shell({
                 }))}
               />
             )}
-          {(activeTab === 'mcps' || activeTab === 'mcp-marketplace') && (
-            <WorkspaceSubnavigation
-              label="MCP views"
-              items={MCP_VIEWS}
-              value={activeTab}
-              onChange={navigate}
-            />
-          )}
+          {activeTab === 'kanban' && <WorkTabs />}
           <PageErrorBoundary
             feature={features[activeTab]}
             key={`${activeTab}:${activeProjectId}:${settingsCategory}`}
@@ -767,29 +688,34 @@ export function Shell({
         </main>
       </div>
       {capture && (
-        <CaptureTask
-          key={capture.ideaId ?? 'capture'}
-          {...capture}
-          onClose={() => setCapture(null)}
-          onStarted={() => {
-            setCapture(null);
-            setActiveTab('kanban');
-          }}
-        />
+        <Suspense fallback={null}>
+          <CaptureTask
+            key={capture.ideaId ?? 'capture'}
+            {...capture}
+            onClose={() => setCapture(null)}
+            onStarted={() => {
+              setCapture(null);
+              setActiveTab('kanban');
+            }}
+          />
+        </Suspense>
       )}
       <UpdateNotice />
       {removingProject && (
-        <RemoveProjectAction
-          project={removingProject}
-          open
-          onOpenChange={(open) => {
-            if (!open) {
-              setRemovingProject(null);
-              requestAnimationFrame(() => projectSwitcher.current?.focus());
-            }
-          }}
-        />
+        <Suspense fallback={null}>
+          <RemoveProjectAction
+            project={removingProject}
+            open
+            onOpenChange={(open) => {
+              if (!open) {
+                setRemovingProject(null);
+                requestAnimationFrame(() => projectSwitcher.current?.focus());
+              }
+            }}
+          />
+        </Suspense>
       )}
+
       <ScheduleNotice />
       <HistoryRecoveryNotice />
       <UnsavedTasksNotice />
@@ -798,6 +724,11 @@ export function Shell({
         onSearch={() => setCommandsOpen(true)}
         onSettings={() => {
           setSettingsCategory('General');
+          setActiveTab('preferences');
+        }}
+        onInvitations={() => {
+          setSettingsProjectId(undefined);
+          setSettingsCategory('Invitations');
           setActiveTab('preferences');
         }}
       />
@@ -814,6 +745,8 @@ export function Shell({
           />
         )}
       </Suspense>
+      <WhatsNewDialog />
+      <ShortcutSheet />
     </div>
   );
 }

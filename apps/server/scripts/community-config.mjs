@@ -7,6 +7,8 @@ export function applyCommunityConfig(settings, environment, source = process.env
     'ACCESS_EMAIL_REPLY_TO',
     'ACCESS_INSTALLER_KEY',
     'ACCESS_STORE_URL',
+    'ACCESS_MAC_CHANNELS',
+    'ACCESS_LINUX_CHANNELS',
     'ACCESS_NEWSLETTER_FORM',
     'ACCESS_AUDIENCE_LIST',
     'ADMIN_EMAIL',
@@ -50,6 +52,15 @@ export function applyCommunityConfig(settings, environment, source = process.env
     )
       throw new Error('Store link must be an official Microsoft product URL');
   }
+  for (const [name, platform] of [
+    ['ACCESS_MAC_CHANNELS', 'macOS'],
+    ['ACCESS_LINUX_CHANNELS', 'Linux'],
+  ])
+    if (
+      vars[name] &&
+      !vars[name].split(',').every((channel) => ['stable', 'beta'].includes(channel.trim()))
+    )
+      throw new Error(`${platform} download channels must be stable and/or beta`);
   vars.EARLY_ACCESS_ENABLED ??= 'false';
   if (!['true', 'false'].includes(vars.EARLY_ACCESS_ENABLED))
     throw new Error('Early access flag must be true or false');
@@ -76,7 +87,9 @@ export function applyCommunityConfig(settings, environment, source = process.env
     required:
       vars.EARLY_ACCESS_ENABLED === 'true'
         ? ['RATE_SECRET', 'ACCESS_SECRET', 'SEQUENZY_API_KEY']
-        : ['RATE_SECRET'],
+        : vars.FEEDBACK_EMAIL_ENABLED === 'true'
+          ? ['RATE_SECRET', 'SEQUENZY_API_KEY']
+          : ['RATE_SECRET'],
   };
   if (
     !['true', 'false'].includes(vars.INGESTION_ENABLED) ||
@@ -93,8 +106,4 @@ export function applyCommunityConfig(settings, environment, source = process.env
     (!vars.FEEDBACK_EMAIL_FROM || !vars.FEEDBACK_EMAIL_TO)
   )
     throw new Error('Feedback email requires verified sender and recipient');
-  settings.send_email =
-    vars.FEEDBACK_EMAIL_ENABLED === 'true'
-      ? [{ name: 'FEEDBACK_EMAIL', allowed_destination_addresses: [vars.FEEDBACK_EMAIL_TO] }]
-      : [];
 }

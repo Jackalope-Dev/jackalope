@@ -13,6 +13,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { nativeTask } from '../../lib/task-runtime';
 import {
   archiveWorktree,
@@ -35,8 +36,10 @@ import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
+import { WorktreeRemovalPlan as RemovalPlan } from './WorktreeRemovalPlan';
 
 /** Ignored paths cleanup deletes, so a confirm never hides them. */
+
 function discarded(worktrees: WorktreeEntry[]): string[] {
   return [...new Set(worktrees.flatMap((wt) => wt.cleanup?.discarded_paths ?? []))].sort();
 }
@@ -64,71 +67,6 @@ function displayPath(path: string, root?: string) {
   return path.startsWith(base) && path.length > base.length ? path.slice(base.length + 1) : path;
 }
 
-/**
- * What a confirm is about to remove, and which step it is on once it runs:
- * removing several worktrees is slow enough to look stalled without it.
- */
-function RemovalPlan({
-  names = [],
-  paths = [],
-  progress,
-  busy = false,
-  busyNote,
-  isFolder = false,
-}: {
-  names?: string[];
-  paths?: string[];
-  progress?: string;
-  busy?: boolean;
-  busyNote?: string;
-  isFolder?: boolean;
-}) {
-  if (busy) {
-    return (
-      <div className="cleanup-plan-busy" role="status" aria-live="polite">
-        <LoadingState label={progress || 'Cleaning up…'} compact />
-        <p className="task-muted text-xs">
-          {busyNote || 'Removing files and Git branches. This may take a moment…'}
-        </p>
-      </div>
-    );
-  }
-
-  if (names.length < 2 && !paths.length) return null;
-
-  const Icon = isFolder ? FolderX : GitBranch;
-
-  return (
-    <div className="cleanup-plan">
-      {names.length > 1 && (
-        <div className="flex flex-col gap-1.5">
-          <p className="cleanup-plan-heading">
-            {isFolder ? 'Folders' : 'Worktrees'} to remove ({names.length}):
-          </p>
-          <ul className="cleanup-plan-list">
-            {names.map((name) => (
-              <li key={name} className="cleanup-plan-item font-mono text-xs">
-                <Icon
-                  size={14}
-                  className="shrink-0 text-[var(--color-text-muted)]"
-                  aria-hidden="true"
-                />
-                <span className="truncate">{name}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {paths.length > 0 && (
-        <details className="cleanup-plan-note">
-          <summary>Ignored files deleted too ({paths.length})</summary>
-          <p className="font-mono text-xs break-all">{paths.join(', ')}</p>
-        </details>
-      )}
-    </div>
-  );
-}
-
 export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }) {
   const {
     projects,
@@ -138,7 +76,17 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     loading,
     checkingWorktrees,
     worktreesError,
-  } = useProjectStore();
+  } = useProjectStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      activeProjectId: s.activeProjectId,
+      loadWorktreesForActiveProject: s.loadWorktreesForActiveProject,
+      spawnTaskWorktree: s.spawnTaskWorktree,
+      loading: s.loading,
+      checkingWorktrees: s.checkingWorktrees,
+      worktreesError: s.worktreesError,
+    })),
+  );
   const project = projects.find((p) => p.id === activeProjectId);
   const [creating, setCreating] = useState(false);
   const [slug, setSlug] = useState('');
@@ -151,8 +99,13 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   const [progress, setProgress] = useState('');
   const pending = busy || removing !== null;
   const refreshing = loading || checkingWorktrees;
+  const projectPath = project?.path ?? '';
+  const normalizedRoot = projectPath.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
   const worktrees = (project?.worktrees ?? []).filter(
-    (wt, index) => index > 0 && !['main', 'master'].includes(wt.branch),
+    (wt, index) =>
+      index > 0 &&
+      !['main', 'master'].includes(wt.branch) &&
+      wt.path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase() !== normalizedRoot,
   );
   const ready = worktrees.filter(isReady);
   const active = worktrees.filter((wt) => !isReady(wt));
@@ -168,7 +121,6 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   }, [feedback, loading, pending]);
   const branchName = branch ?? `feat/${slug.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   const desktop = isTauriEnvironment();
-  const projectPath = project?.path;
   const [sizes, setSizes] = useState<
     Record<string, { bytes: number; files: number; partial: boolean; skippedLinks: number }>
   >({});

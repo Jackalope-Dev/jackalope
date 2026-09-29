@@ -185,16 +185,39 @@ export const useProjectStore = create<ProjectState>()(
           set({ loading: true, checkingWorktrees: false, worktreesError: null });
           const worktrees = await readWorktrees(active.path, targetBranch, false);
           if (request !== worktreeRequest || get().activeProjectId !== active.id) return;
+          const normActive = active.path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
+          const matchingWt =
+            worktrees.find(
+              (wt) =>
+                wt.path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase() === normActive,
+            ) ?? worktrees[0];
+          const currentBranch = matchingWt?.branch?.trim();
           set((state) => ({
             loading: false,
             checkingWorktrees: true,
-            projects: state.projects.map((p) => (p.id === active.id ? { ...p, worktrees } : p)),
+            projects: state.projects.map((p) =>
+              p.id === active.id
+                ? { ...p, worktrees, ...(currentBranch ? { gitBranch: currentBranch } : {}) }
+                : p,
+            ),
           }));
           const inspected = await readWorktrees(active.path, targetBranch, true);
           if (request !== worktreeRequest || get().activeProjectId !== active.id) return;
+          const matchingInspected =
+            inspected.find(
+              (wt) =>
+                wt.path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase() === normActive,
+            ) ?? inspected[0];
+          const inspectedBranch = matchingInspected?.branch?.trim();
           set((state) => ({
             projects: state.projects.map((p) =>
-              p.id === active.id ? { ...p, worktrees: inspected } : p,
+              p.id === active.id
+                ? {
+                    ...p,
+                    worktrees: inspected,
+                    ...(inspectedBranch ? { gitBranch: inspectedBranch } : {}),
+                  }
+                : p,
             ),
           }));
         } catch (e) {
@@ -274,16 +297,6 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
   }));
 }
 
-// Keeps the native mirror in step with this store. The `jackalope` command
-// reads it to learn which project id belongs to a repository, so work started
-// from a terminal lands in the same project as work started here.
-function writeProjectRegistry(projects: Project[]) {
-  if (!isTauriEnvironment()) return;
-  void nativeTask('project_registry_save', { projects: projectRecords(projects) }).catch(() => {
-    // The mirror is a convenience; the store stays the source of truth.
-  });
-}
-
 // Adopts repositories registered from a terminal before this window loaded,
 // then republishes so the mirror reflects any projects added while it was
 // unavailable.
@@ -306,18 +319,31 @@ async function mergeProjectRegistry() {
     if (added.length) {
       useProjectStore.setState((current) => ({ projects: [...current.projects, ...added] }));
     }
-    writeProjectRegistry(useProjectStore.getState().projects);
+    mirrorProjects(useProjectStore.getState().projects);
   } catch {
     // Nothing to adopt if the host cannot be reached.
   }
 }
 
 let mirrored: string | null = null;
+let requestedMirror: string | null = null;
+let mirrorSync: Promise<void> = Promise.resolve();
 function mirrorProjects(projects: Project[]) {
-  const encoded = JSON.stringify(projectRecords(projects));
-  if (encoded === mirrored) return;
-  mirrored = encoded;
-  writeProjectRegistry(projects);
+  if (!isTauriEnvironment()) return;
+  const records = projectRecords(projects);
+  const encoded = JSON.stringify(records);
+  if (encoded === requestedMirror) return;
+  requestedMirror = encoded;
+  mirrorSync = mirrorSync
+    .then(async () => {
+      if (encoded === mirrored) return;
+      await nativeTask('project_registry_save', { projects: records });
+      mirrored = encoded;
+    })
+    .catch(() => {
+      // Retry the same snapshot on the next update if the host was unavailable.
+      if (requestedMirror === encoded) requestedMirror = null;
+    });
 }
 // Subscribing rather than writing from each mutator means a future action
 // cannot forget to mirror.

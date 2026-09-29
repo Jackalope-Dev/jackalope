@@ -38,6 +38,8 @@
     "ACCESS_EMAIL_REPLY_TO": "contact@jackalope.dev",
     "ACCESS_INSTALLER_KEY": "",
     "ACCESS_STORE_URL": "",
+    "ACCESS_MAC_CHANNELS": "",
+    "ACCESS_LINUX_CHANNELS": "",
     "ACCESS_AUDIENCE_LIST": ""
   },
   "d1_databases": [
@@ -106,6 +108,8 @@
         "ACCESS_EMAIL_REPLY_TO": "contact@jackalope.dev",
         "ACCESS_INSTALLER_KEY": "",
         "ACCESS_STORE_URL": "",
+        "ACCESS_MAC_CHANNELS": "",
+        "ACCESS_LINUX_CHANNELS": "",
         "ACCESS_AUDIENCE_LIST": ""
       },
       "d1_databases": [
@@ -159,12 +163,6 @@
           "pattern": "staging-api.jackalope.dev",
           "custom_domain": true
         }
-      ],
-      "send_email": [
-        {
-          "name": "FEEDBACK_EMAIL",
-          "allowed_destination_addresses": ["contact@jackalope.dev"]
-        }
       ]
     },
     "production": {
@@ -189,6 +187,8 @@
         "ACCESS_EMAIL_REPLY_TO": "contact@jackalope.dev",
         "ACCESS_INSTALLER_KEY": "",
         "ACCESS_STORE_URL": "",
+        "ACCESS_MAC_CHANNELS": "beta,stable",
+        "ACCESS_LINUX_CHANNELS": "beta,stable",
         "ACCESS_AUDIENCE_LIST": ""
       },
       "d1_databases": [
@@ -242,22 +242,10 @@
           "pattern": "api.jackalope.dev",
           "custom_domain": true
         }
-      ],
-      "send_email": [
-        {
-          "name": "FEEDBACK_EMAIL",
-          "allowed_destination_addresses": ["contact@jackalope.dev"]
-        }
       ]
     }
   },
   "secrets": {
     "required": ["RATE_SECRET", "ACCESS_SECRET", "SEQUENZY_API_KEY"]
-  },
-  "send_email": [
-    {
-      "name": "FEEDBACK_EMAIL",
-      "allowed_destination_addresses": ["contact@jackalope.dev"]
-    }
-  ]
+  }
 }

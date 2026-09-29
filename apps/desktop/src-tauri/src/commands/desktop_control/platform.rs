@@ -78,15 +78,20 @@ pub struct Readiness {
     pub available: bool,
     pub message: String,
     pub can_request_permissions: bool,
+    /// macOS privacy panes still to allow: `accessibility`, `screenRecording`
+    /// or `inputMonitoring`. macOS shows its prompt only once, so after a
+    /// denial the user must turn each one on in System Settings.
+    #[serde(default)]
+    pub missing: Vec<String>,
 }
 
 pub fn readiness() -> Readiness {
     if !wayland_session() && !supported() {
-        return Readiness { available: false, can_request_permissions: false,
+        return Readiness { available: false, can_request_permissions: false, missing: Vec::new(),
             message: "Native window control is unavailable in this desktop session. On Linux, use an X11 session with accessibility and compositing support. Task browser automation is available separately.".into() };
     }
     #[cfg(windows)]
-    return Readiness { available: true, can_request_permissions: false,
+    return Readiness { available: true, can_request_permissions: false, missing: Vec::new(),
         message: "Native window control is available. Each task asks you to choose a window before access begins.".into() };
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     {
@@ -100,8 +105,19 @@ pub fn readiness() -> Readiness {
                 value["available"] == true && (!wayland_session() || value["protocol"] == 1)
             }
         });
+        let missing = match &result {
+            Ok(value) if cfg!(target_os = "macos") => {
+                ["accessibility", "screenRecording", "inputMonitoring"]
+                    .into_iter()
+                    .filter(|key| value[*key] != true)
+                    .map(String::from)
+                    .collect()
+            }
+            _ => Vec::new(),
+        };
         Readiness {
             available,
+            missing,
             can_request_permissions: (cfg!(target_os = "macos") && result.is_ok())
                 || (cfg!(target_os = "linux")
                     && result
@@ -128,6 +144,7 @@ pub fn readiness() -> Readiness {
     Readiness {
         available: false,
         can_request_permissions: false,
+        missing: Vec::new(),
         message: "Native window control is unavailable on this platform.".into(),
     }
 }
@@ -157,12 +174,56 @@ pub async fn desktop_control_request_permissions() -> Result<Readiness, String> 
         if current.available {
             Ok(current)
         } else {
-            Ok(Readiness { available: false, can_request_permissions: false,
+            Ok(Readiness { available: false, can_request_permissions: false, missing: Vec::new(),
                 message: "GNOME extension installed. Sign out and back in, enable Jackalope Window Control in Extensions, then refresh this device. Each task still needs your window choice and Resume.".into() })
         }
     }).await.map_err(|e| e.to_string())?;
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     Err("This platform does not use macOS desktop permissions.".into())
+}
+
+/// Opens the System Settings privacy pane for one macOS permission.
+#[tauri::command]
+pub fn desktop_control_open_settings(permission: String) -> Result<(), String> {
+    let pane = match permission.as_str() {
+        "accessibility" => "Privacy_Accessibility",
+        "screenRecording" => "Privacy_ScreenCapture",
+        "inputMonitoring" => "Privacy_ListenEvent",
+        _ => return Err("Unknown macOS permission.".into()),
+    };
+    #[cfg(target_os = "macos")]
+    {
+        let opened = std::process::Command::new("/usr/bin/open")
+            .arg(format!(
+                "x-apple.systempreferences:com.apple.preference.security?{pane}"
+            ))
+            .status()
+            .map_err(|error| error.to_string())?;
+        if !opened.success() {
+            return Err("Could not open System Settings.".into());
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = pane;
+        Err("This platform does not use macOS desktop permissions.".into())
+    }
+}
+
+/// Restarts the app so macOS applies newly granted permissions, which it only
+/// reads at launch. Refused while work is running so nothing is interrupted.
+#[tauri::command]
+pub fn desktop_control_restart(
+    app: tauri::AppHandle,
+    runtime: tauri::State<'_, super::super::tasks::TaskRuntime>,
+) -> Result<(), String> {
+    if runtime.active_work_count() > 0 || super::super::work_terminal::active_count() > 0 {
+        return Err(
+            "Finish or stop running work and terminals before restarting Jackalope.".into(),
+        );
+    }
+    app.restart();
 }
 
 #[cfg(target_os = "linux")]

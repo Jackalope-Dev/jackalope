@@ -63,6 +63,10 @@ for light mode and the corresponding unsuffixed files for dark mode.
 it does not reproduce the edited film. Select reviewed runtime exports and update
 all fields in `tour` together when replacing the film.
 
+`scripts/social-preview.html` is the source for `public/social-preview.png`, the
+Open Graph image. After changing it or `media/tasks-light.png`, regenerate it with
+`node apps/website/scripts/capture-social.mjs`.
+
 ## Verification
 
 Against the website preview, the browser callback checks responsive layout,

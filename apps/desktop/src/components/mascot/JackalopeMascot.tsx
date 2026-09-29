@@ -1,6 +1,8 @@
 import { characterMarkViewBox, characterPaths as paths } from '@jackalope/brand/character';
+import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useId, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useReducedMotionPreference } from '../../hooks/useReducedMotionPreference';
 import { type MascotMood, useMascotStore } from '../../stores/mascotStore';
 import { useMascotIdle } from './useMascotIdle';
@@ -83,7 +85,9 @@ export function JackalopeMascot({
   nodding = false,
   onNodComplete,
 }: JackalopeMascotProps) {
-  const { mood, message, pet } = useMascotStore();
+  const { mood, message, pet } = useMascotStore(
+    useShallow((s) => ({ mood: s.mood, message: s.message, pet: s.pet })),
+  );
   const faceMask = useId();
   const button = useRef<HTMLButtonElement>(null);
   const [hovered, setHovered] = useState(false);
@@ -121,9 +125,17 @@ export function JackalopeMascot({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={`absolute ${bubbleSide === 'above' ? 'bottom-full mb-3' : 'top-full mt-3'} z-30 pointer-events-none w-max max-w-[min(17rem,calc(100vw-2rem))] bg-[var(--color-text-primary)] px-3 py-2 rounded-xl shadow-lg text-xs leading-relaxed text-[var(--color-surface-elevated)] ${bubbleAlign === 'start' ? 'left-0' : bubbleAlign === 'end' ? 'right-0' : 'left-1/2 -translate-x-1/2'}`}
+            className={`absolute ${bubbleSide === 'above' ? 'bottom-full mb-3' : 'top-full mt-3'} z-30 flex items-start gap-2 w-max max-w-[min(18rem,calc(100vw-2rem))] bg-[var(--color-text-primary)] py-2 pl-3 pr-1 rounded-xl shadow-lg text-xs leading-relaxed text-[var(--color-surface-elevated)] ${bubbleAlign === 'start' ? 'left-0' : bubbleAlign === 'end' ? 'right-0' : 'left-1/2 -translate-x-1/2'}`}
           >
-            {message}
+            <span className="pt-0.5">{message}</span>
+            <button
+              type="button"
+              className="mascot-bubble-close"
+              aria-label="Dismiss message"
+              onClick={() => useMascotStore.getState().clearMessage()}
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
             <span
               className={`absolute ${bubbleSide === 'above' ? '-bottom-1' : '-top-1'} w-2 h-2 bg-[var(--color-text-primary)] rotate-45 ${bubbleAlign === 'end' ? 'right-4' : 'left-1/2 -translate-x-1/2'}`}
               style={bubbleAlign === 'start' ? { left: dim / 2 } : undefined}

@@ -2,6 +2,7 @@ import { Disclosure, DisclosureSummary, Input } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { FolderOpen, X } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { connectionSupport } from '../../lib/agent-capabilities';
 import { useAgentModels } from '../../lib/agent-models';
 import { effectiveConnections } from '../../lib/mcp-connection';
@@ -59,8 +60,24 @@ export function CaptureTask({
   const assessment = useTaskAssessment();
   const launching = useRef(false);
   const [launchingPlan, setLaunchingPlan] = useState(false);
-  const { projects, activeProjectId, selectProject } = useProjectStore();
-  const { drafts, draft, runners, start, submitting, discover, discovering } = useExecutionStore();
+  const { projects, activeProjectId, selectProject } = useProjectStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      activeProjectId: s.activeProjectId,
+      selectProject: s.selectProject,
+    })),
+  );
+  const { drafts, draft, runners, start, submitting, discover, discovering } = useExecutionStore(
+    useShallow((s) => ({
+      drafts: s.drafts,
+      draft: s.draft,
+      runners: s.runners,
+      start: s.start,
+      submitting: s.submitting,
+      discover: s.discover,
+      discovering: s.discovering,
+    })),
+  );
   const idea = useTaskStore((state) => state.tasks.find((task) => task.id === ideaId));
   const [key] = useState(() =>
     ideaId
@@ -72,6 +89,8 @@ export function CaptureTask({
   );
   const current = useMemo(() => {
     const initial = idea ? planningDraft(idea) : emptyDraft;
+    const projectId = drafts[key]?.projectId ?? idea?.projectId ?? activeProjectId ?? '';
+    const project = projects.find((item) => item.id === projectId);
     return {
       title: idea?.title,
       planningStatus: idea?.status,
@@ -83,16 +102,40 @@ export function CaptureTask({
           ? initial.isolated
           : (projects.find((p) => p.id === activeProjectId)?.preferences?.isolatedByDefault ??
             true)),
-      projectId: drafts[key]?.projectId ?? idea?.projectId ?? activeProjectId ?? '',
-      agent: drafts[key]?.agent ?? agent ?? initial.agent,
+      projectId,
+      agent:
+        drafts[key]?.agent ??
+        agent ??
+        (idea ? initial.agent : (project?.preferences?.preferredRunner ?? initial.agent)),
     };
   }, [idea, projects, activeProjectId, drafts, key, agent]);
   const project = projects.find((p) => p.id === current.projectId);
-  const config = useAgentConfigStore();
+  const config = useAgentConfigStore(
+    useShallow((s) => ({
+      isAgentEnabled: s.isAgentEnabled,
+      defaultMetaAgent: s.defaultMetaAgent,
+      customAgents: s.customAgents,
+      runnerOptions: s.runnerOptions,
+      isModelAllowed: s.isModelAllowed,
+    })),
+  );
   const allowed = runners.filter(
     (r) => config.isAgentEnabled(r.id) && isAgentAllowedForProject(project, r.id),
   );
-  const defaultAgent = config.defaultMetaAgent;
+  const defaultAgent =
+    [
+      project?.preferences?.preferredRunner,
+      config.defaultMetaAgent,
+      ...(project?.preferences?.allowedAgents ?? []),
+    ].find(
+      (id) =>
+        id &&
+        config.isAgentEnabled(id) &&
+        isAgentAllowedForProject(project, id) &&
+        ['codex', 'claude', 'grok', 'opencode', 'kimi'].includes(
+          config.customAgents.find((agent) => agent.id === id)?.adapter ?? id,
+        ),
+    ) ?? '';
   const currentAgent = current.agent || defaultAgent;
   const runner = (current.agent ? allowed : runners).find((r) => r.id === currentAgent);
   const [toolRevision, setToolRevision] = useState(0);

@@ -8,7 +8,8 @@ use std::{
 };
 use tauri::State;
 
-mod automatic;
+pub mod automatic;
+pub use automatic::LearningSource;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]

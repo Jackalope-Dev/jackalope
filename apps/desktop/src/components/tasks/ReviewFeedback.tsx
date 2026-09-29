@@ -2,6 +2,8 @@ import { Button, FormField, Input, Select, SelectItem, Textarea } from '@jackalo
 import * as Dialog from '@radix-ui/react-dialog';
 import { MessageSquarePlus } from 'lucide-react';
 import { createContext, type ReactNode, useContext, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useShallow } from 'zustand/react/shallow';
 import { type ReviewAnchor, type ReviewComment, reviewFeedback } from '../../lib/review-feedback';
 import { useReviewFeedbackStore } from '../../stores/reviewFeedbackStore';
 import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
@@ -23,15 +25,24 @@ export function ReviewFeedback({
   files,
   onFeedback,
   children,
+  toolbarTarget,
 }: {
   taskId: string;
   revision: string;
   files: string[];
   onFeedback?: (text: string) => void | Promise<void>;
   children: ReactNode;
+  /** Where to place the comment controls, such as the review header's action row. */
+  toolbarTarget?: HTMLElement | null;
 }) {
   const comments = useReviewFeedbackStore((state) => state.threads[taskId] ?? empty);
-  const { save, remove, error: storageError } = useReviewFeedbackStore();
+  const {
+    save,
+    remove,
+    error: storageError,
+  } = useReviewFeedbackStore(
+    useShallow((s) => ({ save: s.save, remove: s.remove, error: s.error })),
+  );
   const [editing, setEditing] = useState<ReviewComment | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -51,49 +62,52 @@ export function ReviewFeedback({
     <FeedbackContext.Provider
       value={{ comments, revision, add: onFeedback ? add : undefined, edit }}
     >
-      <div className="review-feedback-toolbar">
-        {onFeedback && (
-          <Button
-            variant="outline"
-            disabled={!files.length}
-            onClick={() => add({ file: files[0], line: 1, side: 'additions' })}
-          >
-            <MessageSquarePlus size={16} aria-hidden="true" /> Add comment
-          </Button>
-        )}
-        {onFeedback && pending.length > 0 && (
-          <Button
-            variant="outline"
-            loading={busy}
-            loadingLabel="Adding…"
-            onClick={async () => {
-              if (busy) return;
-              setBusy(true);
-              setError('');
-              setNotice('');
-              try {
-                await onFeedback(reviewFeedback(comments, revision));
-                setNotice('Comments added to your follow-up.');
-              } catch (cause) {
-                setError(String(cause));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            Add {pending.length} {pending.length === 1 ? 'comment' : 'comments'} to follow-up
-          </Button>
-        )}
-        {comments.some((comment) => comment.resolved) && (
-          <Button
-            variant="ghost"
-            aria-pressed={showResolved}
-            onClick={() => setShowResolved(!showResolved)}
-          >
-            {showResolved ? 'Hide resolved' : 'Show resolved'}
-          </Button>
-        )}
-      </div>
+      {portalToolbar(
+        <div className="review-feedback-toolbar">
+          {onFeedback && (
+            <Button
+              variant="outline"
+              disabled={!files.length}
+              onClick={() => add({ file: files[0], line: 1, side: 'additions' })}
+            >
+              <MessageSquarePlus size={16} aria-hidden="true" /> Add comment
+            </Button>
+          )}
+          {onFeedback && pending.length > 0 && (
+            <Button
+              variant="outline"
+              loading={busy}
+              loadingLabel="Adding…"
+              onClick={async () => {
+                if (busy) return;
+                setBusy(true);
+                setError('');
+                setNotice('');
+                try {
+                  await onFeedback(reviewFeedback(comments, revision));
+                  setNotice('Comments added to your follow-up.');
+                } catch (cause) {
+                  setError(String(cause));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Add {pending.length} {pending.length === 1 ? 'comment' : 'comments'} to follow-up
+            </Button>
+          )}
+          {comments.some((comment) => comment.resolved) && (
+            <Button
+              variant="ghost"
+              aria-pressed={showResolved}
+              onClick={() => setShowResolved(!showResolved)}
+            >
+              {showResolved ? 'Hide resolved' : 'Show resolved'}
+            </Button>
+          )}
+        </div>,
+        toolbarTarget,
+      )}
       {(error || storageError) && <InlineNotice tone="error">{error || storageError}</InlineNotice>}
       {notice && (
         <p role="status" className="task-muted">
@@ -262,4 +276,8 @@ export function ReviewFeedback({
       </Dialog.Root>
     </FeedbackContext.Provider>
   );
+}
+
+function portalToolbar(toolbar: ReactNode, target?: HTMLElement | null) {
+  return target ? createPortal(toolbar, target) : toolbar;
 }

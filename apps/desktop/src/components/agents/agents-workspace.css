@@ -154,3 +154,212 @@
 .agent-roster-heading {
   flex-wrap: wrap;
 }
+
+.agent-roster-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.agent-roster-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.agent-roster-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.agent-roster-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 9999px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.agent-roster-vendor {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.agent-setup-box {
+  grid-column: 1 / -1;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.agent-setup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agent-setup-label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.agent-setup-cmd-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.agent-setup-cmd {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: auto;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  padding: 6px 10px;
+  border-radius: 6px;
+  user-select: all;
+}
+
+.agent-setup-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.agent-setup-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.agent-setup-btn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.agent-setup-btn:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+.agent-setup-btn-copied {
+  color: var(--color-text-primary);
+  border-color: var(--color-accent);
+}
+
+/* Compact roster: one row per agent with identity, then enable and actions. */
+.agent-roster {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.agent-roster-row {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 12px 12px 16px;
+  border-radius: 12px;
+}
+.agent-roster-row > .agent-configure {
+  position: static;
+  grid-column: 4;
+  grid-row: 1;
+  width: 44px;
+  height: 44px;
+}
+.agent-roster-row .agent-roster-name {
+  margin-bottom: 0;
+  padding-right: 0;
+}
+.agent-roster-row .agent-roster-name h2 {
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.agent-roster-row .agent-default {
+  font-size: var(--text-xs);
+}
+.agent-roster-row .agent-presence {
+  margin-bottom: 0;
+}
+.agent-roster-row .agent-account-summary {
+  min-height: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.agent-roster-row > .agent-roster-action {
+  grid-column: 3;
+  grid-row: 1;
+  flex-wrap: nowrap;
+  align-items: center;
+  align-self: center;
+  padding-top: 0;
+}
+.agent-roster-row .agent-enable {
+  flex: 0 0 auto;
+}
+.agent-roster-row .agent-roster-action > button {
+  flex: 0 0 auto;
+}
+/* Install and sign-in commands need the full row. */
+.agent-roster-row > .agent-setup-box {
+  grid-column: 1 / -1;
+}
+@media (max-width: 860px) {
+  .agent-roster-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .agent-roster-row > .agent-configure {
+    grid-column: 3;
+  }
+  .agent-roster-row > .agent-roster-action {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    flex-wrap: wrap;
+  }
+}

@@ -1,5 +1,109 @@
 [
   {
+    "id": "tabs-unread-work-and-live-change-counts",
+    "date": "2026-09-29",
+    "status": "In development",
+    "title": "Tabs, unread work and live change counts",
+    "description": "Keep several tasks open at once and see what changed, what is still running and what you have not read yet.",
+    "items": [
+      "Recently opened tasks and chats stay as tabs. Switch with Ctrl+1 to 9 or Ctrl+Tab",
+      "Work rows show how long an agent has been running, how many lines changed and a dot for results you have not opened",
+      "Changes shows recent commits across your local branches",
+      "Press ? to see keyboard shortcuts"
+    ]
+  },
+  {
+    "id": "compare-agents-and-attach-files-to-requests",
+    "date": "2026-09-29",
+    "status": "In development",
+    "title": "Compare agents and attach files to requests",
+    "description": "Send one request to several agents at once, keep the best result, and give agents screenshots and files without copying paths.",
+    "items": [
+      "Choose Automatic, one agent, or up to four agents to compare from the agent button beside Send",
+      "Compared tasks link to each other and show status, time, checks, changed lines and tokens side by side. Keeping one archives the other finished attempts",
+      "Paste an image, drop files or pick files to attach them. Pasted images stay in the project's ignored .jackalope folder",
+      "Command search finds project files to open in your editor or attach to new work"
+    ]
+  },
+  {
+    "id": "ask-jackalope-usage-date-and-project",
+    "date": "2026-09-28",
+    "status": "In development",
+    "title": "Ask Jackalope usage keeps its date and project",
+    "description": "Usage & quota can show when a helper question happened and which project was open, including after a new conversation.",
+    "items": [
+      "Each new Ask Jackalope turn records when it happened and, when project sharing is on, which project was open",
+      "Archived helper conversations stay in Usage. Turns saved before this change have no date and appear under All time",
+      "A helper file that cannot be read is reported and left on disk"
+    ]
+  },
+  {
+    "id": "connect-local-engines-and-schedule-webhooks",
+    "date": "2026-09-28",
+    "status": "In development",
+    "title": "Connect local engines and schedule webhooks",
+    "description": "Jackalope can use an ACP CLI, a local OpenAI-compatible model server, and a loopback webhook for a schedule.",
+    "items": [
+      "Add an ACP CLI from Agents by its executable path and arguments. Sign in with that CLI first",
+      "Connect a local OpenAI-compatible server, such as LM Studio or vLLM, and choose a model from its model list",
+      "Give a schedule a webhook on this computer. The token is shown once, and a call during an active run is skipped"
+    ]
+  },
+  {
+    "id": "terminal-repository-setup",
+    "date": "2026-09-27",
+    "status": "In development",
+    "title": "Start the terminal in any project directory",
+    "description": "The jackalope command can create a Git repository when the current directory does not have one yet.",
+    "items": [
+      "Ask before creating a repository. Declining, or a non-interactive run, edits the folder directly. Pass --init to create one without asking",
+      "The initial commit includes the current files, with a .gitignore for dependency and secret files when you do not already have one",
+      "Home directories and drive roots are left unchanged"
+    ]
+  },
+  {
+    "id": "terminal-commands-that-match-other-agent-clis",
+    "date": "2026-09-27",
+    "status": "In development",
+    "title": "Terminal commands that match other agent CLIs",
+    "description": "The jackalope terminal command now works the way people coming from other agent CLIs expect.",
+    "items": [
+      "Resume any conversation with --resume, or pick one from a list",
+      "Choose a model for the next conversation with /model",
+      "See account quota and reset times with /usage",
+      "Generate or refresh AGENTS.md with /init",
+      "/clear starts fresh, and mistyped commands suggest the closest match",
+      "A clearer look: rounded menus with a highlighted row, readable secondary text, labelled replies and a working indicator along the header"
+    ]
+  },
+  {
+    "id": "faster-terminal-conversations",
+    "date": "2026-09-26",
+    "status": "In development",
+    "title": "Faster terminal conversations",
+    "description": "The jackalope command keeps you moving while agents work.",
+    "items": [
+      "Run shell commands inline with ! and watch their output stream beside the conversation.",
+      "Select any text with the mouse to copy it, or use /copy for the latest reply.",
+      "The input wraps and grows as you type, and follow-ups queue behind running work.",
+      "A live header shows the conversation, other open work and agent readiness; Ctrl+N and Ctrl+P switch conversations and /bg starts one in the background.",
+      "Mention files with @, search input history with Ctrl+R, filter any picker by typing, and press Esc twice to stop an agent.",
+      "Run a single message from scripts and CI with jackalope -p, with JSON output, a --timeout and meaningful exit codes; ls, status and the new stop command also print JSON.",
+      "Retried work shows every attempt's output, the conversation stays readable while you scroll back, and the terminal reconnects on its own when Jackalope restarts."
+    ]
+  },
+  {
+    "id": "project-agent-preferences-stay-with-each-project",
+    "date": "2026-09-24",
+    "status": "In development",
+    "title": "Project agent preferences stay with each project.",
+    "description": "Keep work and personal projects on their own agents and accounts.",
+    "items": [
+      "Agent switches, task defaults and account choices follow the selected project, including automatic routing.",
+      "The terminal follows saved project colors while open and uses closer matches on 256-color displays."
+    ]
+  },
+  {
     "id": "jackalope-in-your-terminal",
     "date": "2026-09-23",
     "status": "In development",
@@ -11,7 +115,7 @@
       "When the app is closed, the command can open it or run it in the background; opening the app again brings up the same session.",
       "Open the command from the status bar or Cmd/Ctrl+J, then move the conversation to your own terminal."
     ],
-    "note": "Installed setup on each platform is still being validated, and agent questions are answered in the app for now."
+    "note": "Installed setup on each platform is still being validated."
   },
   {
     "id": "recoverable-test-output",

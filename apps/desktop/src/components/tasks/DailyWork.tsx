@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { collectWorkspaceWork, type WorkItem, workPresence } from '../../lib/task-collection';
 import { taskDecision } from '../../lib/task-workflow';
 import { attentionQueue } from '../../lib/workbench';
@@ -15,9 +16,17 @@ import { InlineNotice } from '../ui/InlineNotice';
 export function DailyWork() {
   const runs = useExecutionStore((state) => state.runs);
   const historyError = useExecutionStore((state) => state.historyError);
-  const { sessions, runs: sessionRuns, error: sessionError } = useLiveSessionStore();
+  const {
+    sessions,
+    runs: sessionRuns,
+    error: sessionError,
+  } = useLiveSessionStore(
+    useShallow((s) => ({ sessions: s.sessions, runs: s.runs, error: s.error })),
+  );
   const ideas = useTaskStore((state) => state.tasks);
-  const { queue, error } = useManagedTaskStore();
+  const { queue, error } = useManagedTaskStore(
+    useShallow((s) => ({ queue: s.queue, error: s.error })),
+  );
   const integrated = queue.mergedRunIds;
   useEffect(observeManagedTasks, []);
   const items = useMemo(

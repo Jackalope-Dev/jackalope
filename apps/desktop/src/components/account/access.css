@@ -316,21 +316,18 @@
 .access-frame > .app-titlebar {
   margin: 0;
 }
-.access-workspace {
-  flex: 1;
-  min-height: 0;
-}
-.access-workspace > * {
-  height: 100%;
-}
 .access-notice {
   display: flex;
   flex-wrap: wrap;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 24px;
-  border-bottom: 1px solid var(--color-border);
+  margin: 4px 0 8px;
+  padding: 8px 8px 8px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--color-surface-elevated);
   font-size: 14px;
 }
 

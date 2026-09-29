@@ -1,0 +1,214 @@
+.cli-demo-section {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.25fr);
+  align-items: center;
+  gap: clamp(28px, 5vw, 72px);
+  padding-block: 90px 40px;
+  /* Terminals are dark in either appearance; the accent follows the theme. */
+  --cli-bg: hsl(240 12% 9%);
+  --cli-chrome: hsl(240 10% 14%);
+  --cli-text: hsl(240 10% 90%);
+  --cli-muted: hsl(240 6% 62%);
+  /* Lifted so the theme accent stays readable on the dark screen. */
+  --cli-accent: color-mix(in srgb, var(--color-accent) 55%, white);
+}
+.cli-demo-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  color: var(--color-accent-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.cli-demo-copy h2 {
+  margin: 0 0 20px;
+  font-size: clamp(34px, 4vw, 56px);
+  line-height: 1.08;
+}
+.cli-demo-copy :where(h2) span {
+  color: var(--color-accent-ink);
+}
+.cli-demo-copy > p {
+  margin: 0 0 18px;
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+}
+.cli-demo-copy ul {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 22px;
+  padding-left: 18px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+.cli-demo-copy code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  color: var(--color-text-primary);
+}
+.cli-demo-figure {
+  margin: 0;
+  min-width: 0;
+}
+.cli-demo-window {
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--cli-bg);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+  box-shadow:
+    0 30px 60px -30px color-mix(in srgb, var(--color-accent) 45%, transparent),
+    0 12px 30px -18px rgb(0 0 0 / 0.5);
+}
+.cli-demo-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 14px;
+  background: var(--cli-chrome);
+}
+.cli-demo-titlebar > span {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--cli-muted);
+  opacity: 0.45;
+}
+.cli-demo-titlebar strong {
+  flex: 1;
+  margin-right: 40px;
+  overflow: hidden;
+  color: var(--cli-muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cli-demo-screen {
+  height: 440px;
+  padding: 18px 20px;
+  overflow: hidden;
+  scroll-behavior: smooth;
+  color: var(--cli-text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+:where(.cli-demo-screen p) {
+  margin: 0;
+}
+.cli-demo-screen code {
+  font-family: inherit;
+  color: var(--cli-text);
+}
+.cli-demo-banner {
+  display: grid;
+  margin: 0 0 6px;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: 0.04em;
+  color: var(--cli-accent);
+}
+.cli-demo-echo {
+  font-weight: 500;
+}
+.cli-demo-accent {
+  color: var(--cli-accent);
+}
+.cli-demo-muted {
+  color: var(--cli-muted);
+}
+.cli-demo-ok {
+  color: hsl(150 55% 60%);
+}
+.cli-demo-rule {
+  overflow: hidden;
+  white-space: nowrap;
+  margin-block: 4px 12px;
+}
+.cli-demo-sent {
+  min-height: 1.6em;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.cli-demo-line {
+  animation: cli-demo-in 240ms ease-out both;
+}
+.cli-demo-status {
+  margin-block: 2px 6px;
+  color: var(--cli-muted);
+}
+.cli-demo-question {
+  margin-block: 8px;
+  padding: 8px 12px;
+  border-left: 2px solid var(--cli-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  white-space: pre-wrap;
+}
+.cli-demo-keys {
+  margin-top: 14px;
+  white-space: pre;
+}
+.cli-demo-cursor {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.15em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--cli-accent);
+  animation: cli-demo-blink 1s steps(1) infinite;
+}
+.cli-demo-figure figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.cli-demo-figure figcaption button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+@keyframes cli-demo-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes cli-demo-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cli-demo-screen {
+    scroll-behavior: auto;
+  }
+  .cli-demo-line,
+  .cli-demo-cursor {
+    animation: none;
+  }
+}
+@media (max-width: 860px) {
+  .cli-demo-section {
+    grid-template-columns: 1fr;
+    padding-block: 64px 24px;
+  }
+}
+@media (max-width: 520px) {
+  .cli-demo-screen {
+    height: 470px;
+    padding: 14px;
+    font-size: 11.5px;
+  }
+  .cli-demo-banner {
+    font-size: 16px;
+  }
+  .cli-demo-keys {
+    white-space: normal;
+  }
+}

@@ -6,6 +6,7 @@ export interface AgentProfile {
   group?: 'work' | 'personal' | null;
   tag?: string | null;
   preferredModel?: string | null;
+  configDir?: string | null;
 }
 
 export interface AgentProfilesView {
@@ -21,7 +22,13 @@ export const listAgentProfiles = (agent: string) =>
   nativeTask<AgentProfilesView>('agent_profile_list', { agent });
 
 export const createAgentProfile = (agent: string, name: string, group: AgentProfile['group']) =>
-  nativeTask<AgentProfile>('agent_profile_create', { agent, name, group, pending: true });
+  nativeTask<AgentProfile>('agent_profile_create', {
+    agent,
+    name,
+    group,
+    pending: true,
+    configDir: null,
+  });
 
 export const setAgentProfileGroup = (
   agent: string,
@@ -86,3 +93,16 @@ export const accountStatusLabel = (status?: AccountStatus) => {
     notInstalled: 'Agent not installed',
   }[status.state];
 };
+
+export const setConfigDir = (agent: string, id: string | null, configDir: string | null) =>
+  nativeTask<void>('agent_profile_set_config_dir', { agent, id, configDir });
+
+export interface AgentProbeResult {
+  exists: boolean;
+  executable: boolean;
+  version: string | null;
+  error: string | null;
+}
+
+export const probeExecutable = (path: string) =>
+  nativeTask<AgentProbeResult>('agent_probe_executable', { path });

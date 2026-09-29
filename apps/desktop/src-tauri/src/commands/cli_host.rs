@@ -221,11 +221,12 @@ async fn dispatch(request: Request, app: &AppHandle) -> Response {
     }
 }
 
-/// Resolves the repository containing `path` and the project it belongs to,
-/// registering the repository when the workspace has not seen it before.
+/// Resolves the directory containing `path` and the project it belongs to,
+/// registering it when the workspace has not seen it before. A Git repository
+/// uses its root. Any other directory is the project itself; creating a
+/// repository stays in the terminal command, and only after the user asks.
 fn ensure_project(app: &AppHandle, path: &str) -> Result<protocol::Project, String> {
-    let root = super::tasks::git(path, &["rev-parse", "--show-toplevel"])
-        .map_err(|_| format!("{path} is not inside a Git repository."))?;
+    let root = super::tasks::project_directory(path)?;
     let runtime = app.state::<TaskRuntime>();
     let record = super::project_registry::ensure(&runtime, &root)?;
     Ok(protocol::Project {
@@ -250,6 +251,7 @@ fn transcript(session: &LiveSession, runs: &[TaskRun]) -> Vec<protocol::Message>
             role: "you".into(),
             text: message.text.clone(),
             sent: message.run_id.is_some(),
+            attempt: None,
         });
         // A reply follows the last message its run carried.
         let Some(run_id) = &message.run_id else {
@@ -261,17 +263,38 @@ fn transcript(session: &LiveSession, runs: &[TaskRun]) -> Vec<protocol::Message>
         if !last_of_batch {
             continue;
         }
-        if let Some(run) = runs.iter().find(|run| &run.id == run_id) {
+        let attempts = attempts(run_id, runs);
+        let numbered = attempts.len() > 1;
+        for (number, run) in (1..).zip(&attempts) {
             if !run.result.trim().is_empty() {
                 messages.push(protocol::Message {
                     role: "agent".into(),
                     text: run.result.clone(),
                     sent: true,
+                    attempt: numbered.then_some(number),
                 });
             }
         }
     }
     messages
+}
+
+/// The run a batch started followed by each retry of it, oldest first.
+fn attempts<'a>(run_id: &str, runs: &'a [TaskRun]) -> Vec<&'a TaskRun> {
+    let mut chain = Vec::new();
+    let mut next = runs.iter().find(|run| run.id == run_id);
+    while let Some(run) = next {
+        // A malformed history must not loop forever.
+        if chain.iter().any(|seen: &&TaskRun| seen.id == run.id) {
+            break;
+        }
+        chain.push(run);
+        next = runs
+            .iter()
+            .filter(|candidate| candidate.retry_of.as_deref() == Some(run.id.as_str()))
+            .min_by(|left, right| left.started_at.cmp(&right.started_at));
+    }
+    chain
 }
 
 /// Projects the newest attempt in a conversation into what a terminal renders.
@@ -283,11 +306,21 @@ fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionVie
     let decision = run
         .and_then(|run| run.routing.as_ref())
         .and_then(|routing| routing.decisions.last());
+    let run_error = run
+        .filter(|run| !["review", "reviewed", "running", "starting"].contains(&run.status.as_str()))
+        .and_then(|run| {
+            protocol::present(run.error.as_deref())
+                .or(protocol::present(run.verification_error.as_deref()))
+                .or(run.quota_failure.as_ref().map(|q| q.message.as_str()))
+        });
+    let error = protocol::present(session.error.as_deref())
+        .or(run_error)
+        .map(str::to_string);
     protocol::SessionView {
         id: session.id.clone(),
         title: session.title.clone(),
         paused: session.paused,
-        error: session.error.clone(),
+        error,
         messages: transcript(session, runs),
         run_id: run.map(|run| run.id.clone()),
         status: run.map(|run| run.status.clone()),
@@ -360,7 +393,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                         .iter()
                         .filter(|message| !message.canceled && message.run_id.is_none())
                         .count(),
-                    error: session.error.clone(),
+                    error: protocol::present(session.error.as_deref()).map(str::to_string),
                     updated_at: session.updated_at.clone(),
                 })
                 .collect();
@@ -371,20 +404,25 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             project_path,
             text,
             agent,
+            model,
         } => {
             let project = ensure_project(app, &project_path)?;
             let sessions = app.state::<LiveSessions>();
             let session_id = uuid::Uuid::new_v4().to_string();
-            // `auto` hands agent choice to routing, which is the point: the
-            // terminal describes the work and Jackalope picks who does it,
-            // unless the user named an agent with `/agent`.
+            let policy = app.state::<TaskRuntime>().policy()?;
+            let default_agent = policy
+                .projects
+                .get(&project.id)
+                .and_then(|project| project.preferred_runner.as_deref())
+                .filter(|agent| !agent.is_empty())
+                .unwrap_or("auto");
             let request: super::tasks::RunRequest = serde_json::from_value(serde_json::json!({
                 "id": format!("cli-{}", uuid::Uuid::new_v4().simple()),
                 "projectId": project.id,
                 "projectName": project.name,
                 "projectPath": project.path,
-                "agent": agent.as_deref().filter(|agent| !agent.is_empty()).unwrap_or("auto"),
-                "model": null,
+                "agent": agent.as_deref().filter(|agent| !agent.is_empty()).unwrap_or(default_agent),
+                "model": model.filter(|model| !model.trim().is_empty()),
                 "prompt": "",
                 "isolated": true,
                 "previousRunId": null,
@@ -450,9 +488,10 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             let sessions = app.state::<LiveSessions>().inner().clone();
             let mut tasks = runtime.subscribe();
             let mut conversations = sessions.subscribe();
-            // Both counters only grow, so their sum changes whenever either does.
+            let mut projects = super::project_registry::subscribe();
+            // Include project preferences so idle terminals receive saved theme changes.
             let revision = |runtime: &TaskRuntime, sessions: &LiveSessions| {
-                runtime.revision() + sessions.revision()
+                runtime.revision() + sessions.revision() + super::project_registry::revision()
             };
             let current = revision(&runtime, &sessions);
             if current != since {
@@ -464,6 +503,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 tokio::select! {
                     _ = tasks.changed() => {}
                     _ = conversations.changed() => {}
+                    _ = projects.changed() => {}
                 }
             })
             .await;
@@ -482,6 +522,39 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 };
             }
             Ok(Response::Ok)
+        }
+        Request::Usage => {
+            let records = super::capacity::capacity_snapshot(
+                app.state::<super::capacity::CapacityService>(),
+                app.state::<TaskRuntime>(),
+                Some(true),
+            )
+            .await?;
+            Ok(Response::Usage {
+                accounts: records
+                    .into_iter()
+                    .map(|record| protocol::UsageAccount {
+                        agent: record.agent,
+                        account: record.account,
+                        status: record.status,
+                        detail: record.detail,
+                        observed_at: record.observed_at,
+                        windows: record
+                            .windows
+                            .into_iter()
+                            .map(|window| protocol::UsageWindow {
+                                name: if window.pool_name.is_empty() {
+                                    window.window
+                                } else {
+                                    format!("{} · {}", window.pool_name, window.window)
+                                },
+                                used_percent: window.used_percent,
+                                resets_at: window.resets_at,
+                            })
+                            .collect(),
+                    })
+                    .collect(),
+            })
         }
         Request::Overview => {
             let runtime = app.state::<TaskRuntime>();
@@ -502,7 +575,21 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                         // Agents whose sign-in cannot be probed report as installed.
                         "installed"
                     };
+                    let options = policy.runner_options.get(&runner.id);
                     protocol::AgentStatus {
+                        models: options
+                            .map(|options| {
+                                options
+                                    .models
+                                    .iter()
+                                    .map(|model| model.trim().to_string())
+                                    .filter(|model| !model.is_empty())
+                                    .collect()
+                            })
+                            .unwrap_or_default(),
+                        default_model: options
+                            .map(|options| options.default_model.clone())
+                            .unwrap_or_default(),
                         id: runner.id,
                         name: runner.name,
                         state: state.into(),
@@ -539,6 +626,17 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             // The window may still be loading; it asks again once ready.
             let _ = app.emit("jackalope:open-changes", path);
             Ok(response)
+        }
+        Request::SessionLearn { session_id } => {
+            let sessions = app.state::<LiveSessions>();
+            let runtime = app.state::<TaskRuntime>();
+            let result =
+                super::live_sessions::learn_from_session(&sessions, &runtime, &session_id)?;
+            Ok(Response::Learned {
+                count: result.count,
+                lessons: result.lessons,
+                message: result.message,
+            })
         }
         Request::Ping => Ok(Response::Ok),
         Request::ShowWindow => Ok(show_window(app)),
@@ -599,5 +697,38 @@ impl CliHost {
         if let Ok(encoded) = serde_json::to_vec(&handshake) {
             let _ = super::history::write_atomic(&self.handshake, &encoded);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run(id: &str, retry_of: Option<&str>, started_at: &str) -> TaskRun {
+        TaskRun {
+            id: id.into(),
+            retry_of: retry_of.map(String::from),
+            started_at: started_at.into(),
+            ..TaskRun::default()
+        }
+    }
+
+    #[test]
+    fn a_batch_lists_its_run_and_every_retry_in_order() {
+        let runs = [
+            run("b", Some("a"), "2"),
+            run("a", None, "1"),
+            run("other", None, "0"),
+            run("c", Some("b"), "3"),
+        ];
+        let ids: Vec<&str> = attempts("a", &runs)
+            .iter()
+            .map(|run| run.id.as_str())
+            .collect();
+        assert_eq!(ids, ["a", "b", "c"]);
+        assert!(attempts("missing", &runs).is_empty());
+        // A cycle in stored history ends rather than looping.
+        let looped = [run("x", Some("y"), "1"), run("y", Some("x"), "2")];
+        assert_eq!(attempts("x", &looped).len(), 2);
     }
 }

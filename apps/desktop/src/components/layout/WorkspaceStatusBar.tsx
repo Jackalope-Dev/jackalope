@@ -1,17 +1,15 @@
 import { ListTodo, Monitor, SquareTerminal } from 'lucide-react';
 import { useState } from 'react';
-
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { isActive } from '../../lib/task-runtime';
-
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { Companion } from '../mascot/Companion';
-
 import { useFocusedWork } from './BranchIndicator';
+import { InvitationsButton } from './InvitationsButton';
 import { navigateWorkspace } from './navigation';
 import { StatusBarChanges } from './StatusBarChanges';
 import { StatusBarUsage } from './StatusBarUsage';
@@ -20,9 +18,11 @@ import { useWorkspaceWork } from './WorkSidebar';
 export function WorkspaceStatusBar({
   onSearch,
   onSettings,
+  onInvitations,
 }: {
   onSearch: () => void;
   onSettings: () => void;
+  onInvitations?: () => void;
 }) {
   const host = useHostContextStore((state) => state.host);
   const [terminalError, setTerminalError] = useState('');
@@ -51,7 +51,8 @@ export function WorkspaceStatusBar({
       <button type="button" onClick={activity}>
         <ListTodo size={15} />
         {host ? 'This computer: ' : ''}
-        {active} running{attention ? ` · ${attention} needs you` : ''}
+        {active} running
+        {attention ? ` · ${attention} ${attention === 1 ? 'needs' : 'need'} you` : ''}
       </button>
       {project && !host && (
         <button
@@ -65,7 +66,7 @@ export function WorkspaceStatusBar({
           aria-describedby={terminalError ? 'statusbar-terminal-error' : undefined}
         >
           <SquareTerminal size={15} aria-hidden="true" />
-          Terminal
+          <span className="statusbar-label">Terminal</span>
         </button>
       )}
       {terminalError && (
@@ -73,6 +74,7 @@ export function WorkspaceStatusBar({
           {terminalError}
         </span>
       )}
+      {onInvitations && <InvitationsButton compact onClick={onInvitations} />}
       <StatusBarUsage remote={Boolean(host)} />
       <Companion compact onSearch={onSearch} onSettings={onSettings} />
     </section>

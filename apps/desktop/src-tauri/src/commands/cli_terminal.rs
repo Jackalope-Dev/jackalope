@@ -35,9 +35,10 @@ fn repository(directory: &str) -> Result<PathBuf, String> {
 }
 
 /// Opens a window running `jackalope` in `directory`. Each call opens a new
-/// window, so several conversations can run side by side.
+/// window, so several conversations can run side by side. Async because
+/// building a window from a synchronous command deadlocks WebView2 on Windows.
 #[tauri::command]
-pub fn cli_terminal_window(app: AppHandle, directory: String) -> Result<(), String> {
+pub async fn cli_terminal_window(app: AppHandle, directory: String) -> Result<(), String> {
     let directory = repository(&directory)?;
     command_path()?;
     let key = uuid::Uuid::new_v4().to_string();
@@ -105,9 +106,14 @@ pub fn cli_terminal_close(key: String) -> Result<(), String> {
 }
 
 /// Opens the user's terminal on the conversation the window `key` is showing,
-/// then closes the in-app copy so the conversation has one terminal.
+/// then closes the in-app copy so the conversation has one terminal. Async so
+/// stopping the in-app process does not block the event loop.
 #[tauri::command]
-pub fn cli_terminal_popout(app: AppHandle, key: String, directory: String) -> Result<(), String> {
+pub async fn cli_terminal_popout(
+    app: AppHandle,
+    key: String,
+    directory: String,
+) -> Result<(), String> {
     valid_key(&key)?;
     let directory = repository(&directory)?;
     let command = command_path()?;
@@ -122,7 +128,10 @@ pub fn cli_terminal_popout(app: AppHandle, key: String, directory: String) -> Re
         arguments.push(session);
     }
     open_system_terminal(&directory, &command, &arguments)?;
-    super::work_terminal::close(&terminal_id(&key));
+    let id = terminal_id(&key);
+    tauri::async_runtime::spawn_blocking(move || super::work_terminal::close(&id))
+        .await
+        .map_err(|error| error.to_string())?;
     if let Some(window) = app.get_webview_window(&format!("{PREFIX}{key}")) {
         let _ = window.close();
     }
@@ -288,8 +297,11 @@ mod tests {
 }
 
 /// Ends a window's command when the window goes away, however it was closed.
+/// This runs on the event loop, and stopping the process waits for it to exit,
+/// so the stop happens on a blocking worker.
 pub fn window_destroyed(label: &str) {
     if let Some(key) = label.strip_prefix(PREFIX) {
-        super::work_terminal::close(&terminal_id(key));
+        let id = terminal_id(key);
+        tauri::async_runtime::spawn_blocking(move || super::work_terminal::close(&id));
     }
 }

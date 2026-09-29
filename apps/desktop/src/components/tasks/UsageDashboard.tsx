@@ -1,10 +1,15 @@
 import { Disclosure, DisclosureBody, DisclosureSummary, Table } from '@jackalope/ui';
 import { ChartNoAxesColumn, Download } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { countedTaskDecisions } from '../../lib/decision-usage';
+import { nativeTask } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
+import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { usageEntries } from '../../lib/usage-entries';
 import {
+  type HelperAccountingTurn,
+  selectHelperTurns,
   summarizeUsage,
   usageAccountKey,
   usageCutoff,
@@ -29,8 +34,19 @@ import { JevConnectionUsage } from './JevConnectionUsage';
 import { tokenLabel, UsageInsights } from './UsageInsights';
 import { WorkflowPerformance } from './WorkflowPerformance';
 export function UsageDashboard({ onTask }: { onTask: () => void }) {
-  const { runs, select, loading, error, historyError, refresh } = useExecutionStore();
-  const { projects, selectProject } = useProjectStore();
+  const { runs, select, loading, error, historyError, refresh } = useExecutionStore(
+    useShallow((s) => ({
+      runs: s.runs,
+      select: s.select,
+      loading: s.loading,
+      error: s.error,
+      historyError: s.historyError,
+      refresh: s.refresh,
+    })),
+  );
+  const { projects, selectProject } = useProjectStore(
+    useShallow((s) => ({ projects: s.projects, selectProject: s.selectProject })),
+  );
   const [project, setProject] = useState('all');
   const [period, setPeriod] = useState('30');
   const [account, setAccount] = useState('all');
@@ -43,17 +59,39 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
   const helper = useHelperStore((s) => s.view);
   const helperError = useHelperStore((s) => s.syncError);
   const refreshHelper = useHelperStore((s) => s.refresh);
-  const [helperLoading, setHelperLoading] = useState(true);
+  const [helperReport, setHelperReport] = useState<{
+    turns: HelperAccountingTurn[];
+    unavailable: string[];
+  } | null>(null);
+  const [helperLedgerError, setHelperLedgerError] = useState<string | null>(null);
+  const [helperLoading, setHelperLoading] = useState(isTauriEnvironment());
+  const loadHelperLedger = useCallback(async () => {
+    await refreshHelper();
+    if (!isTauriEnvironment()) return;
+    try {
+      const report = await nativeTask<{ turns: HelperAccountingTurn[]; unavailable: string[] }>(
+        'helper_usage',
+      );
+      setHelperReport(report);
+      setHelperLedgerError(null);
+    } catch (error) {
+      setHelperLedgerError(String(error));
+    }
+  }, [refreshHelper]);
   useEffect(() => {
     let current = true;
-    void refreshHelper().finally(() => {
+    void loadHelperLedger().finally(() => {
       if (current) setHelperLoading(false);
     });
     return () => {
       current = false;
     };
-  }, [refreshHelper]);
+  }, [loadHelperLedger]);
   const accounts = new Map(entries.map((r) => [accountKey(r), `${r.agent} · ${r.account}`]));
+  for (const turn of helperReport?.turns ?? []) {
+    if (turn.accountKey && !accounts.has(turn.accountKey))
+      accounts.set(turn.accountKey, `${turn.agent} · ${turn.account || 'Account not recorded'}`);
+  }
   const [sort, setSort] = useState('tokens');
   const projectNames = new Map([
     ...projects.map((p) => [p.id, p.name] as const),
@@ -76,7 +114,18 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
     [entries, project, account, agent, period, cutoff],
   );
   const insights = useMemo(() => usageInsights(filtered, runs, period), [filtered, runs, period]);
-  const helperUsage = summarizeUsage(helper.turns);
+  const helperTurns = useMemo(
+    () =>
+      selectHelperTurns(helperReport?.turns ?? [], {
+        project,
+        agent,
+        account,
+        period,
+        cutoff,
+      }).sort((a, b) => (b.createdAt ?? -1) - (a.createdAt ?? -1)),
+    [helperReport, project, agent, account, period, cutoff],
+  );
+  const helperUsage = summarizeUsage(helperTurns);
   const ledgerEntries = date
     ? filtered.filter((r) => usageDateKey(r.startedAt, period === 'all') === date)
     : filtered;
@@ -159,7 +208,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
         [
           JSON.stringify(
             {
-              schema: 5,
+              schema: 6,
               filters: { project, agent, account, period },
               taskAssessments: showAssessments
                 ? {
@@ -189,19 +238,40 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
                 })),
               },
               otherAppActivity:
-                project === 'all' && account === 'all' && agent === 'all'
+                helperReport || helperLedgerError || helperError || helper.error
                   ? {
                       source:
-                        'Ask Jackalope retained conversation; undated and excluded from task totals and period filters',
+                        'Ask Jackalope current and archived conversations. Separate from task totals. A period filter omits turns with no recorded date. Unreadable files are listed and left on disk.',
                       usage: helperUsage,
-                      error: helperError ?? helper.error,
-                      turns: helper.turns.map(({ id, agent, model, status, usage }) => ({
-                        id,
-                        agent,
-                        model,
-                        status,
-                        usage,
-                      })),
+                      error: helperLedgerError ?? helperError ?? helper.error ?? undefined,
+                      unavailable: helperReport?.unavailable ?? [],
+                      turns: helperTurns.map(
+                        ({
+                          id,
+                          createdAt,
+                          projectId,
+                          projectName,
+                          agent,
+                          account,
+                          accountKey,
+                          model,
+                          status,
+                          usage,
+                          archived,
+                        }) => ({
+                          id,
+                          createdAt: createdAt ?? null,
+                          projectId: projectId ?? null,
+                          projectName: projectName ?? null,
+                          agent,
+                          account,
+                          accountKey: accountKey ?? null,
+                          model,
+                          status,
+                          usage,
+                          archived: archived ?? false,
+                        }),
+                      ),
                     }
                   : undefined,
               breakdown: {
@@ -250,7 +320,6 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
         }
       />
       <div className="workspace-sections">
-        <WorkflowPerformance />
         <CapacityPanel />
         <section className="workspace-section workspace-stack" aria-label="Task usage">
           <WorkspaceSectionHeading
@@ -319,11 +388,19 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
                 }}
               >
                 <SelectItem value="all">All agents</SelectItem>
-                {[...new Set(entries.map((r) => r.agent))].sort().map((id) => (
-                  <SelectItem key={id} value={id}>
-                    {id}
-                  </SelectItem>
-                ))}
+                {[
+                  ...new Set([
+                    ...entries.map((r) => r.agent),
+                    ...(helperReport?.turns.map((turn) => turn.agent) ?? []),
+                  ]),
+                ]
+                  .filter(Boolean)
+                  .sort()
+                  .map((id) => (
+                    <SelectItem key={id} value={id}>
+                      {id}
+                    </SelectItem>
+                  ))}
               </Select>
             </FormField>
             <FormField label="Sort by">
@@ -550,78 +627,112 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
             </p>
             <p>
               Opening this dashboard does not send a model prompt. Connected capacity is an
-              account-wide read and may include other apps; it is not added to task usage.
+              account-wide read and may include other apps; it is not added to task usage. Ask
+              Jackalope stays separate from task totals. New turns record a date and, when project
+              sharing is current, the open project. Older turns have no date and appear in All time.
+              Archived conversations stay in that list.
             </p>
           </DisclosureBody>
         </Disclosure>
-        {project === 'all' && agent === 'all' && account === 'all' && (
+        {(isTauriEnvironment() || helperReport || helperLedgerError) && (
           <section
             className="usage-app-activity workspace-section workspace-stack"
-            aria-label="Other app activity"
+            aria-label="Ask Jackalope usage"
           >
             <WorkspaceSectionHeading
-              title="Other app activity"
-              description="Device activity, separate from task totals and period filters."
+              title="Ask Jackalope"
+              description="Separate from task totals. Project, account and period filters apply to dated turns."
               action={
-                <Button variant="outline" onClick={() => void refreshHelper()}>
+                <Button variant="outline" onClick={() => void loadHelperLedger()}>
                   Refresh helper history
                 </Button>
               }
             />
             {helperLoading ? (
               <p role="status">Loading helper history…</p>
-            ) : helperError || helper.error ? (
+            ) : helperLedgerError || helperError || helper.error ? (
               <InlineNotice tone="error">
-                Helper usage could not be refreshed. {helperError ?? helper.error}
+                Helper usage could not be refreshed.{' '}
+                {helperLedgerError ?? helperError ?? helper.error}
               </InlineNotice>
             ) : (
               <p className="task-muted">
-                <strong>Ask Jackalope</strong> ·{' '}
-                {helper.turns.length ? tokenLabel(helperUsage.tokens) : 'No saved turns'}
-                {helper.turns.length > 0 &&
-                  ` reported tokens · ${helperUsage.reported} of ${helperUsage.calls} turns reported usage`}
+                {helperTurns.length
+                  ? `${tokenLabel(helperUsage.tokens)} reported tokens · ${helperUsage.reported} of ${helperUsage.calls} turns reported usage`
+                  : (helperReport?.turns.length ?? 0) > 0
+                    ? 'No Ask Jackalope turns match these filters.'
+                    : 'No saved turns'}
               </p>
             )}
-            {helper.turns.length > 0 && !helperError && !helper.error && (
-              <Disclosure>
-                <DisclosureSummary>Inspect helper usage by turn</DisclosureSummary>
-                <DisclosureBody>
-                  <Table
-                    className="usage-ledger-table"
-                    label="Retained Ask Jackalope turns, not filtered by date"
-                  >
-                    <thead>
-                      <tr>
-                        <th>Turn</th>
-                        <th>Agent / model</th>
-                        <th>Status</th>
-                        <th>Reported tokens</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {helper.turns.map((turn, i) => (
-                        <tr key={turn.id}>
-                          <td>{i + 1}</td>
-                          <td>
-                            {turn.agent}
-                            <small>{turn.model ?? 'Model not reported'}</small>
-                          </td>
-                          <td>{turn.status}</td>
-                          <td>
-                            {turn.usage.reported
-                              ? tokenLabel(turn.usage.input + turn.usage.output)
-                              : 'Unavailable'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </DisclosureBody>
-              </Disclosure>
+            {(helperReport?.unavailable.length ?? 0) > 0 && (
+              <InlineNotice tone="error">
+                {helperReport?.unavailable.length === 1
+                  ? '1 helper record could not be read and was left on disk.'
+                  : `${helperReport?.unavailable.length} helper records could not be read and were left on disk.`}{' '}
+                {helperReport?.unavailable.slice(0, 5).join(', ')}
+                {(helperReport?.unavailable.length ?? 0) > 5
+                  ? ` and ${(helperReport?.unavailable.length ?? 0) - 5} more`
+                  : ''}
+              </InlineNotice>
             )}
-            <JevConnectionUsage />
+            {helperTurns.length > 0 && !helperLedgerError && !helperError && !helper.error && (
+              <Table
+                className="usage-ledger-table"
+                label="Ask Jackalope turns for the selected filters"
+              >
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Project</th>
+                    <th>Agent / model</th>
+                    <th>Status</th>
+                    <th>Reported tokens</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {helperTurns.map((turn) => (
+                    <tr key={`${turn.archived ? 'archived' : 'current'}-${turn.id}`}>
+                      <td>
+                        {turn.createdAt == null
+                          ? 'Date not recorded'
+                          : new Date(turn.createdAt).toLocaleString(undefined, {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            })}
+                        {turn.archived ? <small>Archived</small> : null}
+                      </td>
+                      <td>
+                        {turn.projectName ||
+                          (turn.projectId ? 'Removed project' : 'Not attributed')}
+                      </td>
+                      <td>
+                        {turn.agent || 'Agent not recorded'}
+                        <small>{turn.model ?? 'Model not reported'}</small>
+                      </td>
+                      <td>{turn.status}</td>
+                      <td>
+                        {turn.usage.reported
+                          ? tokenLabel(turn.usage.input + turn.usage.output)
+                          : 'Unavailable'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+            {period !== 'all' &&
+              (helperReport?.turns.some((turn) => turn.createdAt == null) ?? false) && (
+                <p className="task-muted">
+                  Turns saved before a date was recorded are visible in All time.
+                </p>
+              )}
           </section>
         )}
+        {project === 'all' && agent === 'all' && account === 'all' && <JevConnectionUsage />}
+        <WorkflowPerformance />
       </div>
     </WorkspacePage>
   );

@@ -35,13 +35,13 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
         consume_opencode_event(run, &event, kind);
         return;
     }
-    if adapter == "kimi" {
+    if adapter == "kimi" || adapter == "acp" {
         if event["role"] == "tool"
             || event["tool_calls"]
                 .as_array()
                 .is_some_and(|calls| !calls.is_empty())
         {
-            run.error = Some("Kimi attempted a tool call in a helper that has tools disabled. Update the CLI before retrying.".into());
+            run.error = Some("Agent attempted a tool call in a helper that has tools disabled. Update the CLI before retrying.".into());
         } else if event["role"] == "assistant" {
             if let Some(text) = event["content"].as_str() {
                 let remaining = 120_000usize.saturating_sub(run.result.chars().count());
@@ -211,7 +211,7 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                 .take(120_000)
                 .collect();
             if event["is_error"] == true {
-                run.error = Some(event["errors"].to_string());
+                run.error = Some(extract_error_message(&event, adapter));
             }
             let u = &event["usage"];
             if u["input_tokens"].is_u64() && u["output_tokens"].is_u64() {
@@ -307,4 +307,68 @@ fn consume_opencode_event(run: &mut TaskRun, event: &Value, kind: &str) {
         }
         _ => {}
     }
+}
+
+fn extract_error_message(event: &Value, adapter: &str) -> String {
+    if let Some(errors) = event["errors"].as_array() {
+        let messages: Vec<_> = errors
+            .iter()
+            .filter_map(|e| {
+                e.as_str()
+                    .or_else(|| e["message"].as_str())
+                    .or_else(|| e["text"].as_str())
+            })
+            .filter(|s| !s.trim().is_empty() && *s != "null")
+            .collect();
+        if !messages.is_empty() {
+            return messages.join("\n");
+        }
+    }
+    if let Some(err_str) = event["errors"]
+        .as_str()
+        .filter(|s| !s.trim().is_empty() && *s != "null")
+    {
+        return err_str.to_string();
+    }
+    if let Some(err_str) = event["error"]["message"]
+        .as_str()
+        .or_else(|| event["error"]["data"]["message"].as_str())
+        .or_else(|| event["error"].as_str())
+        .filter(|s| !s.trim().is_empty() && *s != "null")
+    {
+        return err_str.to_string();
+    }
+    if let Some(msg) = event["message"]
+        .as_str()
+        .filter(|s| !s.trim().is_empty() && *s != "null")
+    {
+        return msg.to_string();
+    }
+    if let Some(result) = event["result"]
+        .as_str()
+        .filter(|s| !s.trim().is_empty() && *s != "null")
+    {
+        return result.to_string();
+    }
+    if let Some(subtype) = event["subtype"]
+        .as_str()
+        .filter(|s| !s.trim().is_empty() && *s != "null")
+    {
+        return format!(
+            "{} error: {subtype}",
+            if adapter == "claude" {
+                "Claude"
+            } else {
+                "Grok"
+            }
+        );
+    }
+    format!(
+        "{} reported an error.",
+        if adapter == "claude" {
+            "Claude"
+        } else {
+            "Grok"
+        }
+    )
 }

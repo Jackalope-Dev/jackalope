@@ -53,7 +53,8 @@ Use outlined buttons for secondary actions, visible selected tabs, and open sect
 for results, checks and next actions. Keep follow-up compact so the result remains usable
 at 960 by 640. Existing work should be visible before opening new-task capture.
 Chat leads with its composer and places work needing attention underneath. Keep
-optional session limits, workflow starters and context controls in its options menu.
+optional session limits, workflow starters and context controls in its options menu;
+keep the agent choice, including comparisons, and attachments visible beside Send.
 
 Visible content is the default. Use short headings, spacing, compact lists and clear
 buttons to make a page scannable. Do not build pages from stacks of accordions or
@@ -84,7 +85,9 @@ requiring Tailwind. Keep native bridges, API clients and app state out of this p
 Desktop compatibility exports can retain existing import paths. Use the local font stacks and established size tokens. Favor clear
 hierarchy, generous space and restrained surfaces over repeated metric cards.
 
-Use semantic action and accent tokens with their matching text colors. Keep
+Use semantic action and accent tokens with their matching text colors, and
+success, warning and danger for status. `pnpm check:tokens` rejects undefined
+color tokens and fixed Tailwind palette shades. Keep
 normal text contrast at least 4.5:1. Selection and status need non-color cues,
 and focus must remain visible in every theme. Use shared Select, input and button
 primitives so opened menus, disabled states and keyboard behavior stay consistent.
@@ -94,6 +97,12 @@ inheritance toggle. Preserve existing saved inheritance,
 saved overrides and automatic light/dark switching. Preview is temporary;
 confirming persists it, while cancellation or leaving an unconfirmed preview
 restores the saved appearance. Invalid color input must not change global styles.
+
+Show selection with a full outline or subtle fill; do not use one-sided accent borders.
+Surfaces that belong together join as one card with a divider and no inner corner
+radius; separate surfaces keep the page gap. Pages use one vertical rhythm from their
+layout gap rather than per-section margins. Transient notices, previews and errors the
+user can clear have a visible close control.
 
 Interactive content targets are at least 44 by 44 CSS pixels. Native window
 chrome can follow platform sizing. Dialogs retain viewport space and scroll on
@@ -107,9 +116,8 @@ has no cancel exit; users reach the final step before entering the workspace.
 The first task remains optional on that final step. Give slow or failed checks a
 clear retry path.
 
-Essential project setup is project → agents → behavior → first task. Optional
-customization adds decisions before behavior and appearance before the first task.
-Show the chosen steps in the progress list and preserve saved advanced setup on reload.
+Project setup is project → agents → decisions → behavior → appearance → first task.
+Show every step in the progress list and preserve saved setup on reload.
 Detect workspace command defaults in
 the background without a manual inspection step. Preserve explicit choices, including
 empty commands, and ignore stale results after changing projects or leaving setup.

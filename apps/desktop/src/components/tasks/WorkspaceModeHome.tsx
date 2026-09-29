@@ -8,9 +8,11 @@ import {
 } from 'lucide-react';
 import { matchesWorkFilter, type WorkItem, workPresence } from '../../lib/task-collection';
 import { attentionQueue, type WorkspacePreset } from '../../lib/workbench';
+import { useChangeStats } from '../../stores/workSignalsStore';
 import { AgentStack } from '../agents/AgentAvatar';
 import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
+import { isUnread, useOpenSignalKey, useWorkSignals, WorkSignals } from './WorkSignals';
 import './workspace-modes.css';
 
 export function WorkspaceModeHome({
@@ -81,30 +83,25 @@ export function WorkspaceModeHome({
           <button
             key={view}
             type="button"
+            title={detail}
             onClick={() =>
               navigateWorkspace(
                 view as 'project-knowledge' | 'changes' | 'worktrees' | 'repo-todos',
               )
             }
           >
-            <Icon size={19} />
-            <span>
-              <strong>{label}</strong>
-              <small>{detail}</small>
-            </span>
-            <ArrowRight size={14} />
+            <Icon size={16} aria-hidden="true" />
+            {label}
           </button>
         ))}
-        <button type="button" onClick={onPlan}>
-          <Workflow size={19} />
-          <span>
-            <strong>Plan feature work</strong>
-            <small>Coordinate a larger change</small>
-          </span>
-          <ArrowRight size={14} />
+        <button type="button" title="Coordinate a larger change" onClick={onPlan}>
+          <Workflow size={16} aria-hidden="true" />
+          Plan feature work
         </button>
       </nav>
     );
+  // Counts only help once there is work to filter; an empty project shows its empty state.
+  if (!items.length) return null;
   return (
     <div className="oversee-summary">
       <nav className="oversee-counts" aria-label="Project activity">
@@ -118,6 +115,7 @@ export function WorkspaceModeHome({
             type="button"
             key={group}
             aria-pressed={filter === group}
+            title={detail}
             onClick={() => onFilter(group)}
           >
             <span>{label}</span>
@@ -156,6 +154,10 @@ export function WorkspaceModeHome({
 
 function ModeWorkItem({ item, onOpen }: { item: WorkItem; onOpen: (item: WorkItem) => void }) {
   const presence = workPresence(item);
+  const signals = useWorkSignals();
+  const openKey = useOpenSignalKey();
+  const stats = useChangeStats([item.run]);
+  const unread = isUnread(item, signals, openKey);
   return (
     <button type="button" className="mode-work-item" onClick={() => onOpen(item)}>
       <AgentStack agents={presence.agents} state={presence.state} size="sm" />
@@ -163,6 +165,11 @@ function ModeWorkItem({ item, onOpen }: { item: WorkItem; onOpen: (item: WorkIte
         <strong>{item.title}</strong>
         <small>{item.run?.progress?.label || item.statusLabel || presence.action}</small>
       </span>
+      <WorkSignals
+        item={item}
+        unread={unread}
+        stats={item.run ? stats[item.run.id]?.value : undefined}
+      />
       <ArrowRight size={16} />
     </button>
   );

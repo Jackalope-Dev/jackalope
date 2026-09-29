@@ -1,13 +1,26 @@
 import { PRESET_THEMES } from '@jackalope/brand/theme';
 import { SearchField } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Folder, LifeBuoy, MessageSquare, Plus, Settings2, SquareTerminal } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import {
+  FileText,
+  Folder,
+  Keyboard,
+  LifeBuoy,
+  MessageSquare,
+  Paperclip,
+  Plus,
+  Settings2,
+  SquareTerminal,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { openCliTerminal } from '../../lib/cli-terminal';
+import { searchFiles } from '../../lib/file-search';
+import { ATTACH_TO_COMPOSER, attachmentReference } from '../../lib/prompt-attachments';
 import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
+import { nativeTask } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
 import { taskDecision } from '../../lib/task-workflow';
-import { openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -16,6 +29,34 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
+
+const fileCache = new Map<string, { files: string[]; loadedAt: number }>();
+
+/** Files in the active project for quick open, refreshed at most every 30 seconds. */
+function useProjectFiles(projectPath: string | undefined, enabled: boolean) {
+  const [files, setFiles] = useState<string[]>(
+    () => (projectPath && fileCache.get(projectPath)?.files) || [],
+  );
+  useEffect(() => {
+    if (!enabled || !projectPath || !isTauriEnvironment()) return;
+    const cached = fileCache.get(projectPath);
+    if (cached) setFiles(cached.files);
+    if (cached && Date.now() - cached.loadedAt < 30_000) return;
+    let canceled = false;
+    nativeTask<string[]>('project_files_list', { projectPath })
+      .then((list) => {
+        fileCache.set(projectPath, { files: list, loadedAt: Date.now() });
+        if (!canceled) setFiles(list);
+      })
+      .catch(() => {
+        if (!canceled) setFiles([]);
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [projectPath, enabled]);
+  return files;
+}
 
 export function CommandPalette({
   isOpen,
@@ -118,6 +159,10 @@ export function CommandPalette({
       `${item.label} ${item.description}`.toLowerCase().includes(search),
   );
   const themes = PRESET_THEMES.filter((item) => item.name.toLowerCase().includes(search));
+  const preferredEditor = useSettingsStore((state) => state.preferredEditor);
+  const projectFiles = useProjectFiles(terminalProject?.path, isOpen && !remoteHost);
+  const files = search.length >= 2 ? searchFiles(projectFiles, search, 8) : [];
+  const [fileError, setFileError] = useState('');
 
   return (
     <Dialog.Root
@@ -168,9 +213,12 @@ export function CommandPalette({
           <div className="command-search">
             <SearchField
               aria-label="Search commands"
-              placeholder="Search tasks, projects, and actions…"
+              placeholder="Search work, files, projects and actions…"
               value={query}
-              onValueChange={(value) => setQuery(value)}
+              onValueChange={(value) => {
+                setQuery(value);
+                setFileError('');
+              }}
             />
             <Dialog.Close className="quiet-icon text-xs" aria-label="Close commands">
               Esc
@@ -235,6 +283,66 @@ export function CommandPalette({
                 <span>{project.name}</span>
               </button>
             ))}
+            {files.length > 0 && terminalProject && (
+              <p className="menu-label">Files in {terminalProject.name}</p>
+            )}
+            {fileError && (
+              <p className="px-3 pb-2 text-xs text-[var(--color-danger)]" role="alert">
+                {fileError}
+              </p>
+            )}
+            {terminalProject &&
+              files.map((file) => (
+                <div key={file} className="command-file-row">
+                  <button
+                    data-command
+                    type="button"
+                    className="workspace-menu-item w-full text-left"
+                    title={`Open in ${preferredEditor === 'cursor' ? 'Cursor' : 'VS Code'}`}
+                    onClick={() => {
+                      setFileError('');
+                      nativeTask('project_file_open', {
+                        projectPath: terminalProject.path,
+                        relativePath: file,
+                        editor: preferredEditor,
+                      })
+                        .then(onClose)
+                        .catch((cause) => setFileError(String(cause)));
+                    }}
+                  >
+                    <FileText size={16} />
+                    <span className="min-w-0">
+                      <span className="block truncate">{file.split('/').pop()}</span>
+                      <small className="block truncate text-[var(--color-text-secondary)]">
+                        {file}
+                      </small>
+                    </span>
+                  </button>
+                  {onCapture && (
+                    <button
+                      type="button"
+                      className="quiet-icon command-file-attach"
+                      aria-label={`Attach ${file} to new work`}
+                      title="Attach to new work"
+                      onClick={() => {
+                        onClose();
+                        onCapture();
+                        const reference = attachmentReference(
+                          `${terminalProject.path}/${file}`,
+                          terminalProject.path,
+                        );
+                        requestAnimationFrame(() =>
+                          window.dispatchEvent(
+                            new CustomEvent(ATTACH_TO_COMPOSER, { detail: [reference] }),
+                          ),
+                        );
+                      }}
+                    >
+                      <Paperclip size={16} />
+                    </button>
+                  )}
+                </div>
+              ))}
             <p className="menu-label">Commands</p>
             {onCapture &&
               ('new work task conversation capture idea'.includes(search) || !search) && (
@@ -279,6 +387,23 @@ export function CommandPalette({
               >
                 <Settings2 className="size-4 text-[var(--color-accent-ink)]" />
                 <span>Settings & Preferences</span>
+              </button>
+            )}
+            {'keyboard shortcuts keys hotkeys'.split(' ').some((kw) => kw.includes(search)) && (
+              <button
+                data-command
+                type="button"
+                className="workspace-menu-item w-full text-left hover:bg-[var(--color-surface-hover)]"
+                onClick={() => {
+                  onClose();
+                  requestAnimationFrame(() =>
+                    window.dispatchEvent(new CustomEvent('jackalope:open-shortcuts')),
+                  );
+                }}
+              >
+                <Keyboard className="size-4 text-[var(--color-accent-ink)]" />
+                <span>Keyboard shortcuts</span>
+                <kbd>?</kbd>
               </button>
             )}
             {showHelp && (
@@ -338,11 +463,12 @@ export function CommandPalette({
               !showSettings &&
               !showHelp &&
               !work.length &&
+              !files.length &&
               !matchingProjects.length &&
               !actions.length &&
               !(onCapture && 'new task capture idea'.includes(search)) && (
                 <p className="p-6 text-sm text-[var(--color-text-secondary)]">
-                  No matches. Try “tasks”, “agents”, or a color.
+                  No matches. Try a file name, “agents” or a color.
                 </p>
               )}
           </div>

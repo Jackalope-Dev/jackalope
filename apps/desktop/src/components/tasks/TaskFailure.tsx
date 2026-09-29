@@ -33,7 +33,7 @@ export function TaskFailure({
   onRetry?: () => void;
   retrying?: boolean;
 }) {
-  const firstLine = message.trim().split('\n')[0];
+  const firstLine = failureSummary(message);
   const summary = firstLine.length > 200 ? `${firstLine.slice(0, 200)}…` : firstLine;
   const failedSetup = !!preparation && !preparation.success;
   return (
@@ -70,4 +70,24 @@ export function TaskFailure({
       )}
     </InlineNotice>
   );
+}
+
+/**
+ * The line shown for a failure. Providers often wrap the useful text in a JSON
+ * body after a short prefix, so a trailing object's "message" is preferred.
+ */
+export function failureSummary(message: string) {
+  const text = message.trim();
+  const firstLine = text.split('\n')[0];
+  const start = text.indexOf('{');
+  if (start < 0 || start > firstLine.length) return firstLine;
+  try {
+    const body = JSON.parse(text.slice(start));
+    const detail = body?.message ?? body?.error?.message ?? body?.error;
+    if (typeof detail === 'string' && detail.trim()) {
+      const prefix = text.slice(0, start).trim().replace(/:$/, '');
+      return prefix ? `${prefix}: ${detail.trim()}` : detail.trim();
+    }
+  } catch {}
+  return firstLine;
 }

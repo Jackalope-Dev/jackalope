@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { nativeTask } from '../../lib/task-runtime';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -8,8 +9,12 @@ import { Switch } from '../ui/Switch';
 import { Setting, SettingGroup } from './Setting';
 
 export function NotificationSettings() {
-  const { status, error } = useNotificationStore();
-  const { osNotifications, updateSettings } = useSettingsStore();
+  const { status, error } = useNotificationStore(
+    useShallow((s) => ({ status: s.status, error: s.error })),
+  );
+  const { osNotifications, updateSettings } = useSettingsStore(
+    useShallow((s) => ({ osNotifications: s.osNotifications, updateSettings: s.updateSettings })),
+  );
   const [result, setResult] = useState('');
   const [busy, setBusy] = useState(false);
   const test = async () => {

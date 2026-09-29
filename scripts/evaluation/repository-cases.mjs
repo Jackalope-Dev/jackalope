@@ -3,6 +3,17 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
+const charMap = {
+  '<': '\\u003C',
+  '>': '\\u003E',
+  '\u2028': '\\u2028',
+  '\u2029': '\\u2029',
+};
+
+export function sanitizeForCode(value) {
+  return JSON.stringify(value).replace(/[<>\u2028\u2029]/g, (char) => charMap[char] || char);
+}
+
 const definitions = [
   [
     'preview-port',
@@ -213,7 +224,7 @@ export async function repositoryCases(revision = 'HEAD') {
         check: 'node --test contract.test.mjs',
         allowedFiles: [filename],
         referenceFiles: { [filename]: original },
-        oracle: `const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url');const root=process.argv[2];(async()=>{const m=await import(pathToFileURL(path.join(root,${JSON.stringify(filename)}))); ${checks} ${shared} for(const [name,text] of Object.entries(${JSON.stringify(protectedFiles)})) assert.equal(fs.readFileSync(path.join(root,name),'utf8'),text); assert.deepEqual(fs.readdirSync(root).filter(n=>n!=='.git').sort(),${JSON.stringify(Object.keys(files).sort())});})().catch(e=>{console.error(e);process.exitCode=1});`,
+        oracle: `const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url');const root=process.argv[2];(async()=>{const m=await import(pathToFileURL(path.join(root,${sanitizeForCode(filename)}))); ${checks} ${shared} for(const [name,text] of Object.entries(${sanitizeForCode(protectedFiles)})) assert.equal(fs.readFileSync(path.join(root,name),'utf8'),text); assert.deepEqual(fs.readdirSync(root).filter(n=>n!=='.git').sort(),${sanitizeForCode(Object.keys(files).sort())});})().catch(e=>{console.error(e);process.exitCode=1});`,
       };
     }),
   );

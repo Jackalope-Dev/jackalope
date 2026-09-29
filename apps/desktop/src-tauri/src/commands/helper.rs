@@ -29,9 +29,20 @@ pub struct Turn {
     status: String,
     agent: String,
     account: String,
+    /// `adapter:profileId`, matching the Usage account filter. Absent on turns
+    /// saved before account attribution.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    account_key: Option<String>,
     model: Option<String>,
     usage: Usage,
     steps: Vec<String>,
+    /// Unix millis. Absent on turns saved before dates were recorded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    created_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    project_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    project_name: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -162,6 +173,74 @@ impl Helper {
         view
     }
 
+    /// Current and archived helper turns for Usage. Prompts and answers stay in
+    /// the conversation files. A file that cannot be read is named and left in place.
+    pub(super) fn usage_report(&self) -> HelperUsageReport {
+        let inner = self.inner.lock().unwrap();
+        let mut report = HelperUsageReport::default();
+        if inner
+            .view
+            .error
+            .as_deref()
+            .is_some_and(|error| error.contains("could not be read"))
+        {
+            report.unavailable.push("conversation.json".into());
+        } else {
+            report
+                .turns
+                .extend(inner.view.turns.iter().map(|turn| usage_turn(turn, false)));
+        }
+        drop(inner);
+        let Some(directory) = self.path.parent() else {
+            report.unavailable.push("archived conversations".into());
+            return report;
+        };
+        let mut archives = Vec::new();
+        match std::fs::read_dir(directory) {
+            Ok(entries) => {
+                for entry in entries.flatten() {
+                    let name = entry.file_name();
+                    let Some(name) = name.to_str() else {
+                        continue;
+                    };
+                    if !name.starts_with("helper-") || !name.ends_with(".json") {
+                        continue;
+                    }
+                    if !entry.file_type().is_ok_and(|kind| kind.is_file()) {
+                        continue;
+                    }
+                    archives.push(entry.path());
+                }
+            }
+            Err(_) => report.unavailable.push("archived conversations".into()),
+        }
+        archives.sort();
+        if archives.len() > ARCHIVE_LIMIT {
+            report.unavailable.push(format!(
+                "{} additional archived conversations were not loaded",
+                archives.len() - ARCHIVE_LIMIT
+            ));
+            archives.truncate(ARCHIVE_LIMIT);
+        }
+        for path in archives {
+            let name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("archived conversation")
+                .to_string();
+            let saved = history::read_bounded(&path, 2_000_000).and_then(|bytes| {
+                serde_json::from_slice::<View>(&bytes).map_err(|e| e.to_string())
+            });
+            match saved {
+                Ok(view) => report
+                    .turns
+                    .extend(view.turns.iter().map(|turn| usage_turn(turn, true))),
+                Err(_) => report.unavailable.push(name),
+            }
+        }
+        report
+    }
+
     fn answer(
         &self,
         id: &str,
@@ -280,6 +359,52 @@ impl Helper {
 }
 
 const HELPER_ADAPTERS: [&str; 5] = ["claude", "codex", "opencode", "grok", "kimi"];
+const ARCHIVE_LIMIT: usize = 100;
+
+fn account_key_for(binding: &agent_profiles::AccountBinding) -> String {
+    format!(
+        "{}:{}",
+        binding.adapter,
+        binding
+            .profile_id
+            .as_deref()
+            .filter(|id| !id.is_empty())
+            .unwrap_or("cli-default")
+    )
+}
+
+/// The open project from fresh shared context. Stale context and disabled
+/// project sharing leave the turn unattributed instead of guessing.
+fn recorded_project(
+    context: &Value,
+    context_at: Option<Instant>,
+) -> (Option<String>, Option<String>) {
+    let fresh = context_at.is_some_and(|at| at.elapsed() < Duration::from_secs(15));
+    if !fresh {
+        return (None, None);
+    }
+    let Some(id) = context
+        .get("activeProjectId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+    else {
+        return (None, None);
+    };
+    let name = context
+        .get("projects")
+        .and_then(Value::as_array)
+        .and_then(|projects| {
+            projects.iter().find(|project| {
+                project.get("id").and_then(Value::as_str).map(str::trim) == Some(id)
+            })
+        })
+        .and_then(|project| project.get("name").and_then(Value::as_str))
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_string);
+    (Some(id.to_string()), name)
+}
 
 /// An agent and account that can answer a tool-free request, in the order
 /// Jackalope tries them.
@@ -411,9 +536,53 @@ fn parse_response(text: &str) -> Result<Value, String> {
     Ok(value)
 }
 
+#[derive(Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HelperUsageTurn {
+    pub id: String,
+    pub created_at: Option<i64>,
+    pub project_id: Option<String>,
+    pub project_name: Option<String>,
+    pub agent: String,
+    pub account: String,
+    pub account_key: Option<String>,
+    pub model: Option<String>,
+    pub status: String,
+    pub usage: Usage,
+    pub archived: bool,
+}
+
+#[derive(Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HelperUsageReport {
+    pub turns: Vec<HelperUsageTurn>,
+    pub unavailable: Vec<String>,
+}
+
+fn usage_turn(turn: &Turn, archived: bool) -> HelperUsageTurn {
+    HelperUsageTurn {
+        id: turn.id.clone(),
+        created_at: turn.created_at,
+        project_id: turn.project_id.clone(),
+        project_name: turn.project_name.clone(),
+        agent: turn.agent.clone(),
+        account: turn.account.clone(),
+        account_key: turn.account_key.clone(),
+        model: turn.model.clone(),
+        status: turn.status.clone(),
+        usage: turn.usage.clone(),
+        archived,
+    }
+}
+
 #[tauri::command]
 pub fn helper_snapshot(helper: State<'_, Helper>) -> View {
     helper.snapshot()
+}
+
+#[tauri::command]
+pub fn helper_usage(helper: State<'_, Helper>) -> HelperUsageReport {
+    helper.usage_report()
 }
 
 #[tauri::command]
@@ -452,13 +621,18 @@ pub fn helper_send(helper: State<'_, Helper>, prompt: String) -> Result<View, St
         if inner.view.turns.len() >= 40 {
             return Err("Start a new conversation to continue. The old conversation will be archived locally.".into());
         }
+        let (project_id, project_name) = recorded_project(&inner.context, inner.context_at);
         inner.view.turns.push(Turn {
             id: id.clone(),
             prompt: prompt.trim().into(),
             status: "working".into(),
             agent: first.agent.clone(),
             account: first.binding.label.clone(),
+            account_key: Some(account_key_for(&first.binding)),
             model: first.model.clone(),
+            created_at: Some(Utc::now().timestamp_millis()),
+            project_id,
+            project_name,
             ..Default::default()
         });
         helper.save(&mut inner)?;

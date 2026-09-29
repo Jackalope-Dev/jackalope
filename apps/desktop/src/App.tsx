@@ -1,11 +1,19 @@
 import { startThemeClock } from '@jackalope/brand/theme';
 import { MotionConfig } from 'motion/react';
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { AccessBoundary } from './components/account/AccessBoundary';
 import { Shell } from './components/layout/Shell';
-import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
-import { WorkspaceTransition } from './components/onboarding/WorkspaceTransition';
 import { observeDesktopControlTheme } from './lib/desktop-control-theme';
+
+const OnboardingFlow = lazy(() =>
+  import('./components/onboarding/OnboardingFlow').then((m) => ({ default: m.OnboardingFlow })),
+);
+const WorkspaceTransition = lazy(() =>
+  import('./components/onboarding/WorkspaceTransition').then((m) => ({
+    default: m.WorkspaceTransition,
+  })),
+);
+
 import { observeTelemetry } from './lib/observe-telemetry';
 import { commitProjectSetup } from './lib/project-setup';
 import { nativeTask } from './lib/task-runtime';
@@ -89,24 +97,26 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <AccessBoundary>
-        {entry ? (
-          <WorkspaceTransition
-            project={onboarding.pendingProject ?? undefined}
-            onComplete={completeEntry}
-            onBack={() => setEntry(null)}
-          />
-        ) : onboarding.status === 'new' || onboarding.status === 'active' ? (
-          <OnboardingFlow
-            onFinish={(agent, draftKey) => setEntry({ agent, draftKey })}
-            onSkip={() => setEntry({})}
-          />
-        ) : (
-          <Shell
-            initialTaskAgent={initialTaskAgent}
-            initialDraftKey={initialDraftKey}
-            focusOnMount={focusWorkspace}
-          />
-        )}
+        <Suspense fallback={null}>
+          {entry ? (
+            <WorkspaceTransition
+              project={onboarding.pendingProject ?? undefined}
+              onComplete={completeEntry}
+              onBack={() => setEntry(null)}
+            />
+          ) : onboarding.status === 'new' || onboarding.status === 'active' ? (
+            <OnboardingFlow
+              onFinish={(agent, draftKey) => setEntry({ agent, draftKey })}
+              onSkip={() => setEntry({})}
+            />
+          ) : (
+            <Shell
+              initialTaskAgent={initialTaskAgent}
+              initialDraftKey={initialDraftKey}
+              focusOnMount={focusWorkspace}
+            />
+          )}
+        </Suspense>
       </AccessBoundary>
     </MotionConfig>
   );

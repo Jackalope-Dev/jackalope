@@ -489,6 +489,7 @@ pub async fn local_ai_verify(
 pub async fn local_ai_connect(
     model_id: String,
     helper_model_id: Option<String>,
+    activate: Option<bool>,
     service: State<'_, LocalAi>,
     runtime: State<'_, tasks::TaskRuntime>,
 ) -> Result<agent_profiles::AgentProfile, String> {
@@ -517,5 +518,9 @@ pub async fn local_ai_connect(
     if service.canceled.load(Ordering::SeqCst) {
         return Err("Connection stopped. Reopen setup to try again.".into());
     }
-    agent_profiles::create_local(&runtime.profiles_root(), &verified)
+    agent_profiles::create_local(
+        &runtime.profiles_root(),
+        &verified,
+        activate.unwrap_or(true),
+    )
 }

@@ -158,6 +158,7 @@
 }
 .landing-story .section-lead {
   align-items: end;
+  margin-bottom: clamp(24px, 2.5vw, 32px);
 }
 .landing-story .workbench {
   border-radius: 0;

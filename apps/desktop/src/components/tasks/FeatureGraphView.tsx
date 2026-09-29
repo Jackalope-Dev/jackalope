@@ -1,4 +1,5 @@
 import { graphlib, layout } from '@dagrejs/dagre';
+import { EmptyState } from '@jackalope/ui';
 import {
   Background,
   Controls,
@@ -17,6 +18,7 @@ import {
   Network,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import type { QueueItem } from '../../lib/queue';
 import { isActive } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -35,7 +37,7 @@ export function FeatureGraphView({
   mergedRunIds: string[];
   onSelectRun?: (runId: string) => void;
 }) {
-  const { runs } = useExecutionStore();
+  const { runs } = useExecutionStore(useShallow((s) => ({ runs: s.runs })));
   const [selectedFeature, setSelectedFeature] = useState<string>('all');
   const [flow, setFlow] = useState<ReactFlowInstance | null>(null);
 
@@ -151,14 +153,14 @@ export function FeatureGraphView({
                 <span
                   className={`feature-graph-badge ${
                     state === 'merged'
-                      ? 'bg-emerald-500/15 text-emerald-400'
+                      ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
                       : state === 'active'
-                        ? 'bg-blue-500/15 text-blue-400'
+                        ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent-ink)]'
                         : state === 'review'
-                          ? 'bg-purple-500/15 text-purple-400'
+                          ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
                           : state === 'attention'
-                            ? 'bg-red-500/15 text-red-400'
-                            : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)]'
+                            ? 'bg-[var(--color-danger)]/15 text-[var(--color-danger)]'
+                            : 'bg-[var(--color-surface-sunken)] text-[var(--color-text-muted)]'
                   }`}
                 >
                   {state === 'merged' && <CheckCircle2 size={10} />}
@@ -248,9 +250,9 @@ export function FeatureGraphView({
   return (
     <div className="feature-graph-wrapper space-y-3">
       {/* Top Toolbar */}
-      <div className="flex items-center justify-between gap-3 flex-wrap bg-[var(--color-bg-secondary)]/60 p-2.5 rounded-lg border border-[var(--color-border)]">
+      <div className="flex items-center justify-between gap-3 flex-wrap bg-[var(--color-surface-hover)]/60 p-2.5 rounded-lg border border-[var(--color-border)]">
         <div className="flex items-center gap-2">
-          <Network size={16} className="text-[var(--color-brand)]" />
+          <Network size={16} className="text-[var(--color-accent-ink)]" />
           <span className="text-xs font-semibold text-[var(--color-text-primary)]">
             Execution Graph ({filteredItems.length} tasks)
           </span>
@@ -276,22 +278,22 @@ export function FeatureGraphView({
         {/* Live Status Badges */}
         <div className="flex items-center gap-2 text-xs">
           {stats.active > 0 && (
-            <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-medium flex items-center gap-1">
+            <span className="px-2 py-0.5 rounded bg-[var(--color-accent)]/10 text-[var(--color-accent-ink)] font-medium flex items-center gap-1">
               <Loader2 size={11} className="animate-spin" /> {stats.active} active
             </span>
           )}
           {stats.review > 0 && (
-            <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 font-medium">
+            <span className="px-2 py-0.5 rounded bg-[var(--color-warning)]/10 text-[var(--color-warning)] font-medium">
               {stats.review} in review
             </span>
           )}
           {stats.merged > 0 && (
-            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">
+            <span className="px-2 py-0.5 rounded bg-[var(--color-success)]/10 text-[var(--color-success)] font-medium">
               {stats.merged} merged
             </span>
           )}
           {stats.attention > 0 && (
-            <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 font-medium">
+            <span className="px-2 py-0.5 rounded bg-[var(--color-danger)]/10 text-[var(--color-danger)] font-medium">
               {stats.attention} needs attention
             </span>
           )}
@@ -313,10 +315,13 @@ export function FeatureGraphView({
       {/* DAG Flow Canvas */}
       <div className="feature-graph-container">
         {filteredItems.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center text-[var(--color-text-muted)]">
-            <Network size={32} className="opacity-40 mb-2" />
-            <p className="text-sm font-medium">No tasks currently queued</p>
-            <p className="text-xs max-w-sm mt-1">Plan a feature to visualize the execution flow.</p>
+          <div className="h-full flex items-center justify-center p-6">
+            <EmptyState
+              icon={Network}
+              level={3}
+              title="No tasks queued"
+              description="Plan a feature to see how its tasks run."
+            />
           </div>
         ) : (
           <ReactFlow

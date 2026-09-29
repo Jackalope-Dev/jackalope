@@ -1,4 +1,4 @@
-import { Badge, Button, InlineNotice } from '@jackalope/ui';
+import { Badge, Button, InlineNotice, Select, SelectItem } from '@jackalope/ui';
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -24,6 +24,51 @@ const platformIcons = { windows: Monitor, macos: Command, linux: Terminal };
 interface DownloadMember {
   email: string;
   download?: { kind?: 'store' } | null;
+  /** Builds this member can download while they are not public. */
+  macos?: ReleaseBuild[];
+  linux?: ReleaseBuild[];
+}
+interface ReleaseBuild {
+  id: string;
+  label: string;
+  channel: 'stable' | 'beta';
+  url: string;
+}
+const channelNames = { stable: 'Stable', beta: 'Beta' } as const;
+
+/** The member's builds for one platform, with a release channel choice when several are offered. */
+function ReleaseDownloads({ builds }: { builds: ReleaseBuild[] }) {
+  const channels = [...new Set(builds.map((build) => build.channel))];
+  const [channel, setChannel] = useState(channels[0]);
+  const selected = channels.includes(channel) ? channel : channels[0];
+  return (
+    <>
+      {channels.length > 1 && (
+        <Select
+          aria-label="Release channel"
+          value={selected}
+          onValueChange={(value) => setChannel(value as ReleaseBuild['channel'])}
+        >
+          {channels.map((option) => (
+            <SelectItem key={option} value={option}>
+              {channelNames[option]}
+            </SelectItem>
+          ))}
+        </Select>
+      )}
+      {builds
+        .filter((build) => build.channel === selected)
+        .map((build, index) => (
+          <a
+            key={build.id}
+            className={`button ${index === 0 ? 'button-primary' : 'button-quiet'}`}
+            href={build.url}
+          >
+            Download for {build.label} <ArrowDownToLine size={17} />
+          </a>
+        ))}
+    </>
+  );
 }
 
 export function DownloadPage({ downloads = desktopDownloads }: { downloads?: PlatformDownload[] }) {
@@ -164,6 +209,7 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
       <section className="download-platforms" aria-label="Desktop downloads">
         {ordered.map((option) => {
           const Icon = platformIcons[option.id];
+          const builds = option.id === 'windows' ? undefined : member?.[option.id];
           return (
             <article
               className={`download-platform${option.id === platform ? ' download-platform-detected' : ''}`}
@@ -177,7 +223,9 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
               <h2>{option.name}</h2>
               <p>{option.detail}</p>
               <div className="download-platform-action">
-                {option.url ? (
+                {!option.url && builds?.length ? (
+                  <ReleaseDownloads builds={builds} />
+                ) : option.url ? (
                   <a
                     className="button button-primary"
                     href={
@@ -212,7 +260,7 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
             </h2>
             <p>
               {email && !token
-                ? `You’re signed in as ${email}. ${downloads.some((option) => option.url) ? 'Choose your platform above to get started.' : 'Downloads are coming soon. Your early access is ready when they arrive.'}`
+                ? `You’re signed in as ${email}. ${downloads.some((option) => option.url) || member?.macos?.length || member?.linux?.length ? 'Choose your platform above to get started.' : 'Downloads are coming soon. Your early access is ready when they arrive.'}`
                 : 'Jackalope is in early access. You’ll need to be accepted from the waitlist or claim a friend’s Instant Access Pass to start using the app.'}
             </p>
             {email && !token ? (

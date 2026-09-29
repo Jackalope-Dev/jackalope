@@ -11,7 +11,6 @@ try {
   await mkdir('output/playwright', { recursive: true });
   await page.route('https://github.com/**', (route) => route.abort());
   await page.goto('http://localhost:5173');
-  await page.getByRole('heading', { name: 'Set up Jackalope', exact: true }).waitFor();
   await page.evaluate(async () => {
     window.storeModule = (name) =>
       import(
@@ -151,6 +150,75 @@ try {
         if (command === 'task_history_recovery') return { directory: 'fixture', entries: [] };
         if (command === 'knowledge_preview') return { entries: [], bytes: 0 };
         if (command === 'task_validate_project') return { gitBranch: 'master', isGit: true };
+        if (command === 'helper_sync') return null;
+        if (command === 'helper_snapshot')
+          return { turns: [], actions: [], connected: false, error: null };
+        if (command === 'helper_usage')
+          return {
+            turns: [
+              {
+                id: 'dated',
+                createdAt: Date.now(),
+                projectId: 'pages-fixture',
+                projectName: 'Trail workspace',
+                agent: 'codex',
+                account: 'Work',
+                accountKey: 'codex:fixture-account',
+                model: 'code-model',
+                status: 'complete',
+                usage: {
+                  input: 10,
+                  output: 4,
+                  cacheRead: 0,
+                  cacheWrite: 0,
+                  reported: true,
+                  estimatedCostUsd: null,
+                },
+                archived: false,
+              },
+              {
+                id: 'other-project',
+                createdAt: Date.now(),
+                projectId: 'other',
+                projectName: 'Other workspace',
+                agent: 'claude',
+                account: 'Personal',
+                accountKey: 'claude:cli-default',
+                model: null,
+                status: 'complete',
+                usage: {
+                  input: 3,
+                  output: 1,
+                  cacheRead: 0,
+                  cacheWrite: 0,
+                  reported: true,
+                  estimatedCostUsd: null,
+                },
+                archived: true,
+              },
+              {
+                id: 'undated',
+                createdAt: null,
+                projectId: null,
+                projectName: null,
+                agent: 'grok',
+                account: 'CLI',
+                accountKey: null,
+                model: null,
+                status: 'complete',
+                usage: {
+                  input: 0,
+                  output: 0,
+                  cacheRead: 0,
+                  cacheWrite: 0,
+                  reported: false,
+                  estimatedCostUsd: null,
+                },
+                archived: false,
+              },
+            ],
+            unavailable: ['helper-broken.json'],
+          };
         return null;
       },
     };
@@ -290,7 +358,8 @@ try {
   await page.getByRole('button', { name: 'Configure Codex', exact: true }).waitFor();
   await page.getByText('CLI setup needed', { exact: true }).waitFor();
   await page.setViewportSize({ width: 1280, height: 840 });
-  assert.equal(await page.locator('.agent-roster-row').count(), 4);
+  assert.equal(await page.locator('.agent-roster-row').count(), 7);
+  await page.getByText('npm install -g opencode-ai').waitFor();
   await page.screenshot({ path: 'output/playwright/agents-grid.png' });
   assert.equal(await page.getByText('Ready', { exact: true }).count(), 0);
   await page.getByRole('button', { name: 'Configure Codex', exact: true }).click();
@@ -605,6 +674,48 @@ try {
 
   await navigate('usage');
   await page.getByRole('heading', { name: 'Usage & Intelligence', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Ask Jackalope', exact: true }).waitFor();
+  const helperTurns = page.getByRole('region', {
+    name: 'Ask Jackalope turns for the selected filters',
+  });
+  await helperTurns.getByText('Trail workspace', { exact: true }).waitFor();
+  await helperTurns.getByText('Other workspace', { exact: true }).waitFor();
+  await helperTurns.getByText('Archived', { exact: true }).waitFor();
+  assert.equal(await helperTurns.getByText('Date not recorded', { exact: true }).count(), 0);
+  await page.getByText('helper-broken.json', { exact: false }).waitFor();
+  const projectFilter = page.getByRole('combobox', { name: 'Project', exact: true });
+  await projectFilter.focus();
+  await projectFilter.press('Enter');
+  await page.getByRole('option', { name: 'Trail workspace', exact: true }).click();
+  await helperTurns.getByText('Trail workspace', { exact: true }).waitFor();
+  assert.equal(await helperTurns.getByText('Other workspace', { exact: true }).count(), 0);
+  await projectFilter.press('Enter');
+  await page.getByRole('option', { name: 'All projects', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Period', exact: true }).click();
+  await page.getByRole('option', { name: 'All time', exact: true }).click();
+  await helperTurns.getByText('Date not recorded', { exact: true }).waitFor();
+  await helperTurns.getByText('Not attributed', { exact: true }).waitFor();
+  for (const width of [1280, 960]) {
+    await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
+    for (const isDark of [false, true]) {
+      await page.evaluate(async (isDark) => {
+        const { useThemeStore } = await window.storeModule('themeStore');
+        useThemeStore
+          .getState()
+          .setTheme({ ...useThemeStore.getState().currentTheme, appearance: 'manual', isDark });
+      }, isDark);
+      await page.screenshot({
+        path: `output/playwright/usage-helper-${isDark ? 'dark' : 'light'}-${width}.png`,
+      });
+      assert.ok(
+        await page
+          .locator('.usage-page')
+          .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+        `usage page fits ${width}`,
+      );
+    }
+  }
+  await page.setViewportSize({ width: 1280, height: 840 });
   await page.getByText('80% remaining', { exact: true }).waitFor();
   const capacityCalls = () =>
     page.evaluate(

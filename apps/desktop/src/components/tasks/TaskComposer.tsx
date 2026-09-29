@@ -16,6 +16,7 @@ import {
 import { type CSSProperties, type ReactNode, useState } from 'react';
 import { effortFor, taskEfforts } from '../../lib/task-effort';
 import type { Runner } from '../../lib/task-runtime';
+import { PROMPT_MAX_CHARS } from '../../lib/task-runtime';
 import type { McpServerConfig } from '../../lib/tauri-bridge';
 import type { TaskDraft } from '../../stores/executionStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
@@ -23,6 +24,7 @@ import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
 import { CodexSpeedSelect } from './CodexSpeedSelect';
+import { DictationButton } from './DictationButton';
 import { OutcomeEditor } from './OutcomeEditor';
 import { TaskContextPanel } from './TaskContextPanel';
 import './task-composer.css';
@@ -171,7 +173,7 @@ export function TaskComposer({
           onChange={(event) => onChange({ prompt: event.target.value })}
           placeholder="Describe a change, investigate a problem, or explore an idea…"
           rows={compact ? 1 : inline ? 4 : 3}
-          maxLength={24000}
+          maxLength={PROMPT_MAX_CHARS}
           onKeyDown={(event) => {
             if (
               (event.ctrlKey || event.metaKey) &&
@@ -186,6 +188,12 @@ export function TaskComposer({
               else onSave();
             }
           }}
+        />
+        <DictationButton
+          disabled={submitting}
+          onText={(value) =>
+            onChange({ prompt: current.prompt.trim() ? `${current.prompt}\n${value}` : value })
+          }
         />
         <p className="composer-launch-summary task-muted">
           {compact && `${projectName || 'Choose a project in Customize'} · `}

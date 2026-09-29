@@ -74,17 +74,48 @@ function render(name, width, height, content, scale = 1) {
     font: { defaultFontFamily: 'Segoe UI' },
     fitTo: { mode: 'zoom', value: scale },
   });
-  writeFileSync(new URL(`${name}.bmp`, output), bitmap(renderer.render()));
+  const image = renderer.render();
+  writeFileSync(new URL(`${name}.bmp`, output), bitmap(image));
+  return image;
 }
 
-render('nsis-sidebar', 164, 314, sidebar(164, 314), 3);
-render(
-  'nsis-header',
-  150,
-  57,
-  `<rect width="150" height="57" fill="${light('surface')}"/>${mark(98, 7, 43, light('accent-ink'))}`,
-  3,
-);
+// NSIS stretches artwork into its controls with nearest-neighbour sampling, so
+// each display scale gets a bitmap at the control's exact pixel size. Controls
+// are sized in dialog units, which depend on hooks.nsh's Segoe UI 9pt font:
+// the wizard image is 109x193 DLU and the header image 100x35 DLU. Sizes were
+// measured with the dialog manager's base-unit rule and confirmed against a
+// running installer at 96 DPI; the aspect ratio differs between scales.
+const nsisScales = [
+  { dpi: 96, wizard: [191, 362], header: [175, 66] },
+  { dpi: 120, wizard: [218, 483], header: [200, 88] },
+  { dpi: 144, wizard: [273, 603], header: [250, 109] },
+  { dpi: 168, wizard: [327, 724], header: [300, 131] },
+  { dpi: 192, wizard: [354, 772], header: [325, 140] },
+  { dpi: 216, wizard: [409, 893], header: [375, 162] },
+  { dpi: 240, wizard: [463, 989], header: [425, 179] },
+  { dpi: 288, wizard: [545, 1158], header: [500, 210] },
+];
+
+// Artwork keeps its 164px and 150px design widths; height follows the control.
+function renderExact(name, designWidth, [width, height], draw) {
+  const zoom = width / designWidth;
+  const designHeight = height / zoom;
+  const image = render(name, designWidth, designHeight, draw(designWidth, designHeight), zoom);
+  if (image.width !== width || image.height !== height) {
+    throw new Error(
+      `${name} rendered at ${image.width}x${image.height}, expected ${width}x${height}`,
+    );
+  }
+}
+
+const header = (width, height) =>
+  `<rect width="${width}" height="${height}" fill="${light('surface')}"/>${mark(width - 52, (height - 43) / 2, 43, light('accent-ink'))}`;
+
+for (const { dpi, wizard, header: headerSize } of nsisScales) {
+  const suffix = dpi === 96 ? '' : `-${dpi}`;
+  renderExact(`nsis-sidebar${suffix}`, 164, wizard, sidebar);
+  renderExact(`nsis-header${suffix}`, 150, headerSize, header);
+}
 render(
   'wix-dialog',
   493,
@@ -103,6 +134,11 @@ writeFileSync(
   [
     `!define JACKALOPE_SURFACE "${light('surface').slice(1)}"`,
     `!define JACKALOPE_TEXT "${light('text-primary').slice(1)}"`,
+    '!macro JACKALOPE_ARTWORK_SCALES UN',
+    ...nsisScales
+      .slice(1)
+      .map(({ dpi }) => `  !insertmacro JACKALOPE_ARTWORK_SCALE "\${UN}" ${dpi}`),
+    '!macroend',
     '',
   ].join('\n'),
 );

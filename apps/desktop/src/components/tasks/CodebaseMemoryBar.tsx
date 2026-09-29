@@ -10,6 +10,7 @@ import {
   TestTube2,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useContextMemoryStore } from '../../stores/contextMemoryStore';
 import type { Project } from '../../stores/projectStore';
@@ -22,7 +23,13 @@ import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import '../projects/project-context.css';
 
 export function CodebaseMemoryBar({ project }: { project: Project }) {
-  const { memories, scanning, refreshMemory } = useContextMemoryStore();
+  const { memories, scanning, refreshMemory } = useContextMemoryStore(
+    useShallow((s) => ({
+      memories: s.memories,
+      scanning: s.scanning,
+      refreshMemory: s.refreshMemory,
+    })),
+  );
   const memory = memories[project.id];
   const busy = scanning[project.id] ?? false;
   const [error, setError] = useState('');

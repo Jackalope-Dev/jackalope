@@ -1,12 +1,16 @@
 import { Textarea } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
+import { usePromptAttachments } from '../../hooks/usePromptAttachments';
 import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/live-session';
+import { appendAttachments } from '../../lib/prompt-attachments';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
 import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
+import { AttachButton } from '../tasks/AttachButton';
 import { DictationButton } from '../tasks/DictationButton';
 import { useManagedPreview } from '../tasks/useManagedPreview';
 import { Button } from '../ui/button';
+import { DismissButton } from '../ui/DismissButton';
 import { InlineNotice } from '../ui/InlineNotice';
 
 export function SessionComposer({
@@ -43,6 +47,17 @@ export function SessionComposer({
   const latest = useRef(text);
   latest.current = text;
   const added = useRef(0);
+  const form = useRef<HTMLFormElement>(null);
+  const attachments = usePromptAttachments({
+    projectPath: session.request.projectPath,
+    target: form,
+    disabled: session.closed,
+    onAttach: (references) => {
+      editing.current = true;
+      setText((current) => appendAttachments(current, references));
+      input.current?.focus();
+    },
+  });
   useEffect(() => {
     if (!addition || added.current === addition.revision) return;
     added.current = addition.revision;
@@ -176,7 +191,9 @@ export function SessionComposer({
   };
   return (
     <form
+      ref={form}
       className="live-composer"
+      data-dragging={attachments.dragging || undefined}
       onSubmit={(event) => {
         event.preventDefault();
         void send();
@@ -202,6 +219,7 @@ export function SessionComposer({
           editing.current = true;
           setText(event.target.value);
         }}
+        onPaste={attachments.onPaste}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
             event.preventDefault();
@@ -229,7 +247,19 @@ export function SessionComposer({
           )}
         </InlineNotice>
       )}
+      {attachments.error && (
+        <InlineNotice tone="error" action={<DismissButton onDismiss={attachments.clearError} />}>
+          {attachments.error}
+        </InlineNotice>
+      )}
       <div className="live-composer-actions">
+        {attachments.available && (
+          <AttachButton
+            onPick={() => void attachments.pick()}
+            busy={attachments.busy}
+            disabled={saving}
+          />
+        )}
         <p className="live-muted">
           {active
             ? 'Queue messages for the next batch, or stop current work and send now.'

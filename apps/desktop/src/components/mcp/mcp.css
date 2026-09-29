@@ -765,3 +765,17 @@
 .mcp-field-pair {
   grid-template-columns: minmax(0, 1fr);
 }
+
+.mcp-card-signin {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: -0.25rem 0 0.5rem;
+}
+.mcp-card-signin:empty {
+  display: none;
+}
+.mcp-card-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

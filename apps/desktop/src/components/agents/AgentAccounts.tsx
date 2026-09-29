@@ -2,6 +2,7 @@ import { RefreshIcon } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check, Circle, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   type AgentProfile,
   accountStatusLabel,
@@ -12,6 +13,7 @@ import {
   setActiveAgentProfile,
   setAgentProfileGroup,
   setAgentProfileTag,
+  setConfigDir,
 } from '../../lib/agent-profiles';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import {
@@ -20,6 +22,8 @@ import {
   profileId,
   useAgentAccountsStore,
 } from '../../stores/agentAccountsStore';
+import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
@@ -28,6 +32,7 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
 import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
+import { Switch } from '../ui/Switch';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { AgentKeySignIn } from './AgentKeySignIn';
 import { DetectedKeysModal } from './DetectedKeysModal';
@@ -66,10 +71,12 @@ function AccountGroup({
 }
 function EditAccount({
   profile,
+  agentId,
   onSave,
   onClose,
 }: {
   profile: AgentProfile;
+  agentId: string;
   onSave: (name: string, group: AgentProfile['group'], tag: string | null) => Promise<void>;
   onClose: () => void;
 }) {
@@ -77,6 +84,7 @@ function EditAccount({
   const [name, setName] = useState(profile.name);
   const [group, setGroup] = useState(profile.group);
   const [tag, setTag] = useState(profile.tag ?? '');
+  const [configDirValue, setConfigDirValue] = useState(profile.configDir ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   return (
@@ -99,6 +107,10 @@ function EditAccount({
             setError('');
             try {
               await onSave(name.trim(), group, tag.trim() || null);
+              const dir = configDirValue.trim() || null;
+              if (dir !== (profile.configDir ?? null)) {
+                await setConfigDir(agentId, profile.id, dir);
+              }
               onClose();
             } catch (e) {
               setError(String(e));
@@ -129,6 +141,24 @@ function EditAccount({
             <span aria-hidden="true">Account group</span>
             <AccountGroup value={group} onChange={setGroup} label="Account group" disabled={busy} />
           </div>
+          <details className="mt-2">
+            <summary className="task-muted text-sm cursor-pointer select-none">
+              Advanced · Custom config directory
+            </summary>
+            <FormField label="Config directory override">
+              <Input
+                value={configDirValue}
+                onChange={(e) => setConfigDirValue(e.target.value)}
+                disabled={busy}
+                placeholder="Leave empty for default"
+                maxLength={512}
+              />
+            </FormField>
+            <p className="task-muted text-xs mt-1">
+              Override the directory where this agent stores its configuration and credentials. Uses
+              the agent's default path when empty.
+            </p>
+          </details>
           {error && <InlineNotice tone="error">{error}</InlineNotice>}
           <DialogFooter>
             <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
@@ -152,11 +182,44 @@ export function AgentAccounts({
   agentId,
   agentName,
   onChanged,
+  projectId,
 }: {
   agentId: string;
   agentName: string;
   onChanged?: () => void;
+  projectId?: string;
 }) {
+  const { projects, updateProjectPreferences } = useProjectStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      updateProjectPreferences: s.updateProjectPreferences,
+    })),
+  );
+  const project = projects.find((item) => item.id === projectId);
+  const config = useAgentConfigStore(useShallow((s) => ({ disabledAccounts: s.disabledAccounts })));
+  const saveProject = async (change: () => void) => {
+    if (!project) throw new Error('This project is no longer available.');
+    const before = project.preferences;
+    change();
+    try {
+      await syncAgentConfig();
+    } catch (cause) {
+      useProjectStore.getState().updateProject(project.id, { preferences: before });
+      throw cause;
+    }
+  };
+  const selectAccount = async (id: string | null) => {
+    if (projectId) {
+      await saveProject(() =>
+        updateProjectPreferences(projectId, {
+          agentAccounts: {
+            ...project?.preferences?.agentAccounts,
+            [agentId]: id ?? CLI_ACCOUNT_ID,
+          },
+        }),
+      );
+    } else await setActiveAgentProfile(agentId, id);
+  };
   const accountData = useAgentAccountsStore((state) => state.agents[agentId]);
   const view = accountData?.view;
   const loading = accountData?.loading ?? true;
@@ -305,28 +368,93 @@ export function AgentAccounts({
         <KeyRound size={15} />
         Scan Local Models & Keys
       </Button>
+      {project && (
+        <Select
+          aria-label={`${agentName} project account`}
+          value={project.preferences?.agentAccounts?.[agentId] ?? 'inherit'}
+          disabled={locked}
+          onValueChange={(id) =>
+            void action('selection', async () => {
+              if (id === 'inherit') {
+                await saveProject(() => {
+                  const agentAccounts = { ...project.preferences?.agentAccounts };
+                  delete agentAccounts[agentId];
+                  updateProjectPreferences(project.id, { agentAccounts });
+                });
+              } else await selectAccount(profileId(id));
+            })
+          }
+        >
+          <SelectItem value="inherit">Automatic · enabled accounts</SelectItem>
+          {accountProfiles(view, statuses).map((profile) => (
+            <SelectItem
+              key={profile.id}
+              value={profile.id}
+              disabled={
+                config.disabledAccounts[agentId]?.includes(profile.id) ||
+                project.preferences?.disabledAccounts?.[agentId]?.includes(profile.id)
+              }
+            >
+              {profile.name}
+            </SelectItem>
+          ))}
+        </Select>
+      )}
       <ul className="agent-accounts-list">
         {accountProfiles(view, statuses).map((profile) => {
           const status = statuses[profile.id];
           const existing = profile.id === CLI_ACCOUNT_ID;
-          const active = profileId(profile.id) === view.activeId;
+          const active = projectId
+            ? profile.id === project?.preferences?.agentAccounts?.[agentId]
+            : profileId(profile.id) === view.activeId;
+          const appEnabled = !config.disabledAccounts[agentId]?.includes(profile.id);
+          const enabled =
+            appEnabled && !project?.preferences?.disabledAccounts?.[agentId]?.includes(profile.id);
           return (
             <li key={profile.id} className="agent-accounts-row">
-              <button
-                type="button"
-                className="agent-account-select"
-                aria-pressed={active}
-                aria-label={`Use ${profile.name} for new ${agentName} tasks`}
-                disabled={locked}
-                onClick={() =>
-                  void action(profile.id, async () => {
-                    await setActiveAgentProfile(agentId, profileId(profile.id));
-                    await load();
-                  })
-                }
-              >
-                {active ? <Check size={18} /> : <Circle size={18} />}
-              </button>
+              {!project && (
+                <button
+                  type="button"
+                  className="agent-account-select"
+                  aria-pressed={active}
+                  aria-label={`Use ${profile.name} for new ${agentName} tasks`}
+                  disabled={locked || !enabled}
+                  onClick={() =>
+                    void action(profile.id, async () => {
+                      await selectAccount(profileId(profile.id));
+                      await load();
+                    })
+                  }
+                >
+                  {active ? <Check size={18} /> : <Circle size={18} />}
+                </button>
+              )}
+              {project && (
+                <div className="flex items-center gap-2">
+                  <Switch
+                    label={`Allow ${agentName} account ${profile.name} for ${project.name}`}
+                    checked={enabled}
+                    disabled={locked || !appEnabled}
+                    onCheckedChange={(checked) =>
+                      void action(profile.id, () =>
+                        saveProject(() => {
+                          const blocked = project.preferences?.disabledAccounts ?? {};
+                          const ids = blocked[agentId] ?? [];
+                          updateProjectPreferences(project.id, {
+                            disabledAccounts: {
+                              ...blocked,
+                              [agentId]: checked
+                                ? ids.filter((id) => id !== profile.id)
+                                : [...new Set([...ids, profile.id])],
+                            },
+                          });
+                        }),
+                      )
+                    }
+                  />
+                  <span>{enabled ? 'Allowed' : 'Blocked'}</span>
+                </div>
+              )}
               <div className="agent-account-identity">
                 <div className="flex flex-wrap items-center gap-2">
                   <strong>{profile.name}</strong>
@@ -443,6 +571,7 @@ export function AgentAccounts({
       {editing && (
         <EditAccount
           profile={editing}
+          agentId={agentId}
           onClose={() => setEditing(undefined)}
           onSave={async (name, group, tag) => {
             await renameAgentProfile(agentId, profileId(editing.id), name);
@@ -467,7 +596,7 @@ export function AgentAccounts({
             }
             pendingProfile.current = null;
             setName('');
-            if (useForTasks) await setActiveAgentProfile(agentId, signIn.id);
+            if (useForTasks) await selectAccount(signIn.id);
             await load();
           }}
         />
@@ -482,7 +611,7 @@ export function AgentAccounts({
             returnFocus={signInOpener.current}
             onClose={closeSignIn}
             onUse={async () => {
-              await setActiveAgentProfile(agentId, signIn.id);
+              await selectAccount(signIn.id);
               await load();
             }}
             onStatus={(status) => {

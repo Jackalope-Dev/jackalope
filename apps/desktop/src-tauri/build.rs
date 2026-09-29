@@ -4,7 +4,7 @@ fn main() {
     let metadata = std::fs::read_to_string(package.join("package.json"))
         .expect("Run pnpm install --frozen-lockfile before building Jackalope");
     assert!(
-        metadata.contains("\"version\": \"0.37.1\""),
+        metadata.contains("\"version\": \"0.38.1\""),
         "Unexpected agent-browser version"
     );
     let target = std::env::var("TARGET").unwrap();

@@ -1,6 +1,6 @@
 use super::tasks::TaskRuntime;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
-use tauri_plugin_shell::ShellExt;
+use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
 pub async fn task_open_editor(
@@ -20,9 +20,8 @@ pub async fn task_open_editor(
     let workspace = dunce::canonicalize(run.workspace).map_err(|e| e.to_string())?;
     let mut url = reqwest::Url::parse(&format!("{editor}://file/")).map_err(|e| e.to_string())?;
     url.set_path(&workspace.to_string_lossy().replace('\\', "/"));
-    #[allow(deprecated)]
-    app.shell()
-        .open(url.as_str(), None)
+    app.opener()
+        .open_url(url.as_str(), None::<&str>)
         .map_err(|e| format!("Could not open the editor. Check that it is installed: {e}"))
 }
 
