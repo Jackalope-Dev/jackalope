@@ -75,7 +75,7 @@ have no update service configured.
 
 ## Keeping Jackalope up to date
 
-Published builds check for updates after startup and every six hours while open.
+Published builds check for updates after startup and every hour while open.
 Open **Settings → Updates & support** to change automatic checking or check now.
 When an update is available, use **Review update** to read the release notes.
 **Later** dismisses the notice for the current session; the update remains in

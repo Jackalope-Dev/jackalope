@@ -319,7 +319,7 @@ the public feed with rehearsal versions.
 7. After each failed attempt, verify the installed version and existing data,
    restore the trial feed, and retry. Record which failures require reopening.
 
-Current automatic checks are throttled to six hours, run while the workspace is
+Current automatic checks are throttled to one hour, run while the workspace is
 visible, and catch up on return. A failed check does not retry continuously; use
 manual Check for updates during a trial. Download begins only after Install.
 Local builds without key/feed cannot participate. First-version users must receive
