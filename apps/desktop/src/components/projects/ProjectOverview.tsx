@@ -226,11 +226,17 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                 }
                 value={
                   <span className="project-stat-value-text">
-                    {readiness?.branch || project.gitBranch || 'Default branch'}
+                    {project.plainFolder
+                      ? 'No Git'
+                      : readiness?.branch || project.gitBranch || 'Default branch'}
                   </span>
                 }
                 description={
-                  !readiness ? (
+                  project.plainFolder ? (
+                    <span className="project-stat-desc">
+                      Tasks run in this folder. Use Git to give each task its own worktree.
+                    </span>
+                  ) : !readiness ? (
                     <span className="project-stat-desc">
                       {busyReadiness ? 'Checking repository…' : 'Repository status unavailable'}
                     </span>
@@ -244,7 +250,9 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                 }
               />
               <div className="project-stat-footer">
-                {readiness?.head ? (
+                {project.plainFolder ? (
+                  <span>Not a Git repository</span>
+                ) : readiness?.head ? (
                   <span className="font-mono">commit {readiness.head.slice(0, 7)}</span>
                 ) : (
                   <span>{readiness ? 'Repository tracked' : 'Status not yet verified'}</span>

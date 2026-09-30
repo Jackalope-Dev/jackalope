@@ -132,7 +132,7 @@ export function OnboardingProjectStep({
               <InlineNotice tone="error">{directoryError}</InlineNotice>
             )}
             <p className="onboarding-note">
-              Creates a new folder with Git ready for your first task.
+              Creates a new folder for your first task, with Git when it is installed.
             </p>
           </>
         ) : (

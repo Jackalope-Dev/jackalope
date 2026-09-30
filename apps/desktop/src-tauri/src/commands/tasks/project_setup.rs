@@ -40,6 +40,19 @@ fn validate_name(name: &str) -> Result<&str, String> {
     Ok(name)
 }
 
+// Newer Git for Windows fails `access("NUL")` with EINVAL and aborts, while a
+// missing global config file is silently skipped on every platform.
+fn isolated_global_config() -> PathBuf {
+    if cfg!(windows) {
+        std::env::temp_dir().join(format!(
+            "jackalope-no-global-config-{}",
+            uuid::Uuid::new_v4()
+        ))
+    } else {
+        PathBuf::from("/dev/null")
+    }
+}
+
 fn git(path: &Path, args: &[&str]) -> Result<String, String> {
     let output = command(path, args, Policy::Isolated)
         .env_remove("GIT_COMMON_DIR")
@@ -49,10 +62,7 @@ fn git(path: &Path, args: &[&str]) -> Result<String, String> {
         .env_remove("GIT_NAMESPACE")
         .env("GIT_CONFIG_COUNT", "0")
         .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env(
-            "GIT_CONFIG_GLOBAL",
-            if cfg!(windows) { "NUL" } else { "/dev/null" },
-        )
+        .env("GIT_CONFIG_GLOBAL", isolated_global_config())
         .env("GIT_AUTHOR_NAME", "Jackalope")
         .env("GIT_AUTHOR_EMAIL", "jackalope@localhost")
         .env("GIT_COMMITTER_NAME", "Jackalope")
@@ -71,7 +81,6 @@ fn create_project(parent: &Path, name: &str) -> Result<ProjectInfo, String> {
     let parent = parent
         .canonicalize()
         .map_err(|_| "Choose an existing parent folder.".to_string())?;
-    git(&parent, &["--version"])?;
     let path = parent.join(name);
     std::fs::create_dir(&path).map_err(|error| {
         if error.kind() == std::io::ErrorKind::AlreadyExists {
@@ -89,16 +98,22 @@ fn create_project(parent: &Path, name: &str) -> Result<ProjectInfo, String> {
         git(&path, &["update-ref", "refs/heads/main", &commit])?;
         Ok(())
     };
-    initialize().map_err(|error| {
-        format!(
-            "Could not initialize Git: {error} The new folder was kept at {}.",
-            path.display()
-        )
-    })?;
+    // Without Git the project is a plain folder that tasks run in directly, as they
+    // do for any existing non-repository folder. The folder is new, so a partial
+    // `.git` left by a failed initialization is ours to remove.
+    let repository = git(&parent, &["--version"]).is_ok()
+        && initialize()
+            .map_err(|_| std::fs::remove_dir_all(path.join(".git")))
+            .is_ok();
     Ok(ProjectInfo {
         path: path.to_string_lossy().into_owned(),
         name: name.into(),
-        branch: "main".into(),
+        branch: if repository {
+            "main".into()
+        } else {
+            String::new()
+        },
+        repository,
     })
 }
 
@@ -137,6 +152,7 @@ mod tests {
         let info = create_project(&parent, "My new project").unwrap();
         let path = Path::new(&info.path);
         assert_eq!(info.branch, "main");
+        assert!(info.repository);
         assert_eq!(git(path, &["status", "--porcelain"]).unwrap(), "");
         assert_eq!(git(path, &["ls-tree", "HEAD"]).unwrap(), "");
         assert_eq!(git(path, &["rev-list", "--count", "HEAD"]).unwrap(), "1");

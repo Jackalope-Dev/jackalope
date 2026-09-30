@@ -69,7 +69,7 @@ function useSwitchTargets(checkout: string) {
     seen.add(project.path);
     targets.push({
       key: project.path,
-      branch: project.gitBranch || 'Branch unknown',
+      branch: project.plainFolder ? 'No Git' : project.gitBranch || 'Branch unknown',
       label: 'Project checkout',
       open: () => {
         useExecutionStore.getState().select(null);
@@ -106,10 +106,13 @@ export function BranchIndicator() {
   const targets = useSwitchTargets(checkout);
   if (!project || host) return null;
   const branch = run
-    ? run.branch || (run.workspace ? 'Branch unknown' : 'Preparing workspace')
+    ? run.branch ||
+      (!run.workspace ? 'Preparing workspace' : project.plainFolder ? 'No Git' : 'Branch unknown')
     : managed
       ? 'Plan workspaces'
-      : project.gitBranch || 'Branch unknown';
+      : project.plainFolder
+        ? 'No Git'
+        : project.gitBranch || 'Branch unknown';
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
