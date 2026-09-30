@@ -38,5 +38,10 @@ test('the terminal command is exposed as a console execution alias', () => {
   // A console execution alias is only valid when the application allows multiple instances.
   assert.match(manifest, /<Application [^>]*desktop4:SupportsMultipleInstances="true"/);
   assert.match(manifest, /<uap5:ExecutionAlias Alias="jackalope.exe" \/>/);
-  assert.match(manifest, /IgnorableNamespaces="uap uap5 uap10 desktop4 rescap"/);
+  // Launch at login uses this task id from window_behavior.rs; it stays off until the user opts in.
+  assert.match(
+    manifest,
+    /<desktop:StartupTask TaskId="JackalopeStartup" Enabled="false" DisplayName="Jackalope" \/>/,
+  );
+  assert.match(manifest, /IgnorableNamespaces="uap uap5 uap10 desktop desktop4 rescap"/);
 });
