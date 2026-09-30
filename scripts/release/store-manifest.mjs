@@ -46,7 +46,7 @@ export function storeManifest({ name, publisher, publisherDisplayName, version }
  <Properties><DisplayName>Jackalope</DisplayName><PublisherDisplayName>${xml(publisherDisplayName)}</PublisherDisplayName><Description>A workspace for your projects and coding agents.</Description><Logo>Assets/StoreLogo.png</Logo></Properties>
  <Resources><Resource Language="en-US" /></Resources>
  <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.22621.0" /></Dependencies>
- <Applications><Application Id="Jackalope" Executable="jackalope-desktop.exe" uap10:RuntimeBehavior="packagedClassicApp" uap10:TrustLevel="mediumIL">
+ <Applications><Application Id="Jackalope" Executable="jackalope-desktop.exe" uap10:RuntimeBehavior="packagedClassicApp" uap10:TrustLevel="mediumIL" desktop4:SupportsMultipleInstances="true">
   <uap:VisualElements DisplayName="Jackalope" Description="A workspace for your projects and coding agents." Square150x150Logo="Assets/Square150x150Logo.png" Square44x44Logo="Assets/Square44x44Logo.png" BackgroundColor="transparent" />
   <Extensions><uap5:Extension Category="windows.appExecutionAlias" Executable="jackalope.exe" EntryPoint="Windows.FullTrustApplication"><uap5:AppExecutionAlias desktop4:Subsystem="console"><uap5:ExecutionAlias Alias="jackalope.exe" /></uap5:AppExecutionAlias></uap5:Extension></Extensions>
  </Application></Applications>
