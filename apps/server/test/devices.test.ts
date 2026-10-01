@@ -3,6 +3,7 @@ import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, expect, it } from 'vitest';
 import { randomToken, tokenHash } from '../src/access/crypto';
 import { pruneAccess } from '../src/access/service';
+import { adminRoutes } from '../src/admin';
 import worker from '../src/index';
 
 const bindings: Env = {
@@ -24,6 +25,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   for (const name of [
+    'access_beta_requests',
     'access_device_links',
     'access_devices',
     'access_sessions',
@@ -697,4 +699,64 @@ it('counts one device slot per machine however often that machine reconnects', a
     (await call('/v1/desktop/start', 'POST', { challenge: randomToken(), deviceKey: 'not-a-key' }))
       .status,
   ).toBe(400);
+});
+it('tracks one pending beta flight request per account through operator resolution', async () => {
+  const owner = await member();
+  const secret = await connectedDevice(owner);
+  expect((await call('/v1/desktop/beta', 'GET')).status).toBe(401);
+  expect(await (await call('/v1/desktop/beta', 'GET', undefined, secret)).json()).toEqual({
+    request: null,
+  });
+  expect(
+    (await call('/v1/desktop/beta', 'POST', { kind: 'join', storeEmail: 'not-an-email' }, secret))
+      .status,
+  ).toBe(400);
+  await call(
+    '/v1/desktop/beta',
+    'POST',
+    { kind: 'join', storeEmail: 'first@example.invalid', appVersion: '0.1.13' },
+    secret,
+  );
+  const joined = await call(
+    '/v1/desktop/beta',
+    'POST',
+    { kind: 'join', storeEmail: ' Store@Example.invalid ', appVersion: '0.1.13' },
+    secret,
+  );
+  expect(await joined.json()).toMatchObject({
+    request: { kind: 'join', storeEmail: 'store@example.invalid', status: 'pending' },
+  });
+  const admin = (path: string, init?: RequestInit) =>
+    adminRoutes(new Request(`https://api.jackalope.dev${path}`, init), bindings, (request) =>
+      request.json(),
+    );
+  const { requests } = await (await admin('/admin/api/beta')).json<{
+    requests: { id: string; storeEmail: string; email: string }[];
+  }>();
+  expect(requests).toEqual([
+    expect.objectContaining({
+      storeEmail: 'store@example.invalid',
+      email: `${owner.id}@example.invalid`,
+    }),
+  ]);
+  const resolve = (status: string) =>
+    admin('/admin/api/beta', {
+      method: 'POST',
+      headers: { origin: 'https://api.jackalope.dev', 'content-type': 'application/json' },
+      body: JSON.stringify({ id: requests[0]?.id, status }),
+    });
+  expect(await (await resolve('done')).json()).toEqual({ updated: true });
+  expect(await (await resolve('declined')).json()).toEqual({ updated: false });
+  expect(await (await call('/v1/desktop/beta', 'GET', undefined, secret)).json()).toMatchObject({
+    request: { kind: 'join', status: 'done', resolvedAt: expect.any(Number) },
+  });
+  expect((await call('/v1/desktop/beta', 'DELETE', undefined, secret)).status).toBe(409);
+  await call(
+    '/v1/desktop/beta',
+    'POST',
+    { kind: 'leave', storeEmail: 'store@example.invalid' },
+    secret,
+  );
+  const withdrawn = await call('/v1/desktop/beta', 'DELETE', undefined, secret);
+  expect(await withdrawn.json()).toMatchObject({ request: { kind: 'join', status: 'done' } });
 });

@@ -3,9 +3,11 @@ import { useEffect, useId } from 'react';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
+import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
+import { BetaProgram } from './BetaProgram';
 import { ReleaseNotes } from './ReleaseNotes';
 
 export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }) {
@@ -30,7 +32,12 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
   return (
     <section className="space-y-3" aria-label="App updates">
       {showHeading && <h3 className="text-base font-medium">App updates</h3>}
-      {release && <p className="settings-row-description">Version {release.currentVersion}</p>}
+      {release && (
+        <p className="settings-row-description flex items-center gap-2">
+          Version {release.currentVersion}
+          {release.channel === 'beta' && <Badge variant="accent">Beta</Badge>}
+        </p>
+      )}
       {(!desktop || !release || release.storeManaged || !release.configured) && (
         <p className="settings-row-description">
           {!desktop
@@ -65,6 +72,9 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
             </p>
           )}
         </div>
+      )}
+      {release?.configured && release.storeManaged && (
+        <BetaProgram onBeta={release.channel === 'beta'} />
       )}
       {release?.configured && (
         <>

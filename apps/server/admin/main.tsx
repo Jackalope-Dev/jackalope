@@ -1,10 +1,18 @@
 import '@jackalope/brand/fonts.css';
 import { characterMarkViewBox, characterPaths } from '@jackalope/brand/character';
 import { Button, ErrorState, ExternalLinkIcon, FeedbackIcon, MailIcon } from '@jackalope/ui';
-import { Activity, ChartNoAxesColumn, LayoutDashboard, Users, Wrench } from 'lucide-react';
+import {
+  Activity,
+  ChartNoAxesColumn,
+  FlaskConical,
+  LayoutDashboard,
+  Users,
+  Wrench,
+} from 'lucide-react';
 import { Component, type ReactNode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Audience, People, Setup } from './Access';
+import { BetaRequests } from './Beta';
 import { Dashboard, Feedback, Usage } from './Dashboard';
 import { Notes } from './Notes';
 import './admin.css';
@@ -14,6 +22,7 @@ const navigation = [
   ['people', '/admin/access#people', 'People', Users],
   ['activity', '/admin#activity', 'Usage & releases', Activity],
   ['feedback', '/admin#feedback', 'Feedback', FeedbackIcon],
+  ['beta', '/admin#beta', 'Beta requests', FlaskConical],
   ['insights', '/admin/access#insights', 'Audience insights', ChartNoAxesColumn],
   ['notes', '/admin/access#notes', 'Product notes', MailIcon],
   ['setup', '/admin/access#setup', 'Service setup', Wrench],
@@ -54,6 +63,7 @@ function App() {
     people: <People search={peopleSearch} />,
     activity: <Usage />,
     feedback: <Feedback />,
+    beta: <BetaRequests />,
     insights: <Audience />,
     notes: <Notes />,
     setup: <Setup />,

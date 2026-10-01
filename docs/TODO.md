@@ -271,6 +271,10 @@ release dates.
 - [ ] Validate required account access in development and release builds, including
   reconnect, revocation, offline expiry and saved-work recovery.
 
+- [ ] Deploy migration `0018_beta_requests.sql` and validate Store beta requests:
+  join, withdraw and leave from an installed Store build, admin copy/mark-done, and
+  the Beta badge after a flight update reaches a member's Store account.
+
 - [ ] Deploy migration `0017_device_machine.sql` and validate per-machine device
   slots: desktop connections send a hashed machine key, and the ten-device limit
   counts distinct machines, so profiles, resets and reinstalls on one computer

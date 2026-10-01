@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { latestBetaRequest, requestBeta, withdrawBeta } from './beta';
 import { randomToken, tokenHash } from './crypto';
 import { memberFeedback } from './feedback';
 import { AccessError, invitations, type Member, tokenSchema } from './service';
@@ -198,6 +199,16 @@ export async function deviceRoutes(
       const member = await deviceMember(env, hash, now);
       if (!member) throw new AccessError(401, 'device_sign_in_required');
       return json(await memberFeedback(env, member.memberId, await readJson(request), now));
+    }
+    if (url.pathname === '/v1/desktop/beta') {
+      const member = await deviceMember(env, hash, now);
+      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      if (request.method === 'GET')
+        return json({ request: await latestBetaRequest(env, member.memberId) });
+      if (request.method === 'POST')
+        return json(await requestBeta(env, member.memberId, await readJson(request), now));
+      if (request.method === 'DELETE') return json(await withdrawBeta(env, member.memberId, now));
+      throw new AccessError(404, 'not_found');
     }
     if (request.method === 'DELETE' && url.pathname === '/v1/desktop/session') {
       await env.DB.batch([

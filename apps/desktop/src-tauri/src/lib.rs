@@ -305,6 +305,7 @@ pub fn run(launch: Launch) {
             commands::community::app_release_channel,
             commands::community::app_telemetry,
             commands::community::app_submit_feedback,
+            commands::account::beta::app_account_beta,
             commands::account::feedback::app_account_feedback,
             commands::release::app_release_status,
             commands::release::app_install_update,

@@ -141,6 +141,17 @@ fixture, unpackaged executable or local rehearsal is not a live Store update tes
 The Store chooses eligible packages by account/flight membership; the in-app Cloud
 channel selector is not available in Store builds.
 
+Store builds show a **Beta** badge on the App updates version line and in the
+What's new dialog when they were built for the beta channel. Approved accounts can
+request to join or leave the beta flight from App updates by entering the Microsoft
+account they use in the Store app. Requests (`0018_beta_requests.sql`) appear under
+**Beta requests** in the admin console, where pending emails can be copied for the
+Partner Center flight group. The operator adds or removes the account there, then
+marks the request done; the app then reports that the next Store update changes
+channel. One pending request per account is kept, and members can withdraw it.
+Leaving the beta does not downgrade: the account receives the next stable package
+whose version is newer than its installed beta.
+
 On a disposable Windows user/profile, install the older published Store package,
 connect an approved account, execute a real task, save work and restart. After the
 newer flight is certified and available to that Microsoft account, check from the

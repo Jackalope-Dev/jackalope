@@ -7,6 +7,7 @@ use std::{path::PathBuf, time::Duration};
 use tauri::Manager;
 use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
+pub mod beta;
 pub mod feedback;
 pub mod settings_sync;
 mod waitlist;
