@@ -1,4 +1,3 @@
-import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { FormField, Input, RefreshIcon } from '@jackalope/ui';
 import {
   ArrowLeft,
@@ -10,11 +9,9 @@ import {
   Terminal,
   Trash2,
 } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useAgentGaze } from '../../hooks/useAgentGaze';
 import { builtinAgents } from '../../lib/agent-catalog';
-import { agentProvider } from '../../lib/agent-provider';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -24,12 +21,12 @@ import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
 import { AgentAccounts } from './AgentAccounts';
-import { AgentAvatar } from './AgentAvatar';
 import { AgentInstallGuide } from './AgentInstallGuide';
 import { AgentModels } from './AgentModels';
 import { AgentSupport } from './AgentSupport';
 import { LocalAiSetup } from './LocalAiSetup';
 import { ManagedRuntimeSettings } from './ManagedRuntimeSettings';
+import { ProviderMark } from './ProviderMark';
 import './agents-workspace.css';
 import './agent-manager.css';
 
@@ -85,9 +82,6 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
         : !selectedRunner?.available
           ? `${selected?.name} is not available on this computer yet.`
           : undefined;
-
-  const mascotRef = useRef<HTMLDivElement>(null);
-  const gaze = useAgentGaze(mascotRef);
 
   const save = async () => {
     setBusy(true);
@@ -167,7 +161,7 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
                           setSaved(false);
                         }}
                       >
-                        <AgentAvatar provider={agent.id} size="xs" />
+                        <ProviderMark provider={agent.id} size={18} />
                         <span className="agent-switcher-name">{agent.name}</span>
                         {appOnly && <span className="agent-switcher-note">App only</span>}
                         {isAgentDef && <Star size={12} aria-hidden="true" />}
@@ -189,10 +183,10 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
           : 'App-wide agent settings'}
       </p>
 
-      {/* Hero Header: Interactive Animated Mascot + Agent Profile */}
-      <div className="agent-hero-card" ref={mascotRef}>
+      {/* Agents show their product mark; animated characters belong to bots and activity. */}
+      <div className="agent-hero-card">
         <div className="agent-hero-mascot" aria-hidden="true">
-          <AgentCharacter provider={agentProvider(selected?.id ?? 'auto')} gaze={gaze} />
+          <ProviderMark provider={selected?.id ?? 'auto'} size={56} />
         </div>
 
         <div className="agent-hero-info">
