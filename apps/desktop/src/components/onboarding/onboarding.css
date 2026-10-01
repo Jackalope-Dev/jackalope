@@ -61,8 +61,8 @@
   font-size: var(--text-xs);
 }
 [aria-current] > .onboarding-step-number {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  background: var(--color-action);
+  color: var(--color-on-action);
 }
 .onboarding-steps strong {
   font-size: var(--text-sm);
@@ -389,8 +389,8 @@
   flex-direction: column;
   height: 100dvh;
   overflow: auto;
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  background: var(--color-action);
+  color: var(--color-on-action);
 }
 .workspace-transition-content {
   display: flex;
@@ -449,8 +449,8 @@
   margin-top: 8px;
 }
 .workspace-transition-actions button {
-  background: var(--color-on-accent);
-  color: var(--color-accent);
+  background: var(--color-on-action);
+  color: var(--color-action);
 }
 .workspace-transition-actions button:last-child {
   color: inherit;
@@ -459,7 +459,7 @@
   text-underline-offset: 4px;
 }
 .workspace-transition :focus-visible {
-  outline: 2px solid var(--color-on-accent);
+  outline: 2px solid var(--color-on-action);
   outline-offset: 4px;
 }
 .workspace-transition .app-titlebar,
