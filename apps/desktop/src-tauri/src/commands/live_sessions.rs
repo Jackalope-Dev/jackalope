@@ -104,8 +104,8 @@ impl SessionPersona {
         if name.is_empty() || name.chars().count() > 60 || name.chars().any(char::is_control) {
             return Err("Use a bot name up to 60 characters.".into());
         }
-        if self.instructions.len() > 6_000 {
-            return Err("Keep bot instructions under 6,000 bytes.".into());
+        if self.instructions.chars().count() > 6_000 {
+            return Err("Keep bot instructions under 6,000 characters.".into());
         }
         Ok(())
     }

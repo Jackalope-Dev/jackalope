@@ -1,5 +1,18 @@
 [
   {
+    "id": "customizable-bots-and-clearer-agent-picker",
+    "date": "2026-10-01",
+    "status": "In development",
+    "title": "Customizable bots and a clearer agent picker",
+    "description": "Give each bot its own look, and pick agents by their familiar product icons.",
+    "items": [
+      "Choose a bot's character style with the arrows and pick its colour, with a live animated preview",
+      "Agents and the agent picker show each provider's product icon",
+      "Models in the agent picker look and feel clickable, with a clear selected state",
+      "More themes use white text on buttons while keeping strong contrast"
+    ]
+  },
+  {
     "id": "agents-coordinate-as-a-swarm",
     "date": "2026-10-01",
     "status": "In development",

@@ -24,6 +24,36 @@ export interface Bot {
   pinned: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Chosen look; bots saved before this existed draw their agent's character in the text colour. */
+  appearance?: BotAppearance;
+}
+
+/** Character silhouettes a bot can wear, shared with the agent characters. */
+export const BOT_STYLES = [
+  { id: 'codex', name: 'Antlers' },
+  { id: 'claude', name: 'Starburst' },
+  { id: 'grok', name: 'Orbit' },
+  { id: 'antigravity', name: 'Peak' },
+  { id: 'opencode', name: 'Octagon' },
+  { id: 'kimi', name: 'Crescent' },
+] as const;
+
+/** Saturated mid-tones that keep the character's surface-coloured eyes visible in both themes. */
+export const BOT_COLORS = [
+  { id: 'ink', name: 'Ink', value: 'var(--color-text-primary)' },
+  { id: 'accent', name: 'Theme', value: 'var(--color-accent)' },
+  { id: 'coral', name: 'Coral', value: '#f2665c' },
+  { id: 'amber', name: 'Amber', value: '#e9a23b' },
+  { id: 'green', name: 'Green', value: '#2fb37f' },
+  { id: 'teal', name: 'Teal', value: '#1fa7bd' },
+  { id: 'blue', name: 'Blue', value: '#4c86f0' },
+  { id: 'violet', name: 'Violet', value: '#8b6cf6' },
+  { id: 'pink', name: 'Pink', value: '#e05297' },
+] as const;
+
+export interface BotAppearance {
+  style: (typeof BOT_STYLES)[number]['id'];
+  color: (typeof BOT_COLORS)[number]['id'];
 }
 
 export type BotDraft = Omit<Bot, 'id' | 'routineIds' | 'pinned' | 'createdAt' | 'updatedAt'>;
@@ -36,8 +66,8 @@ export function validateBot(draft: BotDraft) {
   if (!name) return 'Give the bot a name.';
   if ([...name].length > BOT_NAME_MAX) return `Keep the name under ${BOT_NAME_MAX} characters.`;
   if (!draft.projectId) return 'Choose the project this bot works in.';
-  if (new TextEncoder().encode(draft.instructions.trim()).length > BOT_INSTRUCTIONS_MAX)
-    return 'Shorten the instructions to under 6,000 bytes.';
+  if ([...draft.instructions.trim()].length > BOT_INSTRUCTIONS_MAX)
+    return `Shorten the instructions to under ${BOT_INSTRUCTIONS_MAX.toLocaleString()} characters.`;
   return '';
 }
 

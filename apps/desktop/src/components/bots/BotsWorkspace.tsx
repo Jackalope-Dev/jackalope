@@ -1,4 +1,3 @@
-import { AgentCharacter } from '@jackalope/brand/agent-character';
 import {
   Badge,
   ConfirmDialog,
@@ -18,6 +17,7 @@ import { nativeTask, type RunRequest } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import {
+  BOT_STYLES,
   type Bot,
   type BotDraft,
   rosterOrder,
@@ -34,6 +34,7 @@ import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
+import { BotAvatar } from './BotAvatar';
 import { BotEditor } from './BotEditor';
 import './bots.css';
 
@@ -53,6 +54,10 @@ function blankDraft(projectId: string, template?: BotTemplate): BotDraft {
     model: null,
     projectId,
     connectionIds: null,
+    appearance: {
+      style: BOT_STYLES[Math.floor(Math.random() * BOT_STYLES.length)].id,
+      color: 'accent',
+    },
   };
 }
 
@@ -151,9 +156,7 @@ export function BotsWorkspace() {
                     aria-current={bot.id === selected?.id ? 'true' : undefined}
                     onClick={() => useBotStore.getState().select(bot.id)}
                   >
-                    <span className="bots-avatar" aria-hidden="true">
-                      <AgentCharacter provider={bot.agent} />
-                    </span>
+                    <BotAvatar appearance={bot.appearance} agent={bot.agent} />
                     <span className="bots-roster-copy">
                       <strong>
                         {bot.name}
@@ -230,9 +233,7 @@ function BotTemplates({
       <ul className="bots-templates">
         {BOT_TEMPLATES.map((template) => (
           <li key={template.id} className="bots-template">
-            <span className="bots-avatar" aria-hidden="true">
-              <AgentCharacter provider="auto" />
-            </span>
+            <BotAvatar />
             <div>
               <strong>{template.name}</strong>
               <p>{template.role}</p>
@@ -358,9 +359,7 @@ function BotProfile({
   return (
     <section className="bots-profile" aria-label={bot.name}>
       <header className="bots-profile-header">
-        <span className="bots-avatar bots-avatar-large" aria-hidden="true">
-          <AgentCharacter provider={bot.agent} />
-        </span>
+        <BotAvatar appearance={bot.appearance} agent={bot.agent} size="lg" />
         <div className="bots-profile-identity">
           <h2>{bot.name}</h2>
           {bot.role && <p>{bot.role}</p>}

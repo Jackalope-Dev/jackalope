@@ -16,6 +16,7 @@ import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
+import { BotAppearancePicker } from './BotAppearancePicker';
 
 /** Creates or edits a bot. Saving changes defaults for new conversations only. */
 export function BotEditor({
@@ -39,7 +40,7 @@ export function BotEditor({
   }, [draft.projectId]);
   const connections = effectiveConnections(servers, draft.projectId);
   const patch = (next: Partial<BotDraft>) => setDraft((current) => ({ ...current, ...next }));
-  const bytes = new TextEncoder().encode(draft.instructions).length;
+  const characters = [...draft.instructions].length;
   return (
     <Dialog.Root open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="bot-editor" contained>
@@ -65,6 +66,11 @@ export function BotEditor({
             }
           }}
         >
+          <BotAppearancePicker
+            appearance={draft.appearance}
+            agent={draft.agent}
+            onChange={(appearance) => patch({ appearance })}
+          />
           <div className="bot-editor-row">
             <FormField label="Name">
               <Input
@@ -118,7 +124,7 @@ export function BotEditor({
           </div>
           <FormField
             label="Instructions"
-            description={`Repeated to the agent with every message in this bot’s conversations. ${bytes.toLocaleString()} of ${BOT_INSTRUCTIONS_MAX.toLocaleString()} bytes.`}
+            description={`Repeated to the agent with every message in this bot’s conversations. ${characters.toLocaleString()} of ${BOT_INSTRUCTIONS_MAX.toLocaleString()} characters.`}
           >
             <Textarea
               rows={7}
