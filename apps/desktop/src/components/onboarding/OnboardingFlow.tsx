@@ -304,7 +304,7 @@ export function OnboardingFlow({
           <JackalopeMascot
             size="md"
             className="w-fit"
-            bubbleAlign="start"
+            speechSide="right"
             overrideMood={working && !nodding ? 'thinking' : 'idle'}
             nodding={nodding}
             onNodComplete={completeNod}
