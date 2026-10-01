@@ -73,10 +73,7 @@ export function ProjectPreferences({
                   Edit appearance
                 </Button>
               </Setting>
-              <Setting
-                title="Agents and accounts"
-                description="Choose project defaults and available accounts."
-              >
+              <Setting title="Agents and accounts">
                 <Button variant="outline" onClick={() => openProjectSettings(project.id, 'Agents')}>
                   Configure agents
                 </Button>
@@ -107,7 +104,7 @@ export function ProjectPreferences({
             <WorkspaceSectionHeading title="Task context" />
             <Setting
               title="Split work into subtasks"
-              description="For substantial requests, plan independent pieces and start them as parallel subtasks without a review step. Each subtask owns separate files, and everything comes back as one combined result to review. Requires a verification command."
+              description="Plan substantial requests as parallel subtasks that start without a review step. Requires a verification command."
             >
               <Switch
                 label="Split work into subtasks"

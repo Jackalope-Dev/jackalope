@@ -87,11 +87,7 @@ export function ProjectGitSettings({
   const dirty = JSON.stringify(policy) !== JSON.stringify(saved);
   return (
     <section className="project-preferences-section" aria-labelledby={`${id}-title`}>
-      <WorkspaceSectionHeading
-        titleId={`${id}-title`}
-        title="Commits and cleanup"
-        description="Set commit author attribution, checkpointing, and branch cleanup."
-      />
+      <WorkspaceSectionHeading titleId={`${id}-title`} title="Commits and cleanup" />
       {policy ? (
         <>
           <fieldset disabled={busy || disabled} className="grid gap-2">

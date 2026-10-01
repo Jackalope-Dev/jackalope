@@ -137,7 +137,7 @@ export function KnowledgeEditor({
                 <p className="task-muted">
                   Inputs are required before launch. Each step runs separately and pauses for your
                   evidence review before the next step. Final outcomes require review before
-                  completion or integration. They do not grant the agent new permissions.
+                  completion or integration.
                 </p>
               </>
             )}

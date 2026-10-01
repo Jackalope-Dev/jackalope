@@ -130,8 +130,7 @@ export function DecisionOptions({ projectId }: { projectId?: string }) {
         <p className="task-muted">
           These options apply while Jev is selected and connected. Optional assessments have
           separate API costs and may send repository guidance, candidate lessons, diffs, results and
-          check output to TypeSafe. Usage includes failed calls. They do not approve changes or
-          grant permissions.
+          check output to TypeSafe. Usage includes failed calls.
         </p>
         {error && (
           <InlineNotice tone="error">

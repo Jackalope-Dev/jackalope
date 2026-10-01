@@ -41,7 +41,6 @@ export function McpConfigureServer({
       <WorkspaceHeading
         title={`Configure ${marketplaceName(server)}`}
         titleRef={heading}
-        description="Review the connection and choose where it is available."
         icon={<McpServerIcon server={server} />}
         action={
           <Button variant="ghost" disabled={busy} onClick={onClose}>

@@ -65,11 +65,7 @@ export function ArtifactsProjectSettings({
   const linked = !!link?.remote;
   return (
     <section className="project-preferences-section" aria-labelledby={`${id}-title`}>
-      <WorkspaceSectionHeading
-        titleId={`${id}-title`}
-        title={<ArtifactsTitle />}
-        description="Keep this repository on Cloudflare Artifacts so agents, reviewers and automation can fork and share it."
-      />
+      <WorkspaceSectionHeading titleId={`${id}-title`} title={<ArtifactsTitle />} />
       {status && !status.connected && (
         <Setting
           title="Connect Cloudflare"

@@ -140,9 +140,7 @@ export function McpConnectionResult({
         </Button>
         <Button onClick={onDone}>Done</Button>
       </div>
-      <p className="task-muted">
-        Applies to new task attempts. Your current task and draft stay in place.
-      </p>
+      <p className="task-muted">Applies to new task attempts.</p>
     </section>
   );
 }

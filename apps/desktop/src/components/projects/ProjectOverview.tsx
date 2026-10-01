@@ -435,10 +435,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
           {/* Workspace Commands & Configuration */}
           <section className="workspace-section workspace-stack">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <WorkspaceSectionHeading
-                title="Workspace setup"
-                description="Environment readiness and automated task lifecycle commands."
-              />
+              <WorkspaceSectionHeading title="Workspace setup" />
               <Button
                 variant="ghost"
                 size="sm"
@@ -573,10 +570,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
           {/* Recent Deliveries */}
           {deliveries.length > 0 && (
             <section className="workspace-section workspace-stack">
-              <WorkspaceSectionHeading
-                title="Recent deliveries"
-                description="Completed work integrated locally into your repository."
-              />
+              <WorkspaceSectionHeading title="Recent deliveries" />
               <div className="space-y-2">
                 {deliveries.map((run) => (
                   <Panel

@@ -10,7 +10,7 @@ export function DecisionAdvice({ run }: { run: TaskRun }) {
       <DisclosureBody>
         <p className="task-muted">
           Advice from this attempt’s recorded result and bounded diff. Later edits can make it
-          stale. These assessments do not approve work or replace verification.
+          stale.
         </p>
         {advice.map((line) => (
           <p key={line}>{line}</p>

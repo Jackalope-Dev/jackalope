@@ -63,10 +63,7 @@ export function DecisionUsage({
   const summary = summarizeUsage(calls.map((entry) => entry.attempt));
   return (
     <section aria-label="Task assessment usage" className="workspace-section workspace-stack">
-      <WorkspaceSectionHeading
-        title="Task assessments"
-        description="Decision calls for the selected project and period, separate from task execution."
-      />
+      <WorkspaceSectionHeading title="Task assessments" />
       {error ? (
         <InlineNotice tone="error">{error}</InlineNotice>
       ) : loading ? (
@@ -138,8 +135,7 @@ export function DecisionUsage({
             </DisclosureBody>
           </Disclosure>
           <p className="task-muted">
-            Includes assessments that did not launch work. Reused assessments appear once. These
-            calls are separate from worker routing and execution totals.
+            Includes assessments that did not launch work. Reused assessments appear once.
           </p>
         </>
       )}

@@ -30,10 +30,7 @@ export function BrowserHarness({
   return (
     <WorkspacePage className="">
       <div>
-        <WorkspaceHeading
-          title="Evidence"
-          description="Screenshots and check results saved by tasks in this project. Open a task for the full context."
-        />
+        <WorkspaceHeading title="Evidence" />
         {error && (
           <div className="mb-5 flex flex-wrap items-center gap-3">
             <InlineNotice tone="error">Could not refresh task evidence: {error}</InlineNotice>

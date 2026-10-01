@@ -326,7 +326,7 @@ export function ArtifactsConnection() {
       <SettingGroup>
         <Setting
           title={<ArtifactsTitle />}
-          description="Git-compatible repositories built for agents. Create projects on Artifacts or move an existing repository there from Project settings."
+          description="Create projects on Artifacts, or move an existing repository there from Project settings."
         />
         {status?.connected ? (
           <Setting
@@ -372,7 +372,7 @@ export function ArtifactsConnection() {
               Jackalope Cloud <Badge>Coming soon</Badge>
             </span>
           }
-          description="Hosted Artifacts without a Cloudflare account, with shared review links and checks that run when agents push. Not available yet; connecting your own account is the supported option."
+          description="Hosted Artifacts without a Cloudflare account, with shared review links and checks that run when agents push."
         />
       </SettingGroup>
     </>

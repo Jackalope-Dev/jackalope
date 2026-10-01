@@ -319,10 +319,7 @@ export function SettingsPage({
                   </SettingGroup>
                   <WindowBehaviorSettings />
                   <SettingGroup className="mt-6">
-                    <Setting
-                      title="Companion notifications"
-                      description="All notices remain in the helper."
-                    >
+                    <Setting title="Companion notifications">
                       <Select
                         aria-label="Companion notifications"
                         value={settings.notifications}

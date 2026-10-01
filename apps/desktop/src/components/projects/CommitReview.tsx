@@ -443,7 +443,6 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     <WorkspacePage className="commit-review-page">
       <WorkspaceHeading
         title="Changes"
-        description="Review uncommitted work, choose what to include, and commit."
         action={
           <div className="workspace-actions">
             <Select value={checkout} onValueChange={choose} disabled={busy} aria-label="Checkout">

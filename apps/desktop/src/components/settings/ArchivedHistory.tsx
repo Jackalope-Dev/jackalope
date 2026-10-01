@@ -108,9 +108,6 @@ export function ArchivedHistory() {
           </Button>
         </div>
       </div>
-      <p className="settings-row-description mt-3">
-        Older reviewed tasks stay searchable and can be restored.
-      </p>
       {error && (
         <InlineNotice tone="error" className="mt-4">
           {error}

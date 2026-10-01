@@ -42,7 +42,6 @@ export function CommitHistory({ projectPath }: { projectPath: string }) {
     <section className="workspace-section workspace-stack commit-history" aria-label="History">
       <WorkspaceSectionHeading
         title="History"
-        description="Recent commits on local branches."
         action={
           <Button
             variant="ghost"
