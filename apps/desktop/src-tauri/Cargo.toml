@@ -109,9 +109,3 @@ block2 = "0.6"
 keyring = { version = "=3.6.3", features = ["sync-secret-service", "crypto-rust"] }
 notify-rust = { version = "=4.18.0", default-features = false, features = ["z-with-tokio"] }
 zbus = { version = "5", default-features = false, features = ["tokio"] }
-
-# One codegen unit with LTO trims roughly a quarter of the release binary at
-# the cost of slower release links; debug builds are unaffected.
-[profile.release]
-lto = true
-codegen-units = 1
