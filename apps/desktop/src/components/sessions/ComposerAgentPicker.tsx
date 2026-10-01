@@ -1,5 +1,5 @@
 import { Badge, Popover, Tabs } from '@jackalope/ui';
-import { Check, ChevronDown, Columns2, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, GitCompareArrows, Sparkles } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAgentModels } from '../../lib/agent-models';
@@ -7,7 +7,7 @@ import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { MAX_COMPARED_AGENTS } from '../../stores/compareStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { agentAccountFor, isAgentAllowedForProject, type Project } from '../../stores/projectStore';
-import { AgentAvatar, AgentStack } from '../agents/AgentAvatar';
+import { ProviderMark } from '../agents/ProviderMark';
 import { Button } from '../ui/button';
 import { LoadingState } from '../ui/LoadingState';
 import { Tooltip } from '../ui/Tooltip';
@@ -113,12 +113,17 @@ export function ComposerAgentPicker({
           aria-label={`Agent: ${label}`}
         >
           {comparing ? (
-            <AgentStack
-              agents={selected.map((id) => agents.find((agent) => agent.id === id)?.adapter ?? id)}
-              size="xs"
-            />
+            <span className="provider-mark-row" aria-hidden="true">
+              {selected.slice(0, 3).map((id) => (
+                <ProviderMark
+                  key={id}
+                  provider={agents.find((agent) => agent.id === id)?.adapter ?? id}
+                  size={16}
+                />
+              ))}
+            </span>
           ) : single ? (
-            <AgentAvatar provider={single.adapter} size="xs" />
+            <ProviderMark provider={single.adapter} size={16} />
           ) : (
             <Sparkles size={16} aria-hidden="true" />
           )}
@@ -146,12 +151,12 @@ export function ComposerAgentPicker({
                   selected={current === agent.id}
                   unavailable={!!agent.unavailable}
                 >
-                  <AgentAvatar provider={agent.adapter} size="xs" />
+                  <ProviderMark provider={agent.adapter} size={20} />
                 </RailItem>
               ))}
               {allowCompare && agents.length > 1 && (
                 <RailItem value="compare" label="Compare agents" selected={comparing}>
-                  <Columns2 size={18} aria-hidden="true" />
+                  <GitCompareArrows size={18} aria-hidden="true" />
                 </RailItem>
               )}
             </Tabs.List>
@@ -190,7 +195,7 @@ export function ComposerAgentPicker({
                       disabled={!checked && selected.length >= MAX_COMPARED_AGENTS}
                       onChange={(event) => toggleCompared(agent.id, event.target.checked)}
                     />
-                    <AgentAvatar provider={agent.adapter} size="xs" />
+                    <ProviderMark provider={agent.adapter} size={18} />
                     <span className="agent-picker-copy">
                       <strong>{agent.name}</strong>
                     </span>
@@ -267,7 +272,9 @@ function OptionButton({
       onClick={onSelect}
     >
       <span className="agent-picker-copy">{children}</span>
-      {selected && <Check size={16} className="agent-picker-selected" aria-hidden="true" />}
+      <span className="agent-picker-indicator" aria-hidden="true">
+        {selected && <Check size={12} strokeWidth={3} />}
+      </span>
     </button>
   );
 }

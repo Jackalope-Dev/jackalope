@@ -644,7 +644,7 @@
 .live-session-detached .live-header-native-mac {
   padding-top: 34px;
 }
-.composer-agent-trigger > span:not(.agent-avatar, .agent-stack) {
+.composer-agent-trigger > span:not(.agent-avatar, .agent-stack, .provider-mark-row) {
   max-width: 12rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -657,7 +657,8 @@
 }
 .agent-picker-body {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
+  /* The rail sizes to its icons plus any vertical scrollbar, so it never scrolls sideways. */
+  grid-template-columns: max-content minmax(0, 1fr);
   max-height: min(28rem, 70vh);
 }
 .agent-picker-rail {
@@ -665,7 +666,9 @@
   flex-direction: column;
   gap: 4px;
   padding: 8px 6px;
+  overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-width: thin;
   border-right: 1px solid var(--color-border-subtle);
   background: var(--color-surface-sunken);
 }
@@ -690,7 +693,8 @@
   color: var(--color-text-primary);
 }
 .agent-picker-rail-item[data-current] {
-  box-shadow: inset 0 0 0 1px var(--color-accent);
+  background: var(--color-accent-subtle);
+  color: var(--color-text-primary);
 }
 .agent-picker-rail-item[data-unavailable] {
   opacity: 0.45;
@@ -702,7 +706,7 @@
 .agent-picker-pane {
   display: grid;
   align-content: start;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
   padding: 8px;
   overflow-y: auto;
@@ -734,27 +738,46 @@
   width: 100%;
   min-height: 44px;
   padding: 6px 10px;
-  border: 1px solid transparent;
+  border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
-  background: transparent;
+  background: var(--color-surface);
   color: var(--color-text-primary);
   text-align: left;
   cursor: pointer;
 }
 .agent-picker-option:hover {
+  border-color: var(--color-border);
   background: var(--color-surface-hover);
 }
 .agent-picker-option[aria-pressed="true"] {
-  border-color: var(--color-border);
-  background: var(--color-surface-hover);
+  border-color: var(--color-accent-ink);
+  background: var(--color-accent-subtle);
+}
+/* An empty ring until chosen, so every option reads as selectable. */
+.agent-picker-indicator {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 50%;
+  color: var(--color-on-action);
+}
+.agent-picker-option[aria-pressed="true"] .agent-picker-indicator {
+  border-color: var(--color-action);
+  background: var(--color-action);
+}
+.provider-mark {
+  flex: none;
+}
+.provider-mark-row {
+  display: inline-flex;
+  gap: 2px;
 }
 .agent-picker-option:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: -2px;
-}
-.agent-picker-selected {
-  flex-shrink: 0;
-  color: var(--color-accent);
 }
 .agent-picker-check input {
   width: 16px;
