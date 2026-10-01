@@ -117,6 +117,18 @@ fn create_project(parent: &Path, name: &str) -> Result<ProjectInfo, String> {
     })
 }
 
+pub(crate) fn validate_project_name(name: &str) -> Result<&str, String> {
+    validate_name(name)
+}
+
+pub(crate) fn default_project_directory(app: &AppHandle) -> Result<PathBuf, String> {
+    default_directory(app)
+}
+
+pub(crate) fn create_project_folder(parent: &Path, name: &str) -> Result<ProjectInfo, String> {
+    create_project(parent, name)
+}
+
 #[tauri::command]
 pub async fn task_create_project(
     app: AppHandle,

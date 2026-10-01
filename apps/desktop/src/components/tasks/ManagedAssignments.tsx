@@ -4,6 +4,7 @@ import type { managedTaskWork } from '../../lib/managed-task';
 import { isActive, type TaskRun } from '../../lib/task-runtime';
 import { taskDecision } from '../../lib/task-workflow';
 import { Button } from '../ui/button';
+import { LiveCombination } from './LiveCombination';
 import { ManagedTaskAgent } from './ManagedTaskAgent';
 import { TaskLiveActivity } from './TaskLiveActivity';
 
@@ -20,8 +21,17 @@ export function ManagedAssignments({
   onActivity: (run: TaskRun) => void;
   onRetry: (id: string) => void;
 }) {
+  const started = work.steps.flatMap(({ item, run }) => (run ? [{ item, run }] : []));
   return (
     <div className="managed-assignments">
+      {started.length > 1 && (
+        <LiveCombination
+          projectId={started[0].item.projectId}
+          taskIds={started.map(({ run }) => run.taskId)}
+          titles={Object.fromEntries(started.map(({ item, run }) => [run.taskId, item.title]))}
+          live={started.some(({ run }) => isActive(run))}
+        />
+      )}
       {work.steps.map(({ item, run }) => (
         <Panel key={item.id} className="managed-assignment">
           <ManagedTaskAgent provider={run?.agent ?? item.agent} run={run} />

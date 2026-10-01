@@ -54,6 +54,27 @@ opaque options and URL paths/query values. They are for sharing structure, not
 reinstallation. Tool lists and checks are observations; editing or deleting a
 connection invalidates its check and discards late probe responses.
 
+## Connected apps through Composio
+
+Agents & tools → Connected apps links the person's own Composio project. The project
+key (`ak_…`) is validated by creating a Composio tool-router session for a stable
+per-installation user, then stored with the session identifiers in the profile's
+protected integration storage; the renderer only receives a key hint. The same key
+for the same profile keeps its Composio user, so existing connections survive a new
+session. A missing session is recreated for that user before a sign-in link.
+
+Saving the key writes one global, managed, on-demand connection (`composio`) whose
+HTTP header carries the key in Jackalope's protected configuration. Managed entries
+are not copied into Codex, Claude or Grok client files. Removing the key deletes that
+connection; accounts remain in the Composio project unless disconnected first.
+
+Connect requests a Composio-hosted sign-in link and opens it in the person's browser.
+Only HTTPS `composio.dev` links are opened or delivered. Jackalope never receives
+third-party credentials; Composio owns their lifecycle. Disconnect deletes the account
+with upstream revocation and is limited to accounts of this installation's user.
+Apps without a Composio-managed sign-in need an auth config in that project. Usage is
+billed by Composio to the person's project; Jackalope does not proxy or meter it.
+
 ## Discovery and execution
 
 - `search_tools` / `POST /v1/tools/search`: keyword search over connection IDs,

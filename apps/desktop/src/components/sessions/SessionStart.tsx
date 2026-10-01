@@ -25,7 +25,7 @@ import { Button } from '../ui/button';
 import { DismissButton } from '../ui/DismissButton';
 import { InlineNotice } from '../ui/InlineNotice';
 import { ChatOptions } from './ChatOptions';
-import { ComposerAgentPicker, useComposerAgents } from './ComposerAgentPicker';
+import { ComposerAgentPicker, type ComposerModel, useComposerAgents } from './ComposerAgentPicker';
 import { SessionLimits } from './SessionLimits';
 import { WorkflowStarter } from './WorkflowStarter';
 import './live-session.css';
@@ -67,6 +67,13 @@ export function SessionStart({
     try {
       const saved = JSON.parse(localStorage.getItem(`${draftKey}:agents`) ?? 'null');
       if (Array.isArray(saved) && saved.every((id) => typeof id === 'string')) return saved;
+    } catch {}
+    return null;
+  });
+  const [modelChoice, setModel] = useState<ComposerModel | null>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(`${draftKey}:model`) ?? 'null');
+      if (typeof saved?.id === 'string' && typeof saved?.name === 'string') return saved;
     } catch {}
     return null;
   });
@@ -148,10 +155,12 @@ export function SessionStart({
       else localStorage.removeItem(`${draftKey}:codex-speed`);
       if (agentChoice) localStorage.setItem(`${draftKey}:agents`, JSON.stringify(agentChoice));
       else localStorage.removeItem(`${draftKey}:agents`);
+      if (modelChoice) localStorage.setItem(`${draftKey}:model`, JSON.stringify(modelChoice));
+      else localStorage.removeItem(`${draftKey}:model`);
     } catch {
       setError('This draft could not be saved. Keep this page open until sending succeeds.');
     }
-  }, [draftKey, text, context, limits, codexSpeed, agentChoice]);
+  }, [draftKey, text, context, limits, codexSpeed, agentChoice, modelChoice]);
   const send = async (choice: 'assess' | 'single' | 'plan' = 'assess') => {
     const value = text.trim();
     if (!project || !value || sending.current) return;
@@ -200,6 +209,7 @@ export function SessionStart({
         projectName: project.name,
         projectPath: project.path,
         agent,
+        model: lead && chosen.length === 1 ? modelChoice?.id : undefined,
         codexSpeed,
         agentProfileId: lead ? agentAccountFor(project, lead.adapter) : undefined,
         prompt: value,
@@ -211,12 +221,14 @@ export function SessionStart({
         autoVerify: project.preferences?.autoVerify ?? true,
         contextSelection: context,
       };
+      let autoStart = false;
       if (choice === 'assess' && !limits.maxBatches && !limits.pauseAtEstimatedUsd) {
         const result = await assessment.assess(request, value);
-        if (result.strategy !== 'single') return;
+        autoStart = !!result.autoPlan && project.preferences?.automaticSubtasks !== false;
+        if (!autoStart && result.strategy !== 'single') return;
       }
-      if (choice === 'plan') {
-        await assessment.create(request, value);
+      if (choice === 'plan' || autoStart) {
+        await assessment.create(request, value, autoStart);
         localStorage.removeItem(draftKey);
         localStorage.removeItem(`${draftKey}:context`);
         return;
@@ -335,6 +347,12 @@ export function SessionStart({
               <ComposerAgentPicker
                 project={project}
                 value={agents}
+                model={modelChoice}
+                onModelChange={(next) => {
+                  assessment.clear();
+                  pending.current = null;
+                  setModel(next);
+                }}
                 disabled={busy}
                 onChange={(next) => {
                   assessment.clear();

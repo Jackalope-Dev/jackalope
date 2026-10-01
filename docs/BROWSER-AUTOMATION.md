@@ -76,6 +76,17 @@ MCP approvals are unchanged. Other adapters use their configured transport; vali
   window grant. Browser-based actions may change a site; agents must continue to
   follow the task's authorization.
 
+## Screen view
+
+Task and chat Screen views poll an active attempt's existing browser every two seconds
+through `task_agent_screen`. A read never starts a browser, reserves a slot or waits
+behind an agent command; a busy browser keeps the previous frame. Frames capture only
+the visible viewport, are returned to the renderer and are not saved as artifacts.
+The same view reports desktop grant state without changing it. **Stop browser** closes
+the attempt's session and **Revoke desktop access** releases its window grant; both
+record an activity entry, and the agent receives the existing revoked-access errors.
+Only HTTP and HTTPS pages can be reopened in the person's browser, without task state.
+
 ## Visual preview selection
 
 Preview's **Select in preview** opens a separate task-owned browser window. Users can

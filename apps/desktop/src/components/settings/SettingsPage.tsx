@@ -31,6 +31,7 @@ import { SystemInfoView } from './SystemInfo';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
 import { useShallow } from 'zustand/react/shallow';
+import { ArtifactsConnection } from './ArtifactsConnection';
 import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
 import { RemoteAccess } from './RemoteAccess';
@@ -127,7 +128,8 @@ export function SettingsPage({
         Appearance: 'theme color light dark atmosphere picker toolbar',
         Agents:
           'default models available detected allowed restrict cli command executable configuration automatic quota handoff',
-        'Connected work': 'GitHub Linear Jira issues pull requests API token',
+        'Connected work':
+          'GitHub Linear Jira issues pull requests API token Cloudflare Artifacts repository hosted cloud',
         'Remote access': 'hosts phone companion SSH pairing Tailscale device',
         Decisions: 'Jackalope routing Jev TypeSafe API key automatic agent cost tokens capacity',
         Privacy: 'marketplace MCP network telemetry crash reporting',
@@ -282,7 +284,12 @@ export function SettingsPage({
               {c === 'Jackalope account' && (
                 <JackalopeAccount onInvitations={() => setCategory('Invitations')} />
               )}
-              {c === 'Connected work' && <IssueConnections />}
+              {c === 'Connected work' && (
+                <>
+                  <IssueConnections />
+                  <ArtifactsConnection />
+                </>
+              )}
               {c === 'Desktop' && <DesktopPreferences />}
               {c === 'Saved actions' && <SavedActions />}
               {c === 'Remote access' && <RemoteAccess />}

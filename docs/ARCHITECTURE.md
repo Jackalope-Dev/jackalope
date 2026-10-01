@@ -80,6 +80,7 @@ names; changes must preserve both sides and old saved records.
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |
 | issues.rs, github_workflows.rs | Read-only issue intake and protected Linear/Jira connections |
+| cloudflare_artifacts.rs | Protected Cloudflare Artifacts connection, repository creation, host-scoped token pushes and review snapshots |
 | remote.rs, remote/ | Project-scoped pairing API, protected host connections, SSH forwarding and companion assets |
 | verification.rs, artifacts.rs, release.rs | Saved checks, artifacts, diagnostics and signed updater |
 

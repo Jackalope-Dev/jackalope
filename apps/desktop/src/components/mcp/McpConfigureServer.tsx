@@ -74,7 +74,9 @@ export function McpConfigureServer({
                 ? lastSaved.agentSignIn
                   ? 'oauth'
                   : undefined
-                : recommendation?.authentication
+                : snippet.headers
+                  ? undefined
+                  : recommendation?.authentication
             }
             initial={
               lastSaved?.server ?? {

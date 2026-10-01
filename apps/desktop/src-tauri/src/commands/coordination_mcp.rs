@@ -439,6 +439,42 @@ impl CoordinationTools {
     }
 
     #[tool(
+        description = "List other tasks' live, unintegrated work in this project: changed files with line counts, owned paths, files Git cannot merge with your current work, and whether each changed since you last looked. Snapshots refresh about every ten seconds. Read-only.",
+        annotations(read_only_hint = true, open_world_hint = false)
+    )]
+    async fn peers(
+        &self,
+        context: RequestContext<RoleServer>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let headers = request_headers(&context)?;
+        let Json(result) =
+            super::coordination::peers::bridge_peers(WebState(self.service.clone()), headers)
+                .await
+                .map_err(bridge_error)?;
+        Ok(CallToolResult::structured(result))
+    }
+
+    #[tool(
+        description = "Read a file, or its diff, from another task's current snapshot so you can build against an interface while it is being written. Never changes that task's worktree. Use peers for task IDs and paths.",
+        annotations(read_only_hint = true, open_world_hint = false)
+    )]
+    async fn peer_read(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::coordination::peers::PeerReadInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let headers = request_headers(&context)?;
+        let Json(result) = super::coordination::peers::bridge_peer_read(
+            WebState(self.service.clone()),
+            headers,
+            Json(input),
+        )
+        .await
+        .map_err(|(_, error)| ErrorData::invalid_request(error, None))?;
+        Ok(CallToolResult::structured(result))
+    }
+
+    #[tool(
         description = "Claim a named responsibility, propose an interface agreement, or respond to a handoff. Use project for IDs and current revisions. Pending or rejected interfaces block integration and dependent work. Ownership paths cannot overlap another assignment. This never grants tool permissions or approves code.",
         annotations(
             read_only_hint = false,

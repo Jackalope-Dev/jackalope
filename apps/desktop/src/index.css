@@ -13,6 +13,7 @@
 
 @theme {
   --font-sans: "Plus Jakarta Sans Variable", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque Variable", var(--font-sans);
   --font-mono: "JetBrains Mono Variable", "Cascadia Code", Consolas, monospace;
   --text-xs: 0.75rem;
   --text-xs--line-height: 1.5;
@@ -84,6 +85,11 @@
 .text-muted,
 .task-muted {
   color: var(--color-text-secondary);
+}
+
+/* Headings use the display face; body copy and controls keep the sans face. */
+:where(h1, h2, h3) {
+  font-family: var(--font-display);
 }
 
 body {

@@ -47,6 +47,7 @@ rmcp = { version = "=3.4.1", default-features = false, features = ["server", "ma
 
 toml_edit = { version = "0.25", features = ["serde"] }
 toml = "1"
+base64 = "0.22"
 reqwest = { version = "0.13", default-features = false }
 ignore = "0.4"
 tree-sitter = "0.27"
@@ -92,7 +93,7 @@ windows = { version = "0.62.2", optional = true, features = ["ApplicationModel",
 windows-collections = { version = "0.3.2", optional = true }
 windows-future = { version = "0.3.2", optional = true }
 tauri-winrt-notification = "0.8.1"
-windows-sys = { version = "0.61", features = ["Win32_Storage_Packaging_Appx", "Win32_System_JobObjects", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_Threading", "Win32_Foundation", "Win32_System_IO"] }
+windows-sys = { version = "0.61", features = ["Win32_Storage_Packaging_Appx", "Win32_System_JobObjects", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_Threading", "Win32_Foundation", "Win32_System_IO", "Win32_UI_WindowsAndMessaging"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -108,3 +109,9 @@ block2 = "0.6"
 keyring = { version = "=3.6.3", features = ["sync-secret-service", "crypto-rust"] }
 notify-rust = { version = "=4.18.0", default-features = false, features = ["z-with-tokio"] }
 zbus = { version = "5", default-features = false, features = ["tokio"] }
+
+# One codegen unit with LTO trims roughly a quarter of the release binary at
+# the cost of slower release links; debug builds are unaffected.
+[profile.release]
+lto = true
+codegen-units = 1

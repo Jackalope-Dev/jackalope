@@ -156,7 +156,7 @@ pub(super) struct Ledger {
     pub(super) scope_audits: Vec<super::scope_audit::ScopeAudit>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QueueView {
     pub managed_tasks: Vec<super::managed::ManagedTask>,

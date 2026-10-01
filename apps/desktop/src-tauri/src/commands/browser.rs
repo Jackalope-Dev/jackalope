@@ -124,6 +124,59 @@ fn cancel(slot: &Slot) {
     }
 }
 
+/// What the task's browser shows right now, for the agent-screen panel.
+pub(super) enum Peek {
+    /// The attempt has no browser permission, or never opened a page.
+    Unavailable,
+    /// Access was revoked or the attempt ended.
+    Stopped,
+    /// An agent command holds the browser; the viewer keeps its last frame.
+    Busy,
+    Frame {
+        url: String,
+        png: Vec<u8>,
+    },
+}
+
+/// Captures the visible viewport of an already running task browser. It never
+/// starts a browser, reserves a slot or waits behind an agent command, and the
+/// frame is not saved as a task artifact.
+pub(super) fn peek(run_id: &str) -> Result<Peek, String> {
+    let Some(slot) = sessions()
+        .lock()
+        .map_err(|e| e.to_string())?
+        .get(run_id)
+        .cloned()
+    else {
+        return Ok(Peek::Unavailable);
+    };
+    if slot.canceled.load(Ordering::SeqCst) {
+        return Ok(Peek::Stopped);
+    }
+    let Ok(engine) = slot.engine.try_lock() else {
+        return Ok(Peek::Busy);
+    };
+    let Some(engine) = engine.as_ref() else {
+        return Ok(Peek::Unavailable);
+    };
+    let url = engine.call(json!({"action":"url"}))?["url"]
+        .as_str()
+        .unwrap_or("")
+        .to_owned();
+    let capture = engine
+        .directory
+        .join(format!("view-{}.png", uuid::Uuid::new_v4()));
+    let taken = engine
+        .call(json!({"action":"screenshot", "path":capture, "format":"png", "fullPage":false}));
+    let bytes = taken.and_then(|_| std::fs::read(&capture).map_err(|e| e.to_string()));
+    let _ = std::fs::remove_file(&capture);
+    let png = bytes?;
+    if png.len() > 8 * 1024 * 1024 {
+        return Err("The browser view exceeds the 8 MiB preview limit.".into());
+    }
+    Ok(Peek::Frame { url, png })
+}
+
 pub fn close(run_id: &str) {
     let slot = sessions().lock().unwrap().remove(run_id);
     if let Some(slot) = slot {

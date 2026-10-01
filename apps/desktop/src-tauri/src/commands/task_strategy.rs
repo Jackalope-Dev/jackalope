@@ -31,6 +31,11 @@ pub struct Assessment {
     pub decision: DecisionReceipt,
     pub created_at: String,
     pub cached: bool,
+    /// Plan subtasks without asking: a model recommended parallel or investigative
+    /// work, or local rules found a substantial request they cannot judge alone.
+    /// The planner still keeps tightly coupled work in one assignment.
+    #[serde(default)]
+    pub auto_plan: bool,
 }
 
 #[derive(Serialize)]
@@ -289,6 +294,12 @@ fn local_strategy(
     )
 }
 
+fn auto_plan(assessment: &Assessment, small: bool) -> bool {
+    assessment.parallel_available
+        && (assessment.strategy != StrategyChoice::Single
+            || (assessment.decision.provider == DecisionProvider::LocalRules && !small))
+}
+
 fn root_instructions(root: &Path) -> Result<String, String> {
     let mut instructions = Vec::new();
     for name in ["AGENTS.md", "CLAUDE.md"] {
@@ -486,6 +497,7 @@ fn assess(
         },
         created_at: chrono::Utc::now().to_rfc3339(),
         cached: false,
+        auto_plan: false,
     };
     let receipt_instructions = instructions.clone();
     let receipt_context = saved_context.text();
@@ -600,6 +612,7 @@ fn assess(
         assessment.decision.fallback_reason =
             Some("Assessment canceled; no implementation was started.".into());
     }
+    assessment.auto_plan = auto_plan(&assessment, cheap);
     std::fs::create_dir_all(directory(runtime)).map_err(|error| error.to_string())?;
     let record = serde_json::to_vec(&SavedAssessment {
         request,
@@ -788,6 +801,30 @@ mod tests {
             .contains("preferences changed"));
         drop(runtime);
         std::fs::remove_dir_all(folder).unwrap();
+    }
+    #[test]
+    fn substantial_requests_plan_subtasks_unless_a_model_chose_one_lead() {
+        let mut assessment: Assessment = serde_json::from_value(serde_json::json!({"id":"a","sourceHead":"h","strategy":"single","parallelAvailable":true,"reason":"r","createdAt":"now","cached":false,"decision":{"version":1,"kind":"task_strategy","requestedMode":"deterministic","provider":"local_rules","policyRevision":0,"concentration":null,"fallbackReason":null,"usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"estimatedCostUsd":0,"reported":true}}})).unwrap();
+        assert!(!assessment.auto_plan, "older saved assessments stay manual");
+        assert!(auto_plan(&assessment, false));
+        assert!(
+            !auto_plan(&assessment, true),
+            "small requests go straight to one agent"
+        );
+        assessment.decision.provider = DecisionProvider::Agent;
+        assert!(
+            !auto_plan(&assessment, false),
+            "a model's one-lead choice is respected"
+        );
+        assessment.strategy = StrategyChoice::Parallel;
+        assert!(auto_plan(&assessment, true));
+        assessment.strategy = StrategyChoice::Investigate;
+        assert!(auto_plan(&assessment, true));
+        assessment.parallel_available = false;
+        assert!(
+            !auto_plan(&assessment, false),
+            "restrictions and missing checks keep one lead"
+        );
     }
     #[test]
     fn local_rules_do_not_equate_ambiguity_or_size_with_parallel_work() {

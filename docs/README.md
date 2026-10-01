@@ -26,6 +26,7 @@ maintained behavior, a repeatable workflow or a reusable template. Follow the
 - [Project knowledge](PROJECT-KNOWLEDGE.md), [codebase maps](CODEBASE.md), [Ask Jackalope](HELPER.md)
 - [MCP discovery](MCP-DISCOVERY.md), [browser automation](BROWSER-AUTOMATION.md), [desktop control](DESKTOP-CONTROL.md)
 - [Terminal command](CLI.md)
+- [Bots](BOTS.md)
 
 ## Account services and website
 

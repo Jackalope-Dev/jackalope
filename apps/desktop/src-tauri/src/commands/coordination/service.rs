@@ -234,6 +234,8 @@ impl Coordinator {
 
     pub(super) fn tick(&self) -> Result<(), String> {
         self.reconcile()?;
+        self.ensure_storage_loaded()?;
+        self.auto_start_managed()?;
         self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
@@ -422,6 +424,8 @@ impl Coordinator {
                         .route("/v1/jev/questions", post(bridge_jev_questions))
                         .route("/v1/computer/output", post(bridge_verification_output))
                         .route("/v1/project", get(bridge_project))
+                        .route("/v1/peers", get(peers::bridge_peers))
+                        .route("/v1/peers/read", post(peers::bridge_peer_read))
                         .route("/v1/agreements", post(agreements::bridge_agreement))
                         .route("/v1/tools/search", post(bridge_tool_search))
                         .route("/v1/tools/execute", post(bridge_tool_execute))

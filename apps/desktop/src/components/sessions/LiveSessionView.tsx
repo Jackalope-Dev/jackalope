@@ -6,6 +6,7 @@ import {
   ChevronUp,
   ExternalLink,
   Minus,
+  Monitor,
   PanelRightClose,
   Pause,
   Pin,
@@ -31,6 +32,7 @@ import { useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { AgentQuestion } from '../tasks/AgentQuestion';
+import { AgentScreen } from '../tasks/AgentScreen';
 import { MergeReview } from '../tasks/MergeReview';
 import { ResultReview } from '../tasks/ResultReview';
 import { deliveryHandoff, TaskDelivery } from '../tasks/TaskDelivery';
@@ -108,7 +110,7 @@ export function LiveSessionView({
     const saved = useWorkViewStore.getState().reading[`session:${session.id}`];
     return saved === 'delivery'
       ? 'changes'
-      : ['work', 'changes', 'preview', 'terminal'].includes(saved)
+      : ['work', 'changes', 'preview', 'terminal', 'screen'].includes(saved)
         ? saved
         : preset === 'build' && latest
           ? 'changes'
@@ -127,7 +129,7 @@ export function LiveSessionView({
       return;
     const section = workRequest.section;
     setTab(
-      ['preview', 'terminal'].includes(section)
+      ['preview', 'terminal', 'screen'].includes(section)
         ? section
         : ['changes', 'review', 'integrate', 'verify', 'delivery'].includes(section)
           ? 'changes'
@@ -217,8 +219,26 @@ export function LiveSessionView({
     });
   };
   const provider = active?.agent ?? latest?.agent ?? session.request.agent;
+  const screenRun = active ?? latest;
   const tools = (
     <>
+      {!detached && (
+        <Tooltip content="Agent’s screen">
+          <button
+            type="button"
+            className="app-titlebar-button"
+            aria-label="Agent’s screen"
+            aria-pressed={expanded && tab === 'screen'}
+            onClick={() => {
+              const open = !(expanded && tab === 'screen');
+              setExpanded(open);
+              if (open) setTab('screen');
+            }}
+          >
+            <Monitor size={16} aria-hidden="true" />
+          </button>
+        </Tooltip>
+      )}
       {!integrated && (
         <ChatOptions
           items={[
@@ -322,6 +342,7 @@ export function LiveSessionView({
         <div className="live-title" data-tauri-drag-region={detached || undefined}>
           <h1 data-tauri-drag-region={detached || undefined}>{session.title}</h1>
           <span className="live-muted" data-tauri-drag-region={detached || undefined}>
+            {session.persona ? `${session.persona.name} · ` : ''}
             {session.request.projectName}
           </span>
         </div>
@@ -588,7 +609,7 @@ export function LiveSessionView({
               </Button>
             )}
             <fieldset className="live-tabs" aria-label="Session details">
-              {(['work', 'changes', 'preview', 'terminal'] as const).map((value) => (
+              {(['work', 'changes', 'preview', 'terminal', 'screen'] as const).map((value) => (
                 <Button
                   key={value}
                   variant="ghost"
@@ -610,7 +631,9 @@ export function LiveSessionView({
                       ? 'Review'
                       : value === 'terminal'
                         ? 'Terminal'
-                        : 'Preview'}
+                        : value === 'screen'
+                          ? 'Screen'
+                          : 'Preview'}
                 </Button>
               ))}
             </fieldset>
@@ -690,6 +713,15 @@ export function LiveSessionView({
                 )}
               </>
             )}
+            {tab === 'screen' &&
+              (screenRun ? (
+                <AgentScreen run={screenRun} />
+              ) : (
+                <p className="live-muted">
+                  The agent’s browser and any window you let it control appear here once work
+                  starts.
+                </p>
+              ))}
             {tab === 'terminal' &&
               (latest ? (
                 <Suspense fallback={<p>Loading terminal…</p>}>

@@ -12,6 +12,7 @@ import { Textarea } from '../ui/Textarea';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
+import { ArtifactsProjectSettings } from './ArtifactsProjectSettings';
 import { ProjectGitSettings } from './ProjectGitSettings';
 import { RemoveProjectAction } from './RemoveProjectAction';
 import '../settings/settings.css';
@@ -105,6 +106,18 @@ export function ProjectPreferences({
           <section className="project-preferences-section project-task-context">
             <WorkspaceSectionHeading title="Task context" />
             <Setting
+              title="Split work into subtasks"
+              description="For substantial requests, plan independent pieces and start them as parallel subtasks without a review step. Each subtask owns separate files, and everything comes back as one combined result to review. Requires a verification command."
+            >
+              <Switch
+                label="Split work into subtasks"
+                checked={project.preferences?.automaticSubtasks !== false}
+                onCheckedChange={(automaticSubtasks) =>
+                  updateProjectPreferences(project.id, { automaticSubtasks })
+                }
+              />
+            </Setting>
+            <Setting
               title="Choose guidelines automatically"
               description="Match testing, security, onboarding and other guidance to each new task. Fine-tune the selection under Customize task → Context."
             >
@@ -138,6 +151,13 @@ export function ProjectPreferences({
             </Disclosure>
           </section>
           <ProjectGitSettings key={project.path} projectPath={project.path} />
+          {!project.plainFolder && (
+            <ArtifactsProjectSettings
+              key={`artifacts-${project.path}`}
+              projectPath={project.path}
+              projectName={project.name}
+            />
+          )}
           <section className="project-preferences-section">
             <WorkspaceSectionHeading title="Workspace" />
             <div className="project-workspace-fields">

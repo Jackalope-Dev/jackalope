@@ -23,6 +23,8 @@ export interface ProjectPreferences {
   agentAccounts?: Record<string, string>;
   customInstructions?: string;
   automaticTaskContext?: boolean;
+  /** Split substantial requests into subtasks without a plan review. Defaults to on. */
+  automaticSubtasks?: boolean;
   taskGuidelines?: string[];
   baseBranch?: string;
   branchPrefix?: string;

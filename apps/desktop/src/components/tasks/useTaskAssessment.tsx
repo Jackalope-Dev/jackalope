@@ -20,6 +20,10 @@ export function useTaskAssessment() {
     request: RunRequest;
   }>();
   const [busy, setBusy] = useState(false);
+  // create can run in the same handler as assess, before React re-renders with the result.
+  const latest = useRef<{ value: TaskAssessment; key: string; request: RunRequest } | undefined>(
+    undefined,
+  );
   const operation = useRef<string | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
@@ -42,7 +46,8 @@ export function useTaskAssessment() {
       const value = await assessTask(request, intent, operationId);
       if (!mounted.current || operation.current !== operationId)
         throw new Error('Task assessment stopped.');
-      setAssessment({ value, key, request });
+      latest.current = { value, key, request };
+      setAssessment(latest.current);
       return value;
     } finally {
       if (operation.current === operationId) {
@@ -54,6 +59,7 @@ export function useTaskAssessment() {
   const clear = () => {
     const operationId = operation.current;
     operation.current = null;
+    latest.current = undefined;
     if (mounted.current) {
       setBusy(false);
       setAssessment(undefined);
@@ -61,7 +67,8 @@ export function useTaskAssessment() {
     if (operationId) void cancelAssessment(operationId).catch(() => {});
   };
   const cancel = async () => clear();
-  const create = async (request: RunRequest, intent: string) => {
+  const create = async (request: RunRequest, intent: string, autoStart = false) => {
+    const assessment = latest.current;
     if (!assessment || assessment.key !== assessmentKey(request, intent))
       throw new Error('The task changed. Assess it again before creating a plan.');
     await syncAgentConfig();
@@ -72,6 +79,7 @@ export function useTaskAssessment() {
       request: { ...request, id: assessment.request.id },
       assessmentId: assessment.value.id,
       title,
+      autoStart,
     });
     await useManagedTaskStore.getState().refresh();
     useManagedTaskStore.getState().select(id);

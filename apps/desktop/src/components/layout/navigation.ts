@@ -1,6 +1,8 @@
 import {
+  Blocks,
   BookOpen,
   Bot,
+  BotMessageSquare,
   CalendarClock,
   ChartNoAxesColumn,
   FileCheck2,
@@ -29,6 +31,14 @@ export const WORKSPACE_VIEWS = [
     description: 'Tasks: plan, review and archive work.',
     icon: ListTodo,
     group: 'tasks',
+    primary: true,
+  },
+  {
+    id: 'bots',
+    label: 'Bots',
+    description: 'Saved agents with their own role, model, apps and routines.',
+    icon: BotMessageSquare,
+    group: 'bots',
     primary: true,
   },
   {
@@ -62,6 +72,14 @@ export const WORKSPACE_VIEWS = [
     icon: Bot,
     group: 'agents',
     primary: true,
+  },
+  {
+    id: 'connected-apps',
+    label: 'Connected apps',
+    description: 'Agents: sign in to apps once through Composio for every agent.',
+    icon: Blocks,
+    group: 'agents',
+    primary: false,
   },
   {
     id: 'mcps',
@@ -180,6 +198,7 @@ export type ActiveTab = (typeof WORKSPACE_VIEWS)[number]['id'];
 export const DEFAULT_WORKSPACE_TAB: ActiveTab = 'kanban';
 export const AGENT_VIEWS = [
   { id: 'agents', label: 'Runners' },
+  { id: 'connected-apps', label: 'Connected apps' },
   { id: 'usage', label: 'Usage & quota' },
   { id: 'mcps', label: 'MCP tools' },
   { id: 'mcp-marketplace', label: 'Tool marketplace' },

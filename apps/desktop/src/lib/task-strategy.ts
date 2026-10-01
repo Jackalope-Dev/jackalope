@@ -11,6 +11,8 @@ export interface TaskAssessment {
   decision: DecisionReceipt;
   createdAt: string;
   cached: boolean;
+  /** Plan subtasks without asking; see `auto_plan` in task_strategy.rs. */
+  autoPlan?: boolean;
 }
 
 export const assessTask = (request: RunRequest, intent: string, operationId: string) =>

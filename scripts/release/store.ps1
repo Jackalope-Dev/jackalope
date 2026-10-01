@@ -3,13 +3,10 @@ param(
     [ValidateSet('beta', 'stable')][string]$Channel = 'beta',
     [string]$IdentityName = $env:STORE_IDENTITY_NAME,
     [string]$Publisher = $env:STORE_PUBLISHER,
-    [string]$PublisherDisplayName = $env:STORE_PUBLISHER_DISPLAY_NAME,
-    [string]$WebViewRuntimePath = $env:STORE_WEBVIEW2_PATH
+    [string]$PublisherDisplayName = $env:STORE_PUBLISHER_DISPLAY_NAME
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$runtimeBuildPath = Join-Path $repoRoot 'apps/desktop/src-tauri/WebView2'
-$runtimeStaged = $false
 function Run-Checked([scriptblock]$Command) {
     & $Command
     if ($LASTEXITCODE -ne 0) { throw 'Store build command failed.' }
@@ -29,41 +26,22 @@ try {
     } else {
         $pendingChanges = git status --porcelain --untracked-files=normal
         if ($LASTEXITCODE -ne 0 -or $pendingChanges) { throw 'Store submission builds require a clean, committed checkout.' }
-        if (!$WebViewRuntimePath) { throw 'Submission requires an extracted Microsoft Fixed Version x64 WebView2 Runtime.' }
         if (!$IdentityName -or !$Publisher -or !$PublisherDisplayName -or $IdentityName -eq 'Jackalope.LocalRehearsal') {
             throw 'Submission requires the real Partner Center identity and publisher values.'
         }
-    }
-    if ($WebViewRuntimePath) {
-        $WebViewRuntimePath = (Resolve-Path -LiteralPath $WebViewRuntimePath).Path
-        $runtimeExe = Join-Path $WebViewRuntimePath 'msedgewebview2.exe'
-        $signature = Get-AuthenticodeSignature -LiteralPath $runtimeExe
-        if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
-            throw 'WebView2 must have a valid Microsoft signature.'
-        }
-        $binary = [IO.File]::ReadAllBytes($runtimeExe)
-        $pe = [BitConverter]::ToInt32($binary, 60)
-        if ([BitConverter]::ToUInt16($binary, $pe + 4) -ne 0x8664) { throw 'WebView2 must be x64.' }
     }
     $version = (Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
     $output = Join-Path $repoRoot ('output/store/' + [guid]::NewGuid().ToString())
     $stage = Join-Path $output 'package'
     New-Item -ItemType Directory -Path (Join-Path $stage 'Assets') -Force | Out-Null
     Run-Checked { node scripts/release/store-manifest.mjs (Join-Path $stage 'AppxManifest.xml') $IdentityName $Publisher $PublisherDisplayName $version }
+    # The package relies on the WebView2 Runtime that ships with Windows; the app
+    # explains how to install it on the rare machine without one.
     $config = @{
-        bundle = @{ createUpdaterArtifacts = $false }
+        bundle = @{ createUpdaterArtifacts = $false; windows = @{ webviewInstallMode = @{ type = 'skip' } } }
         plugins = @{ updater = @{ pubkey = ''; endpoints = @() }; jackalope = @{ channel = $Channel } }
     }
     if ($Mode -eq 'rehearsal') { $config.identifier = 'dev.jackalope.store.rehearsal' }
-    if ($WebViewRuntimePath) {
-        if (Test-Path -LiteralPath $runtimeBuildPath) { throw 'Remove or relocate the existing src-tauri/WebView2 directory before packaging.' }
-        New-Item -ItemType Directory -Path $runtimeBuildPath | Out-Null
-        $runtimeStaged = $true
-        Get-ChildItem -LiteralPath $WebViewRuntimePath -Force | ForEach-Object {
-            Copy-Item -LiteralPath $_.FullName -Destination $runtimeBuildPath -Recurse -Force
-        }
-        $config.bundle.windows = @{ webviewInstallMode = @{ type = 'fixedRuntime'; path = 'WebView2' } }
-    }
     $configPath = Join-Path $output 'tauri.store.json'
     $config | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $configPath -Encoding utf8
     $buildOptions = @(if ($Mode -eq 'rehearsal') { '--debug' })
@@ -75,7 +53,6 @@ try {
     Copy-Item -LiteralPath (Join-Path $target "$configuration/jackalope.exe") -Destination $stage
     Copy-Item -LiteralPath (Join-Path $repoRoot 'apps/desktop/src-tauri/resources') -Destination (Join-Path $stage 'resources') -Recurse
     & (Join-Path $PSScriptRoot 'store-resources.ps1') -Stage $stage -SdkBin (Join-Path $sdk.FullName 'x64')
-    if ($WebViewRuntimePath) { Copy-Item -LiteralPath $WebViewRuntimePath -Destination (Join-Path $stage 'WebView2') -Recurse }
     $package = Join-Path $output "Jackalope_${version}_x64.msix"
     Run-Checked { & (Join-Path $sdk.FullName 'x64/makeappx.exe') pack /d $stage /p $package /o }
     $archivePath = Join-Path $output 'upload.zip'
@@ -91,7 +68,7 @@ try {
         mode = $Mode; channel = $Channel; version = $version; sourceRevision = $revision; sourceDirty = $dirty
         identity = $IdentityName; publisher = $Publisher; architecture = 'x64'
         betaAccessRequired = $true; storeManagedUpdates = $true
-        fixedWebView2 = [bool]$WebViewRuntimePath
+        webView2 = 'system'
         packageSha256 = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant()
         uploadSha256 = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
         executableSha256 = (Get-FileHash -LiteralPath (Join-Path $stage 'jackalope-desktop.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -102,12 +79,5 @@ try {
     Write-Output "Unsigned MSIX and receipt: $output"
     Write-Output 'No application was installed or submitted. Microsoft signs approved Store submissions.'
 } finally {
-    try {
-        if ($runtimeStaged) {
-            $expectedRuntimePath = [IO.Path]::GetFullPath((Join-Path $repoRoot 'apps/desktop/src-tauri/WebView2'))
-            $resolvedRuntimePath = (Resolve-Path -LiteralPath $runtimeBuildPath).Path
-            if ($resolvedRuntimePath -ne $expectedRuntimePath) { throw 'Refusing to remove an unexpected WebView2 directory.' }
-            Remove-Item -LiteralPath $resolvedRuntimePath -Recurse -Force
-        }
-    } finally { Pop-Location }
+    Pop-Location
 }

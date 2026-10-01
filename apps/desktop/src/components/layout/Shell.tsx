@@ -92,6 +92,12 @@ const RunnerConnections = lazy(() =>
 const AgentManager = lazy(() =>
   import('../agents/AgentManager').then((m) => ({ default: m.AgentManager })),
 );
+const BotsWorkspace = lazy(() =>
+  import('../bots/BotsWorkspace').then((m) => ({ default: m.BotsWorkspace })),
+);
+const ConnectedApps = lazy(() =>
+  import('../mcp/ConnectedApps').then((m) => ({ default: m.ConnectedApps })),
+);
 const McpWorkspace = lazy(() =>
   import('../mcp/McpWorkspace').then((m) => ({ default: m.McpWorkspace })),
 );
@@ -658,6 +664,8 @@ export function Shell({
                   }
                 />
               )}
+              {activeTab === 'bots' && <BotsWorkspace />}
+              {activeTab === 'connected-apps' && <ConnectedApps />}
               {activeTab === 'schedules' && (
                 <ScheduleManager
                   key={activeProjectId}

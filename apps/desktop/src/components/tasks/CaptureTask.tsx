@@ -333,12 +333,14 @@ export function CaptureTask({
         connectionIds: current.connectionIds,
         contextSelection: current.contextSelection,
       };
+      let autoStart = false;
       if (choice === 'assess') {
         const result = await assessment.assess(request, current.prompt.trim());
-        if (result.strategy !== 'single') return;
+        autoStart = !!result.autoPlan && project.preferences?.automaticSubtasks !== false;
+        if (!autoStart && result.strategy !== 'single') return;
       }
-      if (choice === 'plan') {
-        const parentId = await assessment.create(request, current.prompt.trim());
+      if (choice === 'plan' || autoStart) {
+        const parentId = await assessment.create(request, current.prompt.trim(), autoStart);
         saveIdea(parentId);
         clear();
         selectProject(project.id);

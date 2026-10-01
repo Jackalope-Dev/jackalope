@@ -74,6 +74,8 @@ message. Agents must read pending answers; elapsed time is never an answer.
 | Operation | Native MCP | HTTP |
 | --- | --- | --- |
 | Inventory and capabilities | project | GET /v1/project |
+| Other tasks' live work | peers | GET /v1/peers |
+| Read a peer's current file or diff | peer_read | POST /v1/peers/read with taskId, path, optional diff, offset, limit |
 | Publish a note | message | POST /v1/messages |
 | Read messages | inbox | GET /v1/messages?after=cursor&limit=50 |
 | Acknowledge reading | acknowledge_message | POST /v1/messages/ack with id |
@@ -91,6 +93,28 @@ for broadcasts. Agents can see project broadcasts, their received messages and
 their own sent messages. The user sees all project messages and acknowledgment
 counts. The retained journal is bounded to 2,000 messages; expired cursors require
 rereading and deduplicating retained messages. There is no infinite audit archive.
+
+## Live peer work
+
+Each isolated attempt stays the only writer of its worktree. `peers` shows every other
+task in the project with unintegrated isolated work, running or awaiting review: its
+owned paths, changed files with line counts, whether its snapshot changed since the
+caller last looked, and the files Git cannot merge with the caller's current work.
+`peer_read` returns one file, or that file's diff against the peer's starting commit,
+from the peer's latest snapshot, in bounded character windows. Integrated, canceled,
+archived and shared-checkout work is excluded, and a task cannot read itself.
+
+Snapshots are the trees the scope check records about every ten seconds, so peer data
+can be that old and a peer without a recorded tree reports that it has none yet.
+Conflicts come from `git merge-tree` over synthetic commits of both snapshots on their
+own bases; the result is cached by those commits. Nothing writes to a worktree, index
+or ref. Different lines of the same file can merge cleanly while path-based scope
+audits still report the overlap; overlap gates are unchanged.
+
+A planned task with two or more started assignments shows whether their current
+work merges cleanly, or which assignments and files conflict, refreshed every ten
+seconds while any of them runs. This is a live merge check of unfinished work, not a
+build, test or review of the combination.
 
 ## Ownership and interface decisions
 

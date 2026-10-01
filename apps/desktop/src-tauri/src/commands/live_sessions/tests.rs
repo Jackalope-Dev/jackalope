@@ -714,3 +714,53 @@ process.stdin.on('end',()=>{
     }
     service.coordinator.shutdown();
 }
+
+#[test]
+fn bot_persona_is_repeated_in_every_batch_and_stays_out_of_the_transcript() {
+    let (_root, service, existing) = fixture();
+    let request = service.snapshot(None).unwrap().sessions[0].request.clone();
+    let id = Uuid::new_v4().to_string();
+    let persona = SessionPersona {
+        bot_id: Uuid::new_v4().to_string(),
+        name: " Scout ".into(),
+        instructions: "Review dependencies conservatively.".into(),
+    };
+    service
+        .create_with_persona(
+            id.clone(),
+            String::new(),
+            request.clone(),
+            Some(FirstMessage {
+                id: Uuid::new_v4().to_string(),
+                text: "Check the lockfile".into(),
+            }),
+            SessionLimits::default(),
+            Some(persona.clone()),
+        )
+        .unwrap();
+    let saved: Ledger = serde_json::from_slice(&std::fs::read(&service.path).unwrap()).unwrap();
+    let session = saved.sessions.iter().find(|s| s.id == id).unwrap();
+    assert_eq!(session.persona.as_ref().unwrap().name, "Scout");
+    assert_eq!(session.messages[0].text, "Check the lockfile");
+    let messages = session.messages.iter().collect::<Vec<_>>();
+    let prompt = batch_prompt(session, &messages);
+    assert!(prompt.contains("You are Scout"));
+    assert!(prompt.find("Review dependencies").unwrap() < prompt.find("User message").unwrap());
+    let plain = saved.sessions.iter().find(|s| s.id == existing).unwrap();
+    assert!(plain.persona.is_none());
+    assert!(!batch_prompt(plain, &[]).contains("saved Jackalope bot"));
+    let invalid = SessionPersona {
+        bot_id: "not-a-uuid".into(),
+        ..persona
+    };
+    assert!(service
+        .create_with_persona(
+            Uuid::new_v4().to_string(),
+            "Bot".into(),
+            request,
+            None,
+            SessionLimits::default(),
+            Some(invalid),
+        )
+        .is_err());
+}

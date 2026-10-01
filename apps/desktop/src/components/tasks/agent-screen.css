@@ -1,0 +1,127 @@
+.agent-screen {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+
+.agent-screen-section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.agent-screen-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--color-text-secondary);
+}
+
+.agent-screen-heading h3 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.agent-screen-heading .ui-badge {
+  margin-left: auto;
+}
+
+.agent-screen-frame {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  background: var(--color-surface-sunken);
+}
+
+.agent-screen-address {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.agent-screen-address span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-screen-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 60vh;
+  object-fit: contain;
+  object-position: top;
+  background: var(--color-surface-sunken);
+}
+
+.agent-screen-empty {
+  margin: 0;
+  padding: 40px 24px;
+  color: var(--color-text-muted);
+  text-align: center;
+  font-size: var(--text-sm);
+}
+
+.agent-screen-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.agent-screen-window {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.agent-screen-window span {
+  display: grid;
+  min-width: 0;
+}
+
+.agent-screen-window strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-screen-window small {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.agent-screen-captures {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.agent-screen-captures figure {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  min-width: 0;
+}
+
+.agent-screen-captures img {
+  width: 100%;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+}

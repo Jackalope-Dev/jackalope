@@ -74,10 +74,34 @@
   .ui-toolbar:has(> .form-field) {
     align-items: flex-end;
   }
+  /* A recessed track; the selected option is a raised tile. Unselected options keep
+     an outline so every choice still reads as a button in both themes. */
   .ui-segmented-control {
-    border: 0;
-    padding: 0;
+    width: fit-content;
+    max-width: 100%;
     margin: 0;
-    gap: 8px;
+    padding: 4px;
+    gap: 4px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface-sunken);
+  }
+  .ui-segmented-control > .ui-button {
+    border: 1px solid var(--color-border-subtle);
+    background: transparent;
+    color: var(--color-text-secondary);
+    box-shadow: none;
+  }
+  .ui-segmented-control > .ui-button:hover:not(:disabled) {
+    border-color: var(--color-border);
+    background: var(--color-surface-hover);
+    color: var(--color-text-primary);
+  }
+  .ui-segmented-control > .ui-button[aria-pressed="true"] {
+    border-color: color-mix(in srgb, var(--color-accent) 60%, var(--color-border));
+    background: var(--color-surface-elevated);
+    color: var(--color-text-primary);
+    box-shadow: var(--shadow-flat);
+    font-weight: 600;
   }
 }

@@ -141,6 +141,16 @@ installed upgrades remain acceptance work,
 with Ubuntu 24.04/GNOME 46 the first Wayland acceptance target and X11 compatibility
 retained. Other compositors and GNOME versions remain unsupported.
 
+Saved bots keep standing instructions, an agent and model, a project and a connection
+scope; their conversations repeat the instructions in every batch and routines use
+schedules. Connected apps use the person's own Composio project through one managed
+on-demand connection. A Screen view shows the task browser's viewport and desktop
+grant state with revoke controls. Installed and live-account acceptance remain open.
+
+Cloudflare Artifacts is available as a beta bring-your-own-account option for new and
+existing projects, with pushes and expiring review snapshots. Live account and installed
+acceptance remain open.
+
 ## Up next: broader workflows
 
 Extend agent execution support, explicitly authorized GitHub publication and review
@@ -151,6 +161,7 @@ unfinished work. See [usage and routing](USAGE-AND-ROUTING.md).
 
 ## Further out: work across machines
 
-Managed hosting, native mobile applications, shared workspaces and team collaboration
+Managed hosting (including hosted Artifacts repositories), agent-native repository
+workflows, native mobile applications, shared workspaces and team collaboration
 depend on validated individual remote workflows. These remain exploratory directions.
 See [BACKEND.md](BACKEND.md).

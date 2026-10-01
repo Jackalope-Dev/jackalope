@@ -26,6 +26,7 @@ export interface ManagedTask {
   createdAt: string;
   started: boolean;
   error: string | null;
+  autoStart?: boolean;
 }
 
 export const managedTaskCommand = <T>(

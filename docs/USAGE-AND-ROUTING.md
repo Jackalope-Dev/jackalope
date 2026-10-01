@@ -260,7 +260,8 @@ but cannot publish a recommendation that starts work.
 Create a plan uses the selected development agent, model and account and consumes
 its normal capacity. Native code validates one to four scoped assignments, dependencies
 and ownership; multiple assignments receive a final combined review and verification.
-Users inspect the concrete plan before starting. One parent keeps planning, worker
+Automatic subtasks start the validated plan when the planner finishes; otherwise
+users inspect the concrete plan before starting. One parent keeps planning, worker
 attempts, follow-ups and usage together in Chat and Inbox. Dispatch is restricted to
 that parent and restarts paused. Dependencies use verified predecessor snapshots;
 final integration is explicit and project automatic merge excludes managed tasks.

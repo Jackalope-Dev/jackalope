@@ -17,6 +17,9 @@ pub struct ManagedTask {
     pub created_at: String,
     pub started: bool,
     pub error: Option<String>,
+    /// Start the validated plan as soon as the planner finishes, without a review click.
+    #[serde(default)]
+    pub auto_start: bool,
 }
 
 #[derive(Deserialize)]
@@ -258,6 +261,23 @@ fn parse_plan(text: &str, request: &RunRequest) -> Result<Vec<PlanEntry>, String
     Ok(items)
 }
 
+/// Automatic tasks whose latest planner finished cleanly, with that planner's attempt ID.
+fn auto_start_ready(ledger: &Ledger, runs: &[TaskRun]) -> Vec<(String, String)> {
+    ledger
+        .managed_tasks
+        .iter()
+        .filter(|task| task.auto_start && !task.started && task.error.is_none())
+        .filter_map(|task| {
+            let planner = latest_planner(task, runs)?;
+            (matches!(planner.status.as_str(), "review" | "reviewed")
+                && !planner.finishing
+                && planner.error.is_none()
+                && planner.persistence_error.is_none())
+            .then(|| (task.id.clone(), planner.id.clone()))
+        })
+        .collect()
+}
+
 fn latest_planner<'a>(task: &ManagedTask, runs: &'a [TaskRun]) -> Option<&'a TaskRun> {
     let original = runs.iter().find(|run| run.id == task.planner_run_id)?;
     runs.iter()
@@ -271,6 +291,7 @@ impl Coordinator {
         request: RunRequest,
         assessment_id: String,
         title: String,
+        auto_start: bool,
     ) -> Result<String, String> {
         self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
@@ -295,6 +316,7 @@ impl Coordinator {
             created_at: Utc::now().to_rfc3339(),
             started: false,
             error: None,
+            auto_start,
         };
         {
             let mut inner = self.inner.lock().unwrap();
@@ -446,6 +468,40 @@ impl Coordinator {
         Ok(())
     }
 
+    /// Starts plans whose planner finished, for tasks created with `auto_start`.
+    /// Runs without coordinator locks held because `start_managed` takes them.
+    /// A plan that fails validation records the reason once and waits for review.
+    pub(super) fn auto_start_managed(&self) -> Result<(), String> {
+        let runs = self.runtime.integration_runs()?;
+        let ready = {
+            let inner = self.inner.lock().unwrap();
+            if inner.url.is_none() {
+                return Ok(());
+            }
+            auto_start_ready(&inner.ledger, &runs)
+        };
+        if ready.is_empty() || self.runtime.access.ensure().is_err() {
+            return Ok(());
+        }
+        for (id, planner_run_id) in ready {
+            if let Err(error) = self.start_managed(&id, &planner_run_id) {
+                let mut inner = self.inner.lock().unwrap();
+                let mut ledger = inner.ledger.clone();
+                if let Some(task) = ledger.managed_tasks.iter_mut().find(|task| task.id == id) {
+                    if task.started {
+                        continue;
+                    }
+                    task.error = Some(format!(
+                        "Subtasks did not start automatically: {error} Review the plan to continue."
+                    ));
+                }
+                self.save(&ledger)?;
+                inner.ledger = ledger;
+            }
+        }
+        Ok(())
+    }
+
     fn managed_action(&self, id: &str, action: &str) -> Result<(), String> {
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
@@ -517,6 +573,17 @@ impl Coordinator {
                 }
                 inner.enabled.insert(dispatch_key(id));
             }
+            "review-first" => {
+                if task.started {
+                    return Err("Subtasks have already started.".into());
+                }
+                let mut ledger = inner.ledger.clone();
+                if let Some(saved) = ledger.managed_tasks.iter_mut().find(|saved| saved.id == id) {
+                    saved.auto_start = false;
+                }
+                self.save(&ledger)?;
+                inner.ledger = ledger;
+            }
             "pause" | "stop" => {
                 inner.enabled.remove(&dispatch_key(id));
                 if action == "stop" {
@@ -545,7 +612,7 @@ impl Coordinator {
                     }
                 }
             }
-            _ => return Err("Choose pause, stop, resume or retry-repair.".into()),
+            _ => return Err("Choose pause, stop, resume, review-first or retry-repair.".into()),
         }
         Ok(())
     }
@@ -596,11 +663,12 @@ pub async fn task_plan_create(
     request: RunRequest,
     assessment_id: String,
     title: String,
+    auto_start: Option<bool>,
     state: State<'_, Coordinator>,
 ) -> Result<String, String> {
     let service = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        service.create_managed(request, assessment_id, title)
+        service.create_managed(request, assessment_id, title, auto_start.unwrap_or(false))
     })
     .await
     .map_err(|error| error.to_string())?
@@ -652,6 +720,53 @@ mod tests {
     }
     fn item(id: &str, feature: Option<&str>) -> QueueItem {
         serde_json::from_value(serde_json::json!({"id":id,"featureId":feature,"projectId":"project","projectName":"Project","projectPath":"fixture","title":id,"prompt":id,"agent":"codex","scopes":[id],"dependencies":[],"createdAt":"now","runId":null,"error":null,"canceled":false})).unwrap()
+    }
+    #[test]
+    fn automatic_plans_start_only_after_a_clean_finished_planner() {
+        let mut automatic = task();
+        automatic.started = false;
+        automatic.auto_start = true;
+        let planner = |id: &str, status: &str, started_at: &str| TaskRun {
+            id: id.into(),
+            task_id: "planner-task".into(),
+            status: status.into(),
+            started_at: started_at.into(),
+            ..Default::default()
+        };
+        let mut ledger = Ledger {
+            managed_tasks: vec![automatic.clone()],
+            ..Default::default()
+        };
+        assert!(auto_start_ready(&ledger, &[planner("planner", "running", "1")]).is_empty());
+        let mut finishing = planner("planner", "review", "1");
+        finishing.finishing = true;
+        assert!(auto_start_ready(&ledger, &[finishing]).is_empty());
+        let mut failed = planner("planner", "review", "1");
+        failed.error = Some("boom".into());
+        assert!(auto_start_ready(&ledger, &[failed]).is_empty());
+        // A planning correction supersedes the original attempt.
+        assert_eq!(
+            auto_start_ready(
+                &ledger,
+                &[
+                    planner("planner", "review", "1"),
+                    planner("retry", "reviewed", "2")
+                ]
+            ),
+            vec![("parent".to_string(), "retry".to_string())]
+        );
+        // Reviewed-plan tasks, started tasks and recorded failures never start on their own.
+        let changes: [fn(&mut ManagedTask); 3] = [
+            |task| task.auto_start = false,
+            |task| task.started = true,
+            |task| task.error = Some("Subtasks did not start".into()),
+        ];
+        for change in changes {
+            let mut task = automatic.clone();
+            change(&mut task);
+            ledger.managed_tasks = vec![task];
+            assert!(auto_start_ready(&ledger, &[planner("planner", "review", "1")]).is_empty());
+        }
     }
     #[test]
     fn one_assignment_avoids_an_unnecessary_extra_worker() {

@@ -61,6 +61,9 @@ pub struct SessionDraft {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LiveSession {
+    /// Standing instructions from a saved bot, repeated in every batch prompt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub persona: Option<SessionPersona>,
     #[serde(default)]
     pub topics: Vec<SessionTopic>,
     #[serde(default)]
@@ -84,6 +87,28 @@ pub struct LiveSession {
     pub batches: Vec<SessionBatch>,
     pub draft: SessionDraft,
     pub error: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionPersona {
+    pub bot_id: String,
+    pub name: String,
+    pub instructions: String,
+}
+
+impl SessionPersona {
+    fn validate(&self) -> Result<(), String> {
+        Uuid::parse_str(&self.bot_id).map_err(|_| "Invalid bot identifier")?;
+        let name = self.name.trim();
+        if name.is_empty() || name.chars().count() > 60 || name.chars().any(char::is_control) {
+            return Err("Use a bot name up to 60 characters.".into());
+        }
+        if self.instructions.len() > 6_000 {
+            return Err("Keep bot instructions under 6,000 bytes.".into());
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -305,11 +330,26 @@ impl LiveSessions {
         &self,
         id: String,
         title: String,
-        mut request: RunRequest,
+        request: RunRequest,
         first_message: Option<FirstMessage>,
         limits: SessionLimits,
     ) -> Result<String, String> {
+        self.create_with_persona(id, title, request, first_message, limits, None)
+    }
+
+    pub(super) fn create_with_persona(
+        &self,
+        id: String,
+        title: String,
+        mut request: RunRequest,
+        first_message: Option<FirstMessage>,
+        limits: SessionLimits,
+        persona: Option<SessionPersona>,
+    ) -> Result<String, String> {
         limits.validate()?;
+        if let Some(persona) = &persona {
+            persona.validate()?;
+        }
         Uuid::parse_str(&id).map_err(|_| "Invalid session identifier")?;
         if let Some(message) = &first_message {
             Uuid::parse_str(&message.id).map_err(|_| "Invalid message identifier")?;
@@ -381,6 +421,11 @@ impl LiveSessions {
                 })
                 .collect();
             ledger.sessions.push(LiveSession {
+                persona: persona.map(|persona| SessionPersona {
+                    name: persona.name.trim().into(),
+                    instructions: persona.instructions.trim().into(),
+                    ..persona
+                }),
                 topics: Vec::new(),
                 topics_revision: 0,
                 limits,
@@ -806,6 +851,15 @@ impl LiveSessions {
 
 fn batch_prompt(session: &LiveSession, messages: &[&SessionMessage]) -> String {
     let mut prompt = format!("Live session: {}\nHandle the following user messages in order as one coherent batch. Group related changes; later corrections override earlier requests. Answer questions without assuming they authorize unrelated edits. Implement requested changes fully, preserving prior session work. Do not commit, push, reset, change branches, or create another worktree. Leave cumulative changes for review. Use the existing harness for tools, checks and user questions. Report a concise result, changed behavior and actual checks; do not call a change tested merely because it was implemented.\n", session.title);
+    if let Some(persona) = &session.persona {
+        prompt.push_str(&format!(
+            "You are {}, a saved Jackalope bot. Follow the user's standing instructions for this bot in every batch unless a message overrides them:
+{}
+",
+            persona.name,
+            if persona.instructions.is_empty() { "(No extra instructions.)" } else { &persona.instructions }
+        ));
+    }
     if !session.request.isolated && session.request.target_branch.is_none() {
         prompt.push_str("This folder is not a Git repository. Edit files in place. Do not create a repository unless the user asks.\n");
     }
@@ -845,15 +899,17 @@ pub async fn live_session_create(
     request: RunRequest,
     first_message: Option<FirstMessage>,
     limits: Option<SessionLimits>,
+    persona: Option<SessionPersona>,
 ) -> Result<String, String> {
     let service = service.inner().clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        service.create_with_limits(
+        service.create_with_persona(
             id,
             title.unwrap_or_else(|| "New session".into()),
             request,
             first_message,
             limits.unwrap_or_default(),
+            persona,
         )
     })
     .await

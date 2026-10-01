@@ -100,6 +100,9 @@ release dates.
   setup/check reuse and dependency scheduling. Include failures, independent review,
   corrections and defects; validate requested tiers in installed provider versions.
 
+- [ ] Measure automatic subtasks on representative requests: planning overhead versus
+  single-lead time, how often plans return one assignment, validation failures, and
+  combined-result quality. Tune the local-rules size threshold from those results.
 - [ ] Validate task assessment, stale-cache invalidation, reviewed planning, scoped
   dispatch, retained usage, pause/stop/restart recovery and explicit final integration
   with installed providers. Compare complete cost and quality on held-out tasks;
@@ -218,6 +221,16 @@ release dates.
   including account-specific OAuth, revocation, local browser prerequisites and restart.
   Keep publisher endpoints and pinned local packages current; fixtures do not verify
   third-party authorization or service availability.
+- [ ] Accept Connected apps with a live Composio project: key validation and replacement,
+  hosted sign-in, pending and failed accounts, disconnect with revocation, removed or
+  recreated sessions, apps without managed sign-in and agent tool use through the managed
+  connection with each adapter. Confirm catalog paging and logos for large catalogs.
+- [ ] Validate the Screen view in installed builds: live frames while agents act, busy
+  and stopped browsers, revoke during an in-flight command, desktop grant states and
+  polling cost on long tasks, at 960 by 640 and in both themes.
+- [ ] Validate bots end to end: persona continuity across batches and restarts, model and
+  connection scope on launch, routines created paused or active, deleted projects and
+  schedules, and the provider-rail picker's keyboard navigation and unavailable reasons.
 
 - [ ] Verify automatic lessons across tasks, queues, schedules and restart,
   including evidence, edits, removal and frozen task context. Measure outcomes.
@@ -233,6 +246,22 @@ release dates.
   authenticated installed CLIs, including enterprise hosts, pagination and stale heads.
   Validate editable workflow drafts and preserve explicit authorization for remote writes.
   Broader remote publication, review-thread resolution and proactive proposals remain open.
+- [ ] Validate Cloudflare Artifacts with a live Workers Paid account in installed profiles:
+  connection with and without a data location, new-project creation, moving a repository
+  with many branches, push rejection and retry, the 1 GB repository and 32 MB file limits,
+  review-snapshot expiry, and credential prompts staying suppressed on rejected tokens.
+  Include Connect Cloudflare: consent with one and several accounts, declined consent,
+  occupied loopback ports, refresh-token rotation across restarts, revocation on
+  disconnect, and the packaged Windows Store, macOS and Linux builds.
+- [ ] Measure live peer reads in installed multi-agent plans: how often agents read
+  peers before shared-interface edits, duplicate implementations avoided, and conflicts
+  caught before completion. Consider explicit, agent-requested syncing of a peer's
+  checked snapshot into a running worktree only with scope-audit and review support for
+  adopted changes.
+- [ ] Explore agent-native Artifacts workflows: a fork per task attempt instead of a local
+  worktree, provenance notes on integrated commits, push-event review and check triggers,
+  and opening an existing Artifacts repository as a project. Keep the coordinator,
+  reservation and integration guarantees; a fork does not replace review or merge approval.
 
 ## Account access and optional services
 

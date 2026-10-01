@@ -1,5 +1,7 @@
 pub mod commands;
 pub mod state;
+#[cfg(windows)]
+mod webview_runtime;
 mod window_behavior;
 
 /// Shared with the `jackalope` binary from one source file so the two ends of
@@ -102,6 +104,10 @@ impl MainWindow {
 }
 
 pub fn run(launch: Launch) {
+    #[cfg(windows)]
+    if !launch.headless && !webview_runtime::ensure_available() {
+        return;
+    }
     commands::platform::initialize_environment();
     let mut context = tauri::generate_context!();
     context.config_mut().app.windows[0].user_agent =
@@ -369,6 +375,8 @@ pub fn run(launch: Launch) {
             task_restore_archived,
             task_import_recovery,
             task_screenshot,
+            commands::agent_screen::task_agent_screen,
+            commands::agent_screen::task_agent_screen_revoke,
             task_start,
             commands::coordination::followups::task_followup_queue,
             commands::coordination::followups::task_followup_snapshot,
@@ -396,7 +404,27 @@ pub fn run(launch: Launch) {
             commands::issues::project_issues,
             commands::issues::issue_connections,
             commands::issues::issue_connection_save,
+            commands::composio::composio_status,
+            commands::composio::composio_save_key,
+            commands::composio::composio_remove_key,
+            commands::composio::composio_catalog,
+            commands::composio::composio_accounts,
+            commands::composio::composio_authorize,
+            commands::composio::composio_disconnect,
             commands::issues::issue_connection_remove,
+            commands::coordination::peers::coordination_live_combination,
+            commands::cloudflare_artifacts::cloudflare_artifacts_status,
+            commands::cloudflare_artifacts::cloudflare_artifacts_connect,
+            commands::cloudflare_artifacts::cloudflare_artifacts_disconnect,
+            commands::cloudflare_artifacts::cloudflare_oauth_begin,
+            commands::cloudflare_artifacts::cloudflare_oauth_complete,
+            commands::cloudflare_artifacts::cloudflare_oauth_cancel,
+            commands::cloudflare_artifacts::cloudflare_oauth_connect,
+            commands::cloudflare_artifacts::cloudflare_artifacts_project,
+            commands::cloudflare_artifacts::cloudflare_artifacts_create_project,
+            commands::cloudflare_artifacts::cloudflare_artifacts_convert,
+            commands::cloudflare_artifacts::cloudflare_artifacts_push,
+            commands::cloudflare_artifacts::cloudflare_artifacts_share,
             commands::remote::remote_status,
             commands::remote::remote_configure,
             commands::remote::remote_pairing,

@@ -531,9 +531,25 @@
 .onboarding-project-options > button {
   flex: 1;
 }
+.onboarding-project-storage {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.onboarding-project-storage .ui-segmented-control {
+  display: flex;
+  width: 100%;
+}
+.onboarding-project-storage .ui-segmented-control > button {
+  flex: 1;
+}
 .onboarding-project-name {
   width: 100%;
   margin-top: 8px;
+}
+.onboarding-repo-label {
+  display: block;
+  margin-top: 16px;
 }
 .onboarding-project-location {
   display: flex;

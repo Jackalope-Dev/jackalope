@@ -437,12 +437,34 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
                       <span className="managed-agent-name">
                         {getAgentMetadata(work.planner.agent)?.name ?? work.planner.agent}
                       </span>
-                      <h2>Planning your task</h2>
+                      <h2>
+                        {task.autoStart && !task.error
+                          ? 'Splitting your task into subtasks'
+                          : 'Planning your task'}
+                      </h2>
                       <TaskLiveActivity run={work.planner} />
                     </div>
-                    <Button variant="outline" onClick={() => openActivity(work.planner as TaskRun)}>
-                      <Activity size={16} aria-hidden="true" /> View activity
-                    </Button>
+                    <div className="managed-task-actions">
+                      {task.autoStart && !task.error && (
+                        <Button
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() =>
+                            void act(() =>
+                              managedTaskCommand('action', { id: task.id, action: 'review-first' }),
+                            )
+                          }
+                        >
+                          Review before starting
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        onClick={() => openActivity(work.planner as TaskRun)}
+                      >
+                        <Activity size={16} aria-hidden="true" /> View activity
+                      </Button>
+                    </div>
                   </Panel>
                 ) : planPending ? (
                   <p className="task-muted" role="status">
@@ -480,6 +502,11 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
                       )}
                     </div>
                   </Panel>
+                ) : task.autoStart && !task.error ? (
+                  <WorkspaceSectionHeading
+                    title="Starting subtasks"
+                    description={`${plan.length} ${plan.length === 1 ? 'step' : 'steps'} start automatically.`}
+                  />
                 ) : (
                   <WorkspaceSectionHeading
                     title="Review your plan"
@@ -524,7 +551,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
                     ))}
                   </ol>
                 )}
-                {!!plan.length && (
+                {!!plan.length && (!task.autoStart || !!task.error) && (
                   <div className="managed-plan-start">
                     <Button
                       disabled={busy}

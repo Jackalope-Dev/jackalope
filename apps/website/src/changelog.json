@@ -1,5 +1,57 @@
 [
   {
+    "id": "automatic-subtasks",
+    "date": "2026-10-01",
+    "status": "In development",
+    "title": "Big requests split into subtasks automatically",
+    "description": "Send a substantial request and Jackalope plans independent pieces and starts them in parallel, without a separate review step.",
+    "items": [
+      "Substantial requests are planned and started as parallel subtasks, each owning separate files",
+      "Small requests still go straight to one agent",
+      "Choose Review before starting while it plans, or turn the setting off per project"
+    ]
+  },
+  {
+    "id": "agents-see-each-others-work-live",
+    "date": "2026-10-01",
+    "status": "In development",
+    "title": "Agents see each other's work as it happens",
+    "description": "Agents working on the same project can read each other's in-progress changes instead of waiting for them to finish.",
+    "items": [
+      "Agents can list other tasks' live changes and read their current files or diffs",
+      "Agents learn which files would not merge with their own work while it is still small",
+      "Planned tasks show whether their assignments' current work merges cleanly"
+    ]
+  },
+  {
+    "id": "bots-connected-apps-agent-screen",
+    "date": "2026-10-01",
+    "status": "In development",
+    "title": "Bots, connected apps and the agent's screen",
+    "description": "Save agents with their own role, connect apps once for every agent, and watch what an agent's browser shows.",
+    "items": [
+      "Save bots with their own instructions, agent, model, project and connections",
+      "Message a bot to start a conversation that keeps its role, or give it scheduled routines",
+      "Connect GitHub, Slack, Gmail and more once through your own Composio project for every agent",
+      "Watch the task browser and any window you granted from a Screen view, and stop either",
+      "Pick an agent and model from one list that explains why an agent is unavailable"
+    ],
+    "note": "Installed testing with real accounts is in progress."
+  },
+  {
+    "id": "cloudflare-artifacts-projects-beta",
+    "date": "2026-10-01",
+    "status": "In development",
+    "title": "Cloudflare Artifacts projects (beta)",
+    "description": "Keep projects on Cloudflare Artifacts, Git storage built for agents, using your own Cloudflare account.",
+    "items": [
+      "Create a new project on Artifacts during project setup",
+      "Move an existing repository to Artifacts from Project settings, keeping your other remotes",
+      "Push branches and tags with short-lived tokens that never touch your Git config",
+      "Share a read-only review snapshot with a clone link that expires"
+    ]
+  },
+  {
     "id": "tabs-unread-work-and-live-change-counts",
     "date": "2026-09-29",
     "status": "In development",

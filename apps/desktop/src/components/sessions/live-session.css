@@ -650,53 +650,148 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.composer-agent-menu {
-  min-width: 18rem;
-  max-width: min(22rem, calc(100vw - 24px));
+.agent-picker {
+  width: min(30rem, calc(100vw - 24px));
+  padding: 0;
+  overflow: hidden;
 }
-.composer-agent-copy {
+.agent-picker-body {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  max-height: min(28rem, 70vh);
+}
+.agent-picker-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 6px;
+  overflow-y: auto;
+  border-right: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-sunken);
+}
+.agent-picker-rail-item {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.agent-picker-rail-item:hover {
+  background: var(--color-surface-hover);
+}
+.agent-picker-rail-item[data-state="active"] {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+.agent-picker-rail-item[data-current] {
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+.agent-picker-rail-item[data-unavailable] {
+  opacity: 0.45;
+}
+.agent-picker-rail-item:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+.agent-picker-pane {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px;
+  overflow-y: auto;
+}
+.agent-picker-pane[hidden] {
+  display: none;
+}
+.agent-picker-heading {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px 10px;
+}
+.agent-picker-heading strong {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.agent-picker-heading small,
+.agent-picker-copy small {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.agent-picker-option:hover {
+  background: var(--color-surface-hover);
+}
+.agent-picker-option[aria-pressed="true"] {
+  border-color: var(--color-border);
+  background: var(--color-surface-hover);
+}
+.agent-picker-option:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+.agent-picker-selected {
+  flex-shrink: 0;
+  color: var(--color-accent);
+}
+.agent-picker-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-accent);
+}
+.agent-picker-copy {
   display: grid;
   flex: 1;
   min-width: 0;
 }
-.composer-agent-copy strong {
+.agent-picker-copy strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-text-primary);
+  font-weight: 500;
 }
-.composer-agent-copy small {
-  overflow: hidden;
-  color: var(--color-text-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.agent-picker-default {
+  font-size: var(--text-xs);
 }
-.composer-agent-box {
-  display: grid;
-  flex-shrink: 0;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-}
-.composer-agent-box[data-checked] {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-}
-.composer-agent-menu [data-disabled] {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.composer-agent-hint {
-  max-width: 20rem;
-  padding: 4px 12px 8px;
+.agent-picker-hint,
+.agent-picker-footer {
+  margin: 0;
+  padding: 6px 10px;
   color: var(--color-text-muted);
   font-size: var(--text-xs);
 }
-.composer-agent-menu .workspace-menu-item {
-  min-height: 44px;
-  padding-block: 8px;
+.agent-picker-footer {
+  border-top: 1px solid var(--color-border-subtle);
+  padding: 8px 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-picker-rail-item,
+  .agent-picker-option {
+    transition: none;
+  }
 }
 .live-start-composer[data-dragging] {
   border-color: var(--color-accent);
