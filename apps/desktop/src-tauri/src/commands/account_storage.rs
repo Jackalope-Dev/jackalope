@@ -84,7 +84,13 @@ pub(super) fn write(path: &Path, bytes: &[u8]) -> Result<(), String> {
     if bytes.len() > MAX_SECRET_BYTES {
         return Err("The secure account record is too large.".into());
     }
-    super::history::write_atomic(path, &transform(bytes, true)?)
+    let protected = transform(bytes, true)?;
+    // Connections save into profile folders that may not exist yet on a new profile.
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|_| "The account could not be saved securely. Try connecting again.")?;
+    }
+    super::history::write_atomic(path, &protected)
         .map_err(|_| "The account could not be saved securely. Try connecting again.".into())
 }
 #[cfg(windows)]
@@ -104,7 +110,8 @@ mod tests {
         let folder =
             std::env::temp_dir().join(format!("jackalope-account-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&folder).unwrap();
-        let path = folder.join("account.bin");
+        // A connection's first save can target a folder the profile has not created yet.
+        let path = folder.join("integrations").join("account.bin");
         let plain = b"fixture-device-credential-never-store-as-plaintext";
         write(&path, plain).unwrap();
         let mut encrypted = std::fs::read(&path).unwrap();
@@ -116,6 +123,6 @@ mod tests {
         assert!(read(&path).is_err());
         remove(&path).unwrap();
         assert!(read(&path).unwrap().is_none());
-        std::fs::remove_dir(folder).unwrap();
+        std::fs::remove_dir_all(folder).unwrap();
     }
 }

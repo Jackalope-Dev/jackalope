@@ -74,6 +74,9 @@ pub(in crate::commands) fn write(path: &Path, bytes: &[u8]) -> Result<(), String
         .map(str::to_owned)
         .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let entry = keyring::Entry::new(SERVICE, &id).map_err(unavailable)?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|_| "Secure storage is unavailable.")?;
+    }
     save_record(path, bytes, &id, existing.is_some(), &entry)
 }
 
