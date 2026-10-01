@@ -38,6 +38,12 @@ pub struct QueueItem {
     pub run_id: Option<String>,
     pub error: Option<String>,
     pub canceled: bool,
+    /// Paths inside `scopes` this task handed to a subtask it spawned.
+    #[serde(default)]
+    pub excluded_scopes: Vec<String>,
+    /// The task whose agent spawned this one with `propose_subtask`.
+    #[serde(default)]
+    pub parent_task_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -154,6 +160,14 @@ pub(super) struct Ledger {
     pub(super) reconciliations: Vec<super::reconciliation::ReconciliationJob>,
     #[serde(default)]
     pub(super) scope_audits: Vec<super::scope_audit::ScopeAudit>,
+    /// Conflict signatures already announced to their owners; see peers.rs.
+    #[serde(default)]
+    pub(super) live_conflicts: Vec<String>,
+    /// Task IDs the user allowed to spawn subtasks outside an automatic plan.
+    #[serde(default)]
+    pub(super) subtask_grants: Vec<String>,
+    #[serde(default)]
+    pub(super) adoptions: Vec<super::peers::Adoption>,
 }
 
 #[derive(Clone, Default, Serialize)]
@@ -164,6 +178,8 @@ pub struct QueueView {
     pub reconciliations: Vec<super::reconciliation::ReconciliationJob>,
     pub agreements: Vec<super::agreements::Agreement>,
     pub scope_audits: Vec<super::scope_audit::ScopeAudit>,
+    #[serde(default)]
+    pub adoptions: Vec<super::peers::Adoption>,
     pub items: Vec<QueueItem>,
     pub messages: Vec<CoordinationMessage>,
     pub enabled_projects: Vec<String>,

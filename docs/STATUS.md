@@ -188,9 +188,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   all requirement assessments in one call; review shows their justifications and
   evidence separately from human acceptance.
 - Durable ownership handoffs, explicit interface agreements and changed-file scope
-  checks gate dependent work and integration. Running agents can read other tasks'
-  live unintegrated files and diffs and see which files would not merge with theirs;
-  planned tasks show whether their assignments' current work merges cleanly. Projects can opt into agent reconciliation
+  checks gate dependent work and integration. Running agents can read and adopt other
+  tasks' live unintegrated files, are told when their work stops merging with another
+  task's, and can split off subtasks with the user's consent; planned tasks show
+  whether their assignments' current work merges cleanly and how the work was split. Projects can opt into agent reconciliation
   and verified local merging; source worktrees remain available. See
   [coordination contracts](ORCHESTRATION-CAPABILITIES.md).
 - Repository-aware plans, optional verified predecessor snapshots, dependency-aware

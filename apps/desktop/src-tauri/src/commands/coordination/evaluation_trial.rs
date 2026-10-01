@@ -24,8 +24,8 @@ async fn installed_execution_evaluation() {
 
 async fn evaluate() -> Result<(), Box<dyn std::error::Error>> {
     let mode = std::env::var("JACKALOPE_EVAL_MODE")?;
-    if !["single", "serial", "staged"].contains(&mode.as_str()) {
-        return Err("Use single, serial or staged evaluation mode.".into());
+    if !["single", "serial", "staged", "auto"].contains(&mode.as_str()) {
+        return Err("Use single, serial, staged or auto evaluation mode.".into());
     }
     let case_id = std::env::var("JACKALOPE_EVAL_CASE")?;
     let suite: Value = serde_json::from_str(include_str!(
@@ -71,6 +71,12 @@ async fn evaluate() -> Result<(), Box<dyn std::error::Error>> {
     service.launch();
     let project = Uuid::new_v4().to_string();
     let goal = case["goal"].as_str().unwrap();
+    if mode == "auto" {
+        return automatic(
+            case, &case_id, &root, &repo, &project, runtime, service, cleanup, seconds, tokens,
+        )
+        .await;
+    }
     let mut tasks = if mode == "single" {
         vec![
             json!({"key":"all","title":"Complete request","prompt":goal,"scopes":["."],"dependsOn":[]}),
@@ -195,6 +201,123 @@ async fn evaluate() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
     let report = json!({"version":1,"case":case_id,"mode":mode,"elapsedMs":elapsed_ms,"secondsBudget":seconds,"observedTokenBudget":tokens,"budgetStopped":budget_stopped,"completed":completed,"queue":queue,"oracle":oracle,"accepted":null,"humanReviewMinutes":null,"escapedDefects":null,"runs":runs,"limitations":"The automated oracle is not human acceptance. Token stopping uses reported usage and cannot enforce provider spending. Serial mode uses immediate fixture integration, excluding real human review delays. Repeat each mode with the same provider/model and budgets before drawing conclusions."});
+    std::fs::write(
+        root.join("evaluation.json"),
+        serde_json::to_vec_pretty(&report)?,
+    )?;
+    drop(cleanup);
+    println!(
+        "Evaluation receipt: {}",
+        root.join("evaluation.json").display()
+    );
+    Ok(())
+}
+
+/// Automatic subtasks: the real assessment, planner and automatic start decide the split.
+#[allow(clippy::too_many_arguments)]
+async fn automatic(
+    case: &Value,
+    case_id: &str,
+    root: &Path,
+    repo: &Path,
+    project: &str,
+    runtime: TaskRuntime,
+    service: Coordinator,
+    cleanup: EvaluationOwner,
+    seconds: u64,
+    tokens: u64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let goal = case["goal"].as_str().unwrap();
+    let prompt = format!("{goal}
+
+Do not access the network, install dependencies, edit other worktrees, or commit. Run relevant checks. Report unmet requirements explicitly.");
+    let request: RunRequest = serde_json::from_value(
+        json!({"id":Uuid::new_v4().to_string(),"projectId":project,"projectName":"Execution evaluation","projectPath":repo,"agent":"codex","prompt":prompt,"isolated":true,"targetBranch":"main","verifyCommand":case["check"],"autoVerify":true}),
+    )?;
+    let started = Instant::now();
+    let assessment = {
+        let (runtime, request, goal) = (runtime.clone(), request.clone(), goal.to_string());
+        tauri::async_runtime::spawn_blocking(move || {
+            crate::commands::task_strategy::assess(
+                &runtime,
+                request,
+                goal,
+                Uuid::new_v4().to_string(),
+            )
+        })
+        .await??
+    };
+    let task_id = service.create_managed(
+        request,
+        assessment.id.clone(),
+        "Execution evaluation".into(),
+        true,
+    )?;
+    let mut budget_stopped = false;
+    let final_run_id = loop {
+        let view = service.view()?;
+        let runs = runtime.integration_runs()?;
+        let observed: u64 = runs.iter().map(|r| r.usage.input + r.usage.output).sum();
+        if started.elapsed().as_secs() >= seconds || observed >= tokens {
+            budget_stopped = true;
+            break None;
+        }
+        if let Some(error) = &view.bridge_error {
+            return Err(error.clone().into());
+        }
+        let task = view
+            .managed_tasks
+            .iter()
+            .find(|task| task.id == task_id)
+            .ok_or("Task missing")?;
+        if task.error.is_some()
+            || view
+                .items
+                .iter()
+                .any(|i| i.feature_id.as_deref() == Some(&task_id) && i.error.is_some())
+            || runs.iter().any(|r| r.status == "failed")
+        {
+            break None;
+        }
+        let final_run = task
+            .delivery
+            .as_ref()
+            .and_then(|delivery| delivery.final_item.as_ref())
+            .and_then(|id| view.items.iter().find(|item| &item.id == id))
+            .and_then(|item| item.run_id.as_ref())
+            .and_then(|id| runs.iter().find(|run| &run.id == id));
+        if let Some(run) = final_run.filter(|run| !active(&run.status) && !run.finishing) {
+            break Some(run.id.clone());
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    };
+    let elapsed_ms = started.elapsed().as_millis();
+    service.shutdown();
+    runtime.stop_all();
+    let runs = runtime.integration_runs()?;
+    let view = service.view()?;
+    let task = view.managed_tasks.iter().find(|task| task.id == task_id);
+    let final_run = final_run_id.and_then(|id| runs.iter().find(|run| run.id == id));
+    let completed =
+        final_run.is_some_and(|run| ["review", "reviewed"].contains(&run.status.as_str()));
+    std::fs::write(root.join("oracle.cjs"), case["oracle"].as_str().unwrap())?;
+    let oracle = if let Some(run) = final_run.filter(|_| completed && !budget_stopped) {
+        let mut command = std::process::Command::new("node");
+        command.arg(root.join("oracle.cjs")).arg(&run.workspace);
+        Some(crate::commands::process_control::run_cancellable(
+            command,
+            Duration::from_secs(15),
+            || false,
+        )?)
+    } else {
+        None
+    };
+    let queue: Vec<_> = view
+        .items
+        .iter()
+        .map(|item| json!({"id":item.id,"runId":item.run_id,"error":item.error,"parentTaskId":item.parent_task_id}))
+        .collect();
+    let report = json!({"version":1,"case":case_id,"mode":"auto","elapsedMs":elapsed_ms,"secondsBudget":seconds,"observedTokenBudget":tokens,"budgetStopped":budget_stopped,"completed":completed,"queue":queue,"oracle":oracle,"assessment":assessment,"split":task.map(|task| json!({"autoPlan":assessment.auto_plan,"error":task.error,"delivery":task.delivery})),"accepted":null,"humanReviewMinutes":null,"escapedDefects":null,"runs":runs,"limitations":"Includes assessment and planning time and usage. The automated oracle is not human acceptance. The split is the planner's choice, so it can differ between repetitions."});
     std::fs::write(
         root.join("evaluation.json"),
         serde_json::to_vec_pretty(&report)?,

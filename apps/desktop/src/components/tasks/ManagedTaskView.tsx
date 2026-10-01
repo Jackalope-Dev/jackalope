@@ -62,6 +62,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
   const [planRunId, setPlanRunId] = useState('');
   const [plan, setPlan] = useState<FeatureStep[]>([]);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [activityId, setActivityId] = useState<string | null>(null);
@@ -250,6 +251,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
       onDetails={openDetails}
       onActivity={openActivity}
       onRetry={(id) => void act(() => queueCommand('queue_release', { id, retry: true }))}
+      onNotice={(message, failed) => (failed ? setError : setNotice)(message)}
     />
   );
   return (
@@ -367,6 +369,18 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
       {(!hasResult || work.active.length > 0) && <ManagedTaskJourney task={task} work={work} />}
       {hasResult && !work.active.length && work.interfaceIssue && (
         <InlineNotice>{work.interfaceIssue}</InlineNotice>
+      )}
+      {notice && (
+        <InlineNotice
+          tone="success"
+          action={
+            <Button variant="ghost" onClick={() => setNotice('')}>
+              Close
+            </Button>
+          }
+        >
+          {notice}
+        </InlineNotice>
       )}
       {(error || queueError || task.error) && (
         <InlineNotice tone="error">{error || queueError || task.error}</InlineNotice>

@@ -1,10 +1,15 @@
-//! Live, read-only visibility into concurrent work in the same project.
+//! Live visibility into concurrent work in the same project.
 //!
 //! Each worktree stays single-writer. Peers read each other's latest snapshot
 //! (the tree the scope check records about every ten seconds) instead of
 //! waiting for integration, and pairwise `merge-tree` reports content conflicts
-//! while they are still small. Nothing here writes to a worktree, index or ref:
+//! while they are still small. Reads never write to a worktree, index or ref;
 //! the only objects created are unreferenced synthetic commits for merge-tree.
+//!
+//! `adopt` is the one writer: at the caller's request it copies named files
+//! from a peer's snapshot into the caller's own worktree and records an
+//! [`Adoption`], so scope audits treat those files as the peer's work while the
+//! caller leaves them unchanged.
 
 use super::*;
 use crate::commands::git_command::{command, Policy};
@@ -18,6 +23,32 @@ const MAX_FILES: usize = 200;
 const DEFAULT_READ_CHARS: usize = 20_000;
 const MAX_READ_CHARS: usize = 60_000;
 const MAX_BLOB_BYTES: u64 = 4 * 1024 * 1024;
+const MAX_ADOPT_PATHS: usize = 50;
+const MAX_CONFLICT_SIGNATURES: usize = 256;
+
+/// Files a task copied from a peer's snapshot with `peer_adopt`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Adoption {
+    pub run_id: String,
+    pub source_run_id: String,
+    pub source_task_id: String,
+    pub source_tree: String,
+    pub paths: Vec<String>,
+    pub created_at: String,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct PeerAdoptInput {
+    #[schemars(description = "Task ID from peers")]
+    #[serde(alias = "task_id")]
+    pub task_id: String,
+    #[schemars(
+        description = "Repository-relative files the peer changed, at most 50. You must not have edited them yourself."
+    )]
+    pub paths: Vec<String>,
+}
 
 /// Trees each caller has already seen, so `peers` can flag new progress.
 static LAST_READ: Mutex<Option<HashMap<String, HashMap<String, String>>>> = Mutex::new(None);
@@ -283,6 +314,238 @@ fn conflicts(left: (&TaskRun, &str), right: (&TaskRun, &str)) -> Result<Vec<Stri
     }
     cache.insert(key, paths.clone());
     Ok(paths)
+}
+
+/// Paths a run adopted whose current content still matches the adopted snapshot.
+/// Returned lowercased to match scope-audit paths.
+pub(super) fn unchanged_adoptions(
+    adoptions: &[Adoption],
+    run: &TaskRun,
+    tree: &str,
+) -> HashSet<String> {
+    let mut result = HashSet::new();
+    for adoption in adoptions.iter().filter(|a| a.run_id == run.id) {
+        let mut args = vec![
+            "diff",
+            "--name-only",
+            "--no-renames",
+            "-z",
+            tree,
+            &adoption.source_tree,
+            "--",
+        ];
+        args.extend(adoption.paths.iter().map(String::as_str));
+        let Ok(changed) = git(Path::new(&run.workspace), &args) else {
+            continue;
+        };
+        let changed: HashSet<_> = changed.split('\0').filter(|p| !p.is_empty()).collect();
+        result.extend(
+            adoption
+                .paths
+                .iter()
+                .filter(|path| !changed.contains(path.as_str()))
+                .map(|path| path.to_lowercase()),
+        );
+    }
+    result
+}
+
+fn blob(workspace: &Path, tree: &str, path: &str) -> Option<String> {
+    git(
+        workspace,
+        &[
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            &format!("{tree}:{path}"),
+        ],
+    )
+    .ok()
+    .map(|id| id.trim().to_string())
+    .filter(|id| !id.is_empty())
+}
+
+/// Copies `input.paths` from a peer's latest snapshot into the caller's worktree.
+/// The caller must hold the execution guard and pass its freshly captured tree.
+pub(super) fn adopt(
+    view: &QueueView,
+    runs: &[TaskRun],
+    caller: &TaskRun,
+    caller_tree: &str,
+    input: &PeerAdoptInput,
+) -> Result<Adoption, String> {
+    if input.paths.is_empty() || input.paths.len() > MAX_ADOPT_PATHS {
+        return Err("Name between 1 and 50 files to adopt.".into());
+    }
+    let paths = input
+        .paths
+        .iter()
+        .map(|path| valid_path(path))
+        .collect::<Result<Vec<_>, _>>()?;
+    let peer = candidates(runs, view, &caller.project_id)
+        .into_iter()
+        .find(|run| run.task_id == input.task_id && run.task_id != caller.task_id)
+        .ok_or(
+            "That task has no unintegrated isolated work in this project. Use peers for task IDs.",
+        )?;
+    let peer_tree = tree_of(view, peer)
+        .ok_or("No snapshot yet. Jackalope records one about every ten seconds.")?;
+    let workspace = Path::new(&caller.workspace);
+    let previously_adopted = unchanged_adoptions(&view.adoptions, caller, caller_tree);
+    for path in &paths {
+        let peer_base = blob(Path::new(&peer.workspace), &peer.base_head, path);
+        let peer_version = blob(Path::new(&peer.workspace), &peer_tree, path);
+        if peer_base == peer_version {
+            return Err(format!("{path} is unchanged in that task's snapshot."));
+        }
+        let own_base = blob(workspace, &caller.base_head, path);
+        let own_version = blob(workspace, caller_tree, path);
+        if own_base != own_version && !previously_adopted.contains(&path.to_lowercase()) {
+            return Err(format!(
+                "You changed {path}. Adopting would replace your work; coordinate with its owner through message or agreement instead."
+            ));
+        }
+        if own_version.is_none() && workspace.join(path).is_dir() {
+            return Err(format!("{path} is a folder in your worktree."));
+        }
+    }
+    let index = std::env::temp_dir().join(format!("jackalope-adopt-{}.index", Uuid::new_v4()));
+    let result = (|| {
+        let indexed = |args: &[&str]| -> Result<(), String> {
+            let output = command(workspace, args, Policy::Isolated)
+                .env("GIT_INDEX_FILE", &index)
+                .output()
+                .map_err(|e| e.to_string())?;
+            if !output.status.success() {
+                return Err(String::from_utf8_lossy(&output.stderr).trim().into());
+            }
+            Ok(())
+        };
+        indexed(&["read-tree", &peer_tree])?;
+        let present = paths
+            .iter()
+            .filter(|path| blob(workspace, &peer_tree, path).is_some())
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        if !present.is_empty() {
+            let mut args = vec!["checkout-index", "-f", "--"];
+            args.extend(present);
+            indexed(&args)?;
+        }
+        for path in paths
+            .iter()
+            .filter(|path| blob(workspace, &peer_tree, path).is_none())
+        {
+            match std::fs::remove_file(workspace.join(path)) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(format!("Could not remove {path}: {error}")),
+            }
+        }
+        Ok(())
+    })();
+    let _ = std::fs::remove_file(&index);
+    result?;
+    Ok(Adoption {
+        run_id: caller.id.clone(),
+        source_run_id: peer.id.clone(),
+        source_task_id: peer.task_id.clone(),
+        source_tree: peer_tree,
+        paths,
+        created_at: Utc::now().to_rfc3339(),
+    })
+}
+
+/// Records an adoption, replacing earlier adoptions of the same paths by that run.
+pub(super) fn record_adoption(ledger: &mut Ledger, adoption: Adoption) {
+    for existing in ledger
+        .adoptions
+        .iter_mut()
+        .filter(|a| a.run_id == adoption.run_id)
+    {
+        existing.paths.retain(|path| !adoption.paths.contains(path));
+    }
+    ledger.adoptions.retain(|a| !a.paths.is_empty());
+    ledger.adoptions.push(adoption);
+    let excess = ledger.adoptions.len().saturating_sub(2000);
+    ledger.adoptions.drain(..excess);
+}
+
+/// Messages both owners the first time a pair of running tasks stops merging.
+/// Resolved conflicts drop out, so a conflict that returns is announced again.
+pub(super) fn notify_conflicts(ledger: &mut Ledger, runs: &[TaskRun], merged: &[String]) {
+    let view = QueueView {
+        items: ledger.items.clone(),
+        scope_audits: ledger.scope_audits.clone(),
+        agreements: ledger.agreements.clone(),
+        adoptions: ledger.adoptions.clone(),
+        merged_run_ids: merged.to_vec(),
+        ..Default::default()
+    };
+    let mut projects = runs
+        .iter()
+        .map(|run| run.project_id.as_str())
+        .collect::<Vec<_>>();
+    projects.sort();
+    projects.dedup();
+    let mut current = Vec::new();
+    for project in projects {
+        let live = candidates(runs, &view, project)
+            .into_iter()
+            .take(MAX_PEERS)
+            .filter_map(|run| tree_of(&view, run).map(|tree| (run, tree)))
+            .collect::<Vec<_>>();
+        for (index, (left, left_tree)) in live.iter().enumerate() {
+            for (right, right_tree) in &live[index + 1..] {
+                if !active(&left.status) && !active(&right.status) {
+                    continue;
+                }
+                let Ok(paths) = conflicts((left, left_tree), (right, right_tree)) else {
+                    continue;
+                };
+                if paths.is_empty() {
+                    continue;
+                }
+                let mut pair = [left, right];
+                pair.sort_by(|a, b| a.task_id.cmp(&b.task_id));
+                let signature = format!(
+                    "{}|{}|{}",
+                    pair[0].task_id,
+                    pair[1].task_id,
+                    paths.join(",")
+                );
+                if !ledger.live_conflicts.contains(&signature) {
+                    for (run, other) in [(pair[0], pair[1]), (pair[1], pair[0])] {
+                        if !active(&run.status) {
+                            continue;
+                        }
+                        ledger.messages.push(CoordinationMessage {
+                            id: Uuid::new_v4().to_string(),
+                            project_id: run.project_id.clone(),
+                            task_id: "jackalope".into(),
+                            kind: "blocker".into(),
+                            text: format!(
+                                "Live conflict: your current work and task {} ({}) change {} in ways Git cannot merge. Read its version with peer_read and diff true, then agree one owner through agreement or message before continuing those files.",
+                                other.task_id,
+                                title(&view, other),
+                                paths.iter().take(10).cloned().collect::<Vec<_>>().join(", ")
+                            ),
+                            created_at: Utc::now().to_rfc3339(),
+                            recipient_task_id: Some(run.task_id.clone()),
+                            acknowledged_by: vec![],
+                            report: None,
+                            run_id: Some(run.id.clone()),
+                            source_tree: None,
+                            resolved_by: None,
+                        });
+                    }
+                }
+                current.push(signature);
+            }
+        }
+    }
+    current.truncate(MAX_CONFLICT_SIGNATURES);
+    ledger.live_conflicts = current;
 }
 
 fn title(view: &QueueView, run: &TaskRun) -> String {
@@ -572,6 +835,51 @@ pub(in crate::commands) async fn bridge_peer_read(
         .map_err(|error| (StatusCode::BAD_REQUEST, error))
 }
 
+pub(in crate::commands) async fn bridge_peer_adopt(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(input): Json<PeerAdoptInput>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let caller = service
+        .authorized_run(&headers)
+        .map_err(|status| (status, "Unauthorized".into()))?;
+    let worker = service.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut inner = worker.inner.lock().unwrap();
+        let _guard = crate::commands::integration::execution_guard()?;
+        crate::commands::verification::ensure_idle(&caller.workspace)?;
+        crate::commands::previews::ensure_idle(&caller.workspace)?;
+        let directory = worker.runtime.integration_directory();
+        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+        let caller_tree = crate::commands::integration::workspace_tree(&caller, &directory)?;
+        let merged = crate::commands::integration::applied_run_ids(&worker.runtime)?;
+        let runs = worker.runtime.integration_runs()?;
+        let view = QueueView {
+            items: inner.ledger.items.clone(),
+            scope_audits: inner.ledger.scope_audits.clone(),
+            agreements: inner.ledger.agreements.clone(),
+            adoptions: inner.ledger.adoptions.clone(),
+            merged_run_ids: merged,
+            ..Default::default()
+        };
+        let adoption = adopt(&view, &runs, &caller, &caller_tree, &input)?;
+        let mut ledger = inner.ledger.clone();
+        record_adoption(&mut ledger, adoption.clone());
+        worker.save(&ledger)?;
+        inner.ledger = ledger;
+        Ok::<_, String>(serde_json::json!({
+            "adopted": adoption.paths,
+            "fromTaskId": adoption.source_task_id,
+            "sourceTree": adoption.source_tree,
+            "note": "These files now match the peer's snapshot. Keep them unchanged so they stay the peer's work; if the peer changes them again you will receive a live conflict and can adopt again.",
+        }))
+    })
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .map(Json)
+    .map_err(|error| (StatusCode::BAD_REQUEST, error))
+}
+
 #[tauri::command]
 pub async fn coordination_live_combination(
     project_id: String,
@@ -808,6 +1116,126 @@ mod tests {
         assert_eq!(
             peers(&view, &runs, &clash.0)[0].conflicts,
             vec!["shared.txt".to_string()]
+        );
+    }
+
+    #[test]
+    fn adopted_files_stay_the_peers_work_until_the_adopter_edits_them() {
+        let root = repo();
+        let api = attempt(
+            &root,
+            "api",
+            &[("src/api.ts", "export type User = { id: string };\n")],
+        );
+        let ui = attempt(&root, "ui", &[("src/ui.ts", "ui\n")]);
+        let snapshots = vec![api.clone(), ui.clone()];
+        let runs = snapshots
+            .iter()
+            .map(|(run, _)| run.clone())
+            .collect::<Vec<_>>();
+        let view = view(&snapshots);
+        let request = |paths: &[&str]| PeerAdoptInput {
+            task_id: "task-api".into(),
+            paths: paths.iter().map(|p| p.to_string()).collect(),
+        };
+        assert!(adopt(&view, &runs, &ui.0, &ui.1, &request(&["shared.txt"]))
+            .unwrap_err()
+            .contains("unchanged"));
+        assert!(adopt(&view, &runs, &ui.0, &ui.1, &request(&["../x"])).is_err());
+        let adoption = adopt(&view, &runs, &ui.0, &ui.1, &request(&["src/api.ts"])).unwrap();
+        let workspace = Path::new(&ui.0.workspace);
+        assert_eq!(
+            std::fs::read_to_string(workspace.join("src/api.ts")).unwrap(),
+            "export type User = { id: string };\n"
+        );
+        let tree_after = |workspace: &Path| {
+            let index =
+                std::env::temp_dir().join(format!("jackalope-peer-{}.index", Uuid::new_v4()));
+            let run = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .current_dir(workspace)
+                    .args(args)
+                    .env("GIT_INDEX_FILE", &index)
+                    .output()
+                    .unwrap();
+                String::from_utf8_lossy(&output.stdout).trim().to_string()
+            };
+            run(&["read-tree", "HEAD"]);
+            run(&["add", "--all", "--", "."]);
+            run(&["write-tree"])
+        };
+        let tree = tree_after(workspace);
+        let adoptions = vec![adoption.clone()];
+        assert!(unchanged_adoptions(&adoptions, &ui.0, &tree).contains("src/api.ts"));
+        // Re-adopting a file still unchanged since the last adoption is allowed.
+        let mut adopted_view = view.clone();
+        adopted_view.adoptions = adoptions.clone();
+        assert!(adopt(
+            &adopted_view,
+            &runs,
+            &ui.0,
+            &tree,
+            &request(&["src/api.ts"])
+        )
+        .is_ok());
+        std::fs::write(workspace.join("src/api.ts"), "edited\n").unwrap();
+        let edited = tree_after(workspace);
+        assert!(unchanged_adoptions(&adoptions, &ui.0, &edited).is_empty());
+        assert!(adopt(
+            &adopted_view,
+            &runs,
+            &ui.0,
+            &edited,
+            &request(&["src/api.ts"])
+        )
+        .unwrap_err()
+        .contains("You changed"));
+
+        let mut ledger = Ledger::default();
+        record_adoption(&mut ledger, adoption.clone());
+        record_adoption(&mut ledger, adoption);
+        assert_eq!(ledger.adoptions.len(), 1);
+    }
+
+    #[test]
+    fn new_conflicts_are_announced_once_to_each_running_owner() {
+        let root = repo();
+        let top = attempt(&root, "top", &[("shared.txt", "ONE\ntwo\nthree\n")]);
+        let clash = attempt(&root, "clash", &[("shared.txt", "uno\ntwo\nthree\n")]);
+        let snapshots = vec![top.clone(), clash.clone()];
+        let runs = snapshots
+            .iter()
+            .map(|(run, _)| run.clone())
+            .collect::<Vec<_>>();
+        let mut ledger = Ledger {
+            scope_audits: view(&snapshots).scope_audits,
+            ..Default::default()
+        };
+        notify_conflicts(&mut ledger, &runs, &[]);
+        assert_eq!(ledger.messages.len(), 2);
+        assert!(ledger
+            .messages
+            .iter()
+            .all(|m| m.text.contains("shared.txt")));
+        assert_eq!(ledger.live_conflicts.len(), 1);
+        notify_conflicts(&mut ledger, &runs, &[]);
+        assert_eq!(
+            ledger.messages.len(),
+            2,
+            "an unchanged conflict is not repeated"
+        );
+        let finished = runs
+            .iter()
+            .cloned()
+            .map(|mut run| {
+                run.status = "review".into();
+                run
+            })
+            .collect::<Vec<_>>();
+        notify_conflicts(&mut ledger, &finished, &[]);
+        assert!(
+            ledger.live_conflicts.is_empty(),
+            "finished pairs have nobody to tell"
         );
     }
 

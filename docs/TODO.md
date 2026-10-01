@@ -253,11 +253,11 @@ release dates.
   Include Connect Cloudflare: consent with one and several accounts, declined consent,
   occupied loopback ports, refresh-token rotation across restarts, revocation on
   disconnect, and the packaged Windows Store, macOS and Linux builds.
-- [ ] Measure live peer reads in installed multi-agent plans: how often agents read
-  peers before shared-interface edits, duplicate implementations avoided, and conflicts
-  caught before completion. Consider explicit, agent-requested syncing of a peer's
-  checked snapshot into a running worktree only with scope-audit and review support for
-  adopted changes.
+- [ ] Run the installed swarm trial and `pnpm evaluate:execution --modes=single,auto` on
+  each supported provider: how often agents use peers, peer_adopt and propose_subtask,
+  duplicate implementations avoided, conflicts caught before completion, and whether
+  planner briefings reduce worker discovery. Tune assignment and subtask limits from
+  those results.
 - [ ] Explore agent-native Artifacts workflows: a fork per task attempt instead of a local
   worktree, provenance notes on integrated commits, push-event review and check triggers,
   and opening an existing Artifacts repository as a project. Keep the coordinator,

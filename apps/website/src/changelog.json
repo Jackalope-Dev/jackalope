@@ -1,5 +1,18 @@
 [
   {
+    "id": "agents-coordinate-as-a-swarm",
+    "date": "2026-10-01",
+    "status": "In development",
+    "title": "Agents coordinate and split work on their own",
+    "description": "Parallel agents now hand each other finished pieces, hear about conflicts as they happen, and split off new work without waiting for you.",
+    "items": [
+      "Agents are told the moment their changes stop merging with another agent's",
+      "An agent can copy another agent's finished interface into its own workspace",
+      "Agents split off separable work to new parallel workers, and Split this task asks a running agent to do it",
+      "Plans can use up to eight parallel assignments, and workers start from the planner's findings"
+    ]
+  },
+  {
     "id": "automatic-subtasks",
     "date": "2026-10-01",
     "status": "In development",

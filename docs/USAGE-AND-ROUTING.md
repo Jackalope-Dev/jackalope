@@ -258,7 +258,9 @@ or selected-context changes invalidate reuse. Cancellation retains any reported 
 but cannot publish a recommendation that starts work.
 
 Create a plan uses the selected development agent, model and account and consumes
-its normal capacity. Native code validates one to four scoped assignments, dependencies
+its normal capacity. With the Automatic agent, each assignment and subtask routes
+separately; an explicitly chosen agent and account stay pinned for every worker.
+Native code validates one to four (up to eight) scoped assignments, dependencies
 and ownership; multiple assignments receive a final combined review and verification.
 Automatic subtasks start the validated plan when the planner finishes; otherwise
 users inspect the concrete plan before starting. One parent keeps planning, worker

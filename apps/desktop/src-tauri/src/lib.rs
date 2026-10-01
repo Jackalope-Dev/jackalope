@@ -413,6 +413,7 @@ pub fn run(launch: Launch) {
             commands::composio::composio_disconnect,
             commands::issues::issue_connection_remove,
             commands::coordination::peers::coordination_live_combination,
+            commands::coordination::subtasks::task_request_split,
             commands::cloudflare_artifacts::cloudflare_artifacts_status,
             commands::cloudflare_artifacts::cloudflare_artifacts_connect,
             commands::cloudflare_artifacts::cloudflare_artifacts_disconnect,

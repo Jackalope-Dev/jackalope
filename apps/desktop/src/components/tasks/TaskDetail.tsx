@@ -52,6 +52,7 @@ import { AgentScreen } from './AgentScreen';
 import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview, type ReviewSection } from './ResultReview';
 import { ScreenshotPreview } from './ScreenshotPreview';
+import { SplitTaskButton } from './SplitTaskButton';
 import { TaskActivity } from './TaskActivity';
 import { TaskComparison } from './TaskComparison';
 import { TaskDelivery } from './TaskDelivery';
@@ -574,6 +575,10 @@ export function TaskDetail({
                   {!!pending.length && (
                     <Button onClick={() => inspect('question')}>Answer question</Button>
                   )}
+                  <SplitTaskButton
+                    run={run}
+                    onResult={(message, failed) => (failed ? setError : setNotice)(message)}
+                  />
                   <Button
                     variant="outline"
                     disabled={acting || run.status === 'stopping'}

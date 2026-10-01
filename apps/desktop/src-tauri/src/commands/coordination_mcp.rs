@@ -475,6 +475,54 @@ impl CoordinationTools {
     }
 
     #[tool(
+        description = "Copy files another task changed from its current snapshot into your worktree, so you can build on its finished interface now. Only files you have not edited; keep them unchanged afterwards so they stay that task's work. If it changes them again you get a live conflict and can adopt again.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn peer_adopt(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::coordination::peers::PeerAdoptInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let headers = request_headers(&context)?;
+        let Json(result) = super::coordination::peers::bridge_peer_adopt(
+            WebState(self.service.clone()),
+            headers,
+            Json(input),
+        )
+        .await
+        .map_err(|(_, error)| ErrorData::invalid_request(error, None))?;
+        Ok(CallToolResult::structured(result))
+    }
+
+    #[tool(
+        description = "Split off separable remaining work to a new parallel worker. Hand it whole files or folders inside your own paths that you have not edited; you must not edit them afterwards. It joins this task's combined review. Requires the user's permission through automatic subtasks or Split this task. At most three per task.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn propose_subtask(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::coordination::subtasks::SubtaskInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let headers = request_headers(&context)?;
+        let Json(result) = super::coordination::subtasks::bridge_propose_subtask(
+            WebState(self.service.clone()),
+            headers,
+            Json(input),
+        )
+        .await
+        .map_err(|(_, error)| ErrorData::invalid_request(error, None))?;
+        Ok(CallToolResult::structured(result))
+    }
+
+    #[tool(
         description = "Claim a named responsibility, propose an interface agreement, or respond to a handoff. Use project for IDs and current revisions. Pending or rejected interfaces block integration and dependent work. Ownership paths cannot overlap another assignment. This never grants tool permissions or approves code.",
         annotations(
             read_only_hint = false,

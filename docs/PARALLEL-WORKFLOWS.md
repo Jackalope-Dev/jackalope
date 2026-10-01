@@ -99,7 +99,10 @@ existed remain manual.
 With automatic subtasks off, or for a manual recommendation, **Create a plan** or
 **Investigate and plan** starts a planning attempt using the task's selected
 development agent. The agent receives the complete request and checks repository
-boundaries before proposing one to four assignments. Review ownership and
+boundaries before proposing one to four assignments, or up to eight when the
+concurrency limit is higher. Each assignment includes a planner briefing (key files,
+patterns, contracts, checks and pitfalls, under 1,500 characters) that the worker
+receives so it can skip repeated discovery; workers are told to confirm it. Review ownership and
 dependencies, then choose **Start reviewed plan**. Native validation rejects cycles,
 escaping paths and independent assignments with overlapping scopes, for automatic and
 reviewed plans alike. A changed planner attempt requires another review. Planning
@@ -126,8 +129,9 @@ requests keep their existing execution paths.
 
 New managed plans combine groups of at least two completed assignments while other
 work continues. Pending consumers receive the checked combination; running workers
-keep their frozen inputs but can read other assignments' current work through
-[live peer tools](ORCHESTRATION-CAPABILITIES.md#live-peer-work). The combined worker uses a separate worktree, resolves
+keep their frozen inputs but can read or adopt other assignments' current work
+through [live peer tools](ORCHESTRATION-CAPABILITIES.md#live-peer-work) and split off
+[subtasks](ORCHESTRATION-CAPABILITIES.md#subtasks). The combined worker uses a separate worktree, resolves
 overlapping edits and checks the complete result. Native snapshot, process ownership
 and scope guards remain in force, including overlaps with unrelated tasks. Intermediate
 combinations are included in the final source receipt and cannot be applied separately.

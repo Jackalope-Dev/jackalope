@@ -6,6 +6,7 @@ import { taskDecision } from '../../lib/task-workflow';
 import { Button } from '../ui/button';
 import { LiveCombination } from './LiveCombination';
 import { ManagedTaskAgent } from './ManagedTaskAgent';
+import { SplitTaskButton } from './SplitTaskButton';
 import { TaskLiveActivity } from './TaskLiveActivity';
 
 export function ManagedAssignments({
@@ -14,12 +15,14 @@ export function ManagedAssignments({
   onDetails,
   onActivity,
   onRetry,
+  onNotice,
 }: {
   work: ReturnType<typeof managedTaskWork>;
   busy: boolean;
   onDetails: (run: TaskRun) => void;
   onActivity: (run: TaskRun) => void;
   onRetry: (id: string) => void;
+  onNotice: (message: string, failed: boolean) => void;
 }) {
   const started = work.steps.flatMap(({ item, run }) => (run ? [{ item, run }] : []));
   return (
@@ -40,6 +43,15 @@ export function ManagedAssignments({
               {getAgentMetadata(run?.agent ?? item.agent)?.name ?? 'Automatic'}
             </span>
             <h3>{item.title}</h3>
+            {item.parentTaskId && (
+              <p className="task-muted">
+                Split off from{' '}
+                {work.steps.find((step) => step.item.id === item.parentTaskId)?.item.title ??
+                  'another assignment'}
+                {' · '}
+                {item.scopes.join(', ')}
+              </p>
+            )}
             {run && isActive(run) ? (
               <TaskLiveActivity run={run} />
             ) : (
@@ -58,6 +70,7 @@ export function ManagedAssignments({
             )}
           </div>
           <div className="managed-task-actions">
+            {run && <SplitTaskButton run={run} onResult={onNotice} />}
             {run && (
               <Button
                 variant="outline"

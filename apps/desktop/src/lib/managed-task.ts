@@ -16,6 +16,11 @@ export interface ManagedTask {
     appliedAt: string | null;
     reviewSeconds: number | null;
     interventions: number;
+    plannedAt?: string | null;
+    startedAt?: string | null;
+    assignmentCount?: number;
+    autoStarted?: boolean;
+    spawnedSubtasks?: number;
   } | null;
   id: string;
   title: string;

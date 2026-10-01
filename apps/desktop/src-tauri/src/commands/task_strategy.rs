@@ -384,7 +384,7 @@ fn agent_assessment(
     Ok((answer.map(|answer| answer.strategy), response.usage))
 }
 
-fn assess(
+pub(crate) fn assess(
     runtime: &TaskRuntime,
     request: RunRequest,
     intent: String,
