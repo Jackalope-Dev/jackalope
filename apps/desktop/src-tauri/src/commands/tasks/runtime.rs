@@ -1188,7 +1188,10 @@ impl TaskRuntime {
             .ok_or("Attempt not found")?;
         // A focused attempt that changed nothing, such as answering a question, has
         // nothing to check. Planned assignments always verify: dependents need the result.
-        let managed = req.coordination.as_ref().is_some_and(|context| context.managed);
+        let managed = req
+            .coordination
+            .as_ref()
+            .is_some_and(|context| context.managed);
         if req.auto_verify
             && success
             && run.error.is_none()
@@ -1873,7 +1876,10 @@ fn attempt_changed(run: &TaskRun) -> bool {
         .filter(|output| output.status.success())
         .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
     };
-    match (read(&["status", "--porcelain"]), read(&["rev-parse", "HEAD"])) {
+    match (
+        read(&["status", "--porcelain"]),
+        read(&["rev-parse", "HEAD"]),
+    ) {
         (Some(status), Some(head)) => !status.is_empty() || head != run.base_head,
         _ => true,
     }
@@ -1907,13 +1913,19 @@ mod attempt_change_tests {
             base_head: git(&["rev-parse", "HEAD"]),
             ..Default::default()
         };
-        assert!(!attempt_changed(&run), "answering a question changes nothing");
+        assert!(
+            !attempt_changed(&run),
+            "answering a question changes nothing"
+        );
         std::fs::write(root.join("new.txt"), "x").unwrap();
         assert!(attempt_changed(&run));
         git(&["add", "."]);
         git(&["commit", "-m", "work"]);
         assert!(attempt_changed(&run), "committed work still counts");
-        assert!(attempt_changed(&TaskRun::default()), "unknown counts as changed");
+        assert!(
+            attempt_changed(&TaskRun::default()),
+            "unknown counts as changed"
+        );
         std::fs::remove_dir_all(root).unwrap();
     }
 }

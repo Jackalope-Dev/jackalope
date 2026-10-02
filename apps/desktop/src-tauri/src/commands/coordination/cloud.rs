@@ -88,13 +88,20 @@ fn validate(connection: &Connection) -> Result<String, String> {
         || url.query().is_some()
         || url.fragment().is_some()
     {
-        return Err("Use the Worker's https:// URL (http:// only for a local wrangler dev).".into());
+        return Err(
+            "Use the Worker's https:// URL (http:// only for a local wrangler dev).".into(),
+        );
     }
     if connection.token.len() < 32
         || connection.token.len() > 512
-        || connection.token.chars().any(|c| c.is_whitespace() || c.is_control())
+        || connection
+            .token
+            .chars()
+            .any(|c| c.is_whitespace() || c.is_control())
     {
-        return Err("Use the SWARM_TOKEN secret you set on the Worker (at least 32 characters).".into());
+        return Err(
+            "Use the SWARM_TOKEN secret you set on the Worker (at least 32 characters).".into(),
+        );
     }
     Ok(url.as_str().trim_end_matches('/').to_string())
 }
@@ -212,7 +219,11 @@ async fn sync_run(
         let fresh = call(
             connection,
             reqwest::Method::POST,
-            &format!("/v1/swarms/{}/forks/{}/token", segment(repo), segment(&link.fork)),
+            &format!(
+                "/v1/swarms/{}/forks/{}/token",
+                segment(repo),
+                segment(&link.fork)
+            ),
             None,
         )
         .await?;
@@ -245,14 +256,20 @@ async fn sync_run(
         call(
             connection,
             reqwest::Method::POST,
-            &format!("/v1/swarms/{}/forks/{}/analyze", segment(repo), segment(&link.fork)),
+            &format!(
+                "/v1/swarms/{}/forks/{}/analyze",
+                segment(repo),
+                segment(&link.fork)
+            ),
             None,
         )
         .await?;
         link.pushed_tree = Some(tree.into());
     }
     if let Ok(mut forks) = FORKS.lock() {
-        forks.get_or_insert_with(HashMap::new).insert(run.id.clone(), link);
+        forks
+            .get_or_insert_with(HashMap::new)
+            .insert(run.id.clone(), link);
     }
     Ok(())
 }
