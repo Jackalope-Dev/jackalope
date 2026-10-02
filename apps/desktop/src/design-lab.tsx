@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { useShallow } from 'zustand/react/shallow';
 import { AgentAvatar } from './components/agents/AgentAvatar';
 import { LocalAiSetup } from './components/agents/LocalAiSetup';
+import { WelcomeDialog } from './components/layout/WelcomeDialog';
 import { JackalopeMascot } from './components/mascot/JackalopeMascot';
 import { ThemeEditor } from './components/theme/ThemeEditor';
 import { Button } from './components/ui/button';
@@ -22,6 +23,7 @@ function DesignLab() {
   useEffect(startThemeClock, []);
   const [theme, setTheme] = useState(DEFAULT_THEME);
   const [replay, setReplay] = useState(0);
+  const [welcome, setWelcome] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [period, setPeriod] = useState('30');
   const [agentState, setAgentState] = useState('idle');
@@ -33,6 +35,20 @@ function DesignLab() {
   return (
     <main className="h-dvh overflow-y-auto p-8 lg:p-16 bg-[var(--color-shell)]">
       <div className="max-w-5xl mx-auto">
+        <div className="mb-10 flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={() => {
+              try {
+                localStorage.removeItem('jackalope.welcome.seen');
+              } catch {}
+              setWelcome((value) => value + 1);
+            }}
+          >
+            Show first-launch welcome
+          </Button>
+          {welcome > 0 && <WelcomeDialog key={welcome} />}
+        </div>
         <p className="mb-3 text-sm">
           Local setup fixture: browser state only; no installation, download or native tasks.
         </p>

@@ -25,6 +25,7 @@ export function UpdateNotice() {
     };
   }, [update.load]);
   const version = availableUpdateId(update.release);
+  const ready = !!version && update.downloadedVersion === version;
   useCompanionNotices(
     'update',
     update.error
@@ -47,10 +48,21 @@ export function UpdateNotice() {
                 : update.release?.storeManaged
                   ? 'A Jackalope update is available'
                   : `Jackalope ${version} is available`,
-              detail: 'Ready to install when your work is saved.',
+              detail: ready
+                ? 'Downloaded and ready. Restart when your work is saved.'
+                : 'Install now, or open the details first.',
               kind: 'info',
-              actionLabel: 'Review update',
-              onOpen: () => setOpen(true),
+              actionLabel: ready
+                ? 'Restart to update'
+                : update.release?.storeManaged
+                  ? 'Install update'
+                  : 'Download and install',
+              // Installing checks for active work natively; the details dialog
+              // opens alongside so progress and any blocking reason stay visible.
+              onOpen: () => {
+                setOpen(true);
+                void useUpdateStore.getState().install();
+              },
               onDismiss: update.installing ? undefined : update.dismiss,
             },
           ]

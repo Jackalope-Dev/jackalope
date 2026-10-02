@@ -1,5 +1,5 @@
-import { ListTodo, Monitor, SquareTerminal } from 'lucide-react';
-import { useState } from 'react';
+import { ListTodo, Megaphone, Monitor, SquareTerminal } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { isActive } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -8,6 +8,7 @@ import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { Companion } from '../mascot/Companion';
+import { FeedbackDialog } from '../settings/FeedbackDialog';
 import { useFocusedWork } from './BranchIndicator';
 import { InvitationsButton } from './InvitationsButton';
 import { navigateWorkspace } from './navigation';
@@ -26,6 +27,8 @@ export function WorkspaceStatusBar({
 }) {
   const host = useHostContextStore((state) => state.host);
   const [terminalError, setTerminalError] = useState('');
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const feedbackButton = useRef<HTMLButtonElement>(null);
   const runs = useExecutionStore((state) => state.runs);
   const sessionRuns = useLiveSessionStore((state) => state.runs);
   const { project, checkout } = useFocusedWork();
@@ -76,6 +79,18 @@ export function WorkspaceStatusBar({
       )}
       {onInvitations && <InvitationsButton compact onClick={onInvitations} />}
       <StatusBarUsage remote={Boolean(host)} />
+      <button ref={feedbackButton} type="button" onClick={() => setFeedbackOpen(true)}>
+        <Megaphone size={15} aria-hidden="true" />
+        <span className="statusbar-label">Feedback</span>
+      </button>
+      <FeedbackDialog
+        open={feedbackOpen}
+        onOpenChange={setFeedbackOpen}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          feedbackButton.current?.focus();
+        }}
+      />
       <Companion compact onSearch={onSearch} onSettings={onSettings} />
     </section>
   );

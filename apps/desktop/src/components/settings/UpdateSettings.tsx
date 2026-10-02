@@ -27,6 +27,13 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
   const { release, progress } = update;
   const available = availableUpdateId(release);
   const busy = update.checking || update.installing || update.changingChannel;
+  const ready = !!available && update.downloadedVersion === available;
+  const downloadPercent = update.downloadProgress?.total
+    ? Math.min(
+        100,
+        Math.floor((update.downloadProgress.downloaded / update.downloadProgress.total) * 100),
+      )
+    : null;
   const percent = progress?.total
     ? Math.min(100, Math.floor((progress.downloaded / progress.total) * 100))
     : null;
@@ -94,6 +101,21 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
               onCheckedChange={update.setAutoCheck}
             />
           </div>
+          {!release.storeManaged && (
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium">Download updates automatically</p>
+                <p className="settings-row-description">
+                  Installs only when you choose Restart to update.
+                </p>
+              </div>
+              <Switch
+                label="Download updates automatically"
+                checked={update.autoDownload}
+                onCheckedChange={update.setAutoDownload}
+              />
+            </div>
+          )}
           <Button
             variant="outline"
             disabled={busy || update.installed}
@@ -123,6 +145,18 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
               <ReleaseNotes notes={release.notes} />
             </Disclosure>
           )}
+          {update.downloading && (
+            <p className="settings-row-description" role="status">
+              {downloadPercent === null
+                ? 'Downloading in the background…'
+                : `Downloading in the background… ${downloadPercent}%`}
+            </p>
+          )}
+          {ready && !update.installing && (
+            <p className="settings-row-description" role="status">
+              Downloaded and ready. Restarting takes a few seconds.
+            </p>
+          )}
           {blocked && (
             <p className="text-sm" role="status">
               Finish active tasks, resolve interrupted work and save task history to install.
@@ -142,7 +176,11 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
                   : `Downloading update… ${percent}%`
             }
           >
-            {release.storeManaged ? 'Install update' : 'Install and restart'}
+            {release.storeManaged
+              ? 'Install update'
+              : ready
+                ? 'Restart to update'
+                : 'Install and restart'}
           </Button>
           {update.installing && (
             <p className="settings-row-description" role="status">

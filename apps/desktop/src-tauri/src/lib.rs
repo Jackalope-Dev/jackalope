@@ -310,6 +310,7 @@ pub fn run(launch: Launch) {
             commands::account::feedback::app_account_feedback,
             commands::release::app_release_status,
             commands::release::app_install_update,
+            commands::release::app_download_update,
             system_get_info,
             commands::desktop_control::platform::desktop_control_request_permissions,
             commands::desktop_control::platform::desktop_control_open_settings,

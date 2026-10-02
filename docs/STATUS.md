@@ -327,7 +327,9 @@ The website provides setup and workflow guides, compatibility tables, sample-wor
 media and account flows. Its content is shared with bundled native help through
 `packages/knowledge`. Build and release tooling uses Windows Store MSIX and macOS/Linux Cloud candidates.
 Store builds offer in-app update checks and user-initiated installation through
-Microsoft Store; Store-managed background delivery remains independent. Store members can request
+Microsoft Store; Store-managed background delivery remains independent. Other desktop builds
+can optionally download a found update in the background; installation still waits
+for idle work and the title bar's Restart to update action. Store members can request
 beta flight membership in the app; the operator applies it in Partner Center from
 the admin console's request list. Branch-based
 beta/stable publication is separate from master development and checks complete artifact sets, source checks, signing and
