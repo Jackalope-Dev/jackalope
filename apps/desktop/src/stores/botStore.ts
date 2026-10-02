@@ -35,7 +35,15 @@ export const BOT_STYLES = [
   { id: 'grok', name: 'Orbit' },
   { id: 'antigravity', name: 'Peak' },
   { id: 'opencode', name: 'Octagon' },
-  { id: 'kimi', name: 'Crescent' },
+  { id: 'moon', name: 'Moon' },
+  { id: 'blob', name: 'Blob' },
+  { id: 'heart', name: 'Heart' },
+  { id: 'cloud', name: 'Cloud' },
+  { id: 'ghost', name: 'Ghost' },
+  { id: 'cat', name: 'Cat' },
+  { id: 'gem', name: 'Gem' },
+  { id: 'shield', name: 'Shield' },
+  { id: 'sprout', name: 'Sprout' },
 ] as const;
 
 /** Saturated mid-tones that keep the character's surface-coloured eyes visible in both themes. */

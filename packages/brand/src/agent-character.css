@@ -3,7 +3,8 @@
   width: 100%;
   height: 100%;
   overflow: visible;
-  color: var(--color-text-primary);
+  /* --agent-color lets a bot wear its chosen colour. */
+  color: var(--agent-color, var(--color-text-primary));
 }
 .brand-agent-echo {
   stroke: currentColor;

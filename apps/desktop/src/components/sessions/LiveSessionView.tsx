@@ -1,5 +1,5 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { CopyButton } from '@jackalope/ui';
+import { CopyButton, DropdownMenu as Menu } from '@jackalope/ui';
 import {
   ArrowLeft,
   ChevronDown,
@@ -7,6 +7,7 @@ import {
   ExternalLink,
   Minus,
   Monitor,
+  MoreHorizontal,
   PanelRightClose,
   Pause,
   Pin,
@@ -14,7 +15,7 @@ import {
   Square,
   X,
 } from 'lucide-react';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
 import {
   type LiveSession,
@@ -26,10 +27,12 @@ import {
 import { isActive, nativeTask, respondToPrompt, type TaskRun } from '../../lib/task-runtime';
 import { taskDecision } from '../../lib/task-workflow';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { BOT_COLORS, useBotStore } from '../../stores/botStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
+import { botStyle } from '../bots/BotAvatar';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { AgentQuestion } from '../tasks/AgentQuestion';
 import { AgentScreen } from '../tasks/AgentScreen';
@@ -218,7 +221,12 @@ export function LiveSessionView({
       setReview(await sessionCommand<SessionReview>('review', { id: session.id }));
     });
   };
-  const provider = active?.agent ?? latest?.agent ?? session.request.agent;
+  const bot = useBotStore((state) => state.bots.find((item) => item.id === session.persona?.botId));
+  // A bot's conversation wears the bot's own character and colour instead of the agent's.
+  const botLook = bot ? botStyle(bot.appearance, bot.agent) : null;
+  const botColor = BOT_COLORS.find((item) => item.id === bot?.appearance?.color)?.value;
+  const character = (agent: string) => botLook ?? agent;
+  const provider = character(active?.agent ?? latest?.agent ?? session.request.agent);
   const screenRun = active ?? latest;
   const tools = (
     <>
@@ -318,10 +326,31 @@ export function LiveSessionView({
       )}
     </>
   );
+  const pauseLabel = integrated
+    ? 'Integrated'
+    : session.closed
+      ? 'Reopen session'
+      : session.paused
+        ? 'Resume queue'
+        : 'Pause queue';
+  const togglePause = () =>
+    void act(() =>
+      sessionCommand('action', {
+        id: session.id,
+        action: session.paused || session.closed ? 'resume' : 'pause',
+      }),
+    );
+  const stopWork = () =>
+    void act(async () => {
+      if (!active) return;
+      await sessionCommand('action', { id: session.id, action: 'pause' });
+      await nativeTask('task_stop', { id: active.id });
+    });
   return (
     <section
       className={`live-session${detached ? ' live-session-detached' : ''}`}
       aria-label={session.title}
+      style={botColor ? ({ '--agent-color': botColor } as CSSProperties) : undefined}
     >
       <header
         className={`live-header${detached && /Mac/.test(navigator.platform) ? ' live-header-native-mac' : ''}`}
@@ -368,78 +397,71 @@ export function LiveSessionView({
           {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
         <div className="live-status-actions">
-          <Button
-            variant="outline"
-            size={detached ? 'icon' : undefined}
-            aria-label={
-              integrated
-                ? 'Integrated'
-                : session.closed
-                  ? 'Reopen session'
-                  : session.paused
-                    ? 'Resume queue'
-                    : 'Pause queue'
-            }
-            disabled={busy || integrated}
-            onClick={() =>
-              void act(() =>
-                sessionCommand('action', {
-                  id: session.id,
-                  action: session.paused || session.closed ? 'resume' : 'pause',
-                }),
-              )
-            }
-          >
-            {detached ? (
-              session.paused || session.closed ? (
-                <Play size={16} />
-              ) : (
-                <Pause size={16} />
-              )
-            ) : integrated ? (
-              'Integrated'
-            ) : session.closed ? (
-              'Reopen session'
-            ) : session.paused ? (
-              'Resume queue'
-            ) : (
-              'Pause queue'
-            )}
-          </Button>
-          {active && (
-            <Button
-              variant="outline"
-              size={detached ? 'icon' : undefined}
-              aria-label="Stop work"
-              disabled={busy}
-              onClick={() =>
-                void act(async () => {
-                  await sessionCommand('action', { id: session.id, action: 'pause' });
-                  await nativeTask('task_stop', { id: active.id });
-                })
-              }
-            >
-              {detached ? <Square size={16} /> : 'Stop work'}
-            </Button>
-          )}
           {detached ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={collapsed ? 'Expand conversation' : 'Collapse conversation'}
-              aria-expanded={!collapsed}
-              onClick={() => setCollapsed(!collapsed)}
-            >
-              {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label={pauseLabel}
+                disabled={busy || integrated}
+                onClick={togglePause}
+              >
+                {session.paused || session.closed ? <Play size={16} /> : <Pause size={16} />}
+              </Button>
+              {active && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="Stop work"
+                  disabled={busy}
+                  onClick={stopWork}
+                >
+                  <Square size={16} />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={collapsed ? 'Expand conversation' : 'Collapse conversation'}
+                aria-expanded={!collapsed}
+                onClick={() => setCollapsed(!collapsed)}
+              >
+                {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+              </Button>
+            </>
           ) : (
-            <Button
-              variant={latest && !active && !integrated ? undefined : 'ghost'}
-              disabled={!latest || !!active || busy}
-              onClick={showReview}
-            >
-              Review changes
-            </Button>
+            <>
+              <Menu.Root>
+                <Menu.Trigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="Session actions" disabled={busy}>
+                    <MoreHorizontal size={16} aria-hidden="true" />
+                  </Button>
+                </Menu.Trigger>
+                <Menu.Portal>
+                  <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
+                    <Menu.Item
+                      className="workspace-menu-item"
+                      disabled={integrated}
+                      onSelect={togglePause}
+                    >
+                      {pauseLabel}
+                    </Menu.Item>
+                    {active && (
+                      <Menu.Item className="workspace-menu-item" onSelect={stopWork}>
+                        Stop work
+                      </Menu.Item>
+                    )}
+                  </Menu.Content>
+                </Menu.Portal>
+              </Menu.Root>
+              <Button
+                variant={latest && !active && !integrated ? undefined : 'outline'}
+                disabled={!latest || !!active || busy}
+                onClick={showReview}
+              >
+                Review changes
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -501,8 +523,11 @@ export function LiveSessionView({
                 const lastInBatch = batch?.messageIds.at(-1) === message.id;
                 return (
                   <div key={message.id}>
-                    <article className="live-message" data-canceled={message.canceled || undefined}>
-                      <span className="live-author">You</span>
+                    <article
+                      className="live-message live-sent"
+                      data-canceled={message.canceled || undefined}
+                    >
+                      <span className="live-author sr-only">You</span>
                       <p>{message.text}</p>
                       <div className="live-receipt">
                         {message.canceled
@@ -539,13 +564,14 @@ export function LiveSessionView({
                       <article className="live-message live-reply">
                         <span className="live-mascot">
                           <AgentCharacter
-                            provider={run.agent}
+                            provider={character(run.agent)}
                             state={isActive(run) ? 'working' : 'idle'}
                           />
                         </span>
                         <div>
                           <span className="live-author">
-                            {run.agent === 'auto' ? 'Jackalope' : run.agent}
+                            {session.persona?.name ??
+                              (run.agent === 'auto' ? 'Jackalope' : run.agent)}
                           </span>
                           <Suspense fallback={<p>{run.result}</p>}>
                             <TranscriptResult
@@ -565,7 +591,7 @@ export function LiveSessionView({
                 <div className="live-working">
                   <span className="live-mascot">
                     <AgentCharacter
-                      provider={active.agent}
+                      provider={character(active.agent)}
                       state={questions.length ? 'waiting' : 'working'}
                     />
                   </span>
@@ -647,7 +673,7 @@ export function LiveSessionView({
                       <div className="live-work-row" key={batch.runId}>
                         <span className="live-mascot">
                           <AgentCharacter
-                            provider={run?.agent ?? session.request.agent}
+                            provider={character(run?.agent ?? session.request.agent)}
                             state={run && isActive(run) ? 'working' : 'idle'}
                           />
                         </span>

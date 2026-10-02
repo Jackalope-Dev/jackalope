@@ -1,5 +1,4 @@
 import {
-  Badge,
   ConfirmDialog,
   FormField,
   Input,
@@ -7,6 +6,7 @@ import {
   Switch,
   Textarea,
 } from '@jackalope/ui';
+import * as Dialog from '@radix-ui/react-dialog';
 import { CalendarClock, MessageSquare, MoreHorizontal, Pin, Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -24,11 +24,11 @@ import {
   routinePrompt,
   useBotStore,
 } from '../../stores/botStore';
-import { useExecutionStore } from '../../stores/executionStore';
-import { useLiveSessionStore } from '../../stores/liveSessionStore';
+import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { agentAccountFor, type Project, useProjectStore } from '../../stores/projectStore';
-import { navigateWorkspace } from '../layout/navigation';
+import { LiveSessionView } from '../sessions/LiveSessionView';
 import { Button } from '../ui/button';
+import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
@@ -54,15 +54,25 @@ function blankDraft(projectId: string, template?: BotTemplate): BotDraft {
     model: null,
     projectId,
     connectionIds: null,
-    appearance: {
+    appearance: template?.appearance ?? {
       style: BOT_STYLES[Math.floor(Math.random() * BOT_STYLES.length)].id,
       color: 'accent',
     },
   };
 }
 
-/** Builds the run request a bot's conversation or routine starts with. */
-function botRequest(bot: Bot, project: Project, id: string, prompt: string): RunRequest {
+/**
+ * Builds the run request a bot's conversation or routine starts with. Conversations
+ * skip workspace preparation and automatic checks so a quick question answers quickly;
+ * the agent can still run the saved check itself. Routines prepare and verify as tasks do.
+ */
+function botRequest(
+  bot: Bot,
+  project: Project,
+  id: string,
+  prompt: string,
+  conversation = false,
+): RunRequest {
   const adapter =
     useAgentConfigStore.getState().customAgents.find((agent) => agent.id === bot.agent)?.adapter ??
     bot.agent;
@@ -79,17 +89,10 @@ function botRequest(bot: Bot, project: Project, id: string, prompt: string): Run
     isolated: true,
     targetBranch: project.preferences?.baseBranch || project.gitBranch,
     verifyCommand: project.preferences?.verifyCommand,
-    prepareCommand: project.preferences?.prepareCommand,
+    prepareCommand: conversation ? undefined : project.preferences?.prepareCommand,
     setupFiles: project.preferences?.setupFiles,
-    autoVerify: project.preferences?.autoVerify ?? true,
+    autoVerify: conversation ? false : (project.preferences?.autoVerify ?? true),
   };
-}
-
-/** Opens a conversation in Work, switching to its project first. */
-function openConversation(session: Pick<LiveSession, 'id' | 'request'>) {
-  useProjectStore.getState().selectProject(session.request.projectId);
-  useLiveSessionStore.getState().select(session.id);
-  navigateWorkspace('live-sessions');
 }
 
 export function BotsWorkspace() {
@@ -99,6 +102,11 @@ export function BotsWorkspace() {
   const projects = useProjectStore((state) => state.projects);
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
   const sessions = useLiveSessionStore((state) => state.sessions);
+  const sessionRuns = useLiveSessionStore((state) => state.runs);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [pickingTemplate, setPickingTemplate] = useState(false);
+  const open = sessions.find((session) => session.id === openId && session.persona);
+  useEffect(observeLiveSessions, []);
   const [editing, setEditing] = useState<{ bot?: Bot; draft: BotDraft } | null>(null);
   const [deleting, setDeleting] = useState<Bot | null>(null);
   const roster = useMemo(() => rosterOrder(bots), [bots]);
@@ -120,25 +128,18 @@ export function BotsWorkspace() {
     <WorkspacePage className="bots-page">
       <WorkspaceHeading
         title="Bots"
-        description="Saved agents with their own role, model and apps. Message a bot to start a conversation with it."
         action={
-          bots.length > 0 && (
-            <Button onClick={() => startNew()} disabled={!projects.length}>
-              <Plus size={16} aria-hidden="true" />
-              New bot
-            </Button>
-          )
+          <Button onClick={() => startNew()} disabled={!projects.length}>
+            <Plus size={16} aria-hidden="true" />
+            Create a new bot
+          </Button>
         }
       />
       {!projects.length && (
         <InlineNotice>Add a project first. Each bot works inside one project.</InlineNotice>
       )}
       {bots.length === 0 ? (
-        <BotTemplates
-          disabled={!projects.length}
-          onUse={(template) => startNew(template)}
-          onBlank={() => startNew()}
-        />
+        <BotTemplates disabled={!projects.length} onUse={(template) => startNew(template)} />
       ) : (
         <div className="bots-layout">
           <nav className="bots-roster" aria-label="Bots">
@@ -173,17 +174,54 @@ export function BotsWorkspace() {
                 </div>
               );
             })}
+            <button
+              type="button"
+              className="bots-roster-template"
+              disabled={!projects.length}
+              onClick={() => setPickingTemplate(true)}
+            >
+              Create from template
+            </button>
           </nav>
-          {selected && (
-            <BotProfile
-              key={selected.id}
-              bot={selected}
-              project={projects.find((project) => project.id === selected.projectId)}
-              conversations={conversationsFor(selected)}
-              onEdit={() => setEditing({ bot: selected, draft: selected })}
-            />
+          {open ? (
+            <div className="bots-conversation">
+              <LiveSessionView
+                key={open.id}
+                session={open}
+                runs={sessionRuns}
+                initialDetailsOpen={false}
+                onBack={() => setOpenId(null)}
+              />
+            </div>
+          ) : (
+            selected && (
+              <BotProfile
+                key={selected.id}
+                bot={selected}
+                project={projects.find((project) => project.id === selected.projectId)}
+                conversations={conversationsFor(selected)}
+                onEdit={() => setEditing({ bot: selected, draft: selected })}
+                onOpen={setOpenId}
+              />
+            )
           )}
         </div>
+      )}
+      {pickingTemplate && (
+        <Dialog.Root open onOpenChange={(value) => !value && setPickingTemplate(false)}>
+          <DialogContent className="bots-template-dialog">
+            <DialogHeader title="Create from template" />
+            <DialogCloseButton />
+            <BotTemplates
+              disabled={!projects.length}
+              heading={false}
+              onUse={(template) => {
+                setPickingTemplate(false);
+                startNew(template);
+              }}
+            />
+          </DialogContent>
+        </Dialog.Root>
       )}
       {editing && (
         <BotEditor
@@ -218,22 +256,19 @@ export function BotsWorkspace() {
 function BotTemplates({
   disabled,
   onUse,
-  onBlank,
+  heading = true,
 }: {
   disabled: boolean;
   onUse: (template: BotTemplate) => void;
-  onBlank: () => void;
+  heading?: boolean;
 }) {
   return (
     <section className="workspace-section workspace-stack">
-      <WorkspaceSectionHeading
-        title="Start from a template"
-        description="Every field stays editable. Templates never grant access or start work."
-      />
+      {heading && <WorkspaceSectionHeading title="Start from a template" />}
       <ul className="bots-templates">
         {BOT_TEMPLATES.map((template) => (
           <li key={template.id} className="bots-template">
-            <BotAvatar />
+            <BotAvatar appearance={template.appearance} />
             <div>
               <strong>{template.name}</strong>
               <p>{template.role}</p>
@@ -244,12 +279,6 @@ function BotTemplates({
           </li>
         ))}
       </ul>
-      <div>
-        <Button disabled={disabled} onClick={onBlank}>
-          <Plus size={16} aria-hidden="true" />
-          Start from scratch
-        </Button>
-      </div>
     </section>
   );
 }
@@ -302,17 +331,14 @@ function BotProfile({
   project,
   conversations,
   onEdit,
+  onOpen,
 }: {
   bot: Bot;
   project?: Project;
   conversations: LiveSession[];
   onEdit: () => void;
+  onOpen: (id: string) => void;
 }) {
-  const runners = useExecutionStore((state) => state.runners);
-  const agentName =
-    bot.agent === 'auto'
-      ? 'Automatic'
-      : (runners.find((runner) => runner.id === bot.agent)?.name ?? bot.agent);
   const draftKey = `jackalope-bot-draft:${bot.id}`;
   const [text, setText] = useState(() => localStorage.getItem(draftKey) ?? '');
   const [busy, setBusy] = useState(false);
@@ -327,8 +353,8 @@ function BotProfile({
   const send = async () => {
     const value = text.trim();
     if (!value || !project || busy) return;
-    if (new TextEncoder().encode(value).length > 12000) {
-      setError('Shorten this message to 12,000 UTF-8 bytes. Your draft is preserved.');
+    if ([...value].length > 12000) {
+      setError('Shorten this message to 12,000 characters. Your draft is preserved.');
       return;
     }
     // Retrying the same text reuses identifiers so a slow first attempt cannot duplicate it.
@@ -341,7 +367,7 @@ function BotProfile({
       await syncAgentConfig();
       await sessionCommand('create', {
         id: attempt.id,
-        request: botRequest(bot, project, attempt.id, value),
+        request: botRequest(bot, project, attempt.id, value, true),
         firstMessage: { id: attempt.messageId, text: value },
         limits: { maxBatches: null, pauseAtEstimatedUsd: null },
         persona: { botId: bot.id, name: bot.name, instructions: bot.instructions },
@@ -349,7 +375,7 @@ function BotProfile({
       setText('');
       pending.current = null;
       await useLiveSessionStore.getState().refresh(attempt.id);
-      openConversation({ id: attempt.id, request: botRequest(bot, project, attempt.id, value) });
+      onOpen(attempt.id);
     } catch (cause) {
       setError(String(cause));
     } finally {
@@ -363,25 +389,17 @@ function BotProfile({
         <div className="bots-profile-identity">
           <h2>{bot.name}</h2>
           {bot.role && <p>{bot.role}</p>}
-          <div className="bots-profile-meta">
-            <Badge>
-              {agentName}
-              {bot.agent !== 'auto' && bot.model ? ` · ${bot.model.name}` : ''}
-            </Badge>
-            <Badge appearance="plain">{project?.name ?? 'Project unavailable'}</Badge>
-            <Badge appearance="plain">
-              {bot.connectionIds === null
-                ? 'All connections'
-                : `${bot.connectionIds.length} ${bot.connectionIds.length === 1 ? 'connection' : 'connections'}`}
-            </Badge>
-          </div>
         </div>
-        <Button variant="outline" onClick={onEdit}>
-          Edit bot
-        </Button>
       </header>
       {!project && (
-        <InlineNotice tone="warning">
+        <InlineNotice
+          tone="warning"
+          action={
+            <Button variant="outline" onClick={onEdit}>
+              Edit bot
+            </Button>
+          }
+        >
           This bot’s project is no longer in Jackalope. Edit the bot to choose another project.
         </InlineNotice>
       )}
@@ -409,7 +427,6 @@ function BotProfile({
         />
         {error && <InlineNotice tone="error">{error}</InlineNotice>}
         <div className="bots-composer-actions">
-          <span className="task-muted">Starts a new conversation in Work.</span>
           <Button
             type="submit"
             disabled={!text.trim() || !project || !isTauriEnvironment()}
@@ -421,22 +438,12 @@ function BotProfile({
         </div>
       </form>
       <section className="workspace-section workspace-stack">
-        <WorkspaceSectionHeading title="Instructions" />
-        <p className="bots-instructions">
-          {bot.instructions || 'No standing instructions. Edit the bot to add some.'}
-        </p>
-      </section>
-      <section className="workspace-section workspace-stack">
         <WorkspaceSectionHeading title="Conversations" />
         {conversations.length ? (
           <ul className="bots-list">
             {conversations.slice(0, 12).map((session) => (
               <li key={session.id}>
-                <button
-                  type="button"
-                  className="bots-list-row"
-                  onClick={() => openConversation(session)}
-                >
+                <button type="button" className="bots-list-row" onClick={() => onOpen(session.id)}>
                   <MessageSquare size={16} aria-hidden="true" />
                   <span>{session.title}</span>
                   <small>
@@ -526,7 +533,7 @@ function BotRoutines({ bot, project }: { bot: Bot; project: Project }) {
     <section className="workspace-section workspace-stack">
       <WorkspaceSectionHeading
         title="Routines"
-        description="Scheduled work this bot runs on its own. Manage timing and history in Automations."
+        description="Manage timing and history in Automations."
         action={
           !adding && (
             <Button variant="outline" onClick={() => setAdding(true)}>
