@@ -9,6 +9,7 @@ import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { BetaProgram } from './BetaProgram';
 import { ReleaseNotes } from './ReleaseNotes';
+import { SettingBody, SettingGroup } from './Setting';
 
 export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }) {
   const update = useUpdateStore();
@@ -29,9 +30,9 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
   const percent = progress?.total
     ? Math.min(100, Math.floor((progress.downloaded / progress.total) * 100))
     : null;
-  return (
-    <section className="space-y-3" aria-label="App updates">
-      {showHeading && <h3 className="text-base font-medium">App updates</h3>}
+  const content = (
+    <>
+      {' '}
       {release && (
         <p className="settings-row-description flex items-center gap-2">
           Version {release.currentVersion}
@@ -167,6 +168,15 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
           )}
         </p>
       )}
+    </>
+  );
+  return showHeading ? (
+    <SettingGroup aria-label="App updates" title={'App updates'}>
+      <SettingBody>{content}</SettingBody>
+    </SettingGroup>
+  ) : (
+    <section className="space-y-3" aria-label="App updates">
+      {content}
     </section>
   );
 }

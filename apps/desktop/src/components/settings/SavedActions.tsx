@@ -6,6 +6,7 @@ import { type SavedAction, useSavedActionsStore } from '../../stores/savedAction
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
+import { Setting, SettingActions, SettingBody, SettingGroup } from './Setting';
 
 const empty = (): SavedAction => ({
   id: crypto.randomUUID(),
@@ -21,37 +22,44 @@ export function SavedActions() {
   const projects = useProjectStore((state) => state.projects);
   const [draft, setDraft] = useState(empty);
   const [error, setError] = useState('');
+  const editing = actions.some((action) => action.id === draft.id);
   return (
-    <div className="project-workspace-fields">
-      <p className="task-muted">
-        Prompts fill a conversation draft. Commands are offered in an idle task terminal and run
-        only when you choose Run command. Saved on this device.
-      </p>
-      {actions.map((action) => (
-        <div className="flex flex-wrap items-center gap-2" key={action.id}>
-          <span className="flex-1">
-            {action.name} · {action.kind} ·{' '}
-            {action.projectId
-              ? (projects.find((project) => project.id === action.projectId)?.name ??
-                'Unavailable project')
-              : 'All projects'}
-          </span>
-          <Button variant="ghost" onClick={() => setDraft(action)}>
-            Edit
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              remove(action.id);
-              if (draft.id === action.id) setDraft(empty());
-            }}
-          >
-            Delete
-          </Button>
-        </div>
-      ))}
+    <>
+      {actions.length > 0 && (
+        <SettingGroup
+          title="Saved actions"
+          description="Prompts fill a conversation draft. Commands are offered in an idle task terminal and run only when you choose Run command. Saved on this device."
+        >
+          {actions.map((action) => (
+            <Setting
+              key={action.id}
+              title={action.name}
+              description={`${action.kind === 'command' ? 'Terminal command' : 'Prompt preset'} · ${
+                action.projectId
+                  ? (projects.find((project) => project.id === action.projectId)?.name ??
+                    'Unavailable project')
+                  : 'All projects'
+              }`}
+            >
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={() => setDraft(action)}>
+                  Edit
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    remove(action.id);
+                    if (draft.id === action.id) setDraft(empty());
+                  }}
+                >
+                  Delete
+                </Button>
+              </div>
+            </Setting>
+          ))}
+        </SettingGroup>
+      )}
       <form
-        className="project-workspace-fields"
         onSubmit={(event) => {
           event.preventDefault();
           try {
@@ -63,59 +71,70 @@ export function SavedActions() {
           }
         }}
       >
-        <FormField label="Name">
-          <Input
-            aria-label="Saved action name"
-            value={draft.name}
-            maxLength={80}
-            onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-          />
-        </FormField>
-        <FormField label="Type">
-          <Select
-            aria-label="Saved action type"
-            value={draft.kind}
-            onValueChange={(kind) => setDraft({ ...draft, kind: kind as SavedAction['kind'] })}
-          >
-            <SelectItem value="prompt">Prompt preset</SelectItem>
-            <SelectItem value="command">Terminal command</SelectItem>
-          </Select>
-        </FormField>
-        <FormField label="Available in">
-          <Select
-            aria-label="Saved action scope"
-            value={draft.projectId ?? '__all'}
-            onValueChange={(value) =>
-              setDraft({ ...draft, projectId: value === '__all' ? null : value })
-            }
-          >
-            <SelectItem value="__all">All projects</SelectItem>
-            {projects.map((project) => (
-              <SelectItem key={project.id} value={project.id}>
-                {project.name}
-              </SelectItem>
-            ))}
-          </Select>
-        </FormField>
-        <FormField label={draft.kind === 'command' ? 'Command' : 'Prompt'}>
-          <Textarea
-            aria-label="Saved action text"
-            rows={5}
-            maxLength={12000}
-            value={draft.body}
-            onChange={(event) => setDraft({ ...draft, body: event.target.value })}
-          />
-        </FormField>
-        <div className="flex gap-2">
-          <Button type="submit" disabled={!draft.name.trim() || !draft.body.trim()}>
-            Save action
-          </Button>
-          <Button variant="ghost" onClick={() => setDraft(empty())}>
-            Clear
-          </Button>
-        </div>
+        <SettingGroup
+          title={editing ? `Edit ${draft.name || 'saved action'}` : 'New saved action'}
+          description={
+            actions.length
+              ? undefined
+              : 'Prompts fill a conversation draft. Commands are offered in an idle task terminal and run only when you choose Run command. Saved on this device.'
+          }
+        >
+          <SettingBody>
+            <FormField label="Name">
+              <Input
+                aria-label="Saved action name"
+                value={draft.name}
+                maxLength={80}
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+              />
+            </FormField>
+            <FormField label="Type">
+              <Select
+                aria-label="Saved action type"
+                value={draft.kind}
+                onValueChange={(kind) => setDraft({ ...draft, kind: kind as SavedAction['kind'] })}
+              >
+                <SelectItem value="prompt">Prompt preset</SelectItem>
+                <SelectItem value="command">Terminal command</SelectItem>
+              </Select>
+            </FormField>
+            <FormField label="Available in">
+              <Select
+                aria-label="Saved action scope"
+                value={draft.projectId ?? '__all'}
+                onValueChange={(value) =>
+                  setDraft({ ...draft, projectId: value === '__all' ? null : value })
+                }
+              >
+                <SelectItem value="__all">All projects</SelectItem>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </Select>
+            </FormField>
+            <FormField label={draft.kind === 'command' ? 'Command' : 'Prompt'}>
+              <Textarea
+                aria-label="Saved action text"
+                rows={5}
+                maxLength={12000}
+                value={draft.body}
+                onChange={(event) => setDraft({ ...draft, body: event.target.value })}
+              />
+            </FormField>
+          </SettingBody>
+          <SettingActions>
+            <Button type="submit" disabled={!draft.name.trim() || !draft.body.trim()}>
+              Save action
+            </Button>
+            <Button variant="ghost" onClick={() => setDraft(empty())}>
+              {editing ? 'Cancel' : 'Clear'}
+            </Button>
+          </SettingActions>
+        </SettingGroup>
       </form>
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
-    </div>
+    </>
   );
 }

@@ -18,7 +18,7 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { CliCommandSetting } from './CliCommandSetting';
-import { Setting, SettingGroup } from './Setting';
+import { Setting, SettingActions, SettingGroup } from './Setting';
 
 export interface DesktopActivity {
   mode: 'off' | 'working' | 'always';
@@ -94,22 +94,7 @@ export function DesktopPreferences() {
   };
   return (
     <>
-      <SettingGroup>
-        <Setting
-          title="Keep computer awake"
-          description="Prevent idle sleep while Jackalope is open. While working covers agent runs and finishing checks; it releases when they finish. Your display can still sleep. Explicit sleep and closing the lid follow your system settings."
-        >
-          <Select
-            aria-label="Keep computer awake"
-            value={activity?.mode ?? 'off'}
-            disabled={!activity || saving}
-            onValueChange={(value) => void awake(value as DesktopActivity['mode'])}
-          >
-            <SelectItem value="off">Off</SelectItem>
-            <SelectItem value="working">While work runs</SelectItem>
-            <SelectItem value="always">While Jackalope is open</SelectItem>
-          </Select>
-        </Setting>
+      <SettingGroup title="Display & editor">
         <Setting title="Interface zoom">
           <Select
             aria-label="Interface zoom"
@@ -135,6 +120,8 @@ export function DesktopPreferences() {
             <SelectItem value="cursor">Cursor</SelectItem>
           </Select>
         </Setting>
+      </SettingGroup>
+      <SettingGroup title="Terminal">
         <Setting
           title="Terminal shell"
           description="Applies when starting a terminal. WSL terminals do not change the environment used by agents or checks."
@@ -188,55 +175,69 @@ export function DesktopPreferences() {
             onCheckedChange={(terminalLinks) => settings.updateSettings({ terminalLinks })}
           />
         </Setting>
+        <CliCommandSetting />
+        <Setting
+          title="Restore terminal output"
+          description="Save the last 256 KiB when a terminal stops or Jackalope quits. After restarting, output is read-only until you start a new shell. Applies to newly started terminals."
+        >
+          <Switch
+            label="Restore terminal output"
+            checked={settings.retainTerminalOutput}
+            onCheckedChange={(retainTerminalOutput) =>
+              settings.updateSettings({ retainTerminalOutput })
+            }
+          />
+        </Setting>
       </SettingGroup>
-      <CliCommandSetting />
-      <Setting
-        title="Restore terminal output"
-        description="Save the last 256 KiB when a terminal stops or Jackalope quits. After restarting, output is read-only until you start a new shell. Applies to newly started terminals."
-      >
-        <Switch
-          label="Restore terminal output"
-          checked={settings.retainTerminalOutput}
-          onCheckedChange={(retainTerminalOutput) =>
-            settings.updateSettings({ retainTerminalOutput })
-          }
-        />
-      </Setting>
-      {activity && (
-        <section className="desktop-services" aria-label="Running services on this computer">
-          <h3>Running services on this computer</h3>
-          <p className="task-muted">
-            {activity.awake ? 'Keeping awake' : 'Idle sleep allowed'} · {activity.activeWork} active{' '}
-            {activity.activeWork === 1 ? 'attempt' : 'attempts'} · {activity.terminals}{' '}
-            {activity.terminals === 1 ? 'terminal' : 'terminals'} · {activity.previews.length}{' '}
-            {activity.previews.length === 1 ? 'preview' : 'previews'}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {activity.previews.map(([id, port]) => (
-              <Button
-                key={id}
-                variant="outline"
-                onClick={() => {
-                  useWorkViewStore.getState().open(id, 'preview');
-                  navigateWorkspace('kanban');
-                }}
-              >
-                Preview on port {port}
+      <SettingGroup title="Power">
+        <Setting
+          title="Keep computer awake"
+          description="Prevent idle sleep while Jackalope is open. While working covers agent runs and finishing checks; it releases when they finish. Your display can still sleep. Explicit sleep and closing the lid follow your system settings."
+        >
+          <Select
+            aria-label="Keep computer awake"
+            value={activity?.mode ?? 'off'}
+            disabled={!activity || saving}
+            onValueChange={(value) => void awake(value as DesktopActivity['mode'])}
+          >
+            <SelectItem value="off">Off</SelectItem>
+            <SelectItem value="working">While work runs</SelectItem>
+            <SelectItem value="always">While Jackalope is open</SelectItem>
+          </Select>
+        </Setting>
+        {activity && (
+          <Setting
+            title="Running on this computer"
+            description={`${activity.awake ? 'Keeping awake' : 'Idle sleep allowed'} · ${activity.activeWork} active ${
+              activity.activeWork === 1 ? 'attempt' : 'attempts'
+            } · ${activity.terminals} ${activity.terminals === 1 ? 'terminal' : 'terminals'} · ${
+              activity.previews.length
+            } ${activity.previews.length === 1 ? 'preview' : 'previews'}`}
+          >
+            <div className="flex flex-wrap justify-end gap-2">
+              {activity.previews.map(([id, port]) => (
+                <Button
+                  key={id}
+                  variant="outline"
+                  onClick={() => {
+                    useWorkViewStore.getState().open(id, 'preview');
+                    navigateWorkspace('kanban');
+                  }}
+                >
+                  Preview on port {port}
+                </Button>
+              ))}
+              <Button variant="outline" onClick={() => navigateWorkspace('worktrees')}>
+                Inspect worktrees and disk use
               </Button>
-            ))}
-            <Button variant="outline" onClick={() => navigateWorkspace('worktrees')}>
-              Inspect worktrees and disk use
-            </Button>
-          </div>
-        </section>
-      )}
-      <h3>Local dictation</h3>
-      <p className="task-muted">
-        Connect an OpenAI-compatible transcription server running on this computer. Dictate records
-        only when clicked, then adds text to your draft for review. Jackalope does not save the
-        audio.
-      </p>
-      <SettingGroup>
+            </div>
+          </Setting>
+        )}
+      </SettingGroup>
+      <SettingGroup
+        title="Local dictation"
+        description="Connect an OpenAI-compatible transcription server running on this computer. Dictate records only when clicked, then adds text to your draft for review. Jackalope does not save the audio."
+      >
         <Setting
           title="Local transcription endpoint"
           description="Leave empty to disable dictation."
@@ -256,11 +257,10 @@ export function DesktopPreferences() {
           />
         </Setting>
       </SettingGroup>
-      <h3>Keyboard shortcuts</h3>
-      <p className="task-muted">
-        Use Mod for {displayShortcut('Mod')}. Changes apply after saving.
-      </p>
-      <SettingGroup>
+      <SettingGroup
+        title="Keyboard shortcuts"
+        description={`Use Mod for ${displayShortcut('Mod')}. Changes apply after saving.`}
+      >
         {(Object.keys(defaultShortcuts) as ShortcutAction[]).map((action) => (
           <Setting key={action} title={shortcutNames[action]}>
             <Input
@@ -270,22 +270,22 @@ export function DesktopPreferences() {
             />
           </Setting>
         ))}
+        <SettingActions>
+          <Button variant="outline" onClick={saveShortcuts}>
+            Save shortcuts
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              settings.updateSettings({ shortcuts: {} });
+              setDrafts(defaultShortcuts);
+              setError('');
+            }}
+          >
+            Restore defaults
+          </Button>
+        </SettingActions>
       </SettingGroup>
-      <div className="flex gap-2">
-        <Button variant="outline" onClick={saveShortcuts}>
-          Save shortcuts
-        </Button>
-        <Button
-          variant="ghost"
-          onClick={() => {
-            settings.updateSettings({ shortcuts: {} });
-            setDrafts(defaultShortcuts);
-            setError('');
-          }}
-        >
-          Restore defaults
-        </Button>
-      </div>
       {(error || activityError || activity?.error) && (
         <InlineNotice tone="error">{error || activityError || activity?.error}</InlineNotice>
       )}

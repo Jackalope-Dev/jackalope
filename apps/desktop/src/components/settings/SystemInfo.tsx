@@ -12,7 +12,7 @@ import {
 } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
-import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
+import { Setting, SettingBody, SettingGroup } from './Setting';
 
 const PERMISSION_LABELS: Record<DesktopPermission, string> = {
   accessibility: 'Accessibility',
@@ -82,105 +82,102 @@ export function SystemInfoView() {
     };
   }, [load]);
   return (
-    <section className="workspace-section">
-      <WorkspaceSectionHeading
-        title="Devices"
-        level={3}
-        action={
-          <Button
-            variant="outline"
-            disabled={!desktop || loading || requestingPermissions}
-            onClick={() => void load()}
-            loading={loading}
-            loadingLabel="Reading…"
-          >
-            <RefreshIcon size={16} />
-            Refresh device
-          </Button>
-        }
-      />
+    <SettingGroup
+      aria-label="This device"
+      title={
+        <span className="inline-flex items-center gap-2">
+          <Monitor size={16} className="text-[var(--color-accent-ink)]" aria-hidden="true" />
+          {host?.device_name ?? 'This device'}
+        </span>
+      }
+      description={host ? `This device · ${host.os} · ${host.arch}` : undefined}
+      action={
+        <Button
+          variant="outline"
+          disabled={!desktop || loading || requestingPermissions}
+          onClick={() => void load()}
+          loading={loading}
+          loadingLabel="Reading…"
+        >
+          <RefreshIcon size={16} />
+          Refresh device
+        </Button>
+      }
+    >
       {error && (
-        <InlineNotice tone="error" className="mb-5">
-          {error}
-        </InlineNotice>
+        <SettingBody>
+          <InlineNotice tone="error">{error}</InlineNotice>
+        </SettingBody>
       )}
       {host ? (
-        <div className="flex items-start gap-5 py-6">
-          <Monitor size={32} className="text-[var(--color-accent-ink)] shrink-0" />
-          <div>
-            <h3 className="text-xl font-medium break-words">{host.device_name}</h3>
-            <p className="task-muted mt-2">
-              This device · {host.os} · {host.arch}
-            </p>
-            {host.desktop_control && (
-              <div className="mt-6 max-w-2xl">
-                <h3 className="font-medium">Native window control</h3>
-                <p className="task-muted mt-2" role="status">
-                  {host.desktop_control.message}
+        <>
+          <Setting
+            title="Git"
+            description={
+              host.git_available
+                ? 'Git is available for project work.'
+                : 'Install Git to open repositories and create worktrees.'
+            }
+          />
+          {host.desktop_control && (
+            <Setting title="Native window control" description={host.desktop_control.message}>
+              {host.desktop_control.can_request_permissions && !host.desktop_control.available && (
+                <Button
+                  variant="outline"
+                  disabled={requestingPermissions || loading}
+                  onClick={() => void requestPermissions()}
+                  loading={requestingPermissions}
+                  loadingLabel="Setting up…"
+                >
+                  {host.os === 'linux'
+                    ? 'Install GNOME window control'
+                    : 'Set up macOS permissions'}
+                </Button>
+              )}
+            </Setting>
+          )}
+          {host.desktop_control &&
+            !host.desktop_control.available &&
+            !!host.desktop_control.missing?.length && (
+              <SettingBody>
+                <p className="task-muted">
+                  If macOS did not ask, turn Jackalope on in each pane, then restart the app.
                 </p>
-                {host.desktop_control.can_request_permissions &&
-                  !host.desktop_control.available && (
-                    <Button
-                      className="mt-3"
-                      variant="outline"
-                      disabled={requestingPermissions || loading}
-                      onClick={() => void requestPermissions()}
-                      loading={requestingPermissions}
-                      loadingLabel="Setting up…"
-                    >
-                      {host.os === 'linux'
-                        ? 'Install GNOME window control'
-                        : 'Set up macOS permissions'}
-                    </Button>
-                  )}
-                {!host.desktop_control.available && !!host.desktop_control.missing?.length && (
-                  <div className="mt-4">
-                    <p className="task-muted">
-                      If macOS did not ask, turn Jackalope on in each pane, then restart the app.
-                    </p>
-                    <ul
-                      className="mt-2 flex flex-wrap gap-2"
-                      aria-label="Missing macOS permissions"
-                    >
-                      {host.desktop_control.missing.map((permission) => (
-                        <li key={permission}>
-                          <Button variant="outline" onClick={() => void openSettings(permission)}>
-                            Open {PERMISSION_LABELS[permission]}
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                    {requested && (
-                      <Button
-                        className="mt-3"
-                        disabled={restarting || loading}
-                        onClick={() => void restart()}
-                        loading={restarting}
-                        loadingLabel="Restarting…"
-                      >
-                        Restart Jackalope
+                <ul className="flex flex-wrap gap-2" aria-label="Missing macOS permissions">
+                  {host.desktop_control.missing.map((permission) => (
+                    <li key={permission}>
+                      <Button variant="outline" onClick={() => void openSettings(permission)}>
+                        Open {PERMISSION_LABELS[permission]}
                       </Button>
-                    )}
+                    </li>
+                  ))}
+                </ul>
+                {requested && (
+                  <div>
+                    <Button
+                      disabled={restarting || loading}
+                      onClick={() => void restart()}
+                      loading={restarting}
+                      loadingLabel="Restarting…"
+                    >
+                      Restart Jackalope
+                    </Button>
                   </div>
                 )}
-              </div>
+              </SettingBody>
             )}
-            <p className="task-muted mt-2">
-              {host.git_available
-                ? 'Git is available for project work.'
-                : 'Install Git to open repositories and create worktrees.'}
-            </p>
-          </div>
-        </div>
+        </>
       ) : (
-        <p role="status" className="task-muted">
-          {loading
-            ? 'Reading device information…'
-            : !desktop
-              ? 'Device information is available in the desktop app.'
-              : 'Device information could not be loaded. Try refreshing.'}
-        </p>
+        <SettingBody>
+          <p role="status" className="task-muted">
+            {loading
+              ? 'Reading device information…'
+              : !desktop
+                ? 'Device information is available in the desktop app.'
+                : 'Device information could not be loaded. Try refreshing.'}
+          </p>
+        </SettingBody>
       )}
-    </section>
+    </SettingGroup>
   );
 }

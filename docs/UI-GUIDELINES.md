@@ -216,7 +216,10 @@ own layouts.
 
 Use FormField with Input, Textarea or Select for labelled controls and associated
 help or validation text. SettingRow and SettingGroup own preference rows, dividers
-and responsive control placement. Use InlineNotice for inline feedback, choosing
+and responsive control placement. Settings pages are stacks of SettingGroup cards: use its
+title, description and action for a card heading, SettingBody for forms, pickers or lists
+inside a card, SettingActions for a card's buttons and `tone="danger"` for destructive
+settings. Do not place loose headings, rows or buttons between cards. Use InlineNotice for inline feedback, choosing
 the tone from the actual outcome; use its action slot for recovery controls.
 WorkspaceToolbar owns filter/action wrapping and spacing. FilterGroup represents
 pressed filter choices; WorkspaceSubnavigation represents navigation between views.
