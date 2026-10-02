@@ -74,7 +74,7 @@ for (const channel of ['stable', 'beta']) {
       {
         appId: '9NBLGGH4R315',
         channel,
-        flightId: 'flight-1',
+        flightId: '00000000-0000-4000-8000-000000000001',
         receipt,
         token: 'test',
         fileName: 'new.msix',
@@ -149,4 +149,37 @@ test('Store submission is bound to the reviewed source, channel and architecture
   );
   assert.throws(() => validateSource({ ...candidate, channel: 'stable' }, env), /reviewed source/);
   assert.throws(() => validateSource({ ...candidate, architecture: 'arm64' }, env), /architecture/);
+});
+
+test('a beta flight can be named instead of identified', async () => {
+  const paths = [];
+  await assert.rejects(
+    submit(
+      {
+        appId: '9NBLGGH4R315',
+        channel: 'beta',
+        flightId: 'Beta',
+        receipt,
+        token: 'test',
+        fileName: 'new.msix',
+        checkpoint: async () => {},
+        upload: async () => {},
+      },
+      async (url) => {
+        const path = new URL(url).pathname;
+        paths.push(path);
+        if (path.endsWith('/listflights'))
+          return Response.json({
+            value: [
+              { flightId: '00000000-0000-4000-8000-0000000000be', friendlyName: 'Beta' },
+              { flightId: '00000000-0000-4000-8000-0000000000aa', friendlyName: 'Internal' },
+            ],
+          });
+        // Stop after the flight is resolved; the rest of the flow is covered above.
+        return new Response(null, { status: 418 });
+      },
+    ),
+    /HTTP 418/,
+  );
+  assert.ok(paths.includes('/v1.0/my/applications/9NBLGGH4R315/listflights'));
 });

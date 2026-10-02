@@ -81,7 +81,7 @@ export async function submit(
   { appId, channel, flightId, token, receipt, fileName, upload, checkpoint },
   fetcher = fetch,
 ) {
-  const target = submissionPath(appId, channel, flightId);
+  submissionPath(appId, channel, flightId);
   const request = async (path, method = 'GET', body) => {
     const result = await response(fetcher, `${api}${path}`, {
       method,
@@ -90,6 +90,19 @@ export async function submit(
     });
     return result.status === 204 ? {} : result.json();
   };
+  // Partner Center shows a flight's name but not its ID, so a name is resolved here.
+  if (channel === 'beta' && !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(flightId)) {
+    const { value = [] } = await request(`/applications/${appId}/listflights`);
+    const matches = value.filter(
+      (flight) => flight.friendlyName?.toLowerCase() === flightId.toLowerCase(),
+    );
+    if (matches.length !== 1)
+      throw new Error(
+        `Expected one Store package flight named ${flightId}; found ${matches.length}`,
+      );
+    flightId = matches[0].flightId;
+  }
+  const target = submissionPath(appId, channel, flightId);
   const app = await request(`/applications/${appId}`);
   if (app.packageIdentityName !== receipt.identity || app.publisherName !== receipt.publisher)
     throw new Error('Package identity does not match the selected Store product');
