@@ -109,7 +109,7 @@ export const roadmapStages = [
         title: 'Bots that keep their role.',
         summary: 'Saved agents, connected apps, and a view of what the agent sees.',
         detail:
-          'Save a bot with a name, standing instructions, an agent and model, a project and the connections it may use, then message it to start a conversation. Its instructions travel with every message, and routines run its work on a schedule. Connect apps such as GitHub, Slack and Gmail once through your own Composio project, and every agent can use them as tools. The Screen view shows the task browser’s current page and any window you allowed an agent to control, and lets you stop either. Choose an agent and model from a picker that lists every agent and why unavailable ones cannot run. Installed testing with real accounts is in progress.',
+          'Save a bot with a name, its own character and colour, standing instructions, an agent and model, a project and the connections it may use, or start from templates for review, research, testing, docs, security and more. Message it to start a conversation that stays on the Bots page; quick questions skip workspace setup. Its instructions travel with every message, and routines run its work on a schedule. Connect apps such as GitHub, Slack and Gmail once through your own Composio project, and every agent can use them as tools. The Screen view shows the task browser’s current page and any window you allowed an agent to control, and lets you stop either. Choose an agent and model from a picker that lists every agent and why unavailable ones cannot run. Installed testing with real accounts is in progress.',
       },
       {
         title: 'Repositories built for agents.',

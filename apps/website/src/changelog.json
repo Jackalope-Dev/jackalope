@@ -1,5 +1,19 @@
 [
   {
+    "id": "bots-get-their-own-home",
+    "date": "2026-10-01",
+    "status": "In development",
+    "title": "Bots get their own home, and quick questions stay quick",
+    "description": "Talk to your bots right where they live, pick from more ready-made bots, and get answers without waiting on a full workspace setup.",
+    "items": [
+      "Bot conversations open and stay on the Bots page, laid out like a chat",
+      "New templates for testing, docs, security, release notes, browser checks and onboarding, several with ready-made routines",
+      "Creating a bot takes four short steps, and editing one fits on a single page",
+      "Questions skip workspace setup, and checks only run when files change",
+      "Agent replies render their formatting instead of showing as code"
+    ]
+  },
+  {
     "id": "customizable-bots-and-clearer-agent-picker",
     "date": "2026-10-01",
     "status": "In development",
