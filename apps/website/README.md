@@ -57,6 +57,10 @@ npx --yes --package @playwright/cli playwright-cli -s=website-capture run-code -
 npx --yes --package @playwright/cli playwright-cli -s=website-capture run-code --filename apps/website/scripts/capture-tour.js
 ~~~
 
+`node apps/website/scripts/capture-feature-media.mjs` refreshes `recurring*.png` from
+the same preview; set `JACKALOPE_CAPTURE_ORIGIN` to its URL and, without Edge,
+`JACKALOPE_CAPTURE_BROWSER` to a Chromium executable.
+
 Choose the desired appearance before capturing. The script writes `*-light.png`
 for light mode and the corresponding unsuffixed files for dark mode.
 `record-tour.js` can capture raw frontend interactions into ignored output;

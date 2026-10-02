@@ -446,11 +446,6 @@ export function LandingPage({
         <HeroMark />
         <div className="landing-width landing-hero-grid">
           <div className="hero-copy">
-            <a className="hero-chip" href="/changelog/">
-              <span className="hero-chip-label">Public beta</span>
-              <span>A guided welcome and one-click feedback</span>
-              <ArrowRight size={14} aria-hidden="true" />
-            </a>
             <div className="hero-poster">
               <h1 id="hero-title">
                 <span>More agents.</span> <span>Less juggling.</span>

@@ -61,10 +61,19 @@ async function response(fetcher, url, options) {
       'Store request failed or timed out. Inspect the saved submission before retrying.',
     );
   }
-  if (!result.ok)
+  if (!result.ok) {
+    // Name the request and Microsoft's reason: a missing flight and a pending
+    // submission both fail here but need different fixes in Partner Center.
+    const target = `${options.method ?? 'GET'} ${new URL(url).pathname.replace('/v1.0/my', '')}`;
+    let reason = '';
+    try {
+      const body = await result.json();
+      reason = String(body?.message ?? body?.error?.message ?? body?.code ?? '').slice(0, 300);
+    } catch {}
     throw new Error(
-      `Store request failed (HTTP ${result.status}). Inspect Partner Center before retrying.`,
+      `Store request failed (HTTP ${result.status}) for ${target}${reason ? `: ${reason}` : ''}. Inspect Partner Center before retrying.`,
     );
+  }
   return result;
 }
 

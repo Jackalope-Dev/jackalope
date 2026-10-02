@@ -12,57 +12,6 @@
   background: var(--color-accent);
 }
 
-/* Hero: release chip above the headline. */
-.landing-story .hero-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 100%;
-  min-height: 44px;
-  margin-bottom: 22px;
-  padding: 5px 14px 5px 5px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
-  backdrop-filter: blur(8px);
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  text-decoration: none;
-  transition:
-    border-color 160ms ease,
-    color 160ms ease;
-}
-.landing-story .hero-chip:hover {
-  border-color: var(--color-accent);
-  color: var(--color-text-primary);
-}
-.landing-story .hero-chip:focus-visible {
-  outline: 2px solid var(--color-accent-ink);
-  outline-offset: 3px;
-}
-.landing-story .hero-chip > span:nth-child(2) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.landing-story .hero-chip-label {
-  flex-shrink: 0;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.02em;
-}
-.landing-story .hero-chip svg {
-  flex-shrink: 0;
-  transition: translate 160ms ease;
-}
-.landing-story .hero-chip:hover svg {
-  translate: 3px 0;
-}
-
 /* Cards in a revealed section arrive one after another. */
 .landing-story.js-reveal [data-reveal] :is(.feature-card, .local-band-points > li) {
   opacity: 0;
@@ -169,18 +118,12 @@
   .landing-story .local-band-points {
     grid-template-columns: minmax(0, 1fr);
   }
-  .landing-story .hero-chip {
-    font-size: 13px;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .landing-story.js-reveal [data-reveal] :is(.feature-card, .local-band-points > li) {
     opacity: 1;
     translate: none;
     animation: none;
-  }
-  .landing-story .hero-chip svg {
-    transition: none;
   }
 }
 
