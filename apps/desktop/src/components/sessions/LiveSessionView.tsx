@@ -352,6 +352,58 @@ export function LiveSessionView({
       await sessionCommand('action', { id: session.id, action: 'pause' });
       await nativeTask('task_stop', { id: active.id });
     });
+  const statusControl = (
+    <button
+      type="button"
+      className="live-status"
+      aria-expanded={simple ? undefined : expanded}
+      aria-controls={simple ? undefined : 'live-session-work'}
+      disabled={simple && !expanded}
+      onClick={() => setExpanded(!expanded)}
+    >
+      <span aria-live="polite">
+        {status === 'Queued'
+          ? `${pending} queued`
+          : latest && !active && status === 'Ready to review'
+            ? taskDecision(latest).label
+            : status}
+        {pending && status !== 'Queued' ? ` · ${pending} queued` : ''}
+      </span>
+      {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+    </button>
+  );
+  const headerActions = (
+    <>
+      <Menu.Root>
+        <Menu.Trigger asChild>
+          <Button variant="ghost" size="icon" aria-label="Session actions" disabled={busy}>
+            <MoreHorizontal size={16} aria-hidden="true" />
+          </Button>
+        </Menu.Trigger>
+        <Menu.Portal>
+          <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
+            <Menu.Item className="workspace-menu-item" disabled={integrated} onSelect={togglePause}>
+              {pauseLabel}
+            </Menu.Item>
+            {active && (
+              <Menu.Item className="workspace-menu-item" onSelect={stopWork}>
+                Stop work
+              </Menu.Item>
+            )}
+          </Menu.Content>
+        </Menu.Portal>
+      </Menu.Root>
+      {!simple && (
+        <Button
+          variant={latest && !active && !integrated ? undefined : 'outline'}
+          disabled={!latest || !!active || busy}
+          onClick={showReview}
+        >
+          Review changes
+        </Button>
+      )}
+    </>
+  );
   return (
     <section
       className={`live-session${detached ? ' live-session-detached' : ''}`}
@@ -380,100 +432,50 @@ export function LiveSessionView({
             {session.persona ? `${session.persona.name} · ` : ''}
             {session.request.projectName}
           </span>
+          {!detached && statusControl}
         </div>
-        <div className="app-titlebar-controls">{tools}</div>
+        <div className="app-titlebar-controls">
+          {!detached && headerActions}
+          {tools}
+        </div>
       </header>
       <SessionRecovery />
-      <div className="live-statusbar">
-        <button
-          type="button"
-          className="live-status"
-          aria-expanded={simple ? undefined : expanded}
-          aria-controls={simple ? undefined : 'live-session-work'}
-          disabled={simple && !expanded}
-          onClick={() => setExpanded(!expanded)}
-        >
-          <span aria-live="polite">
-            {status === 'Queued'
-              ? `${pending} queued`
-              : latest && !active && status === 'Ready to review'
-                ? taskDecision(latest).label
-                : status}
-            {pending && status !== 'Queued' ? ` · ${pending} queued` : ''}
-          </span>
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
-        <div className="live-status-actions">
-          {detached ? (
-            <>
+      {detached && (
+        <div className="live-statusbar">
+          {statusControl}
+          <div className="live-status-actions">
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label={pauseLabel}
+              disabled={busy || integrated}
+              onClick={togglePause}
+            >
+              {session.paused || session.closed ? <Play size={16} /> : <Pause size={16} />}
+            </Button>
+            {active && (
               <Button
                 variant="outline"
                 size="icon"
-                aria-label={pauseLabel}
-                disabled={busy || integrated}
-                onClick={togglePause}
+                aria-label="Stop work"
+                disabled={busy}
+                onClick={stopWork}
               >
-                {session.paused || session.closed ? <Play size={16} /> : <Pause size={16} />}
+                <Square size={16} />
               </Button>
-              {active && (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Stop work"
-                  disabled={busy}
-                  onClick={stopWork}
-                >
-                  <Square size={16} />
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={collapsed ? 'Expand conversation' : 'Collapse conversation'}
-                aria-expanded={!collapsed}
-                onClick={() => setCollapsed(!collapsed)}
-              >
-                {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Menu.Root>
-                <Menu.Trigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="Session actions" disabled={busy}>
-                    <MoreHorizontal size={16} aria-hidden="true" />
-                  </Button>
-                </Menu.Trigger>
-                <Menu.Portal>
-                  <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
-                    <Menu.Item
-                      className="workspace-menu-item"
-                      disabled={integrated}
-                      onSelect={togglePause}
-                    >
-                      {pauseLabel}
-                    </Menu.Item>
-                    {active && (
-                      <Menu.Item className="workspace-menu-item" onSelect={stopWork}>
-                        Stop work
-                      </Menu.Item>
-                    )}
-                  </Menu.Content>
-                </Menu.Portal>
-              </Menu.Root>
-              {!simple && (
-                <Button
-                  variant={latest && !active && !integrated ? undefined : 'outline'}
-                  disabled={!latest || !!active || busy}
-                  onClick={showReview}
-                >
-                  Review changes
-                </Button>
-              )}
-            </>
-          )}
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={collapsed ? 'Expand conversation' : 'Collapse conversation'}
+              aria-expanded={!collapsed}
+              onClick={() => setCollapsed(!collapsed)}
+            >
+              {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
       {(error || session.error) && (
         <div className="live-notice">
           <InlineNotice tone="error">{error || session.error}</InlineNotice>

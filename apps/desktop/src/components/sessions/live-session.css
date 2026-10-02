@@ -61,13 +61,24 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 20px 4px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--color-border-subtle);
   background: var(--color-surface);
   flex: none;
 }
+.live-header:has(~ .live-statusbar, ~ .work-toolbar) {
+  border-bottom: 0;
+}
 .live-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
   flex: 1;
   min-width: 0;
+}
+.live-title h1 {
+  flex-basis: 100%;
 }
 .live-title h1 {
   font-size: var(--text-base);
@@ -123,6 +134,21 @@
   cursor: pointer;
   font-size: var(--text-xs);
   text-align: left;
+}
+/* The status sits beside the project name, so the header stays one row. */
+.live-title > .live-status {
+  min-height: 28px;
+  padding: 0 4px;
+  margin: -4px 0;
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+}
+.live-title > .live-status:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+.live-title > .live-status:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
 }
 .live-columns {
   display: grid;
@@ -269,12 +295,9 @@
   gap: 10px;
   margin-top: 8px;
 }
-.live-composer-actions > p {
-  flex: 1 0 100%;
-  min-width: 0;
-}
-:where(.live-session-detached) .live-composer-actions > p {
-  display: none;
+/* Attach sits on the left; sending actions stay on the right. */
+.live-composer-actions > [aria-label="Attach files"] {
+  margin-right: auto;
 }
 :where(.live-session-detached) .live-composer-actions > button {
   flex: 1;
