@@ -355,6 +355,12 @@ HTML/style context. Selection notes survive view changes; the browser closes wit
 GitHub, Linear and Jira Cloud issue browsers prepare editable task drafts and retain source
 links. GitHub uses the installed CLI; Linear/Jira credentials use protected native storage.
 
+Jackalope Swarm (beta) gives each live attempt on an Artifacts-linked project its own fork
+through the person's own Worker (`apps/swarm`). Every 15 seconds the desktop pushes changed
+snapshots as synthetic commits, and the Worker reports files and overlapping edits across
+forks on Project → Swarm. Forks are deleted when attempts finish; merging stays local.
+See [the Worker guide](../apps/swarm/README.md).
+
 Cloudflare Artifacts (beta) connects a user's own Cloudflare account and namespace from
 Settings → Connected work. Connect Cloudflare signs in through the browser with Jackalope's
 public OAuth client (PKCE, loopback redirect on 127.0.0.1 ports 47851–47853) and lists the

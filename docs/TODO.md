@@ -246,6 +246,9 @@ release dates.
   authenticated installed CLIs, including enterprise hosts, pagination and stale heads.
   Validate editable workflow drafts and preserve explicit authorization for remote writes.
   Broader remote publication, review-thread resolution and proactive proposals remain open.
+- [ ] Accept Jackalope Swarm with a deployed Worker: fork creation, snapshot pushes from several
+  live attempts, conflict accuracy against Git merges, token renewal, restart re-registration,
+  fork deletion after integration and archive, and two machines sharing one repository.
 - [ ] Validate Cloudflare Artifacts with a live Workers Paid account in installed profiles:
   connection with and without a data location, new-project creation, moving a repository
   with many branches, push rejection and retry, the 1 GB repository and 32 MB file limits,

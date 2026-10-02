@@ -12,6 +12,7 @@ Saved history and running tasks remain accessible when access expires.
 | `apps/desktop/src-tauri` | Execution, persistence, process ownership, Git safeguards and native packaging |
 | `apps/website` | Marketing, browser account flows, static discovery output and website verification |
 | `apps/server` | Account/access services, optional ingestion and database migrations |
+| `apps/swarm` | Bring-your-own Worker that forks Artifacts repositories per agent attempt and reports cross-fork conflicts |
 | `packages/ui` | Browser-safe React controls shared by desktop, website and admin |
 | `packages/brand` | Shared theme, tokens, typography and character geometry |
 | `packages/knowledge` | Shared public guides, Markdown serialization and generated native help catalog |
