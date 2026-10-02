@@ -23,6 +23,25 @@
   overflow: auto;
   padding: 12px;
 }
+/* Filling diffs take their container's height and scroll inside it. */
+.rich-diff[data-fill] {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.rich-diff[data-fill] > .rich-diff-region,
+.rich-diff[data-fill] > .rich-diff-raw {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+.rich-diff[data-fill] .rich-diff-scroll {
+  position: absolute;
+  inset: 0;
+  height: auto;
+}
 .rich-diff-raw pre {
   font: 12px / 1.6 var(--font-mono);
 }

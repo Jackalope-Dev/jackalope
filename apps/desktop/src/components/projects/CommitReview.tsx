@@ -655,7 +655,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
               <InlineNotice>{patchError}</InlineNotice>
             ) : patch?.path === focused ? (
               patch.text.trim() ? (
-                <DiffPreview patch={patch.text} file={focused} />
+                <DiffPreview patch={patch.text} file={focused} fill />
               ) : (
                 <p className="task-muted">No text changes (mode or binary change).</p>
               )
