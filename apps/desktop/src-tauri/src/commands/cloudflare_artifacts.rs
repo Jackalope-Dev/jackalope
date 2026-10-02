@@ -461,6 +461,21 @@ fn repository_root(project_path: &str) -> Result<PathBuf, String> {
     Ok(path)
 }
 
+/// The Artifacts namespace and repository a project pushes to, if it is linked.
+pub(in crate::commands) fn linked_repository(path: &Path) -> Option<(String, String)> {
+    linked_remote(path).and_then(|remote| remote_identity(&remote))
+}
+
+/// Pushes refspecs to an Artifacts remote with a token scoped to that host.
+pub(in crate::commands) fn push_with_token(
+    path: &Path,
+    remote: &str,
+    token: &str,
+    refspecs: &[&str],
+) -> Result<String, String> {
+    push(path, remote, token, refspecs)
+}
+
 fn linked_remote(path: &Path) -> Option<String> {
     git(path, &["remote", "get-url", REMOTE_NAME])
         .ok()

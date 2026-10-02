@@ -8,6 +8,7 @@ import {
   FileCheck2,
   GitBranch,
   GitCommitHorizontal,
+  GitFork,
   History,
   Layers3,
   ListTodo,
@@ -56,6 +57,14 @@ export const WORKSPACE_VIEWS = [
     icon: Network,
     group: 'project',
     primary: true,
+  },
+  {
+    id: 'swarm',
+    label: 'Swarm',
+    description: 'Project: every agent fork on Artifacts and the conflicts between them.',
+    icon: GitFork,
+    group: 'project',
+    primary: false,
   },
   {
     id: 'topology',

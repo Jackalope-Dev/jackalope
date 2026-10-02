@@ -1,4 +1,5 @@
 pub(super) mod agreements;
+pub mod cloud;
 pub mod peers;
 mod reconciliation;
 mod scope_audit;

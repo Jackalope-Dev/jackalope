@@ -169,6 +169,17 @@ fn candidates<'a>(runs: &'a [TaskRun], view: &QueueView, project_id: &str) -> Ve
     latest
 }
 
+/// Every project's live attempts with their latest checked snapshot tree.
+pub(super) fn snapshots(view: &QueueView, runs: &[TaskRun]) -> Vec<(TaskRun, String)> {
+    let projects: std::collections::BTreeSet<&str> =
+        runs.iter().map(|run| run.project_id.as_str()).collect();
+    projects
+        .into_iter()
+        .flat_map(|project| candidates(runs, view, project))
+        .filter_map(|run| tree_of(view, run).map(|tree| (run.clone(), tree)))
+        .collect()
+}
+
 fn tree_of(view: &QueueView, run: &TaskRun) -> Option<String> {
     view.scope_audits
         .iter()
@@ -236,7 +247,7 @@ fn files(run: &TaskRun, tree: &str) -> Result<(Vec<PeerFile>, usize), String> {
     Ok((result, omitted))
 }
 
-fn synthetic_commit(workspace: &Path, tree: &str, base: &str) -> Result<String, String> {
+pub(super) fn synthetic_commit(workspace: &Path, tree: &str, base: &str) -> Result<String, String> {
     let output = command(
         workspace,
         &[
@@ -548,7 +559,7 @@ pub(super) fn notify_conflicts(ledger: &mut Ledger, runs: &[TaskRun], merged: &[
     ledger.live_conflicts = current;
 }
 
-fn title(view: &QueueView, run: &TaskRun) -> String {
+pub(super) fn title(view: &QueueView, run: &TaskRun) -> String {
     view.items
         .iter()
         .find(|item| item.id == run.task_id)

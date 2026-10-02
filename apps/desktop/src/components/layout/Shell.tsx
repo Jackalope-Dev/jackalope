@@ -95,6 +95,9 @@ const AgentManager = lazy(() =>
 const BotsWorkspace = lazy(() =>
   import('../bots/BotsWorkspace').then((m) => ({ default: m.BotsWorkspace })),
 );
+const SwarmBoard = lazy(() =>
+  import('../swarm/SwarmBoard').then((m) => ({ default: m.SwarmBoard })),
+);
 const ConnectedApps = lazy(() =>
   import('../mcp/ConnectedApps').then((m) => ({ default: m.ConnectedApps })),
 );
@@ -666,6 +669,7 @@ export function Shell({
               )}
               {activeTab === 'bots' && <BotsWorkspace />}
               {activeTab === 'connected-apps' && <ConnectedApps />}
+              {activeTab === 'swarm' && <SwarmBoard />}
               {activeTab === 'schedules' && (
                 <ScheduleManager
                   key={activeProjectId}

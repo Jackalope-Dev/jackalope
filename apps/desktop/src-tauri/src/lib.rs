@@ -170,6 +170,7 @@ pub fn run(launch: Launch) {
             ));
             let coordinator = Coordinator::new(directory.join("coordination"), runtime.clone())?;
             coordinator.launch();
+            commands::coordination::cloud::launch(coordinator.clone());
             let sessions = commands::live_sessions::LiveSessions::new(
                 directory.join("live-sessions/sessions.json"),
                 runtime.clone(),
@@ -422,6 +423,10 @@ pub fn run(launch: Launch) {
             commands::cloudflare_artifacts::cloudflare_oauth_complete,
             commands::cloudflare_artifacts::cloudflare_oauth_cancel,
             commands::cloudflare_artifacts::cloudflare_oauth_connect,
+            commands::coordination::cloud::swarm_connection_status,
+            commands::coordination::cloud::swarm_connection_save,
+            commands::coordination::cloud::swarm_connection_remove,
+            commands::coordination::cloud::swarm_cloud_state,
             commands::cloudflare_artifacts::cloudflare_artifacts_project,
             commands::cloudflare_artifacts::cloudflare_artifacts_create_project,
             commands::cloudflare_artifacts::cloudflare_artifacts_convert,

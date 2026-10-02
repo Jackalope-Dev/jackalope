@@ -36,6 +36,7 @@ import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
 import { RemoteAccess } from './RemoteAccess';
 import { SavedActions } from './SavedActions';
+import { SwarmConnection } from './SwarmConnection';
 
 interface SettingsPageProps {
   onClose: () => void;
@@ -288,6 +289,7 @@ export function SettingsPage({
                 <>
                   <IssueConnections />
                   <ArtifactsConnection />
+                  <SwarmConnection />
                 </>
               )}
               {c === 'Desktop' && <DesktopPreferences />}
