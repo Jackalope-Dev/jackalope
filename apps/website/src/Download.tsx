@@ -38,7 +38,10 @@ const channelNames = { stable: 'Stable', beta: 'Beta' } as const;
 
 /** The member's builds for one platform, with a release channel choice when several are offered. */
 function ReleaseDownloads({ builds }: { builds: ReleaseBuild[] }) {
-  const channels = [...new Set(builds.map((build) => build.channel))];
+  // Stable leads and is the default; beta stays available for people who choose it.
+  const channels = [...new Set(builds.map((build) => build.channel))].sort(
+    (a, b) => Number(b === 'stable') - Number(a === 'stable'),
+  );
   const [channel, setChannel] = useState(channels[0]);
   const selected = channels.includes(channel) ? channel : channels[0];
   return (

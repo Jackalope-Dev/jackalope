@@ -5,6 +5,7 @@ import { browserDeviceAction, connectedDevices } from './devices';
 import { feedbackResponse } from './feedback';
 import { campaignSchema, preferencesSchema, savePreferences } from './insights';
 import { deliverAccessMail } from './mail';
+import type { EmailDownload } from './mail-templates';
 import { syncNewsletter } from './newsletter';
 import {
   AccessError,
@@ -71,6 +72,26 @@ export function linuxChannels(env: Env) {
 }
 function releaseDownloadUrl(channel: string, id: keyof typeof releaseDownloads) {
   return `https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/${releaseDownloads[id].platform}?channel=${channel}`;
+}
+
+/**
+ * Direct stable-channel downloads for approval emails. Installers are public on the
+ * release CDN; the desktop account gate, not the link, controls who can run tasks.
+ */
+export function stableDownloads(env: Env): EmailDownload[] {
+  const store = storeUrl(env);
+  return [
+    ...(store ? [{ label: 'Windows (Microsoft Store)', url: store }] : []),
+    ...(macChannels(env).includes('stable')
+      ? (['macos-aarch64', 'macos-x86_64'] as const).map((id) => ({
+          label: `macOS (${releaseDownloads[id].label})`,
+          url: releaseDownloadUrl('stable', id),
+        }))
+      : []),
+    ...(linuxChannels(env).includes('stable')
+      ? [{ label: 'Linux (AppImage)', url: releaseDownloadUrl('stable', 'linux-x86_64') }]
+      : []),
+  ];
 }
 
 export function storeUrl(env: Env) {

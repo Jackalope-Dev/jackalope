@@ -10,6 +10,7 @@ import {
   type WaitlistMail,
 } from '../src/access/mail';
 import { syncNewsletter } from '../src/access/newsletter';
+import { stableDownloads } from '../src/access/routes';
 import {
   acceptToken,
   approve,
@@ -814,3 +815,32 @@ it.each([200, 302])(
     });
   },
 );
+
+it('approval emails offer direct stable downloads and other emails do not', () => {
+  const settings = {
+    ...env,
+    ACCESS_STORE_URL: 'https://apps.microsoft.com/detail/9NM89QFJQ244',
+    ACCESS_MAC_CHANNELS: 'stable,beta',
+    ACCESS_LINUX_CHANNELS: 'beta',
+  } as Env;
+  const downloads = stableDownloads(settings);
+  expect(downloads.map((item) => item.label)).toEqual([
+    'Windows (Microsoft Store)',
+    'macOS (Apple silicon)',
+    'macOS (Intel)',
+  ]);
+  expect(downloads[1].url).toContain('dmg-aarch64?channel=stable');
+  const welcome = accessEmail(
+    { to: 'a@example.com', kind: 'welcome', token: 't' },
+    'https://jackalope.dev',
+    downloads,
+  );
+  expect(welcome.body).toContain('apps.microsoft.com/detail/9NM89QFJQ244');
+  expect(welcome.text).toContain('Or download directly');
+  const login = accessEmail(
+    { to: 'a@example.com', kind: 'login', token: 't' },
+    'https://jackalope.dev',
+    downloads,
+  );
+  expect(login.body).not.toContain('Or download directly');
+});

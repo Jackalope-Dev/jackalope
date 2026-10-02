@@ -141,3 +141,12 @@
 .landing-story .landing-finale .finale-mark {
   max-height: 260px;
 }
+/* Consent lines follow the card, which stays dark whatever the accent's own text color. */
+.landing-story .landing-finale .finale-top .signup :is(.signup-consent, .signup-newsletter),
+.landing-story .landing-finale .finale-top .signup :is(.signup-consent, .signup-newsletter) a {
+  color: #ffffff;
+}
+.landing-story .landing-finale .finale-top .signup .button {
+  background: #ffffff;
+  color: #0f0d17;
+}
