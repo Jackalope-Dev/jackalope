@@ -20,6 +20,9 @@ not process privileges. Tool connections and browser previews do not prove
 task execution. Preserve the contracts in [CORE-WORKFLOW.md](CORE-WORKFLOW.md)
 and [task outcomes](TASK-OUTCOMES.md).
 
+Match the work to the request. A question should not wait on workspace preparation or
+automatic checks; reserve full setup and verification for work that changes files.
+
 ## Navigation and copy
 
 Peer workspace views use WorkspacePage for gutters and scrolling,
@@ -38,6 +41,25 @@ Use concise headings, familiar action labels and concrete explanations.
 Remove repeated instructions, slogans, decorative status labels and normal-state
 footnotes. Preserve accessible names, dialog descriptions and consequential
 information about cost, permissions, data loss, consent and recovery.
+
+Copy earns its place by changing what someone does next. Do not describe what a
+control already shows, restate a heading, or reassure about what a feature will not
+do unless that is a real risk. Explain things when they are created or when they
+affect cost, permissions, data or reversibility. Express user-facing limits in
+characters, not bytes.
+
+Overview pages show identity, recent activity and the next action; configuration such
+as agent, project and connections belongs in the edit flow. Offer each action in one
+place, a row's options menu or the page header, not both. Setup with several decisions
+walks through short steps with a few related choices each and validates per step;
+editing something already set up shows every section on one page for quick changes.
+
+A page or conversation header is one block with a single divider beneath it; stacked
+bars share its surface instead of adding rules. Keep one primary action visible and
+group secondary actions such as pause, stop and reopen in an options menu. Link to more
+of a list with `NoticeRow` (quiet surface, info icon, arrow), not an underlined inline
+link. Conversations put the person's messages on the right as tinted bubbles and
+replies on the left beside the speaker's character, with agent Markdown rendered.
 
 Task titles should be short objectives, with original instructions in task details under Activity.
 Results lead with output. Review gives the changed-file browser the full content
@@ -88,7 +110,9 @@ hierarchy, generous space and restrained surfaces over repeated metric cards.
 Use semantic action and accent tokens with their matching text colors, and
 success, warning and danger for status. `pnpm check:tokens` rejects undefined
 color tokens and fixed Tailwind palette shades. Keep
-normal text contrast at least 4.5:1. Selection and status need non-color cues,
+normal text contrast at least 4.5:1. Text on an accent fill uses `--color-action` and
+`--color-on-action`, which deepen the accent so white text reaches 4.5:1 where it can;
+never put text on raw `--color-accent`. Selection and status need non-color cues,
 and focus must remain visible in every theme. Use shared Select, input and button
 primitives so opened menus, disabled states and keyboard behavior stay consistent.
 
@@ -98,7 +122,12 @@ saved overrides and automatic light/dark switching. Preview is temporary;
 confirming persists it, while cancellation or leaving an unconfirmed preview
 restores the saved appearance. Invalid color input must not change global styles.
 
-Show selection with a full outline or subtle fill; do not use one-sided accent borders.
+Show selection with a subtle tinted fill (`--color-accent-subtle`); avoid accent rings and
+one-sided accent borders. Options people choose from look selectable: a bordered row
+with a radio or check indicator, not bare text. Focus rings on fields sit just inside
+the control so scrolling dialogs and panels never clip them. Contained dialogs pad their
+own body and footer to line up with the header, and content sits on the dialog surface
+rather than nested background panels.
 Surfaces that belong together join as one card with a divider and no inner corner
 radius; separate surfaces keep the page gap. Pages use one vertical rhythm from their
 layout gap rather than per-section margins. Transient notices, previews and errors the
@@ -154,6 +183,13 @@ The mascot's five moods reflect actual app activity. Keep pointer reactions,
 blinks and acknowledgments subtle. Pause idle motion offscreen, when unfocused
 and during activity moods. Reduced motion retains a readable static expression.
 Do not introduce fabricated activity or persistent decorative status indicators.
+
+Jackalope speaks only through `MascotSpeech`: a bubble above the mascot with its tail
+pointing at it, never covering the status bar. Identify agents and providers with their
+product marks (`ProviderMark`) wherever people choose or recognize them; animated
+characters belong to bots, live activity and the mascot. Bots keep the character and
+colour their owner chose everywhere they appear. Development builds and the beta
+channel append " - dev" or " - Beta" to the title bar; stable shows only the name.
 
 Use motion to explain changes, acknowledge input or express the mascot's
 personality. Avoid competing animation, ambient pulses and unnecessary delays.

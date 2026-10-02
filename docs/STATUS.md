@@ -229,9 +229,14 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Task and chat Screen views poll the attempt's existing task browser viewport and
   desktop grant state without opening a browser, requesting access or saving an
   artifact. People can stop the browser or revoke desktop control from there.
-- Saved bots keep a name, role, standing instructions, agent and model, project and
-  connection scope locally. Messaging a bot starts a chat whose native persona is
-  repeated in every batch prompt; routines are ordinary schedules. See [bots](BOTS.md).
+- Saved bots keep a name, role, standing instructions, agent and model, project,
+  connection scope and a chosen character and colour locally. Messaging a bot starts a
+  chat inside the Bots page whose native persona is repeated in every batch prompt;
+  those chats skip workspace preparation and automatic checks and stay out of Work.
+  Templates cover review, fixing, testing, docs, security, release notes and onboarding;
+  routines are ordinary schedules. See [bots](BOTS.md).
+- Short requests phrased as questions skip workspace preparation, and focused attempts
+  that change no files skip automatic checks; planned assignments always verify.
 - The composer's agent picker lists every discovered agent in a rail, dims unusable
   ones with their reason, and offers each agent's discovered models within its saved
   restrictions; a chosen model applies to single-agent starts.
