@@ -1,21 +1,15 @@
-.bot-showcase-heading {
+.landing-story .bot-showcase-heading {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   justify-items: start;
-  gap: 12px;
+  align-items: start;
+  gap: 20px;
 }
 
 .bot-showcase-heading p {
   max-width: 38rem;
   margin: 0;
   color: var(--color-text-secondary);
-}
-
-.bot-showcase-status {
-  padding: 4px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  color: var(--color-text-secondary);
-  font-size: 0.8125rem;
 }
 
 .bot-showcase-grid {

@@ -183,3 +183,18 @@
     transition: none;
   }
 }
+
+/* Finale card: the dark glass reads well on the accent band in both themes. */
+.landing-story .landing-finale .finale-top {
+  padding: clamp(24px, 3.5vw, 44px);
+  border-color: rgb(255 255 255 / 0.14);
+  background: rgb(15 13 23 / 0.52);
+  color: #ffffff;
+}
+.landing-story .landing-finale .finale-top h2 {
+  margin-block: 0 16px;
+  font-size: clamp(38px, 5vw, 72px);
+}
+.landing-story .landing-finale .finale-mark {
+  max-height: 260px;
+}

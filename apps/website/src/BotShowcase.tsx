@@ -96,8 +96,9 @@ export function BotShowcase() {
     >
       <div className="landing-width">
         <div className="workspace-heading bot-showcase-heading">
-          <span className="bot-showcase-status">In development</span>
-          <h2 id="bots-title">Bots that know their job.</h2>
+          <h2 id="bots-title" className="titled">
+            Bots that know their <span className="title-accent">job.</span>
+          </h2>
           <p>
             Give a bot a role, an agent and the tools it may use. Ask it a question any time, or let
             it run on a schedule. Each one keeps its own look.
