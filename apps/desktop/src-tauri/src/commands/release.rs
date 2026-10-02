@@ -14,6 +14,19 @@ static INSTALLING: AtomicBool = AtomicBool::new(false);
 pub fn installing() -> bool {
     INSTALLING.load(Ordering::SeqCst)
 }
+/// A package fetched ahead of time so "Restart to update" only installs. The
+/// updater verifies its signature when installing, not when downloading.
+#[cfg(not(all(windows, feature = "store")))]
+static DOWNLOADED: std::sync::Mutex<
+    Option<(ReleaseChannel, tauri_plugin_updater::Update, Vec<u8>)>,
+> = std::sync::Mutex::new(None);
+static DOWNLOADING: AtomicBool = AtomicBool::new(false);
+struct DownloadGuard;
+impl Drop for DownloadGuard {
+    fn drop(&mut self) {
+        DOWNLOADING.store(false, Ordering::SeqCst);
+    }
+}
 struct InstallGuard;
 impl Drop for InstallGuard {
     fn drop(&mut self) {
@@ -193,17 +206,23 @@ pub async fn app_install_update(
     }
     #[cfg(not(all(windows, feature = "store")))]
     {
-        let updater = updater(&app, channel, 60)?;
-        let update = updater
-            .check()
-            .await
-            .map_err(|e| e.to_string())?
-            .ok_or("The selected update is no longer available. Check again.")?;
-        if update.version != version {
-            return Err(
-                "The available version changed. Review the new update before installing.".into(),
-            );
+        let cached = DOWNLOADED
+            .lock()
+            .map_err(|_| "Update state unavailable.")?
+            .take()
+            .filter(|(saved, update, _)| *saved == channel && update.version == version);
+        if let Some((_, update, bytes)) = cached {
+            let _ = progress.send(UpdateProgress {
+                phase: "installing",
+                downloaded: 0,
+                total: None,
+            });
+            update.install(bytes).map_err(|_| {
+                "Update could not be completed. Reopen Jackalope and check the installed version before retrying.".to_string()
+            })?;
+            app.restart();
         }
+        let update = checked_update(&app, channel, &version).await?;
         let mut downloaded = 0u64;
         let mut last_progress = std::time::Instant::now();
         update.download_and_install(|chunk, total| {
@@ -216,6 +235,84 @@ pub async fn app_install_update(
         let _ = progress.send(UpdateProgress { phase: "installing", downloaded: 0, total: None });
     }).await.map_err(|_| "Update could not be completed. Reopen Jackalope and check the installed version before retrying.".to_string())?;
         app.restart();
+    }
+}
+
+#[cfg(not(all(windows, feature = "store")))]
+async fn checked_update(
+    app: &AppHandle,
+    channel: ReleaseChannel,
+    version: &str,
+) -> Result<tauri_plugin_updater::Update, String> {
+    let update = updater(app, channel, 60)?
+        .check()
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or("The selected update is no longer available. Check again.")?;
+    if update.version != version {
+        return Err(
+            "The available version changed. Review the new update before installing.".into(),
+        );
+    }
+    Ok(update)
+}
+
+/// Downloads an update without installing it, so a later restart is quick.
+/// Running tasks are unaffected; installing still requires idle work.
+#[tauri::command]
+pub async fn app_download_update(
+    app: AppHandle,
+    version: String,
+    channel: ReleaseChannel,
+    progress: tauri::ipc::Channel<UpdateProgress>,
+) -> Result<(), String> {
+    if !configured(&app) {
+        return Err("This build has no trusted update source.".into());
+    }
+    #[cfg(all(windows, feature = "store"))]
+    {
+        let _ = (version, channel, progress);
+        return Err("Microsoft Store downloads its own updates.".into());
+    }
+    #[cfg(not(all(windows, feature = "store")))]
+    {
+        if DOWNLOADED
+            .lock()
+            .map_err(|_| "Update state unavailable.")?
+            .as_ref()
+            .is_some_and(|(saved, update, _)| *saved == channel && update.version == version)
+        {
+            return Ok(());
+        }
+        if DOWNLOADING.swap(true, Ordering::SeqCst) {
+            return Err("An update is already downloading.".into());
+        }
+        let _download = DownloadGuard;
+        let update = checked_update(&app, channel, &version).await?;
+        let mut downloaded = 0u64;
+        let mut last_progress = std::time::Instant::now();
+        let bytes = update
+            .download(
+                |chunk, total| {
+                    downloaded = downloaded.saturating_add(chunk as u64);
+                    if last_progress.elapsed() >= std::time::Duration::from_millis(100)
+                        || total == Some(downloaded)
+                    {
+                        let _ = progress.send(UpdateProgress {
+                            phase: "downloading",
+                            downloaded,
+                            total,
+                        });
+                        last_progress = std::time::Instant::now();
+                    }
+                },
+                || {},
+            )
+            .await
+            .map_err(|error| format!("Could not download the update: {error}"))?;
+        *DOWNLOADED.lock().map_err(|_| "Update state unavailable.")? =
+            Some((channel, update, bytes));
+        Ok(())
     }
 }
 

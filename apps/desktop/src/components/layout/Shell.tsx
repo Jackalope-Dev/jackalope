@@ -25,6 +25,7 @@ import { AccessNoticeSlot } from '../account/AccessBoundary';
 import { useTrackOpenWork } from '../tasks/WorkSignals';
 import { BranchIndicator } from './BranchIndicator';
 import { ShortcutSheet } from './ShortcutSheet';
+import { WelcomeDialog } from './WelcomeDialog';
 import { WhatsNewDialog } from './WhatsNewDialog';
 import { WorkSidebar } from './WorkSidebar';
 import { WorkspaceStatusBar } from './WorkspaceStatusBar';
@@ -757,6 +758,7 @@ export function Shell({
           />
         )}
       </Suspense>
+      <WelcomeDialog />
       <WhatsNewDialog />
       <ShortcutSheet />
     </div>

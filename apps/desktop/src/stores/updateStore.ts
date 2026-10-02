@@ -21,6 +21,11 @@ interface UpdateBridge {
   desktop: () => boolean;
   status: (check: boolean) => Promise<ReleaseStatus>;
   setChannel?: (channel: 'stable' | 'beta') => Promise<void>;
+  download?: (
+    version: string,
+    progress: (value: UpdateProgress) => void,
+    channel: 'stable' | 'beta',
+  ) => Promise<void>;
   install: (
     version: string,
     progress: (value: UpdateProgress) => void,
@@ -30,6 +35,11 @@ interface UpdateBridge {
 }
 interface UpdateState {
   autoCheck: boolean;
+  autoDownload: boolean;
+  downloading: boolean;
+  downloadProgress: UpdateProgress | null;
+  /** The version whose package is downloaded and ready to install on restart. */
+  downloadedVersion: string | null;
   release: ReleaseStatus | null;
   changingChannel: boolean;
   setChannel: (channel: 'stable' | 'beta') => Promise<void>;
@@ -42,6 +52,8 @@ interface UpdateState {
   lastChecked: number | null;
   dismissedVersion: string | null;
   setAutoCheck: (value: boolean) => void;
+  setAutoDownload: (value: boolean) => void;
+  download: () => Promise<void>;
   dismiss: () => void;
   load: () => Promise<void>;
   check: (automatic?: boolean) => Promise<void>;
@@ -62,15 +74,21 @@ interface PreferenceStorage {
 }
 export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStorage) {
   let autoCheck = true;
+  let autoDownload = false;
   try {
     storage ??= localStorage;
     autoCheck = storage.getItem('jackalope-auto-update-check') !== 'false';
+    autoDownload = storage.getItem('jackalope-auto-update-download') === 'true';
   } catch {
     autoCheck = false;
   }
   let loading: Promise<void> | undefined;
   return create<UpdateState>()((set, get) => ({
     autoCheck,
+    autoDownload,
+    downloading: false,
+    downloadProgress: null,
+    downloadedVersion: null,
     release: null,
     changingChannel: false,
     setChannel: async (channel) => {
@@ -86,7 +104,13 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
       set({ changingChannel: true, error: null });
       try {
         await bridge.setChannel(channel);
-        set({ release: null, lastAttempt: null, lastChecked: null, dismissedVersion: null });
+        set({
+          release: null,
+          downloadedVersion: null,
+          lastAttempt: null,
+          lastChecked: null,
+          dismissedVersion: null,
+        });
         await get().load();
       } catch (error) {
         set({ error: String(error) });
@@ -108,6 +132,42 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
         storage?.setItem('jackalope-auto-update-check', String(autoCheck));
       } catch {
         set({ error: 'This preference could not be saved. It applies until Jackalope closes.' });
+      }
+    },
+    setAutoDownload: (autoDownload) => {
+      set({ autoDownload });
+      try {
+        storage?.setItem('jackalope-auto-update-download', String(autoDownload));
+      } catch {
+        set({ error: 'This preference could not be saved. It applies until Jackalope closes.' });
+      }
+      if (autoDownload) void get().download();
+    },
+    download: async () => {
+      const state = get();
+      const version = availableUpdateId(state.release);
+      if (
+        !version ||
+        !bridge.download ||
+        state.release?.storeManaged ||
+        state.downloadedVersion === version ||
+        state.downloading ||
+        state.installing ||
+        state.changingChannel
+      )
+        return;
+      set({ downloading: true, downloadProgress: null, error: null });
+      try {
+        await bridge.download(
+          version,
+          (downloadProgress) => set({ downloadProgress }),
+          state.release?.channel ?? 'stable',
+        );
+        if (availableUpdateId(get().release) === version) set({ downloadedVersion: version });
+      } catch (error) {
+        set({ error: String(error) });
+      } finally {
+        set({ downloading: false, downloadProgress: null });
       }
     },
     dismiss: () => set({ dismissedVersion: availableUpdateId(get().release) }),
@@ -143,6 +203,9 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
         if (!get().release?.configured || (automatic && !get().autoCheck)) return;
         const release = await bridge.status(true);
         set({ release, lastChecked: bridge.now() });
+        if (availableUpdateId(release) !== get().downloadedVersion)
+          set({ downloadedVersion: null });
+        if (get().autoDownload) void get().download();
       } catch (error) {
         set({ error: String(error) });
       } finally {
@@ -152,7 +215,14 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
     install: async () => {
       const state = get();
       const version = availableUpdateId(state.release);
-      if (!version || state.checking || state.installing || state.changingChannel) return;
+      if (
+        !version ||
+        state.checking ||
+        state.installing ||
+        state.downloading ||
+        state.changingChannel
+      )
+        return;
       set({ installing: true, error: null, progress: null, installed: false });
       try {
         await bridge.install(
@@ -175,6 +245,12 @@ export const useUpdateStore = createUpdateStore({
   desktop: isTauriEnvironment,
   status: (check) => nativeTask<ReleaseStatus>('app_release_status', { check }),
   setChannel: (channel) => nativeTask('app_release_channel', { channel }),
+  download: async (version, onProgress, channel) => {
+    const { Channel } = await import('@tauri-apps/api/core');
+    const progress = new Channel<UpdateProgress>();
+    progress.onmessage = onProgress;
+    await nativeTask('app_download_update', { version, progress, channel });
+  },
   install: async (version, onProgress, channel) => {
     const { Channel } = await import('@tauri-apps/api/core');
     const progress = new Channel<UpdateProgress>();
