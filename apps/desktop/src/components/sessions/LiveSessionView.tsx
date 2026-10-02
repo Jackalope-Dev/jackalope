@@ -31,6 +31,7 @@ import { BOT_COLORS, useBotStore } from '../../stores/botStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useWorkbenchStore } from '../../stores/workbenchStore';
+import { useChangeStats } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { botStyle } from '../bots/BotAvatar';
 import { TaskLearning } from '../knowledge/TaskLearning';
@@ -65,12 +66,15 @@ export function LiveSessionView({
   detached = false,
   onBack,
   initialDetailsOpen,
+  simple = false,
 }: {
   session: LiveSession;
   runs: TaskRun[];
   detached?: boolean;
   onBack?: () => void;
   initialDetailsOpen?: boolean;
+  /** A plain conversation for bot chats: no workspace, terminal or session tools; review appears in the transcript. */
+  simple?: boolean;
 }) {
   const { active, latest, pending, questions, status } = sessionWork(session, runs);
   const runById = useMemo(() => new Map(runs.map((run) => [run.id, run])), [runs]);
@@ -211,6 +215,8 @@ export function LiveSessionView({
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       await getCurrentWindow()[action]();
     });
+  const changeStats = useChangeStats(simple ? [latest] : []);
+  const latestChanges = latest ? changeStats[latest.id]?.value : undefined;
   const showReview = () => {
     setExpanded(true);
     setTab('changes');
@@ -230,7 +236,7 @@ export function LiveSessionView({
   const screenRun = active ?? latest;
   const tools = (
     <>
-      {!detached && (
+      {!detached && !simple && (
         <Tooltip content="Agent’s screen">
           <button
             type="button"
@@ -247,7 +253,7 @@ export function LiveSessionView({
           </button>
         </Tooltip>
       )}
-      {!integrated && (
+      {!integrated && !simple && (
         <ChatOptions
           items={[
             {
@@ -382,8 +388,9 @@ export function LiveSessionView({
         <button
           type="button"
           className="live-status"
-          aria-expanded={expanded}
-          aria-controls="live-session-work"
+          aria-expanded={simple ? undefined : expanded}
+          aria-controls={simple ? undefined : 'live-session-work'}
+          disabled={simple && !expanded}
           onClick={() => setExpanded(!expanded)}
         >
           <span aria-live="polite">
@@ -454,13 +461,15 @@ export function LiveSessionView({
                   </Menu.Content>
                 </Menu.Portal>
               </Menu.Root>
-              <Button
-                variant={latest && !active && !integrated ? undefined : 'outline'}
-                disabled={!latest || !!active || busy}
-                onClick={showReview}
-              >
-                Review changes
-              </Button>
+              {!simple && (
+                <Button
+                  variant={latest && !active && !integrated ? undefined : 'outline'}
+                  disabled={!latest || !!active || busy}
+                  onClick={showReview}
+                >
+                  Review changes
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -470,8 +479,8 @@ export function LiveSessionView({
           <InlineNotice tone="error">{error || session.error}</InlineNotice>
         </div>
       )}
-      <WorkSourceLink prompts={session.messages.map((message) => message.text)} />
-      {latest && !detached && (
+      {!simple && <WorkSourceLink prompts={session.messages.map((message) => message.text)} />}
+      {latest && !detached && !simple && (
         <WorkContext
           key={`context:${session.id}`}
           run={latest}
@@ -483,14 +492,14 @@ export function LiveSessionView({
           <SessionTopics key={`topics:${session.id}`} session={session} />
         </WorkContext>
       )}
-      {latest && !detached && !session.closed && (
+      {latest && !detached && !session.closed && !simple && (
         <WorkFeedbackInbox
           key={`feedback:${latest.taskId}`}
           taskId={latest.taskId}
           onFeedback={append}
         />
       )}
-      {!latest && !detached && (
+      {!latest && !detached && !simple && (
         <div className="work-toolbar">
           <SessionTopics key={`topics:${session.id}`} session={session} />
         </div>
@@ -584,6 +593,26 @@ export function LiveSessionView({
                         </div>
                       </article>
                     )}
+                    {simple &&
+                      lastInBatch &&
+                      run?.id === latest?.id &&
+                      run &&
+                      !isActive(run) &&
+                      !integrated &&
+                      !!latestChanges?.files && (
+                        <div className="live-review-cta">
+                          <span>
+                            Changed {latestChanges.files}{' '}
+                            {latestChanges.files === 1 ? 'file' : 'files'}
+                            <small>
+                              +{latestChanges.added} −{latestChanges.removed}
+                            </small>
+                          </span>
+                          <Button disabled={busy} onClick={showReview}>
+                            Review changes
+                          </Button>
+                        </div>
+                      )}
                   </div>
                 );
               })}

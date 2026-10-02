@@ -191,6 +191,7 @@ export function BotsWorkspace() {
                 runs={sessionRuns}
                 initialDetailsOpen={false}
                 onBack={() => setOpenId(null)}
+                simple
               />
             </div>
           ) : (
