@@ -7,10 +7,13 @@ import {
   Check,
   GitBranch,
   GitMerge,
+  KeyRound,
+  Laptop,
   Moon,
   Play,
   Plus,
   ScanSearch,
+  SlidersHorizontal,
   Sun,
 } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
@@ -24,6 +27,7 @@ import { DISCORD_URL } from './community';
 import { tour } from './content';
 import { EditorialArt } from './EditorialArt';
 import { WorkspaceClip } from './WorkspaceClip';
+import './landing-refresh.css';
 
 function HeroMark() {
   const root = useRef<HTMLDivElement>(null);
@@ -367,6 +371,29 @@ function Workbench() {
   );
 }
 
+const localPoints = [
+  {
+    icon: Laptop,
+    title: 'Runs locally',
+    detail: 'Agents work in your projects on your computer, each task in its own Git worktree.',
+  },
+  {
+    icon: KeyRound,
+    title: 'Your accounts',
+    detail: 'Use your existing agent subscriptions and sign-ins. Credentials stay on your device.',
+  },
+  {
+    icon: GitMerge,
+    title: 'Nothing merges unseen',
+    detail: 'Read the diff and checks first. Integration only happens when you choose it.',
+  },
+  {
+    icon: SlidersHorizontal,
+    title: 'Separate switches',
+    detail: 'Settings sync, feedback and diagnostics each have their own control.',
+  },
+];
+
 export function LandingPage({
   action,
   downloadAction,
@@ -396,6 +423,8 @@ export function LandingPage({
     faqs.slice(Math.ceil(faqs.length / 2)),
   ];
   useEffect(() => {
+    // Cards start hidden only once this runs, so server-rendered pages stay readable without it.
+    landing.current?.classList.add('js-reveal');
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -417,6 +446,11 @@ export function LandingPage({
         <HeroMark />
         <div className="landing-width landing-hero-grid">
           <div className="hero-copy">
+            <a className="hero-chip" href="/changelog/">
+              <span className="hero-chip-label">Public beta</span>
+              <span>A guided welcome and one-click feedback</span>
+              <ArrowRight size={14} aria-hidden="true" />
+            </a>
             <div className="hero-poster">
               <h1 id="hero-title">
                 <span>More agents.</span> <span>Less juggling.</span>
@@ -485,10 +519,10 @@ export function LandingPage({
       >
         <div className="landing-width">
           <div className="feature-heading">
-            <h2 id="features-title">
+            <h2 id="features-title" className="titled">
               A lot going on.
               <br />
-              All in one place.
+              <span className="title-accent">All in one place.</span>
             </h2>
           </div>
           <div className="feature-grid">
@@ -537,7 +571,9 @@ export function LandingPage({
         <EchoMark animated={false} className="section-echo-mark" />
         <div className="landing-width">
           <div className="workspace-heading">
-            <h2 id="inside-title">Meet your new workspace.</h2>
+            <h2 id="inside-title" className="titled">
+              Meet your new <span className="title-accent">workspace.</span>
+            </h2>
           </div>
           <Tabs.Root defaultValue="tasks" className="product-explorer">
             <Tabs.List aria-label="Explore the workspace" className="product-tabs">
@@ -569,10 +605,10 @@ export function LandingPage({
       >
         <div className="landing-width atmosphere-layout">
           <div>
-            <h2 id="atmosphere-title">
+            <h2 id="atmosphere-title" className="titled">
               Make room.
               <br />
-              Make it yours.
+              <span className="title-accent">Make it yours.</span>
             </h2>
             <p>
               Try a palette. The whole page comes along.
@@ -625,12 +661,39 @@ export function LandingPage({
         </div>
       </section>
 
+      <section className="local-band" aria-labelledby="local-title" data-reveal="">
+        <div className="landing-width">
+          <div>
+            <h2 id="local-title" className="titled">
+              Your machine.
+              <br />
+              <span className="title-accent">Your call.</span>
+            </h2>
+            <p className="local-band-lede">
+              Jackalope runs the agents you already use on your own computer. It organizes the work;
+              you decide what lands.
+            </p>
+          </div>
+          <ul className="local-band-points">
+            {localPoints.map(({ icon: Icon, title, detail }) => (
+              <li key={title}>
+                <Icon size={20} aria-hidden="true" className="local-band-icon" />
+                <strong>{title}</strong>
+                <span>{detail}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
       <section
         className="landing-width landing-questions"
         id="questions"
         aria-labelledby="questions-title"
       >
-        <h2 id="questions-title">Questions</h2>
+        <h2 id="questions-title" className="titled">
+          Questions
+        </h2>
         <div className="landing-faq-grid">
           {faqColumns.map((column) => (
             <div className="faq-list" key={column[0]?.[0]}>
