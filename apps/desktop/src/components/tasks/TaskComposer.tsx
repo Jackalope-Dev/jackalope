@@ -19,7 +19,7 @@ import type { Runner } from '../../lib/task-runtime';
 import { PROMPT_MAX_CHARS } from '../../lib/task-runtime';
 import type { McpServerConfig } from '../../lib/tauri-bridge';
 import type { TaskDraft } from '../../stores/executionStore';
-import { AgentAvatar } from '../agents/AgentAvatar';
+import { ProviderMark } from '../agents/ProviderMark';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
@@ -302,7 +302,7 @@ export function TaskComposer({
                         aria-pressed={current.agent === agent.id}
                         onClick={() => onChange({ agent: agent.id, model: undefined })}
                       >
-                        <AgentAvatar provider={agent.id} size="sm" />
+                        <ProviderMark provider={agent.id} size={20} />
                         <span>
                           <strong>{agent.name}</strong>
                           <span>{agent.available ? 'Available' : 'Needs setup'}</span>

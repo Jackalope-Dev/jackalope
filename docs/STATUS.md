@@ -188,13 +188,18 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   all requirement assessments in one call; review shows their justifications and
   evidence separately from human acceptance.
 - Durable ownership handoffs, explicit interface agreements and changed-file scope
-  checks gate dependent work and integration. Projects can opt into agent reconciliation
+  checks gate dependent work and integration. Running agents can read and adopt other
+  tasks' live unintegrated files, are told when their work stops merging with another
+  task's, and can split off subtasks with the user's consent; planned tasks show
+  whether their assignments' current work merges cleanly and how the work was split. Projects can opt into agent reconciliation
   and verified local merging; source worktrees remain available. See
   [coordination contracts](ORCHESTRATION-CAPABILITIES.md).
 - Repository-aware plans, optional verified predecessor snapshots, dependency-aware
   scheduling, structured coordination reports and workspace verification reservations.
-- New tasks can assess focused work, investigation or a reviewed plan through the
-  project's Decisions preference. Local fast paths and reused assessments avoid model
+- New tasks can assess focused work, investigation or a plan through the project's
+  Decisions preference. Substantial requests are split into subtasks that start
+  without a review click by default; a project setting or Review before starting
+  keeps the reviewed-plan flow. Local fast paths and reused assessments avoid model
   calls. Plans retain one parent, scoped assignments, attempts and usage; multiple
   assignments receive progressive integration checks and a final combined result.
   New plans retain conflict resolution and bounded verification repairs within the task.
@@ -216,6 +221,25 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   agent sign-in guidance and save-and-check results. Full AllMCPs search and custom
   connections remain available; live publisher/account acceptance remains open.
   Task-owned Chromium sessions and scoped desktop-window grants.
+- Connected apps link the user's own Composio project. The project key and Composio
+  identifiers stay in protected storage; apps connect through Composio's hosted sign-in
+  in the user's browser, and one managed on-demand connection delivers them to every
+  agent. Composio holds third-party tokens and bills usage to that project. See
+  [Connected apps](MCP-DISCOVERY.md#connected-apps-through-composio).
+- Task and chat Screen views poll the attempt's existing task browser viewport and
+  desktop grant state without opening a browser, requesting access or saving an
+  artifact. People can stop the browser or revoke desktop control from there.
+- Saved bots keep a name, role, standing instructions, agent and model, project,
+  connection scope and a chosen character and colour locally. Messaging a bot starts a
+  chat inside the Bots page whose native persona is repeated in every batch prompt;
+  those chats skip workspace preparation and automatic checks and stay out of Work.
+  Templates cover review, fixing, testing, docs, security, release notes and onboarding;
+  routines are ordinary schedules. See [bots](BOTS.md).
+- Short requests phrased as questions skip workspace preparation, and focused attempts
+  that change no files skip automatic checks; planned assignments always verify.
+- The composer's agent picker lists every discovered agent in a rail, dims unusable
+  ones with their reason, and offers each agent's discovered models within its saved
+  restrictions; a chosen model applies to single-agent starts.
 - Codex/Claude effort requests and advertised OpenCode provider variants, focused isolated-task coordination, verification
   timeout alignment, usage attribution
   and direct-CLI quality comparisons with separate routing evaluation gates. See
@@ -303,7 +327,9 @@ The website provides setup and workflow guides, compatibility tables, sample-wor
 media and account flows. Its content is shared with bundled native help through
 `packages/knowledge`. Build and release tooling uses Windows Store MSIX and macOS/Linux Cloud candidates.
 Store builds offer in-app update checks and user-initiated installation through
-Microsoft Store; Store-managed background delivery remains independent. Branch-based
+Microsoft Store; Store-managed background delivery remains independent. Store members can request
+beta flight membership in the app; the operator applies it in Partner Center from
+the admin console's request list. Branch-based
 beta/stable publication is separate from master development and checks complete artifact sets, source checks, signing and
 installed-acceptance configuration; live signing and installed upgrades remain
 release acceptance work. See [release automation](RELEASE-AUTOMATION.md).
@@ -328,6 +354,25 @@ selected element from its current page state, with a cropped screenshot and boun
 HTML/style context. Selection notes survive view changes; the browser closes with its preview.
 GitHub, Linear and Jira Cloud issue browsers prepare editable task drafts and retain source
 links. GitHub uses the installed CLI; Linear/Jira credentials use protected native storage.
+
+Jackalope Swarm (beta) gives each live attempt on an Artifacts-linked project its own fork
+through the person's own Worker (`apps/swarm`). Every 15 seconds the desktop pushes changed
+snapshots as synthetic commits, and the Worker reports files and overlapping edits across
+forks on Project → Swarm. Forks are deleted when attempts finish; merging stays local.
+See [the Worker guide](../apps/swarm/README.md).
+
+Cloudflare Artifacts (beta) connects a user's own Cloudflare account and namespace from
+Settings → Connected work. Connect Cloudflare signs in through the browser with Jackalope's
+public OAuth client (PKCE, loopback redirect on 127.0.0.1 ports 47851–47853) and lists the
+accounts the person shared; an API token remains an alternative. Tokens stay in protected
+native storage, OAuth access refreshes before expiry and disconnecting revokes it. Setup can
+create a new project backed by an Artifacts repository, and Project settings can move an
+existing repository there through a new `artifacts` remote, leaving other remotes and local
+`jackalope/*` task branches untouched. Pushes use short-lived repo tokens scoped to the
+Artifacts host and never written to remotes or Git config. A read-only review snapshot
+returns an expiring clone command shown once. Tasks still run in local worktrees; hosted
+Artifacts, per-task forks and push-triggered automation are not implemented. Live
+Cloudflare account and installed acceptance remain open.
 
 Trusted hosts and a responsive phone companion are implemented for native validation.
 Settings → Remote access scopes paired devices to selected projects. A separate loopback
@@ -354,6 +399,6 @@ update acceptance remain platform-specific requirements. Real-model quality and
 lesson/routing improvements require matched trials and independent review. Automated
 checks do not establish service delivery or installed-app acceptance.
 
-Managed remote hosting, native mobile apps, enforced monetary budgets and team collaboration remain future work. Use
+Managed remote hosting (including hosted Artifacts), native mobile apps, enforced monetary budgets and team collaboration remain future work. Use
 the [documentation index](README.md), [contribution guide](../CONTRIBUTING.md) and
 [licensing guide](LICENSING.md) for development and redistribution.

@@ -31,9 +31,6 @@ export function ScheduleTemplateLibrary({
           <h2 id="template-library-title" className="text-xl font-medium">
             Start with a useful routine
           </h2>
-          <p className="task-muted mt-2">
-            Choose a template, tailor it to your project, and enable when ready.
-          </p>
         </div>
         <span className="task-muted">{scheduleTemplates.length} templates</span>
       </div>

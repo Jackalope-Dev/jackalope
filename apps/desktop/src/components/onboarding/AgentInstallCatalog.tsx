@@ -1,7 +1,7 @@
 import { CopyButton, Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { ExternalLink } from 'lucide-react';
 import type { builtinAgents } from '../../lib/agent-catalog';
-import { AgentAvatar } from '../agents/AgentAvatar';
+import { ProviderMark } from '../agents/ProviderMark';
 
 /** A shell command with a copy action that reports clipboard failures. */
 export function CommandCopy({ command }: { command: string }) {
@@ -30,7 +30,7 @@ export function AgentInstallCatalog({
           <div key={agent.id} className="onboarding-catalog-card">
             <div className="onboarding-catalog-head">
               <div className="flex items-center gap-2.5">
-                <AgentAvatar provider={agent.id} size="xs" />
+                <ProviderMark provider={agent.id} size={16} />
                 <div>
                   <strong>{agent.name}</strong>
                   <span className="onboarding-vendor">{agent.vendor}</span>

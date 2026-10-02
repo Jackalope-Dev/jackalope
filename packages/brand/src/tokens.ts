@@ -135,7 +135,8 @@ export function themeTokens(theme: ThemePalette) {
   let actionLight = accentLight;
   let actionText = luminance <= 1.05 / 4.5 - 0.05 ? '#ffffff' : '#000000';
   if (actionText === '#000000') {
-    for (let depth = 0.5; depth <= 12; depth += 0.5) {
+    // Deep enough for white text on orange, green and cyan accents; yellow keeps black text.
+    for (let depth = 0.5; depth <= 18; depth += 0.5) {
       const candidate = Math.max(0, accentLight - depth);
       if (1.05 / (relativeLuminance(hslToHex(accentHue, accentSat, candidate)) + 0.05) >= 4.6) {
         actionLight = candidate;

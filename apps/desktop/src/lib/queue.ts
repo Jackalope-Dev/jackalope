@@ -17,6 +17,10 @@ export interface QueueItem {
   runId: string | null;
   error: string | null;
   canceled: boolean;
+  /** Paths this task handed to subtasks it spawned. */
+  excludedScopes?: string[];
+  /** Set on subtasks an agent split off with propose_subtask. */
+  parentTaskId?: string | null;
 }
 export interface QueueMessage {
   report?: { completed: string[]; remaining: string[]; artifacts: string[] } | null;

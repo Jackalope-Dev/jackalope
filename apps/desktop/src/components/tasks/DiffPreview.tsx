@@ -30,7 +30,7 @@ class DiffBoundary extends Component<{ patch: string; children: ReactNode }, { f
   }
 }
 
-export function DiffPreview(props: { patch: string; file?: string }) {
+export function DiffPreview(props: { patch: string; file?: string; fill?: boolean }) {
   return (
     <DiffBoundary patch={props.patch}>
       <Suspense fallback={<LoadingState label={'Opening diff…'} />}>

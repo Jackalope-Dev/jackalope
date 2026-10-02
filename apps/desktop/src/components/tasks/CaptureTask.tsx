@@ -7,6 +7,7 @@ import { connectionSupport } from '../../lib/agent-capabilities';
 import { useAgentModels } from '../../lib/agent-models';
 import { effectiveConnections } from '../../lib/mcp-connection';
 import { planningDraft } from '../../lib/planning';
+import { isQuestionOnly } from '../../lib/question-intent';
 import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog';
 import { assemblePrompt, PROMPT_VERSION } from '../../lib/skills/context-assembler';
 import { resolveTaskGuidelines } from '../../lib/skills/task-context';
@@ -323,7 +324,9 @@ export function CaptureTask({
         agentProfileId: current.agent ? agentAccountFor(project, adapter) : undefined,
         targetBranch: project.preferences?.baseBranch || project.gitBranch,
         verifyCommand: project.preferences?.verifyCommand,
-        prepareCommand: project.preferences?.prepareCommand,
+        prepareCommand: isQuestionOnly(current.prompt)
+          ? undefined
+          : project.preferences?.prepareCommand,
         setupFiles: project.preferences?.setupFiles,
         autoVerify: project.preferences?.autoVerify === true,
         prompt: finalPrompt,
@@ -333,12 +336,14 @@ export function CaptureTask({
         connectionIds: current.connectionIds,
         contextSelection: current.contextSelection,
       };
+      let autoStart = false;
       if (choice === 'assess') {
         const result = await assessment.assess(request, current.prompt.trim());
-        if (result.strategy !== 'single') return;
+        autoStart = !!result.autoPlan && project.preferences?.automaticSubtasks !== false;
+        if (!autoStart && result.strategy !== 'single') return;
       }
-      if (choice === 'plan') {
-        const parentId = await assessment.create(request, current.prompt.trim());
+      if (choice === 'plan' || autoStart) {
+        const parentId = await assessment.create(request, current.prompt.trim(), autoStart);
         saveIdea(parentId);
         clear();
         selectProject(project.id);

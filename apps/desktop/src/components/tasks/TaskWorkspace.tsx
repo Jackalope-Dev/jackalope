@@ -337,9 +337,7 @@ export function TaskWorkspace({
               : `Build in ${project?.name ?? 'your workspace'}`
         }
         description={
-          preset === 'focus' ? undefined : preset === 'oversee' ? (
-            'Answer questions, unblock work and review results.'
-          ) : hasWork ? undefined : (
+          preset !== 'build' || hasWork ? undefined : (
             <span>
               Describe what to build, fix, or explore, or{' '}
               <button

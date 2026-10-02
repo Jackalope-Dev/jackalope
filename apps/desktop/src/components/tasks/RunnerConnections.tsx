@@ -23,10 +23,10 @@ import { accountForAgent, useCapacityStore } from '../../stores/capacityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { AddAgentForm } from '../agents/AddAgentForm';
-import { AgentAvatar } from '../agents/AgentAvatar';
 import { AgentInstallGuide } from '../agents/AgentInstallGuide';
 import { LocalAiSetup } from '../agents/LocalAiSetup';
 import { ProviderConnections } from '../agents/ProviderConnections';
+import { ProviderMark } from '../agents/ProviderMark';
 import {
   navigateWorkspace,
   openAgentConfiguration,
@@ -311,12 +311,9 @@ export function RunnerConnections({
         >
           <Settings2 size={16} />
         </button>
-        <AgentAvatar
-          provider={provider}
-          size="md"
-          working={working && !waitingRun}
-          waiting={!!waitingRun}
-        />
+        <span className="agent-roster-mark" aria-hidden="true">
+          <ProviderMark provider={provider} size={32} />
+        </span>
         <div className="agent-roster-identity">
           <div className="agent-roster-name">
             <h2>{custom?.name ?? runner.name}</h2>

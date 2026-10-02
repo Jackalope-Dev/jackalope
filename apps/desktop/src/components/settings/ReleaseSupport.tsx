@@ -1,4 +1,4 @@
-import { DiscordIcon, Textarea } from '@jackalope/ui';
+import { DiscordIcon, FormField, Textarea } from '@jackalope/ui';
 import { LifeBuoy } from 'lucide-react';
 import { useState } from 'react';
 import { DISCORD_URL } from '../../lib/community';
@@ -6,6 +6,7 @@ import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import { FeedbackForm } from './FeedbackForm';
+import { Setting, SettingActions, SettingBody, SettingGroup } from './Setting';
 import { UpdateSettings } from './UpdateSettings';
 
 export function ReleaseSupport() {
@@ -34,81 +35,81 @@ export function ReleaseSupport() {
     setMessage('Report copied. Review it before sharing it with support. Nothing was sent.');
   };
   return (
-    <div className="space-y-6">
+    <>
       <UpdateSettings />
       <FeedbackForm />
-      <section className="space-y-3" aria-label="Documentation and knowledgebase">
-        <h3 className="text-base font-medium">Documentation & Guides</h3>
-        <p className="settings-row-description">
-          Read architecture guides, agent configuration instructions, worktree workflows, and
-          troubleshooting recipes in the online Knowledgebase.
-        </p>
-        <Button
-          variant="outline"
-          onClick={() => void openExternalUrl('https://jackalope.dev/knowledge/')}
+      <SettingGroup aria-label="Help and community">
+        <Setting
+          title="Documentation & guides"
+          description="Architecture guides, agent configuration, worktree workflows and troubleshooting recipes in the online Knowledgebase."
         >
-          <LifeBuoy className="size-4 mr-2" />
-          Browse Knowledgebase
-        </Button>
-      </section>
-      <section className="space-y-3" aria-label="Community">
-        <h3 className="text-base font-medium">Community</h3>
-        <p className="settings-row-description">
-          Ask questions, share workflows, and hear about new releases first in the Jackalope
-          Discord.
-        </p>
-        <Button variant="outline" onClick={() => void openExternalUrl(DISCORD_URL)}>
-          <DiscordIcon className="size-4 mr-2" />
-          Join the Discord
-        </Button>
-      </section>
-      <section className="space-y-3" aria-label="Support report">
-        <h3 className="text-base font-medium">Prepare a local support report</h3>
-        <p className="settings-row-description">
-          Prepare a local report with app version, OS, and task outcome counts. It excludes account
-          names, credentials, project paths, prompts, code, and command output. Nothing is sent
-          automatically.
-        </p>
-        <Button
-          variant="outline"
-          disabled={!desktop || busy}
-          onClick={() =>
-            void act(async () =>
-              setDiagnostics(await nativeTask<Record<string, unknown>>('app_diagnostics')),
-            )
-          }
+          <Button
+            variant="outline"
+            onClick={() => void openExternalUrl('https://jackalope.dev/knowledge/')}
+          >
+            <LifeBuoy className="size-4 mr-2" />
+            Browse Knowledgebase
+          </Button>
+        </Setting>
+        <Setting
+          title="Community"
+          description="Ask questions, share workflows and hear about new releases first in the Jackalope Discord."
         >
-          Preview support report
-        </Button>
+          <Button variant="outline" onClick={() => void openExternalUrl(DISCORD_URL)}>
+            <DiscordIcon className="size-4 mr-2" />
+            Join the Discord
+          </Button>
+        </Setting>
+      </SettingGroup>
+      <SettingGroup
+        aria-label="Support report"
+        title="Prepare a local support report"
+        description="Includes app version, OS and task outcome counts. Excludes account names, credentials, project paths, prompts, code and command output. Nothing is sent automatically."
+        action={
+          <Button
+            variant="outline"
+            disabled={!desktop || busy}
+            onClick={() =>
+              void act(async () =>
+                setDiagnostics(await nativeTask<Record<string, unknown>>('app_diagnostics')),
+              )
+            }
+          >
+            Preview support report
+          </Button>
+        }
+      >
         {diagnostics && (
           <>
-            <section aria-label="Support report contents">
-              <h3 className="text-base font-medium">Report contents</h3>
-              <pre className="task-output mt-3">{JSON.stringify(diagnostics, null, 2)}</pre>
-            </section>
-            <label htmlFor="support-feedback" className="block text-sm font-medium">
-              What were you trying to do, and what happened?
-            </label>
-            <Textarea
-              id="support-feedback"
-              className="settings-textarea"
-              rows={4}
-              maxLength={8000}
-              value={feedback}
-              onChange={(event) => setFeedback(event.target.value)}
-              placeholder="Include steps to reproduce or a suggestion. Leave out sensitive information."
-            />
-            <Button variant="outline" disabled={busy} onClick={() => void act(copy)}>
-              Copy report and feedback
-            </Button>
+            <SettingBody aria-label="Support report contents">
+              <pre className="task-output">{JSON.stringify(diagnostics, null, 2)}</pre>
+              <FormField label="What were you trying to do, and what happened?">
+                <Textarea
+                  id="support-feedback"
+                  className="settings-textarea"
+                  rows={4}
+                  maxLength={8000}
+                  value={feedback}
+                  onChange={(event) => setFeedback(event.target.value)}
+                  placeholder="Include steps to reproduce or a suggestion. Leave out sensitive information."
+                />
+              </FormField>
+            </SettingBody>
+            <SettingActions>
+              <Button variant="outline" disabled={busy} onClick={() => void act(copy)}>
+                Copy report and feedback
+              </Button>
+            </SettingActions>
           </>
         )}
-      </section>
-      {message && (
-        <p className="text-sm break-words" role="status">
-          {message}
-        </p>
-      )}
-    </div>
+        {message && (
+          <SettingBody>
+            <p className="text-sm break-words" role="status">
+              {message}
+            </p>
+          </SettingBody>
+        )}
+      </SettingGroup>
+    </>
   );
 }

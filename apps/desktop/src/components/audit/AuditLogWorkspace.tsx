@@ -215,7 +215,7 @@ export function AuditLogWorkspace() {
                   aria-pressed={selectedCategory === cat.id}
                   className={`h-full shrink-0 px-2.5 py-1 rounded-md text-sm font-medium transition-colors ${
                     selectedCategory === cat.id
-                      ? 'bg-[var(--color-accent)] text-[var(--color-on-accent)]'
+                      ? 'bg-[var(--color-action)] text-[var(--color-on-action)]'
                       : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
                   }`}
                 >

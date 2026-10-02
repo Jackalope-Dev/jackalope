@@ -41,7 +41,6 @@ export function McpConfigureServer({
       <WorkspaceHeading
         title={`Configure ${marketplaceName(server)}`}
         titleRef={heading}
-        description="Review the connection and choose where it is available."
         icon={<McpServerIcon server={server} />}
         action={
           <Button variant="ghost" disabled={busy} onClick={onClose}>
@@ -74,7 +73,9 @@ export function McpConfigureServer({
                 ? lastSaved.agentSignIn
                   ? 'oauth'
                   : undefined
-                : recommendation?.authentication
+                : snippet.headers
+                  ? undefined
+                  : recommendation?.authentication
             }
             initial={
               lastSaved?.server ?? {

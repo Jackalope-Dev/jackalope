@@ -14,6 +14,10 @@ const OPTIONAL: &[(&str, &str)] = &[
     ("inbox", "coordination"),
     ("acknowledge_message", "coordination"),
     ("agreement", "coordination"),
+    ("peers", "coordination"),
+    ("peer_read", "coordination"),
+    ("peer_adopt", "coordination"),
+    ("propose_subtask", "coordination"),
 ];
 
 pub(super) fn deferred(run: &TaskRun) -> bool {

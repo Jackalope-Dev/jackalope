@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef } from 'react';
 import { Streamdown } from 'streamdown';
 import { useColorScheme } from '../../hooks/useColorScheme';
 import { createMarkdownHighlighter } from '../../lib/markdown-highlighter';
+import { normalizeAgentMarkdown } from '../../lib/markdown-normalize';
 import { ResultImage } from '../../lib/result-images';
 import { safeResultLink } from '../../lib/task-workflow';
 import 'streamdown/styles.css';
@@ -70,7 +71,7 @@ export default memo(function TaskMarkdown({
           },
         }}
       >
-        {content}
+        {normalizeAgentMarkdown(content)}
       </Streamdown>
     </div>
   );

@@ -12,6 +12,7 @@ import { useChangeStats } from '../../stores/workSignalsStore';
 import { AgentStack } from '../agents/AgentAvatar';
 import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
+import { NoticeRow } from '../ui/NoticeRow';
 import { isUnread, useOpenSignalKey, useWorkSignals, WorkSignals } from './WorkSignals';
 import './workspace-modes.css';
 
@@ -44,9 +45,9 @@ export function WorkspaceModeHome({
         </div>
         <ModeWorkItem item={next} onOpen={onOpen} />
         {attention.length > 1 && (
-          <button type="button" className="task-inline-link" onClick={() => onFilter('attention')}>
+          <NoticeRow onClick={() => onFilter('attention')}>
             {attention.length - 1} more {attention.length === 2 ? 'needs' : 'need'} your attention
-          </button>
+          </NoticeRow>
         )}
       </section>
     ) : null;

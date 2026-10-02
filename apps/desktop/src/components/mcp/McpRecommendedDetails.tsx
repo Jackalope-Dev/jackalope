@@ -74,8 +74,7 @@ export function McpRecommendedDetails({
           <SourceLink url={server.detailUrl}>View on AllMCPs</SourceLink>
         </div>
         <p className="task-muted">
-          Selected from publisher documentation. Available tools and access depend on your account
-          and service permissions.
+          Available tools and access depend on your account and service permissions.
         </p>
         <div>
           <Button onClick={onConfigure}>

@@ -118,18 +118,19 @@ pub struct DesktopSettings {
 }
 
 #[tauri::command]
-pub fn desktop_settings(
+pub async fn desktop_settings(
     app: AppHandle,
     behavior: State<'_, WindowBehavior>,
 ) -> Result<DesktopSettings, String> {
+    let close_to_tray = behavior
+        .preferences
+        .lock()
+        .map_err(|e| e.to_string())?
+        .close_to_tray;
     Ok(DesktopSettings {
-        close_to_tray: behavior
-            .preferences
-            .lock()
-            .map_err(|e| e.to_string())?
-            .close_to_tray,
+        close_to_tray,
         tray_available: behavior.tray_available.load(Ordering::Relaxed),
-        launch_at_login: app.autolaunch().is_enabled().unwrap_or(false),
+        launch_at_login: launch_at_login_enabled(&app).await,
     })
 }
 
@@ -141,8 +142,20 @@ pub fn desktop_set_close_to_tray(
     behavior.save(enabled)
 }
 
+async fn launch_at_login_enabled(app: &AppHandle) -> bool {
+    #[cfg(all(windows, feature = "store"))]
+    if store_startup::packaged() {
+        return store_startup::enabled().await.unwrap_or(false);
+    }
+    app.autolaunch().is_enabled().unwrap_or(false)
+}
+
 #[tauri::command]
-pub fn desktop_set_launch_at_login(enabled: bool, app: AppHandle) -> Result<(), String> {
+pub async fn desktop_set_launch_at_login(enabled: bool, app: AppHandle) -> Result<(), String> {
+    #[cfg(all(windows, feature = "store"))]
+    if store_startup::packaged() {
+        return store_startup::set(enabled).await;
+    }
     let manager = app.autolaunch();
     let result = if enabled {
         manager.enable()
@@ -150,6 +163,64 @@ pub fn desktop_set_launch_at_login(enabled: bool, app: AppHandle) -> Result<(), 
         manager.disable()
     };
     result.map_err(|e| e.to_string())
+}
+
+/// MSIX virtualizes the `Run` registry key the autostart plugin writes, so packaged
+/// builds use the manifest's `windows.startupTask` (id shared with store-manifest.mjs).
+#[cfg(all(windows, feature = "store"))]
+mod store_startup {
+    use windows::{
+        core::HSTRING,
+        ApplicationModel::{Package, StartupTask, StartupTaskState},
+    };
+
+    const TASK_ID: &str = "JackalopeStartup";
+
+    pub fn packaged() -> bool {
+        Package::Current().is_ok()
+    }
+
+    async fn task() -> Result<StartupTask, String> {
+        StartupTask::GetAsync(&HSTRING::from(TASK_ID))
+            .map_err(startup_error)?
+            .await
+            .map_err(startup_error)
+    }
+
+    fn startup_error(error: windows::core::Error) -> String {
+        format!(
+            "Windows could not update the startup setting ({}).",
+            error.code()
+        )
+    }
+
+    fn is_enabled(state: StartupTaskState) -> bool {
+        state == StartupTaskState::Enabled || state == StartupTaskState::EnabledByPolicy
+    }
+
+    pub async fn enabled() -> Result<bool, String> {
+        Ok(is_enabled(task().await?.State().map_err(startup_error)?))
+    }
+
+    pub async fn set(enabled: bool) -> Result<(), String> {
+        let task = task().await?;
+        if !enabled {
+            return task.Disable().map_err(startup_error);
+        }
+        let state = task
+            .RequestEnableAsync()
+            .map_err(startup_error)?
+            .await
+            .map_err(startup_error)?;
+        if is_enabled(state) {
+            Ok(())
+        } else if state == StartupTaskState::DisabledByPolicy {
+            Err("Your organization's policy prevents Jackalope from starting at sign-in.".into())
+        } else {
+            // Once a user turns the startup app off in Windows, only they can turn it back on.
+            Err("Turn on Jackalope in Windows Settings → Apps → Startup.".into())
+        }
+    }
 }
 
 /// Raises the main window from the tray, the Dock or a second app launch,

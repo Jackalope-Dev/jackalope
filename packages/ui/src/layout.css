@@ -6,8 +6,8 @@
     flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 16px 24px;
-    margin-bottom: 24px;
+    gap: 12px 24px;
+    margin-bottom: 16px;
   }
   .ui-page-header > div:first-child,
   .ui-section-header > div:first-child {
@@ -30,7 +30,7 @@
     letter-spacing: -0.045em;
   }
   .ui-section-header {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
   .ui-section-header :is(h2, h3) {
     margin: 0;
@@ -44,7 +44,7 @@
   }
   .ui-page-header p,
   .ui-section-header p {
-    margin: 8px 0 0;
+    margin: 4px 0 0;
     color: var(--color-text-secondary);
     font-size: var(--text-sm, 0.875rem);
     line-height: 1.5;
@@ -74,10 +74,34 @@
   .ui-toolbar:has(> .form-field) {
     align-items: flex-end;
   }
+  /* A recessed track; the selected option is a raised tile. Unselected options keep
+     an outline so every choice still reads as a button in both themes. */
   .ui-segmented-control {
-    border: 0;
-    padding: 0;
+    width: fit-content;
+    max-width: 100%;
     margin: 0;
-    gap: 8px;
+    padding: 4px;
+    gap: 4px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface-sunken);
+  }
+  .ui-segmented-control > .ui-button {
+    border: 1px solid var(--color-border-subtle);
+    background: transparent;
+    color: var(--color-text-secondary);
+    box-shadow: none;
+  }
+  .ui-segmented-control > .ui-button:hover:not(:disabled) {
+    border-color: var(--color-border);
+    background: var(--color-surface-hover);
+    color: var(--color-text-primary);
+  }
+  .ui-segmented-control > .ui-button[aria-pressed="true"] {
+    border-color: color-mix(in srgb, var(--color-accent) 60%, var(--color-border));
+    background: var(--color-surface-elevated);
+    color: var(--color-text-primary);
+    box-shadow: var(--shadow-flat);
+    font-weight: 600;
   }
 }

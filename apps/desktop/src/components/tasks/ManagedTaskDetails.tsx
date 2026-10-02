@@ -53,6 +53,39 @@ export function ManagedTaskDetails({
         )}
         <p className="task-muted">Includes assessment, planning and execution.</p>
       </Panel>
+      {task.delivery?.startedAt && (
+        <Panel className="workspace-stack">
+          <WorkspaceSectionHeading title="Work split" />
+          <dl className="managed-measurements">
+            <div>
+              <dt>Planned assignments</dt>
+              <dd>{task.delivery.assignmentCount ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Split off by agents</dt>
+              <dd>{task.delivery.spawnedSubtasks ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Started</dt>
+              <dd>{task.delivery.autoStarted ? 'Automatically' : 'After plan review'}</dd>
+            </div>
+            {task.delivery.plannedAt && (
+              <div>
+                <dt>Request to planned</dt>
+                <dd>
+                  {Math.max(
+                    0,
+                    Math.ceil(
+                      (Date.parse(task.delivery.plannedAt) - Date.parse(task.createdAt)) / 60000,
+                    ),
+                  )}{' '}
+                  min
+                </dd>
+              </div>
+            )}
+          </dl>
+        </Panel>
+      )}
       {task.delivery && (
         <Panel className="workspace-stack">
           <WorkspaceSectionHeading title="Review and delivery" />

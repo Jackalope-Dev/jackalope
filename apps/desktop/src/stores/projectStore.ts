@@ -23,6 +23,8 @@ export interface ProjectPreferences {
   agentAccounts?: Record<string, string>;
   customInstructions?: string;
   automaticTaskContext?: boolean;
+  /** Split substantial requests into subtasks without a plan review. Defaults to on. */
+  automaticSubtasks?: boolean;
   taskGuidelines?: string[];
   baseBranch?: string;
   branchPrefix?: string;
@@ -62,6 +64,8 @@ export interface Project {
   name: string;
   path: string;
   gitBranch: string;
+  /** Not a Git repository: tasks run in the folder itself, without branches or worktrees. */
+  plainFolder?: boolean;
   worktrees: WorktreeEntry[];
   description?: string;
   preferences?: ProjectPreferences;
@@ -180,6 +184,10 @@ export const useProjectStore = create<ProjectState>()(
         const active = get().projects.find((p) => p.id === get().activeProjectId);
         if (!active) return;
         const request = ++worktreeRequest;
+        if (active.plainFolder) {
+          set({ loading: false, checkingWorktrees: false, worktreesError: null });
+          return;
+        }
 
         try {
           set({ loading: true, checkingWorktrees: false, worktreesError: null });

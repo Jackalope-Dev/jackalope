@@ -110,11 +110,18 @@ pub(super) fn audit(ledger: &Ledger, runs: &[TaskRun], merged: &[String]) -> Vec
             accepted_tree: previous.and_then(|a| a.accepted_tree.clone()),
         };
         let paths = match changed_paths(run) {
-            Ok((tree, paths)) => {
+            Ok((tree, mut paths)) => {
+                // Files adopted from a peer and left unchanged remain that peer's work.
+                let adopted = super::peers::unchanged_adoptions(&ledger.adoptions, run, &tree);
+                paths.retain(|path| !adopted.contains(path));
                 if let Some(item) = item {
+                    let excluded = &item.excluded_scopes;
                     a.outside = paths
                         .iter()
-                        .filter(|p| !contains(&agreements::effective_scopes(ledger, item), p))
+                        .filter(|p| {
+                            !contains(&agreements::effective_scopes(ledger, item), p)
+                                || contains(excluded, p)
+                        })
                         .cloned()
                         .collect();
                 }
@@ -196,6 +203,7 @@ impl Coordinator {
                     created_at: Utc::now().to_rfc3339(), recipient_task_id: Some(a.task_id.clone()), acknowledged_by: vec![], report: None, run_id: Some(a.run_id.clone()), source_tree: a.tree.clone(), resolved_by: None });
             }
             ledger.scope_audits = next;
+            super::peers::notify_conflicts(&mut ledger, &runs, &merged);
             let excess = ledger.messages.len().saturating_sub(2000);
             ledger.messages.drain(..excess);
             self.save(&ledger)?;

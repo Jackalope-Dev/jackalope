@@ -1,0 +1,9 @@
+{
+  "$schema": "../server/node_modules/wrangler/config-schema.json",
+  "name": "jackalope-swarm",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-28",
+  "artifacts": [{ "binding": "ARTIFACTS", "namespace": "jackalope" }],
+  "durable_objects": { "bindings": [{ "name": "SWARM", "class_name": "Swarm" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Swarm"] }]
+}

@@ -33,7 +33,7 @@
   }
   .themed-select:focus-visible {
     outline: 2px solid var(--color-accent-ink);
-    outline-offset: 3px;
+    outline-offset: -1px;
   }
   .themed-select:disabled {
     opacity: 0.5;

@@ -100,6 +100,9 @@ release dates.
   setup/check reuse and dependency scheduling. Include failures, independent review,
   corrections and defects; validate requested tiers in installed provider versions.
 
+- [ ] Measure automatic subtasks on representative requests: planning overhead versus
+  single-lead time, how often plans return one assignment, validation failures, and
+  combined-result quality. Tune the local-rules size threshold from those results.
 - [ ] Validate task assessment, stale-cache invalidation, reviewed planning, scoped
   dispatch, retained usage, pause/stop/restart recovery and explicit final integration
   with installed providers. Compare complete cost and quality on held-out tasks;
@@ -218,6 +221,16 @@ release dates.
   including account-specific OAuth, revocation, local browser prerequisites and restart.
   Keep publisher endpoints and pinned local packages current; fixtures do not verify
   third-party authorization or service availability.
+- [ ] Accept Connected apps with a live Composio project: key validation and replacement,
+  hosted sign-in, pending and failed accounts, disconnect with revocation, removed or
+  recreated sessions, apps without managed sign-in and agent tool use through the managed
+  connection with each adapter. Confirm catalog paging and logos for large catalogs.
+- [ ] Validate the Screen view in installed builds: live frames while agents act, busy
+  and stopped browsers, revoke during an in-flight command, desktop grant states and
+  polling cost on long tasks, at 960 by 640 and in both themes.
+- [ ] Validate bots end to end: persona continuity across batches and restarts, model and
+  connection scope on launch, routines created paused or active, deleted projects and
+  schedules, and the provider-rail picker's keyboard navigation and unavailable reasons.
 
 - [ ] Verify automatic lessons across tasks, queues, schedules and restart,
   including evidence, edits, removal and frozen task context. Measure outcomes.
@@ -233,6 +246,25 @@ release dates.
   authenticated installed CLIs, including enterprise hosts, pagination and stale heads.
   Validate editable workflow drafts and preserve explicit authorization for remote writes.
   Broader remote publication, review-thread resolution and proactive proposals remain open.
+- [ ] Accept Jackalope Swarm with a deployed Worker: fork creation, snapshot pushes from several
+  live attempts, conflict accuracy against Git merges, token renewal, restart re-registration,
+  fork deletion after integration and archive, and two machines sharing one repository.
+- [ ] Validate Cloudflare Artifacts with a live Workers Paid account in installed profiles:
+  connection with and without a data location, new-project creation, moving a repository
+  with many branches, push rejection and retry, the 1 GB repository and 32 MB file limits,
+  review-snapshot expiry, and credential prompts staying suppressed on rejected tokens.
+  Include Connect Cloudflare: consent with one and several accounts, declined consent,
+  occupied loopback ports, refresh-token rotation across restarts, revocation on
+  disconnect, and the packaged Windows Store, macOS and Linux builds.
+- [ ] Run the installed swarm trial and `pnpm evaluate:execution --modes=single,auto` on
+  each supported provider: how often agents use peers, peer_adopt and propose_subtask,
+  duplicate implementations avoided, conflicts caught before completion, and whether
+  planner briefings reduce worker discovery. Tune assignment and subtask limits from
+  those results.
+- [ ] Explore agent-native Artifacts workflows: a fork per task attempt instead of a local
+  worktree, provenance notes on integrated commits, push-event review and check triggers,
+  and opening an existing Artifacts repository as a project. Keep the coordinator,
+  reservation and integration guarantees; a fork does not replace review or merge approval.
 
 ## Account access and optional services
 
@@ -241,6 +273,10 @@ release dates.
 
 - [ ] Validate required account access in development and release builds, including
   reconnect, revocation, offline expiry and saved-work recovery.
+
+- [ ] Deploy migration `0018_beta_requests.sql` and validate Store beta requests:
+  join, withdraw and leave from an installed Store build, admin copy/mark-done, and
+  the Beta badge after a flight update reaches a member's Store account.
 
 - [ ] Deploy migration `0017_device_machine.sql` and validate per-machine device
   slots: desktop connections send a hashed machine key, and the ten-device limit

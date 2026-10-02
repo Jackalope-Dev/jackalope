@@ -17,8 +17,8 @@ import { useMascotStore } from '../../stores/mascotStore';
 import { type OnboardingStep, useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useThemeStore } from '../../stores/themeStore';
-import { AgentAvatar } from '../agents/AgentAvatar';
 import { LocalAiSetup } from '../agents/LocalAiSetup';
+import { ProviderMark } from '../agents/ProviderMark';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
@@ -304,7 +304,7 @@ export function OnboardingFlow({
           <JackalopeMascot
             size="md"
             className="w-fit"
-            bubbleAlign="start"
+            speechSide="right"
             overrideMood={working && !nodding ? 'thinking' : 'idle'}
             nodding={nodding}
             onNodComplete={completeNod}
@@ -418,7 +418,7 @@ export function OnboardingFlow({
                           <span className="onboarding-radio">
                             {agent === item.id && <Check size={14} />}
                           </span>
-                          <AgentAvatar provider={adapter} size="sm" />
+                          <ProviderMark provider={adapter} size={20} />
                           <div className="onboarding-runner-info">
                             <div className="onboarding-runner-header">
                               <strong>{item.name}</strong>
@@ -654,7 +654,7 @@ export function OnboardingFlow({
           {step === 'task' && (
             <>
               <div className="flex items-center gap-3 my-4">
-                {runner && <AgentAvatar provider={runnerAdapter} size="sm" />}
+                {runner && <ProviderMark provider={runnerAdapter} size={20} />}
                 <div>
                   <strong className="block text-sm text-[var(--color-text-primary)]">
                     {runner?.name ?? 'Your agent'}

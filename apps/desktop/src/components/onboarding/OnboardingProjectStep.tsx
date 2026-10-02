@@ -1,13 +1,21 @@
-import { Input } from '@jackalope/ui';
+import { Badge, Input, SegmentedControl } from '@jackalope/ui';
 import { ArrowRight, FolderOpen, FolderPlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import {
+  type ArtifactsStatus,
+  artifactsStatus,
+  createArtifactsProject,
+  suggestRepoName,
+  validRepoName,
+} from '../../lib/cloudflare-artifacts';
 import { createProject, openProject } from '../../lib/project-setup';
 import { nativeTask } from '../../lib/task-runtime';
 import type { Project } from '../../stores/projectStore';
+import { ArtifactsConnectForm } from '../settings/ArtifactsConnection';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 
-/** Open an existing repository or create a new project folder. */
+/** Open an existing repository, or create a new project folder locally or backed by Cloudflare Artifacts. */
 export function OnboardingProjectStep({
   initialPath,
   pendingProject,
@@ -27,20 +35,33 @@ export function OnboardingProjectStep({
   onOpened: (project: Project, created: boolean) => Promise<void>;
 }) {
   const [path, setPath] = useState(initialPath);
-  const [projectMode, setProjectMode] = useState<'existing' | 'new'>('existing');
+  const [projectMode, setProjectMode] = useState<'existing' | 'new' | 'artifacts'>('existing');
+  const creating = projectMode !== 'existing';
   const [projectName, setProjectName] = useState('');
+  const [repoName, setRepoName] = useState('');
+  const [repoEdited, setRepoEdited] = useState(false);
+  const [artifacts, setArtifacts] = useState<ArtifactsStatus | null>(null);
+  const [pushWarning, setPushWarning] = useState('');
   const [parentPath, setParentPath] = useState<string | null>(null);
   const [defaultDirectory, setDefaultDirectory] = useState('');
   const [directoryError, setDirectoryError] = useState('');
   useEffect(() => {
-    if (!desktop || projectMode !== 'new') return;
+    if (!desktop || projectMode !== 'artifacts') return;
+    void artifactsStatus()
+      .then(setArtifacts)
+      .catch(() => setArtifacts({ connected: false }));
+  }, [desktop, projectMode]);
+  useEffect(() => {
+    if (!desktop || !creating) return;
     void nativeTask<string>('task_project_directory')
       .then((directory) => {
         setDefaultDirectory(directory);
         setDirectoryError('');
       })
       .catch(() => setDirectoryError('Choose a folder for your new project.'));
-  }, [desktop, projectMode]);
+  }, [desktop, creating]);
+  const effectiveRepoName = repoEdited ? repoName : suggestRepoName(projectName);
+  const needsConnection = projectMode === 'artifacts' && !artifacts?.connected;
   return (
     <>
       <fieldset className="onboarding-project-options" aria-label="Project setup">
@@ -57,11 +78,11 @@ export function OnboardingProjectStep({
           Open existing
         </Button>
         <Button
-          variant={projectMode === 'new' ? 'primary' : 'outline'}
-          aria-pressed={projectMode === 'new'}
+          variant={creating ? 'primary' : 'outline'}
+          aria-pressed={creating}
           disabled={busy}
           onClick={() => {
-            setProjectMode('new');
+            if (!creating) setProjectMode('new');
             clearError();
           }}
         >
@@ -69,29 +90,84 @@ export function OnboardingProjectStep({
           Create new project
         </Button>
       </fieldset>
+      {creating && (
+        <div className="onboarding-project-storage">
+          <span className="task-label" aria-hidden="true">
+            Keep it on
+          </span>
+          <SegmentedControl
+            label="Where to keep the new project"
+            value={projectMode}
+            onChange={(mode) => {
+              setProjectMode(mode);
+              clearError();
+            }}
+            items={[
+              { id: 'new', label: 'This computer', disabled: busy },
+              {
+                id: 'artifacts',
+                label: (
+                  <>
+                    Cloudflare Artifacts <Badge variant="accent">Beta</Badge>
+                  </>
+                ),
+                disabled: busy,
+              },
+            ]}
+          />
+        </div>
+      )}
       {!desktop && (
         <InlineNotice>
           Open the desktop app to create or choose a project and discover agents.
         </InlineNotice>
       )}
+      {pushWarning && (
+        <InlineNotice tone="warning">
+          The project and its Artifacts repository were created, but the first push failed. Use Push
+          to Artifacts in Project settings to retry. {pushWarning}
+        </InlineNotice>
+      )}
+      {desktop && needsConnection && artifacts && (
+        <>
+          <p className="onboarding-note">
+            Cloudflare Artifacts stores your project as a Git repository built for many agents
+            working at once. Connect your Cloudflare account to continue.
+          </p>
+          <ArtifactsConnectForm className="space-y-3" disabled={busy} onConnected={setArtifacts} />
+        </>
+      )}
       <form
+        hidden={needsConnection}
         onSubmit={(event) => {
           event.preventDefault();
           void attempt(async () => {
-            const opened =
-              projectMode === 'new'
-                ? await createProject(projectName, parentPath, { provisional: true })
-                : await openProject(path, {
-                    provisional: true,
-                    pending: pendingProject,
-                  });
+            let opened: Project;
+            if (projectMode === 'artifacts') {
+              const created = await createArtifactsProject(
+                projectName,
+                parentPath,
+                effectiveRepoName,
+                { provisional: true },
+              );
+              opened = created.project;
+              setPushWarning(created.pushError ?? '');
+            } else {
+              opened =
+                projectMode === 'new'
+                  ? await createProject(projectName, parentPath, { provisional: true })
+                  : await openProject(path, {
+                      provisional: true,
+                      pending: pendingProject,
+                    });
+            }
             setPath(opened.path);
             setProjectMode('existing');
-            await onOpened(opened, projectMode === 'new');
+            await onOpened(opened, creating);
           });
         }}
       >
-        {projectMode === 'new' ? (
+        {creating ? (
           <>
             <label className="task-label" htmlFor="onboarding-project-name">
               Project name
@@ -106,6 +182,27 @@ export function OnboardingProjectStep({
               disabled={!desktop || busy}
               onChange={(event) => setProjectName(event.target.value)}
             />
+            {projectMode === 'artifacts' && (
+              <>
+                <label className="task-label onboarding-repo-label" htmlFor="onboarding-repo-name">
+                  Artifacts repository
+                </label>
+                <Input
+                  id="onboarding-repo-name"
+                  className="task-input onboarding-project-name"
+                  spellCheck={false}
+                  maxLength={100}
+                  required
+                  value={effectiveRepoName}
+                  aria-invalid={!!effectiveRepoName && !validRepoName(effectiveRepoName)}
+                  disabled={!desktop || busy}
+                  onChange={(event) => {
+                    setRepoEdited(true);
+                    setRepoName(event.target.value);
+                  }}
+                />
+              </>
+            )}
             <div className="onboarding-project-location">
               <div>
                 <span className="task-label">Create in</span>
@@ -132,7 +229,9 @@ export function OnboardingProjectStep({
               <InlineNotice tone="error">{directoryError}</InlineNotice>
             )}
             <p className="onboarding-note">
-              Creates a new folder with Git ready for your first task.
+              {projectMode === 'artifacts'
+                ? `Creates the repository in the ${artifacts?.namespace ?? ''} namespace and a local folder that pushes to it. Requires Git.`
+                : 'Creates a new folder for your first task, with Git when it is installed.'}
             </p>
           </>
         ) : (
@@ -173,14 +272,16 @@ export function OnboardingProjectStep({
             disabled={
               !desktop ||
               busy ||
-              (projectMode === 'new'
-                ? !projectName.trim() || (!parentPath && !defaultDirectory)
+              (creating
+                ? !projectName.trim() ||
+                  (!parentPath && !defaultDirectory) ||
+                  (projectMode === 'artifacts' && !validRepoName(effectiveRepoName))
                 : !path.trim())
             }
             loading={busy}
-            loadingLabel={projectMode === 'new' ? 'Creating project…' : 'Checking repository…'}
+            loadingLabel={creating ? 'Creating project…' : 'Checking repository…'}
           >
-            {projectMode === 'new' ? 'Create project and continue' : 'Continue with this project'}
+            {creating ? 'Create project and continue' : 'Continue with this project'}
             <ArrowRight size={16} />
           </Button>
         </div>

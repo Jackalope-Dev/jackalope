@@ -3,7 +3,7 @@ import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
-import { Setting, SettingGroup } from './Setting';
+import { Setting, SettingBody, SettingGroup } from './Setting';
 
 interface DesktopSettings {
   closeToTray: boolean;
@@ -62,47 +62,51 @@ export function WindowBehaviorSettings() {
   };
 
   return (
-    <>
-      <SettingGroup className="mt-6">
-        <Setting
-          title="Close to system tray"
-          controlId="close-to-tray"
-          descriptionId="close-to-tray-description"
-          description="Keep tasks running when the window closes."
-        >
-          <Switch
-            id="close-to-tray"
-            label="Close to system tray"
-            aria-describedby="close-to-tray-description"
-            checked={settings?.closeToTray ?? true}
-            disabled={!settings?.trayAvailable || saving}
-            onCheckedChange={update}
-          />
-        </Setting>
-        <Setting
-          title="Launch at login"
-          controlId="launch-at-login"
-          descriptionId="launch-at-login-description"
-          description="Start Jackalope automatically when you sign in."
-        >
-          <Switch
-            id="launch-at-login"
-            label="Launch at login"
-            aria-describedby="launch-at-login-description"
-            checked={settings?.launchAtLogin ?? false}
-            disabled={!settings || saving}
-            onCheckedChange={updateLaunchAtLogin}
-          />
-        </Setting>
-      </SettingGroup>
-      {settings && !settings.trayAvailable && (
-        <InlineNotice tone="warning">
-          System tray unavailable. Closing quits Jackalope.
-        </InlineNotice>
+    <SettingGroup title="Window & startup">
+      <Setting
+        title="Close to system tray"
+        controlId="close-to-tray"
+        descriptionId="close-to-tray-description"
+        description="Keep tasks running when the window closes."
+      >
+        <Switch
+          id="close-to-tray"
+          label="Close to system tray"
+          aria-describedby="close-to-tray-description"
+          checked={settings?.closeToTray ?? true}
+          disabled={!settings?.trayAvailable || saving}
+          onCheckedChange={update}
+        />
+      </Setting>
+      <Setting
+        title="Launch at login"
+        controlId="launch-at-login"
+        descriptionId="launch-at-login-description"
+        description="Start Jackalope automatically when you sign in."
+      >
+        <Switch
+          id="launch-at-login"
+          label="Launch at login"
+          aria-describedby="launch-at-login-description"
+          checked={settings?.launchAtLogin ?? false}
+          disabled={!settings || saving}
+          onCheckedChange={updateLaunchAtLogin}
+        />
+      </Setting>
+      {((settings && !settings.trayAvailable) || error) && (
+        <SettingBody>
+          {settings && !settings.trayAvailable && (
+            <InlineNotice tone="warning">
+              System tray unavailable. Closing quits Jackalope.
+            </InlineNotice>
+          )}
+          {error && (
+            <InlineNotice tone="error">
+              Could not save or load window preferences: {error}
+            </InlineNotice>
+          )}
+        </SettingBody>
       )}
-      {error && (
-        <InlineNotice tone="error">Could not save or load window preferences: {error}</InlineNotice>
-      )}
-    </>
+    </SettingGroup>
   );
 }

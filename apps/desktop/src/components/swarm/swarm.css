@@ -1,0 +1,148 @@
+.swarm-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.swarm-meta code,
+.swarm-lane code,
+.swarm-conflict code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.swarm-conflicts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.swarm-conflict {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
+}
+
+.swarm-conflict > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-danger);
+}
+
+.swarm-conflict p {
+  margin: 4px 0 2px;
+  font-size: var(--text-sm);
+}
+
+.swarm-conflict small {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.swarm-lanes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: 12px;
+}
+
+.swarm-lane {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  background: var(--color-surface);
+}
+
+.swarm-lane[data-conflicted] {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+}
+
+.swarm-lane header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.swarm-lane header > div {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.swarm-lane header strong {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swarm-lane header small {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swarm-lane p {
+  margin: 0;
+  font-size: var(--text-xs);
+}
+
+.swarm-files {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.swarm-files li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.swarm-files li[data-conflicted] {
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+}
+
+.swarm-files code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swarm-file-status {
+  flex-shrink: 0;
+  width: 16px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-align: center;
+}
+
+.swarm-file-status[data-status="added"] {
+  color: var(--color-success);
+}
+
+.swarm-file-status[data-status="deleted"] {
+  color: var(--color-danger);
+}

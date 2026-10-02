@@ -255,6 +255,14 @@ select option {
   max-height: calc(100dvh - 48px);
   overflow-y: auto;
 }
+/* Contained dialogs keep a fixed header and footer and scroll only their own body,
+   which pads itself to line up with the header. */
+.task-dialog.appearance-panel[data-contained] {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
 .task-close {
   position: absolute;
   top: 18px;

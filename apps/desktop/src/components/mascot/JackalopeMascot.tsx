@@ -1,10 +1,10 @@
 import { characterMarkViewBox, characterPaths as paths } from '@jackalope/brand/character';
-import { X } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { motion } from 'motion/react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useReducedMotionPreference } from '../../hooks/useReducedMotionPreference';
 import { type MascotMood, useMascotStore } from '../../stores/mascotStore';
+import { MascotSpeech } from './MascotSpeech';
 import { useMascotIdle } from './useMascotIdle';
 
 interface JackalopeMascotProps {
@@ -12,8 +12,8 @@ interface JackalopeMascotProps {
   showBubble?: boolean;
   className?: string;
   overrideMood?: MascotMood;
-  bubbleAlign?: 'start' | 'center' | 'end';
-  bubbleSide?: 'above' | 'below';
+  /** Which way the speech bubble extends from the mascot; see MascotSpeech. */
+  speechSide?: 'left' | 'right';
   reduceMotion?: boolean;
   onActivate?: () => void;
   label?: string;
@@ -74,8 +74,7 @@ export function JackalopeMascot({
   showBubble = true,
   className = '',
   overrideMood,
-  bubbleAlign = 'center',
-  bubbleSide = 'above',
+  speechSide = 'left',
   reduceMotion: forceReducedMotion = false,
   onActivate,
   label,
@@ -118,31 +117,15 @@ export function JackalopeMascot({
 
   return (
     <div className={`relative flex items-center select-none ${className}`}>
-      <AnimatePresence>
-        {showBubble && message && (
-          <motion.div
-            role="status"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className={`absolute ${bubbleSide === 'above' ? 'bottom-full mb-3' : 'top-full mt-3'} z-30 flex items-start gap-2 w-max max-w-[min(18rem,calc(100vw-2rem))] bg-[var(--color-text-primary)] py-2 pl-3 pr-1 rounded-xl shadow-lg text-xs leading-relaxed text-[var(--color-surface-elevated)] ${bubbleAlign === 'start' ? 'left-0' : bubbleAlign === 'end' ? 'right-0' : 'left-1/2 -translate-x-1/2'}`}
-          >
-            <span className="pt-0.5">{message}</span>
-            <button
-              type="button"
-              className="mascot-bubble-close"
-              aria-label="Dismiss message"
-              onClick={() => useMascotStore.getState().clearMessage()}
-            >
-              <X size={14} aria-hidden="true" />
-            </button>
-            <span
-              className={`absolute ${bubbleSide === 'above' ? '-bottom-1' : '-top-1'} w-2 h-2 bg-[var(--color-text-primary)] rotate-45 ${bubbleAlign === 'end' ? 'right-4' : 'left-1/2 -translate-x-1/2'}`}
-              style={bubbleAlign === 'start' ? { left: dim / 2 } : undefined}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {showBubble && message && (
+        <MascotSpeech
+          side={speechSide}
+          motion={!reduceMotion}
+          onDismiss={() => useMascotStore.getState().clearMessage()}
+        >
+          {message}
+        </MascotSpeech>
+      )}
       <motion.button
         ref={button}
         type="button"

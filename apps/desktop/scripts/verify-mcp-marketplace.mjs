@@ -75,7 +75,7 @@ try {
   );
   await page.getByRole('button', { name: 'Add tools', exact: true }).click();
   await page.getByRole('heading', { name: 'MCP marketplace', exact: true }).waitFor();
-  assert.equal(await page.locator('.mcp-market-card').count(), 10);
+  assert.equal(await page.locator('.mcp-market-card').count(), 11);
   for (const width of [1280, 960]) {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
     for (const isDark of [false, true]) {
@@ -224,7 +224,7 @@ try {
   assert.equal(await page.locator('.mcp-market-card').count(), 0);
   const before = directoryRequests.length;
   await page.getByRole('button', { name: 'Enable Marketplace', exact: true }).click();
-  assert.equal(await page.locator('.mcp-market-card').count(), 10);
+  assert.equal(await page.locator('.mcp-market-card').count(), 11);
   assert.equal(directoryRequests.length, before);
   assert.deepEqual(errors, []);
   console.log(

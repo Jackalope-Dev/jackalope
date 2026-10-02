@@ -1,11 +1,11 @@
 import { Bot, Check, UserRound, UsersRound } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
+import { Setting, SettingActions, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
 import { Switch } from '../ui/Switch';
-import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 
 const choices = [
   {
@@ -86,39 +86,36 @@ export function ProjectGitSettings({
   };
   const dirty = JSON.stringify(policy) !== JSON.stringify(saved);
   return (
-    <section className="project-preferences-section" aria-labelledby={`${id}-title`}>
-      <WorkspaceSectionHeading
-        titleId={`${id}-title`}
-        title="Commits and cleanup"
-        description="Set commit author attribution, checkpointing, and branch cleanup."
-      />
-      {policy ? (
-        <>
-          <fieldset disabled={busy || disabled} className="grid gap-2">
-            <legend className="sr-only">Commit attribution</legend>
-            {choices.map(({ value, title, description, icon: Icon }) => (
-              <label
-                key={value}
-                className="flex items-center gap-3 min-h-11 p-3 cursor-pointer rounded-lg border border-[var(--color-border)] has-[:checked]:bg-[var(--color-surface-elevated)]"
-              >
-                <input
-                  type="radio"
-                  name={`${id}-attribution`}
-                  value={value}
-                  checked={policy.attribution === value}
-                  onChange={() => {
-                    setNotice('');
-                    setPolicy({ ...policy, attribution: value });
-                  }}
-                />
-                <Icon size={20} aria-hidden="true" className="shrink-0" />
-                <span className="min-w-0">
-                  <strong className="block text-sm">{title}</strong>
-                  <span className="task-muted text-sm">{description}</span>
-                </span>
-              </label>
-            ))}
-            <div className="grid gap-3 sm:grid-cols-2 mt-3">
+    <SettingGroup title="Commits and cleanup">
+      {policy && (
+        <fieldset disabled={busy || disabled} className="project-git-fields">
+          <legend className="sr-only">Commit attribution</legend>
+          <SettingBody>
+            <div className="grid gap-2">
+              {choices.map(({ value, title, description, icon: Icon }) => (
+                <label
+                  key={value}
+                  className="flex items-center gap-3 min-h-11 p-3 cursor-pointer rounded-lg border border-[var(--color-border)] has-[:checked]:bg-[var(--color-accent-subtle)]"
+                >
+                  <input
+                    type="radio"
+                    name={`${id}-attribution`}
+                    value={value}
+                    checked={policy.attribution === value}
+                    onChange={() => {
+                      setNotice('');
+                      setPolicy({ ...policy, attribution: value });
+                    }}
+                  />
+                  <Icon size={20} aria-hidden="true" className="shrink-0" />
+                  <span className="min-w-0">
+                    <strong className="block text-sm">{title}</strong>
+                    <span className="task-muted text-sm">{description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
               <label htmlFor={`${id}-name`} className="task-label">
                 Your commit name
                 <Input
@@ -137,60 +134,62 @@ export function ProjectGitSettings({
                 />
               </label>
             </div>
-            <div className="flex items-center justify-between gap-4 min-h-11 mt-2">
-              <span className="text-sm">Save checkpoints after successful tasks</span>
-              <Switch
-                label="Save checkpoints after successful tasks"
-                checked={policy.autoCheckpoint !== false}
-                onCheckedChange={(autoCheckpoint) => setPolicy({ ...policy, autoCheckpoint })}
-              />
-            </div>
-            <div className="flex items-center justify-between gap-4 min-h-11 mt-2">
-              <span className="text-sm">Remove worktree and branch after approval</span>
-              <Switch
-                label="Remove worktree and branch after approval"
-                checked={policy.cleanupAfterMerge}
-                onCheckedChange={(cleanupAfterMerge) => setPolicy({ ...policy, cleanupAfterMerge })}
-              />
-            </div>
-          </fieldset>
-          {!onDraftChange && (
-            <Button
-              className="mt-4"
-              variant="outline"
-              disabled={
-                busy ||
-                disabled ||
-                !dirty ||
-                (policy.attribution !== 'agent' &&
-                  (!policy.name.trim() || !policy.email.includes('@')))
-              }
-              onClick={() => void save()}
-              loading={busy}
-              loadingLabel="Saving…"
-            >
-              <Check size={16} />
-              Save commit settings
-            </Button>
-          )}
-          {dirty && !onDraftChange && (
-            <p className="task-muted text-sm mt-2">Save to apply these choices.</p>
-          )}
-        </>
-      ) : (
-        !error && (
-          <p role="status" className="task-muted">
-            Reading repository settings…
-          </p>
-        )
+          </SettingBody>
+          <Setting title="Save checkpoints after successful tasks">
+            <Switch
+              label="Save checkpoints after successful tasks"
+              checked={policy.autoCheckpoint !== false}
+              onCheckedChange={(autoCheckpoint) => setPolicy({ ...policy, autoCheckpoint })}
+            />
+          </Setting>
+          <Setting title="Remove worktree and branch after approval">
+            <Switch
+              label="Remove worktree and branch after approval"
+              checked={policy.cleanupAfterMerge}
+              onCheckedChange={(cleanupAfterMerge) => setPolicy({ ...policy, cleanupAfterMerge })}
+            />
+          </Setting>
+        </fieldset>
       )}
-      {notice && <InlineNotice role="status">{notice}</InlineNotice>}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
-      {!policy && error && (
-        <Button variant="outline" onClick={() => setRetry(retry + 1)}>
-          Retry settings
-        </Button>
+      {(!policy || notice || error) && (
+        <SettingBody>
+          {!policy && !error && (
+            <p role="status" className="task-muted">
+              Reading repository settings…
+            </p>
+          )}
+          {notice && <InlineNotice role="status">{notice}</InlineNotice>}
+          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          {!policy && error && (
+            <div>
+              <Button variant="outline" onClick={() => setRetry(retry + 1)}>
+                Retry settings
+              </Button>
+            </div>
+          )}
+        </SettingBody>
       )}
-    </section>
+      {policy && !onDraftChange && (
+        <SettingActions>
+          <Button
+            variant="outline"
+            disabled={
+              busy ||
+              disabled ||
+              !dirty ||
+              (policy.attribution !== 'agent' &&
+                (!policy.name.trim() || !policy.email.includes('@')))
+            }
+            onClick={() => void save()}
+            loading={busy}
+            loadingLabel="Saving…"
+          >
+            <Check size={16} />
+            Save commit settings
+          </Button>
+          {dirty && <span className="task-muted text-sm">Save to apply these choices.</span>}
+        </SettingActions>
+      )}
+    </SettingGroup>
   );
 }

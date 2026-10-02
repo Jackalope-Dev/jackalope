@@ -2,6 +2,60 @@ import type { BlogPost } from './blog-types.ts';
 
 export const recentPosts: BlogPost[] = [
   {
+    slug: 'bots-that-know-their-job',
+    cover: { kind: 'agents', tone: 'mint', label: 'Give it a role once.' },
+    title: 'Bots: coding agents that keep their role, tools and schedule.',
+    seoTitle: 'Coding agent bots with roles and schedules',
+    category: 'Product notes',
+    date: '2026-10-01',
+    readingTime: '4 min read',
+    description:
+      'Save a coding agent as a bot with standing instructions, an agent, a project and its tools. Ask it questions, give it work, or let it run on a schedule.',
+    sections: [
+      {
+        id: 'why-bots',
+        title: 'Stop re-explaining the same job',
+        paragraphs: [
+          'Some work comes back every day: reviewing what merged, answering a question about how a module works, checking dependencies, keeping docs honest. Each time, you open a conversation and explain the job again. A bot remembers it.',
+          'A bot is a saved agent with a name, a role and standing instructions, plus the agent and model it uses, the project it works in and the connections it may use. Message it and it starts a conversation with all of that already in place.',
+        ],
+      },
+      {
+        id: 'make-one',
+        title: 'Make one in a minute',
+        paragraphs: [
+          'Start from a template or from scratch. Setup takes four short steps: a name and a look, the project and agent, the role and instructions, then the apps and tools it can use. Each bot picks a character shape and colour, so you can tell your reviewer from your researcher at a glance.',
+        ],
+        bullets: [
+          'Reviewer reviews new commits every weekday and reports the most serious issue first.',
+          'Researcher answers questions about the codebase and quotes the files it read.',
+          'Fixer reproduces a bug before fixing it and adds a regression test.',
+          'Tester, Docs keeper, Sentinel, Release notes, Polisher, Scout, Triage and Guide cover the rest.',
+        ],
+      },
+      {
+        id: 'quick-questions',
+        title: 'Quick questions stay quick',
+        paragraphs: [
+          'Asking a bot how something works should not wait on a full workspace setup. Bot conversations skip the project’s preparation command and automatic checks, so a question gets an answer as soon as the agent has read the code. If the bot does change files, you review and merge them like any other result.',
+          'Conversations stay on the Bots page with the bot that had them, instead of crowding your list of work.',
+        ],
+      },
+      {
+        id: 'routines',
+        title: 'Let it run on a schedule',
+        paragraphs: [
+          'Give a bot a routine and it works on its own: a daily review, a weekly test-gap pass, a weekly security review. Routines are ordinary Automations, so timing, history and pausing all live in one place.',
+          'Bots are in development and need an approved Jackalope account. Installed testing with real accounts is still in progress.',
+        ],
+        links: [
+          { label: 'Explore the roadmap', href: '/roadmap/' },
+          { label: 'Follow the changelog', href: '/changelog/' },
+        ],
+      },
+    ],
+  },
+  {
     slug: 'coding-agents-from-the-terminal',
     cover: { kind: 'agents', tone: 'indigo', label: 'Say it where you already are.' },
     title: 'Run coding agents from your terminal without losing the thread.',

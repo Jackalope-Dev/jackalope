@@ -10,6 +10,7 @@ interface ProjectInfo {
   path: string;
   name: string;
   branch: string;
+  repository: boolean;
 }
 
 export async function openProject(
@@ -44,16 +45,26 @@ function projectFromInfo(info: ProjectInfo, pending?: Project | null): Project {
       : store.projects.find(
           (project) => projectPathKey(project.path) === projectPathKey(info.path),
         );
+  const git = projectGitState(info);
   return existing
-    ? { ...existing, worktrees: [] }
+    ? { ...existing, ...git, worktrees: [] }
     : {
         id: crypto.randomUUID(),
         name: info.name,
         path: info.path,
-        gitBranch: info.branch || 'Detached HEAD',
+        ...git,
         agentProvider: 'codex' as const,
         worktrees: [],
       };
+}
+
+export function projectGitState(info: {
+  branch: string;
+  repository: boolean;
+}): Pick<Project, 'gitBranch' | 'plainFolder'> {
+  return info.repository
+    ? { gitBranch: info.branch || 'Detached HEAD', plainFolder: undefined }
+    : { gitBranch: '', plainFolder: true };
 }
 
 export function commitProjectSetup(pending: Project): Project {

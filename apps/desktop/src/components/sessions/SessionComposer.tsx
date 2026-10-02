@@ -260,13 +260,6 @@ export function SessionComposer({
             disabled={saving}
           />
         )}
-        <p className="live-muted">
-          {active
-            ? 'Queue messages for the next batch, or stop current work and send now.'
-            : session.paused
-              ? 'Queue is paused. Sending saves the message; Resume queue starts it.'
-              : 'Messages continue in the same workspace and account.'}
-        </p>
         {active && (
           <Button
             type="button"

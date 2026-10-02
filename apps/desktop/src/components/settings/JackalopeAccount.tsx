@@ -8,6 +8,7 @@ import { useSettingsSyncStore } from '../../stores/settingsSyncStore';
 import { WaitlistAccount, type WaitlistProgress } from '../account/WaitlistAccount';
 import { Button } from '../ui/button';
 import { FeedbackPreferences } from './FeedbackPreferences';
+import { SettingActions, SettingBody, SettingGroup } from './Setting';
 
 export interface AccountStatus {
   state:
@@ -141,11 +142,8 @@ export function JackalopeAccount({
   const welcome = presentation === 'welcome';
   const waiting =
     (account?.state === 'waiting' || account?.state === 'waiting-offline') && !!account.waitlist;
-  return (
-    <div className={welcome ? 'access-account' : 'space-y-6'}>
-      {presentation === 'settings' && (
-        <p className="settings-row-description">Beta access requires an approved account.</p>
-      )}
+  const status = (
+    <>
       {!account && !error && <p role="status">Reading account connection…</p>}
       {account?.state === 'unavailable' && (
         <p>Open the desktop app to connect your Jackalope account.</p>
@@ -186,102 +184,121 @@ export function JackalopeAccount({
       {account?.state === 'expired' && (
         <p role="status">Your connection request ended. Connect again to try once more.</p>
       )}
-      <div className={welcome ? 'access-account-actions' : 'flex flex-wrap gap-3'}>
-        {(account?.state === 'disconnected' || account?.state === 'expired') && (
-          <Button
-            disabled={busy}
-            onClick={() => void act('app_account_connect')}
-            loading={busy}
-            loadingLabel="Connecting…"
-          >
-            Connect account
-            {welcome && !busy && <ExternalLinkIcon size={20} aria-hidden="true" />}
+    </>
+  );
+  const actions = (
+    <>
+      {(account?.state === 'disconnected' || account?.state === 'expired') && (
+        <Button
+          disabled={busy}
+          onClick={() => void act('app_account_connect')}
+          loading={busy}
+          loadingLabel="Connecting…"
+        >
+          Connect account
+          {welcome && !busy && <ExternalLinkIcon size={20} aria-hidden="true" />}
+        </Button>
+      )}
+      {(account?.state === 'pending' || (account?.state === 'waiting' && !waiting)) && (
+        <>
+          <Button disabled={busy} onClick={() => void act('app_account_open_browser', false)}>
+            Open browser
           </Button>
-        )}
-        {(account?.state === 'pending' || (account?.state === 'waiting' && !waiting)) && (
-          <>
-            <Button disabled={busy} onClick={() => void act('app_account_open_browser', false)}>
-              Open browser
-            </Button>
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => void act('app_account_disconnect')}
-            >
-              Cancel connection
-            </Button>
-          </>
-        )}
-        {waiting && (
-          <>
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => void act('app_account_status')}
-              loading={busy}
-              loadingLabel="Checking…"
-            >
-              Refresh status
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={busy}
-              onClick={() => void act('app_account_open_browser', false)}
-            >
-              Manage waitlist on website
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={busy}
-              onClick={() => void act('app_account_disconnect')}
-            >
-              Disconnect this desktop
-            </Button>
-          </>
-        )}
-        {connected && (
-          <>
-            {onInvitations && <Button onClick={onInvitations}>View Instant Access Passes</Button>}
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => void act('app_account_open_browser', false)}
-            >
-              Manage account
-            </Button>
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => void act('app_account_disconnect')}
-              loading={busy}
-              loadingLabel="Disconnecting…"
-            >
-              Disconnect this desktop
-            </Button>
-          </>
-        )}
-        {(error || account?.state === 'offline') && (
           <Button
             variant="outline"
             disabled={busy}
-            onClick={() =>
-              void act(
-                account?.state === 'pending' || account?.state === 'waiting'
-                  ? 'app_account_poll'
-                  : 'app_account_status',
-              )
-            }
+            onClick={() => void act('app_account_disconnect')}
           >
-            Retry
+            Cancel connection
           </Button>
-        )}
-      </div>
-      {error && (
-        <p role="alert" className="settings-row-description">
-          {error}
-        </p>
+        </>
       )}
-      {connected && presentation === 'settings' && <FeedbackPreferences />}
-    </div>
+      {waiting && (
+        <>
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() => void act('app_account_status')}
+            loading={busy}
+            loadingLabel="Checking…"
+          >
+            Refresh status
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() => void act('app_account_open_browser', false)}
+          >
+            Manage waitlist on website
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() => void act('app_account_disconnect')}
+          >
+            Disconnect this desktop
+          </Button>
+        </>
+      )}
+      {connected && (
+        <>
+          {onInvitations && <Button onClick={onInvitations}>View Instant Access Passes</Button>}
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() => void act('app_account_open_browser', false)}
+          >
+            Manage account
+          </Button>
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() => void act('app_account_disconnect')}
+            loading={busy}
+            loadingLabel="Disconnecting…"
+          >
+            Disconnect this desktop
+          </Button>
+        </>
+      )}
+      {(error || account?.state === 'offline') && (
+        <Button
+          variant="outline"
+          disabled={busy}
+          onClick={() =>
+            void act(
+              account?.state === 'pending' || account?.state === 'waiting'
+                ? 'app_account_poll'
+                : 'app_account_status',
+            )
+          }
+        >
+          Retry
+        </Button>
+      )}
+    </>
+  );
+  const failure = error && (
+    <p role="alert" className="settings-row-description">
+      {error}
+    </p>
+  );
+  if (welcome)
+    return (
+      <div className="access-account">
+        {status}
+        <div className="access-account-actions">{actions}</div>
+        {failure}
+      </div>
+    );
+  return (
+    <>
+      <SettingGroup title="Your account" description="Beta access requires an approved account.">
+        <SettingBody>{status}</SettingBody>
+        <SettingActions>{actions}</SettingActions>
+        {failure && <SettingBody>{failure}</SettingBody>}
+      </SettingGroup>
+      {connected && <FeedbackPreferences />}
+    </>
   );
 }

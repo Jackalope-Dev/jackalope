@@ -322,13 +322,21 @@ pub struct ProjectInfo {
     pub path: String,
     pub name: String,
     pub branch: String,
+    /// False for a plain folder, where tasks run in place without worktrees.
+    pub repository: bool,
 }
 
 #[tauri::command]
 pub async fn task_validate_project(path: String) -> Result<ProjectInfo, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let root = git(&path, &["rev-parse", "--show-toplevel"])?;
-        let branch = git(&root, &["branch", "--show-current"])?;
+        let (root, branch, repository) = match plain_folder(&path)? {
+            Some(folder) => (folder, String::new(), false),
+            None => {
+                let root = git(&path, &["rev-parse", "--show-toplevel"])?;
+                let branch = git(&root, &["branch", "--show-current"])?;
+                (root, branch, true)
+            }
+        };
         Ok(ProjectInfo {
             name: Path::new(&root)
                 .file_name()
@@ -337,6 +345,7 @@ pub async fn task_validate_project(path: String) -> Result<ProjectInfo, String> 
                 .into_owned(),
             path: root,
             branch,
+            repository,
         })
     })
     .await

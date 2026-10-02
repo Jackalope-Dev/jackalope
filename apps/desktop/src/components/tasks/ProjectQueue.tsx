@@ -441,7 +441,9 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
               })
           )}
           <p className="task-muted text-sm my-4">
-            Tasks start from committed {project.preferences?.baseBranch || project.gitBranch}.
+            {project.plainFolder
+              ? 'Tasks run directly in this folder.'
+              : `Tasks start from committed ${project.preferences?.baseBranch || project.gitBranch}.`}{' '}
             Pausing or restarting stops new dispatches.
           </p>
           <CoordinationAutomation

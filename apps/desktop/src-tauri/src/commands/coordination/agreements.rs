@@ -54,7 +54,7 @@ pub struct AgreementInput {
     pub participants: Vec<String>,
 }
 
-fn live(a: &Agreement) -> bool {
+pub(super) fn live(a: &Agreement) -> bool {
     !["released", "canceled"].contains(&a.status.as_str())
 }
 

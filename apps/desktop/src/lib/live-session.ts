@@ -19,7 +19,15 @@ export interface SessionDraft {
   text: string;
   revision: number;
 }
+/** Standing instructions from a saved bot, repeated natively in every batch. */
+export interface SessionPersona {
+  botId: string;
+  name: string;
+  instructions: string;
+}
+
 export interface LiveSession {
+  persona?: SessionPersona;
   topics?: SessionTopic[];
   topicsRevision?: number;
   limits?: SessionLimits;

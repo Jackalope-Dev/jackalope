@@ -234,8 +234,8 @@
   border-radius: 5px;
 }
 [data-selected] > button .task-context-check {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  background: var(--color-action);
+  color: var(--color-on-action);
   border-color: transparent;
 }
 .task-context-suggestion {

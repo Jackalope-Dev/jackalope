@@ -23,8 +23,11 @@ access and Store-managed updates. A separate local package identity and desktop
 data directory protect the everyday installation. Output goes to a fresh
 `output/store/<id>/` directory: an unsigned MSIX, expanded package, generated
 Tauri config and receipt recording source revision/dirty state and hashes.
-Rehearsals without a fixed WebView2 runtime depend on the machine's installed
-Evergreen runtime and cannot establish clean-machine acceptance.
+
+Packages do not bundle a browser engine. They use the Evergreen WebView2 Runtime
+that ships with Windows 11 and is installed on current Windows 10 through Edge;
+Microsoft keeps it patched. On a machine without it, the app shows a dialog
+linking to Microsoft's download page and exits instead of opening a blank window.
 
 The **Store release** workflow defaults to a manually dispatched rehearsal.
 Rehearsals verify and package without publication. Candidate mode builds real-identity
@@ -34,24 +37,16 @@ Select beta or stable as the workflow branch; that selects beta or stable delive
 For a submission, enroll at [Store developer registration](https://storedeveloper.microsoft.com/)
 and reserve an MSIX product. Copy the exact package name, publisher identity and
 publisher display name from Partner Center. Set these nonsecret values in the
-current shell and provide an extracted, current **x64 Fixed Version WebView2**
-runtime downloaded from Microsoft:
+current shell:
 
 ~~~powershell
 $env:STORE_IDENTITY_NAME = '<Package/Identity/Name>'
 $env:STORE_PUBLISHER = '<Package/Identity/Publisher>'
 $env:STORE_PUBLISHER_DISPLAY_NAME = '<publisher display name>'
-$env:STORE_WEBVIEW2_PATH = 'C:\path\to\extracted-fixed-runtime'
 ./scripts/release/store.ps1 -Mode submission
 ~~~
 
-Submission builds use release optimization, require real identity inputs and a
-Microsoft-signed WebView2 runtime, and include the runtime in the package.
-Supply the extracted runtime directory itself, containing `msedgewebview2.exe`.
-Packaging temporarily stages it as `src-tauri/WebView2` for Tauri compilation,
-then removes that staging copy. An existing directory at that path is preserved
-and stops the build.
-Keep this pinned runtime current with security releases and test each update.
+Submission builds use release optimization and require real identity inputs.
 The app version must have three numeric parts; the Store package adds the reserved
 fourth component `.0`. A build receipt is not Store certification or installation
 evidence. Upload the first reviewed MSIX manually to Partner Center. Subsequent
@@ -77,11 +72,7 @@ One-time setup:
    `STORE_CLIENT_SECRET`. Set an expiry reminder through your existing secret process.
 3. Set repository variables `STORE_APP_ID`, `STORE_BETA_FLIGHT_ID`, `STORE_TENANT_ID`,
    `STORE_CLIENT_ID`, `STORE_IDENTITY_NAME`, `STORE_PUBLISHER`,
-   `STORE_PUBLISHER_DISPLAY_NAME`, `STORE_WEBVIEW2_URL`, `STORE_WEBVIEW2_SHA256`.
-   The runtime URL must be Microsoft's direct x64 Fixed Version CAB download URL;
-   review/accept its license and independently verify the SHA256 before configuring.
-   The package retains the complete extracted runtime including its notices. Review
-   required runtime notices and SmartScreen disclosures before submitting.
+   `STORE_PUBLISHER_DISPLAY_NAME`.
 4. Run `pnpm release:setup --apply` to configure protected branches, branch-scoped
    Store/Cloud environments and immutable release tags. It selects
    `RELEASE_DISTRIBUTION=store` and removes Windows from Cloud targets. Existing
@@ -123,15 +114,12 @@ artifacts for 30 days. Review current GitHub runner, cache and artifact-storage 
 repository's visibility and plan before enabling frequent packaging jobs. The same scripts work on another Windows CI runner:
 
 ~~~powershell
-./scripts/release/store-runtime.ps1
 ./scripts/release/store.ps1 -Mode submission -Channel beta
 # Set EXPECTED_SOURCE, EXPECTED_CHANNEL, GITHUB_REF_NAME, GITHUB_REPOSITORY,
 # authenticated GH_TOKEN and the same Store submission/acceptance gates as Actions.
 node scripts/release/store-submit.mjs 'C:\path\to\output\store\id'
 ~~~
 
-Locally, assign the path printed by `store-runtime.ps1` to `STORE_WEBVIEW2_PATH`.
-The download helper exports that variable automatically only under GitHub Actions.
 Fixture and build success do not establish live Store submission or certification.
 
 ## In-app updates and installed acceptance
@@ -152,6 +140,17 @@ updates are outside this app guard. Packaged Store identity is required; a brows
 fixture, unpackaged executable or local rehearsal is not a live Store update test.
 The Store chooses eligible packages by account/flight membership; the in-app Cloud
 channel selector is not available in Store builds.
+
+Store builds show a **Beta** badge on the App updates version line and in the
+What's new dialog when they were built for the beta channel. Approved accounts can
+request to join or leave the beta flight from App updates by entering the Microsoft
+account they use in the Store app. Requests (`0018_beta_requests.sql`) appear under
+**Beta requests** in the admin console, where pending emails can be copied for the
+Partner Center flight group. The operator adds or removes the account there, then
+marks the request done; the app then reports that the next Store update changes
+channel. One pending request per account is kept, and members can withdraw it.
+Leaving the beta does not downgrade: the account receives the next stable package
+whose version is newer than its installed beta.
 
 On a disposable Windows user/profile, install the older published Store package,
 connect an approved account, execute a real task, save work and restart. After the
@@ -227,7 +226,7 @@ the listing; installed acceptance must cover both waiting and approved accounts.
 ## Remaining acceptance
 
 - Deploy and verify the existing account migration/API/website before inviting anyone.
-- Provide Partner Center identity, a fixed WebView2 runtime and a working certification
+- Provide Partner Center identity and a working certification
   account with reproducible login/agent instructions. Magic-link-only access must be
   workable for reviewers; do not add an unauthenticated reviewer bypass.
 - Test the expanded package in a disposable Windows user/VM with Developer Mode,
@@ -235,7 +234,7 @@ the listing; installed acceptance must cover both waiting and approved accounts.
   the actual MSIX installation, use a test certificate trusted only in the disposable
   machine, or install a certified private Store submission. Do not install local
   signing certificates or replace an everyday installation as part of a build.
-- Test installed clean-profile startup, offline WebView2 loading, approved/pending/
+- Test installed clean-profile startup, the missing-WebView2 dialog, approved/pending/
   revoked accounts, grace expiry/restart, project creation, Git worktrees, agent
   discovery and execution, provider credentials, PTY, cancellation, scheduled work,
   browser pairing and saved-data persistence. MSIX file/registry virtualization

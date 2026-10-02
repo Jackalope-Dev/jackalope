@@ -302,7 +302,6 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
     <WorkspacePage className="usage-page workspace-sections">
       <WorkspaceHeading
         title="Usage & quota"
-        description="Your account limits, token activity and the work behind them."
         action={
           <Button
             variant="outline"
@@ -322,10 +321,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
       <div className="workspace-sections">
         <CapacityPanel />
         <section className="workspace-section workspace-stack" aria-label="Task usage">
-          <WorkspaceSectionHeading
-            title="Task usage"
-            description="Reported activity from your loaded Jackalope history."
-          />
+          <WorkspaceSectionHeading title="Task usage" />
           <WorkspaceToolbar className="usage-filters">
             <FormField label="Account">
               <Select

@@ -6,6 +6,30 @@
     border-radius: 12px;
     overflow: hidden;
   }
+  .settings-group[data-tone="danger"] {
+    border-color: color-mix(in srgb, var(--color-danger) 55%, var(--color-border));
+  }
+  /* Separate surfaces keep a gap; rows inside one group share the card. */
+  .settings-group + .settings-group {
+    margin-top: 16px;
+  }
+  .settings-block {
+    display: grid;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+  .settings-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px 16px;
+  }
+  .settings-block:last-child,
+  .settings-actions:last-child {
+    border-bottom: none;
+  }
   .settings-row {
     display: flex;
     flex-wrap: wrap;
@@ -28,6 +52,9 @@
     font-size: var(--text-sm);
     font-weight: 500;
     color: var(--color-text-primary);
+  }
+  .settings-group-header .settings-row-label {
+    font-weight: 600;
   }
   .settings-row-description {
     display: block;

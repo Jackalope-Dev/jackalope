@@ -86,13 +86,27 @@ when the project's fallback is explicitly Agent-powered; both calls retain usage
 Sessions with batch or
 cost limits retain their existing serial flow.
 
-**Create a plan** or **Investigate and plan** starts a planning attempt using the
-task's selected development agent. The agent receives the complete request and
-checks repository boundaries before proposing one to four assignments. Review
-ownership and dependencies, then choose **Start reviewed plan**. Native validation
-rejects cycles, escaping paths and independent assignments with overlapping scopes.
-A changed planner attempt requires another review. Planning workspaces must remain
-unchanged before implementation starts.
+**Automatic subtasks** are on by default (Project settings → Tasks → Split work
+into subtasks). When parallel planning is available, a request is planned and started
+without a review click if a model assessment recommends parallel or investigative
+work, or local rules find a request they do not classify as small. A model's one-lead
+choice and small requests start one agent as before. The planner may still return a
+single assignment. Validation failures record the reason on the task and wait for the
+manual review below; they are not retried automatically. **Review before starting**
+on a planning task turns its automatic start off. Assessments saved before this field
+existed remain manual.
+
+With automatic subtasks off, or for a manual recommendation, **Create a plan** or
+**Investigate and plan** starts a planning attempt using the task's selected
+development agent. The agent receives the complete request and checks repository
+boundaries before proposing one to four assignments, or up to eight when the
+concurrency limit is higher. Each assignment includes a planner briefing (key files,
+patterns, contracts, checks and pitfalls, under 1,500 characters) that the worker
+receives so it can skip repeated discovery; workers are told to confirm it. Review ownership and
+dependencies, then choose **Start reviewed plan**. Native validation rejects cycles,
+escaping paths and independent assignments with overlapping scopes, for automatic and
+reviewed plans alike. A changed planner attempt requires another review. Planning
+workspaces must remain unchanged before implementation starts.
 
 Planning considers integration and review effort, shared contracts, generated files,
 manifests and lockfiles. Shared changes have one owner or an explicit dependency.
@@ -115,7 +129,9 @@ requests keep their existing execution paths.
 
 New managed plans combine groups of at least two completed assignments while other
 work continues. Pending consumers receive the checked combination; running workers
-keep their frozen inputs. The combined worker uses a separate worktree, resolves
+keep their frozen inputs but can read or adopt other assignments' current work
+through [live peer tools](ORCHESTRATION-CAPABILITIES.md#live-peer-work) and split off
+[subtasks](ORCHESTRATION-CAPABILITIES.md#subtasks). The combined worker uses a separate worktree, resolves
 overlapping edits and checks the complete result. Native snapshot, process ownership
 and scope guards remain in force, including overlaps with unrelated tasks. Intermediate
 combinations are included in the final source receipt and cannot be applied separately.

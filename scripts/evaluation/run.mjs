@@ -10,6 +10,8 @@ const args = process.argv.slice(2);
 const value = (name, fallback) =>
   args.find((arg) => arg.startsWith(`${name}=`))?.slice(name.length + 1) ?? fallback;
 const cases = value('--case', suite.cases.map((c) => c.id).join(',')).split(',');
+// 'auto' sends the goal through assessment, planning and automatic subtasks instead of the
+// case's fixed task list, so '--modes=single,auto' measures whether automatic splitting pays off.
 const modes = value('--modes', 'single,serial,staged').split(',');
 const repeats = Number(value('--repeat', '3'));
 // Arms of the repository-map comparison: '--repo-map=on,off' interleaves them so one suite measures
@@ -19,7 +21,7 @@ const seconds = Number(value('--seconds', '300'));
 const tokens = Number(value('--tokens', '1000000'));
 if (
   cases.some((id) => !suite.cases.some((c) => c.id === id)) ||
-  modes.some((m) => !['single', 'serial', 'staged'].includes(m)) ||
+  modes.some((m) => !['single', 'serial', 'staged', 'auto'].includes(m)) ||
   maps.some((m) => !['on', 'off'].includes(m)) ||
   !Number.isInteger(repeats) ||
   repeats < 1 ||
@@ -150,6 +152,8 @@ for (const id of cases)
           receipt,
           processExit: 0,
           completed: report.completed === true,
+          assignments: report.split?.delivery?.assignmentCount ?? null,
+          spawnedSubtasks: report.split?.delivery?.spawnedSubtasks ?? null,
           elapsedMs: report.elapsedMs,
           oraclePassed: report.oracle?.success ?? false,
           budgetStopped: report.budgetStopped,

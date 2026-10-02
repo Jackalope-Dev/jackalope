@@ -1,5 +1,6 @@
 import { createRemoteJWKSet, type JWTVerifyGetKey, jwtVerify } from 'jose';
 import { accessAdmin } from './access/admin';
+import { adminBetaRequests, resolveBetaRequest } from './access/beta';
 import { adminPage } from './admin-page';
 
 const keySets = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
@@ -162,6 +163,28 @@ export async function adminRoutes(
       .bind(body.status, body.id, Date.now())
       .run();
     return Response.json({ updated: result.meta.changes === 1 }, { headers });
+  }
+  if (request.method === 'GET' && url.pathname === '/admin/api/beta') {
+    const status = url.searchParams.get('status') ?? 'pending';
+    if (!['pending', 'done', 'declined', 'withdrawn', 'all'].includes(status))
+      return Response.json({ error: 'invalid_filter' }, { status: 400, headers });
+    return Response.json(await adminBetaRequests(env, status), { headers });
+  }
+  if (request.method === 'POST' && url.pathname === '/admin/api/beta') {
+    if (request.headers.get('origin') !== url.origin)
+      return Response.json({ error: 'origin_required' }, { status: 403, headers });
+    const body = await readJson(request);
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      !('id' in body) ||
+      !('status' in body) ||
+      typeof body.id !== 'string' ||
+      !/^[a-f0-9-]{36}$/.test(body.id) ||
+      (body.status !== 'done' && body.status !== 'declined')
+    )
+      return Response.json({ error: 'invalid_request' }, { status: 400, headers });
+    return Response.json(await resolveBetaRequest(env, body.id, body.status), { headers });
   }
   return Response.json({ error: 'not_found' }, { status: 404, headers });
 }

@@ -15,6 +15,7 @@ impl Coordinator {
             reconciliations: inner.ledger.reconciliations.clone(),
             agreements: inner.ledger.agreements.clone(),
             scope_audits: inner.ledger.scope_audits.clone(),
+            adoptions: inner.ledger.adoptions.clone(),
             items: inner.ledger.items.clone(),
             messages: inner.ledger.messages.clone(),
             enabled_projects: inner.enabled.iter().cloned().collect(),
@@ -77,6 +78,8 @@ impl Coordinator {
         }
         let id = Uuid::new_v4().to_string();
         ledger.items.push(QueueItem {
+            excluded_scopes: vec![],
+            parent_task_id: None,
             staged_dependencies: req.staged_dependencies,
             feature: req.feature,
             feature_id: req.feature_id,
@@ -234,6 +237,8 @@ impl Coordinator {
 
     pub(super) fn tick(&self) -> Result<(), String> {
         self.reconcile()?;
+        self.ensure_storage_loaded()?;
+        self.auto_start_managed()?;
         self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
@@ -422,6 +427,10 @@ impl Coordinator {
                         .route("/v1/jev/questions", post(bridge_jev_questions))
                         .route("/v1/computer/output", post(bridge_verification_output))
                         .route("/v1/project", get(bridge_project))
+                        .route("/v1/peers", get(peers::bridge_peers))
+                        .route("/v1/peers/read", post(peers::bridge_peer_read))
+                        .route("/v1/peers/adopt", post(peers::bridge_peer_adopt))
+                        .route("/v1/subtasks", post(subtasks::bridge_propose_subtask))
                         .route("/v1/agreements", post(agreements::bridge_agreement))
                         .route("/v1/tools/search", post(bridge_tool_search))
                         .route("/v1/tools/execute", post(bridge_tool_execute))
@@ -715,6 +724,8 @@ impl Coordinator {
                     .find(|r| r.id == run_id)
                     .ok_or(StatusCode::UNAUTHORIZED)?;
                 QueueItem {
+                    excluded_scopes: vec![],
+                    parent_task_id: None,
                     staged_dependencies: false,
                     feature: None,
                     feature_id: None,

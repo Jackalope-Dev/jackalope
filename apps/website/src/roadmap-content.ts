@@ -66,7 +66,7 @@ export const roadmapStages = [
         title: 'One request, a reviewed approach.',
         summary: 'Project decision preferences guide task assessment and planning.',
         detail:
-          'Review an approach, then follow Plan, Work, Check and Review in one task. Jackalope combines completed assignments, resolves overlapping changes in isolated workspaces and can repair failed checks within a bounded allowance. Review the complete result, preview and checks before applying changes. Local fast paths and reused assessments avoid extra model calls; usage includes planning and repair work. Codex speed controls, workspace context freshness, dependency scheduling and check capacity help reduce repeated work. Task timings show waits and execution. Installed-provider testing and comparisons including review and corrections remain in progress.',
+          'Substantial requests split into parallel subtasks automatically, or you can review the plan first, then follow Plan, Work, Check and Review in one task. Jackalope combines completed assignments, resolves overlapping changes in isolated workspaces and can repair failed checks within a bounded allowance. Review the complete result, preview and checks before applying changes. Local fast paths and reused assessments avoid extra model calls; usage includes planning and repair work. Codex speed controls, workspace context freshness, dependency scheduling and check capacity help reduce repeated work. Task timings show waits and execution. Installed-provider testing and comparisons including review and corrections remain in progress.',
       },
       {
         title: 'Room to work in parallel.',
@@ -104,6 +104,18 @@ export const roadmapStages = [
         summary: 'A jackalope command that picks up where the app leaves off.',
         detail:
           'Run jackalope in the current directory to describe work, let Jackalope choose the agent, and watch progress in a terminal conversation. A Git repository keeps each conversation in its own worktree. A folder that is not a repository is edited directly, or becomes a repository after you confirm or pass --init. It shares sessions and account access with the app and can start it in the background. Run shell commands inline, mention files, queue follow-ups while agents work, or send a single message from scripts with jackalope -p. Open it from the status bar, then move the conversation to your own terminal. Answer agent questions without leaving the terminal. Installed setup on each platform is still in progress.',
+      },
+      {
+        title: 'Bots that keep their role.',
+        summary: 'Saved agents, connected apps, and a view of what the agent sees.',
+        detail:
+          'Save a bot with a name, its own character and colour, standing instructions, an agent and model, a project and the connections it may use, or start from templates for review, research, testing, docs, security and more. Message it to start a conversation that stays on the Bots page; quick questions skip workspace setup. Its instructions travel with every message, and routines run its work on a schedule. Connect apps such as GitHub, Slack and Gmail once through your own Composio project, and every agent can use them as tools. The Screen view shows the task browser’s current page and any window you allowed an agent to control, and lets you stop either. Choose an agent and model from a picker that lists every agent and why unavailable ones cannot run. Installed testing with real accounts is in progress.',
+      },
+      {
+        title: 'Repositories built for agents.',
+        summary: 'Cloudflare Artifacts projects, in beta.',
+        detail:
+          'Connect your own Cloudflare account to create a project backed by an Artifacts repository or move an existing repository there. Push branches and tags with short-lived tokens, and share a read-only review snapshot with a link that expires. Tasks still run in local worktrees. Live account testing and installed validation are in progress; a hosted option is not available yet.',
       },
       {
         title: 'A first run worth coming back to.',
@@ -171,7 +183,7 @@ export const roadmapStages = [
         title: 'More ways to work together.',
         summary: 'Shared workflows, team spaces, and hosting choices.',
         detail:
-          'We intend to explore team collaboration and managed or self-hosted remote services after validating individual remote workflows. Shared remote workspaces are future work. We have not announced pricing or a release date for these plans.',
+          'We intend to explore team collaboration, managed or self-hosted remote services, and hosted Artifacts repositories that let many agents fork, review and check work in parallel, after validating individual remote workflows. Shared remote workspaces are future work. We have not announced pricing or a release date for these plans.',
       },
     ],
   },

@@ -20,6 +20,7 @@ import {
 } from '../../lib/routing-settings';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { InlineNotice } from '../ui/InlineNotice';
+import { SettingActions, SettingBody, SettingGroup } from './Setting';
 import './routing.css';
 import { DecisionOptions } from './DecisionOptions';
 
@@ -425,80 +426,88 @@ export function RoutingPreferences({ projectId }: { projectId?: string }) {
     }
   };
   return (
-    <div className="routing-preferences">
-      <RoutingSetup
-        projectId={projectId}
-        key={settings?.revision}
-        mode={mode}
-        jevFallback={jevFallback}
-        onFallbackChange={(value) => {
-          setJevFallback(value);
-          setMessage('');
-          setError('');
-        }}
-        onModeChange={(value) => {
-          setMode(value);
-          setMessage('');
-          setError('');
-        }}
-        onReadyChange={setReady}
-        onSettingsChange={setSettings}
-        disabled={saving}
-      />
-      {projectId && settings && (
-        <div className="routing-detail">
-          {settings.projectMode
-            ? 'This project overrides the app default.'
-            : 'This project inherits the app default.'}
-          {!settings.projectMode && (
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={saving || !ready}
-              onClick={() => void save()}
-            >
-              Keep this choice for this project
-            </Button>
-          )}
-          {settings.projectMode && (
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={saving || !ready}
-              onClick={() => {
-                setSaving(true);
-                setError('');
-                void routingSettings
-                  .setMode(null, settings.revision, projectId)
-                  .then((value) => {
-                    setSettings(value);
-                    setMode(value.mode);
-                    setJevFallback(value.jevFallback);
-                    setMessage('Using the app default.');
-                  })
-                  .catch((error) => setError(String(error)))
-                  .finally(() => setSaving(false));
-              }}
-            >
-              Use app default
-            </Button>
-          )}
-        </div>
+    <SettingGroup>
+      <SettingBody className="routing-preferences">
+        <RoutingSetup
+          projectId={projectId}
+          key={settings?.revision}
+          mode={mode}
+          jevFallback={jevFallback}
+          onFallbackChange={(value) => {
+            setJevFallback(value);
+            setMessage('');
+            setError('');
+          }}
+          onModeChange={(value) => {
+            setMode(value);
+            setMessage('');
+            setError('');
+          }}
+          onReadyChange={setReady}
+          onSettingsChange={setSettings}
+          disabled={saving}
+        />
+        {projectId && settings && (
+          <div className="routing-detail">
+            {settings.projectMode
+              ? 'This project overrides the app default.'
+              : 'This project inherits the app default.'}
+            {!settings.projectMode && (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={saving || !ready}
+                onClick={() => void save()}
+              >
+                Keep this choice for this project
+              </Button>
+            )}
+            {settings.projectMode && (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={saving || !ready}
+                onClick={() => {
+                  setSaving(true);
+                  setError('');
+                  void routingSettings
+                    .setMode(null, settings.revision, projectId)
+                    .then((value) => {
+                      setSettings(value);
+                      setMode(value.mode);
+                      setJevFallback(value.jevFallback);
+                      setMessage('Using the app default.');
+                    })
+                    .catch((error) => setError(String(error)))
+                    .finally(() => setSaving(false));
+                }}
+              >
+                Use app default
+              </Button>
+            )}
+          </div>
+        )}
+      </SettingBody>
+      <SettingActions>
+        <Button
+          disabled={!ready || (mode === settings?.mode && jevFallback === settings?.jevFallback)}
+          loading={saving}
+          loadingLabel="Saving…"
+          onClick={() => void save()}
+        >
+          Save routing choice
+        </Button>
+        {message && (
+          <p role="status" className="routing-detail">
+            {message}
+          </p>
+        )}
+      </SettingActions>
+      {error && (
+        <SettingBody>
+          <InlineNotice tone="error">{error}</InlineNotice>
+        </SettingBody>
       )}
-      <Button
-        disabled={!ready || (mode === settings?.mode && jevFallback === settings?.jevFallback)}
-        loading={saving}
-        loadingLabel="Saving…"
-        onClick={() => void save()}
-      >
-        Save routing choice
-      </Button>
-      {message && (
-        <p role="status" className="routing-detail">
-          {message}
-        </p>
-      )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
-    </div>
+    </SettingGroup>
   );
 }

@@ -476,7 +476,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'concurrency-collisions',
         question: 'How does Jackalope coordinate parallel work?',
         paragraphs: [
-          'New tasks can recommend focused work, investigation, or a reviewed plan using the project’s Decisions preference. Create a plan uses your selected development agent and its normal capacity. Review the concrete assignments before starting; one parent keeps planning, worker attempts, usage, and the combined result together.',
+          'Substantial requests are split into subtasks automatically: your selected development agent plans independent pieces with separate file ownership, and they start without a review step. Small requests go straight to one agent. Choose Review before starting while it plans to check the assignments first, or turn off Split work into subtasks in Project settings to always review plans. One parent keeps planning, worker attempts, usage, and the combined result together.',
+          'While subtasks run, agents can read each other’s in-progress files, copy a finished interface into their own workspace, and hear right away when their changes stop merging. An agent that finds separable work can split it off to a new parallel worker, and Split this task asks a running agent to do the same. Each piece keeps separate file ownership and joins the combined review.',
           'Parallel plans record task scopes, dependencies, and a concurrency limit. The coordinator reserves work before launching an agent; dependencies wait for the changes they need to be integrated.',
           'New managed plans combine groups of completed assignments while other work continues. Shared contracts have one owner or an explicit dependency. Jackalope resolves overlaps in a separate workspace and checks the combined result before handing it to dependent work or final review.',
           'Plan, Work, Check and Review keep the complete result, preview and checks together. Work details expands individual assignments. A failed check can receive up to two automatic repair attempts; a correction authorizes a fresh allowance. If more help is needed, the task keeps the result and offers a correction or another repair. Provider failures and interrupted processes require explicit recovery.',
@@ -511,6 +512,65 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           title: 'Inspect a worktree',
           code: 'git worktree list\ngit -C .worktrees/task-auth-flow status --short\ngit -C .worktrees/task-auth-flow log -5 --oneline',
         },
+      },
+    ],
+  },
+  {
+    slug: 'cloudflare-artifacts',
+    category: 'architecture',
+    title: 'Keep projects on Cloudflare Artifacts (beta)',
+    shortTitle: 'Cloudflare Artifacts',
+    description:
+      'Connect your Cloudflare account, create a project backed by an Artifacts repository or move an existing one, push branches, and share expiring review snapshots.',
+    readingTime: '3 min read',
+    sections: [
+      {
+        id: 'what-artifacts-is',
+        question: 'What is Cloudflare Artifacts?',
+        paragraphs: [
+          'Artifacts is Cloudflare’s Git-compatible storage built for agents. Each repository has a standard Git remote, cheap forks and short-lived access tokens, so many agents, reviewers and automations can work from copies of the same project.',
+          'In Jackalope it is a beta option. Tasks still run in local worktrees on your computer; Artifacts is where the project lives remotely.',
+        ],
+        links: [
+          {
+            label: 'Cloudflare Artifacts documentation',
+            href: 'https://developers.cloudflare.com/artifacts/',
+          },
+        ],
+      },
+      {
+        id: 'connect-account',
+        question: 'How do I connect my Cloudflare account?',
+        paragraphs: [
+          'Artifacts requires the Workers Paid plan, and Cloudflare bills operations and storage to your account. Open Settings → Connected work and fill in Cloudflare Artifacts.',
+        ],
+        steps: [
+          'Copy your account ID from the Cloudflare dashboard.',
+          'Create an API token with the Account → Artifacts → Edit permission.',
+          'Choose a namespace for Jackalope repositories, such as jackalope.',
+          'Optionally restrict data to the EU or US. This applies only when Jackalope creates the namespace and cannot be changed later.',
+          'Choose Connect. Jackalope checks the token with Cloudflare before saving it in your system’s protected storage.',
+        ],
+      },
+      {
+        id: 'create-or-move',
+        question: 'How do I create a new project on Artifacts or move an existing one?',
+        paragraphs: [
+          'In project setup, choose Create on Artifacts. Jackalope creates the repository, a local project folder with Git, and pushes the first commit.',
+          'For an existing repository, open Project settings → Cloudflare Artifacts and choose Move to Artifacts. Jackalope creates the repository, adds a remote named artifacts and pushes your branches, tags and notes. Your other remotes stay as they are, and Jackalope task branches stay local.',
+        ],
+        callout: {
+          kind: 'note',
+          text: 'Artifacts repositories are limited to 1 GB, with files up to 32 MB. A push that exceeds these limits is refused and shows Git’s message.',
+        },
+      },
+      {
+        id: 'push-and-share',
+        question: 'How do pushing and review snapshots work?',
+        paragraphs: [
+          'Push to Artifacts sends local branches, tags and notes using a token that lasts 15 minutes and is revoked afterward. Tokens are never written into the remote URL or Git configuration. Changes that are not fast-forwards are refused rather than overwritten.',
+          'Share a review snapshot makes a read-only copy of what was last pushed and a clone command that expires after 1 hour, 1 day or 7 days. The command contains a read token and is shown only once; anyone who has it can read that snapshot until it expires.',
+        ],
       },
     ],
   },
