@@ -296,10 +296,7 @@
 }
 
 .bot-editor {
-  display: flex;
-  flex-direction: column;
   width: min(44rem, calc(100vw - 32px));
-  overflow: hidden;
 }
 
 /* Contained dialogs pad their own body and footer to line up with the header. */
@@ -309,7 +306,7 @@
   align-content: start;
   gap: 20px;
   min-height: 0;
-  padding: 0 32px 24px;
+  padding: 0 32px 20px;
   overflow-y: auto;
 }
 
@@ -414,7 +411,7 @@
 
 .bot-editor > .app-dialog-footer {
   margin: 0;
-  padding: 16px 32px 24px;
+  padding: 16px 32px 20px;
   border-top: 1px solid var(--color-border-subtle);
 }
 
