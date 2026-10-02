@@ -1,8 +1,8 @@
 .workspace-page-layout {
-  --workspace-page-padding: 32px;
-  --workspace-heading-gap: 24px;
-  --workspace-section-gap: 32px;
-  --workspace-section-heading-gap: 16px;
+  --workspace-page-padding: 24px;
+  --workspace-heading-gap: 16px;
+  --workspace-section-gap: 28px;
+  --workspace-section-heading-gap: 12px;
   box-sizing: border-box;
   flex: 1;
   min-width: 0;
@@ -42,7 +42,7 @@
 }
 .workspace-heading p,
 .workspace-section-header p {
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
   line-height: 1.5;

@@ -6,8 +6,8 @@
     flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 16px 24px;
-    margin-bottom: 24px;
+    gap: 12px 24px;
+    margin-bottom: 16px;
   }
   .ui-page-header > div:first-child,
   .ui-section-header > div:first-child {
@@ -30,7 +30,7 @@
     letter-spacing: -0.045em;
   }
   .ui-section-header {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
   .ui-section-header :is(h2, h3) {
     margin: 0;
@@ -44,7 +44,7 @@
   }
   .ui-page-header p,
   .ui-section-header p {
-    margin: 8px 0 0;
+    margin: 4px 0 0;
     color: var(--color-text-secondary);
     font-size: var(--text-sm, 0.875rem);
     line-height: 1.5;
