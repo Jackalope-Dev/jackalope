@@ -443,7 +443,6 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     <WorkspacePage className="commit-review-page">
       <WorkspaceHeading
         title="Changes"
-        description="Review uncommitted work, choose what to include, and commit."
         action={
           <div className="workspace-actions">
             <Select value={checkout} onValueChange={choose} disabled={busy} aria-label="Checkout">
@@ -656,7 +655,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
               <InlineNotice>{patchError}</InlineNotice>
             ) : patch?.path === focused ? (
               patch.text.trim() ? (
-                <DiffPreview patch={patch.text} file={focused} />
+                <DiffPreview patch={patch.text} file={focused} fill />
               ) : (
                 <p className="task-muted">No text changes (mode or binary change).</p>
               )

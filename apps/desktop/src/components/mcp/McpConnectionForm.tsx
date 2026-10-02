@@ -359,11 +359,6 @@ export function McpConnectionForm({
                   available to those agents through their own accounts.
                 </InlineNotice>
               )}
-              {authentication === 'advanced' && (
-                <p className="task-muted">
-                  Your existing headers and client options are preserved below.
-                </p>
-              )}
             </>
           )}
           <details

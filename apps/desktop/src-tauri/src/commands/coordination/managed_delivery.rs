@@ -17,6 +17,14 @@ pub struct Delivery {
     pub review_samples: Vec<String>,
     pub interventions: u32,
     pub decision_versions: HashMap<String, Vec<(String, u64)>>,
+    /// When the planner finished and when its assignments were queued.
+    pub planned_at: Option<String>,
+    pub started_at: Option<String>,
+    /// Planned implementation assignments, excluding the combined review.
+    pub assignment_count: usize,
+    pub auto_started: bool,
+    /// Subtasks agents spawned with propose_subtask.
+    pub spawned_subtasks: usize,
 }
 
 impl Default for Delivery {
@@ -34,6 +42,11 @@ impl Default for Delivery {
             review_samples: vec![],
             interventions: 0,
             decision_versions: HashMap::new(),
+            planned_at: None,
+            started_at: None,
+            assignment_count: 0,
+            auto_started: false,
+            spawned_subtasks: 0,
         }
     }
 }

@@ -17,6 +17,21 @@ pub struct ManagedTask {
     pub created_at: String,
     pub started: bool,
     pub error: Option<String>,
+    /// Start the validated plan as soon as the planner finishes, without a review click.
+    #[serde(default)]
+    pub auto_start: bool,
+    /// The assignment limit the planner was given; older plans were limited to four.
+    #[serde(default = "default_max_assignments")]
+    pub max_assignments: usize,
+}
+
+fn default_max_assignments() -> usize {
+    4
+}
+
+/// Larger plans only help when enough workers can run at once.
+pub(super) fn assignment_limit(concurrency: usize) -> usize {
+    concurrency.clamp(4, 8)
 }
 
 #[derive(Deserialize)]
@@ -30,6 +45,8 @@ struct ProposedStep {
     depends_on: Vec<String>,
     #[serde(default)]
     outcomes: Vec<String>,
+    #[serde(default)]
+    briefing: String,
 }
 
 pub(super) fn dispatch_key(id: &str) -> String {
@@ -96,8 +113,8 @@ pub(super) fn reconcile_attempts(ledger: &mut Ledger, runs: &[TaskRun]) -> bool 
     changed
 }
 
-fn planning_prompt(request: &str) -> String {
-    format!("Plan this complete request using the repository and its instructions. Read only: do not edit files, install dependencies, commit, launch other agents or implement changes. Return ONLY a JSON array of 1–4 assignments with key, title, prompt, scopes (actual relative repository files/folders), dependsOn (other assignment keys), and outcomes (reviewable requirements). Preserve the complete request and its constraints. Minimize total implementation, integration and human review effort, not just worker duration. When asked to choose work, prefer a bounded, independently verifiable improvement and check prerequisites before proposing a new integration. Keep tightly coupled work together and tests with implementation. Inspect imports, API contracts, schemas, generated files, manifests and lockfiles: different files do not imply independent work. Give each shared contract and dependency change one owner; put it in a prerequisite and name the contract in consumer instructions. Independent assignments must have non-overlapping ownership. Use parallel investigation or review only when it helps the requested result. Use one assignment when splitting creates more integration work than it saves. Account for each worker repeating repository discovery, dependency setup and required checks. Prefer a small shared-contract prerequisite that unlocks independent consumers; keep the tests for each behavior with its implementation. Do not split a short change just to fill available slots. Jackalope combines finished work, checks dependencies and appends final review and verification; do not add your own integration assignments. No agent names or model changes. Each prompt must be self-contained and identify its exact responsibility.\n\nComplete request:\n{request}")
+fn planning_prompt(request: &str, limit: usize) -> String {
+    format!("Plan this complete request using the repository and its instructions. Read only: do not edit files, install dependencies, commit, launch other agents or implement changes. Return ONLY a JSON array of 1–{limit} assignments with key, title, prompt, scopes (actual relative repository files/folders), dependsOn (other assignment keys), outcomes (reviewable requirements) and briefing. The briefing gives that worker what you learned so it can skip repository discovery: key files and symbols, patterns to follow, contracts it must honor, the commands that check it and pitfalls, as facts under 1500 characters. Preserve the complete request and its constraints. Minimize total implementation, integration and human review effort, not just worker duration. When asked to choose work, prefer a bounded, independently verifiable improvement and check prerequisites before proposing a new integration. Keep tightly coupled work together and tests with implementation. Inspect imports, API contracts, schemas, generated files, manifests and lockfiles: different files do not imply independent work. Give each shared contract and dependency change one owner; put it in a prerequisite and name the contract in consumer instructions. Independent assignments must have non-overlapping ownership. Use parallel investigation or review only when it helps the requested result. Use one assignment when splitting creates more integration work than it saves. Account for each worker repeating repository discovery, dependency setup and required checks. Prefer a small shared-contract prerequisite that unlocks independent consumers; keep the tests for each behavior with its implementation. Do not split a short change just to fill available slots. Jackalope combines finished work, checks dependencies and appends final review and verification; do not add your own integration assignments. No agent names or model changes. Each prompt must be self-contained and identify its exact responsibility.\n\nComplete request:\n{request}")
 }
 
 pub(super) fn prepare_followup(
@@ -138,7 +155,7 @@ pub(super) fn prepare_followup(
         }
         request.prompt = format!(
             "{}\n\nPlanning correction from user:\n{}",
-            planning_prompt(&task.request.prompt),
+            planning_prompt(&task.request.prompt, task.max_assignments),
             request.prompt
         );
         request.auto_verify = false;
@@ -158,7 +175,7 @@ pub(super) fn prepare_followup(
     Ok(())
 }
 
-fn parse_plan(text: &str, request: &RunRequest) -> Result<Vec<PlanEntry>, String> {
+fn parse_plan(text: &str, request: &RunRequest, limit: usize) -> Result<Vec<PlanEntry>, String> {
     let text = text.trim();
     let text = if text.starts_with("```") {
         text.split_once('\n')
@@ -172,8 +189,10 @@ fn parse_plan(text: &str, request: &RunRequest) -> Result<Vec<PlanEntry>, String
         return Err("The proposed plan is too large.".into());
     }
     let proposed: Vec<ProposedStep> = serde_json::from_str(text).map_err(|_| "The agent did not return a valid task plan. Open its result and request a corrected JSON plan.")?;
-    if proposed.is_empty() || proposed.len() > 4 {
-        return Err("A managed task needs between one and four implementation assignments.".into());
+    if proposed.is_empty() || proposed.len() > limit {
+        return Err(format!(
+            "A managed task needs between one and {limit} implementation assignments."
+        ));
     }
     let mut items = Vec::new();
     for step in proposed {
@@ -183,6 +202,7 @@ fn parse_plan(text: &str, request: &RunRequest) -> Result<Vec<PlanEntry>, String
             || step.title.len() > 160
             || step.prompt.trim().is_empty()
             || step.prompt.len() > 20_000
+            || step.briefing.len() > 4_000
         {
             return Err(
                 "Every assignment needs a unique key, short title and concrete instructions."
@@ -202,7 +222,19 @@ fn parse_plan(text: &str, request: &RunRequest) -> Result<Vec<PlanEntry>, String
         items.push(PlanEntry {
             key: step.key,
             title: step.title,
-            prompt: format!("{}\n\nJackalope owns this task's worker count. Do not delegate or launch other agents.\n\nComplete request (shared context; perform only your assigned work):\n{}", step.prompt, request.prompt),
+            prompt: format!(
+                "{}{}\n\nJackalope owns this task's worker count. Do not launch other agents; propose_subtask is the only way to split off work.\n\nComplete request (shared context; perform only your assigned work):\n{}",
+                step.prompt,
+                if step.briefing.trim().is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        "\n\nPlanner briefing (from reading the repository; confirm before relying on it):\n{}",
+                        step.briefing.trim()
+                    )
+                },
+                request.prompt
+            ),
             agent: request.agent.clone(),
             scopes,
             depends_on: step.depends_on,
@@ -258,6 +290,23 @@ fn parse_plan(text: &str, request: &RunRequest) -> Result<Vec<PlanEntry>, String
     Ok(items)
 }
 
+/// Automatic tasks whose latest planner finished cleanly, with that planner's attempt ID.
+fn auto_start_ready(ledger: &Ledger, runs: &[TaskRun]) -> Vec<(String, String)> {
+    ledger
+        .managed_tasks
+        .iter()
+        .filter(|task| task.auto_start && !task.started && task.error.is_none())
+        .filter_map(|task| {
+            let planner = latest_planner(task, runs)?;
+            (matches!(planner.status.as_str(), "review" | "reviewed")
+                && !planner.finishing
+                && planner.error.is_none()
+                && planner.persistence_error.is_none())
+            .then(|| (task.id.clone(), planner.id.clone()))
+        })
+        .collect()
+}
+
 fn latest_planner<'a>(task: &ManagedTask, runs: &'a [TaskRun]) -> Option<&'a TaskRun> {
     let original = runs.iter().find(|run| run.id == task.planner_run_id)?;
     runs.iter()
@@ -266,11 +315,12 @@ fn latest_planner<'a>(task: &ManagedTask, runs: &'a [TaskRun]) -> Option<&'a Tas
 }
 
 impl Coordinator {
-    fn create_managed(
+    pub(super) fn create_managed(
         &self,
         request: RunRequest,
         assessment_id: String,
         title: String,
+        auto_start: bool,
     ) -> Result<String, String> {
         self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
@@ -295,6 +345,8 @@ impl Coordinator {
             created_at: Utc::now().to_rfc3339(),
             started: false,
             error: None,
+            auto_start,
+            max_assignments: assignment_limit(self.inner.lock().unwrap().concurrency),
         };
         {
             let mut inner = self.inner.lock().unwrap();
@@ -325,7 +377,7 @@ impl Coordinator {
     fn launch_planner(&self, task: &ManagedTask) -> Result<(), String> {
         let mut planning = task.request.clone();
         planning.id = task.planner_run_id.clone();
-        planning.prompt = planning_prompt(&planning.prompt);
+        planning.prompt = planning_prompt(&planning.prompt, task.max_assignments);
         planning.auto_verify = false;
         planning.prepare_command = None;
         planning.verify_command = None;
@@ -374,7 +426,7 @@ impl Coordinator {
         if !changed.is_empty() || !committed.is_empty() {
             return Err("The planning agent changed files. Inspect its workspace before starting implementation.".into());
         }
-        parse_plan(&run.result, &task.request)
+        parse_plan(&run.result, &task.request, task.max_assignments)
     }
 
     fn start_managed(&self, id: &str, planner_run_id: &str) -> Result<(), String> {
@@ -434,7 +486,13 @@ impl Coordinator {
             .unwrap();
         task.started = true;
         task.error = None;
+        let planned_at = latest_planner(task, &runs).and_then(|run| run.ended_at.clone());
+        let auto_started = task.auto_start;
         if let Some(delivery) = &mut task.delivery {
+            delivery.planned_at = planned_at;
+            delivery.started_at = Some(Utc::now().to_rfc3339());
+            delivery.assignment_count = count.saturating_sub(usize::from(count > 1));
+            delivery.auto_started = auto_started;
             delivery.final_item = created.last().cloned();
             if count > 1 {
                 delivery.integration_items = created.last().cloned().into_iter().collect();
@@ -443,6 +501,40 @@ impl Coordinator {
         self.save(&ledger)?;
         inner.ledger = ledger;
         inner.enabled.insert(dispatch_key(id));
+        Ok(())
+    }
+
+    /// Starts plans whose planner finished, for tasks created with `auto_start`.
+    /// Runs without coordinator locks held because `start_managed` takes them.
+    /// A plan that fails validation records the reason once and waits for review.
+    pub(super) fn auto_start_managed(&self) -> Result<(), String> {
+        let runs = self.runtime.integration_runs()?;
+        let ready = {
+            let inner = self.inner.lock().unwrap();
+            if inner.url.is_none() {
+                return Ok(());
+            }
+            auto_start_ready(&inner.ledger, &runs)
+        };
+        if ready.is_empty() || self.runtime.access.ensure().is_err() {
+            return Ok(());
+        }
+        for (id, planner_run_id) in ready {
+            if let Err(error) = self.start_managed(&id, &planner_run_id) {
+                let mut inner = self.inner.lock().unwrap();
+                let mut ledger = inner.ledger.clone();
+                if let Some(task) = ledger.managed_tasks.iter_mut().find(|task| task.id == id) {
+                    if task.started {
+                        continue;
+                    }
+                    task.error = Some(format!(
+                        "Subtasks did not start automatically: {error} Review the plan to continue."
+                    ));
+                }
+                self.save(&ledger)?;
+                inner.ledger = ledger;
+            }
+        }
         Ok(())
     }
 
@@ -517,6 +609,17 @@ impl Coordinator {
                 }
                 inner.enabled.insert(dispatch_key(id));
             }
+            "review-first" => {
+                if task.started {
+                    return Err("Subtasks have already started.".into());
+                }
+                let mut ledger = inner.ledger.clone();
+                if let Some(saved) = ledger.managed_tasks.iter_mut().find(|saved| saved.id == id) {
+                    saved.auto_start = false;
+                }
+                self.save(&ledger)?;
+                inner.ledger = ledger;
+            }
             "pause" | "stop" => {
                 inner.enabled.remove(&dispatch_key(id));
                 if action == "stop" {
@@ -545,7 +648,7 @@ impl Coordinator {
                     }
                 }
             }
-            _ => return Err("Choose pause, stop, resume or retry-repair.".into()),
+            _ => return Err("Choose pause, stop, resume, review-first or retry-repair.".into()),
         }
         Ok(())
     }
@@ -596,11 +699,12 @@ pub async fn task_plan_create(
     request: RunRequest,
     assessment_id: String,
     title: String,
+    auto_start: Option<bool>,
     state: State<'_, Coordinator>,
 ) -> Result<String, String> {
     let service = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        service.create_managed(request, assessment_id, title)
+        service.create_managed(request, assessment_id, title, auto_start.unwrap_or(false))
     })
     .await
     .map_err(|error| error.to_string())?
@@ -654,10 +758,87 @@ mod tests {
         serde_json::from_value(serde_json::json!({"id":id,"featureId":feature,"projectId":"project","projectName":"Project","projectPath":"fixture","title":id,"prompt":id,"agent":"codex","scopes":[id],"dependencies":[],"createdAt":"now","runId":null,"error":null,"canceled":false})).unwrap()
     }
     #[test]
+    fn automatic_plans_start_only_after_a_clean_finished_planner() {
+        let mut automatic = task();
+        automatic.started = false;
+        automatic.auto_start = true;
+        let planner = |id: &str, status: &str, started_at: &str| TaskRun {
+            id: id.into(),
+            task_id: "planner-task".into(),
+            status: status.into(),
+            started_at: started_at.into(),
+            ..Default::default()
+        };
+        let mut ledger = Ledger {
+            managed_tasks: vec![automatic.clone()],
+            ..Default::default()
+        };
+        assert!(auto_start_ready(&ledger, &[planner("planner", "running", "1")]).is_empty());
+        let mut finishing = planner("planner", "review", "1");
+        finishing.finishing = true;
+        assert!(auto_start_ready(&ledger, &[finishing]).is_empty());
+        let mut failed = planner("planner", "review", "1");
+        failed.error = Some("boom".into());
+        assert!(auto_start_ready(&ledger, &[failed]).is_empty());
+        // A planning correction supersedes the original attempt.
+        assert_eq!(
+            auto_start_ready(
+                &ledger,
+                &[
+                    planner("planner", "review", "1"),
+                    planner("retry", "reviewed", "2")
+                ]
+            ),
+            vec![("parent".to_string(), "retry".to_string())]
+        );
+        // Reviewed-plan tasks, started tasks and recorded failures never start on their own.
+        let changes: [fn(&mut ManagedTask); 3] = [
+            |task| task.auto_start = false,
+            |task| task.started = true,
+            |task| task.error = Some("Subtasks did not start".into()),
+        ];
+        for change in changes {
+            let mut task = automatic.clone();
+            change(&mut task);
+            ledger.managed_tasks = vec![task];
+            assert!(auto_start_ready(&ledger, &[planner("planner", "review", "1")]).is_empty());
+        }
+    }
+    #[test]
+    fn plan_size_follows_concurrency_and_workers_receive_the_planner_briefing() {
+        assert_eq!(assignment_limit(1), 4);
+        assert_eq!(assignment_limit(6), 6);
+        assert_eq!(assignment_limit(32), 8);
+        let five = (0..5)
+            .map(|i| {
+                format!(r#"{{"key":"k{i}","title":"T{i}","prompt":"P{i}","scopes":["s{i}"]}}"#)
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        assert!(parse_plan(&format!("[{five}]"), &request(), 4).is_err());
+        assert_eq!(
+            parse_plan(&format!("[{five}]"), &request(), 6)
+                .unwrap()
+                .len(),
+            6
+        );
+        let plan = parse_plan(
+            r#"[{"key":"a","title":"A","prompt":"Do A","scopes":["src"],"briefing":"Types live in src/types.ts; run pnpm test."}]"#,
+            &request(),
+            4,
+        )
+        .unwrap();
+        assert!(plan[0].prompt.contains("Planner briefing"));
+        assert!(plan[0].prompt.contains("src/types.ts"));
+        assert!(planning_prompt("x", 6).contains("1–6 assignments"));
+        assert!(planning_prompt("x", 6).contains("briefing"));
+    }
+    #[test]
     fn one_assignment_avoids_an_unnecessary_extra_worker() {
         let plan = parse_plan(
             r#"[{"key":"a","title":"A","prompt":"A","scopes":["src"]}]"#,
             &request(),
+            4,
         )
         .unwrap();
         assert_eq!(plan.len(), 1);
@@ -750,7 +931,7 @@ mod tests {
     }
     #[test]
     fn plan_preserves_request_and_adds_combined_verification() {
-        let plan = parse_plan(r#"[{"key":"api","title":"API","prompt":"Implement API","scopes":["api"],"outcomes":["API works"]},{"key":"ui","title":"UI","prompt":"Implement UI","scopes":["ui"]}]"#, &request()).unwrap();
+        let plan = parse_plan(r#"[{"key":"api","title":"API","prompt":"Implement API","scopes":["api"],"outcomes":["API works"]},{"key":"ui","title":"UI","prompt":"Implement UI","scopes":["ui"]}]"#, &request(), 4).unwrap();
         assert_eq!(plan.len(), 3);
         assert_eq!(plan[2].depends_on, vec!["api", "ui"]);
         assert!(plan
@@ -764,17 +945,18 @@ mod tests {
     }
     #[test]
     fn independent_overlap_and_cycles_are_rejected() {
-        assert!(parse_plan(r#"[{"key":"a","title":"A","prompt":"A","scopes":["src"]},{"key":"b","title":"B","prompt":"B","scopes":["src/file.ts"]}]"#, &request()).is_err());
-        assert!(parse_plan(r#"[{"key":"a","title":"A","prompt":"A","scopes":["src"],"dependsOn":["b"]},{"key":"b","title":"B","prompt":"B","scopes":["other"],"dependsOn":["a"]}]"#, &request()).is_err());
+        assert!(parse_plan(r#"[{"key":"a","title":"A","prompt":"A","scopes":["src"]},{"key":"b","title":"B","prompt":"B","scopes":["src/file.ts"]}]"#, &request(), 4).is_err());
+        assert!(parse_plan(r#"[{"key":"a","title":"A","prompt":"A","scopes":["src"],"dependsOn":["b"]},{"key":"b","title":"B","prompt":"B","scopes":["other"],"dependsOn":["a"]}]"#, &request(), 4).is_err());
         assert!(parse_plan(
             r#"[{"key":"a","title":"A","prompt":"A","scopes":["../outside"]}]"#,
-            &request()
+            &request(),
+            4
         )
         .is_err());
     }
     #[test]
     fn dependent_shared_ownership_is_sequential() {
-        let plan = parse_plan(r#"[{"key":"a","title":"A","prompt":"A","scopes":["src"]},{"key":"b","title":"B","prompt":"B","scopes":["src/file.ts"],"dependsOn":["a"]}]"#, &request()).unwrap();
+        let plan = parse_plan(r#"[{"key":"a","title":"A","prompt":"A","scopes":["src"]},{"key":"b","title":"B","prompt":"B","scopes":["src/file.ts"],"dependsOn":["a"]}]"#, &request(), 4).unwrap();
         assert_eq!(plan[1].depends_on, vec!["a"]);
     }
 }

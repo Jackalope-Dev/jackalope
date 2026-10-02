@@ -4,6 +4,7 @@ import { isMacPlatform } from '../../lib/platform-shortcuts';
 import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useUpdateStore } from '../../stores/updateStore';
 import { FeedbackDialog } from '../settings/FeedbackDialog';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { Tooltip } from '../ui/Tooltip';
@@ -31,6 +32,9 @@ export function TitleBar({ onSettings }: { onSettings?: () => void }) {
   const feedbackButton = useRef<HTMLButtonElement>(null);
   const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
   const shortcuts = useSettingsStore((state) => state.shortcuts);
+  const beta = useUpdateStore((state) => state.release?.channel === 'beta');
+  // Development builds and the beta channel are labeled; stable keeps the plain title.
+  const edition = import.meta.env.DEV ? ' - dev' : beta ? ' - Beta' : '';
 
   useEffect(() => {
     if (!isTauriEnvironment()) return;
@@ -64,7 +68,7 @@ export function TitleBar({ onSettings }: { onSettings?: () => void }) {
       <div className="app-titlebar-left" data-tauri-drag-region />
       <div className="app-titlebar-label" data-tauri-drag-region>
         <img src="/mascot.svg" alt="" aria-hidden="true" className="size-3.5" />
-        <span>Jackalope</span>
+        <span>Jackalope{edition}</span>
       </div>
       <div className="app-titlebar-controls">
         {onSettings && showThemePicker && <ArcColorPicker variant="titlebar" />}

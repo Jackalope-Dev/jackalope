@@ -57,6 +57,32 @@ pub(super) fn overlaps(a: &[String], b: &[String]) -> bool {
     })
 }
 
+fn covered(paths: &[String], path: &str) -> bool {
+    paths
+        .iter()
+        .any(|p| p == "." || p == path || path.starts_with(&format!("{p}/")))
+}
+
+/// Whether two items own a common path that neither handed to a subtask.
+pub(super) fn item_overlap(ledger: &Ledger, a: &QueueItem, b: &QueueItem) -> bool {
+    let left = agreements::effective_scopes(ledger, a);
+    let right = agreements::effective_scopes(ledger, b);
+    left.iter().any(|x| {
+        right.iter().any(|y| {
+            let deeper = if x == "." {
+                y
+            } else if y == "." || x == y || x.starts_with(&format!("{y}/")) {
+                x
+            } else if y.starts_with(&format!("{x}/")) {
+                y
+            } else {
+                return false;
+            };
+            !covered(&a.excluded_scopes, deeper) && !covered(&b.excluded_scopes, deeper)
+        })
+    })
+}
+
 pub(super) fn scopes(values: Vec<String>) -> Result<Vec<String>, String> {
     if values.is_empty() || values.len() > 30 {
         return Err(
@@ -164,6 +190,11 @@ pub(super) fn ready_items(
                         })
             } else {
                 inner.enabled.contains(&item.project_id)
+                    || item.parent_task_id.as_ref().is_some_and(|parent| {
+                        inner
+                            .enabled
+                            .contains(&super::subtasks::dispatch_key(parent))
+                    })
             }) && !item.canceled
                 && item.run_id.is_none()
                 && item.error.is_none()
@@ -230,13 +261,12 @@ pub(super) fn ready_items(
                     && (super::managed_delivery::is_integration(&inner.ledger, item)
                         || super::managed_delivery::is_integration(&inner.ledger, other)))
                 && !(item.staged_dependencies && predecessors.contains(&other.id))
-                && overlaps(
-                    &agreements::effective_scopes(&inner.ledger, item),
-                    &agreements::effective_scopes(&inner.ledger, other),
-                )
+                && item_overlap(&inner.ledger, item, other)
         });
+        // A spawning task's own run keeps working while its subtasks start.
         let active_overlap = active_runs.iter().any(|run| {
             run.project_id == item.project_id
+                && item.parent_task_id.as_ref() != Some(&run.task_id)
                 && !inner
                     .ledger
                     .items
@@ -246,11 +276,7 @@ pub(super) fn ready_items(
         if pending_overlap
             || active_overlap
             || reserved.iter().any(|other: &&QueueItem| {
-                other.project_id == item.project_id
-                    && overlaps(
-                        &agreements::effective_scopes(&inner.ledger, other),
-                        &agreements::effective_scopes(&inner.ledger, item),
-                    )
+                other.project_id == item.project_id && item_overlap(&inner.ledger, other, item)
             })
         {
             continue;
@@ -329,5 +355,41 @@ mod scheduling_tests {
             ["root", "peer"]
         );
         assert!(!ready.iter().any(|i| i.id == "child"));
+    }
+}
+
+#[cfg(test)]
+mod delegation_tests {
+    use super::*;
+
+    fn item(id: &str, scopes: &[&str], excluded: &[&str]) -> QueueItem {
+        serde_json::from_value(serde_json::json!({"id":id,"projectId":"p","projectName":"p","projectPath":"fixture","title":id,"prompt":id,"agent":"codex","scopes":scopes,"excludedScopes":excluded,"dependencies":[],"createdAt":"now","runId":null,"error":null,"canceled":false})).unwrap()
+    }
+
+    #[test]
+    fn handed_off_paths_no_longer_overlap_their_former_owner() {
+        let ledger = Ledger::default();
+        let parent = item("parent", &["src"], &["src/ui"]);
+        assert!(!item_overlap(
+            &ledger,
+            &parent,
+            &item("child", &["src/ui"], &[])
+        ));
+        assert!(!item_overlap(
+            &ledger,
+            &parent,
+            &item("deeper", &["src/ui/page.ts"], &[])
+        ));
+        assert!(item_overlap(
+            &ledger,
+            &parent,
+            &item("sibling", &["src/api"], &[])
+        ));
+        assert!(item_overlap(&ledger, &parent, &item("whole", &["."], &[])));
+        assert!(item_overlap(
+            &ledger,
+            &item("a", &["src"], &[]),
+            &item("b", &["src/ui"], &[])
+        ));
     }
 }

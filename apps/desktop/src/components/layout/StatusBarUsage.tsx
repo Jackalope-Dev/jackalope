@@ -8,7 +8,7 @@ import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useCapacityStore } from '../../stores/capacityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { isAgentAllowedForProject, useProjectStore } from '../../stores/projectStore';
-import { AgentAvatar } from '../agents/AgentAvatar';
+import { ProviderMark } from '../agents/ProviderMark';
 import { Button } from '../ui/button';
 import { navigateWorkspace } from './navigation';
 import './statusbar-usage.css';
@@ -125,7 +125,7 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
               data-tone={summary.tone ?? 'unknown'}
               title={`${agentName(summary.record.agent)} · ${summary.name ?? 'Account allowance'} · ${summary.label ?? 'Not reported'}`}
             >
-              <AgentAvatar provider={summary.record.agent} size="xs" />
+              <ProviderMark provider={summary.record.agent} size={16} />
               <span className="statusbar-quota-readout">
                 <span>
                   {summary.remaining == null
@@ -173,7 +173,7 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
               aria-label={agentName(record.agent)}
             >
               <header>
-                <AgentAvatar provider={record.agent} size="sm" />
+                <ProviderMark provider={record.agent} size={20} />
                 <div>
                   <h3>{agentName(record.agent)}</h3>
                   <p>{record.account || 'Account unknown'}</p>

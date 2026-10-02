@@ -86,6 +86,48 @@ pub fn close(id: &str) {
     }
 }
 
+/// Read-only grant state for the agent-screen panel.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopView {
+    /// choosing, active, paused, canceled or busy (an operation holds the grant).
+    pub status: String,
+    pub reason: String,
+    pub window: Option<String>,
+    pub app: Option<String>,
+}
+
+/// Never waits behind an in-flight desktop operation and never changes the grant.
+pub fn view(id: &str) -> Option<DesktopView> {
+    let session = sessions().lock().ok()?.get(id).cloned()?;
+    if session.canceled.load(Ordering::SeqCst) {
+        return None;
+    }
+    let busy = |status: &str| DesktopView {
+        status: status.into(),
+        reason: String::new(),
+        window: None,
+        app: None,
+    };
+    let Ok(mut access) = session.access.try_lock() else {
+        return Some(busy("busy"));
+    };
+    let Some(window) = access.window.clone() else {
+        return (!access.prompt_id.is_empty()).then(|| busy("choosing"));
+    };
+    let (status, reason) = match access.indicator.as_mut().map(|indicator| indicator.state()) {
+        Some(Ok(state)) => (state.status, state.reason),
+        Some(Err(error)) => ("canceled".into(), error),
+        None => ("choosing".into(), String::new()),
+    };
+    Some(DesktopView {
+        status,
+        reason,
+        window: Some(window.title),
+        app: Some(window.class),
+    })
+}
+
 fn current(runtime: &TaskRuntime, id: &str) -> Result<TaskRun, String> {
     runtime
         .integration_runs()?

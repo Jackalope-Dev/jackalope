@@ -15,6 +15,8 @@ type Recommendation = McpRecommendation & {
   description: string;
   source: string;
   endpoint?: string;
+  /** Credential headers for services that do not accept a bearer token; values are left blank. */
+  headers?: Record<string, string>;
   command?: string;
   args?: string[];
 };
@@ -131,14 +133,14 @@ const recommendations: Recommendation[] = [
     name: 'Composio',
     publisher: 'Composio',
     group: 'Plan & collaborate',
-    description:
-      'Connect 250+ tools and SaaS apps including Slack, Jira, GitHub, Gmail, and Salesforce.',
+    description: 'Connect 1,000+ SaaS apps including Slack, Jira, GitHub, Gmail, and Salesforce.',
     source: 'https://github.com/ComposioHQ/composio',
-    documentation: 'https://docs.composio.dev/framework/mcp',
-    command: 'npx',
-    args: ['-y', 'composio-core@0.5.39', 'mcp', '--isolated'],
+    documentation: 'https://docs.composio.dev/docs/composio-connect',
+    endpoint: 'https://connect.composio.dev/mcp',
+    headers: { 'x-consumer-api-key': '' },
     authentication: 'token',
-    setup: 'Add your COMPOSIO_API_KEY to access your connected workspace apps and integrations.',
+    setup:
+      'Add your Composio consumer key to the x-consumer-api-key header in Advanced settings. Connect apps in your Composio dashboard.',
     registryId: 'composio-mcp',
   },
   {
@@ -216,7 +218,7 @@ export const recommendedServers: AllMcpsServer[] = recommendations.map((item) =>
   claudeConfigSnippet: {
     mcpServers: {
       [item.id]: item.endpoint
-        ? { url: item.endpoint }
+        ? { url: item.endpoint, ...(item.headers && { headers: item.headers }) }
         : { command: item.command, args: item.args },
     },
   },

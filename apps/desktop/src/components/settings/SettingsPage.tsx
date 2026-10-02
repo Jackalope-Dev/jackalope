@@ -1,4 +1,21 @@
-import { DiscordIcon, Input, SearchField } from '@jackalope/ui';
+import { DiscordIcon, FormField, Input, SearchField } from '@jackalope/ui';
+import {
+  Bot,
+  Database,
+  FolderCog,
+  Gavel,
+  KeyRound,
+  LifeBuoy,
+  type LucideIcon,
+  Monitor,
+  Palette,
+  Plug,
+  Radio,
+  Settings2,
+  Shield,
+  UserRound,
+  Zap,
+} from 'lucide-react';
 
 import { useEffect, useRef, useState } from 'react';
 import { DISCORD_URL } from '../../lib/community';
@@ -7,7 +24,7 @@ import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
 import { ProjectPreferences } from '../projects/ProjectPreferences';
@@ -26,15 +43,17 @@ import { PrivacySettings } from './PrivacySettings';
 import { ReferralSettings } from './ReferralSettings';
 import { ReleaseSupport } from './ReleaseSupport';
 import { RoutingPreferences } from './RoutingSetup';
-import { Setting, SettingGroup } from './Setting';
+import { Setting, SettingActions, SettingBody, SettingGroup } from './Setting';
 import { SystemInfoView } from './SystemInfo';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
 import { useShallow } from 'zustand/react/shallow';
+import { ArtifactsConnection } from './ArtifactsConnection';
 import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
 import { RemoteAccess } from './RemoteAccess';
 import { SavedActions } from './SavedActions';
+import { SwarmConnection } from './SwarmConnection';
 
 interface SettingsPageProps {
   onClose: () => void;
@@ -43,24 +62,49 @@ interface SettingsPageProps {
   initialCategory?: SettingsCategory;
 }
 const categories = [
+  'Project',
   'General',
+  'Appearance',
   'Desktop',
   'Saved actions',
+  'Agents',
+  'Decisions',
+  'Connected work',
   'Jackalope account',
   'Invitations',
-  'Appearance',
-  'Agents',
-  'Connected work',
   'Remote access',
-  'Decisions',
   'Privacy',
-  'Project',
   'Updates & support',
-  'Data & reset',
   'System',
   'Diagnostics',
+  'Data & reset',
 ] as const;
 export type SettingsCategory = (typeof categories)[number];
+/** Sidebar sections; categories keep the order above within each. */
+const navigationGroups: { label: string; categories: SettingsCategory[] }[] = [
+  {
+    label: 'Workspace',
+    categories: ['Project', 'General', 'Appearance', 'Desktop', 'Saved actions'],
+  },
+  { label: 'Agents & tools', categories: ['Agents', 'Decisions', 'Connected work'] },
+  { label: 'Account & access', categories: ['Jackalope account', 'Remote access', 'Privacy'] },
+  { label: 'Help & data', categories: ['Updates & support', 'Data & reset'] },
+];
+const navigationIcons: Partial<Record<SettingsCategory, LucideIcon>> = {
+  Project: FolderCog,
+  General: Settings2,
+  Appearance: Palette,
+  Desktop: Monitor,
+  'Saved actions': Zap,
+  Agents: Bot,
+  Decisions: Gavel,
+  'Connected work': Plug,
+  'Jackalope account': UserRound,
+  'Remote access': Radio,
+  Privacy: Shield,
+  'Updates & support': LifeBuoy,
+  'Data & reset': Database,
+};
 const settingsGroup = (category: SettingsCategory): SettingsCategory =>
   category === 'Invitations'
     ? 'Jackalope account'
@@ -120,14 +164,15 @@ export function SettingsPage({
         Invitations: 'invite referral share link email accepted connected early access',
         Diagnostics: 'activity log routing events errors codebase',
         General:
-          'window close exit system tray background quit minimize guided setup onboarding notifications companion animations quiet',
+          'window close exit system tray background quit minimize launch login startup guided setup onboarding notifications system quiet test',
         Desktop:
           'keyboard shortcuts zoom terminal shell font editor keep awake sleep power WSL links running services previews ports disk worktrees',
         'Saved actions': 'prompt presets commands shortcuts reuse global project',
-        Appearance: 'theme color light dark atmosphere picker toolbar',
+        Appearance: 'theme color light dark atmosphere picker toolbar companion mascot animations',
         Agents:
           'default models available detected allowed restrict cli command executable configuration automatic quota handoff',
-        'Connected work': 'GitHub Linear Jira issues pull requests API token',
+        'Connected work':
+          'GitHub Linear Jira issues pull requests API token Cloudflare Artifacts repository hosted cloud',
         'Remote access': 'hosts phone companion SSH pairing Tailscale device',
         Decisions: 'Jackalope routing Jev TypeSafe API key automatic agent cost tokens capacity',
         Privacy: 'marketplace MCP network telemetry crash reporting',
@@ -237,25 +282,36 @@ export function SettingsPage({
       </div>
       <div className="settings-body">
         <nav className="settings-sidebar" aria-label="Settings categories">
-          {scopedCategories
-            .filter((c) => settingsGroup(c) === c)
-            .map((c) => (
-              <button
-                key={c}
-                type="button"
-                className={`settings-nav-item ${settingsGroup(category) === c && !query ? 'is-active' : ''}`}
-                aria-current={settingsGroup(category) === c && !query ? 'page' : undefined}
-                onClick={() => {
-                  setCategory(c);
-                  setQuery('');
-                  setMessage('');
-                  setConfirming(false);
-                  setConfirmation('');
-                }}
-              >
-                {c}
-              </button>
-            ))}
+          {navigationGroups.map((group) => {
+            const items = group.categories.filter((c) => scopedCategories.includes(c));
+            if (!items.length) return null;
+            return (
+              <div key={group.label} className="settings-nav-group">
+                <span className="settings-nav-label">{group.label}</span>
+                {items.map((c) => {
+                  const Icon = navigationIcons[c] ?? KeyRound;
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      className={`settings-nav-item ${settingsGroup(category) === c && !query ? 'is-active' : ''}`}
+                      aria-current={settingsGroup(category) === c && !query ? 'page' : undefined}
+                      onClick={() => {
+                        setCategory(c);
+                        setQuery('');
+                        setMessage('');
+                        setConfirming(false);
+                        setConfirmation('');
+                      }}
+                    >
+                      <Icon size={16} aria-hidden="true" />
+                      {c}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
           <button
             type="button"
             className="settings-nav-item settings-community-link"
@@ -282,7 +338,13 @@ export function SettingsPage({
               {c === 'Jackalope account' && (
                 <JackalopeAccount onInvitations={() => setCategory('Invitations')} />
               )}
-              {c === 'Connected work' && <IssueConnections />}
+              {c === 'Connected work' && (
+                <>
+                  <IssueConnections />
+                  <ArtifactsConnection />
+                  <SwarmConnection />
+                </>
+              )}
               {c === 'Desktop' && <DesktopPreferences />}
               {c === 'Saved actions' && <SavedActions />}
               {c === 'Remote access' && <RemoteAccess />}
@@ -297,8 +359,13 @@ export function SettingsPage({
               )}
               {c === 'General' && (
                 <>
+                  <WindowBehaviorSettings />
+                  <NotificationSettings />
                   <SettingGroup>
-                    <Setting title="Guided setup">
+                    <Setting
+                      title="Guided setup"
+                      description="Walk through project, agents and appearance setup again. Your saved work stays."
+                    >
                       <Button
                         variant="outline"
                         onClick={() => {
@@ -308,37 +375,6 @@ export function SettingsPage({
                       >
                         Open guided setup
                       </Button>
-                    </Setting>
-                  </SettingGroup>
-                  <WindowBehaviorSettings />
-                  <SettingGroup className="mt-6">
-                    <Setting
-                      title="Companion notifications"
-                      description="All notices remain in the helper."
-                    >
-                      <Select
-                        aria-label="Companion notifications"
-                        value={settings.notifications}
-                        onValueChange={(value) =>
-                          settings.updateSettings({ notifications: value as NotificationLevel })
-                        }
-                      >
-                        <SelectItem value="all">All notifications</SelectItem>
-                        <SelectItem value="failures-only">Needs attention only</SelectItem>
-                        <SelectItem value="none">Quiet</SelectItem>
-                      </Select>
-                    </Setting>
-                  </SettingGroup>
-                  <NotificationSettings />
-                  <SettingGroup className="mt-6">
-                    <Setting title="Companion animations">
-                      <Switch
-                        label="Companion animations"
-                        checked={settings.mascotReactions}
-                        onCheckedChange={(mascotReactions) =>
-                          settings.updateSettings({ mascotReactions })
-                        }
-                      />
                     </Setting>
                   </SettingGroup>
                 </>
@@ -355,7 +391,7 @@ export function SettingsPage({
               {c === 'Privacy' && (
                 <>
                   <PrivacySettings />
-                  <SettingGroup className="mt-6">
+                  <SettingGroup>
                     <Setting
                       title="Use MCP marketplace"
                       description="Allow searches and server details from allmcps.com. Disabling cancels marketplace requests; configured MCP servers remain available."
@@ -366,12 +402,14 @@ export function SettingsPage({
                         onCheckedChange={settings.setUseMcpMarketplace}
                       />
                     </Setting>
+                    <SettingBody>
+                      <p className="settings-row-description">
+                        Publisher avatars load from GitHub. Marketplace searches go to AllMCPs,
+                        which publicly logs requests, with User-Agent Jackalope/0.1.0. Your
+                        connected agents and MCP servers use their own services.
+                      </p>
+                    </SettingBody>
                   </SettingGroup>
-                  <p className="settings-disclosure-box">
-                    Publisher avatars load from GitHub. Marketplace searches go to AllMCPs, which
-                    publicly logs requests, with User-Agent Jackalope/0.1.0. Your connected agents
-                    and MCP servers use their own services.
-                  </p>
                 </>
               )}
               {c === 'Project' && (
@@ -382,50 +420,52 @@ export function SettingsPage({
               {c === 'Updates & support' && <ReleaseSupport />}
               {c === 'Data & reset' && (
                 <>
-                  <Button variant="outline" onClick={() => void exportConfig()}>
-                    Copy preferences to clipboard
-                  </Button>
-                  <ArchivedHistory />
-                  <div className="settings-reset-box mt-6">
-                    <h3 className="text-base font-semibold">Reset Jackalope</h3>
-                    <p className="settings-row-description mt-3">
-                      Erase this profile's projects, task history, drafts, queue, audit log, agent
-                      selections and appearance. Jackalope restarts for first-time setup.
-                      Repositories, worktrees, external agent sign-ins and agent MCP configuration
-                      files are preserved.
-                    </p>
-                    <p className="settings-row-description mt-3">
-                      Stop active tasks and pause queues before resetting. Existing worktrees will
-                      remain on disk and can be managed after reopening the repository.
-                    </p>
-                    {!confirming ? (
-                      <Button
-                        variant="outline"
-                        className="mt-4"
-                        onClick={() => {
-                          setConfirming(true);
-                          setConfirmation('');
-                        }}
-                      >
-                        Reset all local data…
+                  <SettingGroup>
+                    <Setting
+                      title="Preferences"
+                      description="Copy this profile's preferences as JSON, for support or to compare settings."
+                    >
+                      <Button variant="outline" onClick={() => void exportConfig()}>
+                        Copy preferences
                       </Button>
-                    ) : (
-                      <div className="mt-4">
-                        <label
-                          htmlFor="reset-confirmation"
-                          className="block text-sm font-medium mb-2"
+                    </Setting>
+                  </SettingGroup>
+                  <ArchivedHistory />
+                  <SettingGroup
+                    tone="danger"
+                    title="Reset Jackalope"
+                    description="Erase this profile's projects, task history, drafts, queue, audit log, agent selections and appearance. Jackalope restarts for first-time setup. Repositories, worktrees, external agent sign-ins and agent MCP configuration files are preserved."
+                  >
+                    <SettingBody>
+                      <p className="settings-row-description">
+                        Stop active tasks and pause queues before resetting. Existing worktrees will
+                        remain on disk and can be managed after reopening the repository.
+                      </p>
+                      {confirming && (
+                        <FormField label="Type RESET to confirm permanent deletion">
+                          <Input
+                            id="reset-confirmation"
+                            autoComplete="off"
+                            value={confirmation}
+                            disabled={resetting}
+                            onChange={(e) => setConfirmation(e.target.value)}
+                          />
+                        </FormField>
+                      )}
+                    </SettingBody>
+                    <SettingActions>
+                      {!confirming ? (
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setConfirming(true);
+                            setConfirmation('');
+                          }}
                         >
-                          Type RESET to confirm permanent deletion
-                        </label>
-                        <Input
-                          id="reset-confirmation"
-                          autoComplete="off"
-                          className="settings-input w-full"
-                          value={confirmation}
-                          disabled={resetting}
-                          onChange={(e) => setConfirmation(e.target.value)}
-                        />
-                        <div className="flex flex-wrap gap-3 mt-4">
+                          Reset all local data…
+                        </Button>
+                      ) : (
+                        <>
                           <Button
                             disabled={confirmation !== 'RESET' || resetting}
                             onClick={() => void reset()}
@@ -444,10 +484,10 @@ export function SettingsPage({
                           >
                             Cancel
                           </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                        </>
+                      )}
+                    </SettingActions>
+                  </SettingGroup>
                 </>
               )}
             </section>

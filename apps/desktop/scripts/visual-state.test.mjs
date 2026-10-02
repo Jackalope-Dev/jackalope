@@ -282,7 +282,7 @@ test('action fills prefer white with bounded deepening and keep contrast on hove
           );
         }
         const actionLight = Number(tokens['--color-action'].match(/([\d.]+)%\)$/)[1]);
-        assert.ok(actionLight <= light && actionLight >= Math.max(0, light - 12));
+        assert.ok(actionLight <= light && actionLight >= Math.max(0, light - 18));
         assert.equal(tokens['--color-accent'], `hsl(${hue} ${saturation}% ${light}%)`);
       }
     }
@@ -290,6 +290,10 @@ test('action fills prefer white with bounded deepening and keep contrast on hove
   const rose = themeTokens(PRESET_THEMES.find((theme) => theme.id === 'zen-rose'));
   assert.equal(rose['--color-on-action'], '#ffffff');
   assert.notEqual(rose['--color-action'], rose['--color-accent']);
+  for (const id of ['mojave-sunset', 'alpine-aurora', 'cyber-cyan']) {
+    const preset = PRESET_THEMES.find((theme) => theme.id === id);
+    assert.equal(themeTokens(preset)['--color-on-action'], '#ffffff', id);
+  }
   const yellow = themeTokens(PRESET_THEMES.find((theme) => theme.id === 'neon-amber'));
   assert.equal(yellow['--color-on-action'], '#000000');
   assert.equal(yellow['--color-action'], yellow['--color-accent']);

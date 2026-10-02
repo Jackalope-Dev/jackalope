@@ -101,10 +101,7 @@ export function SessionTopics({ session }: { session: LiveSession }) {
         </Dialog.Trigger>
         <DialogContent className="work-topics-dialog">
           <DialogCloseButton />
-          <DialogHeader
-            title="Topics"
-            description="Group messages into separate task drafts. The original conversation stays intact."
-          />
+          <DialogHeader title="Topics" description="Group messages into separate task drafts." />
           <div className="work-topics-actions">
             <Button
               variant="outline"
@@ -130,7 +127,6 @@ export function SessionTopics({ session }: { session: LiveSession }) {
             >
               New topic
             </Button>
-            <p className="task-muted">Suggestions use message headings and opening lines.</p>
           </div>
           {error && <InlineNotice tone="error">{error}</InlineNotice>}
           <div className="work-topics-layout">

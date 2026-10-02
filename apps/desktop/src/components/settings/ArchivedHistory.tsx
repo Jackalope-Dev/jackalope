@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { type ArchivedRun, nativeTask, statusLabel } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
+import { Setting, SettingActions, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 
@@ -82,10 +83,11 @@ export function ArchivedHistory() {
   };
 
   return (
-    <section className="mt-8" aria-label="Archived task history">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h3 className="text-base font-semibold">Archived task history</h3>
-        <div className="flex gap-2">
+    <SettingGroup
+      aria-label="Archived task history"
+      title="Archived task history"
+      action={
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             disabled={!desktop || importing}
@@ -107,63 +109,52 @@ export function ArchivedHistory() {
             Refresh
           </Button>
         </div>
-      </div>
-      <p className="settings-row-description mt-3">
-        Older reviewed tasks stay searchable and can be restored.
-      </p>
-      {error && (
-        <InlineNotice tone="error" className="mt-4">
-          {error}
-        </InlineNotice>
-      )}
-      {notice && (
-        <p role="status" className="task-muted mt-4">
-          {notice}
-        </p>
-      )}
-      {!error && !loading && runs.length === 0 && (
-        <p className="task-muted mt-4 flex items-center gap-2">
-          <Archive size={18} />
-          {desktop
-            ? 'No archived task history yet.'
-            : 'Open the desktop app to manage archived task history.'}
-        </p>
-      )}
-      {runs.length > 0 && (
-        <>
-          <ul className="mt-4 divide-y divide-[var(--color-border)]">
-            {runs.slice(0, shown).map((run) => (
-              <li key={run.id} className="py-3 flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{run.prompt || 'Untitled task'}</p>
-                  <p className="task-muted text-xs mt-1">
-                    {run.projectName} · {run.agent} · {statusLabel[run.status] ?? run.status} ·{' '}
-                    {new Date(run.endedAt ?? run.startedAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  disabled={!!busyId}
-                  onClick={() => void restore(run)}
-                  loading={busyId === run.id}
-                  loadingLabel="Restoring…"
-                >
-                  Restore
-                </Button>
-              </li>
-            ))}
-          </ul>
-          {shown < runs.length && (
-            <Button
-              variant="ghost"
-              className="mt-3"
-              onClick={() => setShown((count) => count + PAGE)}
-            >
-              Show more ({runs.length - shown} older)
-            </Button>
+      }
+    >
+      {(error || notice || (!loading && runs.length === 0)) && (
+        <SettingBody>
+          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          {notice && (
+            <p role="status" className="task-muted">
+              {notice}
+            </p>
           )}
-        </>
+          {!error && !loading && runs.length === 0 && (
+            <p className="task-muted flex items-center gap-2">
+              <Archive size={18} />
+              {desktop
+                ? 'No archived task history yet.'
+                : 'Open the desktop app to manage archived task history.'}
+            </p>
+          )}
+        </SettingBody>
       )}
-    </section>
+      {runs.slice(0, shown).map((run) => (
+        <Setting
+          key={run.id}
+          title={<span className="block truncate">{run.prompt || 'Untitled task'}</span>}
+          description={`${run.projectName} · ${run.agent} · ${statusLabel[run.status] ?? run.status} · ${new Date(
+            run.endedAt ?? run.startedAt,
+          ).toLocaleDateString()}`}
+        >
+          <Button
+            variant="outline"
+            disabled={!!busyId}
+            onClick={() => void restore(run)}
+            loading={busyId === run.id}
+            loadingLabel="Restoring…"
+          >
+            Restore
+          </Button>
+        </Setting>
+      ))}
+      {shown < runs.length && (
+        <SettingActions>
+          <Button variant="ghost" onClick={() => setShown((count) => count + PAGE)}>
+            Show more ({runs.length - shown} older)
+          </Button>
+        </SettingActions>
+      )}
+    </SettingGroup>
   );
 }

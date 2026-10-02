@@ -4,7 +4,9 @@ import { Fragment, type ReactNode, useEffect, useRef, useState } from 'react';
 import { type ReleaseNotes, shouldShowReleaseNotes } from '../../lib/release-notes';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useOnboardingStore } from '../../stores/onboardingStore';
+import { useUpdateStore } from '../../stores/updateStore';
 import { FeedbackDialog } from '../settings/FeedbackDialog';
+import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
 
@@ -52,6 +54,8 @@ export function WhatsNewDialog() {
   const [notes, setNotes] = useState<ReleaseNotes | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const done = useRef<HTMLButtonElement>(null);
+  const beta = useUpdateStore((state) => state.release?.channel === 'beta');
+  const loadRelease = useUpdateStore((state) => state.load);
 
   useEffect(() => {
     if (!isTauriEnvironment()) return;
@@ -66,14 +70,17 @@ export function WhatsNewDialog() {
       const { loadReleaseNotes } = await import('../../lib/release-notes-loader');
       const loaded = await loadReleaseNotes(version);
       markSeen(version);
-      if (alive && loaded) setNotes(loaded);
+      if (alive && loaded) {
+        await loadRelease().catch(() => {});
+        if (alive) setNotes(loaded);
+      }
     })().catch(() => {
       // Notes are a courtesy; a missing file or version must not interrupt work.
     });
     return () => {
       alive = false;
     };
-  }, []);
+  }, [loadRelease]);
 
   return (
     <>
@@ -88,8 +95,17 @@ export function WhatsNewDialog() {
           >
             <DialogCloseButton label="Close what's new" />
             <DialogHeader
-              title={`What's new in Jackalope ${notes.version}`}
-              description="Here's what changed since your last update."
+              title={
+                <span className="flex items-center gap-2">
+                  What's new in Jackalope {notes.version}
+                  {beta && <Badge variant="accent">Beta</Badge>}
+                </span>
+              }
+              description={
+                beta
+                  ? "Here's what changed since your last update. Beta builds include early changes that may be less stable."
+                  : "Here's what changed since your last update."
+              }
             />
             <div className="whats-new-body">
               {notes.sections.map((section) => (

@@ -1,0 +1,198 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { createPersistStorage } from '../lib/persist-storage.ts';
+
+/**
+ * A saved, long-lived agent: a name and standing instructions plus the agent,
+ * model, project and connections its conversations start with. Conversations
+ * carry the persona natively, so they keep the bot's role after edits here.
+ */
+export interface Bot {
+  id: string;
+  name: string;
+  /** Short line shown in the roster. */
+  role: string;
+  instructions: string;
+  /** 'auto' lets Jackalope route each conversation. */
+  agent: string;
+  model: { id: string; name: string } | null;
+  projectId: string;
+  /** null delivers every enabled connection; a list limits new conversations to those IDs. */
+  connectionIds: string[] | null;
+  /** Native schedule IDs created as this bot's routines. */
+  routineIds: string[];
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+  /** Chosen look; bots saved before this existed draw their agent's character in the text colour. */
+  appearance?: BotAppearance;
+}
+
+/** Character silhouettes a bot can wear, shared with the agent characters. */
+export const BOT_STYLES = [
+  { id: 'codex', name: 'Antlers' },
+  { id: 'claude', name: 'Starburst' },
+  { id: 'grok', name: 'Orbit' },
+  { id: 'antigravity', name: 'Peak' },
+  { id: 'opencode', name: 'Octagon' },
+  { id: 'moon', name: 'Moon' },
+  { id: 'blob', name: 'Blob' },
+  { id: 'heart', name: 'Heart' },
+  { id: 'cloud', name: 'Cloud' },
+  { id: 'ghost', name: 'Ghost' },
+  { id: 'cat', name: 'Cat' },
+  { id: 'gem', name: 'Gem' },
+  { id: 'shield', name: 'Shield' },
+  { id: 'sprout', name: 'Sprout' },
+] as const;
+
+/** Saturated mid-tones that keep the character's surface-coloured eyes visible in both themes. */
+export const BOT_COLORS = [
+  { id: 'ink', name: 'Ink', value: 'var(--color-text-primary)' },
+  { id: 'accent', name: 'Theme', value: 'var(--color-accent)' },
+  { id: 'coral', name: 'Coral', value: '#f2665c' },
+  { id: 'amber', name: 'Amber', value: '#e9a23b' },
+  { id: 'green', name: 'Green', value: '#2fb37f' },
+  { id: 'teal', name: 'Teal', value: '#1fa7bd' },
+  { id: 'blue', name: 'Blue', value: '#4c86f0' },
+  { id: 'violet', name: 'Violet', value: '#8b6cf6' },
+  { id: 'pink', name: 'Pink', value: '#e05297' },
+] as const;
+
+export interface BotAppearance {
+  style: (typeof BOT_STYLES)[number]['id'];
+  color: (typeof BOT_COLORS)[number]['id'];
+}
+
+export type BotDraft = Omit<Bot, 'id' | 'routineIds' | 'pinned' | 'createdAt' | 'updatedAt'>;
+
+export const BOT_NAME_MAX = 60;
+export const BOT_INSTRUCTIONS_MAX = 6000;
+
+export function validateBot(draft: BotDraft) {
+  const name = draft.name.trim();
+  if (!name) return 'Give the bot a name.';
+  if ([...name].length > BOT_NAME_MAX) return `Keep the name under ${BOT_NAME_MAX} characters.`;
+  if (!draft.projectId) return 'Choose the project this bot works in.';
+  if ([...draft.instructions.trim()].length > BOT_INSTRUCTIONS_MAX)
+    return `Shorten the instructions to under ${BOT_INSTRUCTIONS_MAX.toLocaleString()} characters.`;
+  return '';
+}
+
+interface BotState {
+  bots: Bot[];
+  selectedId: string | null;
+  select: (id: string | null) => void;
+  create: (draft: BotDraft) => string;
+  update: (id: string, patch: Partial<BotDraft>) => void;
+  duplicate: (id: string) => string | null;
+  remove: (id: string) => void;
+  togglePin: (id: string) => void;
+  addRoutine: (id: string, scheduleId: string) => void;
+  forgetRoutine: (scheduleId: string) => void;
+}
+
+export const useBotStore = create<BotState>()(
+  persist(
+    (set, get) => ({
+      bots: [],
+      selectedId: null,
+      select: (selectedId) => set({ selectedId }),
+      create: (draft) => {
+        const error = validateBot(draft);
+        if (error) throw new Error(error);
+        const now = new Date().toISOString();
+        const bot: Bot = {
+          ...draft,
+          name: draft.name.trim(),
+          role: draft.role.trim(),
+          instructions: draft.instructions.trim(),
+          id: crypto.randomUUID(),
+          routineIds: [],
+          pinned: false,
+          createdAt: now,
+          updatedAt: now,
+        };
+        set((state) => ({ bots: [...state.bots, bot], selectedId: bot.id }));
+        return bot.id;
+      },
+      update: (id, patch) => {
+        const current = get().bots.find((bot) => bot.id === id);
+        if (!current) throw new Error('This bot no longer exists.');
+        const next = { ...current, ...patch };
+        const error = validateBot(next);
+        if (error) throw new Error(error);
+        set((state) => ({
+          bots: state.bots.map((bot) =>
+            bot.id === id
+              ? {
+                  ...next,
+                  name: next.name.trim(),
+                  role: next.role.trim(),
+                  instructions: next.instructions.trim(),
+                  updatedAt: new Date().toISOString(),
+                }
+              : bot,
+          ),
+        }));
+      },
+      duplicate: (id) => {
+        const source = get().bots.find((bot) => bot.id === id);
+        if (!source) return null;
+        const suffix = ' copy';
+        return get().create({
+          name: `${source.name.slice(0, BOT_NAME_MAX - suffix.length)}${suffix}`,
+          role: source.role,
+          instructions: source.instructions,
+          agent: source.agent,
+          model: source.model,
+          projectId: source.projectId,
+          connectionIds: source.connectionIds,
+        });
+      },
+      remove: (id) =>
+        set((state) => ({
+          bots: state.bots.filter((bot) => bot.id !== id),
+          selectedId: state.selectedId === id ? null : state.selectedId,
+        })),
+      togglePin: (id) =>
+        set((state) => ({
+          bots: state.bots.map((bot) => (bot.id === id ? { ...bot, pinned: !bot.pinned } : bot)),
+        })),
+      addRoutine: (id, scheduleId) =>
+        set((state) => ({
+          bots: state.bots.map((bot) =>
+            bot.id === id ? { ...bot, routineIds: [...bot.routineIds, scheduleId] } : bot,
+          ),
+        })),
+      forgetRoutine: (scheduleId) =>
+        set((state) => ({
+          bots: state.bots.map((bot) => ({
+            ...bot,
+            routineIds: bot.routineIds.filter((item) => item !== scheduleId),
+          })),
+        })),
+    }),
+    {
+      name: 'jackalope-bots-v1',
+      version: 1,
+      storage: createPersistStorage(),
+      partialize: (state) => ({ bots: state.bots, selectedId: state.selectedId }),
+    },
+  ),
+);
+
+/** Pinned bots first, then most recently changed. */
+export function rosterOrder(bots: Bot[]) {
+  return [...bots].sort(
+    (a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt),
+  );
+}
+
+/** The standing instructions a routine's scheduled task receives. */
+export function routinePrompt(bot: Pick<Bot, 'name' | 'instructions'>, task: string) {
+  const standing = bot.instructions.trim()
+    ? `Standing instructions:\n${bot.instructions.trim()}\n\n`
+    : '';
+  return `You are ${bot.name}, a saved Jackalope bot running a scheduled routine.\n${standing}Routine:\n${task.trim()}`;
+}

@@ -61,7 +61,10 @@ pub mod previews;
 pub mod readiness;
 pub mod schedules;
 
+pub mod agent_screen;
 pub mod browser;
+pub mod cloudflare_artifacts;
+pub mod composio;
 pub mod delivery;
 pub mod desktop_control;
 pub mod github_workflows;

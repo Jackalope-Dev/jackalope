@@ -200,8 +200,13 @@
   text-decoration: underline;
 }
 .commit-diff {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
   min-width: 0;
   max-width: 100%;
+  /* Grows to the sidebar's height, with room to read a diff when the sidebar is short. */
+  min-height: min(70vh, 720px);
   overflow: hidden;
 }
 .commit-diff > :not(header) {

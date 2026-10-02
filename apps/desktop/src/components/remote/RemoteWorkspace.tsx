@@ -171,8 +171,8 @@ export function RemoteWorkspace({
   const submit = async () => {
     if (inFlight.current || !draft.trim()) return;
     const text = draft.trim();
-    if (new TextEncoder().encode(text).length > 12000) {
-      setError('Shorten this message to 12,000 bytes. Your draft is saved.');
+    if ([...text].length > 12000) {
+      setError('Shorten this message to 12,000 characters. Your draft is saved.');
       return;
     }
     let action: RemoteAction = composing

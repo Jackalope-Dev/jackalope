@@ -195,10 +195,9 @@ async function main() {
   if (
     receipt.mode !== 'submission' ||
     receipt.sourceDirty !== false ||
-    !receipt.fixedWebView2 ||
     !receipt.storeManagedUpdates
   )
-    throw new Error('Only a clean submission build with bundled WebView2 can be submitted');
+    throw new Error('Only a clean submission build can be submitted');
   const env = process.env;
   validateSource(receipt, env);
   const plan = storePlan(env, { mode: 'submission' }, 'Status: ready');

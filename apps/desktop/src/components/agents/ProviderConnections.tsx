@@ -199,8 +199,7 @@ function ConnectProvider({ provider, onClose }: { provider: ApiProvider; onClose
                   </label>
                   {!useForTasks && (
                     <p className="task-muted text-sm">
-                      The account will be available in task settings. Existing defaults stay
-                      selected.
+                      The account will be available in task settings.
                     </p>
                   )}
                 </>

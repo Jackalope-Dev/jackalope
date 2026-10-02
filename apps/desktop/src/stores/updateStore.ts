@@ -55,7 +55,7 @@ export function availableUpdateId(release: ReleaseStatus | null): string | null 
     : (release?.availableVersion ?? null);
 }
 
-export const UPDATE_INTERVAL = 6 * 60 * 60 * 1000;
+export const UPDATE_INTERVAL = 60 * 60 * 1000;
 interface PreferenceStorage {
   getItem: (key: string) => string | null;
   setItem: (key: string, value: string) => void;

@@ -47,8 +47,6 @@ jobs:
       STORE_IDENTITY_NAME: ${{ vars.STORE_IDENTITY_NAME }}
       STORE_PUBLISHER: ${{ vars.STORE_PUBLISHER }}
       STORE_PUBLISHER_DISPLAY_NAME: ${{ vars.STORE_PUBLISHER_DISPLAY_NAME }}
-      STORE_WEBVIEW2_URL: ${{ vars.STORE_WEBVIEW2_URL }}
-      STORE_WEBVIEW2_SHA256: ${{ vars.STORE_WEBVIEW2_SHA256 }}
       RELEASE_MODE: ${{ needs.plan.outputs.mode == 'rehearsal' && 'rehearsal' || 'submission' }}
       RELEASE_CHANNEL: ${{ needs.plan.outputs.channel }}
     steps:
@@ -75,9 +73,6 @@ jobs:
             store-${{ github.ref_name }}-windows-rust-1.98.1-
       - run: pnpm verify
       - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features --features store
-      - if: env.RELEASE_MODE == 'submission'
-        shell: pwsh
-        run: ./scripts/release/store-runtime.ps1
       - id: package
         shell: pwsh
         run: ./scripts/release/store.ps1 -Mode $env:RELEASE_MODE -Channel $env:RELEASE_CHANNEL

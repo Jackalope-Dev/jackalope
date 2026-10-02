@@ -595,6 +595,18 @@ summary {
 .feedback-report label {
   max-width: 220px;
 }
+.beta-copy,
+.beta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.beta-copy {
+  margin-bottom: 8px;
+}
+.beta-actions {
+  margin-top: 16px;
+}
 .insight-grid .facts {
   grid-template-columns: 1fr auto;
 }

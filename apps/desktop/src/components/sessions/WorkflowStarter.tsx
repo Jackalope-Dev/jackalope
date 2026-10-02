@@ -92,10 +92,7 @@ export function WorkflowStarter({
               }}
             />
           </label>
-          <p className="task-muted">
-            GitHub items are read from this project's repository. Review the prepared request before
-            sending it.
-          </p>
+          <p className="task-muted">GitHub items are read from this project's repository.</p>
           <Button
             type="button"
             variant="outline"

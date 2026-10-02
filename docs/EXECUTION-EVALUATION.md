@@ -74,7 +74,19 @@ To execute installed Codex trials in new disposable repositories/profiles:
 pnpm evaluate:execution -- --execute '--case=small-fix,layered-feature' --repeat=3 --seconds=300 --tokens=1000000
 ```
 
-Modes are `single`, `serial` and `staged`; select a subset with `'--modes=single,staged'`.
+Modes are `single`, `serial`, `staged` and `auto`; select a subset with `'--modes=single,staged'`.
+`auto` ignores the case's fixed task list and sends the goal through assessment,
+planning and automatic subtasks, so `'--modes=single,auto'` compares one agent with
+automatic splitting. Its receipts include assessment and planning usage, the number of
+planned assignments and spawned subtasks; the split can differ between repetitions.
+
+`installed_agents_share_live_work_and_split_off_subtasks` is an ignored native trial
+for peers, peer_adopt and propose_subtask with two installed agents. Set
+`JACKALOPE_SWARM_TRIAL_REPO` to a disposable repository, `JACKALOPE_SWARM_TRIAL_PROFILE`
+to a new profile path and optionally `JACKALOPE_SWARM_TRIAL_AGENTS` (default
+`claude,codex`) and `JACKALOPE_SWARM_TRIAL_TIMEOUT_SECONDS`. Its `result.json` reports
+file, adoption, subtask and tool-use oracles; it is acceptance evidence, not a measured
+improvement.
 The driver builds once and runs a private executable copy for consistent comparisons
 and to avoid locking the shared Windows test binary. It rotates mode order across repetitions. Each trial retains native journals,
 stage timings, usage, its independent behavioral oracle, limits and failures.

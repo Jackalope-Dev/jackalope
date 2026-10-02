@@ -4,6 +4,7 @@ import { useExecutionStore } from '../stores/executionStore';
 import { useMcpStore } from '../stores/mcpStore';
 import { type Project, useProjectStore } from '../stores/projectStore';
 import { prepareCodebase } from './codebase';
+import { projectGitState } from './project-setup';
 import { nativeTask } from './task-runtime';
 import { isTauriEnvironment } from './tauri-bridge';
 
@@ -81,14 +82,13 @@ export function prepareWorkspace(
     const key = `${project.id}:${project.path}`;
     jobs.push(
       job(`project:${key}`, 'Checking the project folder', async () => {
-        const info = await nativeTask<{ branch: string }>('task_validate_project', {
-          path: project.path,
-        });
+        const info = await nativeTask<{ branch: string; repository: boolean }>(
+          'task_validate_project',
+          { path: project.path },
+        );
         const current = useProjectStore.getState().projects.find((item) => item.id === project.id);
         if (current?.path === project.path)
-          useProjectStore
-            .getState()
-            .updateProject(project.id, { gitBranch: info.branch || 'Detached HEAD' });
+          useProjectStore.getState().updateProject(project.id, projectGitState(info));
       }),
       job(`context:${key}:${provisional}`, 'Reading repository instructions and context', () =>
         useContextMemoryStore

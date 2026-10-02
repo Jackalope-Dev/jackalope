@@ -60,6 +60,8 @@ fn entry(key: &str, dependencies: &[&str]) -> PlanEntry {
 #[test]
 fn queue_dispatched_tasks_also_learn_about_the_harness_bridge() {
     let item = QueueItem {
+        excluded_scopes: vec![],
+        parent_task_id: None,
         staged_dependencies: false,
         feature: None,
         feature_id: None,

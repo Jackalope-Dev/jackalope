@@ -297,7 +297,7 @@ export function RepoTodos({
                     <EmptyState
                       icon={ListTodo}
                       title="Make room for what’s next"
-                      description="Capture a first idea, a small fix, or a longer-term plan. Your list lives alongside your code."
+                      description="Capture a first idea, a small fix, or a longer-term plan."
                       action={
                         !error && (
                           <Button

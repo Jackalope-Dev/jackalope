@@ -53,8 +53,7 @@ export function AgentModels({
         <h3 className="text-base font-medium">{models[0]?.name}</h3>
         <p className="task-muted">{catalog.detail}</p>
         <p className="task-muted text-xs">
-          This account has its own model. Other OpenCode accounts keep their saved model
-          preferences. Use local setup to check and connect another local model.
+          This account has its own model. Use local setup to check and connect another local model.
         </p>
         {restricted && !detectedSelected.length && (
           <InlineNotice tone="error">
@@ -233,7 +232,6 @@ export function AgentModels({
           {visibleModels.some((model) => model.metadata) && (
             <p className="task-muted text-xs">
               Limits and prices come from OpenCode’s model catalog and account configuration.
-              Catalog freshness, model access and task quality require separate checks.
             </p>
           )}
           {!query && models.length > 12 && (

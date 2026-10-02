@@ -12,6 +12,7 @@ Saved history and running tasks remain accessible when access expires.
 | `apps/desktop/src-tauri` | Execution, persistence, process ownership, Git safeguards and native packaging |
 | `apps/website` | Marketing, browser account flows, static discovery output and website verification |
 | `apps/server` | Account/access services, optional ingestion and database migrations |
+| `apps/swarm` | Bring-your-own Worker that forks Artifacts repositories per agent attempt and reports cross-fork conflicts |
 | `packages/ui` | Browser-safe React controls shared by desktop, website and admin |
 | `packages/brand` | Shared theme, tokens, typography and character geometry |
 | `packages/knowledge` | Shared public guides, Markdown serialization and generated native help catalog |
@@ -80,6 +81,7 @@ names; changes must preserve both sides and old saved records.
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |
 | issues.rs, github_workflows.rs | Read-only issue intake and protected Linear/Jira connections |
+| cloudflare_artifacts.rs | Protected Cloudflare Artifacts connection, repository creation, host-scoped token pushes and review snapshots |
 | remote.rs, remote/ | Project-scoped pairing API, protected host connections, SSH forwarding and companion assets |
 | verification.rs, artifacts.rs, release.rs | Saved checks, artifacts, diagnostics and signed updater |
 

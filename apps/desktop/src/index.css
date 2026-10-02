@@ -13,6 +13,7 @@
 
 @theme {
   --font-sans: "Plus Jakarta Sans Variable", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque Variable", var(--font-sans);
   --font-mono: "JetBrains Mono Variable", "Cascadia Code", Consolas, monospace;
   --text-xs: 0.75rem;
   --text-xs--line-height: 1.5;
@@ -84,6 +85,11 @@
 .text-muted,
 .task-muted {
   color: var(--color-text-secondary);
+}
+
+/* Headings use the display face; body copy and controls keep the sans face. */
+:where(h1, h2, h3) {
+  font-family: var(--font-display);
 }
 
 body {
@@ -548,6 +554,96 @@ img[src="/mascot.svg"] {
 .starter-chip:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
+}
+
+/* A quiet link to more of something; see NoticeRow. */
+.notice-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.notice-row-label {
+  flex: 1;
+  min-width: 0;
+}
+.notice-row:hover {
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+.notice-row:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -1px;
+}
+
+/* Every Jackalope message: above the mascot, tail pointing at it. See MascotSpeech. */
+.mascot-speech {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 48px));
+  padding: 8px 8px 8px 14px;
+  border-radius: 14px;
+  background: var(--color-text-primary);
+  color: var(--color-surface-elevated);
+  box-shadow: var(--shadow-pop);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.mascot-speech[data-side="left"] {
+  right: 50%;
+  border-bottom-right-radius: 4px;
+}
+.mascot-speech[data-side="right"] {
+  left: 50%;
+  border-bottom-left-radius: 4px;
+}
+.mascot-speech::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  background: inherit;
+  rotate: 45deg;
+}
+.mascot-speech[data-side="left"]::after {
+  right: 8px;
+}
+.mascot-speech[data-side="right"]::after {
+  left: 8px;
+}
+.mascot-speech-text {
+  padding-top: 4px;
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mascot-speech[data-motion="true"] {
+    animation: mascot-speech-arrive 400ms ease-out;
+  }
+}
+@keyframes mascot-speech-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Sized for pointer use but kept visually light against the bubble. */

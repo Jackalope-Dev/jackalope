@@ -1,4 +1,3 @@
-import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { Badge, Panel, RefreshIcon } from '@jackalope/ui';
 import { Zap } from 'lucide-react';
 
@@ -13,6 +12,7 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './capacity-panel.css';
+import { ProviderMark } from '../agents/ProviderMark';
 
 const agentName = (agent: string) =>
   agent === 'jev' ? 'TypeSafe Jev' : (getAgentMetadata(agent)?.name ?? agent);
@@ -157,7 +157,7 @@ export function CapacityPanel() {
                     {record.agent === 'jev' ? (
                       <Zap size={24} />
                     ) : (
-                      <AgentCharacter provider={record.agent} />
+                      <ProviderMark provider={record.agent} size={24} />
                     )}
                   </span>
                   <div className="capacity-card-identity">

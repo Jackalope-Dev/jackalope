@@ -9,7 +9,7 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { Textarea } from '../ui/Textarea';
-import { Setting } from './Setting';
+import { Setting, SettingBody, SettingGroup } from './Setting';
 
 type Counts = { attempts: number; reviewed: number; failed: number; historySaveFailures: number };
 type Report = {
@@ -83,15 +83,9 @@ export function FeedbackForm({
       'Submitted. Your report is in the private inbox; an email notification will also be queued for the maintainer.',
     );
   };
-  return (
-    <section className="space-y-3" aria-label="Send feedback">
-      {showHeading && (
-        <h3 className="text-base font-medium">
-          {invited
-            ? 'What’s useful, and what could feel better?'
-            : 'Send a bug, feature request, or idea'}
-        </h3>
-      )}
+  const content = (
+    <>
+      {' '}
       <p className="settings-row-description">
         Your message goes to Jackalope’s private dashboard and contact@jackalope.dev. App version,
         installed channel, and operating system are included. Leave out secrets and personal
@@ -185,6 +179,22 @@ export function FeedbackForm({
         </>
       )}
       {status && <InlineNotice role="status">{status}</InlineNotice>}
+    </>
+  );
+  return showHeading ? (
+    <SettingGroup
+      aria-label="Send feedback"
+      title={
+        invited
+          ? 'What’s useful, and what could feel better?'
+          : 'Send a bug, feature request, or idea'
+      }
+    >
+      <SettingBody>{content}</SettingBody>
+    </SettingGroup>
+  ) : (
+    <section className="space-y-3" aria-label="Send feedback">
+      {content}
     </section>
   );
 }

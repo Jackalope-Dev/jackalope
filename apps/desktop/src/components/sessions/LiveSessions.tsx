@@ -47,7 +47,7 @@ export function LiveSessions({
     (item) => item.id === selectedId && (!project || item.request.projectId === project.id),
   );
   const items = sessions
-    .filter((item) => !project || item.request.projectId === project.id)
+    .filter((item) => !item.persona && (!project || item.request.projectId === project.id))
     .map((item) => {
       const work = sessionWork(item, runs);
       const group = item.closed

@@ -19,7 +19,16 @@ const highlighterOptions = {
   preferredHighlighter: 'shiki-js' as const,
 };
 
-export default function RichDiff({ patch, file }: { patch: string; file?: string }) {
+/** `fill` sizes the diff to its container instead of to its content. */
+export default function RichDiff({
+  patch,
+  file,
+  fill = false,
+}: {
+  patch: string;
+  file?: string;
+  fill?: boolean;
+}) {
   const scheme = useColorScheme();
   const feedback = useReviewFeedback();
   const [split, setSplit] = useState(false);
@@ -76,7 +85,7 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
   const files = unmatched ? parsed : selected;
   return (
     <WorkerPoolContextProvider poolOptions={poolOptions} highlighterOptions={highlighterOptions}>
-      <div className="rich-diff">
+      <div className="rich-diff" data-fill={fill || undefined}>
         <fieldset className="rich-content-toolbar" aria-label="Diff display">
           <Button variant="outline" aria-pressed={split} onClick={() => setSplit(!split)}>
             {split ? 'Split view' : 'Unified view'}
@@ -114,19 +123,25 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
           >
             <Virtualizer
               className="rich-diff-scroll"
-              style={{
-                height: `min(60vh, ${Math.min(
-                  640,
-                  Math.max(
-                    120,
-                    files.reduce(
-                      (height, entry) =>
-                        height + (split ? entry.splitLineCount : entry.unifiedLineCount) * 20 + 56,
-                      0,
-                    ),
-                  ),
-                )}px)`,
-              }}
+              style={
+                fill
+                  ? undefined
+                  : {
+                      height: `min(60vh, ${Math.min(
+                        640,
+                        Math.max(
+                          120,
+                          files.reduce(
+                            (height, entry) =>
+                              height +
+                              (split ? entry.splitLineCount : entry.unifiedLineCount) * 20 +
+                              56,
+                            0,
+                          ),
+                        ),
+                      )}px)`,
+                    }
+              }
             >
               {files.map((entry) => (
                 <FileDiff

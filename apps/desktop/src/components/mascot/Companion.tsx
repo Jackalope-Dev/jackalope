@@ -19,6 +19,7 @@ import { AskJackalope } from './AskJackalope';
 import { CompanionSettings } from './CompanionSettings';
 import { openCompanionTask } from './CompanionSources';
 import { JackalopeMascot } from './JackalopeMascot';
+import { MascotSpeech } from './MascotSpeech';
 import { returnToCompanion } from './useCompanionNotices';
 import './companion.css';
 
@@ -130,23 +131,19 @@ export function Companion({
               hint &&
               !readIds.includes(hint.id) &&
               shouldNotify(hint.kind, level) && (
-                <div key={hint.id} className="companion-hint" data-motion={reactions} role="status">
-                  <span>{hint.title}</span>
-                  <button
-                    type="button"
-                    className="mascot-bubble-close"
-                    aria-label="Dismiss notification preview"
-                    onClick={() => setHint(null)}
-                  >
-                    <X size={14} aria-hidden="true" />
-                  </button>
-                </div>
+                <MascotSpeech
+                  key={hint.id}
+                  motion={reactions}
+                  dismissLabel="Dismiss notification preview"
+                  onDismiss={() => setHint(null)}
+                >
+                  {hint.title}
+                </MascotSpeech>
               )}
             <JackalopeMascot
               size="sm"
               className="companion-avatar"
               showBubble={!open}
-              bubbleAlign="end"
               overrideMood={currentMood}
               reduceMotion={!reactions}
               onActivate={() => setOpen((value) => !value)}

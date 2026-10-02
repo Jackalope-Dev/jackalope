@@ -48,9 +48,11 @@ import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
+import { AgentScreen } from './AgentScreen';
 import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview, type ReviewSection } from './ResultReview';
 import { ScreenshotPreview } from './ScreenshotPreview';
+import { SplitTaskButton } from './SplitTaskButton';
 import { TaskActivity } from './TaskActivity';
 import { TaskComparison } from './TaskComparison';
 import { TaskDelivery } from './TaskDelivery';
@@ -165,7 +167,7 @@ export function TaskDetail({
   const applied = useCallback(() => setIntegrated(true), []);
   const key = `reply:${run.taskId}`;
   const split = useWorkViewStore((state) => state.split[run.taskId] ?? preset === 'build');
-  const alongside = split && ['changes', 'preview', 'terminal', 'activity'].includes(tab);
+  const alongside = split && ['changes', 'preview', 'terminal', 'activity', 'screen'].includes(tab);
   const reply = drafts[key]?.prompt ?? '';
   const active = isActive(run);
   const previewRunning = useManagedPreview(run.id, !active && !integrated);
@@ -573,6 +575,10 @@ export function TaskDetail({
                   {!!pending.length && (
                     <Button onClick={() => inspect('question')}>Answer question</Button>
                   )}
+                  <SplitTaskButton
+                    run={run}
+                    onResult={(message, failed) => (failed ? setError : setNotice)(message)}
+                  />
                   <Button
                     variant="outline"
                     disabled={acting || run.status === 'stopping'}
@@ -640,6 +646,7 @@ export function TaskDetail({
               { value: 'changes', label: 'Review' },
               { value: 'preview', label: 'Preview' },
               { value: 'terminal', label: 'Terminal' },
+              { value: 'screen', label: 'Screen' },
               { value: 'activity', label: 'Activity' },
             ].map(({ value, label }) => (
               <Tabs.Trigger key={value} value={value}>
@@ -648,7 +655,7 @@ export function TaskDetail({
             ))}
           </Tabs.List>
           <div className="task-view-tools">
-            {['changes', 'preview', 'terminal', 'activity'].includes(tab) && (
+            {['changes', 'preview', 'terminal', 'activity', 'screen'].includes(tab) && (
               <Button
                 variant="ghost"
                 className="conversation-toggle"
@@ -841,6 +848,9 @@ export function TaskDetail({
             <Suspense fallback={<p>Loading terminal…</p>}>
               <TaskTerminal run={run} />
             </Suspense>
+          </Tabs.Content>
+          <Tabs.Content value="screen">
+            <AgentScreen run={run} visible={tab === 'screen'} />
           </Tabs.Content>
           <Tabs.Content value="preview">
             {!active && run.status !== 'interrupted' && run.workspace && !integrated ? (

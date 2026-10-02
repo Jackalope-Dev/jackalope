@@ -154,6 +154,8 @@ export function collectWorkspaceWork(
   if (!archived)
     for (const session of sessions) {
       if (projectId !== null && session.request.projectId !== projectId) continue;
+      // Bot conversations live in the Bots view.
+      if (session.persona) continue;
       const work = sessionWork(session, runs);
       items.push({
         id: `session:${session.id}`,

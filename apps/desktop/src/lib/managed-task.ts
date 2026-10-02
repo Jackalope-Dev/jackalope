@@ -16,6 +16,11 @@ export interface ManagedTask {
     appliedAt: string | null;
     reviewSeconds: number | null;
     interventions: number;
+    plannedAt?: string | null;
+    startedAt?: string | null;
+    assignmentCount?: number;
+    autoStarted?: boolean;
+    spawnedSubtasks?: number;
   } | null;
   id: string;
   title: string;
@@ -26,6 +31,7 @@ export interface ManagedTask {
   createdAt: string;
   started: boolean;
   error: string | null;
+  autoStart?: boolean;
 }
 
 export const managedTaskCommand = <T>(

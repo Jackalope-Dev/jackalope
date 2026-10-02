@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { AgentSupport } from './AgentSupport';
+import { BotShowcase } from './BotShowcase';
 import { BrandMark } from './BrandMark';
 import type { EditorialCover } from './blog-types';
 import { CliDemo } from './CliDemo';
@@ -524,6 +525,8 @@ export function LandingPage({
       <Workbench />
 
       <CliDemo />
+
+      <BotShowcase />
 
       <section
         className="workspace-section section-echo"
