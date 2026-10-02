@@ -1,4 +1,3 @@
-import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { Badge, Disclosure, DisclosureBody, DisclosureSummary, Panel, Stat } from '@jackalope/ui';
 import { ArrowUpRight } from 'lucide-react';
 import { useEffect, useRef } from 'react';
@@ -6,6 +5,7 @@ import type { UsageInsights as Insights } from '../../lib/usage-insights';
 import { Button } from '../ui/button';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './usage-insights.css';
+import { ProviderMark } from '../agents/ProviderMark';
 
 export const tokenLabel = (tokens: number | null) =>
   tokens === null ? 'Unavailable' : tokens.toLocaleString();
@@ -271,7 +271,7 @@ function UsageRanking({
         >
           {agents && (
             <span className="usage-rank-mark" aria-hidden="true">
-              <AgentCharacter provider={row.id} />
+              <ProviderMark provider={row.id} size={18} />
             </span>
           )}
           <span className="usage-rank-label">
