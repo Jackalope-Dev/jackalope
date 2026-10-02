@@ -151,6 +151,129 @@ export interface KnowledgeGuide {
 
 export const knowledgeGuides: KnowledgeGuide[] = [
   {
+    slug: 'getting-started-in-the-beta',
+    category: 'workflows',
+    title: 'Get started with the Jackalope beta',
+    shortTitle: 'Getting started',
+    description:
+      'Install Jackalope, connect your approved account, find your way around and send feedback while the app is in beta.',
+    readingTime: '3 min read',
+    sections: [
+      {
+        id: 'install',
+        question: 'How do I install Jackalope?',
+        paragraphs: [
+          'On Windows, install Jackalope from the Microsoft Store. On macOS, download the Apple silicon or Intel build. On Linux, download the AppImage. Your approval email links to each one, and the download page lists them too.',
+          'The download page offers the Stable release by default. Beta builds arrive sooner and may be less polished; choose Beta in the release picker only if you want them.',
+        ],
+        links: [{ label: 'Download Jackalope', href: '/download/' }],
+      },
+      {
+        id: 'connect',
+        question: 'How do I connect my account?',
+        paragraphs: [
+          'Running tasks needs an approved Jackalope account. Choose Connect account; your browser opens and the app shows a code. Sign in, check that the code matches and confirm. The app then shows your email and approved access.',
+          'Saved work stays readable without a connection. After you connect, new tasks keep working offline for up to 72 hours.',
+        ],
+      },
+      {
+        id: 'first-look',
+        question: 'What do I see the first time I open it?',
+        paragraphs: [
+          'A short welcome introduces the main features and how to reach us. Project setup then walks through your repository, agents, decisions, behavior, appearance and an optional first task.',
+          'The Work page holds your conversations, tasks and plans. Choose Focus, Build or Oversee from the layout picker at the top: Focus keeps one conversation in front of you, Build puts review, preview and terminal beside the work, and Oversee shows a full-width board of everything that is running or waiting for you.',
+        ],
+      },
+      {
+        id: 'feedback',
+        question: 'How do I report a problem or suggest something?',
+        paragraphs: [
+          'Choose Feedback in the bottom bar at any time. Pick a bug, feature request or idea, describe what happened, and review the message before you send it. A sentence about what you were trying to do helps most.',
+        ],
+        callout: {
+          kind: 'tip',
+          text: 'The Discord is a good place to compare workflows with other beta members and hear about changes as they ship.',
+        },
+      },
+      {
+        id: 'updates',
+        question: 'How do updates work?',
+        paragraphs: [
+          'Jackalope checks for updates every hour and offers to install them. Turn on Download updates automatically in Settings → Updates & support to have them ready in advance; Restart to update then appears in the title bar. Microsoft Store builds update through the Store.',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'workspace-modes',
+    category: 'workflows',
+    title: 'Focus, Build and Oversee: choosing a workspace layout',
+    shortTitle: 'Workspace modes',
+    description:
+      'Switch between a single conversation, a build layout with tools beside the work, and a board for everything in progress.',
+    readingTime: '2 min read',
+    sections: [
+      {
+        id: 'which-mode',
+        question: 'Which layout should I use?',
+        paragraphs: [
+          'Focus shows a compact navigation rail, the conversation composer and the next task. Use it when you are working on one thing.',
+          'Build keeps recent work, project tools and the conversation beside review, preview, terminal or activity. Use it while you iterate on a change.',
+          'Oversee uses full-width navigation with live work counts, a queue of work that needs you and a board. Use it when several agents are running.',
+        ],
+      },
+      {
+        id: 'switching',
+        question: 'Do I lose anything when I switch?',
+        paragraphs: [
+          'No. Modes and their work-list filters are saved for each project, and drafts are kept. Switching mode resets any conversation-layout adjustments you made, not your work.',
+          'Needs you lists recovery steps and questions first, then older reviews, so the most urgent item is always at the top.',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'bots',
+    category: 'agents',
+    title: 'Create bots for repeated work',
+    shortTitle: 'Bots',
+    description:
+      'Save an agent with a role, instructions and the tools it may use, then ask it questions or run it on a schedule.',
+    readingTime: '3 min read',
+    sections: [
+      {
+        id: 'what-is-a-bot',
+        question: 'What is a bot?',
+        paragraphs: [
+          'A bot is a saved agent profile: a name, a role, standing instructions, an agent and model, a project and the connected apps it may use. Each bot keeps the character and color you choose, everywhere it appears.',
+          'Templates cover reviewing, fixing, testing, documentation, security, release notes and onboarding. A template fills in the editor; it never grants access, enables connections or starts work on its own.',
+        ],
+      },
+      {
+        id: 'create',
+        question: 'How do I create one?',
+        steps: [
+          'Open Bots and choose a template or start from scratch.',
+          'Name and look: give the bot a name, a character and a color.',
+          'Project and agent: choose its project, agent and model.',
+          'Role and instructions: describe its job in up to 6,000 characters.',
+          'Apps and tools: choose which connected apps it may use, then save.',
+        ],
+        paragraphs: [
+          'Edits apply to new conversations and routines. Existing conversations keep the settings they started with.',
+        ],
+      },
+      {
+        id: 'talk',
+        question: 'How do conversations and routines work?',
+        paragraphs: [
+          'Message a bot from the Bots page. Its role and instructions are sent with every message, so it stays in character across follow-ups and restarts. Bot conversations stay on the Bots page rather than in Work, and they skip workspace preparation and automatic checks so answers arrive quickly.',
+          'A routine runs a bot on a schedule. Routines are ordinary automations: change their timing, see their history or add a webhook in Automations. Deleting a bot keeps its past conversations.',
+        ],
+      },
+    ],
+  },
+  {
     slug: 'terminal-command',
     category: 'workflows',
     title: 'Work with Jackalope from the terminal',
@@ -209,7 +332,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'start-chat',
         question: 'How do I start a chat in Jackalope?',
         paragraphs: [
-          'Open Tasks → Chat, choose your project and agent account, and send the first message. The session keeps its messages and successive batches in one isolated Git workspace. You need approved Jackalope access, a supported installed agent, and a usable provider account to run work.',
+          'Open Work, choose your project and agent account, and send the first message. The session keeps its messages and successive batches in one isolated Git workspace. You need approved Jackalope access, a supported installed agent, and a usable provider account to run work.',
           'Describe one observable change and how it should be checked. Use New task for a structured brief or a reviewed plan when the work needs separate assignments. A chat processes batches in order; it is not a parallel plan.',
         ],
         links: [
@@ -672,7 +795,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'kimi-code',
         question: 'What does Kimi Code support?',
         paragraphs: [
-          'Install the current Kimi Code CLI and select Kimi in Agents → Configuration. Use kimi login for the default account or Add account & sign in for a separate profile. Named profiles use KIMI_CODE_HOME for configuration, sign-in data, and sessions; migrate legacy Python CLI setups before using them.',
+          'Install the current Kimi Code CLI and open Agents & tools → Runners and choose Configure Kimi Code. Use kimi login for the default account or Add account & sign in for a separate profile. Named profiles use KIMI_CODE_HOME for configuration, sign-in data, and sessions; migrate legacy Python CLI setups before using them.',
           'Kimi tasks stream text and tool activity, offer the CLI’s tool approval choices and structured questions, and continue the exact saved session with its original account. Declining or leaving an approval unanswered stops the attempt. Selected models come from the account’s CLI session configuration.',
           'Kimi supports automatic routing and Ask Jackalope with tools disabled for those requests. Worker token usage uses session-total deltas; cache breakdown, cost, and helper tokens remain unknown. Membership quota requires a managed Kimi account with a current login. Detection and authentication checks do not establish signed-in execution or installed-app acceptance.',
         ],
@@ -687,7 +810,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Use a small task in a project that is appropriate for the account. This helps distinguish CLI discovery, successful sign-in, and the ability to run your chosen model.',
         ],
         steps: [
-          'Install the agent CLI and open Agents → Configuration. Select the agent and the intended default or named account.',
+          'Install the agent CLI, open Agents & tools → Runners and choose Configure beside the agent. Select the intended default or named account.',
           'Complete that profile’s sign-in or key setup. Review provider billing and model access for the selected account.',
           'Choose the account in the project settings, then create an explicitly assigned task: “Read the project instructions and summarize how to run the tests. Do not change files.”',
           'Inspect the bound agent/account and the result. If access fails, repair that same profile before trying a larger task.',
@@ -707,7 +830,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'work-personal-segregation',
         question: 'How do work and personal account profiles differ?',
         paragraphs: [
-          'Named Codex, Claude Code, Grok, OpenCode, and Kimi Code profiles use separate supported CLI directories. The Agents page saves enable/disable, default task agent, and account choices for the selected project. Project agent settings offers Work/Personal group selection and allowed accounts. App settings retains app-wide limits. New work uses the project default; continuations retain their bound profile.',
+          'Named Codex, Claude Code, Grok, OpenCode, and Kimi Code profiles use separate supported CLI directories. Agents & tools → Runners saves enable/disable, default task agent, and account choices for the selected project. Project agent settings offers Work/Personal group selection and allowed accounts. App settings retains app-wide limits. New work uses the project default; continuations retain their bound profile.',
           'Antigravity named profiles require Gemini API keys with separate API billing. Its existing subscription login is shared and can change outside Jackalope. Profiles organize credentials; they do not isolate OS permissions or inherited provider configuration.',
         ],
       },
@@ -724,7 +847,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'credential-drift',
         question: 'How do I recover from an expired agent sign-in?',
         paragraphs: [
-          'Open Agents → Configuration and select the affected account. Complete its sign-in flow, using Copy link or Open browser if needed. Check the same profile that the task uses; signing in to the default CLI account does not repair a separate named profile.',
+          'Open Agents & tools → Runners, choose Configure beside the agent and select the affected account. Complete its sign-in flow, using Copy link or Open browser if needed. Check the same profile that the task uses; signing in to the default CLI account does not repair a separate named profile.',
           'Some adapters validate access only when launched. A detected executable or saved credential does not prove the provider will accept the next request.',
         ],
       },
@@ -806,7 +929,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'debugging-mcp',
         question: 'Where do I configure and diagnose connections?',
         paragraphs: [
-          'Open MCP → Connections. Check the command and arguments for stdio, or the endpoint and transport for a remote server. Verify that the selected agent supports that transport.',
+          'Open Agents & tools → MCP tools. Check the command and arguments for stdio, or the endpoint and transport for a remote server. Verify that the selected agent supports that transport.',
           'Use the connection probe for configured header or environment authentication. CLI-owned OAuth sessions must be checked in that CLI and account profile. A successful probe does not establish that every task can use the tool.',
         ],
       },
@@ -952,7 +1075,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'app-updates',
         question: 'How does Jackalope update itself?',
         paragraphs: [
-          'Installed Jackalope checks for updates shortly after it opens and every few hours while its window is in use. When a newer version is ready, the companion shows a notice; choose Review update, then install and restart when your work is saved. Nothing installs without your choice.',
+          'Installed Jackalope checks for updates shortly after it opens and every hour while its window is in use. When a newer version is ready, Jackalope tells you and offers Download and install. To get updates ready sooner, turn on Download updates automatically in Settings → Updates & support; when a download finishes, Restart to update appears in the title bar. Nothing installs until you choose it, and installing waits until running tasks finish. Microsoft Store builds update through the Store.',
           'In Settings → Updates & support you can check now, turn automatic checks off and, when offered, choose the Stable or Beta update channel. If a check fails, the notice shows the reason.',
         ],
       },
@@ -1099,7 +1222,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'mcp-overview',
         question: 'How do I connect project tools?',
         paragraphs: [
-          'Open MCP → Marketplace for a curated collection of publisher-maintained tools. Review what a service does and its setup guide, then choose Configure. Search or choose All servers to browse the wider AllMCPs directory. Use Custom connection for your own endpoint or local command.',
+          'Open Agents & tools → Tool marketplace for a curated collection of publisher-maintained tools. Review what a service does and its setup guide, then choose Configure. Search or choose All servers to browse the wider AllMCPs directory. Use Custom connection for your own endpoint or local command.',
         ],
       },
       {
@@ -1288,7 +1411,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How do I continue from another computer or my phone?',
         paragraphs: [
           'On the machine that runs your work, open Settings → Remote access, enable paired devices, select projects and save. Keep Jackalope running. Selected projects share task content and allow paired devices to start isolated tasks, answer questions and send follow-ups using the host’s saved settings.',
-          'For another desktop, open Tasks → Hosts → Connect a host. Use an SSH alias that already signs in with a verified host key, or an HTTPS address. Create a pairing code on the host and paste it on the connecting desktop.',
+          'For another desktop, select This computer in the bottom bar, then choose Connect a host. Use an SSH alias that already signs in with a verified host key, or an HTTPS address. Create a pairing code on the host and paste it on the connecting desktop.',
           'For a phone, set up private HTTPS with Tailscale after signing both devices into Tailscale, or enter your existing HTTPS proxy address under Connection settings. Create a pairing link, open it on the phone and name the device. Links work once and expire after five minutes. Revoke devices from the host settings.',
           'Work continues on the host when you disconnect. Refresh status before retrying an interrupted action. Reconnecting reuses saved send identifiers to avoid duplicate messages. Host restart retains normal paused/recovery behavior. Phone and multi-device installed acceptance remain in progress; native mobile applications and managed hosting are not included.',
         ],
