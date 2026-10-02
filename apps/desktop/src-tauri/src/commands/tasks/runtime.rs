@@ -1186,11 +1186,15 @@ impl TaskRuntime {
             .into_iter()
             .find(|run| run.id == id)
             .ok_or("Attempt not found")?;
+        // A focused attempt that changed nothing, such as answering a question, has
+        // nothing to check. Planned assignments always verify: dependents need the result.
+        let managed = req.coordination.as_ref().is_some_and(|context| context.managed);
         if req.auto_verify
             && success
             && run.error.is_none()
             && !run.result.is_empty()
             && self.is_running(id)
+            && (managed || attempt_changed(&run))
         {
             self.update_checked(id, |r| r.finishing = true)?;
             if let Err(error) = crate::commands::verification::finish(self, id) {
@@ -1849,5 +1853,67 @@ impl TaskRuntime {
             crate::commands::desktop_control::close(&request.id);
         });
         Ok(id)
+    }
+}
+
+/// Whether an isolated attempt left uncommitted or committed changes. Unknown counts as changed.
+fn attempt_changed(run: &TaskRun) -> bool {
+    if run.base_head.is_empty() || run.workspace.is_empty() {
+        return true;
+    }
+    let workspace = Path::new(&run.workspace);
+    let read = |args: &[&str]| {
+        crate::commands::git_command::command(
+            workspace,
+            args,
+            crate::commands::git_command::Policy::Inspection,
+        )
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+    };
+    match (read(&["status", "--porcelain"]), read(&["rev-parse", "HEAD"])) {
+        (Some(status), Some(head)) => !status.is_empty() || head != run.base_head,
+        _ => true,
+    }
+}
+
+#[cfg(test)]
+mod attempt_change_tests {
+    use super::*;
+
+    #[test]
+    fn only_attempts_with_changes_need_automatic_checks() {
+        let root = std::env::temp_dir().join(format!("jackalope-changed-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(&root)
+                .args(args)
+                .env("GIT_AUTHOR_NAME", "t")
+                .env("GIT_AUTHOR_EMAIL", "t@t")
+                .env("GIT_COMMITTER_NAME", "t")
+                .env("GIT_COMMITTER_EMAIL", "t@t")
+                .output()
+                .unwrap();
+            assert!(output.status.success());
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        };
+        git(&["init", "--initial-branch=main"]);
+        git(&["commit", "--allow-empty", "-m", "base"]);
+        let run = TaskRun {
+            workspace: root.to_string_lossy().into(),
+            base_head: git(&["rev-parse", "HEAD"]),
+            ..Default::default()
+        };
+        assert!(!attempt_changed(&run), "answering a question changes nothing");
+        std::fs::write(root.join("new.txt"), "x").unwrap();
+        assert!(attempt_changed(&run));
+        git(&["add", "."]);
+        git(&["commit", "-m", "work"]);
+        assert!(attempt_changed(&run), "committed work still counts");
+        assert!(attempt_changed(&TaskRun::default()), "unknown counts as changed");
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

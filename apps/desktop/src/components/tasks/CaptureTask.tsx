@@ -7,6 +7,7 @@ import { connectionSupport } from '../../lib/agent-capabilities';
 import { useAgentModels } from '../../lib/agent-models';
 import { effectiveConnections } from '../../lib/mcp-connection';
 import { planningDraft } from '../../lib/planning';
+import { isQuestionOnly } from '../../lib/question-intent';
 import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog';
 import { assemblePrompt, PROMPT_VERSION } from '../../lib/skills/context-assembler';
 import { resolveTaskGuidelines } from '../../lib/skills/task-context';
@@ -323,7 +324,9 @@ export function CaptureTask({
         agentProfileId: current.agent ? agentAccountFor(project, adapter) : undefined,
         targetBranch: project.preferences?.baseBranch || project.gitBranch,
         verifyCommand: project.preferences?.verifyCommand,
-        prepareCommand: project.preferences?.prepareCommand,
+        prepareCommand: isQuestionOnly(current.prompt)
+          ? undefined
+          : project.preferences?.prepareCommand,
         setupFiles: project.preferences?.setupFiles,
         autoVerify: project.preferences?.autoVerify === true,
         prompt: finalPrompt,

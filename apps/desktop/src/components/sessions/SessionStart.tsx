@@ -8,6 +8,7 @@ import { startComparison } from '../../lib/compare-launch';
 import type { ContextSelection } from '../../lib/knowledge';
 import { type SessionLimits as Limits, sessionCommand } from '../../lib/live-session';
 import { ATTACH_TO_COMPOSER, appendAttachments } from '../../lib/prompt-attachments';
+import { isQuestionOnly } from '../../lib/question-intent';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
 import type { RunRequest } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -216,7 +217,8 @@ export function SessionStart({
         isolated: true,
         targetBranch: project.preferences?.baseBranch || project.gitBranch,
         verifyCommand: project.preferences?.verifyCommand,
-        prepareCommand: project.preferences?.prepareCommand,
+        // A question needs no installed dependencies; the agent can prepare if it must.
+        prepareCommand: isQuestionOnly(value) ? undefined : project.preferences?.prepareCommand,
         setupFiles: project.preferences?.setupFiles,
         autoVerify: project.preferences?.autoVerify ?? true,
         contextSelection: context,
