@@ -353,8 +353,8 @@ impl LiveSessions {
         Uuid::parse_str(&id).map_err(|_| "Invalid session identifier")?;
         if let Some(message) = &first_message {
             Uuid::parse_str(&message.id).map_err(|_| "Invalid message identifier")?;
-            if message.text.trim().is_empty() || message.text.len() > 12_000 {
-                return Err("Use a message between 1 and 12,000 bytes.".into());
+            if message.text.trim().is_empty() || message.text.chars().count() > 12_000 {
+                return Err("Use a message between 1 and 12,000 characters.".into());
             }
         }
         let title = first_message
@@ -456,8 +456,8 @@ impl LiveSessions {
         draft_revision: Option<u64>,
     ) -> Result<SessionDraft, String> {
         Uuid::parse_str(&message_id).map_err(|_| "Invalid message identifier")?;
-        if text.trim().is_empty() || text.len() > 12_000 {
-            return Err("Use a message between 1 and 12,000 bytes.".into());
+        if text.trim().is_empty() || text.chars().count() > 12_000 {
+            return Err("Use a message between 1 and 12,000 characters.".into());
         }
         let _gate = self.gate.lock().map_err(|e| e.to_string())?;
         let integrated = self.integrated_ids()?;
@@ -497,8 +497,8 @@ impl LiveSessions {
     }
 
     fn draft(&self, id: &str, text: String, revision: u64) -> Result<SessionDraft, String> {
-        if text.len() > 12_000 {
-            return Err("The message is limited to 12,000 bytes.".into());
+        if text.chars().count() > 12_000 {
+            return Err("The message is limited to 12,000 characters.".into());
         }
         self.update(|ledger| {
             let session = Self::session(ledger, id)?;

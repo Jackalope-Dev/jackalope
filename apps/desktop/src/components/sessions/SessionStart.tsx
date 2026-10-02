@@ -165,9 +165,9 @@ export function SessionStart({
   const send = async (choice: 'assess' | 'single' | 'plan' = 'assess') => {
     const value = text.trim();
     if (!project || !value || sending.current) return;
-    if (new TextEncoder().encode(value).length > 12000) {
+    if ([...value].length > 12000) {
       setError(
-        'This request is too long. Shorten it to 12,000 UTF-8 bytes before sending. Your draft is preserved.',
+        'This request is too long. Shorten it to 12,000 characters before sending. Your draft is preserved.',
       );
       return;
     }
