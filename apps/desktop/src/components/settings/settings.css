@@ -396,6 +396,36 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+/* Wide windows: the heading stays put and the category list and settings scroll
+   separately, so switching pages never needs a scroll back to the top. */
+@media (min-width: 801px) {
+  .settings-page.workspace-page-layout {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+  .settings-page .settings-body {
+    flex: 1;
+    min-height: 0;
+  }
+  .settings-page .settings-sidebar,
+  .settings-page .settings-content {
+    min-height: 0;
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .settings-page .settings-sidebar {
+    align-self: stretch;
+    /* Room for focus rings and the last item above the window edge. */
+    padding: 2px 4px 24px 2px;
+  }
+  .settings-page .settings-content {
+    padding: 2px 4px 40px 2px;
+    scrollbar-gutter: stable;
+  }
+}
 @media (max-width: 800px) {
   .settings-page .settings-body {
     grid-template-columns: minmax(0, 1fr);
