@@ -70,6 +70,36 @@ test('a channel cannot change while an update check is pending', async () => {
   await check;
 });
 
+test('auto-download fetches a found update once and marks it ready to install', async () => {
+  const downloads = [];
+  const f = fixture({
+    download: async (version, _progress, channel) => {
+      downloads.push({ version, channel });
+    },
+  });
+  await f.store.getState().check();
+  assert.equal(f.store.getState().downloadedVersion, null, 'off by default');
+  f.store.getState().setAutoDownload(true);
+  await new Promise((resolve) => setTimeout(resolve));
+  assert.equal(f.store.getState().downloadedVersion, '0.2.0');
+  await f.store.getState().check();
+  await new Promise((resolve) => setTimeout(resolve));
+  assert.deepEqual(downloads, [{ version: '0.2.0', channel: 'stable' }]);
+});
+
+test('a failed download leaves the update installable manually', async () => {
+  const f = fixture({
+    download: async () => {
+      throw 'offline';
+    },
+  });
+  await f.store.getState().check();
+  await f.store.getState().download();
+  assert.equal(f.store.getState().downloadedVersion, null);
+  assert.equal(f.store.getState().error, 'offline');
+  assert.equal(f.store.getState().downloading, false);
+});
+
 function fixture(overrides = {}) {
   let time = 1000;
   const calls = [];

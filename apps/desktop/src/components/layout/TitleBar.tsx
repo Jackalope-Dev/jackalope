@@ -1,11 +1,10 @@
-import { LifeBuoy, Megaphone, Minus, Settings2, Square, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { LifeBuoy, Minus, RotateCw, Settings2, Square, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { isMacPlatform } from '../../lib/platform-shortcuts';
 import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { useUpdateStore } from '../../stores/updateStore';
-import { FeedbackDialog } from '../settings/FeedbackDialog';
+import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { Tooltip } from '../ui/Tooltip';
 
@@ -28,11 +27,15 @@ const isMac = isMacPlatform();
  */
 export function TitleBar({ onSettings }: { onSettings?: () => void }) {
   const [isMaximized, setIsMaximized] = useState(false);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const feedbackButton = useRef<HTMLButtonElement>(null);
   const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
   const shortcuts = useSettingsStore((state) => state.shortcuts);
   const beta = useUpdateStore((state) => state.release?.channel === 'beta');
+  const updateReady = useUpdateStore(
+    (state) =>
+      state.downloadedVersion !== null &&
+      state.downloadedVersion === availableUpdateId(state.release),
+  );
+  const updating = useUpdateStore((state) => state.installing);
   // Development builds and the beta channel are labeled; stable keeps the plain title.
   const edition = import.meta.env.DEV ? ' - dev' : beta ? ' - Beta' : '';
 
@@ -71,6 +74,22 @@ export function TitleBar({ onSettings }: { onSettings?: () => void }) {
         <span>Jackalope{edition}</span>
       </div>
       <div className="app-titlebar-controls">
+        {updateReady && (
+          <Tooltip content="The update is downloaded. Jackalope reopens in a few seconds.">
+            <button
+              type="button"
+              className="app-titlebar-update"
+              disabled={updating}
+              aria-busy={updating}
+              onMouseDown={(event) => event.stopPropagation()}
+              onDoubleClick={(event) => event.stopPropagation()}
+              onClick={() => void useUpdateStore.getState().install()}
+            >
+              <RotateCw size={13} aria-hidden="true" />
+              {updating ? 'Restarting…' : 'Restart to update'}
+            </button>
+          </Tooltip>
+        )}
         {onSettings && showThemePicker && <ArcColorPicker variant="titlebar" />}
         {onSettings && (
           <Tooltip content={`Settings (${displayShortcut(resolveShortcuts(shortcuts).settings)})`}>
@@ -86,19 +105,6 @@ export function TitleBar({ onSettings }: { onSettings?: () => void }) {
             </button>
           </Tooltip>
         )}
-        <Tooltip content="Send feedback">
-          <button
-            ref={feedbackButton}
-            type="button"
-            className="app-titlebar-button"
-            aria-label="Send feedback"
-            onMouseDown={(event) => event.stopPropagation()}
-            onDoubleClick={(event) => event.stopPropagation()}
-            onClick={() => setFeedbackOpen(true)}
-          >
-            <Megaphone size={16} aria-hidden="true" />
-          </button>
-        </Tooltip>
         <Tooltip content="Help Center">
           <button
             type="button"
@@ -143,14 +149,6 @@ export function TitleBar({ onSettings }: { onSettings?: () => void }) {
           </>
         )}
       </div>
-      <FeedbackDialog
-        open={feedbackOpen}
-        onOpenChange={setFeedbackOpen}
-        onCloseAutoFocus={(event) => {
-          event.preventDefault();
-          feedbackButton.current?.focus();
-        }}
-      />
     </div>
   );
 }

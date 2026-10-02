@@ -9,12 +9,15 @@ import { FeedbackDialog } from '../settings/FeedbackDialog';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
+import { welcomePending } from './WelcomeDialog';
 
 const SEEN_KEY = 'jackalope.whats-new.seen-version';
 
 // Captured when the app starts: someone finishing setup in this session is on
 // a fresh install and has nothing to catch up on.
 const setupCompleteAtLaunch = useOnboardingStore.getState().status === 'complete';
+// The first-launch welcome replaces release notes; one introduction is enough.
+const welcomeAtLaunch = welcomePending();
 
 function readSeen(): string | null {
   try {
@@ -63,7 +66,7 @@ export function WhatsNewDialog() {
     void (async () => {
       const { getVersion } = await import('@tauri-apps/api/app');
       const version = await getVersion();
-      if (!shouldShowReleaseNotes(version, readSeen(), setupCompleteAtLaunch)) {
+      if (welcomeAtLaunch || !shouldShowReleaseNotes(version, readSeen(), setupCompleteAtLaunch)) {
         markSeen(version);
         return;
       }

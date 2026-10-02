@@ -85,11 +85,14 @@ export function Companion({
     for (const notice of current) seen.current.add(notice.id);
     if (next && !open) setHint(next);
   }, [announcementKey, open]);
+  const hintNotice = hint ? notices.find((notice) => notice.id === hint.id) : undefined;
+  const hintAction = hintNotice?.onOpen && hintNotice.actionLabel ? hintNotice : undefined;
   useEffect(() => {
     if (!hint) return;
-    const timer = setTimeout(() => setHint(null), 6000);
+    // A bubble with an action stays long enough to reach it.
+    const timer = setTimeout(() => setHint(null), hintAction ? 20_000 : 6000);
     return () => clearTimeout(timer);
-  }, [hint]);
+  }, [hint, hintAction]);
   useEffect(() => {
     if (open) setHint(null);
   }, [open]);
@@ -138,6 +141,19 @@ export function Companion({
                   onDismiss={() => setHint(null)}
                 >
                   {hint.title}
+                  {hintAction && (
+                    <button
+                      type="button"
+                      className="mascot-speech-action"
+                      onClick={() => {
+                        setHint(null);
+                        markRead([hintAction.id]);
+                        hintAction.onOpen?.();
+                      }}
+                    >
+                      {hintAction.actionLabel}
+                    </button>
+                  )}
                 </MascotSpeech>
               )}
             <JackalopeMascot

@@ -1,5 +1,18 @@
 [
   {
+    "id": "a-warmer-welcome-and-faster-updates",
+    "date": "2026-10-02",
+    "status": "In development",
+    "title": "A warmer welcome and faster updates",
+    "description": "New members get a short tour, feedback is always one click away and updates can be ready before you restart.",
+    "items": [
+      "A first-launch welcome introduces the beta and the main ways to work.",
+      "Send feedback from the bottom bar at any time.",
+      "Optionally download updates in the background, then choose Restart to update from the title bar.",
+      "Jackalope's update message now offers to install right away."
+    ]
+  },
+  {
     "id": "bots-get-their-own-home",
     "date": "2026-10-01",
     "status": "In development",
