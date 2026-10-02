@@ -5,7 +5,7 @@ export const recentPosts: BlogPost[] = [
     slug: 'bots-that-know-their-job',
     cover: { kind: 'agents', tone: 'mint', label: 'Give it a role once.' },
     title: 'Bots: coding agents that keep their role, tools and schedule.',
-    seoTitle: 'Saved AI coding agent bots with roles and schedules',
+    seoTitle: 'Coding agent bots with roles and schedules',
     category: 'Product notes',
     date: '2026-10-01',
     readingTime: '4 min read',
