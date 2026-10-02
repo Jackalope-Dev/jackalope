@@ -61,8 +61,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--color-border-subtle);
+  padding: 16px 20px 4px;
   background: var(--color-surface);
   flex: none;
 }
@@ -98,10 +97,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 20px;
+  padding: 0 20px 4px;
   min-height: 48px;
   border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
   flex: none;
+}
+/* The header, status and task bars read as one block with a single divider beneath it. */
+.live-statusbar:has(~ .work-toolbar) {
+  border-bottom: 0;
 }
 .live-status-actions {
   display: flex;
@@ -172,13 +176,35 @@
   min-height: 28px;
   cursor: pointer;
 }
+/* A conversation: your messages on the right, replies on the left beside their character. */
+.live-sent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.live-sent > p {
+  max-width: min(78%, 40rem);
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 16px 16px 4px 16px;
+  background: var(--color-accent-subtle);
+  line-height: 1.5;
+}
+.live-sent > .live-receipt {
+  margin-top: 4px;
+}
 .live-reply {
   display: flex;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 10px;
 }
 .live-reply > div {
   min-width: 0;
-  flex: 1;
+  max-width: min(88%, 52rem);
+  padding: 10px 14px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 4px 16px 16px 16px;
+  background: var(--color-surface);
 }
 .live-reply .live-mascot {
   width: 36px;
