@@ -915,6 +915,9 @@ mod tests {
         let root = std::env::temp_dir().join(format!("jackalope-peers-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
         run_git(&root, &["init", "--initial-branch=main"]);
+        // Windows runners set core.autocrlf globally, which would check adopted files
+        // out with CRLF endings.
+        run_git(&root, &["config", "core.autocrlf", "false"]);
         std::fs::write(root.join("shared.txt"), "one\ntwo\nthree\n").unwrap();
         run_git(&root, &["add", "."]);
         run_git(&root, &["commit", "-m", "base"]);
