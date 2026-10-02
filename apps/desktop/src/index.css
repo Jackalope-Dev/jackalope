@@ -556,6 +556,35 @@ img[src="/mascot.svg"] {
   outline-offset: 2px;
 }
 
+/* A quiet link to more of something; see NoticeRow. */
+.notice-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.notice-row-label {
+  flex: 1;
+  min-width: 0;
+}
+.notice-row:hover {
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+.notice-row:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -1px;
+}
+
 /* Every Jackalope message: above the mascot, tail pointing at it. See MascotSpeech. */
 .mascot-speech {
   position: absolute;

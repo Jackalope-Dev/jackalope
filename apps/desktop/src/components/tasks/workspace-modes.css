@@ -139,8 +139,7 @@
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
 }
-.focus-resume > .task-inline-link {
-  min-height: 44px;
+.focus-resume > .notice-row {
   margin-top: 8px;
 }
 /* Quick links to project tools: one compact row, since the Project tabs hold the full views. */
