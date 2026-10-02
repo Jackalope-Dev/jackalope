@@ -86,7 +86,7 @@ when the project's fallback is explicitly Agent-powered; both calls retain usage
 Sessions with batch or
 cost limits retain their existing serial flow.
 
-**Automatic subtasks** are on by default (Project settings → Task context → Split work
+**Automatic subtasks** are on by default (Project settings → Tasks → Split work
 into subtasks). When parallel planning is available, a request is planned and started
 without a review click if a model assessment recommends parallel or investigative
 work, or local rules find a request they do not classify as small. A model's one-lead

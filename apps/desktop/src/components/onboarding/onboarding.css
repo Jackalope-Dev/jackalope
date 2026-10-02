@@ -197,11 +197,6 @@
   margin-top: 0;
   padding-top: 0;
 }
-.onboarding-behavior-section .project-preferences-section {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: none;
-}
 .onboarding-agent-choice {
   display: flex;
   align-items: center;

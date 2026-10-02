@@ -1,5 +1,5 @@
 import { CopyButton, FormField, Input, Select, SelectItem } from '@jackalope/ui';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   type ArtifactsProjectLink,
   type ArtifactsReviewShare,
@@ -14,10 +14,9 @@ import {
 } from '../../lib/cloudflare-artifacts';
 import { openSettings } from '../layout/navigation';
 import { ArtifactsTitle } from '../settings/ArtifactsConnection';
-import { Setting } from '../settings/Setting';
+import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
-import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 
 type Busy = '' | 'convert' | 'push' | 'share';
 
@@ -28,7 +27,6 @@ export function ArtifactsProjectSettings({
   projectPath: string;
   projectName: string;
 }) {
-  const id = useId();
   const [status, setStatus] = useState<ArtifactsStatus>();
   const [link, setLink] = useState<ArtifactsProjectLink>();
   const [repoName, setRepoName] = useState(() => suggestRepoName(projectName));
@@ -64,8 +62,7 @@ export function ArtifactsProjectSettings({
   };
   const linked = !!link?.remote;
   return (
-    <section className="project-preferences-section" aria-labelledby={`${id}-title`}>
-      <WorkspaceSectionHeading titleId={`${id}-title`} title={<ArtifactsTitle />} />
+    <SettingGroup title={<ArtifactsTitle />}>
       {status && !status.connected && (
         <Setting
           title="Connect Cloudflare"
@@ -77,13 +74,15 @@ export function ArtifactsProjectSettings({
         </Setting>
       )}
       {status?.connected && link && !link.repository && (
-        <InlineNotice>
-          Artifacts needs this project to be a Git repository with at least one commit.
-        </InlineNotice>
+        <SettingBody>
+          <InlineNotice>
+            Artifacts needs this project to be a Git repository with at least one commit.
+          </InlineNotice>
+        </SettingBody>
       )}
       {status?.connected && link?.repository && !linked && (
         <form
-          className="project-workspace-fields"
+          className="settings-block"
           onSubmit={(event) => {
             event.preventDefault();
             void run('convert', async () => {
@@ -124,10 +123,12 @@ export function ArtifactsProjectSettings({
             <CopyButton text={link.remote ?? ''} label="Copy remote" variant="outline" />
           </Setting>
           {link.foreign ? (
-            <InlineNotice tone="warning">
-              This remote belongs to a different Cloudflare account or namespace than the one
-              connected in Settings. Connect that account to push or share.
-            </InlineNotice>
+            <SettingBody>
+              <InlineNotice tone="warning">
+                This remote belongs to a different Cloudflare account or namespace than the one
+                connected in Settings. Connect that account to push or share.
+              </InlineNotice>
+            </SettingBody>
           ) : (
             <>
               <Setting
@@ -182,39 +183,43 @@ export function ArtifactsProjectSettings({
           )}
         </>
       )}
-      {share && (
-        <InlineNotice
-          tone="success"
-          action={
-            <>
-              <CopyButton text={share.cloneCommand} label="Copy clone command" />
-              <Button variant="ghost" onClick={() => setShare(undefined)}>
-                Close
-              </Button>
-            </>
-          }
-        >
-          Snapshot {share.repo} expires {new Date(share.expiresAt).toLocaleString()}. The clone
-          command contains a read token and is shown only now.
-        </InlineNotice>
+      {(share || notice || error) && (
+        <SettingBody>
+          {share && (
+            <InlineNotice
+              tone="success"
+              action={
+                <>
+                  <CopyButton text={share.cloneCommand} label="Copy clone command" />
+                  <Button variant="ghost" onClick={() => setShare(undefined)}>
+                    Close
+                  </Button>
+                </>
+              }
+            >
+              Snapshot {share.repo} expires {new Date(share.expiresAt).toLocaleString()}. The clone
+              command contains a read token and is shown only now.
+            </InlineNotice>
+          )}
+          {notice && (
+            <InlineNotice
+              tone="success"
+              action={
+                <Button variant="ghost" onClick={() => setNotice('')}>
+                  Close
+                </Button>
+              }
+            >
+              {notice}
+            </InlineNotice>
+          )}
+          {error && (
+            <InlineNotice tone="error">
+              <span className="whitespace-pre-wrap">{error}</span>
+            </InlineNotice>
+          )}
+        </SettingBody>
       )}
-      {notice && (
-        <InlineNotice
-          tone="success"
-          action={
-            <Button variant="ghost" onClick={() => setNotice('')}>
-              Close
-            </Button>
-          }
-        >
-          {notice}
-        </InlineNotice>
-      )}
-      {error && (
-        <InlineNotice tone="error">
-          <span className="whitespace-pre-wrap">{error}</span>
-        </InlineNotice>
-      )}
-    </section>
+    </SettingGroup>
   );
 }

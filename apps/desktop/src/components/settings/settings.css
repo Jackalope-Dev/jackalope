@@ -485,51 +485,39 @@
 .project-preferences {
   min-width: 0;
 }
-.project-preferences-section {
-  margin-top: var(--workspace-section-gap, 32px);
-  padding-top: var(--workspace-section-gap, 32px);
-  border-top: 1px solid var(--color-border-subtle);
-}
-.project-workspace-fields {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 24px;
-}
 .project-preferences .workspace-heading > div {
   min-width: 0;
 }
 .project-preferences .workspace-heading p {
   overflow-wrap: anywhere;
 }
-.project-preferences-section > .settings-row {
-  padding: 20px 0 0;
-  margin-top: 8px;
+/* Commands and branch names need more room than the control's content width. */
+.project-setting-input {
+  width: min(360px, 100%);
 }
-.project-task-context > .settings-row {
-  padding-top: 0;
-  margin-top: 0;
-  border-bottom: none;
-}
-/* Even space above the first link row and below the last, matching other sections. */
-.project-settings-links {
-  padding-top: 16px;
-}
-.project-settings-links > .settings-row {
+.project-git-fields {
+  min-width: 0;
   margin: 0;
-  padding: 16px 0;
+  padding: 0;
+  border: 0;
 }
-.project-settings-links > .settings-row:last-child {
-  padding-bottom: 0;
+.project-git-fields:not(:last-child) > .settings-row:last-child {
+  border-bottom: 1px solid var(--color-border-subtle);
 }
-.project-preferences .settings-row-description {
-  overflow-wrap: anywhere;
+.project-guidelines > .ui-disclosure-summary {
+  padding: 8px 20px;
+  font-size: var(--text-sm);
+}
+/* The card clips overflow, so keep the ring inside the summary. */
+.project-guidelines > .ui-disclosure-summary:focus-visible {
+  outline-offset: -2px;
+}
+.project-guidelines[open] > .ui-disclosure-summary {
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 .settings-content .activity-log {
   padding: 0;
   max-width: none;
-}
-.project-preferences .settings-input {
-  min-width: 0;
 }
 .desktop-services {
   display: grid;
