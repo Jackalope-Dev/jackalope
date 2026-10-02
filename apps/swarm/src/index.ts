@@ -76,10 +76,8 @@ export default {
       const message = cause instanceof Error ? cause.message : String(cause);
       const known =
         cause instanceof SwarmError || /^(Unknown|Send|Use|That|The fork)/.test(message);
-      return json(
-        { error: message },
-        known ? (message.startsWith('Unknown fork') ? 404 : 400) : 502,
-      );
+      if (/^Unknown fork|not found/i.test(message)) return json({ error: message }, 404);
+      return json({ error: message }, known ? 400 : 502);
     }
   },
 } satisfies ExportedHandler<Env>;

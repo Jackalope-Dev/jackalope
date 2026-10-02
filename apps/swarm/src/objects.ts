@@ -72,3 +72,20 @@ export class CachedReader implements ObjectReader {
     return text;
   }
 }
+
+export interface RepoInfo {
+  name: string;
+  remote: string;
+  defaultBranch: string;
+}
+
+/**
+ * Repository metadata. Handles are RPC stubs whose fields are not readable
+ * directly; `info()` is the supported call, though Wrangler's types omit it.
+ */
+export async function repoInfo(handle: unknown): Promise<RepoInfo> {
+  const info = await (handle as { info(): Promise<Partial<RepoInfo>> }).info();
+  if (typeof info?.remote !== 'string' || typeof info.defaultBranch !== 'string')
+    throw new Error('Artifacts did not describe the repository.');
+  return { name: String(info.name ?? ''), remote: info.remote, defaultBranch: info.defaultBranch };
+}

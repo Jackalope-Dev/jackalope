@@ -2,7 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { type ChangedFile, changedFiles } from './changes';
 import { allConflicts, type Conflict } from './conflicts';
 import { forkName, SwarmError, text } from './names';
-import { CachedReader, objectReader } from './objects';
+import { CachedReader, objectReader, repoInfo } from './objects';
 
 /** One agent attempt working in its own fork of the shared repository. */
 export interface ForkRecord {
@@ -75,7 +75,7 @@ export class Swarm extends DurableObject<Env> {
         const handle = await this.env.ARTIFACTS.get(fork);
         const token = await handle.createToken('write', TOKEN_TTL);
         created = {
-          remote: handle.remote,
+          remote: (await repoInfo(handle)).remote,
           token: token.plaintext,
           tokenExpiresAt: token.expiresAt,
         };
@@ -106,7 +106,7 @@ export class Swarm extends DurableObject<Env> {
         remote: created.remote,
         token: created.token,
         tokenExpiresAt: created.tokenExpiresAt,
-        branch: base.defaultBranch,
+        branch: (await repoInfo(base)).defaultBranch,
       };
     });
   }
@@ -116,7 +116,8 @@ export class Swarm extends DurableObject<Env> {
     if (!(await this.ctx.storage.get(`fork:${fork}`))) throw new SwarmError('Unknown fork.', 404);
     const handle = await this.env.ARTIFACTS.get(fork);
     const token = await handle.createToken('write', TOKEN_TTL);
-    return { fork, remote: handle.remote, token: token.plaintext, tokenExpiresAt: token.expiresAt };
+    const { remote } = await repoInfo(handle);
+    return { fork, remote, token: token.plaintext, tokenExpiresAt: token.expiresAt };
   }
 
   /** Re-reads one fork after a push and recomputes conflicts across all forks. */
@@ -137,7 +138,8 @@ export class Swarm extends DurableObject<Env> {
       try {
         const handle = await this.env.ARTIFACTS.get(fork);
         const own = await reader(fork);
-        const [head] = await own.log({ ref: handle.defaultBranch, limit: 1 });
+        const { defaultBranch } = await repoInfo(handle);
+        const [head] = await own.log({ ref: defaultBranch, limit: 1 });
         if (!head) throw new SwarmError('The fork has no commits yet. Push the attempt first.');
         const changes = await changedFiles(own, record.baseCommit, head.hash);
         Object.assign(record, {
