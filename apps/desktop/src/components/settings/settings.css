@@ -510,12 +510,16 @@
   margin-top: 0;
   border-bottom: none;
 }
+/* Even space above the first link row and below the last, matching other sections. */
 .project-settings-links {
-  padding-top: 8px;
+  padding-top: 16px;
 }
 .project-settings-links > .settings-row {
   margin: 0;
   padding: 16px 0;
+}
+.project-settings-links > .settings-row:last-child {
+  padding-bottom: 0;
 }
 .project-preferences .settings-row-description {
   overflow-wrap: anywhere;
