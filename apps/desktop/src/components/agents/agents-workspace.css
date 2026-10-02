@@ -94,6 +94,18 @@
 }
 /* The default orchestrator carries the whole card so it reads at a glance
    rather than relying on a label beside the name. */
+/* Agents show their product mark; animated characters belong to bots and live activity. */
+.agent-roster-mark {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 16px;
+  background: var(--color-surface-sunken);
+  color: var(--color-text-primary);
+}
+
 .agent-roster-row[data-default] {
   border-color: color-mix(in srgb, var(--color-accent-ink) 45%, var(--color-border-subtle));
   background: color-mix(in srgb, var(--color-accent-ink) 7%, var(--color-surface));
