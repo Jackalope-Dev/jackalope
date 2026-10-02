@@ -97,7 +97,8 @@
 .workspace-stack > .workspace-section-header {
   margin-bottom: 0;
 }
-.workspace-section + .workspace-section {
+.workspace-section + .workspace-section,
+.workspace-page-layout > :where(:not(.workspace-heading)) + .workspace-section {
   margin-top: var(--workspace-section-gap, 32px);
 }
 .workspace-sections > .workspace-section {
