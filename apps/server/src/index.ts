@@ -8,6 +8,7 @@ import { admin } from './admin';
 import { feedbackSchema, telemetrySchema } from './contracts';
 import { ServiceError as ApiError } from './errors';
 import { deliverFeedback } from './feedback-mail';
+import { lopebase, lopebasePath } from './lopebase';
 import { prune, saveFeedback, saveTelemetry } from './storage';
 
 function json(value: unknown, status = 200) {
@@ -173,6 +174,11 @@ export default {
         const response = await admin(request, env, readJson);
         if (response.ok && request.method === 'POST' && ctx) ctx.waitUntil(deliverAccessMail(env));
         return response;
+      }
+      if (url.pathname === lopebasePath || url.pathname.startsWith(`${lopebasePath}/`)) {
+        const adapter = lopebase(env);
+        if (!adapter) throw new ApiError(404, 'not_found');
+        return await adapter.handle(request);
       }
       if (url.search) throw new ApiError(400, 'query_not_allowed');
       if (url.pathname.startsWith('/updates/')) return await release(request, env, url.pathname);

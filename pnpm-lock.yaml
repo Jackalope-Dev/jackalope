@@ -57,7 +57,7 @@ importers:
         version: 1.1.1(patch_hash=3047bd4e881a0c325944b6b98f8581f900745805ac5e0b572b7ac35a6065821d)(react@19.3.0)
       '@tauri-apps/api':
         specifier: ^2.2.0
-        version: 2.11.1
+        version: 2.12.0
       '@tauri-apps/plugin-opener':
         specifier: 2.5.5
         version: 2.5.5
@@ -140,6 +140,9 @@ importers:
       '@jackalope/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@lopebase/adapter':
+        specifier: ^0.2.0
+        version: 0.2.0
       jose:
         specifier: ^6.2.12
         version: 6.2.12
@@ -943,6 +946,10 @@ packages:
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
 
+  '@lopebase/adapter@0.2.0':
+    resolution: {integrity: sha512-ibtKamF41PJOnYGSuYr/PrWTF083/2R+j56ssXHlBk4B2zt1Pyhs3IuU4CtrZVmen2GPrs0ZznAXOFNGhpQf6g==}
+    engines: {node: '>=18'}
+
   '@oxc-project/types@0.151.0':
     resolution: {integrity: sha512-J1yXrIlNDZVzE3ada310xeAw7nH8yCAyLPuUIsjKatFPmfn5bS1oW+cM+QsGOtVWd5nhSpbwZWx/rue+r5Z+PA==}
 
@@ -1654,9 +1661,6 @@ packages:
     resolution: {integrity: sha512-yYU8cogLeSh/ms2jh8Fj7jaba/EWa7Ja6GoUqYZaraEuCI5YS6ms6ObZgjjedm+jm6XZjdNRWBpPP6Z86oOxcw==}
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7 || ^8
-
-  '@tauri-apps/api@2.11.1':
-    resolution: {integrity: sha512-M2FPuYND2m+wh5hfW9ZpSdxMPdEJovPBWwoHJmwUpysTYNHaOkVFN419m/K0LIgjb/7KU2vBgsUepJWugQCvAA==}
 
   '@tauri-apps/api@2.12.0':
     resolution: {integrity: sha512-fUSxFX8VABYe9W9K5ROdEaKVkNUFRcMSRofjruvaxztXA+I0XnQHcYHF8m/a6iExRUxsUf0HsFWhPBuH9IgzJw==}
@@ -3477,6 +3481,8 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
+  '@lopebase/adapter@0.2.0': {}
+
   '@oxc-project/types@0.151.0': {}
 
   '@pierre/diffs@1.4.1(patch_hash=98dc046e605241bfc2caa85b6cae6b53291a1210f49fb191387a88048a337907)(@shikijs/themes@4.4.3)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
@@ -4108,8 +4114,6 @@ snapshots:
       '@tailwindcss/oxide': 4.3.3
       tailwindcss: 4.3.3
       vite: 8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)
-
-  '@tauri-apps/api@2.11.1': {}
 
   '@tauri-apps/api@2.12.0': {}
 
