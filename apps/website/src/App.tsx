@@ -85,7 +85,7 @@ const faqs = [
     'Can I download Jackalope now?',
     downloadsAvailable
       ? 'Visit the download page for available platforms. Early access requires waitlist approval or a claimed Instant Access Pass.'
-      : 'Approved early-access members can download for macOS, in Stable or Beta, and Linux Beta from the download page after signing in. Windows is coming soon. Join the waitlist and we’ll email you when your access is ready.',
+      : 'macOS and Linux builds, in Stable or Beta, are on the download page. Windows is coming soon. Using the app requires waitlist approval or a claimed Instant Access Pass.',
   ],
   [
     'Does an invitation include a download?',

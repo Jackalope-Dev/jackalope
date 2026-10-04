@@ -16,6 +16,8 @@ import {
   type DesktopPlatform,
   detectDesktopPlatform,
   type PlatformDownload,
+  publicReleaseBuilds,
+  type ReleaseBuild,
 } from './platform-downloads';
 import { WaitlistButton } from './Signup';
 import './download.css';
@@ -27,12 +29,6 @@ interface DownloadMember {
   /** Builds this member can download while they are not public. */
   macos?: ReleaseBuild[];
   linux?: ReleaseBuild[];
-}
-interface ReleaseBuild {
-  id: string;
-  label: string;
-  channel: 'stable' | 'beta';
-  url: string;
 }
 const channelNames = { stable: 'Stable', beta: 'Beta' } as const;
 
@@ -212,7 +208,12 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
       <section className="download-platforms" aria-label="Desktop downloads">
         {ordered.map((option) => {
           const Icon = platformIcons[option.id];
-          const builds = option.id === 'windows' ? undefined : member?.[option.id];
+          const builds =
+            option.id === 'windows'
+              ? undefined
+              : member?.[option.id]?.length
+                ? member[option.id]
+                : publicReleaseBuilds(option.id);
           return (
             <article
               className={`download-platform${option.id === platform ? ' download-platform-detected' : ''}`}
@@ -263,7 +264,7 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
             </h2>
             <p>
               {email && !token
-                ? `You’re signed in as ${email}. ${downloads.some((option) => option.url) || member?.macos?.length || member?.linux?.length ? 'Choose your platform above to get started.' : 'Downloads are coming soon. Your early access is ready when they arrive.'}`
+                ? `You’re signed in as ${email}. Choose your platform above to get started.`
                 : 'Jackalope is in early access. You’ll need to be accepted from the waitlist or claim a friend’s Instant Access Pass to start using the app.'}
             </p>
             {email && !token ? (

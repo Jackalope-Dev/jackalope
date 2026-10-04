@@ -121,8 +121,12 @@ They are embedded in static output and must never contain secrets.
 | `VITE_RELEASE_VERSION` | Matching version, required with an installer URL; not required for the Store. |
 | `VITE_SITE_URL` | Optional HTTPS origin for canonical, social and discovery URLs. |
 
-The public `/download/` page lists all three desktop platforms. A platform without
-a configured URL shows Coming soon. Browser platform hints only reorder the options;
+The public `/download/` page lists all three desktop platforms. macOS and Linux
+offer the public release CDN builds, with a Stable or Beta choice, unless a
+download URL is configured; signed-in members get the access service's equivalent
+links so first downloads are recorded. Windows without a configured URL shows
+Coming soon. The desktop account gate, not the download link, controls who can use
+the app. Browser platform hints only reorder the options;
 mobile devices and unknown platforms keep the neutral ordering. Visiting the page
 never starts a download or opens a Store link automatically.
 
