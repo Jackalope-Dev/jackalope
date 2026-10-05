@@ -8,14 +8,6 @@
   gap: 40px;
   margin-bottom: 48px;
 }
-.download-eyebrow {
-  color: var(--color-accent-ink);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  margin-bottom: 14px;
-}
 .download-heading h1 {
   font-size: clamp(36px, 5.4vw, 64px);
   font-weight: 500;

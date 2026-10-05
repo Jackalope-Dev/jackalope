@@ -160,7 +160,6 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
     <main id="main" className="download-page page-width">
       <header className="download-heading">
         <div>
-          <p className="download-eyebrow">Your next workspace</p>
           <h1>Download Jackalope.</h1>
           <p className="download-lede">
             A little more room for your projects, coding agents, and ideas.

@@ -11,8 +11,8 @@ import './styles.css';
 import './launch.css';
 import './growth.css';
 import './refinement.css';
-import './landing-story.css';
-import './display.css';
+import './header.css';
+import './site.css';
 
 applyThemeTokens(readWebsiteTheme());
 signupCampaign();

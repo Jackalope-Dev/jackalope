@@ -1,5 +1,17 @@
 [
   {
+    "id": "download-jackalope-on-windows-macos-and-linux",
+    "date": "2026-10-04",
+    "status": "Released",
+    "title": "Download Jackalope on Windows, macOS and Linux.",
+    "description": "Desktop builds are now public on every platform. Signing in still needs an approved waitlist spot or an Instant Access Pass.",
+    "items": [
+      "Get Jackalope for Windows from the Microsoft Store.",
+      "Download Apple silicon and Intel builds for macOS, or an AppImage for Linux.",
+      "Choose the Stable release, or opt into Beta builds that arrive sooner."
+    ]
+  },
+  {
     "id": "a-warmer-welcome-and-faster-updates",
     "date": "2026-10-02",
     "status": "In development",

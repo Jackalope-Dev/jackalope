@@ -1,7 +1,7 @@
 import { DiscordIcon, GitHubIcon } from '@jackalope/ui';
 import type { ReactNode } from 'react';
 import { BrandMark } from './BrandMark';
-import { DISCORD_URL } from './community';
+import { DISCORD_URL, GITHUB_URL } from './community';
 import './footer.css';
 
 const groups: Array<{ title: string; links: Array<[string, string, ReactNode?]> }> = [
@@ -49,7 +49,7 @@ const groups: Array<{ title: string; links: Array<[string, string, ReactNode?]> 
       ['Your access & passes', '/access/'],
       ['Questions', '/#questions'],
       ['Join our Discord', DISCORD_URL, <DiscordIcon key="discord" />],
-      ['GitHub', 'https://github.com/Jackalope-Dev/jackalope', <GitHubIcon key="github" />],
+      ['GitHub', GITHUB_URL, <GitHubIcon key="github" />],
       ['Follow on X', 'https://x.com/JackalopeDotDev'],
       ['Join us on Reddit', 'https://www.reddit.com/r/JackalopeDev/'],
     ],

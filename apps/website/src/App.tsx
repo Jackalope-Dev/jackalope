@@ -1,14 +1,15 @@
-import { applyThemeTokens, PRESET_THEMES, type ThemePalette } from '@jackalope/brand/theme';
-import { Button, IconButton, DropdownMenu as Menu } from '@jackalope/ui';
+import { applyThemeTokens, type ThemePalette } from '@jackalope/brand/theme';
+import { Button, GitHubIcon, IconButton, DropdownMenu as Menu } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowDownToLine, ArrowRight, Menu as MenuIcon, Moon, Sun, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { AccessPage } from './Access';
 import { BenchmarksPage } from './Benchmarks';
 import { BrandMark } from './BrandMark';
+import { GITHUB_URL } from './community';
 import { tour } from './content';
 import { DownloadPage } from './Download';
-import { downloadsAvailable } from './download-config';
+import { desktopDownloads, downloadsAvailable } from './download-config';
 import { FeedbackPage } from './Feedback';
 import { Footer } from './Footer';
 import { JournalPage } from './Journal';
@@ -26,8 +27,6 @@ import { setInitialVideoVolume } from './video-volume';
 import { WaitlistPage } from './Waitlist';
 import './knowledge.css';
 
-const version = import.meta.env.VITE_RELEASE_VERSION?.trim();
-
 function DownloadButton({ compact = false }: { compact?: boolean }) {
   if (!downloadsAvailable) return <WaitlistButton compact={compact} />;
   return (
@@ -41,18 +40,30 @@ function DownloadButton({ compact = false }: { compact?: boolean }) {
   );
 }
 
+const platforms = desktopDownloads.some((platform) => platform.id === 'windows' && platform.url)
+  ? 'Windows, macOS and Linux'
+  : 'macOS and Linux';
+
 const faqs = [
   [
     'What is Jackalope?',
-    'Jackalope is a desktop workspace for AI coding agents, including Codex, Claude Code, Gemini CLI, Grok, OpenCode, Kimi Code, and Antigravity. Run tasks in parallel, keep their project context together, and review the changes in one place. Jackalope is prerelease; check the download page for availability.',
+    'Jackalope is a desktop workspace for AI coding agents, including Codex, Claude Code, Gemini CLI, Grok, OpenCode, Kimi Code and Antigravity. Run tasks in parallel, each in its own Git worktree, keep their project context together, and review the changes in one place.',
+  ],
+  [
+    'How do I get access?',
+    'Join the waitlist and verify your email. We are approving new members quickly and will email you when your account is approved; then sign in to the desktop app. A direct invitation or a claimed Instant Access Pass skips the wait. Each verified signup through your referral link earns a day of priority, and approved members receive five passes to share. No payment is needed to join.',
+  ],
+  [
+    'Can I download Jackalope now?',
+    `Yes. Builds for ${platforms} are on the download page. Signing in to the app requires an approved waitlist spot or a claimed Instant Access Pass.`,
   ],
   [
     'Why use it instead of more terminal tabs?',
-    'Each task keeps its brief, agent, account, worktree, questions, and result together. You can see what needs attention and review related changes as one combined patch.',
+    'Each task keeps its brief, agent, account, worktree, questions and result together. You can see what needs attention and review related changes as one combined patch.',
   ],
   [
     'Do I need an AI subscription?',
-    'Bring a supported agent CLI and its provider account. Jackalope does not include model access. Subscription requirements, usage limits, and charges depend on your provider.',
+    'Bring a supported agent CLI and its provider account. Jackalope does not include model access. Subscription requirements, usage limits and charges depend on your provider.',
   ],
   [
     'Does my code stay on my computer?',
@@ -63,33 +74,19 @@ const faqs = [
     'Yes. Create named account profiles and choose project defaults. Continuations retain their selected profile. Antigravity profiles use Gemini API keys; its existing subscription login is shared. Profiles do not isolate local file access.',
   ],
   [
-    'What happens after I join?',
-    'Verify your email to confirm your place and get your referral link. Each verified new signup through your link earns one day of priority. Approved members receive five Instant Access Passes to share. No payment is needed to join.',
-  ],
-  [
-    'Can Jackalope choose an agent, model, and account?',
-    'Yes. Settings → Decisions lets you choose local rules, agent-powered reasoning, or optional Jev-assisted decisions, with project overrides. Local rules use no model call. Routing respects allowed agents, configured models, accounts, tool compatibility, and reported capacity. Recognized quota failures can hand off to an eligible alternative while preserving the work. You can also assign an agent yourself.',
+    'Can Jackalope choose an agent, model and account?',
+    'Yes. Choose local rules, agent-powered reasoning or optional Jev-assisted decisions, with project overrides. Local rules use no model call. Routing respects allowed agents, configured models, accounts, tool compatibility and reported capacity, and recognized quota failures can hand off to an eligible alternative. You can always assign an agent yourself.',
     'routing-question',
   ],
   [
     'Which tools does Jackalope give agents?',
-    'Browse the MCP directory and choose project connections. Selected stdio and HTTP tools support on-demand discovery; direct connection support varies by agent. Built-in tools cover browser interaction, screenshots, accessibility audits, questions, and local verification. Windows desktop control adds accessibility snapshots, window captures, focus, clicks, typing, and scrolling after you select a window for that attempt. A theme-colored glow and status bar show when control is active. Escape or Stop revokes access; mouse or keyboard activity pauses it until you Resume. It operates your live desktop under existing OS permissions. macOS, Linux X11, and GNOME 46 Wayland window control remain in native validation; GNOME requires an optional extension, and other Wayland desktops are unsupported.',
+    'Connect MCP tools from the directory for each project. Built-in tools cover browser interaction, screenshots, accessibility audits, questions and local checks. On Windows, an agent can control an app window you select; a status bar shows when control is active, mouse or keyboard activity pauses it, and Escape revokes it. Desktop control on macOS and Linux is still in validation.',
     'tools-question',
   ],
   [
-    'How do different agents communicate and stay up to date?',
-    'Tasks share a project inventory with ownership, scopes, dependencies, and messages. Agents can send direct task messages or project broadcasts. Jackalope supplies a bounded briefing at launch and continuation, then attaches relevant updates to its own tool responses. Agents can check the durable inbox between those checkpoints. Delivery does not guarantee that an agent has read or acted on an update, and messages do not automatically wake agents, approve changes, or merge work.',
+    'How do agents stay in sync with each other?',
+    'Tasks share a project inventory with ownership, scopes, dependencies and messages. Agents get a briefing at launch and continuation, can message each other, and receive relevant updates through Jackalope tools. Messages do not automatically wake agents, approve changes or merge work.',
     'coordination-question',
-  ],
-  [
-    'Can I download Jackalope now?',
-    downloadsAvailable
-      ? 'Visit the download page for available platforms. Early access requires waitlist approval or a claimed Instant Access Pass.'
-      : 'macOS and Linux builds, in Stable or Beta, are on the download page. Windows is coming soon. Using the app requires waitlist approval or a claimed Instant Access Pass.',
-  ],
-  [
-    'Does an invitation include a download?',
-    'A valid direct invitation skips the waitlist after you verify your email, while the inviter has capacity. Your account shows downloads when a build is available.',
   ],
 ];
 
@@ -101,15 +98,12 @@ export function App({ path = '/' }: { path?: string }) {
   const marketingPage = marketingPages.find((page) => page.path === path);
   const [theme, setTheme] = useState<ThemePalette>(DEFAULT_WEBSITE_THEME);
   const dark = theme.isDark;
-  const palette = PRESET_THEMES.findIndex((preset) => preset.id === theme.id);
   const updateTheme = (next: ThemePalette) => {
     applyThemeTokens(next);
     saveWebsiteTheme(next);
     setTheme(next);
   };
   const setDark = (isDark: boolean) => updateTheme({ ...theme, isDark });
-  const setPalette = (index: number) =>
-    updateTheme({ ...PRESET_THEMES[index], isDark: dark, atmosphere: 18 });
   const [videoOpen, setVideoOpen] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const videoTrigger = useRef<HTMLElement | null>(null);
@@ -150,6 +144,13 @@ export function App({ path = '/' }: { path?: string }) {
                 Member access
               </a>
             )}
+            <a
+              className="icon-button github-link"
+              href={GITHUB_URL}
+              aria-label="Jackalope on GitHub"
+            >
+              <GitHubIcon size={18} />
+            </a>
             <IconButton
               className="icon-button appearance-toggle"
               type="button"
@@ -196,7 +197,6 @@ export function App({ path = '/' }: { path?: string }) {
                     ['Git worktrees for agents', '/git-worktrees-for-ai-agents/'],
                     ['Supported agents', '/agents/'],
                     ['Review AI-generated code', '/guides/review-ai-generated-code/'],
-                    ['Make it yours', '/#atmosphere'],
                     ['Questions', '/#questions'],
                     ['Changelog', '/changelog/'],
                     ['Roadmap', '/roadmap/'],
@@ -215,22 +215,10 @@ export function App({ path = '/' }: { path?: string }) {
 
       {home ? (
         <LandingPage
-          available={downloadsAvailable}
-          releaseVersion={version}
-          action={<DownloadButton />}
-          downloadAction={
-            downloadsAvailable ? (
-              <a className="button button-primary button-download" href="/download/">
-                Choose your platform <ArrowDownToLine size={18} />
-              </a>
-            ) : (
-              <Signup />
-            )
-          }
+          waitlistAction={<WaitlistButton />}
+          signup={<Signup />}
+          platforms={platforms}
           dark={dark}
-          setDark={setDark}
-          palette={palette}
-          setPalette={setPalette}
           onPlay={() => {
             videoTrigger.current = document.activeElement as HTMLElement;
             setVideoError(false);
@@ -239,7 +227,7 @@ export function App({ path = '/' }: { path?: string }) {
           faqs={faqs}
         />
       ) : path === '/tour/' ? (
-        <TourPage dark={dark} available={downloadsAvailable} />
+        <TourPage dark={dark} />
       ) : path === '/download/' ? (
         <DownloadPage />
       ) : path === '/feedback/' ? (

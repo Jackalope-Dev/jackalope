@@ -192,6 +192,7 @@ h3 {
   background:
     linear-gradient(var(--download-fill), var(--download-fill)) padding-box,
     var(--color-spectrum) border-box;
+  background-color: var(--download-fill);
   box-shadow:
     0 2px 4px color-mix(in srgb, var(--color-text-primary) 12%, transparent),
     0 8px 24px -8px var(--color-accent-glow),
@@ -219,6 +220,7 @@ h3 {
   background:
     linear-gradient(var(--download-fill), var(--download-fill)) padding-box,
     var(--color-spectrum) border-box;
+  background-color: var(--download-fill);
   box-shadow:
     0 3px 6px color-mix(in srgb, var(--color-text-primary) 16%, transparent),
     0 12px 30px -7px var(--color-accent-glow),

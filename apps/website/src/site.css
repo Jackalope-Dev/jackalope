@@ -1,0 +1,24 @@
+/* Site-wide alignment with the home page: the floating header overlays each page, and
+   page headings share the home page's display type. Loaded last. */
+.site-header {
+  margin-bottom: calc(-1 * var(--header-height));
+}
+/* Full-bleed heroes run beneath the header; a transparent border keeps their content
+   clear of it while their own background paints underneath. */
+#main:is(.acquisition-page, .roadmap-page, .product-tour) > :first-child {
+  border-top: var(--header-height) solid transparent;
+  background-origin: border-box;
+}
+#main:not(.lp, .acquisition-page, .roadmap-page, .product-tour) {
+  margin-top: var(--header-height);
+}
+
+#main:not(.lp) h1 {
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+#main:not(.lp) h2 {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}

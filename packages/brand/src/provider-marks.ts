@@ -1,4 +1,4 @@
-// Generated from @lobehub/icons 5.22.0 (MIT, Copyright (c) 2023 LobeHub); see public/licenses/lobehub-icons.txt.
+// Generated from @lobehub/icons 5.22.0 (MIT, Copyright (c) 2023 LobeHub); each app ships public/licenses/lobehub-icons.txt.
 // Each mark is a trademark of its owner, shown only to identify that product.
 export interface ProviderMarkData {
   title: string;
