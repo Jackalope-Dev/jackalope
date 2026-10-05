@@ -1,4 +1,4 @@
-import { Checkbox, FormField, Input, Textarea } from '@jackalope/ui';
+import { Checkbox, FormField, Input, Switch, Textarea } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -18,6 +18,7 @@ import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '..
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { BotAppearancePicker } from './BotAppearancePicker';
+import { BotWakes } from './BotWakes';
 
 const STEPS = [
   { id: 'look', title: 'Name and look', description: 'Give your bot a name and a face.' },
@@ -35,6 +36,11 @@ const STEPS = [
     id: 'apps',
     title: 'Apps and tools',
     description: 'Choose which connections its conversations can use.',
+  },
+  {
+    id: 'wakes',
+    title: 'Wake-ups and teamwork',
+    description: 'Choose what wakes it on its own and whether it works with other bots.',
   },
 ] as const;
 
@@ -54,6 +60,7 @@ export function BotEditor({
   const [draft, setDraft] = useState<BotDraft>(initial);
   const [step, setStep] = useState(0);
   const [error, setError] = useState('');
+  const [wakeOpen, setWakeOpen] = useState(false);
   const servers = useMcpStore((state) => state.servers);
   const project = projects.find((item) => item.id === draft.projectId);
   useEffect(() => {
@@ -92,6 +99,10 @@ export function BotEditor({
     setStep(index);
   };
   const save = () => {
+    if (wakeOpen) {
+      setError('Save or cancel the wake-up you are editing first.');
+      return;
+    }
     const message = validateBot(draft);
     if (message) {
       setError(message);
@@ -284,6 +295,44 @@ export function BotEditor({
                     </p>
                   ))}
               </fieldset>
+            )}
+            {show(4) && (
+              <>
+                {heading(4)}
+                <label className="bot-editor-choice bot-editor-teamwork">
+                  <Switch
+                    checked={draft.collaborate}
+                    onCheckedChange={(collaborate) => patch({ collaborate })}
+                    aria-describedby="bot-teamwork-help"
+                  />
+                  <span>
+                    <strong>Works with other bots</strong>
+                    <small id="bot-teamwork-help">
+                      It can find other bots, ask them for help and take their requests. Each
+                      message appears in both conversations.
+                    </small>
+                  </span>
+                </label>
+                <div className="bot-editor-field">
+                  <span className="bot-editor-label">Wake-ups</span>
+                  <p className="form-field-description">
+                    A wake-up continues its latest open conversation or starts a new one, and you
+                    can follow it on the Bots page. Conversations a bot starts pause after 20
+                    replies until you resume them.
+                  </p>
+                  <BotWakes
+                    wakes={draft.wakes}
+                    projectId={draft.projectId}
+                    connectionIds={draft.connectionIds}
+                    connections={connections.map((server) => ({
+                      id: server.id,
+                      name: server.name,
+                    }))}
+                    onChange={(wakes) => patch({ wakes })}
+                    onEditingChange={setWakeOpen}
+                  />
+                </div>
+              </>
             )}
           </div>
           {error && <InlineNotice tone="error">{error}</InlineNotice>}

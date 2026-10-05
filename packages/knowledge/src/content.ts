@@ -235,18 +235,18 @@ export const knowledgeGuides: KnowledgeGuide[] = [
   {
     slug: 'bots',
     category: 'agents',
-    title: 'Create bots for repeated work',
+    title: 'Create bots that work on their own',
     shortTitle: 'Bots',
     description:
-      'Save an agent with a role, instructions and the tools it may use, then ask it questions or run it on a schedule.',
-    readingTime: '3 min read',
+      'Save an agent with a role, instructions and the tools it may use, then talk to it, let it wake up on its own and work with other bots.',
+    readingTime: '4 min read',
     sections: [
       {
         id: 'what-is-a-bot',
         question: 'What is a bot?',
         paragraphs: [
           'A bot is a saved agent profile: a name, a role, standing instructions, an agent and model, a project and the connected apps it may use. Each bot keeps the character and color you choose, everywhere it appears.',
-          'Templates cover reviewing, fixing, testing, documentation, security, release notes and onboarding. A template fills in the editor; it never grants access, enables connections or starts work on its own.',
+          'Templates cover reviewing, fixing, testing, documentation, security, release notes and onboarding. A template fills in the editor, including a suggested wake-up that starts turned off; it never grants access, enables connections or starts work on its own.',
         ],
       },
       {
@@ -257,18 +257,36 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Name and look: give the bot a name, a character and a color.',
           'Project and agent: choose its project, agent and model.',
           'Role and instructions: describe its job in up to 6,000 characters.',
-          'Apps and tools: choose which connected apps it may use, then save.',
+          'Apps and tools: choose which connected apps it may use.',
+          'Wake-ups and teamwork: choose what wakes it and whether it works with other bots, then save.',
         ],
         paragraphs: [
-          'Edits apply to new conversations and routines. Existing conversations keep the settings they started with.',
+          'Edits apply to new conversations. Existing conversations keep the settings they started with.',
         ],
       },
       {
         id: 'talk',
-        question: 'How do conversations and routines work?',
+        question: 'How do conversations work?',
         paragraphs: [
           'Message a bot from the Bots page. Its role and instructions are sent with every message, so it stays in character across follow-ups and restarts. Bot conversations stay on the Bots page rather than in Work, and they skip workspace preparation and automatic checks so answers arrive quickly.',
-          'A routine runs a bot on a schedule. Routines are ordinary automations: change their timing, see their history or add a webhook in Automations. Deleting a bot keeps its past conversations.',
+          'Bots can show you cards: a decision with options, a question, a suggested next step, sources they used or an update. Answer a card from the conversation or from the bot’s Needs you section, and the bot continues with your answer. The Bots item in the sidebar counts cards and suggestions waiting on you, and with notifications on, Jackalope tells you when a bot needs you while it is in the background.',
+        ],
+      },
+      {
+        id: 'wake-ups',
+        question: 'How do bots wake up on their own?',
+        paragraphs: [
+          'A wake-up works without you: on a schedule, when the project or a path in it changes on the target branch, or when a connected app returns new data. For connected apps, choose a tool the connection marks read-only and how often to check; the first check records the current result and later differences wake the bot.',
+          'It continues its latest conversation while that conversation is open, so the bot builds on earlier runs; finishing or pausing the conversation makes the next wake-up start fresh. Each wake-up shows when it runs next and what happened last. Use Run now to try one immediately. Choose Pause all wake-ups from the options beside Create a new bot to stop them for every bot; Run now still works. Wake-ups missed while Jackalope was closed are skipped, a bot wakes at most 12 times an hour, and conversations a bot starts pause after 20 replies until you resume them.',
+          'Routines created before wake-ups existed keep running as automations; manage their timing and history in Automations.',
+        ],
+      },
+      {
+        id: 'teamwork',
+        question: 'How do bots work together?',
+        paragraphs: [
+          'With teamwork on, a bot can look up your other bots, send one a request and receive its reply in the same conversation. Both conversations show who sent each message, and the bot’s activity lists every hand-off. A bot’s message is never treated as your approval.',
+          'Bots can also suggest a new bot when work has no owner. Review the suggestion to open the editor with its details, or dismiss it; nothing is created until you save. Turn off Works with other bots to keep a bot to itself. Deleting a bot keeps its past conversations and stops its wake-ups.',
         ],
       },
     ],

@@ -1,27 +1,40 @@
-import {
-  ConfirmDialog,
-  FormField,
-  Input,
-  DropdownMenu as Menu,
-  Switch,
-  Textarea,
-} from '@jackalope/ui';
+import { ConfirmDialog, DropdownMenu as Menu, Switch, Textarea } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { CalendarClock, MessageSquare, MoreHorizontal, Pin, Plus } from 'lucide-react';
+import {
+  AlarmClock,
+  ArrowRightLeft,
+  Bot as BotIcon,
+  MessageSquare,
+  MoreHorizontal,
+  Pin,
+  Plus,
+  Sparkles,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import {
+  type BotProposal,
+  botRequest,
+  describeWake,
+  type HubEvent,
+  needsYou,
+  resolveProposal,
+  setWakeUpsPaused,
+  useBotHubStore,
+  type WakeState,
+  wakeNow,
+} from '../../lib/bot-hub';
 import { BOT_TEMPLATES, type BotTemplate } from '../../lib/bot-templates';
 import { type LiveSession, sessionCommand } from '../../lib/live-session';
-import { scheduleTimingExpression } from '../../lib/schedules';
-import { nativeTask, type RunRequest } from '../../lib/task-runtime';
+import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import {
   BOT_STYLES,
   type Bot,
   type BotDraft,
+  type BotWake,
   rosterOrder,
-  routinePrompt,
   useBotStore,
 } from '../../stores/botStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -30,11 +43,11 @@ import { LiveSessionView } from '../sessions/LiveSessionView';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { BotAvatar } from './BotAvatar';
+import { BotCardView } from './BotCardView';
 import { BotEditor } from './BotEditor';
 import './bots.css';
 
@@ -43,6 +56,10 @@ interface ScheduleLedger {
     definition: { id: string; name: string; enabled: boolean; expression: string };
     nextAt: string;
   }[];
+}
+
+function randomStyle() {
+  return BOT_STYLES[Math.floor(Math.random() * BOT_STYLES.length)].id;
 }
 
 function blankDraft(projectId: string, template?: BotTemplate): BotDraft {
@@ -54,45 +71,65 @@ function blankDraft(projectId: string, template?: BotTemplate): BotDraft {
     model: null,
     projectId,
     connectionIds: null,
-    appearance: template?.appearance ?? {
-      style: BOT_STYLES[Math.floor(Math.random() * BOT_STYLES.length)].id,
-      color: 'accent',
-    },
+    appearance: template?.appearance ?? { style: randomStyle(), color: 'accent' },
+    collaborate: true,
+    // A template's suggested schedule starts off: templates never start work by themselves.
+    wakes: template?.routine
+      ? [
+          {
+            id: crypto.randomUUID(),
+            name: template.routine.name,
+            prompt: template.routine.prompt,
+            enabled: false,
+            trigger: {
+              kind: 'schedule',
+              expression: template.routine.expression,
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            },
+          },
+        ]
+      : [],
   };
 }
 
-/**
- * Builds the run request a bot's conversation or routine starts with. Conversations
- * skip workspace preparation and automatic checks so a quick question answers quickly;
- * the agent can still run the saved check itself. Routines prepare and verify as tasks do.
- */
-function botRequest(
-  bot: Bot,
-  project: Project,
-  id: string,
-  prompt: string,
-  conversation = false,
-): RunRequest {
+function proposalDraft(proposal: BotProposal, projectId: string): BotDraft {
+  return {
+    ...blankDraft(projectId),
+    name: proposal.name,
+    role: proposal.role,
+    instructions: proposal.instructions,
+    wakes: proposal.wake
+      ? [
+          {
+            id: crypto.randomUUID(),
+            name: proposal.wake.name,
+            prompt: proposal.wake.prompt,
+            enabled: true,
+            trigger: {
+              kind: 'schedule',
+              expression: proposal.wake.expression,
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            },
+          },
+        ]
+      : [],
+  };
+}
+
+function profileFor(bot: Bot, project: Project) {
   const adapter =
     useAgentConfigStore.getState().customAgents.find((agent) => agent.id === bot.agent)?.adapter ??
     bot.agent;
-  return {
-    id,
-    projectId: project.id,
-    projectName: project.name,
-    projectPath: project.path,
-    agent: bot.agent,
-    model: bot.agent === 'auto' ? undefined : bot.model?.id,
-    agentProfileId: bot.agent === 'auto' ? undefined : agentAccountFor(project, adapter),
-    connectionIds: bot.connectionIds ?? undefined,
-    prompt,
-    isolated: true,
-    targetBranch: project.preferences?.baseBranch || project.gitBranch,
-    verifyCommand: project.preferences?.verifyCommand,
-    prepareCommand: conversation ? undefined : project.preferences?.prepareCommand,
-    setupFiles: project.preferences?.setupFiles,
-    autoVerify: conversation ? false : (project.preferences?.autoVerify ?? true),
-  };
+  return agentAccountFor(project, adapter);
+}
+
+/** How a conversation started when the person did not start it. */
+function conversationOrigin(session: LiveSession) {
+  const origin = session.messages[0]?.origin;
+  if (!origin) return '';
+  if (origin.kind === 'wake') return 'Woke up';
+  if (origin.kind === 'card') return 'Your answer';
+  return origin.label;
 }
 
 export function BotsWorkspace() {
@@ -103,11 +140,25 @@ export function BotsWorkspace() {
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
   const sessions = useLiveSessionStore((state) => state.sessions);
   const sessionRuns = useLiveSessionStore((state) => state.runs);
+  const hub = useBotHubStore(
+    useShallow((state) => ({
+      cards: state.cards,
+      proposals: state.proposals,
+      events: state.events,
+      wakes: state.wakes,
+      paused: state.paused,
+      error: state.error,
+    })),
+  );
   const [openId, setOpenId] = useState<string | null>(null);
   const [pickingTemplate, setPickingTemplate] = useState(false);
   const open = sessions.find((session) => session.id === openId && session.persona);
   useEffect(observeLiveSessions, []);
-  const [editing, setEditing] = useState<{ bot?: Bot; draft: BotDraft } | null>(null);
+  const [editing, setEditing] = useState<{
+    bot?: Bot;
+    draft: BotDraft;
+    proposalId?: string;
+  } | null>(null);
   const [deleting, setDeleting] = useState<Bot | null>(null);
   const roster = useMemo(() => rosterOrder(bots), [bots]);
   const selected = bots.find((bot) => bot.id === selectedId) ?? roster[0];
@@ -122,6 +173,15 @@ export function BotsWorkspace() {
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     [sessions],
   );
+  // Opening another bot's conversation, such as one a message came from, selects that bot too.
+  const openSession = useCallback(
+    (id: string) => {
+      const botId = sessions.find((session) => session.id === id)?.persona?.botId;
+      if (botId) useBotStore.getState().select(botId);
+      setOpenId(id);
+    },
+    [sessions],
+  );
   const startNew = (template?: BotTemplate) =>
     setEditing({ draft: blankDraft(defaultProject, template) });
   return (
@@ -129,15 +189,31 @@ export function BotsWorkspace() {
       <WorkspaceHeading
         title="Bots"
         action={
-          <Button onClick={() => startNew()} disabled={!projects.length}>
-            <Plus size={16} aria-hidden="true" />
-            Create a new bot
-          </Button>
+          <div className="bots-heading-actions">
+            {bots.length > 0 && <HubMenu paused={hub.paused} />}
+            <Button onClick={() => startNew()} disabled={!projects.length}>
+              <Plus size={16} aria-hidden="true" />
+              Create a new bot
+            </Button>
+          </div>
         }
       />
+      {hub.paused && bots.length > 0 && (
+        <InlineNotice
+          tone="warning"
+          action={
+            <Button variant="outline" onClick={() => void setWakeUpsPaused(false)}>
+              Resume wake-ups
+            </Button>
+          }
+        >
+          Wake-ups are paused. Bots only work when you message them or use Run now.
+        </InlineNotice>
+      )}
       {!projects.length && (
         <InlineNotice>Add a project first. Each bot works inside one project.</InlineNotice>
       )}
+      {hub.error && <InlineNotice tone="error">{hub.error}</InlineNotice>}
       {bots.length === 0 ? (
         <BotTemplates disabled={!projects.length} onUse={(template) => startNew(template)} />
       ) : (
@@ -145,6 +221,7 @@ export function BotsWorkspace() {
           <nav className="bots-roster" aria-label="Bots">
             {roster.map((bot) => {
               const latest = conversationsFor(bot)[0];
+              const waiting = needsYou(hub, bot.id).count;
               return (
                 <div
                   key={bot.id}
@@ -155,7 +232,11 @@ export function BotsWorkspace() {
                     type="button"
                     className="bots-roster-open"
                     aria-current={bot.id === selected?.id ? 'true' : undefined}
-                    onClick={() => useBotStore.getState().select(bot.id)}
+                    aria-label={waiting ? `${bot.name}, ${waiting} waiting on you` : undefined}
+                    onClick={() => {
+                      useBotStore.getState().select(bot.id);
+                      setOpenId(null);
+                    }}
                   >
                     <BotAvatar appearance={bot.appearance} agent={bot.agent} />
                     <span className="bots-roster-copy">
@@ -165,6 +246,11 @@ export function BotsWorkspace() {
                       </strong>
                       <small>{latest?.title ?? (bot.role || 'No conversations yet')}</small>
                     </span>
+                    {waiting > 0 && (
+                      <small className="bots-roster-count" aria-hidden="true">
+                        {waiting}
+                      </small>
+                    )}
                   </button>
                   <BotMenu
                     bot={bot}
@@ -191,6 +277,7 @@ export function BotsWorkspace() {
                 runs={sessionRuns}
                 initialDetailsOpen={false}
                 onBack={() => setOpenId(null)}
+                onOpenSession={openSession}
                 simple
               />
             </div>
@@ -199,10 +286,24 @@ export function BotsWorkspace() {
               <BotProfile
                 key={selected.id}
                 bot={selected}
+                bots={bots}
                 project={projects.find((project) => project.id === selected.projectId)}
                 conversations={conversationsFor(selected)}
+                proposals={hub.proposals.filter(
+                  (item) => item.status === 'open' && item.fromBotId === selected.id,
+                )}
+                events={hub.events.filter(
+                  (event) => event.botId === selected.id || event.otherBotId === selected.id,
+                )}
+                wakeStates={hub.wakes}
                 onEdit={() => setEditing({ bot: selected, draft: selected })}
-                onOpen={setOpenId}
+                onOpen={openSession}
+                onReviewProposal={(proposal) =>
+                  setEditing({
+                    draft: proposalDraft(proposal, selected.projectId),
+                    proposalId: proposal.id,
+                  })
+                }
               />
             )
           )}
@@ -232,7 +333,10 @@ export function BotsWorkspace() {
           onSave={(draft) => {
             const store = useBotStore.getState();
             if (editing.bot) store.update(editing.bot.id, draft);
-            else store.create(draft);
+            else {
+              const id = store.create(draft);
+              if (editing.proposalId) void resolveProposal(editing.proposalId, 'accept', id);
+            }
             setEditing(null);
           }}
         />
@@ -242,7 +346,7 @@ export function BotsWorkspace() {
           open
           onOpenChange={(open) => !open && setDeleting(null)}
           title={`Delete ${deleting.name}?`}
-          description="Its conversations stay in Work and its routines stay in Automations. Only the saved bot is removed."
+          description="Its conversations and routines stay. Its wake-ups stop, and other bots can no longer message it."
           label="Delete bot"
           onConfirm={() => {
             useBotStore.getState().remove(deleting.id);
@@ -281,6 +385,28 @@ function BotTemplates({
         ))}
       </ul>
     </section>
+  );
+}
+
+function HubMenu({ paused }: { paused: boolean }) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button variant="outline" aria-label="Bot options">
+          <MoreHorizontal size={16} aria-hidden="true" />
+        </Button>
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
+          <Menu.Item
+            className="workspace-menu-item"
+            onSelect={() => void setWakeUpsPaused(!paused)}
+          >
+            {paused ? 'Resume all wake-ups' : 'Pause all wake-ups'}
+          </Menu.Item>
+        </Menu.Content>
+      </Menu.Portal>
+    </Menu.Root>
   );
 }
 
@@ -329,17 +455,28 @@ function BotMenu({
 
 function BotProfile({
   bot,
+  bots,
   project,
   conversations,
+  proposals,
+  events,
+  wakeStates,
   onEdit,
   onOpen,
+  onReviewProposal,
 }: {
   bot: Bot;
+  bots: Bot[];
   project?: Project;
   conversations: LiveSession[];
+  proposals: BotProposal[];
+  events: HubEvent[];
+  wakeStates: WakeState[];
   onEdit: () => void;
   onOpen: (id: string) => void;
+  onReviewProposal: (proposal: BotProposal) => void;
 }) {
+  const cards = useBotHubStore(useShallow((state) => needsYou(state, bot.id).cards));
   const draftKey = `jackalope-bot-draft:${bot.id}`;
   const [text, setText] = useState(() => localStorage.getItem(draftKey) ?? '');
   const [busy, setBusy] = useState(false);
@@ -368,7 +505,7 @@ function BotProfile({
       await syncAgentConfig();
       await sessionCommand('create', {
         id: attempt.id,
-        request: botRequest(bot, project, attempt.id, value, true),
+        request: botRequest(bot, project, attempt.id, value, true, profileFor(bot, project)),
         firstMessage: { id: attempt.messageId, text: value },
         limits: { maxBatches: null, pauseAtEstimatedUsd: null },
         persona: { botId: bot.id, name: bot.name, instructions: bot.instructions },
@@ -383,6 +520,7 @@ function BotProfile({
       setBusy(false);
     }
   };
+  const nameOf = (id: string | null) => bots.find((item) => item.id === id)?.name;
   return (
     <section className="bots-profile" aria-label={bot.name}>
       <header className="bots-profile-header">
@@ -401,7 +539,8 @@ function BotProfile({
             </Button>
           }
         >
-          This bot’s project is no longer in Jackalope. Edit the bot to choose another project.
+          This bot’s project is no longer in Jackalope. Edit the bot to choose another project. Its
+          wake-ups are paused until then.
         </InlineNotice>
       )}
       <form
@@ -438,43 +577,309 @@ function BotProfile({
           </Button>
         </div>
       </form>
+      {(cards.length > 0 || proposals.length > 0) && (
+        <section className="workspace-section workspace-stack">
+          <WorkspaceSectionHeading title="Needs you" />
+          <div className="bots-cards">
+            {cards.map((card) => (
+              <BotCardView key={card.id} card={card} onOpenConversation={onOpen} />
+            ))}
+            {proposals.map((proposal) => (
+              <ProposalCard
+                key={proposal.id}
+                proposal={proposal}
+                onReview={() => onReviewProposal(proposal)}
+                onOpen={() => onOpen(proposal.sessionId)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
       <section className="workspace-section workspace-stack">
         <WorkspaceSectionHeading title="Conversations" />
         {conversations.length ? (
           <ul className="bots-list">
-            {conversations.slice(0, 12).map((session) => (
-              <li key={session.id}>
-                <button type="button" className="bots-list-row" onClick={() => onOpen(session.id)}>
-                  <MessageSquare size={16} aria-hidden="true" />
-                  <span>{session.title}</span>
-                  <small>
-                    {session.closed ? 'Finished · ' : ''}
-                    {new Date(session.updatedAt).toLocaleString()}
-                  </small>
-                </button>
-              </li>
-            ))}
+            {conversations.slice(0, 12).map((session) => {
+              const origin = conversationOrigin(session);
+              return (
+                <li key={session.id}>
+                  <button
+                    type="button"
+                    className="bots-list-row"
+                    onClick={() => onOpen(session.id)}
+                  >
+                    {origin === 'Woke up' ? (
+                      <AlarmClock size={16} aria-hidden="true" />
+                    ) : origin ? (
+                      <ArrowRightLeft size={16} aria-hidden="true" />
+                    ) : (
+                      <MessageSquare size={16} aria-hidden="true" />
+                    )}
+                    <span>{session.title}</span>
+                    <small>
+                      {origin ? `${origin} · ` : ''}
+                      {session.closed ? 'Finished · ' : session.paused ? 'Paused · ' : ''}
+                      {new Date(session.updatedAt).toLocaleString()}
+                    </small>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <p className="task-muted">Send a message to start the first conversation.</p>
         )}
       </section>
-      {project && <BotRoutines bot={bot} project={project} />}
+      <BotWakeList
+        bot={bot}
+        project={project}
+        states={wakeStates}
+        onEdit={onEdit}
+        onOpen={onOpen}
+      />
+      {events.length > 0 && (
+        <section className="workspace-section workspace-stack">
+          <WorkspaceSectionHeading
+            title="Activity"
+            description={
+              bot.collaborate
+                ? 'Wake-ups, messages with other bots and cards.'
+                : 'Wake-ups and cards. Messaging other bots is off.'
+            }
+          />
+          <ul className="bots-list bots-activity">
+            {events
+              .slice(-12)
+              .reverse()
+              .map((event) => (
+                <li key={event.id}>
+                  <ActivityRow
+                    event={event}
+                    other={nameOf(event.botId === bot.id ? event.otherBotId : event.botId)}
+                    onOpen={onOpen}
+                  />
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
+      {project && bot.routineIds.length > 0 && <BotRoutines bot={bot} />}
     </section>
   );
 }
 
-function BotRoutines({ bot, project }: { bot: Bot; project: Project }) {
-  const [ledger, setLedger] = useState<ScheduleLedger | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [error, setError] = useState('');
-  const template = BOT_TEMPLATES.find((item) => item.name === bot.name)?.routine;
-  const [name, setName] = useState(template?.name ?? '');
-  const [task, setTask] = useState(template?.prompt ?? '');
-  const [repeat, setRepeat] = useState('weekdays');
-  const [time, setTime] = useState('09:00');
-  const [enabled, setEnabled] = useState(true);
+function ProposalCard({
+  proposal,
+  onReview,
+  onOpen,
+}: {
+  proposal: BotProposal;
+  onReview: () => void;
+  onOpen: () => void;
+}) {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  return (
+    <article className="bot-card" data-kind="proposal">
+      <header className="bot-card-header">
+        <Sparkles size={16} aria-hidden="true" />
+        <span>
+          <small>Suggested bot</small>
+          <strong>
+            {proposal.name} · {proposal.role}
+          </strong>
+        </span>
+      </header>
+      <p className="bot-card-body">{proposal.reason}</p>
+      {proposal.wake && (
+        <p className="bot-card-body task-muted">
+          Wakes up:{' '}
+          {describeWake({
+            id: '',
+            name: proposal.wake.name,
+            prompt: proposal.wake.prompt,
+            enabled: true,
+            trigger: { kind: 'schedule', expression: proposal.wake.expression, timezone: '' },
+          })}{' '}
+          · {proposal.wake.name}
+        </p>
+      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <footer className="bot-card-footer">
+        <Button variant="ghost" onClick={onOpen}>
+          Open conversation
+        </Button>
+        <Button
+          variant="ghost"
+          loading={busy}
+          loadingLabel="Dismissing…"
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await resolveProposal(proposal.id, 'dismiss');
+            } catch (cause) {
+              setError(String(cause));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Dismiss
+        </Button>
+        <Button onClick={onReview}>
+          <BotIcon size={16} aria-hidden="true" />
+          Review and create
+        </Button>
+      </footer>
+    </article>
+  );
+}
+
+function ActivityRow({
+  event,
+  other,
+  onOpen,
+}: {
+  event: HubEvent;
+  other?: string;
+  onOpen: (id: string) => void;
+}) {
+  const content = (
+    <>
+      {event.kind === 'wake' || event.kind === 'skipped' ? (
+        <AlarmClock size={16} aria-hidden="true" />
+      ) : event.kind === 'message' || event.kind === 'reply' ? (
+        <ArrowRightLeft size={16} aria-hidden="true" />
+      ) : (
+        <Sparkles size={16} aria-hidden="true" />
+      )}
+      <span>
+        {event.text}
+        {other && event.kind === 'reply' ? ` to ${other}` : ''}
+      </span>
+      <small>{new Date(event.at).toLocaleString()}</small>
+    </>
+  );
+  return event.sessionId ? (
+    <button type="button" className="bots-list-row" onClick={() => onOpen(event.sessionId ?? '')}>
+      {content}
+    </button>
+  ) : (
+    <div className="bots-list-row" data-static>
+      {content}
+    </div>
+  );
+}
+
+function BotWakeList({
+  bot,
+  project,
+  states,
+  onEdit,
+  onOpen,
+}: {
+  bot: Bot;
+  project?: Project;
+  states: WakeState[];
+  onEdit: () => void;
+  onOpen: (id: string) => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const setWake = (id: string, patch: Partial<BotWake>) => {
+    try {
+      useBotStore.getState().update(bot.id, {
+        wakes: bot.wakes.map((wake) => (wake.id === id ? { ...wake, ...patch } : wake)),
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  };
+  return (
+    <section className="workspace-section workspace-stack">
+      <WorkspaceSectionHeading
+        title="Wake-ups"
+        description="Wake-ups start or continue conversations on their own."
+        action={
+          <Button variant="outline" onClick={onEdit}>
+            <AlarmClock size={16} aria-hidden="true" />
+            {bot.wakes.length ? 'Edit wake-ups' : 'Add wake-up'}
+          </Button>
+        }
+      />
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      {bot.wakes.length ? (
+        <ul className="bots-list">
+          {bot.wakes.map((wake) => {
+            const state = states.find((item) => item.wakeId === wake.id);
+            const status = !wake.enabled
+              ? 'Off'
+              : [
+                  state?.lastOutcome,
+                  wake.trigger.kind === 'schedule' && state?.nextCheckAt
+                    ? `Next ${new Date(state.nextCheckAt).toLocaleString()}`
+                    : state?.lastCheckedAt
+                      ? `Checked ${new Date(state.lastCheckedAt).toLocaleTimeString()}`
+                      : 'Starting',
+                ]
+                  .filter(Boolean)
+                  .join(' · ');
+            return (
+              <li key={wake.id} className="bots-routine">
+                <span>
+                  <strong>{wake.name}</strong>
+                  <small>{describeWake(wake)}</small>
+                  <small>{status}</small>
+                </span>
+                <span className="bot-wake-actions">
+                  {state?.lastSessionId && (
+                    <Button variant="ghost" onClick={() => onOpen(state.lastSessionId ?? '')}>
+                      Latest
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    disabled={!project || !isTauriEnvironment() || busy !== null}
+                    loading={busy === wake.id}
+                    loadingLabel="Waking…"
+                    onClick={async () => {
+                      setBusy(wake.id);
+                      setError('');
+                      try {
+                        onOpen(await wakeNow(bot.id, wake.id));
+                        await useLiveSessionStore.getState().refresh(null);
+                      } catch (cause) {
+                        setError(String(cause));
+                      } finally {
+                        setBusy(null);
+                      }
+                    }}
+                  >
+                    Run now
+                  </Button>
+                  <Switch
+                    aria-label={`Turn on ${wake.name}`}
+                    checked={wake.enabled}
+                    onCheckedChange={(enabled) => setWake(wake.id, { enabled })}
+                  />
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="task-muted">
+          Wake {bot.name} on a schedule, when the project changes or when a connection has new data.
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** Schedules created as routines before wake-ups existed. Timing and history stay in Automations. */
+function BotRoutines({ bot }: { bot: Bot }) {
+  const [ledger, setLedger] = useState<ScheduleLedger | null>(null);
+  const [error, setError] = useState('');
   const read = useCallback(async () => {
     if (!isTauriEnvironment()) return;
     try {
@@ -495,133 +900,43 @@ function BotRoutines({ bot, project }: { bot: Bot; project: Project }) {
       if (!ledger.schedules.some((schedule) => schedule.definition.id === id))
         useBotStore.getState().forgetRoutine(id);
   }, [ledger, bot.routineIds]);
-  const save = async () => {
-    const expression = scheduleTimingExpression(repeat, time, '1');
-    if (!name.trim() || !task.trim() || !expression) {
-      setError('Name the routine, describe the work and choose a valid time.');
-      return;
-    }
-    setBusy(true);
-    setError('');
-    try {
-      await syncAgentConfig();
-      const id = crypto.randomUUID();
-      const prompt = routinePrompt(bot, task);
-      await nativeTask('schedule_save', {
-        definition: {
-          id,
-          name: `${bot.name}: ${name.trim()}`.slice(0, 160),
-          expression,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          rawPrompt: prompt,
-          missed: 'skip',
-          enabled,
-          request: { ...botRequest(bot, project, id, prompt), autoVerify: false },
-        },
-      });
-      useBotStore.getState().addRoutine(bot.id, id);
-      setAdding(false);
-      setName('');
-      setTask('');
-      await read();
-    } catch (cause) {
-      setError(String(cause));
-    } finally {
-      setBusy(false);
-    }
-  };
+  if (!routines.length && !error) return null;
   return (
     <section className="workspace-section workspace-stack">
       <WorkspaceSectionHeading
         title="Routines"
-        description="Manage timing and history in Automations."
-        action={
-          !adding && (
-            <Button variant="outline" onClick={() => setAdding(true)}>
-              <CalendarClock size={16} aria-hidden="true" />
-              Add routine
-            </Button>
-          )
-        }
+        description="Earlier scheduled tasks. Manage timing and history in Automations."
       />
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
-      {routines.length > 0 && (
-        <ul className="bots-list">
-          {routines.map((routine) => (
-            <li key={routine.definition.id} className="bots-routine">
-              <span>
-                <strong>{routine.definition.name.replace(`${bot.name}: `, '')}</strong>
-                <small>
-                  {routine.definition.enabled
-                    ? `Next run ${new Date(routine.nextAt).toLocaleString()}`
-                    : 'Paused'}
-                </small>
-              </span>
-              <Switch
-                aria-label={`Run ${routine.definition.name}`}
-                checked={routine.definition.enabled}
-                onCheckedChange={async (next) => {
-                  try {
-                    await nativeTask('schedule_set_enabled', {
-                      id: routine.definition.id,
-                      enabled: next,
-                    });
-                    await read();
-                  } catch (cause) {
-                    setError(String(cause));
-                  }
-                }}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-      {!routines.length && !adding && <p className="task-muted">No routines yet.</p>}
-      {adding && (
-        <form
-          className="bots-routine-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void save();
-          }}
-        >
-          <FormField label="Routine name">
-            <Input
-              value={name}
-              maxLength={100}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Weekly dependency check"
+      <ul className="bots-list">
+        {routines.map((routine) => (
+          <li key={routine.definition.id} className="bots-routine">
+            <span>
+              <strong>{routine.definition.name.replace(`${bot.name}: `, '')}</strong>
+              <small>
+                {routine.definition.enabled
+                  ? `Next run ${new Date(routine.nextAt).toLocaleString()}`
+                  : 'Paused'}
+              </small>
+            </span>
+            <Switch
+              aria-label={`Run ${routine.definition.name}`}
+              checked={routine.definition.enabled}
+              onCheckedChange={async (next) => {
+                try {
+                  await nativeTask('schedule_set_enabled', {
+                    id: routine.definition.id,
+                    enabled: next,
+                  });
+                  await read();
+                } catch (cause) {
+                  setError(String(cause));
+                }
+              }}
             />
-          </FormField>
-          <FormField label="What should it do?">
-            <Textarea rows={3} value={task} onChange={(event) => setTask(event.target.value)} />
-          </FormField>
-          <div className="bots-routine-timing">
-            <FormField label="Repeat">
-              <Select value={repeat} onValueChange={setRepeat}>
-                <SelectItem value="daily">Every day</SelectItem>
-                <SelectItem value="weekdays">Weekdays</SelectItem>
-                <SelectItem value="weekly">Every Monday</SelectItem>
-              </Select>
-            </FormField>
-            <FormField label="Time">
-              <Input type="time" value={time} onChange={(event) => setTime(event.target.value)} />
-            </FormField>
-            <label className="bots-switch">
-              <Switch checked={enabled} onCheckedChange={setEnabled} aria-label="Turn on now" />
-              Turn on now
-            </label>
-          </div>
-          <div className="bots-composer-actions">
-            <Button variant="ghost" type="button" onClick={() => setAdding(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" loading={busy} loadingLabel="Saving…">
-              Save routine
-            </Button>
-          </div>
-        </form>
-      )}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

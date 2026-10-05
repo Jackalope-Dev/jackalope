@@ -1362,6 +1362,9 @@ impl TaskRuntime {
             .cloned()
             .collect())
     }
+    pub(in crate::commands) fn run_snapshot(&self, id: &str) -> Option<TaskRun> {
+        self.inner.lock().ok()?.runs.get(id).cloned()
+    }
     pub(in crate::commands) fn has_run(&self, id: &str) -> Result<bool, String> {
         Ok(self
             .inner

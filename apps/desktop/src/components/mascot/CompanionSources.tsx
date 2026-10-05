@@ -3,6 +3,7 @@ import { taskNotices } from '../../lib/companion-tasks';
 import type { TaskRun } from '../../lib/task-runtime';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { useBotStore } from '../../stores/botStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -46,6 +47,12 @@ export function CompanionSources() {
         while (alive) {
           const id = await nativeTask<string | null>('notification_take_open');
           if (!id || !alive) return;
+          // Bot cards and suggestions open their bot rather than a task.
+          if (id.startsWith('bot:')) {
+            useBotStore.getState().select(id.slice(4));
+            navigateWorkspace('bots');
+            continue;
+          }
           await useExecutionStore.getState().refresh();
           const run = useExecutionStore.getState().runs.find((run) => run.id === id);
           if (alive && run) openCompanionTask(run);

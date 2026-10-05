@@ -19,8 +19,12 @@ export interface Bot {
   projectId: string;
   /** null delivers every enabled connection; a list limits new conversations to those IDs. */
   connectionIds: string[] | null;
-  /** Native schedule IDs created as this bot's routines. */
+  /** Native schedule IDs created as routines before wake-ups existed; still listed and toggled. */
   routineIds: string[];
+  /** What starts a conversation without the person: schedules, repository or connection changes. */
+  wakes: BotWake[];
+  /** Whether the bot may message other bots and accept their messages. */
+  collaborate: boolean;
   pinned: boolean;
   createdAt: string;
   updatedAt: string;
@@ -64,10 +68,60 @@ export interface BotAppearance {
   color: (typeof BOT_COLORS)[number]['id'];
 }
 
+export type BotWakeTrigger =
+  | { kind: 'schedule'; expression: string; timezone: string }
+  | { kind: 'repoChange'; path: string }
+  | {
+      kind: 'connection';
+      connectionId: string;
+      tool: string;
+      arguments: Record<string, unknown>;
+      intervalMinutes: number;
+    };
+
+export interface BotWake {
+  id: string;
+  name: string;
+  /** What the bot should do when this wakes it. */
+  prompt: string;
+  enabled: boolean;
+  trigger: BotWakeTrigger;
+}
+
 export type BotDraft = Omit<Bot, 'id' | 'routineIds' | 'pinned' | 'createdAt' | 'updatedAt'>;
 
 export const BOT_NAME_MAX = 60;
 export const BOT_INSTRUCTIONS_MAX = 6000;
+export const BOT_WAKES_MAX = 10;
+export const WAKE_PROMPT_MAX = 4000;
+
+/** Mirrors native wake-up validation so problems show in the editor before saving. */
+export function validateWake(wake: BotWake, connectionIds: string[] | null) {
+  const name = wake.name.trim();
+  if (!name || [...name].length > 80) return 'Name each wake-up in up to 80 characters.';
+  const prompt = wake.prompt.trim();
+  if (!prompt || [...prompt].length > WAKE_PROMPT_MAX)
+    return `Describe what “${name}” should do in up to ${WAKE_PROMPT_MAX.toLocaleString()} characters.`;
+  const trigger = wake.trigger;
+  if (trigger.kind === 'schedule' && trigger.expression.trim().split(/\s+/).length !== 5)
+    return `Choose when “${name}” runs.`;
+  if (
+    trigger.kind === 'repoChange' &&
+    (/[\\:]/.test(trigger.path) ||
+      trigger.path.startsWith('/') ||
+      trigger.path.split('/').some((part) => part === '..' || part === '.'))
+  )
+    return 'Watch a path relative to the project, using forward slashes.';
+  if (trigger.kind === 'connection') {
+    if (!trigger.connectionId || !trigger.tool.trim())
+      return `Choose a connection and tool for “${name}”.`;
+    if (trigger.intervalMinutes < 5 || trigger.intervalMinutes > 1440)
+      return 'Check connections every 5 minutes to once a day.';
+    if (connectionIds && !connectionIds.includes(trigger.connectionId))
+      return `This bot cannot use the connection “${name}” watches.`;
+  }
+  return '';
+}
 
 export function validateBot(draft: BotDraft) {
   const name = draft.name.trim();
@@ -76,6 +130,11 @@ export function validateBot(draft: BotDraft) {
   if (!draft.projectId) return 'Choose the project this bot works in.';
   if ([...draft.instructions.trim()].length > BOT_INSTRUCTIONS_MAX)
     return `Shorten the instructions to under ${BOT_INSTRUCTIONS_MAX.toLocaleString()} characters.`;
+  if (draft.wakes.length > BOT_WAKES_MAX) return `Keep at most ${BOT_WAKES_MAX} wake-ups per bot.`;
+  for (const wake of draft.wakes) {
+    const error = validateWake(wake, draft.connectionIds);
+    if (error) return error;
+  }
   return '';
 }
 
@@ -88,7 +147,6 @@ interface BotState {
   duplicate: (id: string) => string | null;
   remove: (id: string) => void;
   togglePin: (id: string) => void;
-  addRoutine: (id: string, scheduleId: string) => void;
   forgetRoutine: (scheduleId: string) => void;
 }
 
@@ -148,6 +206,10 @@ export const useBotStore = create<BotState>()(
           model: source.model,
           projectId: source.projectId,
           connectionIds: source.connectionIds,
+          appearance: source.appearance,
+          collaborate: source.collaborate,
+          // Copies start quiet so two bots never wake for the same trigger by surprise.
+          wakes: source.wakes.map((wake) => ({ ...wake, id: crypto.randomUUID(), enabled: false })),
         });
       },
       remove: (id) =>
@@ -159,12 +221,6 @@ export const useBotStore = create<BotState>()(
         set((state) => ({
           bots: state.bots.map((bot) => (bot.id === id ? { ...bot, pinned: !bot.pinned } : bot)),
         })),
-      addRoutine: (id, scheduleId) =>
-        set((state) => ({
-          bots: state.bots.map((bot) =>
-            bot.id === id ? { ...bot, routineIds: [...bot.routineIds, scheduleId] } : bot,
-          ),
-        })),
       forgetRoutine: (scheduleId) =>
         set((state) => ({
           bots: state.bots.map((bot) => ({
@@ -175,24 +231,28 @@ export const useBotStore = create<BotState>()(
     }),
     {
       name: 'jackalope-bots-v1',
-      version: 1,
+      version: 2,
       storage: createPersistStorage(),
       partialize: (state) => ({ bots: state.bots, selectedId: state.selectedId }),
+      migrate: (persisted) => migrateBots(persisted),
     },
   ),
 );
+
+/** Bots saved before wake-ups and teamwork existed start with none and may collaborate. */
+export function migrateBots(persisted: unknown) {
+  const state = (persisted ?? {}) as { bots?: Partial<Bot>[]; selectedId?: string | null };
+  return {
+    selectedId: state.selectedId ?? null,
+    bots: (state.bots ?? []).map(
+      (bot) => ({ ...bot, wakes: bot.wakes ?? [], collaborate: bot.collaborate ?? true }) as Bot,
+    ),
+  } as BotState;
+}
 
 /** Pinned bots first, then most recently changed. */
 export function rosterOrder(bots: Bot[]) {
   return [...bots].sort(
     (a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt),
   );
-}
-
-/** The standing instructions a routine's scheduled task receives. */
-export function routinePrompt(bot: Pick<Bot, 'name' | 'instructions'>, task: string) {
-  const standing = bot.instructions.trim()
-    ? `Standing instructions:\n${bot.instructions.trim()}\n\n`
-    : '';
-  return `You are ${bot.name}, a saved Jackalope bot running a scheduled routine.\n${standing}Routine:\n${task.trim()}`;
 }

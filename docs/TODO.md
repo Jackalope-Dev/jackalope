@@ -229,8 +229,13 @@ release dates.
   and stopped browsers, revoke during an in-flight command, desktop grant states and
   polling cost on long tasks, at 960 by 640 and in both themes.
 - [ ] Validate bots end to end: persona continuity across batches and restarts, model and
-  connection scope on launch, routines created paused or active, deleted projects and
-  schedules, and the provider-rail picker's keyboard navigation and unavailable reasons.
+  connection scope on launch, deleted projects and legacy routines, and the provider-rail
+  picker's keyboard navigation and unavailable reasons. Exercise wake-ups across sleep,
+  timezone changes and restart; repository and real connection polling, including
+  Composio tools, missing read-only annotations, slow or failing servers and credential
+  changes. Run bot-to-bot hand-offs with installed providers, including replies to
+  finished, paused or deleted conversations, the hop and hourly limits, card answers and
+  suggestion review. Measure polling cost and whether bot-started work stays useful.
 
 - [ ] Verify automatic lessons across tasks, queues, schedules and restart,
   including evidence, edits, removal and frozen task context. Measure outcomes.

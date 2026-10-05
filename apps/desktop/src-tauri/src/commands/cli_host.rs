@@ -431,6 +431,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             let first = super::live_sessions::FirstMessage {
                 id: uuid::Uuid::new_v4().to_string(),
                 text,
+                origin: None,
             };
             sessions.create_with_limits(
                 session_id.clone(),
