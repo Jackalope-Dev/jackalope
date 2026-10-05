@@ -74,7 +74,7 @@ pub struct ScheduleLedger {
     pub error: Option<String>,
 }
 
-fn next_at(
+pub(super) fn next_at(
     expression: &str,
     timezone: &str,
     after: DateTime<Utc>,

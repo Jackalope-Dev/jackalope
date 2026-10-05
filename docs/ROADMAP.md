@@ -142,8 +142,9 @@ with Ubuntu 24.04/GNOME 46 the first Wayland acceptance target and X11 compatibi
 retained. Other compositors and GNOME versions remain unsupported.
 
 Saved bots keep standing instructions, an agent and model, a project and a connection
-scope; their conversations repeat the instructions in every batch and routines use
-schedules. Connected apps use the person's own Composio project through one managed
+scope; their conversations repeat the instructions in every batch. Bots wake on
+schedules, project changes and new connection data, consult each other, and bring
+decisions, questions and sources to the person as cards. Connected apps use the person's own Composio project through one managed
 on-demand connection. A Screen view shows the task browser's viewport and desktop
 grant state with revoke controls. Installed and live-account acceptance remain open.
 

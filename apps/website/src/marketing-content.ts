@@ -215,7 +215,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Current agent compatibility',
         paragraphs: [
-          'These are implemented capabilities. Jackalope is coming soon; validate your installed CLI version, sign-in, and required tool flow when you receive access.',
+          'These are implemented capabilities. Jackalope is in early access; validate your installed CLI version, sign-in, and required tool flow when you receive access.',
         ],
         table: {
           columns: ['Agent', 'Project tools', 'Account behavior'],
@@ -465,7 +465,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Continue, check, and review the change.',
         paragraphs: [
           'Ask for a correction under the same task to retain its account and history. Inspect the patch and the parser test output, then try a nearby edge case. For work alongside Claude Code, give each task a separate scope and make dependent changes wait for integration.',
-          'Jackalope is coming soon. These are implemented adapter capabilities; your installed CLI version, account, model, and tool combination still need a real task check. Jackalope does not include an OpenAI subscription or remove Codex permission requirements.',
+          'Jackalope is in early access. These are implemented adapter capabilities; your installed CLI version, account, model, and tool combination still need a real task check. Jackalope does not include an OpenAI subscription or remove Codex permission requirements.',
         ],
         links: [
           {
@@ -553,7 +553,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Use a second agent where the work is independent.',
         paragraphs: [
           'While Claude Code fixes the invitation screen, another agent can update unrelated documentation in its own worktree. If the documentation depends on a new resend contract, make it wait until that change is accepted. Review both outputs together and exercise the invitation flow before integration.',
-          'Jackalope is coming soon. Its Claude Code adapter implements tasks, questions, continuation, and review; installed-version and account acceptance remain separate from the sample interface tour.',
+          'Jackalope is in early access. Its Claude Code adapter implements tasks, questions, continuation, and review; installed-version and account acceptance remain separate from the sample interface tour.',
         ],
         links: [
           {
@@ -630,7 +630,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Validate the actual command behavior.',
         paragraphs: [
           'For the missing-output example, run the command with a writable destination and with a failing destination. Check the file, exit status, and error message together. A successful agent response alone cannot establish that the command now reports failures correctly.',
-          'Jackalope is coming soon. Grok tasks, continuation, and review are implemented; provider permissions, installed CLI compatibility, and model access still apply. Jackalope does not include xAI model usage.',
+          'Jackalope is in early access. Grok tasks, continuation, and review are implemented; provider permissions, installed CLI compatibility, and model access still apply. Jackalope does not include xAI model usage.',
         ],
         links: [
           {
@@ -712,7 +712,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Continue the task, then inspect the combination.',
         paragraphs: [
           'Ask for a missed edge case under the same task to preserve its history and account binding. If another agent is changing a caller of the sorting function, review that interaction before integration; two separate worktrees can still disagree about expected behavior.',
-          'Jackalope is coming soon. The OpenCode adapter implements execution and continuation, while real provider and installed-version checks remain necessary. Free model availability can change, and Jackalope does not supply provider access or a complete billing record.',
+          'Jackalope is in early access. The OpenCode adapter implements execution and continuation, while real provider and installed-version checks remain necessary. Free model availability can change, and Jackalope does not supply provider access or a complete billing record.',
         ],
         links: [
           {

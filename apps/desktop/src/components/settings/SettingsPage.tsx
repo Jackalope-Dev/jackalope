@@ -141,9 +141,12 @@ export function SettingsPage({
     initialCategory ?? (initialScope === 'project' ? 'Project' : 'General'),
   );
   const selectedSection = useRef<HTMLElement>(null);
+  const content = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (settingsGroup(category) !== category)
       selectedSection.current?.scrollIntoView({ block: 'start' });
+    // The content panel scrolls on its own, so a new page starts at its top.
+    else content.current?.scrollTo({ top: 0 });
   }, [category]);
   const [query, setQuery] = useState('');
   const [message, setMessage] = useState('');
@@ -321,7 +324,7 @@ export function SettingsPage({
             Join the Discord
           </button>
         </nav>
-        <div className="settings-content">
+        <div className="settings-content" ref={content}>
           {!visible.length && <p>No settings match “{query}”.</p>}
           {visible.map((c) => (
             <section

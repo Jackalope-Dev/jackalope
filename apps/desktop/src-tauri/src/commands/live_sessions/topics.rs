@@ -87,6 +87,7 @@ mod tests {
             created_at: String::new(),
             run_id: None,
             canceled: false,
+            origin: None,
         }];
         let mut topics = vec![SessionTopic {
             id: Uuid::new_v4().to_string(),

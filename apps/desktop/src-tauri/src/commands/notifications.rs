@@ -99,6 +99,25 @@ fn notices(runs: &[Snapshot]) -> Vec<Notice> {
         .collect()
 }
 
+/// Bot cards and suggestions waiting on the person. Activation opens the bot, not a task.
+fn bot_notices() -> Vec<Notice> {
+    super::bot_hub::installed()
+        .map(|hub| hub.waiting())
+        .unwrap_or_default()
+        .into_iter()
+        .map(|waiting| Notice {
+            key: waiting.key,
+            run_id: format!("bot:{}", waiting.bot_id),
+            title: if waiting.suggestion {
+                "A bot suggested a new bot"
+            } else {
+                "A bot needs your decision"
+            },
+            attention: !waiting.suggestion,
+        })
+        .collect()
+}
+
 fn permitted(preferences: &Preferences, notice: &Notice, focused: bool) -> bool {
     preferences.enabled
         && !focused
@@ -152,6 +171,7 @@ pub fn launch(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut seen: HashSet<String> = notices(&initial)
             .into_iter()
+            .chain(bot_notices())
             .map(|notice| notice.key)
             .collect();
         loop {
@@ -160,7 +180,8 @@ pub fn launch(app: tauri::AppHandle) {
             if !service.alive.load(Ordering::Relaxed) {
                 break;
             }
-            let current = notices(&app.state::<TaskRuntime>().notification_snapshot());
+            let mut current = notices(&app.state::<TaskRuntime>().notification_snapshot());
+            current.extend(bot_notices());
             let focused = app.get_webview_window("main").is_some_and(|window| {
                 window.is_focused().unwrap_or(false) && window.is_visible().unwrap_or(false)
             });

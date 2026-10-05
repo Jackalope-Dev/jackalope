@@ -323,7 +323,7 @@ const comparisons: Comparison[] = [
       {
         question: 'Can I download Jackalope now?',
         answer:
-          'Jackalope is coming soon. Join the early-access waitlist; public downloads and pricing have not been announced.',
+          'Jackalope is in early access: download it for Windows, macOS or Linux, then sign in once your waitlist spot is approved. Public pricing has not been announced.',
       },
     ],
   },
@@ -523,7 +523,7 @@ const comparisons: Comparison[] = [
         title: 'Availability and the right fit',
         paragraphs: [
           'Our assessment: prioritize Conductor in your evaluation when shared cloud workspaces and live teammate participation are requirements. Consider Jackalope early access when you want to coordinate local agents with project context and explicit review of dependent changes.',
-          'Jackalope is coming soon, and public pricing has not been announced. Your provider account supplies model access. If you are budgeting for a cloud workflow, compare workspace subscription, execution resources, and model usage separately rather than treating the agent subscription as the whole cost.',
+          'Jackalope is in early access, and public pricing has not been announced. Your provider account supplies model access. If you are budgeting for a cloud workflow, compare workspace subscription, execution resources, and model usage separately rather than treating the agent subscription as the whole cost.',
         ],
       },
     ],
@@ -629,7 +629,7 @@ const comparisons: Comparison[] = [
         title: 'Choose by the work around the agent',
         paragraphs: [
           'Our assessment: evaluate Emdash when a broad agent catalog, issue intake, or remote development is central to your workflow. Evaluate Jackalope when your priority is carrying context and evidence through a local task lifecycle, with dependent work and combined review.',
-          'Use the same small UI change in both trials. Capture a browser check, request a follow-up, and review the final patch. Jackalope is coming soon; join the waitlist to try it when invited. Model access remains with your provider, and public Jackalope pricing has not been announced.',
+          'Use the same small UI change in both trials. Capture a browser check, request a follow-up, and review the final patch. Jackalope is in early access; join the waitlist to try it once approved. Model access remains with your provider, and public Jackalope pricing has not been announced.',
         ],
       },
     ],
@@ -733,7 +733,7 @@ const comparisons: Comparison[] = [
         title: 'Make the decision with a real branch lifecycle',
         paragraphs: [
           'Our assessment: Braid is worth evaluating if you want project setup, editing, sessions, and GitHub review close together. Consider Jackalope early access if you want task history and explicit integration of dependent results to organize your work.',
-          'Run the trial through review and cleanup rather than stopping when the agent replies. Verify that important uncommitted files remain available, identify which branch owns the final change, and confirm your normal checks on the combined result. Jackalope is coming soon, with model access supplied by your provider and public pricing still unannounced.',
+          'Run the trial through review and cleanup rather than stopping when the agent replies. Verify that important uncommitted files remain available, identify which branch owns the final change, and confirm your normal checks on the combined result. Jackalope is in early access, with model access supplied by your provider and public pricing still unannounced.',
         ],
       },
     ],
@@ -1061,7 +1061,7 @@ const comparisons: Comparison[] = [
         title: 'A complementary idea is not an implemented integration',
         paragraphs: [
           'Our assessment: evaluate Hermes when you want a persistent general-purpose agent with automation and messaging. Evaluate Jackalope when you want to supervise supported coding agents in local projects and retain a reviewable history of their work.',
-          'Jackalope does not currently advertise a native Hermes task adapter. Do not assume that the products can be connected simply because their roles could complement one another. Check supported adapters before planning a combined workflow. Jackalope is coming soon, public pricing is unannounced, and model access comes from your own provider.',
+          'Jackalope does not currently advertise a native Hermes task adapter. Do not assume that the products can be connected simply because their roles could complement one another. Check supported adapters before planning a combined workflow. Jackalope is in early access, public pricing is unannounced, and model access comes from your own provider.',
         ],
       },
     ],

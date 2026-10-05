@@ -167,7 +167,7 @@ export const growthPages: MarketingPage[] = [
       {
         title: 'Separate availability from a roadmap.',
         paragraphs: [
-          'Jackalope is coming soon. Its tour uses sample data, and public pricing has not been announced. Your installed agents and provider accounts supply model access. Check current downloads and plans on each alternative’s own site before making a purchase or migration decision.',
+          'Jackalope is in early access. Its tour uses sample data, and public pricing has not been announced. Your installed agents and provider accounts supply model access. Check current downloads and plans on each alternative’s own site before making a purchase or migration decision.',
           'Treat workspace fees, model usage, and remote compute as separate costs. A documented feature is a reason to run a trial, not evidence that a particular account, repository, or deployment has passed one.',
         ],
         links: [

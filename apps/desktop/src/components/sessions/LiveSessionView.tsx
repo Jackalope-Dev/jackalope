@@ -1,6 +1,7 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { CopyButton, DropdownMenu as Menu } from '@jackalope/ui';
 import {
+  AlarmClock,
   ArrowLeft,
   ChevronDown,
   ChevronUp,
@@ -17,8 +18,10 @@ import {
 } from 'lucide-react';
 import { type CSSProperties, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
+import { type BotCard, useBotHubStore } from '../../lib/bot-hub';
 import {
   type LiveSession,
+  type MessageOrigin,
   type SessionReview,
   sessionCommand,
   sessionRunNeedsAttention,
@@ -33,7 +36,8 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useWorkbenchStore } from '../../stores/workbenchStore';
 import { useChangeStats } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
-import { botStyle } from '../bots/BotAvatar';
+import { BotAvatar, botStyle } from '../bots/BotAvatar';
+import { BotCardView } from '../bots/BotCardView';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { AgentQuestion } from '../tasks/AgentQuestion';
 import { AgentScreen } from '../tasks/AgentScreen';
@@ -67,6 +71,7 @@ export function LiveSessionView({
   onBack,
   initialDetailsOpen,
   simple = false,
+  onOpenSession,
 }: {
   session: LiveSession;
   runs: TaskRun[];
@@ -75,6 +80,8 @@ export function LiveSessionView({
   initialDetailsOpen?: boolean;
   /** A plain conversation for bot chats: no workspace, terminal or session tools; review appears in the transcript. */
   simple?: boolean;
+  /** Opens another conversation, such as the one a bot message came from. */
+  onOpenSession?: (id: string) => void;
 }) {
   const { active, latest, pending, questions, status } = sessionWork(session, runs);
   const runById = useMemo(() => new Map(runs.map((run) => [run.id, run])), [runs]);
@@ -86,6 +93,14 @@ export function LiveSessionView({
     () => new Map(session.messages.map((message) => [message.id, message])),
     [session.messages],
   );
+  const hubCards = useBotHubStore((state) => state.cards);
+  const cardsByRun = useMemo(() => {
+    const byRun = new Map<string, BotCard[]>();
+    for (const card of hubCards)
+      if (card.sessionId === session.id)
+        byRun.set(card.runId, [...(byRun.get(card.runId) ?? []), card]);
+    return byRun;
+  }, [hubCards, session.id]);
   const recentBatches = useMemo(
     () => new Set(session.batches.slice(-20).map((batch) => batch.runId)),
     [session.batches],
@@ -532,13 +547,22 @@ export function LiveSessionView({
                 const batch = message.runId ? batchById.get(message.runId) : undefined;
                 const run = message.runId ? runById.get(message.runId) : undefined;
                 const lastInBatch = batch?.messageIds.at(-1) === message.id;
+                const origin = message.origin;
+                const incoming = origin && origin.kind !== 'card';
                 return (
                   <div key={message.id}>
                     <article
-                      className="live-message live-sent"
+                      className={`live-message ${incoming ? 'live-incoming' : 'live-sent'}`}
+                      data-origin={origin?.kind}
                       data-canceled={message.canceled || undefined}
                     >
-                      <span className="live-author sr-only">You</span>
+                      {incoming ? (
+                        <MessageOriginLabel origin={origin} onOpenSession={onOpenSession} />
+                      ) : (
+                        <span className={`live-author${origin ? '' : ' sr-only'}`}>
+                          {origin ? `You answered “${origin.label}”` : 'You'}
+                        </span>
+                      )}
                       <p>{message.text}</p>
                       <div className="live-receipt">
                         {message.canceled
@@ -595,6 +619,13 @@ export function LiveSessionView({
                         </div>
                       </article>
                     )}
+                    {lastInBatch &&
+                      run &&
+                      cardsByRun.get(run.id)?.map((card) => (
+                        <div key={card.id} className="live-card">
+                          <BotCardView card={card} />
+                        </div>
+                      ))}
                     {simple &&
                       lastInBatch &&
                       run?.id === latest?.id &&
@@ -872,5 +903,35 @@ export function LiveSessionView({
         )}
       </div>
     </section>
+  );
+}
+
+/** Says who sent a message the person did not type: a wake-up or another bot. */
+function MessageOriginLabel({
+  origin,
+  onOpenSession,
+}: {
+  origin: MessageOrigin;
+  onOpenSession?: (id: string) => void;
+}) {
+  const sender = useBotStore((state) => state.bots.find((bot) => bot.id === origin.botId));
+  return (
+    <span className="live-author live-origin">
+      {origin.kind === 'wake' ? (
+        <AlarmClock size={14} aria-hidden="true" />
+      ) : (
+        <BotAvatar appearance={sender?.appearance} agent={sender?.agent} />
+      )}
+      <span>{origin.kind === 'wake' ? `Woke up · ${origin.label}` : origin.label}</span>
+      {origin.sessionId && onOpenSession && origin.kind !== 'wake' && (
+        <button
+          type="button"
+          className="live-origin-link"
+          onClick={() => onOpenSession(origin.sessionId ?? '')}
+        >
+          Open {origin.botName ?? 'their'} conversation
+        </button>
+      )}
+    </span>
   );
 }

@@ -184,7 +184,7 @@ function TourFilm() {
   );
 }
 
-export function TourPage({ dark, available }: { dark: boolean; available: boolean }) {
+export function TourPage({ dark }: { dark: boolean }) {
   return (
     <main id="main" className="product-tour">
       <section className="tour-intro">
@@ -210,15 +210,9 @@ export function TourPage({ dark, available }: { dark: boolean; available: boolea
                 </a>
               </div>
               <p className="tour-availability">
-                {available ? (
-                  <a href="/download/">
-                    Explore available downloads <ArrowRight size={14} />
-                  </a>
-                ) : (
-                  <a href="/download/">
-                    Coming soon. See platform availability <ArrowRight size={14} />
-                  </a>
-                )}
+                <a href="/download/">
+                  Explore available downloads <ArrowRight size={14} />
+                </a>
               </p>
             </div>
             <div className="tour-hero-art" aria-hidden="true">

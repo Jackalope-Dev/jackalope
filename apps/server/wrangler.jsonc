@@ -186,9 +186,9 @@
         "ACCESS_EMAIL_FROM": "",
         "ACCESS_EMAIL_REPLY_TO": "contact@jackalope.dev",
         "ACCESS_INSTALLER_KEY": "",
-        "ACCESS_STORE_URL": "",
-        "ACCESS_MAC_CHANNELS": "beta,stable",
-        "ACCESS_LINUX_CHANNELS": "beta,stable",
+        "ACCESS_STORE_URL": "https://apps.microsoft.com/detail/9NM89QFJQ244",
+        "ACCESS_MAC_CHANNELS": "stable,beta",
+        "ACCESS_LINUX_CHANNELS": "stable,beta",
         "ACCESS_AUDIENCE_LIST": ""
       },
       "d1_databases": [

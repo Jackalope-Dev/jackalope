@@ -670,25 +670,38 @@ img[src="/mascot.svg"] {
   padding-top: 4px;
   overflow-wrap: anywhere;
 }
-/* The bubble is inverted, so its action inverts back to read as a button. */
-.mascot-speech-action {
+/* The bubble is inverted, so its action inverts back to read as a button. Scoped under
+   the bubble so status bar button hovers, which would tint it unreadably, never apply. */
+.mascot-speech .mascot-speech-action {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
+  min-height: 32px;
   margin: 8px 0 2px;
-  padding: 0 16px;
+  padding: 0 12px;
   border-radius: 999px;
   background: var(--color-surface-elevated);
   color: var(--color-text-primary);
+  font-size: var(--text-xs);
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 120ms ease;
+  transition: background-color 120ms ease;
 }
-.mascot-speech-action:hover {
-  opacity: 0.88;
+/* Keeps a 44px hit area around the smaller pill. */
+.mascot-speech .mascot-speech-action::before {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
 }
-.mascot-speech-action:focus-visible {
+.mascot-speech .mascot-speech-action:hover {
+  background: color-mix(in srgb, var(--color-surface-elevated) 86%, var(--color-text-primary));
+  color: var(--color-text-primary);
+}
+.mascot-speech .mascot-speech-action:active {
+  background: color-mix(in srgb, var(--color-surface-elevated) 76%, var(--color-text-primary));
+}
+.mascot-speech .mascot-speech-action:focus-visible {
   outline: 2px solid var(--color-surface-elevated);
   outline-offset: 2px;
 }

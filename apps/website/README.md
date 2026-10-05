@@ -57,6 +57,10 @@ npx --yes --package @playwright/cli playwright-cli -s=website-capture run-code -
 npx --yes --package @playwright/cli playwright-cli -s=website-capture run-code --filename apps/website/scripts/capture-tour.js
 ~~~
 
+`node apps/website/scripts/capture-feature-media.mjs` refreshes `recurring*.png` from
+the same preview; set `JACKALOPE_CAPTURE_ORIGIN` to its URL and, without Edge,
+`JACKALOPE_CAPTURE_BROWSER` to a Chromium executable.
+
 Choose the desired appearance before capturing. The script writes `*-light.png`
 for light mode and the corresponding unsuffixed files for dark mode.
 `record-tour.js` can capture raw frontend interactions into ignored output;
@@ -117,8 +121,12 @@ They are embedded in static output and must never contain secrets.
 | `VITE_RELEASE_VERSION` | Matching version, required with an installer URL; not required for the Store. |
 | `VITE_SITE_URL` | Optional HTTPS origin for canonical, social and discovery URLs. |
 
-The public `/download/` page lists all three desktop platforms. A platform without
-a configured URL shows Coming soon. Browser platform hints only reorder the options;
+The public `/download/` page lists all three desktop platforms. macOS and Linux
+offer the public release CDN builds, with a Stable or Beta choice, unless a
+download URL is configured; signed-in members get the access service's equivalent
+links so first downloads are recorded. Windows without a configured URL shows
+Coming soon. The desktop account gate, not the download link, controls who can use
+the app. Browser platform hints only reorder the options;
 mobile devices and unknown platforms keep the neutral ordering. Visiting the page
 never starts a download or opens a Store link automatically.
 

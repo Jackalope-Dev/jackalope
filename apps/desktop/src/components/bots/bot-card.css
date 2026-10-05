@@ -1,0 +1,131 @@
+/* A bot's card: context, sources and the choices that answer it. */
+.bot-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  overflow-wrap: anywhere;
+}
+
+.bot-card[data-status="answered"],
+.bot-card[data-status="dismissed"] {
+  border-color: var(--color-border-subtle);
+  background: var(--color-surface-sunken);
+}
+
+.bot-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--color-text-secondary);
+}
+
+.bot-card-header > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.bot-card-header > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bot-card-header small {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.bot-card-header strong {
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.bot-card-body {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.bot-card-sources {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bot-card-source {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-ink);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+button.bot-card-source {
+  cursor: pointer;
+}
+
+button.bot-card-source:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+span.bot-card-source {
+  color: var(--color-text-primary);
+}
+
+.bot-card-source code {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.bot-card-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bot-card-reply {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.bot-card-reply textarea {
+  width: 100%;
+}
+
+.bot-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.bot-card-footer > span {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.bot-card-footer:empty {
+  display: none;
+}

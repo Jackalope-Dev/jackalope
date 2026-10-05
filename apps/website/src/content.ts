@@ -178,7 +178,7 @@ export const pages: SitePage[] = [
     path: '/',
     title: 'Jackalope: Run AI coding agents in parallel',
     description:
-      'Run coding agents in parallel Git worktrees. Match project guidance, automate checks, explore code dependencies, and review changes in one desktop workspace.',
+      'Run Codex, Claude Code, Gemini CLI and more in parallel, each in its own Git worktree. Review every change in one desktop app for Windows, macOS and Linux.',
   },
   {
     path: '/download/',

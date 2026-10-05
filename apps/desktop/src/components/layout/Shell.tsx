@@ -3,6 +3,8 @@ import { Check, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Settings2 } fr
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
 import { useWindowEvent } from '../../hooks/useWindowEvent';
+import { needsYou, useBotHubStore } from '../../lib/bot-hub';
+import { observeBots } from '../../lib/bot-hub-sync';
 import { captureDraftForProject } from '../../lib/capture-draft';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { displayShortcut, matchesShortcut, resolveShortcuts } from '../../lib/shortcuts';
@@ -137,6 +139,8 @@ export function Shell({
 } = {}) {
   const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
   useEffect(observeLiveSessions, []);
+  useEffect(observeBots, []);
+  const botsWaiting = useBotHubStore((state) => needsYou(state).count);
   useEffect(observeManagedTasks, []);
   const canvas = useRef<HTMLElement>(null);
   const projectSwitcher = useRef<HTMLButtonElement>(null);
@@ -506,12 +510,21 @@ export function Shell({
                   setActiveTab(item.id);
                 }}
                 aria-current={view.group === item.group ? 'page' : undefined}
-                aria-label={item.label}
+                aria-label={
+                  item.id === 'bots' && botsWaiting > 0
+                    ? `${item.label}, ${botsWaiting} waiting on you`
+                    : item.label
+                }
                 title={item.label}
                 className="workspace-nav-item"
               >
                 <item.icon className="size-3.5" />
                 <span>{item.label}</span>
+                {item.id === 'bots' && botsWaiting > 0 && (
+                  <small className="workspace-nav-count" aria-hidden="true">
+                    {botsWaiting}
+                  </small>
+                )}
               </button>
             ))}
           </nav>

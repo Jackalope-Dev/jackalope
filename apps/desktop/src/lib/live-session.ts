@@ -7,6 +7,15 @@ export interface SessionMessage {
   createdAt: string;
   runId: string | null;
   canceled: boolean;
+  /** Set when the message came from a wake-up, another bot or a card answer rather than typing. */
+  origin?: MessageOrigin;
+}
+export interface MessageOrigin {
+  kind: 'wake' | 'bot' | 'reply' | 'card';
+  label: string;
+  botId?: string;
+  botName?: string;
+  sessionId?: string;
 }
 export interface SessionBatch {
   runId: string;

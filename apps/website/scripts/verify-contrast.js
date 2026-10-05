@@ -34,6 +34,8 @@ async function _verifyContrast(page) {
           continue;
         if (![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue;
         const style = getComputedStyle(el);
+        // Gradient-clipped headings have no single text color to measure.
+        if (style.backgroundClip === 'text') continue;
         const ancestors = [];
         let node = el;
         while (node) {
@@ -63,10 +65,18 @@ async function _verifyContrast(page) {
       return { total, min: +min.toFixed(2), failures };
     });
   const results = [];
-  for (const palette of ['Mojave Sunset', 'Alpine Aurora', 'Electric Indigo', 'Zen Rose']) {
-    await page.getByRole('button', { name: palette, exact: true }).click();
+  for (const [palette, id] of [
+    ['Mojave Sunset', 'mojave-sunset'],
+    ['Alpine Aurora', 'alpine-aurora'],
+    ['Electric Indigo', 'electric-indigo'],
+    ['Zen Rose', 'zen-rose'],
+  ]) {
     for (const appearance of ['Light', 'Dark']) {
-      await page.getByRole('button', { name: appearance, exact: true }).click();
+      await page.evaluate(
+        (saved) => localStorage.setItem('jackalope-website-theme', JSON.stringify(saved)),
+        { id, isDark: appearance === 'Dark' },
+      );
+      await page.reload();
       await page.evaluate(() =>
         document.querySelectorAll('details').forEach((el) => {
           el.open = true;
@@ -75,26 +85,20 @@ async function _verifyContrast(page) {
       const checks = [];
       const record = async (state) => checks.push({ state, ...(await audit()) });
       await record('default');
-      for (const name of ['Changes & review', 'Agents & accounts']) {
-        await page.getByRole('tab', { name, exact: true }).click();
-        await record(name);
-      }
-      for (const name of ['Find a stubborn bug', 'Explore a new direction']) {
+      for (const name of ['Review', 'Agents', 'Schedules']) {
         await page.getByRole('tab', { name, exact: true }).click();
         await record(name);
       }
       await page.locator('.landing-header .appearance-toggle').hover();
       await record('appearance hover');
       await page.locator('.landing-header .button').hover();
-      await record('signup hover');
-      await page.locator('.landing-finale .button').hover();
-      await record('footer signup hover');
-      await page.getByRole('button', { name: 'Join waitlist', exact: true }).click();
+      await record('header action hover');
+      await page.locator('.lp-final .button').hover();
+      await record('final signup hover');
+      await page.locator('.lp-actions').getByRole('button', { name: 'Join the waitlist' }).click();
       await page.getByRole('dialog').waitFor();
       await record('signup dialog');
       await page.keyboard.press('Escape');
-      await page.getByRole('tab', { name: 'Tasks & ideas', exact: true }).click();
-      await page.getByRole('tab', { name: 'Build a feature', exact: true }).click();
       const failures = checks.flatMap((check) =>
         check.failures.map((failure) => ({ state: check.state, ...failure })),
       );

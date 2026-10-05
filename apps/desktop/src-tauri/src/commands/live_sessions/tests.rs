@@ -107,6 +107,7 @@ fn first_message_starts_and_names_the_session_atomically() {
                 Some(FirstMessage {
                     id: message_id.clone(),
                     text: "  Fix the search\n spacing  ".into(),
+                    origin: None,
                 }),
             )
             .unwrap();
@@ -132,7 +133,8 @@ fn first_message_starts_and_names_the_session_atomically() {
             request,
             Some(FirstMessage {
                 id: message_id,
-                text: " ".into()
+                text: " ".into(),
+                origin: None,
             })
         )
         .is_err());
@@ -733,6 +735,7 @@ fn bot_persona_is_repeated_in_every_batch_and_stays_out_of_the_transcript() {
             Some(FirstMessage {
                 id: Uuid::new_v4().to_string(),
                 text: "Check the lockfile".into(),
+                origin: None,
             }),
             SessionLimits::default(),
             Some(persona.clone()),

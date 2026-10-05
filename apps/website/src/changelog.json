@@ -1,5 +1,30 @@
 [
   {
+    "id": "bots-that-work-on-their-own",
+    "date": "2026-10-05",
+    "status": "In development",
+    "title": "Bots that work on their own.",
+    "description": "Bots can now wake themselves up, work with each other and bring you the decisions that need you.",
+    "items": [
+      "Wake a bot on a schedule, when the project changes or when a connected app returns new data.",
+      "Bots find and message each other, and replies come back to the conversation that asked.",
+      "Decisions, questions, next steps and sources appear as cards you can answer from the conversation or the Bots page.",
+      "Bots can suggest new bots for you to review, and every wake-up and message is labelled in their conversations."
+    ]
+  },
+  {
+    "id": "download-jackalope-on-windows-macos-and-linux",
+    "date": "2026-10-04",
+    "status": "Released",
+    "title": "Download Jackalope on Windows, macOS and Linux.",
+    "description": "Desktop builds are now public on every platform. Signing in still needs an approved waitlist spot or an Instant Access Pass.",
+    "items": [
+      "Get Jackalope for Windows from the Microsoft Store.",
+      "Download Apple silicon and Intel builds for macOS, or an AppImage for Linux.",
+      "Choose the Stable release, or opt into Beta builds that arrive sooner."
+    ]
+  },
+  {
     "id": "a-warmer-welcome-and-faster-updates",
     "date": "2026-10-02",
     "status": "In development",

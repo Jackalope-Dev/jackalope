@@ -51,6 +51,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
         : 'Website retains its prerelease state',
     );
   }
+  // The Store listing is public, so builds offer it unless the environment overrides it.
+  process.env.VITE_WINDOWS_STORE_URL ??= 'https://apps.microsoft.com/detail/9NM89QFJQ244';
   if (build) {
     const website = resolve(root, 'apps/website');
     for (const args of [

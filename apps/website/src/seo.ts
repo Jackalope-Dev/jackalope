@@ -286,10 +286,17 @@ function marketingPageText(page: MarketingPage, origin: string) {
 }
 
 export function discoveryFiles(origin = siteOrigin, env: Record<string, string | undefined> = {}) {
-  const downloads = platformDownloads(env).filter((platform) => platform.url);
-  const availability = downloads.length
-    ? `Downloads are configured for ${downloads.map((platform) => `${platform.name}${platform.store ? ' through Microsoft Store' : ` version ${env.VITE_RELEASE_VERSION?.trim()}`}`).join(', ')}. See ${origin}/download/ for current availability and access requirements. Early access requires waitlist approval or a claimed Instant Access Pass; model access is separate.`
-    : `Public downloads are not open yet. Join the waitlist for early-access news. See ${origin}/download/ for platform availability.`;
+  // macOS and Linux always have public release builds; Windows is listed once configured.
+  const platforms = platformDownloads(env)
+    .filter((platform) => platform.url || platform.id !== 'windows')
+    .map((platform) =>
+      platform.store
+        ? `${platform.name} through Microsoft Store`
+        : platform.url
+          ? `${platform.name} version ${env.VITE_RELEASE_VERSION?.trim()}`
+          : platform.name,
+    );
+  const availability = `Desktop downloads are available for ${new Intl.ListFormat('en', { type: 'conjunction' }).format(platforms)}. See ${origin}/download/ for current availability. Using the app requires waitlist approval or a claimed Instant Access Pass; model access is separate.`;
   const intro = `# Jackalope\n\n> A desktop workspace for coding agents, local Git projects, tasks, worktrees, and review.\n\nJackalope is a product of Jackalope Digital LLC (${company.url}). The canonical product website is ${origin}.\n\n## Availability\n\n${availability} Users bring their own locally installed agents and provider accounts; an AI subscription is not included.\n\n## Product\n\nTasks keep ideas, attempts, results, and review together. Isolated Git worktrees separate working directories. Users inspect patches and run project checks before deciding what to integrate. Website screenshots and the recorded tour use Atlas sample project data.\n\n`;
   const publicPages = indexablePages;
   const links = publicPages

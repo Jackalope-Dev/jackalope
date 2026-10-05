@@ -233,8 +233,13 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   connection scope and a chosen character and colour locally. Messaging a bot starts a
   chat inside the Bots page whose native persona is repeated in every batch prompt;
   those chats skip workspace preparation and automatic checks and stay out of Work.
-  Templates cover review, fixing, testing, docs, security, release notes and onboarding;
-  routines are ordinary schedules. See [bots](BOTS.md).
+  Bots wake themselves on schedules, project changes or new results from a read-only
+  connection tool, message each other with replies routed back, show decision, input,
+  action, source and update cards, and suggest new bots for the person to review. Every
+  wake, message and card is labelled in the transcript and activity; hourly, hand-off
+  and batch limits bound autonomous work. Templates cover review, fixing, testing, docs,
+  security, release notes and onboarding. Earlier routines remain ordinary schedules.
+  See [bots](BOTS.md).
 - Short requests phrased as questions skip workspace preparation, and focused attempts
   that change no files skip automatic checks; planned assignments always verify.
 - The composer's agent picker lists every discovered agent in a rail, dims unusable

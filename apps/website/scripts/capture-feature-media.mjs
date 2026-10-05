@@ -6,10 +6,16 @@ const origin = process.env.JACKALOPE_CAPTURE_ORIGIN ?? 'http://localhost:5193';
 const setup = new Function(
   `${readFileSync(new URL('./capture-setup.js', import.meta.url), 'utf8')}; return _captureSetup;`,
 )();
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+// JACKALOPE_CAPTURE_BROWSER selects a browser executable where Edge isn't installed.
+const browser = await chromium.launch(
+  process.env.JACKALOPE_CAPTURE_BROWSER
+    ? { executablePath: process.env.JACKALOPE_CAPTURE_BROWSER, headless: true }
+    : { channel: 'msedge', headless: true },
+);
 try {
   for (const colorScheme of ['dark', 'light']) {
     const page = await browser.newPage({ colorScheme, reducedMotion: 'reduce' });
+    await page.addInitScript(() => localStorage.setItem('jackalope.welcome.seen', '1'));
     await page.goto(origin);
     await setup(page);
     await page.setViewportSize({ width: 1440, height: 1100 });
@@ -64,7 +70,7 @@ try {
       };
     });
     await page.reload();
-    await page.getByRole('button', { name: 'Recurring', exact: true }).click();
+    await page.getByRole('button', { name: 'Automations', exact: true }).click();
     await page.getByRole('heading', { name: 'Weekly dependency review', exact: true }).waitFor();
     await page.evaluate(async (isDark) => {
       const { useThemeStore } = await import('/src/stores/themeStore.ts');
@@ -74,8 +80,8 @@ try {
     }, colorScheme === 'dark');
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(300);
-    const panel = await page.locator('.task-page').boundingBox();
-    const schedules = await page.locator('.schedule-list').boundingBox();
+    const panel = await page.locator('.workspace-page-layout').first().boundingBox();
+    const schedules = await page.locator('.schedule-list').first().boundingBox();
     const clip = {
       x: panel.x,
       y: panel.y,

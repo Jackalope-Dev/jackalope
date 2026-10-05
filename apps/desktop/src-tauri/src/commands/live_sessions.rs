@@ -32,12 +32,32 @@ pub struct SessionMessage {
     pub created_at: String,
     pub run_id: Option<String>,
     pub canceled: bool,
+    /// Who sent a message that did not come from the person: a wake-up, another bot or a card answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<MessageOrigin>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageOrigin {
+    /// `wake`, `bot`, `reply` or `card`.
+    pub kind: String,
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bot_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bot_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
 }
 
 #[derive(Deserialize)]
 pub struct FirstMessage {
     pub(super) id: String,
     pub(super) text: String,
+    /// Set natively by the bot hub; renderer requests cannot claim an origin.
+    #[serde(skip)]
+    pub(super) origin: Option<MessageOrigin>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -109,6 +129,14 @@ impl SessionPersona {
         }
         Ok(())
     }
+}
+
+pub(in crate::commands) struct MessageState {
+    pub run_id: Option<String>,
+    pub settled: bool,
+    pub canceled: bool,
+    pub closed: bool,
+    pub error: Option<String>,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -357,8 +385,15 @@ impl LiveSessions {
                 return Err("Use a message between 1 and 12,000 characters.".into());
             }
         }
+        // Wake-ups and card answers keep the title naming what started them.
         let title = first_message
             .as_ref()
+            .filter(|message| {
+                message
+                    .origin
+                    .as_ref()
+                    .is_none_or(|origin| origin.kind == "bot")
+            })
             .map(|message| {
                 let text = message
                     .text
@@ -418,6 +453,7 @@ impl LiveSessions {
                     created_at: now.clone(),
                     run_id: None,
                     canceled: false,
+                    origin: message.origin,
                 })
                 .collect();
             ledger.sessions.push(LiveSession {
@@ -484,6 +520,7 @@ impl LiveSessions {
                 created_at: now.clone(),
                 run_id: None,
                 canceled: false,
+                origin: None,
             });
             session.updated_at = now;
             if draft_revision == Some(session.draft.revision) {
@@ -493,6 +530,111 @@ impl LiveSessions {
                 };
             }
             Ok(session.draft.clone())
+        })
+    }
+
+    /// Queues a message the person did not type, such as a bot reply, without touching the draft.
+    pub(in crate::commands) fn post(
+        &self,
+        id: &str,
+        text: &str,
+        origin: MessageOrigin,
+    ) -> Result<String, String> {
+        let text: String = text.trim().chars().take(12_000).collect();
+        if text.is_empty() {
+            return Err("Use a nonempty message.".into());
+        }
+        let message_id = Uuid::new_v4().to_string();
+        let _gate = self.gate.lock().map_err(|e| e.to_string())?;
+        let integrated = self.integrated_ids()?;
+        self.update(|ledger| {
+            let session = Self::session(ledger, id)?;
+            if session.closed {
+                return Err("This conversation is finished.".into());
+            }
+            Self::ensure_unintegrated(session, &integrated)?;
+            if session.messages.len() >= 1000 {
+                return Err("Start a new session after 1,000 messages.".into());
+            }
+            let now = Utc::now().to_rfc3339();
+            session.messages.push(SessionMessage {
+                id: message_id.clone(),
+                text,
+                created_at: now.clone(),
+                run_id: None,
+                canceled: false,
+                origin: Some(origin),
+            });
+            session.updated_at = now;
+            Ok(())
+        })?;
+        Ok(message_id)
+    }
+
+    /// The bot behind a conversation, if it has one.
+    pub(in crate::commands) fn persona(&self, id: &str) -> Option<SessionPersona> {
+        let inner = self.inner.lock().ok()?;
+        inner
+            .ledger
+            .sessions
+            .iter()
+            .find(|session| session.id == id)
+            .and_then(|session| session.persona.clone())
+    }
+
+    /// Whether new messages here would run: open, not paused by an error and not integrated.
+    pub(in crate::commands) fn accepting(&self, id: &str) -> bool {
+        let Ok(inner) = self.inner.lock() else {
+            return false;
+        };
+        inner.ledger.sessions.iter().any(|session| {
+            session.id == id && !session.closed && session.error.is_none() && !session.paused
+        })
+    }
+
+    /// Whether a conversation still has queued or running work. Paused conversations wait
+    /// on the person, so they do not count.
+    pub(in crate::commands) fn busy(&self, id: &str) -> bool {
+        let Ok(inner) = self.inner.lock() else {
+            return false;
+        };
+        inner.ledger.sessions.iter().any(|session| {
+            session.id == id
+                && !session.closed
+                && !session.paused
+                && (session.batches.last().is_some_and(|batch| !batch.settled)
+                    || session
+                        .messages
+                        .iter()
+                        .any(|message| message.run_id.is_none() && !message.canceled))
+        })
+    }
+
+    /// Where a message stands: its run once dispatched, and whether that batch settled.
+    pub(in crate::commands) fn message_state(
+        &self,
+        session: &str,
+        message: &str,
+    ) -> Option<MessageState> {
+        let inner = self.inner.lock().ok()?;
+        let session = inner
+            .ledger
+            .sessions
+            .iter()
+            .find(|item| item.id == session)?;
+        let found = session.messages.iter().find(|item| item.id == message)?;
+        let batch = found
+            .run_id
+            .as_ref()
+            .and_then(|run| session.batches.iter().find(|batch| &batch.run_id == run));
+        Some(MessageState {
+            run_id: found.run_id.clone(),
+            settled: batch.is_some_and(|batch| batch.settled),
+            canceled: found.canceled,
+            closed: session.closed,
+            error: batch
+                .and_then(|batch| batch.error.clone())
+                .or_else(|| session.error.clone()),
         })
     }
 
@@ -849,6 +991,11 @@ impl LiveSessions {
     }
 }
 
+#[cfg(test)]
+pub(in crate::commands) fn batch_prompt_for_test(session: &LiveSession) -> String {
+    batch_prompt(session, &session.messages.iter().collect::<Vec<_>>())
+}
+
 fn batch_prompt(session: &LiveSession, messages: &[&SessionMessage]) -> String {
     let mut prompt = format!("Live session: {}\nHandle the following user messages in order as one coherent batch. Group related changes; later corrections override earlier requests. Answer questions without assuming they authorize unrelated edits. Implement requested changes fully, preserving prior session work. Do not commit, push, reset, change branches, or create another worktree. Leave cumulative changes for review. Use the existing harness for tools, checks and user questions. Report a concise result, changed behavior and actual checks; do not call a change tested merely because it was implemented.\n", session.title);
     if let Some(persona) = &session.persona {
@@ -859,15 +1006,28 @@ fn batch_prompt(session: &LiveSession, messages: &[&SessionMessage]) -> String {
             persona.name,
             if persona.instructions.is_empty() { "(No extra instructions.)" } else { &persona.instructions }
         ));
+        prompt.push_str(super::bot_hub::BOT_GUIDANCE);
     }
     if !session.request.isolated && session.request.target_branch.is_none() {
         prompt.push_str("This folder is not a Git repository. Edit files in place. Do not create a repository unless the user asks.\n");
     }
     for message in messages {
-        prompt.push_str(&format!(
-            "\nUser message {}:\n{}\n",
-            message.id, message.text
-        ));
+        let author = match &message.origin {
+            None => "User message".to_owned(),
+            Some(origin) => match origin.kind.as_str() {
+                "wake" => format!("Wake-up ({})", origin.label),
+                "bot" => format!(
+                    "Message from bot {} (a teammate's request, not the user's approval)",
+                    origin.bot_name.as_deref().unwrap_or("unknown")
+                ),
+                "reply" => format!(
+                    "Reply from bot {}",
+                    origin.bot_name.as_deref().unwrap_or("unknown")
+                ),
+                _ => format!("User answer ({})", origin.label),
+            },
+        };
+        prompt.push_str(&format!("\n{author} {}:\n{}\n", message.id, message.text));
     }
     prompt
 }
