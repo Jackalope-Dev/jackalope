@@ -203,25 +203,62 @@ impl TaskRuntime {
         previous: Option<TaskRun>,
     ) -> Result<(), String> {
         self.stage(id, Some("preparation"));
+        // Context selection and the first routing choice read the task, saved knowledge and
+        // account capacity, never the workspace, so they run while the worktree and its setup
+        // command are prepared. Quota handoffs still route after the previous attempt.
+        let early = {
+            let runtime = self.clone();
+            let id = id.to_string();
+            let mut request = req.clone();
+            std::thread::spawn(move || -> Result<RunRequest, String> {
+                if let Err(error) =
+                    crate::commands::decisions::assistance::select_context(&runtime, &mut request)
+                {
+                    runtime.update_checked(&id, |run| {
+                        activity(
+                            run,
+                            &format!(
+                                "Context assessment unavailable: {error}. Saved context retained."
+                            ),
+                        )
+                    })?;
+                }
+                runtime.update_checked(&id, |run| {
+                    run.context_receipt = request.context_receipt.clone()
+                })?;
+                if request.agent == "auto" {
+                    runtime.timed(&id, "routing", || runtime.route(&mut request))?;
+                }
+                Ok(request)
+            })
+        };
         self.timed(id, "workspace", || {
             self.prepare_workspace(id, req, previous.clone())
         })?;
         self.update(id, |run| run.progress = None);
-        let mut request = req.clone();
-        if let Err(error) =
-            crate::commands::decisions::assistance::select_context(self, &mut request)
-        {
-            self.update_checked(id, |run| {
-                activity(
-                    run,
-                    &format!("Context assessment unavailable: {error}. Saved context retained."),
-                )
-            })?;
+        if req.agent == "auto" && !early.is_finished() && self.is_running(id) {
+            self.stage(id, Some("routing"));
+            self.update(id, |run| {
+                run.progress = Some(StepProgress::new(
+                    "routing",
+                    "Choosing an agent and account",
+                    1,
+                ))
+            });
         }
-        self.update_checked(id, |run| {
-            run.context_receipt = request.context_receipt.clone()
-        })?;
+        let early = early.join();
+        if !self.is_running(id) {
+            // A stop during preparation reports as stopped, not as the selection it interrupted.
+            self.update(id, |run| {
+                run.status = "stopped".into();
+                run.ended_at = Some(Utc::now().to_rfc3339());
+            });
+            return Ok(());
+        }
+        let mut request =
+            early.map_err(|_| "Agent selection stopped unexpectedly.".to_string())??;
         let mut resume = previous;
+        let mut routed = true;
         loop {
             if !self.is_running(id) {
                 self.update(id, |run| {
@@ -230,7 +267,7 @@ impl TaskRuntime {
                 });
                 return Ok(());
             }
-            if request.agent == "auto" {
+            if !std::mem::replace(&mut routed, false) && request.agent == "auto" {
                 self.stage(id, Some("routing"));
                 self.update(id, |run| {
                     run.progress = Some(StepProgress::new(
