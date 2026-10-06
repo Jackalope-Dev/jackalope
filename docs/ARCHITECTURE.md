@@ -216,8 +216,10 @@ paths recent attempts touched rank highest. It costs no model calls, is capped w
 below the prompt budget and is presented as a starting point, not an authoritative
 file list. The scan is cached by repository and commit rather than directory, so an
 isolated task in a fresh worktree reuses the analysis of the repository it branched
-from instead of repeating it. `JACKALOPE_REPO_MAP=off` removes it for comparison runs. The launch prompt
-is ordered invariant text, then project-stable text, then the task, so the prefix a
+from instead of repeating it. `JACKALOPE_REPO_MAP=off` removes it for comparison runs. Launches add facts and
+contracts the agent cannot infer, not working-style advice the native harness
+already tunes per model; Claude Code and Codex take the invariant contract as system
+or developer instructions. The launch prompt is ordered invariant text, then project-stable text, then the task, so the prefix a
 provider may serve from cache stays byte-identical between tasks. Actual serialized
 request boundaries and cache policy belong to the installed CLI; stable text alone
 does not establish a cache hit or lower cost.

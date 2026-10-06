@@ -184,7 +184,7 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Live provider calibration and native cross-platform acceptance remain open.
 - Isolated Git worktrees, task checkpoints, verification, snapshot-bound outcome
   acceptance, combined patch review and guarded integration with recoverable cleanup.
-  Final verification guidance batches checks after implementation. Agents can report
+  Agents can report
   all requirement assessments in one call; review shows their justifications and
   evidence separately from human acceptance.
 - Durable ownership handoffs, explicit interface agreements and changed-file scope
@@ -277,8 +277,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Symbol definitions, related tests and explicit file locations sharpen retrieval;
   per-repository locks allow independent scans. Detailed launch timings and latency
   summaries retain failures and missing measurements in quality comparisons.
-- New tasks use version-four final-phase guidance and concise ordinary-task native
-  instructions. Managed assignments retain full ownership guidance.
+- Ordinary tasks carry Jackalope's workspace, permission, question and reporting
+  contracts plus task facts; working-style advice is left to each native harness.
+  Claude Code and Codex receive the contract as system or developer instructions. Managed
+  assignments retain full ownership guidance. Context selection and Automatic
+  routing run while the workspace and its setup command are prepared.
   Locally parsed test summaries and compact successful output preserve captured
   diagnostics and recoverable originals; comparative task savings remain unproven.
   Required checks remain explicit; final automatic checks reuse a successful result only

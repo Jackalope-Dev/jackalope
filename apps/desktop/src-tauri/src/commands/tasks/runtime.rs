@@ -782,10 +782,33 @@ impl TaskRuntime {
                 .verify_command
                 .as_ref()
                 .is_some_and(|command| !command.trim().is_empty());
-        let mut input = if lean {
+        let preamble = if lean {
             super::prompt::lean_preamble()
         } else {
             super::prompt::preamble()
+        };
+        // Claude and Codex add the invariant contract to their own system or developer
+        // instructions, so it keeps that precedence and the first user turn carries only task
+        // data. The lean contract is one line, which keeps it a safe argument for npm .cmd
+        // shims. Codex parses -c values as TOML; a JSON string is a valid TOML basic string.
+        let system_channel =
+            lean && crate::commands::experiments::is("JACKALOPE_INSTRUCTION_CHANNEL", "system");
+        let system_bytes = match adapter.as_str() {
+            "claude" if system_channel => {
+                cmd.args(["--append-system-prompt", preamble.trim_end()]);
+                preamble.len()
+            }
+            "codex" if system_channel => {
+                let value = serde_json::to_string(preamble.trim_end()).unwrap();
+                cmd.args(["-c", &format!("developer_instructions={value}")]);
+                preamble.len()
+            }
+            _ => 0,
+        };
+        let mut input = if system_bytes > 0 {
+            String::new()
+        } else {
+            preamble
         };
         let commit_policy = crate::commands::project_git::read(Path::new(&req.project_path))?;
         commit_policy.environment(&mut cmd, &[req.agent.clone()]);
@@ -824,7 +847,7 @@ impl TaskRuntime {
             .map(|r| r.contract.clone())
             .unwrap_or_default();
         input.push_str(&contract.text());
-        if !crate::commands::experiments::is("JACKALOPE_SCOPE_GUARD", "off") {
+        if super::prompt::workflow_guidance() {
             input.push_str(super::prompt::SCOPE_GUIDANCE);
         }
         let host_parallelism = std::thread::available_parallelism().ok();
@@ -936,7 +959,7 @@ impl TaskRuntime {
             run.efficiency.verification_flow =
                 Some(if final_check { "final" } else { "agent" }.into());
             run.efficiency.launches += 1;
-            run.efficiency.launch_prompt_bytes += input.len() as u64;
+            run.efficiency.launch_prompt_bytes += (input.len() + system_bytes) as u64;
         })?;
         #[cfg(test)]
         cmd.env_remove("JACKALOPE_QUALITY_SPEC");

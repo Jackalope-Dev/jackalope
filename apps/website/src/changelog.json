@@ -1,5 +1,17 @@
 [
   {
+    "id": "agents-start-sooner-and-keep-their-own-playbook",
+    "date": "2026-10-06",
+    "status": "In development",
+    "title": "Agents start sooner and keep their own playbook.",
+    "description": "Jackalope now gives agents the facts and rules of your workspace and lets each agent's own tooling decide how to work.",
+    "items": [
+      "Automatic tasks choose an agent while the workspace is still being prepared.",
+      "Agents receive a shorter set of instructions focused on your workspace, permissions and review.",
+      "Claude Code and Codex receive Jackalope's rules as system instructions, keeping the first message about your task."
+    ]
+  },
+  {
     "id": "bots-that-work-on-their-own",
     "date": "2026-10-05",
     "status": "In development",
