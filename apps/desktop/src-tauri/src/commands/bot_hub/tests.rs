@@ -759,3 +759,80 @@ fn bridge_agents_reach_the_same_bot_tools_by_name() {
         .call(&outsider, "bots", serde_json::json!({}))
         .is_err());
 }
+
+fn recall(query: &str, conversation: Option<&str>) -> RecallInput {
+    RecallInput {
+        query: query.into(),
+        conversation_id: conversation.map(Into::into),
+        offset: 0,
+    }
+}
+
+#[test]
+fn bots_recall_only_their_own_earlier_conversations() {
+    let fixture = fixture();
+    let scout = bot(&fixture, "Scout");
+    let other = bot(&fixture, "Other");
+    fixture
+        .hub
+        .sync(vec![scout.clone(), other.clone()])
+        .unwrap();
+    let origin = || MessageOrigin {
+        kind: "wake".into(),
+        label: "Test".into(),
+        bot_id: None,
+        bot_name: None,
+        session_id: None,
+    };
+    let (lockfile, _) = fixture
+        .hub
+        .deliver(
+            &scout,
+            "The lockfile check fails on Windows.",
+            origin(),
+            None,
+        )
+        .unwrap();
+    fixture
+        .hub
+        .deliver(&scout, "Review the release notes.", origin(), None)
+        .unwrap();
+    let (theirs, _) = fixture
+        .hub
+        .deliver(
+            &other,
+            "A lockfile question for someone else.",
+            origin(),
+            None,
+        )
+        .unwrap();
+    let run = conversation(&fixture, &scout);
+
+    let found = fixture.hub.recall(&run, recall("lockfile", None)).unwrap();
+    let ids: Vec<_> = found["conversations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["conversationId"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(ids, vec![lockfile.clone()]);
+    assert!(found["conversations"][0]["excerpt"]
+        .as_str()
+        .unwrap()
+        .contains("Windows"));
+    let listed = fixture.hub.recall(&run, recall("", None)).unwrap();
+    assert_eq!(listed["conversations"].as_array().unwrap().len(), 3);
+
+    let read = fixture
+        .hub
+        .recall(&run, recall("", Some(&lockfile)))
+        .unwrap();
+    assert!(read["text"].as_str().unwrap().contains("Wake-up (Test)"));
+    assert!(read["nextOffset"].is_null());
+    assert!(fixture.hub.recall(&run, recall("", Some(&theirs))).is_err());
+    let through_bridge = fixture
+        .hub
+        .call(&run, "recall", serde_json::json!({"query": "release"}))
+        .unwrap();
+    assert_eq!(through_bridge["conversations"].as_array().unwrap().len(), 1);
+}

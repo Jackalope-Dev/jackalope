@@ -80,7 +80,7 @@ remain ordinary schedules listed and toggled on the bot; new ones are not create
 
 ## Teamwork, cards and suggestions
 
-Runs belonging to a bot conversation receive five coordination tools; other tasks do
+Runs belonging to a bot conversation receive six coordination tools; other tasks do
 not list them:
 
 - `bots` lists other saved bots with role, project, wake-ups and whether they accept
@@ -100,6 +100,9 @@ not list them:
   twenty waiting.
 - `remember` saves, replaces or removes a note of at most 500 characters for the bot's
   future conversations. A bot keeps at most 30 notes and can only change its own.
+- `recall` searches the bot's own conversations by word, newest first among equal
+  matches, or reads one back in 12,000-character pages with the person's messages and
+  the bot's replies. Other bots' conversations are refused.
 - `suggest_bot` records a proposed bot with an optional scheduled wake-up. Nothing is
   created until the person reviews it in the editor; duplicates of existing bot or open
   suggestion names are refused and a bot may have three waiting.
@@ -128,6 +131,7 @@ The bot's memory follows the guidance in every batch: its saved notes with their
 and in a conversation's first batch the title, date and clipped latest reply of up to
 five of its other conversations. The Bots page lists notes under **Memory**, with the
 conversation that saved each one; removing a note takes effect from the next batch.
+Older work stays reachable through `recall` rather than the prompt.
 
 Bot conversations open only on the Bots page. `collectWorkspaceWork` and the Chat
 history skip sessions with a persona, and the command palette, work-pane requests,

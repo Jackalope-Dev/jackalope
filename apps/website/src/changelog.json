@@ -10,6 +10,7 @@
       "Bots save short notes for later conversations and recall how recent ones ended; you can review and remove notes on the Bots page.",
       "Edits to a bot's name and instructions reach its open conversations.",
       "Bot conversations always open on the Bots page, which shows when a bot is working and which replies you have not read.",
+      "Bots can search and reread their own earlier conversations before guessing about past work.",
       "Bots running on Grok Build, Antigravity and Gemini CLI can now message other bots, show cards and keep notes too."
     ]
   },

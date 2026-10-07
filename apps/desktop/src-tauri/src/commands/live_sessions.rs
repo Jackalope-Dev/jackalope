@@ -681,6 +681,27 @@ impl LiveSessions {
         memory
     }
 
+    /// A bot's conversations, newest first, for recalling earlier work.
+    pub(in crate::commands) fn bot_sessions(&self, bot_id: &str) -> Vec<LiveSession> {
+        let Ok(inner) = self.inner.lock() else {
+            return vec![];
+        };
+        let mut sessions: Vec<_> = inner
+            .ledger
+            .sessions
+            .iter()
+            .filter(|session| {
+                session
+                    .persona
+                    .as_ref()
+                    .is_some_and(|persona| persona.bot_id == bot_id)
+            })
+            .cloned()
+            .collect();
+        sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        sessions
+    }
+
     /// Whether new messages here would run: open, not paused by an error and not integrated.
     pub(in crate::commands) fn accepting(&self, id: &str) -> bool {
         let Ok(inner) = self.inner.lock() else {
