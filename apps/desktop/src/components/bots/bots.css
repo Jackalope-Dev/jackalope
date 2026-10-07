@@ -687,3 +687,53 @@
   content: "";
   height: 4px;
 }
+
+/* A reply arrived since the person last read the conversation. */
+.bots-roster-unread {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.bots-conversation-row {
+  min-height: 56px;
+}
+
+.bots-list-row .bots-conversation-copy {
+  display: grid;
+}
+
+.bots-conversation-title,
+.bots-conversation-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bots-roster-item[data-unread] .bots-roster-copy small,
+.bots-conversation-row[data-unread] .bots-conversation-title {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.bots-composer-thread {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bots-composer-thread strong {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.bots-note {
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+}

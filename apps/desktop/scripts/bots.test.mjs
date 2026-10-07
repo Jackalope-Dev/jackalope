@@ -188,3 +188,87 @@ test('agent screen only reopens web pages and labels desktop grants', () => {
     'In control',
   );
 });
+
+const conversation = (id, extra = {}) => ({
+  id,
+  title: id,
+  persona: { botId: 'scout', name: 'Scout', instructions: '' },
+  request: {},
+  createdAt: '2026-10-01T00:00:00Z',
+  updatedAt: '2026-10-01T00:00:00Z',
+  paused: false,
+  closed: false,
+  pinned: false,
+  messages: [],
+  batches: [],
+  draft: { text: '', revision: 0 },
+  error: null,
+  ...extra,
+});
+
+test('bot pages continue the latest open conversation and track unread replies', async () => {
+  const {
+    batchLimitReached,
+    botActivity,
+    botConversations,
+    continuableConversation,
+    isUnread,
+    lastReplyAt,
+  } = await import('../src/lib/bot-conversations.ts');
+  const older = conversation('older', { updatedAt: '2026-10-01T00:00:00Z' });
+  const newer = conversation('newer', {
+    updatedAt: '2026-10-02T00:00:00Z',
+    batches: [{ runId: 'run', messageIds: [], previousRunId: null, error: null, settled: true }],
+  });
+  const other = conversation('other', {
+    persona: { botId: 'else', name: 'Else', instructions: '' },
+  });
+  const list = botConversations([older, other, newer], 'scout');
+  assert.deepEqual(
+    list.map((item) => item.id),
+    ['newer', 'older'],
+  );
+  assert.equal(continuableConversation(list)?.id, 'newer');
+  assert.equal(continuableConversation([{ ...newer, paused: true }, older]), undefined);
+  assert.equal(continuableConversation([{ ...newer, closed: true }]), undefined);
+  assert.equal(continuableConversation([]), undefined);
+
+  const runs = [{ id: 'run', status: 'review', endedAt: '2026-10-02T01:00:00Z', prompts: [] }];
+  assert.equal(lastReplyAt(newer, runs), '2026-10-02T01:00:00Z');
+  assert.equal(isUnread(newer, runs, {}, '2026-10-01T00:00:00Z'), true);
+  assert.equal(
+    isUnread(newer, runs, { newer: '2026-10-02T02:00:00Z' }, '2026-10-01T00:00:00Z'),
+    false,
+  );
+  // Replies from before read tracking began never count as new.
+  assert.equal(isUnread(newer, runs, {}, '2026-10-03T00:00:00Z'), false);
+  assert.equal(isUnread(older, runs, {}, '2026-10-01T00:00:00Z'), false);
+
+  assert.equal(botActivity(list, runs), 'idle');
+  assert.equal(botActivity(list, [{ ...runs[0], status: 'running', endedAt: null }]), 'working');
+
+  const limited = {
+    ...newer,
+    paused: true,
+    limits: { maxBatches: 1, pauseAtEstimatedUsd: null },
+    error:
+      'The session reached its batch limit. Review the result and adjust limits before resuming.',
+  };
+  assert.equal(batchLimitReached(limited), true);
+  assert.equal(batchLimitReached({ ...limited, persona: undefined }), false);
+  assert.equal(batchLimitReached({ ...limited, error: 'Quota reached' }), false);
+});
+
+test('opening a bot conversation selects its bot and reads are remembered', () => {
+  const id = useBotStore.getState().create(draft({ name: 'Reader' }));
+  useBotStore.getState().select(null);
+  useBotStore.getState().openConversation('session-1', id);
+  assert.equal(useBotStore.getState().openSessionId, 'session-1');
+  assert.equal(useBotStore.getState().selectedId, id);
+  useBotStore.getState().openConversation('session-2', 'missing');
+  assert.equal(useBotStore.getState().selectedId, id);
+  useBotStore.getState().markSeen('session-1');
+  assert.ok(useBotStore.getState().seen['session-1']);
+  useBotStore.getState().openConversation(null);
+  assert.equal(useBotStore.getState().openSessionId, null);
+});

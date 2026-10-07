@@ -11,8 +11,9 @@ for the chat sessions bots start.
 agent (`auto` or an agent ID), optional model, project, connection scope, wake-ups,
 whether the bot works with other bots (`collaborate`) and the schedule IDs of routines
 created before wake-ups existed. A `null` connection scope delivers every enabled
-connection; a list becomes the run request's `connectionIds`. Edits apply to new
-conversations only. Instructions are limited to 6,000 characters in the renderer and
+connection; a list becomes the run request's `connectionIds`. Name and instruction edits
+reach open conversations from their next batch; agent, model, project and connection
+changes apply to new conversations. Instructions are limited to 6,000 characters in the renderer and
 in native validation. Version 2 of the store adds empty wake-ups and `collaborate: true`
 to older saved bots; duplicates copy wake-ups turned off.
 
@@ -33,10 +34,12 @@ The renderer mirrors bots whose project still exists into `commands/bot_hub.rs` 
 `bot_hub_sync`, after both the bot and project stores hydrate so an empty early
 directory cannot clear wake-up progress. Each entry carries the conversation run
 request the Bots page would start with. The hub stores its directory, wake-up state,
-cards, suggestions, hand-offs and the latest 300 activity entries in
+cards, suggestions, hand-offs, saved notes and the latest 300 activity entries in
 `bots/hub.json` in the profile directory, written atomically. An unreadable file is
 preserved and every write is refused until it is repaired. `bot-hub-changed` events
-and a 15-second poll keep the renderer snapshot current.
+and a 15-second poll keep the renderer snapshot current. Each sync also rewrites the
+persona of the bot's open conversations when its name or instructions changed, and
+drops notes belonging to removed bots.
 
 Everything the hub starts is an ordinary persona live session. Messages the person did
 not type carry an `origin` (`wake`, `bot`, `reply` or `card`) that the transcript shows
@@ -77,7 +80,7 @@ remain ordinary schedules listed and toggled on the bot; new ones are not create
 
 ## Teamwork, cards and suggestions
 
-Runs belonging to a bot conversation receive four coordination tools; other tasks do
+Runs belonging to a bot conversation receive five coordination tools; other tasks do
 not list them:
 
 - `bots` lists other saved bots with role, project, wake-ups and whether they accept
@@ -95,6 +98,8 @@ not list them:
   conversation that asked, or a new one if that conversation no longer accepts
   messages. Dismissing sends nothing. A reply may show ten cards and a bot may have
   twenty waiting.
+- `remember` saves, replaces or removes a note of at most 500 characters for the bot's
+  future conversations. A bot keeps at most 30 notes and can only change its own.
 - `suggest_bot` records a proposed bot with an optional scheduled wake-up. Nothing is
   created until the person reviews it in the editor; duplicates of existing bot or open
   suggestion names are refused and a bot may have three waiting.
@@ -109,23 +114,43 @@ instead of MCP do not receive these tools.
 
 ## Conversations
 
-Messaging a bot creates a live session with a native `persona` (bot ID, name,
-instructions). `live_sessions.rs` validates it and prepends it with the teamwork
-guidance to every batch prompt, so the role survives continuations and restarts without
-appearing in the transcript. Sessions without a persona are unchanged and older records
-load as before.
+Messaging a bot from its page continues its latest conversation while that one accepts
+messages; **New conversation** starts another. A finished, paused, failed or integrated
+latest conversation always starts a new one. Each conversation is a live session with a
+native `persona` (bot ID, name, instructions). `live_sessions.rs` validates it and
+prepends it with the teamwork guidance to every batch prompt, so the role survives
+continuations and restarts without appearing in the transcript. Sessions without a
+persona are unchanged and older records load as before.
 
-Bot conversations open inside the Bots page and stay out of Work: `collectWorkspaceWork`
-and the Chat history skip sessions with a persona. The Bots page lists sessions by
-persona bot ID with how each started; deleting a bot keeps its sessions and stops its
-wake-ups. Conversation requests skip the project's preparation command and automatic
-checks so a question answers quickly; the agent can still run the saved check.
+The bot's memory follows the guidance in every batch: its saved notes with their IDs,
+and in a conversation's first batch the title, date and clipped latest reply of up to
+five of its other conversations. The Bots page lists notes under **Memory**, with the
+conversation that saved each one; removing a note takes effect from the next batch.
+
+Bot conversations open only on the Bots page. `collectWorkspaceWork` and the Chat
+history skip sessions with a persona, and the command palette, work-pane requests,
+runs that belong to a bot conversation and conversations returned from their own window
+all open the Bots page with that bot selected. The page lists sessions by persona bot ID
+with how each started and a preview of the latest reply; long lists add search and
+**Show all**. Roster characters show working or waiting only while a bot has a running
+attempt or an open question. A dot marks bots with replies the person has not opened;
+read times stay in renderer storage, and replies from before read tracking began count
+as read. A hub-started conversation that reaches its batch limit offers **Let it
+continue**, which allows 20 more batches and resumes it. Deleting a bot keeps its
+sessions and stops its wake-ups. Conversation requests skip the project's preparation
+command and automatic checks so a question answers quickly; the agent can still run the
+saved check.
 
 ## Verification
 
 `scripts/bots.test.mjs` covers validation, migration, roster order, run requests, the
-hub directory and waiting counts. Native `bot_hub` tests cover sync validation,
-schedule and observer evaluation, messaging limits, reply routing, cards and
-suggestions; `live_sessions` tests cover persona validation, delivery and
-compatibility. Installed agent runs, real connection polling, wake-ups across sleep and
+hub directory, waiting counts, which conversation a message continues, unread replies,
+activity and batch limits. Native `bot_hub` tests cover sync validation, schedule and
+observer evaluation, messaging limits, reply routing, cards, suggestions, notes, persona
+refresh and recalled conversations; `live_sessions` tests cover persona validation,
+delivery and compatibility. With the desktop preview running at
+`JACKALOPE_PREVIEW_URL` (default `http://127.0.0.1:5192`),
+`node scripts/verification/verify-bots.mjs` checks the Bots page against fixtures:
+unread markers, continuing a conversation, search, notes, the batch-limit action,
+keyboard use, both themes and a narrow layout. Installed agent runs, real connection polling, wake-ups across sleep and
 restart, and multi-window behavior remain native acceptance work.

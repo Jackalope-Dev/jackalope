@@ -1,6 +1,6 @@
 use super::{
-    clip, BotCard, BotHub, BotProposal, CardOption, CardSource, HubBot, ProposedWake, Relay,
-    HOURLY_MESSAGES, MAX_CARDS, MAX_DEPTH, SESSION_MESSAGES,
+    clip, BotCard, BotHub, BotNote, BotProposal, CardOption, CardSource, HubBot, ProposedWake,
+    Relay, HOURLY_MESSAGES, MAX_CARDS, MAX_DEPTH, MAX_NOTES, NOTE_CHARS, SESSION_MESSAGES,
 };
 use crate::commands::{live_sessions::MessageOrigin, tasks::TaskRun};
 use chrono::{Duration as Span, Utc};
@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 /// Tools only bot conversations receive.
-pub const BOT_TOOLS: &[&str] = &["bots", "bot_message", "present", "suggest_bot"];
+pub const BOT_TOOLS: &[&str] = &["bots", "bot_message", "present", "suggest_bot", "remember"];
 
 #[derive(Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -118,6 +118,18 @@ pub struct SuggestBotInput {
     pub reason: String,
     #[schemars(description = "Optional scheduled wake-up for the new bot.")]
     pub wake_up: Option<WakeInput>,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RememberInput {
+    #[schemars(
+        description = "One self-contained note, at most 500 characters. Leave empty with replaces to remove that note."
+    )]
+    #[serde(default)]
+    pub note: String,
+    #[schemars(description = "ID of a saved note to replace or remove, from your saved notes.")]
+    pub replaces: Option<String>,
 }
 
 fn bounded(value: &str, limit: usize, field: &str) -> Result<String, String> {
@@ -492,6 +504,63 @@ impl BotHub {
         })?;
         Ok(
             json!({"proposalId": id, "status": "The user can create or dismiss this suggestion on the Bots page."}),
+        )
+    }
+
+    pub(crate) fn remember(&self, run: &TaskRun, input: RememberInput) -> Result<Value, String> {
+        let (me, session) = self.caller(run)?;
+        let note = input.note.trim().to_owned();
+        if note.chars().count() > NOTE_CHARS {
+            return Err(format!("Keep each note under {NOTE_CHARS} characters."));
+        }
+        let replaces = input
+            .replaces
+            .map(|id| id.trim().to_owned())
+            .filter(|id| !id.is_empty());
+        if note.is_empty() && replaces.is_none() {
+            return Err("Write a note, or pass replaces to remove one.".into());
+        }
+        let now = Utc::now().to_rfc3339();
+        let (status, id) = self.update(|ledger| {
+            if let Some(id) = &replaces {
+                let index = ledger
+                    .notes
+                    .iter()
+                    .position(|item| &item.id == id && item.bot_id == me.id)
+                    .ok_or("No saved note has that ID.")?;
+                if note.is_empty() {
+                    ledger.notes.remove(index);
+                    return Ok(("removed", id.clone()));
+                }
+                let item = &mut ledger.notes[index];
+                item.text = note.clone();
+                item.session_id = Some(session.clone());
+                item.updated_at = now.clone();
+                return Ok(("replaced", id.clone()));
+            }
+            if ledger
+                .notes
+                .iter()
+                .filter(|item| item.bot_id == me.id)
+                .count()
+                >= MAX_NOTES
+            {
+                return Err(format!(
+                    "You already keep {MAX_NOTES} notes. Replace or remove one first."
+                ));
+            }
+            let id = Uuid::new_v4().to_string();
+            ledger.notes.push(BotNote {
+                id: id.clone(),
+                bot_id: me.id.clone(),
+                text: note.clone(),
+                session_id: Some(session.clone()),
+                updated_at: now.clone(),
+            });
+            Ok(("saved", id))
+        })?;
+        Ok(
+            json!({"noteId": id, "status": status, "next": "Your future conversations receive saved notes."}),
         )
     }
 }

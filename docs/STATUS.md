@@ -231,8 +231,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   artifact. People can stop the browser or revoke desktop control from there.
 - Saved bots keep a name, role, standing instructions, agent and model, project,
   connection scope and a chosen character and colour locally. Messaging a bot starts a
-  chat inside the Bots page whose native persona is repeated in every batch prompt;
-  those chats skip workspace preparation and automatic checks and stay out of Work.
+  chat inside the Bots page, or continues its latest open one, whose native persona is
+  repeated in every batch prompt and follows later edits; those chats skip workspace
+  preparation and automatic checks and open only on the Bots page. Bots keep up to 30
+  notes for later conversations and recall how their latest conversations ended; the
+  roster shows real activity and unread replies.
   Bots wake themselves on schedules, project changes or new results from a read-only
   connection tool, message each other with replies routed back, show decision, input,
   action, source and update cards, and suggest new bots for the person to review. Every

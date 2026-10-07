@@ -1,5 +1,18 @@
 [
   {
+    "id": "bots-remember-and-keep-their-conversations-together",
+    "date": "2026-10-07",
+    "status": "In development",
+    "title": "Bots remember and keep their conversations together.",
+    "description": "Messages to a bot continue its latest conversation, and bots carry what they learn into new ones.",
+    "items": [
+      "Messaging a bot continues its latest open conversation, with a choice to start a new one.",
+      "Bots save short notes for later conversations and recall how recent ones ended; you can review and remove notes on the Bots page.",
+      "Edits to a bot's name and instructions reach its open conversations.",
+      "Bot conversations always open on the Bots page, which shows when a bot is working and which replies you have not read."
+    ]
+  },
+  {
     "id": "agents-start-sooner-and-keep-their-own-playbook",
     "date": "2026-10-06",
     "status": "In development",

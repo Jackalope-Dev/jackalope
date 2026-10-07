@@ -556,7 +556,7 @@ fn changes_found_while_busy_are_retried_and_pausing_stops_checks() {
     assert_ne!(state.baseline, baseline);
     assert_eq!(state.last_session_id.as_deref(), Some(session.as_str()));
 
-    // Edited instructions start the next wake-up in a fresh conversation.
+    // Edited instructions reach the open conversation, so the next wake-up continues it.
     scout.instructions = "Be brief.".into();
     fixture.hub.sync(vec![scout.clone()]).unwrap();
     let queued = fixture
@@ -576,7 +576,11 @@ fn changes_found_while_busy_are_retried_and_pausing_stops_checks() {
         .sessions
         .action(&session, "cancel-message", Some(&queued))
         .unwrap();
-    assert_ne!(fixture.hub.wake_now(&scout.id, &wake.id).unwrap(), session);
+    assert_eq!(fixture.hub.wake_now(&scout.id, &wake.id).unwrap(), session);
+    assert_eq!(
+        fixture.sessions.persona(&session).unwrap().instructions,
+        "Be brief."
+    );
 }
 
 #[test]
@@ -616,4 +620,95 @@ fn deleting_a_bot_closes_its_open_cards_and_suggestions() {
     fixture.hub.sync(vec![]).unwrap();
     assert!(fixture.hub.waiting().is_empty());
     assert_eq!(fixture.hub.snapshot().unwrap().cards[0].status, "dismissed");
+}
+
+fn note(text: &str, replaces: Option<&str>) -> RememberInput {
+    RememberInput {
+        note: text.into(),
+        replaces: replaces.map(Into::into),
+    }
+}
+
+#[test]
+fn bots_keep_bounded_notes_for_later_conversations() {
+    let fixture = fixture();
+    let scout = bot(&fixture, "Scout");
+    let other = bot(&fixture, "Other");
+    fixture
+        .hub
+        .sync(vec![scout.clone(), other.clone()])
+        .unwrap();
+    let run = conversation(&fixture, &scout);
+    let saved = fixture
+        .hub
+        .remember(&run, note("The user prefers short replies.", None))
+        .unwrap();
+    let id = saved["noteId"].as_str().unwrap().to_owned();
+    assert!(fixture
+        .hub
+        .notes_prompt(&scout.id)
+        .contains("prefers short replies"));
+    assert!(fixture.hub.notes_prompt(&other.id).is_empty());
+    assert!(fixture.hub.remember(&run, note("", None)).is_err());
+    assert!(fixture
+        .hub
+        .remember(&run, note(&"x".repeat(NOTE_CHARS + 1), None))
+        .is_err());
+
+    fixture
+        .hub
+        .remember(&run, note("The user prefers detailed replies.", Some(&id)))
+        .unwrap();
+    let prompt = fixture.hub.notes_prompt(&scout.id);
+    assert!(prompt.contains("detailed") && !prompt.contains("short"));
+    let theirs = conversation(&fixture, &other);
+    assert!(fixture
+        .hub
+        .remember(&theirs, note("Not mine.", Some(&id)))
+        .is_err());
+
+    for index in 1..MAX_NOTES {
+        fixture
+            .hub
+            .remember(&run, note(&format!("Note {index}"), None))
+            .unwrap();
+    }
+    assert!(fixture
+        .hub
+        .remember(&run, note("One too many", None))
+        .is_err());
+    fixture.hub.remember(&run, note("", Some(&id))).unwrap();
+    assert!(!fixture.hub.notes_prompt(&scout.id).contains("detailed"));
+
+    let kept = fixture.hub.snapshot().unwrap().notes[0].id.clone();
+    fixture.hub.forget_note(&kept).unwrap();
+    assert!(fixture.hub.forget_note(&kept).is_err());
+    fixture.hub.sync(vec![other]).unwrap();
+    assert!(fixture.hub.snapshot().unwrap().notes.is_empty());
+}
+
+#[test]
+fn edits_reach_open_conversations_and_new_ones_recall_recent_work() {
+    let fixture = fixture();
+    let mut scout = bot(&fixture, "Scout");
+    fixture.hub.sync(vec![scout.clone()]).unwrap();
+    let first = conversation(&fixture, &scout);
+    let first = first.live_session_id.unwrap();
+    scout.name = "Scout Prime".into();
+    scout.instructions = "Review only the lockfile.".into();
+    fixture.hub.sync(vec![scout.clone()]).unwrap();
+    let persona = fixture.sessions.persona(&first).unwrap();
+    assert_eq!(persona.name, "Scout Prime");
+    assert_eq!(persona.instructions, "Review only the lockfile.");
+
+    let second = conversation(&fixture, &scout).live_session_id.unwrap();
+    let sessions = fixture.sessions.snapshot(None).unwrap().sessions;
+    let session = sessions.iter().find(|item| item.id == second).unwrap();
+    let memory = fixture.sessions.bot_memory(session, &[]);
+    assert!(memory.contains("Your latest other conversations"));
+    assert!(memory.contains("(no reply yet)"));
+    let plain = sessions.iter().find(|item| item.id == first).unwrap();
+    let mut unrelated = plain.clone();
+    unrelated.persona = None;
+    assert!(fixture.sessions.bot_memory(&unrelated, &[]).is_empty());
 }

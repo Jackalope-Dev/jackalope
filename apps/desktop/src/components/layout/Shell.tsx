@@ -7,11 +7,13 @@ import { needsYou, useBotHubStore } from '../../lib/bot-hub';
 import { observeBots } from '../../lib/bot-hub-sync';
 import { captureDraftForProject } from '../../lib/capture-draft';
 import { openCliTerminal } from '../../lib/cli-terminal';
+import type { LiveSession } from '../../lib/live-session';
 import { displayShortcut, matchesShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { observeWorkbenchPerformance } from '../../lib/workbench-performance';
+import { useBotStore } from '../../stores/botStore';
 import { openChanges } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeHelper, useHelperStore } from '../../stores/helperStore';
@@ -53,6 +55,7 @@ import {
   type ActiveTab,
   AGENT_VIEWS,
   DEFAULT_WORKSPACE_TAB,
+  navigateWorkspace,
   type ProjectSettingsDestination,
   WORKSPACE_VIEWS,
 } from './navigation';
@@ -126,6 +129,14 @@ const RemoveProjectAction = lazy(() =>
   import('../projects/RemoveProjectAction').then((m) => ({ default: m.RemoveProjectAction })),
 );
 
+/** Bot conversations open on the Bots page, never in Work or Chat. */
+function openInBots(session: LiveSession) {
+  if (!session.persona) return false;
+  useBotStore.getState().openConversation(session.id, session.persona.botId);
+  navigateWorkspace('bots');
+  return true;
+}
+
 export function Shell({
   initialTaskAgent,
   initialCapture,
@@ -165,6 +176,7 @@ export function Shell({
         const session = useLiveSessionStore
           .getState()
           .sessions.find((session) => session.id === payload.sessionId);
+        if (session && openInBots(session)) return;
         if (session) useProjectStore.getState().selectProject(session.request.projectId);
         useLiveSessionStore.getState().select(payload.sessionId);
         useWorkViewStore.getState().open(`session:${payload.sessionId}`, payload.pane);
@@ -184,6 +196,7 @@ export function Shell({
   useTauriEvent<string>('live-session-open', async (payload) => {
     await useLiveSessionStore.getState().refresh(payload);
     const session = useLiveSessionStore.getState().sessions.find((item) => item.id === payload);
+    if (session && openInBots(session)) return;
     if (session) useProjectStore.getState().selectProject(session.request.projectId);
     useLiveSessionStore.getState().select(payload);
     setActiveTab('live-sessions');
@@ -298,6 +311,7 @@ export function Shell({
     const session = useLiveSessionStore
       .getState()
       .sessions.find((item) => `session:${item.id}` === workRequest.id);
+    if (session && openInBots(session)) return;
     if (session) {
       selectProject(session.request.projectId);
       useLiveSessionStore.getState().select(session.id);
@@ -306,6 +320,10 @@ export function Shell({
     }
     const run = useExecutionStore.getState().runs.find((item) => item.id === workRequest.id);
     if (!run) return;
+    const owner = useLiveSessionStore
+      .getState()
+      .sessions.find((item) => item.id === run.liveSessionId);
+    if (owner && openInBots(owner)) return;
     selectProject(run.projectId);
     if (run.liveSessionId) {
       useLiveSessionStore.getState().select(run.liveSessionId);

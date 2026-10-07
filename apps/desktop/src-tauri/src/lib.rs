@@ -249,6 +249,7 @@ pub fn run(launch: Launch) {
             commands::bot_hub::bot_hub_card,
             commands::bot_hub::bot_hub_proposal,
             commands::bot_hub::bot_hub_wake_now,
+            commands::bot_hub::bot_hub_forget_note,
             commands::bot_hub::bot_hub_connection_tools,
             commands::live_sessions::live_session_snapshot,
             commands::live_sessions::live_session_create,

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { type CSSProperties, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
+import { BOT_BATCH_ALLOWANCE, batchLimitReached } from '../../lib/bot-conversations';
 import { type BotCard, useBotHubStore } from '../../lib/bot-hub';
 import {
   type LiveSession,
@@ -491,10 +492,42 @@ export function LiveSessionView({
           </div>
         </div>
       )}
-      {(error || session.error) && (
+      {!error && batchLimitReached(session) ? (
         <div className="live-notice">
-          <InlineNotice tone="error">{error || session.error}</InlineNotice>
+          <InlineNotice
+            tone="warning"
+            action={
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() =>
+                  void act(async () => {
+                    await sessionCommand('limits', {
+                      id: session.id,
+                      limits: {
+                        ...session.limits,
+                        maxBatches: session.batches.length + BOT_BATCH_ALLOWANCE,
+                      },
+                    });
+                    await sessionCommand('action', { id: session.id, action: 'resume' });
+                  })
+                }
+              >
+                Let it continue
+              </Button>
+            }
+          >
+            {session.persona?.name ?? 'This bot'} paused after {session.batches.length} replies it
+            started without you. Review what it did, then let it continue for up to{' '}
+            {BOT_BATCH_ALLOWANCE} more.
+          </InlineNotice>
         </div>
+      ) : (
+        (error || session.error) && (
+          <div className="live-notice">
+            <InlineNotice tone="error">{error || session.error}</InlineNotice>
+          </div>
+        )
       )}
       {!simple && <WorkSourceLink prompts={session.messages.map((message) => message.text)} />}
       {latest && !detached && !simple && (
