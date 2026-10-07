@@ -1,8 +1,9 @@
 import { DropdownMenu as Menu, SearchIcon } from '@jackalope/ui';
 import { Check, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
 import { useWindowEvent } from '../../hooks/useWindowEvent';
+import { unreadBotConversations } from '../../lib/bot-conversations';
 import { needsYou, useBotHubStore } from '../../lib/bot-hub';
 import { observeBots } from '../../lib/bot-hub-sync';
 import { captureDraftForProject } from '../../lib/capture-draft';
@@ -152,6 +153,16 @@ export function Shell({
   useEffect(observeLiveSessions, []);
   useEffect(observeBots, []);
   const botsWaiting = useBotHubStore((state) => needsYou(state).count);
+  const { botSessions, botRuns } = useLiveSessionStore(
+    useShallow((state) => ({ botSessions: state.sessions, botRuns: state.runs })),
+  );
+  const { seen, seenFloor } = useBotStore(
+    useShallow((state) => ({ seen: state.seen, seenFloor: state.seenFloor })),
+  );
+  const botsUnread = useMemo(
+    () => unreadBotConversations(botSessions, botRuns, seen, seenFloor),
+    [botSessions, botRuns, seen, seenFloor],
+  );
   useEffect(observeManagedTasks, []);
   const canvas = useRef<HTMLElement>(null);
   const projectSwitcher = useRef<HTMLButtonElement>(null);
@@ -529,8 +540,16 @@ export function Shell({
                 }}
                 aria-current={view.group === item.group ? 'page' : undefined}
                 aria-label={
-                  item.id === 'bots' && botsWaiting > 0
-                    ? `${item.label}, ${botsWaiting} waiting on you`
+                  item.id === 'bots' && (botsWaiting > 0 || botsUnread > 0)
+                    ? [
+                        item.label,
+                        botsWaiting ? `${botsWaiting} waiting on you` : '',
+                        botsUnread
+                          ? `${botsUnread} new ${botsUnread === 1 ? 'reply' : 'replies'}`
+                          : '',
+                      ]
+                        .filter(Boolean)
+                        .join(', ')
                     : item.label
                 }
                 title={item.label}
@@ -538,11 +557,14 @@ export function Shell({
               >
                 <item.icon className="size-3.5" />
                 <span>{item.label}</span>
-                {item.id === 'bots' && botsWaiting > 0 && (
-                  <small className="workspace-nav-count" aria-hidden="true">
-                    {botsWaiting}
-                  </small>
-                )}
+                {item.id === 'bots' &&
+                  (botsWaiting > 0 ? (
+                    <small className="workspace-nav-count" aria-hidden="true">
+                      {botsWaiting}
+                    </small>
+                  ) : (
+                    botsUnread > 0 && <small className="workspace-nav-unread" aria-hidden="true" />
+                  ))}
               </button>
             ))}
           </nav>

@@ -41,6 +41,17 @@ export function isUnread(
   return !read || reply > read;
 }
 
+/** How many bot conversations have replies the person has not read. */
+export function unreadBotConversations(
+  sessions: LiveSession[],
+  runs: TaskRun[],
+  seen: Record<string, string>,
+  floor: string,
+) {
+  return sessions.filter((session) => session.persona && isUnread(session, runs, seen, floor))
+    .length;
+}
+
 /** The bot's mood from real activity: waiting on an answer, working or idle. */
 export function botActivity(conversations: LiveSession[], runs: TaskRun[]) {
   let working = false;

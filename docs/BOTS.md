@@ -135,7 +135,8 @@ runs that belong to a bot conversation and conversations returned from their own
 all open the Bots page with that bot selected. The page lists sessions by persona bot ID
 with how each started and a preview of the latest reply; long lists add search and
 **Show all**. Roster characters show working or waiting only while a bot has a running
-attempt or an open question. A dot marks bots with replies the person has not opened;
+attempt or an open question. A dot marks bots, and the Bots navigation item when nothing is waiting, with replies
+the person has not opened;
 read times stay in renderer storage, and replies from before read tracking began count
 as read. A hub-started conversation that reaches its batch limit offers **Let it
 continue**, which allows 20 more batches and resumes it. Deleting a bot keeps its

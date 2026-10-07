@@ -268,6 +268,15 @@
 .workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-toggle {
   align-self: center;
 }
+/* Bot replies the person has not opened; counts are reserved for things waiting on them. */
+.workspace-shell .workspace-nav-unread {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
 .workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-item {
   justify-content: center;
   padding-inline: 0;
@@ -294,6 +303,11 @@
   right: 0;
   min-width: 16px;
   padding: 0 4px;
+}
+.workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-unread {
+  position: absolute;
+  top: 4px;
+  right: 4px;
 }
 .workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-item > span {
   display: none;

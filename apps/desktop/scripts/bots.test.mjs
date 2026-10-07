@@ -244,6 +244,10 @@ test('bot pages continue the latest open conversation and track unread replies',
   assert.equal(isUnread(newer, runs, {}, '2026-10-03T00:00:00Z'), false);
   assert.equal(isUnread(older, runs, {}, '2026-10-01T00:00:00Z'), false);
 
+  const { unreadBotConversations } = await import('../src/lib/bot-conversations.ts');
+  const plain = { ...newer, id: 'plain', persona: undefined };
+  assert.equal(unreadBotConversations([newer, older, plain], runs, {}, '2026-10-01T00:00:00Z'), 1);
+
   assert.equal(botActivity(list, runs), 'idle');
   assert.equal(botActivity(list, [{ ...runs[0], status: 'running', endedAt: null }]), 'working');
 
