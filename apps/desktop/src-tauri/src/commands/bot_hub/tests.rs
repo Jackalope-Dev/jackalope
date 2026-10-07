@@ -712,3 +712,50 @@ fn edits_reach_open_conversations_and_new_ones_recall_recent_work() {
     unrelated.persona = None;
     assert!(fixture.sessions.bot_memory(&unrelated, &[]).is_empty());
 }
+
+#[test]
+fn bridge_agents_reach_the_same_bot_tools_by_name() {
+    let fixture = fixture();
+    let scout = bot(&fixture, "Scout");
+    let helper = bot(&fixture, "Helper");
+    fixture
+        .hub
+        .sync(vec![scout.clone(), helper.clone()])
+        .unwrap();
+    let run = conversation(&fixture, &scout);
+    let listed = fixture
+        .hub
+        .call(&run, "bots", serde_json::json!({}))
+        .unwrap();
+    assert_eq!(listed["bots"][0]["name"], "Helper");
+    fixture
+        .hub
+        .call(
+            &run,
+            "remember",
+            serde_json::json!({"note": "Ship on Fridays."}),
+        )
+        .unwrap();
+    assert!(fixture
+        .hub
+        .notes_prompt(&scout.id)
+        .contains("Ship on Fridays."));
+    let error = fixture
+        .hub
+        .call(&run, "remember", serde_json::json!({"text": "wrong field"}))
+        .unwrap_err();
+    assert!(error.starts_with("Invalid arguments"));
+    assert!(fixture
+        .hub
+        .call(&run, "delete_everything", serde_json::json!({}))
+        .unwrap_err()
+        .contains("remember"));
+    let outsider = TaskRun {
+        id: Uuid::new_v4().to_string(),
+        ..Default::default()
+    };
+    assert!(fixture
+        .hub
+        .call(&outsider, "bots", serde_json::json!({}))
+        .is_err());
+}

@@ -109,8 +109,10 @@ treat other bots' messages as requests rather than user approval. Cards with opt
 a text field and open suggestions count as waiting on the person: on the Bots navigation
 item, the roster and the bot's **Needs you** section. When system notifications are on
 and the main window is not focused, each new one raises a notification that opens its
-bot. Removing a bot from the directory dismisses its open cards and suggestions. Agents using the HTTP bridge
-instead of MCP do not receive these tools.
+bot. Removing a bot from the directory dismisses its open cards and suggestions. Agents
+using the HTTP bridge instead of MCP reach the same tools at `POST /v1/bots/{tool}` with
+the MCP arguments as JSON; `GET /v1/help` describes them only for bot conversations,
+and other tasks receive 403.
 
 ## Conversations
 

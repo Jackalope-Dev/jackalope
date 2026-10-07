@@ -507,6 +507,24 @@ impl BotHub {
         )
     }
 
+    /// Runs a bot tool by name for agents that reach Jackalope through the HTTP bridge.
+    pub(crate) fn call(&self, run: &TaskRun, tool: &str, input: Value) -> Result<Value, String> {
+        fn parse<T: serde::de::DeserializeOwned>(input: Value) -> Result<T, String> {
+            serde_json::from_value(input).map_err(|error| format!("Invalid arguments: {error}"))
+        }
+        match tool {
+            "bots" => self.directory(run, parse(input)?),
+            "bot_message" => self.message(run, parse(input)?),
+            "present" => self.present(run, parse(input)?),
+            "suggest_bot" => self.suggest(run, parse(input)?),
+            "remember" => self.remember(run, parse(input)?),
+            _ => Err(format!(
+                "Unknown bot tool. Use one of: {}.",
+                BOT_TOOLS.join(", ")
+            )),
+        }
+    }
+
     pub(crate) fn remember(&self, run: &TaskRun, input: RememberInput) -> Result<Value, String> {
         let (me, session) = self.caller(run)?;
         let note = input.note.trim().to_owned();
