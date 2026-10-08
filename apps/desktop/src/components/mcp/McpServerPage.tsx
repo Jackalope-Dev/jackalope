@@ -131,7 +131,11 @@ export function McpServerPage({
         className="mcp-detail-tabs"
         onValueChange={() => scroll.current?.scrollTo({ top: 0 })}
       >
-        <Tabs.List aria-label="Server information" className="mcp-detail-tab-list">
+        <Tabs.List
+          appearance="segmented"
+          aria-label="Server information"
+          className="mcp-detail-tab-list"
+        >
           <Tabs.Trigger value="overview">Overview</Tabs.Trigger>
           <Tabs.Trigger value="tools">Tools{tools.length ? ` (${tools.length})` : ''}</Tabs.Trigger>
           <Tabs.Trigger value="setup">Setup</Tabs.Trigger>

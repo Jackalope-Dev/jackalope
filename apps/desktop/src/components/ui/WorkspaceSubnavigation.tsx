@@ -1,3 +1,6 @@
+import { SegmentedNav, type SegmentItem } from '@jackalope/ui';
+
+/** Peer views of one workspace area, as a segmented control aligned with the page gutter. */
 export function WorkspaceSubnavigation<T extends string>({
   label,
   items,
@@ -5,23 +8,13 @@ export function WorkspaceSubnavigation<T extends string>({
   onChange,
 }: {
   label: string;
-  items: readonly { id: T; label: string }[];
+  items: readonly SegmentItem<T>[];
   value: T;
   onChange: (value: T) => void;
 }) {
   return (
-    <nav aria-label={label} className="workspace-subnavigation">
-      {items.map((item) => (
-        <button
-          type="button"
-          key={item.id}
-          aria-current={value === item.id ? 'page' : undefined}
-          onClick={() => onChange(item.id)}
-          className="workspace-nav-item"
-        >
-          {item.label}
-        </button>
-      ))}
-    </nav>
+    <div className="workspace-subnavigation">
+      <SegmentedNav label={label} items={items} value={value} onChange={onChange} />
+    </div>
   );
 }

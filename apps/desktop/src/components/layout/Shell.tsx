@@ -1,17 +1,20 @@
 import { DropdownMenu as Menu, SearchIcon } from '@jackalope/ui';
 import { Check, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
 import { useWindowEvent } from '../../hooks/useWindowEvent';
+import { unreadBotConversations } from '../../lib/bot-conversations';
 import { needsYou, useBotHubStore } from '../../lib/bot-hub';
 import { observeBots } from '../../lib/bot-hub-sync';
 import { captureDraftForProject } from '../../lib/capture-draft';
 import { openCliTerminal } from '../../lib/cli-terminal';
+import type { LiveSession } from '../../lib/live-session';
 import { displayShortcut, matchesShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { observeWorkbenchPerformance } from '../../lib/workbench-performance';
+import { useBotStore } from '../../stores/botStore';
 import { openChanges } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeHelper, useHelperStore } from '../../stores/helperStore';
@@ -53,6 +56,7 @@ import {
   type ActiveTab,
   AGENT_VIEWS,
   DEFAULT_WORKSPACE_TAB,
+  navigateWorkspace,
   type ProjectSettingsDestination,
   WORKSPACE_VIEWS,
 } from './navigation';
@@ -126,6 +130,14 @@ const RemoveProjectAction = lazy(() =>
   import('../projects/RemoveProjectAction').then((m) => ({ default: m.RemoveProjectAction })),
 );
 
+/** Bot conversations open on the Bots page, never in Work or Chat. */
+function openInBots(session: LiveSession) {
+  if (!session.persona) return false;
+  useBotStore.getState().openConversation(session.id, session.persona.botId);
+  navigateWorkspace('bots');
+  return true;
+}
+
 export function Shell({
   initialTaskAgent,
   initialCapture,
@@ -141,6 +153,16 @@ export function Shell({
   useEffect(observeLiveSessions, []);
   useEffect(observeBots, []);
   const botsWaiting = useBotHubStore((state) => needsYou(state).count);
+  const { botSessions, botRuns } = useLiveSessionStore(
+    useShallow((state) => ({ botSessions: state.sessions, botRuns: state.runs })),
+  );
+  const { seen, seenFloor } = useBotStore(
+    useShallow((state) => ({ seen: state.seen, seenFloor: state.seenFloor })),
+  );
+  const botsUnread = useMemo(
+    () => unreadBotConversations(botSessions, botRuns, seen, seenFloor),
+    [botSessions, botRuns, seen, seenFloor],
+  );
   useEffect(observeManagedTasks, []);
   const canvas = useRef<HTMLElement>(null);
   const projectSwitcher = useRef<HTMLButtonElement>(null);
@@ -165,6 +187,7 @@ export function Shell({
         const session = useLiveSessionStore
           .getState()
           .sessions.find((session) => session.id === payload.sessionId);
+        if (session && openInBots(session)) return;
         if (session) useProjectStore.getState().selectProject(session.request.projectId);
         useLiveSessionStore.getState().select(payload.sessionId);
         useWorkViewStore.getState().open(`session:${payload.sessionId}`, payload.pane);
@@ -184,6 +207,7 @@ export function Shell({
   useTauriEvent<string>('live-session-open', async (payload) => {
     await useLiveSessionStore.getState().refresh(payload);
     const session = useLiveSessionStore.getState().sessions.find((item) => item.id === payload);
+    if (session && openInBots(session)) return;
     if (session) useProjectStore.getState().selectProject(session.request.projectId);
     useLiveSessionStore.getState().select(payload);
     setActiveTab('live-sessions');
@@ -298,6 +322,7 @@ export function Shell({
     const session = useLiveSessionStore
       .getState()
       .sessions.find((item) => `session:${item.id}` === workRequest.id);
+    if (session && openInBots(session)) return;
     if (session) {
       selectProject(session.request.projectId);
       useLiveSessionStore.getState().select(session.id);
@@ -306,6 +331,10 @@ export function Shell({
     }
     const run = useExecutionStore.getState().runs.find((item) => item.id === workRequest.id);
     if (!run) return;
+    const owner = useLiveSessionStore
+      .getState()
+      .sessions.find((item) => item.id === run.liveSessionId);
+    if (owner && openInBots(owner)) return;
     selectProject(run.projectId);
     if (run.liveSessionId) {
       useLiveSessionStore.getState().select(run.liveSessionId);
@@ -511,8 +540,16 @@ export function Shell({
                 }}
                 aria-current={view.group === item.group ? 'page' : undefined}
                 aria-label={
-                  item.id === 'bots' && botsWaiting > 0
-                    ? `${item.label}, ${botsWaiting} waiting on you`
+                  item.id === 'bots' && (botsWaiting > 0 || botsUnread > 0)
+                    ? [
+                        item.label,
+                        botsWaiting ? `${botsWaiting} waiting on you` : '',
+                        botsUnread
+                          ? `${botsUnread} new ${botsUnread === 1 ? 'reply' : 'replies'}`
+                          : '',
+                      ]
+                        .filter(Boolean)
+                        .join(', ')
                     : item.label
                 }
                 title={item.label}
@@ -520,11 +557,14 @@ export function Shell({
               >
                 <item.icon className="size-3.5" />
                 <span>{item.label}</span>
-                {item.id === 'bots' && botsWaiting > 0 && (
-                  <small className="workspace-nav-count" aria-hidden="true">
-                    {botsWaiting}
-                  </small>
-                )}
+                {item.id === 'bots' &&
+                  (botsWaiting > 0 ? (
+                    <small className="workspace-nav-count" aria-hidden="true">
+                      {botsWaiting}
+                    </small>
+                  ) : (
+                    botsUnread > 0 && <small className="workspace-nav-unread" aria-hidden="true" />
+                  ))}
               </button>
             ))}
           </nav>

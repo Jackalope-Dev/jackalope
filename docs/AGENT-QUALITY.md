@@ -31,8 +31,8 @@ tool-only measurements; these omit worker execution and cannot establish task sa
 
 ## Prompt and output contracts
 
-- Fresh worker launches ask the lead to assess delegation after
-  inspecting repository context. Small or tightly coupled work stays sequential;
+- Managed launches ask the lead to assess delegation after
+  inspecting repository context. Ordinary tasks leave delegation to the native harness. Small or tightly coupled work stays sequential;
   useful independent work can use the provider's available, permitted subagent
   tools without a separate split decision from the user. Explicit user/repository
   restrictions still apply. The lead assigns bounded ownership, reviews worker
@@ -41,8 +41,13 @@ tool-only measurements; these omit worker execution and cannot establish task sa
   is launched to emulate them. These are agent instructions, not native enforcement
   of a worker count or evidence that a provider actually delegated. Provider
   lifecycle, usage coverage and quality still require installed trials.
-- Ordinary tasks use final-phase guidance and a concise preamble; managed
-  assignments retain full ownership instructions. Native continuations receive
+- Ordinary tasks receive a concise contract: assigned workspace, no commit, merge or
+  push, permission denials, the question tool, unweakened tests and the final report.
+  Working style is left to the native harness, which its provider tunes per model;
+  matched pilots found added workflow guidance slower without better outcomes, while
+  task facts such as the repository map reduced exploration. Claude Code receives
+  the contract through `--append-system-prompt` and Codex through `developer_instructions`. Managed assignments retain full
+  ownership instructions. Native continuations receive
   current workflow, task, contract and workspace instructions.
 - Automatic guidelines distinguish design tokens from authentication tokens, skip
   negated requests and fenced examples, and avoid a debugging workflow for spelling
@@ -57,13 +62,13 @@ tool-only measurements; these omit worker execution and cannot establish task sa
 - Routing receives the task, outcome contract and selected knowledge without the
   worker's bridge protocol manual. Different agents/models still use the existing
   validated router; unknown defaults are not assumed equivalent.
-- Workers finish a coherent implementation before batching required tests, builds
-  and evidence capture in a final verification phase. Explicit test-first or repository
-  instructions, and diagnostics necessary to choose an implementation, take precedence.
-  Each applicable requirement gets a concise final agent assessment with a status,
+- Managed workers finish a coherent implementation before batching required tests,
+  builds and evidence capture in a final verification phase. Explicit test-first or
+  repository instructions, and diagnostics necessary to choose an implementation, take
+  precedence. Each applicable requirement gets a concise final agent assessment with a status,
   justification and evidence references through one `record_validation_step` call.
   These claims appear beside the review controls and never accept requirements for the user.
-- Workers batch independent reads/searches where supported, reuse established
+- Managed workers batch independent reads/searches where supported, reuse established
   context and keep progress concise. Repository-required checks remain mandatory;
   changes, failures and unresolved concerns justify additional verification.
 - Shared launch context recommends serial ad hoc checks when the native host's
@@ -636,7 +641,8 @@ user setting or proof of a faster workflow.
 | Setting | Behavior |
 | --- | --- |
 | `JACKALOPE_OPENCODE_TRANSPORT=cli` | Reproduces the earlier headless JSON transport for evaluation. Ordinary OpenCode tasks use an authenticated task-owned server and explicit permission replies. External unattended comparisons reject requests in both arms; user-mediated recovery is a separate outcome. |
-| `JACKALOPE_SCOPE_GUARD=off` | Removes the shared guidance to distinguish required outcomes from suggestions, preserve regression contracts, inspect bounded source first and select relevant plus mandatory checks. The guidance is normally included across adapters. |
+| `JACKALOPE_SCOPE_GUARD=on` | Restores the shared workflow and scope guidance: batching reads, final-phase checks, delegation thresholds, distinguishing required outcomes from suggestions and selecting relevant plus mandatory checks. Off by default; the native harness owns working style. |
+| `JACKALOPE_INSTRUCTION_CHANNEL=prompt` | Sends the ordinary-task contract in the first user message instead of Claude Code's `--append-system-prompt` or Codex's `developer_instructions`. Other adapters always use the prompt. |
 | `JACKALOPE_PROVIDER_EFFORT=off` or `low` | Preserves OpenCode provider defaults or requests its advertised low variant independently of task-approach text. Neither is automatic quality-based effort selection. Compare against normal effort with the same model and prompt. |
 | `JACKALOPE_NATIVE_TOOLS=off` | Disables the default recoverable OpenCode test-output filter for matched comparisons. `output` enables that default. Native file reads retain their original arguments and permissions. |
 | `JACKALOPE_RESULT_QUERIES=on` | Exposes exact queries over captured tool results, complete JSON row pages, bounded path hints and explicit selection guidance. Records row selection, fallback, truncation and expansion counters. |

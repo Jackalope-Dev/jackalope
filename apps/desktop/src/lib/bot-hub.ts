@@ -48,6 +48,15 @@ export interface HubEvent {
   text: string;
 }
 
+/** A note a bot saved for its future conversations. */
+export interface BotNote {
+  id: string;
+  botId: string;
+  text: string;
+  sessionId: string | null;
+  updatedAt: string;
+}
+
 export interface WakeState {
   wakeId: string;
   botId: string;
@@ -64,6 +73,7 @@ export interface HubSnapshot {
   events: HubEvent[];
   wakes: WakeState[];
   relays: { id: string; fromBotId: string; toBotId: string; toSessionId: string }[];
+  notes: BotNote[];
   /** Every scheduled and observed wake-up is paused; Run now still works. */
   paused: boolean;
   error: string | null;
@@ -182,6 +192,7 @@ const EMPTY: HubSnapshot = {
   events: [],
   wakes: [],
   relays: [],
+  notes: [],
   paused: false,
   error: null,
 };
@@ -230,6 +241,10 @@ export const setWakeUpsPaused = async (paused: boolean) => {
       error: `Wake-ups could not be ${paused ? 'paused' : 'resumed'}: ${error}`,
     });
   }
+};
+export const forgetNote = async (id: string) => {
+  await invoke('bot_hub_forget_note', { id });
+  await useBotHubStore.getState().refresh();
 };
 export const wakeNow = (botId: string, wakeId: string) =>
   invoke<string>('bot_hub_wake_now', { botId, wakeId });

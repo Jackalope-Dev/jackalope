@@ -199,6 +199,9 @@ struct Ledger {
     sessions: Vec<LiveSession>,
 }
 
+/// Other conversations a bot's new conversation is told about.
+const RECENT_CONVERSATIONS: usize = 5;
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSnapshot {
@@ -582,6 +585,123 @@ impl LiveSessions {
             .and_then(|session| session.persona.clone())
     }
 
+    /// Brings open conversations up to date with their bots' current names and instructions,
+    /// so an edited bot's next batch follows its new instructions.
+    pub(in crate::commands) fn refresh_personas(
+        &self,
+        bots: &[(String, String, String)],
+    ) -> Result<(), String> {
+        let stale = |session: &LiveSession| {
+            let persona = session.persona.as_ref()?;
+            let (_, name, instructions) = bots.iter().find(|bot| bot.0 == persona.bot_id)?;
+            (!session.closed
+                && (persona.name != name.trim() || persona.instructions != instructions.trim()))
+            .then(|| (name.trim().to_owned(), instructions.trim().to_owned()))
+        };
+        {
+            let inner = self.inner.lock().map_err(|e| e.to_string())?;
+            if inner.error.is_some() || !inner.ledger.sessions.iter().any(|s| stale(s).is_some()) {
+                return Ok(());
+            }
+        }
+        let _gate = self.gate.lock().map_err(|e| e.to_string())?;
+        self.update(|ledger| {
+            for session in &mut ledger.sessions {
+                if let Some((name, instructions)) = stale(session) {
+                    if let Some(persona) = session.persona.as_mut() {
+                        persona.name = name;
+                        persona.instructions = instructions;
+                    }
+                }
+            }
+            Ok(())
+        })?;
+        self.changed();
+        Ok(())
+    }
+
+    /// What a bot carries between conversations: its saved notes, and when a conversation
+    /// starts, how its latest other conversations ended.
+    pub(in crate::commands) fn bot_memory(
+        &self,
+        session: &LiveSession,
+        runs: &[TaskRun],
+    ) -> String {
+        let Some(persona) = &session.persona else {
+            return String::new();
+        };
+        let mut memory = super::bot_hub::installed()
+            .map(|hub| hub.notes_prompt(&persona.bot_id))
+            .unwrap_or_default();
+        if !session.batches.is_empty() {
+            return memory;
+        }
+        let recent: Vec<(String, String, Option<String>)> = {
+            let Ok(inner) = self.inner.lock() else {
+                return memory;
+            };
+            let mut others: Vec<_> = inner
+                .ledger
+                .sessions
+                .iter()
+                .filter(|other| {
+                    other.id != session.id
+                        && other
+                            .persona
+                            .as_ref()
+                            .is_some_and(|other| other.bot_id == persona.bot_id)
+                        && !other.messages.is_empty()
+                })
+                .collect();
+            others.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+            others
+                .into_iter()
+                .take(RECENT_CONVERSATIONS)
+                .map(|other| {
+                    (
+                        other.title.clone(),
+                        other.updated_at.chars().take(10).collect(),
+                        other.batches.last().map(|batch| batch.run_id.clone()),
+                    )
+                })
+                .collect()
+        };
+        if recent.is_empty() {
+            return memory;
+        }
+        memory.push_str("Your latest other conversations, newest first (the user can open them on the Bots page):\n");
+        for (title, date, run) in recent {
+            let result = run
+                .and_then(|id| runs.iter().find(|run| run.id == id))
+                .map(|run| super::bot_hub::clip(&run.result.replace('\n', " "), 400))
+                .filter(|result| !result.is_empty())
+                .unwrap_or_else(|| "(no reply yet)".into());
+            memory.push_str(&format!("- {date} · {title}: {result}\n"));
+        }
+        memory
+    }
+
+    /// A bot's conversations, newest first, for recalling earlier work.
+    pub(in crate::commands) fn bot_sessions(&self, bot_id: &str) -> Vec<LiveSession> {
+        let Ok(inner) = self.inner.lock() else {
+            return vec![];
+        };
+        let mut sessions: Vec<_> = inner
+            .ledger
+            .sessions
+            .iter()
+            .filter(|session| {
+                session
+                    .persona
+                    .as_ref()
+                    .is_some_and(|persona| persona.bot_id == bot_id)
+            })
+            .cloned()
+            .collect();
+        sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        sessions
+    }
+
     /// Whether new messages here would run: open, not paused by an error and not integrated.
     pub(in crate::commands) fn accepting(&self, id: &str) -> bool {
         let Ok(inner) = self.inner.lock() else {
@@ -838,7 +958,11 @@ impl LiveSessions {
                 let batch = SessionBatch {
                     run_id: Uuid::new_v4().to_string(),
                     message_ids: pending.iter().map(|m| m.id.clone()).collect(),
-                    prompt: batch_prompt(&snapshot, &pending),
+                    prompt: batch_prompt_with(
+                        &snapshot,
+                        &pending,
+                        &self.bot_memory(&snapshot, &runs),
+                    ),
                     previous_run_id: snapshot
                         .batches
                         .iter()
@@ -996,7 +1120,13 @@ pub(in crate::commands) fn batch_prompt_for_test(session: &LiveSession) -> Strin
     batch_prompt(session, &session.messages.iter().collect::<Vec<_>>())
 }
 
+#[cfg(test)]
 fn batch_prompt(session: &LiveSession, messages: &[&SessionMessage]) -> String {
+    batch_prompt_with(session, messages, "")
+}
+
+/// `memory` is the bot's saved notes and recent conversations, placed after its guidance.
+fn batch_prompt_with(session: &LiveSession, messages: &[&SessionMessage], memory: &str) -> String {
     let mut prompt = format!("Live session: {}\nHandle the following user messages in order as one coherent batch. Group related changes; later corrections override earlier requests. Answer questions without assuming they authorize unrelated edits. Implement requested changes fully, preserving prior session work. Do not commit, push, reset, change branches, or create another worktree. Leave cumulative changes for review. Use the existing harness for tools, checks and user questions. Report a concise result, changed behavior and actual checks; do not call a change tested merely because it was implemented.\n", session.title);
     if let Some(persona) = &session.persona {
         prompt.push_str(&format!(
@@ -1007,6 +1137,7 @@ fn batch_prompt(session: &LiveSession, messages: &[&SessionMessage]) -> String {
             if persona.instructions.is_empty() { "(No extra instructions.)" } else { &persona.instructions }
         ));
         prompt.push_str(super::bot_hub::BOT_GUIDANCE);
+        prompt.push_str(memory);
     }
     if !session.request.isolated && session.request.target_branch.is_none() {
         prompt.push_str("This folder is not a Git repository. Edit files in place. Do not create a repository unless the user asks.\n");

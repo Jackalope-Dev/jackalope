@@ -346,13 +346,7 @@ export function OnboardingFlow({
               </Button>
             )}
           </div>
-          <h2
-            id="onboarding-heading"
-            ref={heading}
-            data-step={step}
-            tabIndex={-1}
-            className={step === 'behavior' ? 'sr-only' : undefined}
-          >
+          <h2 id="onboarding-heading" ref={heading} data-step={step} tabIndex={-1}>
             {step === 'project'
               ? 'Choose a project'
               : step === 'agent'
@@ -600,12 +594,17 @@ export function OnboardingFlow({
           )}
           {step === 'behavior' && project && (
             <>
+              <p className="onboarding-description">
+                How tasks commit their work and when finished branches are removed. You can change
+                this later in Project settings.
+              </p>
               <div className="onboarding-behavior-section">
                 <ProjectGitSettings
                   key={project.path}
                   projectPath={project.path}
                   onDraftChange={setCommitPolicy}
                   disabled={busy}
+                  titled={false}
                 />
               </div>
 

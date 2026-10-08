@@ -1,5 +1,5 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { CopyButton, DropdownMenu as Menu } from '@jackalope/ui';
+import { CopyButton, SegmentedControl } from '@jackalope/ui';
 import {
   AlarmClock,
   ArrowLeft,
@@ -8,7 +8,8 @@ import {
   ExternalLink,
   Minus,
   Monitor,
-  MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
   PanelRightClose,
   Pause,
   Pin,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 import { type CSSProperties, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
+import { BOT_BATCH_ALLOWANCE, batchLimitReached } from '../../lib/bot-conversations';
 import { type BotCard, useBotHubStore } from '../../lib/bot-hub';
 import {
   type LiveSession,
@@ -249,6 +251,26 @@ export function LiveSessionView({
   const character = (agent: string) => botLook ?? agent;
   const provider = character(active?.agent ?? latest?.agent ?? session.request.agent);
   const screenRun = active ?? latest;
+  const pauseLabel = integrated
+    ? 'Integrated'
+    : session.closed
+      ? 'Reopen session'
+      : session.paused
+        ? 'Resume queue'
+        : 'Pause queue';
+  const togglePause = () =>
+    void act(() =>
+      sessionCommand('action', {
+        id: session.id,
+        action: session.paused || session.closed ? 'resume' : 'pause',
+      }),
+    );
+  const stopWork = () =>
+    void act(async () => {
+      if (!active) return;
+      await sessionCommand('action', { id: session.id, action: 'pause' });
+      await nativeTask('task_stop', { id: active.id });
+    });
   const tools = (
     <>
       {!detached && !simple && (
@@ -268,8 +290,20 @@ export function LiveSessionView({
           </button>
         </Tooltip>
       )}
-      {!integrated && !simple && (
+      {(!detached || (!integrated && !simple)) && (
         <ChatOptions
+          actions={
+            detached
+              ? []
+              : [
+                  ...(integrated
+                    ? []
+                    : [{ id: 'pause', label: pauseLabel, onSelect: togglePause, disabled: busy }]),
+                  ...(active
+                    ? [{ id: 'stop', label: 'Stop work', onSelect: stopWork, disabled: busy }]
+                    : []),
+                ]
+          }
           items={[
             {
               id: 'limits',
@@ -285,7 +319,7 @@ export function LiveSessionView({
                 />
               ),
             },
-          ]}
+          ].filter(() => !integrated && !simple)}
         />
       )}
       {detached && (
@@ -347,26 +381,6 @@ export function LiveSessionView({
       )}
     </>
   );
-  const pauseLabel = integrated
-    ? 'Integrated'
-    : session.closed
-      ? 'Reopen session'
-      : session.paused
-        ? 'Resume queue'
-        : 'Pause queue';
-  const togglePause = () =>
-    void act(() =>
-      sessionCommand('action', {
-        id: session.id,
-        action: session.paused || session.closed ? 'resume' : 'pause',
-      }),
-    );
-  const stopWork = () =>
-    void act(async () => {
-      if (!active) return;
-      await sessionCommand('action', { id: session.id, action: 'pause' });
-      await nativeTask('task_stop', { id: active.id });
-    });
   const statusControl = (
     <button
       type="button"
@@ -389,25 +403,6 @@ export function LiveSessionView({
   );
   const headerActions = (
     <>
-      <Menu.Root>
-        <Menu.Trigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Session actions" disabled={busy}>
-            <MoreHorizontal size={16} aria-hidden="true" />
-          </Button>
-        </Menu.Trigger>
-        <Menu.Portal>
-          <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
-            <Menu.Item className="workspace-menu-item" disabled={integrated} onSelect={togglePause}>
-              {pauseLabel}
-            </Menu.Item>
-            {active && (
-              <Menu.Item className="workspace-menu-item" onSelect={stopWork}>
-                Stop work
-              </Menu.Item>
-            )}
-          </Menu.Content>
-        </Menu.Portal>
-      </Menu.Root>
       {!simple && (
         <Button
           variant={latest && !active && !integrated ? undefined : 'outline'}
@@ -491,10 +486,42 @@ export function LiveSessionView({
           </div>
         </div>
       )}
-      {(error || session.error) && (
+      {!error && batchLimitReached(session) ? (
         <div className="live-notice">
-          <InlineNotice tone="error">{error || session.error}</InlineNotice>
+          <InlineNotice
+            tone="warning"
+            action={
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() =>
+                  void act(async () => {
+                    await sessionCommand('limits', {
+                      id: session.id,
+                      limits: {
+                        ...session.limits,
+                        maxBatches: session.batches.length + BOT_BATCH_ALLOWANCE,
+                      },
+                    });
+                    await sessionCommand('action', { id: session.id, action: 'resume' });
+                  })
+                }
+              >
+                Let it continue
+              </Button>
+            }
+          >
+            {session.persona?.name ?? 'This bot'} paused after {session.batches.length} replies it
+            started without you. Review what it did, then let it continue for up to{' '}
+            {BOT_BATCH_ALLOWANCE} more.
+          </InlineNotice>
         </div>
+      ) : (
+        (error || session.error) && (
+          <div className="live-notice">
+            <InlineNotice tone="error">{error || session.error}</InlineNotice>
+          </div>
+        )
       )}
       {!simple && <WorkSourceLink prompts={session.messages.map((message) => message.text)} />}
       {latest && !detached && !simple && (
@@ -505,6 +532,7 @@ export function LiveSessionView({
             setExpanded(true);
             setTab('terminal');
           }}
+          hideTerminal={expanded}
         >
           <SessionTopics key={`topics:${session.id}`} session={session} />
         </WorkContext>
@@ -685,46 +713,47 @@ export function LiveSessionView({
         </div>
         {expanded && (
           <aside className="live-work" id="live-session-work">
-            {tab !== 'work' && (
-              <Button
-                variant="ghost"
-                aria-pressed={split}
-                onClick={() =>
-                  useWorkViewStore.getState().setSplit(`session:${session.id}`, !split)
-                }
-              >
-                {split ? 'Hide conversation' : 'Show conversation'}
-              </Button>
-            )}
-            <fieldset className="live-tabs" aria-label="Session details">
-              {(['work', 'changes', 'preview', 'terminal', 'screen'] as const).map((value) => (
-                <Button
-                  key={value}
-                  variant="ghost"
-                  aria-pressed={tab === value}
-                  onClick={() => {
-                    if (value === 'changes') showReview();
-                    else {
-                      setTab(value);
-                      if (value === 'preview' && !integrated)
-                        void act(() =>
-                          sessionCommand('action', { id: session.id, action: 'pause' }),
-                        );
+            <div className="live-work-bar">
+              <SegmentedControl
+                className="live-tabs"
+                label="Session details"
+                value={tab}
+                onChange={(value) => {
+                  if (value === 'changes') showReview();
+                  else {
+                    setTab(value);
+                    if (value === 'preview' && !integrated)
+                      void act(() => sessionCommand('action', { id: session.id, action: 'pause' }));
+                  }
+                }}
+                items={[
+                  { id: 'work', label: 'Activity' },
+                  { id: 'changes', label: 'Review' },
+                  { id: 'preview', label: 'Preview' },
+                  { id: 'terminal', label: 'Terminal' },
+                  { id: 'screen', label: 'Screen' },
+                ]}
+              />
+              {tab !== 'work' && (
+                <Tooltip content={split ? 'Hide conversation' : 'Show conversation'}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={split ? 'Hide conversation' : 'Show conversation'}
+                    aria-pressed={split}
+                    onClick={() =>
+                      useWorkViewStore.getState().setSplit(`session:${session.id}`, !split)
                     }
-                  }}
-                >
-                  {value === 'work'
-                    ? 'Activity'
-                    : value === 'changes'
-                      ? 'Review'
-                      : value === 'terminal'
-                        ? 'Terminal'
-                        : value === 'screen'
-                          ? 'Screen'
-                          : 'Preview'}
-                </Button>
-              ))}
-            </fieldset>
+                  >
+                    {split ? (
+                      <PanelLeftClose size={16} aria-hidden="true" />
+                    ) : (
+                      <PanelLeftOpen size={16} aria-hidden="true" />
+                    )}
+                  </Button>
+                </Tooltip>
+              )}
+            </div>
             {tab === 'work' && (
               <>
                 <div className="live-work-list">

@@ -228,7 +228,9 @@ release dates.
 - [ ] Validate the Screen view in installed builds: live frames while agents act, busy
   and stopped browsers, revoke during an in-flight command, desktop grant states and
   polling cost on long tasks, at 960 by 640 and in both themes.
-- [ ] Validate bots end to end: persona continuity across batches and restarts, model and
+- [ ] Validate bots end to end: persona continuity across batches, restarts and edits,
+  notes and recalled conversations with installed providers, continuing conversations
+  from the bot page, unread markers and Bots-page routing from every entry point, model and
   connection scope on launch, deleted projects and legacy routines, and the provider-rail
   picker's keyboard navigation and unavailable reasons. Exercise wake-ups across sleep,
   timezone changes and restart; repository and real connection polling, including

@@ -4,10 +4,11 @@ packages:
 ignoredBuiltDependencies:
   - lefthook
 overrides:
-  sharp: 0.35.4
+  sharp: 0.35.5
   shiki: 4.4.3
   '@shikijs/transformers': 4.4.3
   undici@>=7.28.0 <7.29.1: 7.29.1
+  source-map-js@>=1.0.0 <1.2.2: 1.2.2
 patchedDependencies:
   '@streamdown/code@1.1.1': patches/@streamdown__code@1.1.1.patch
   '@pierre/diffs@1.4.1': patches/@pierre__diffs@1.4.1.patch

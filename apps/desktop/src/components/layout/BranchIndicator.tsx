@@ -1,5 +1,5 @@
 import { Popover } from '@jackalope/ui';
-import { GitBranch } from 'lucide-react';
+import { ChevronDown, GitBranch } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { sessionWork } from '../../lib/live-session';
 import { managedTaskWork } from '../../lib/managed-task';
@@ -119,6 +119,7 @@ export function BranchIndicator() {
         <button type="button" className="chrome-branch" title={`Branch: ${branch}`}>
           <GitBranch size={14} aria-hidden="true" />
           <span className="chrome-branch-name">{branch}</span>
+          <ChevronDown size={12} aria-hidden="true" className="chrome-branch-chevron" />
         </button>
       </Popover.Trigger>
       <Popover.Portal>

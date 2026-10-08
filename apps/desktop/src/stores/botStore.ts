@@ -5,7 +5,7 @@ import { createPersistStorage } from '../lib/persist-storage.ts';
 /**
  * A saved, long-lived agent: a name and standing instructions plus the agent,
  * model, project and connections its conversations start with. Conversations
- * carry the persona natively, so they keep the bot's role after edits here.
+ * carry the persona natively; the hub brings open ones up to date after edits.
  */
 export interface Bot {
   id: string;
@@ -138,10 +138,22 @@ export function validateBot(draft: BotDraft) {
   return '';
 }
 
+/** Conversations remembered as read; older entries are dropped past this many. */
+const SEEN_MAX = 500;
+
 interface BotState {
   bots: Bot[];
   selectedId: string | null;
+  /** The bot conversation open on the Bots page, if any. Not saved. */
+  openSessionId: string | null;
+  /** When each bot conversation was last read, by session ID. */
+  seen: Record<string, string>;
+  /** Activity before this counts as read, so conversations from before read tracking are not all new. */
+  seenFloor: string;
   select: (id: string | null) => void;
+  /** Shows a conversation on the Bots page, selecting its bot. */
+  openConversation: (sessionId: string | null, botId?: string) => void;
+  markSeen: (sessionId: string) => void;
   create: (draft: BotDraft) => string;
   update: (id: string, patch: Partial<BotDraft>) => void;
   duplicate: (id: string) => string | null;
@@ -155,7 +167,27 @@ export const useBotStore = create<BotState>()(
     (set, get) => ({
       bots: [],
       selectedId: null,
+      openSessionId: null,
+      seen: {},
+      seenFloor: new Date().toISOString(),
       select: (selectedId) => set({ selectedId }),
+      openConversation: (openSessionId, botId) =>
+        set((state) => ({
+          openSessionId,
+          selectedId:
+            botId && state.bots.some((bot) => bot.id === botId) ? botId : state.selectedId,
+        })),
+      markSeen: (sessionId) =>
+        set((state) => {
+          const seen = { ...state.seen, [sessionId]: new Date().toISOString() };
+          const ids = Object.keys(seen);
+          if (ids.length > SEEN_MAX)
+            for (const id of ids
+              .sort((a, b) => seen[a].localeCompare(seen[b]))
+              .slice(0, ids.length - SEEN_MAX))
+              delete seen[id];
+          return { seen };
+        }),
       create: (draft) => {
         const error = validateBot(draft);
         if (error) throw new Error(error);
@@ -233,7 +265,12 @@ export const useBotStore = create<BotState>()(
       name: 'jackalope-bots-v1',
       version: 2,
       storage: createPersistStorage(),
-      partialize: (state) => ({ bots: state.bots, selectedId: state.selectedId }),
+      partialize: (state) => ({
+        bots: state.bots,
+        selectedId: state.selectedId,
+        seen: state.seen,
+        seenFloor: state.seenFloor,
+      }),
       migrate: (persisted) => migrateBots(persisted),
     },
   ),

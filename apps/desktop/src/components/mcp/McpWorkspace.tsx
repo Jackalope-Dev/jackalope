@@ -1,4 +1,4 @@
-import { Badge, LoadingIcon, RefreshIcon, SearchField } from '@jackalope/ui';
+import { Badge, LoadingIcon, RefreshIcon, SearchField, SegmentedNav } from '@jackalope/ui';
 import {
   Activity,
   Check,
@@ -256,7 +256,7 @@ export function McpWorkspace({
                 : undefined
             }
             action={
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="workspace-actions">
                 {activeTab === 'configured' && (
                   <Button onClick={() => setActiveTab('marketplace')}>
                     <Globe size={16} />
@@ -297,29 +297,33 @@ export function McpWorkspace({
 
           {/* Main Tabs */}
           {!view && (
-            <nav className="mcp-tabs" aria-label="MCP views">
-              <button
-                type="button"
-                onClick={() => setActiveTab('configured')}
-                aria-pressed={activeTab === 'configured'}
-                className={`mcp-tab-btn ${activeTab === 'configured' ? 'active' : ''}`}
-              >
-                <Server size={17} />
-                <span>Connections</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">
-                  {servers.length}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('marketplace')}
-                aria-pressed={activeTab === 'marketplace'}
-                className={`mcp-tab-btn ${activeTab === 'marketplace' ? 'active' : ''}`}
-              >
-                <Globe size={17} />
-                <span>Marketplace</span>
-              </button>
-            </nav>
+            <SegmentedNav
+              className="mcp-tabs"
+              label="MCP views"
+              value={activeTab}
+              onChange={setActiveTab}
+              items={[
+                {
+                  id: 'configured',
+                  label: (
+                    <>
+                      <Server size={16} aria-hidden="true" />
+                      Connections
+                    </>
+                  ),
+                  count: servers.length,
+                },
+                {
+                  id: 'marketplace',
+                  label: (
+                    <>
+                      <Globe size={16} aria-hidden="true" />
+                      Marketplace
+                    </>
+                  ),
+                },
+              ]}
+            />
           )}
 
           {/* Tab 1: Configured MCPs */}
@@ -338,31 +342,29 @@ export function McpWorkspace({
                   value={scopeFilter}
                   onChange={setScopeFilter}
                   items={[
-                    { id: 'all', label: `All (${servers.length})` },
+                    { id: 'all', label: 'All', count: servers.length },
                     ...(activeProjectId
                       ? [
                           {
                             id: `project:${activeProjectId}`,
-                            label: `This project (${servers.filter((s) => s.scope === `project:${activeProjectId}`).length})`,
+                            label: 'This project',
+                            count: servers.filter((s) => s.scope === `project:${activeProjectId}`)
+                              .length,
                           },
                         ]
                       : []),
-                    {
-                      id: 'global',
-                      label: `Global (${servers.filter((s) => s.scope === 'global').length})`,
-                    },
-                    {
-                      id: 'claude',
-                      label: `Claude Code (${servers.filter((s) => s.scope === 'claude').length})`,
-                    },
-                    {
-                      id: 'codex',
-                      label: `Codex (${servers.filter((s) => s.scope === 'codex').length})`,
-                    },
-                    {
-                      id: 'grok',
-                      label: `Grok (${servers.filter((s) => s.scope === 'grok').length})`,
-                    },
+                    ...(
+                      [
+                        ['global', 'Global'],
+                        ['claude', 'Claude Code'],
+                        ['codex', 'Codex'],
+                        ['grok', 'Grok'],
+                      ] as const
+                    ).map(([id, label]) => ({
+                      id,
+                      label,
+                      count: servers.filter((s) => s.scope === id).length,
+                    })),
                   ]}
                 />
 

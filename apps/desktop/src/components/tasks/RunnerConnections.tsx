@@ -27,12 +27,7 @@ import { AgentInstallGuide } from '../agents/AgentInstallGuide';
 import { LocalAiSetup } from '../agents/LocalAiSetup';
 import { ProviderConnections } from '../agents/ProviderConnections';
 import { ProviderMark } from '../agents/ProviderMark';
-import {
-  navigateWorkspace,
-  openAgentConfiguration,
-  openProjectSettings,
-  openSettings,
-} from '../layout/navigation';
+import { openAgentConfiguration, openProjectSettings, openSettings } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { EmptyState } from '../ui/EmptyState';
@@ -448,7 +443,7 @@ export function RunnerConnections({
           title="Agents"
           description={project ? `Agent choices for ${project.name}` : 'App-wide agent settings'}
           action={
-            <div className="agent-workspace-actions">
+            <div className="workspace-actions">
               <Button onClick={() => setAdding(true)}>
                 <Plus size={18} />
                 Add agent
@@ -461,26 +456,20 @@ export function RunnerConnections({
               >
                 {project ? 'Project agent settings' : 'Agent settings'}
               </Button>
-              <Button variant="outline" onClick={() => navigateWorkspace('mcps')}>
-                Connections
+              <Button
+                variant="outline"
+                disabled={!desktop || checking || discovering || capacity.loading}
+                onClick={() => void checkAll()}
+                title="Finds installed agents, then reads each account's identity and remaining capacity."
+                loading={checking || discovering || capacity.loading}
+                loadingLabel="Checking…"
+              >
+                <RefreshIcon size={16} />
+                Check again
               </Button>
             </div>
           }
         />
-        <div className="agent-roster-heading">
-          <span>On this computer</span>
-          <Button
-            variant="ghost"
-            disabled={!desktop || checking || discovering || capacity.loading}
-            onClick={() => void checkAll()}
-            title="Finds installed agents, then reads each account's identity and remaining capacity."
-            loading={checking || discovering || capacity.loading}
-            loadingLabel="Checking…"
-          >
-            <RefreshIcon size={16} />
-            Check again
-          </Button>
-        </div>
         {(checkError || error || capacity.error) && (
           <InlineNotice tone="error">{checkError || error || capacity.error}</InlineNotice>
         )}
@@ -540,6 +529,7 @@ export function RunnerConnections({
             description={<>Give your installed agent a name and tell Jackalope where to find it.</>}
           />
           <AddAgentForm
+            onCancel={() => setAdding(false)}
             onAdded={() => {
               setAdding(false);
               if (desktop) void checkAgents();

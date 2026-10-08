@@ -1,6 +1,6 @@
 .work-context {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md);
   padding: 10px 14px;
   min-width: 0;
 }
@@ -126,7 +126,7 @@
   align-items: flex-start;
   gap: 12px;
   padding: 10px 12px;
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md);
   cursor: pointer;
   outline: none;
   user-select: none;
@@ -192,7 +192,7 @@
   height: 300px;
   padding: 8px;
   background: var(--color-surface-sunken);
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md);
 }
 .work-terminal-dialog .task-terminal-screen {
   height: clamp(180px, 44vh, 420px);

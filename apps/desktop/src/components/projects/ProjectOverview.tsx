@@ -1,13 +1,11 @@
-import { Badge, Disclosure, DisclosureSummary, Panel, Stat } from '@jackalope/ui';
+import { Badge, Disclosure, DisclosureSummary, SettingGroup, SettingRow } from '@jackalope/ui';
 import {
-  Activity,
-  ArrowRight,
   FolderOpen,
   GitBranch,
   ListTodo,
+  MonitorPlay,
   Plus,
   RefreshCw,
-  Settings2,
   ShieldCheck,
   Terminal,
 } from 'lucide-react';
@@ -29,6 +27,7 @@ import { IssuePicker } from '../tasks/IssuePicker';
 import { ProjectReturn } from '../tasks/ProjectReturn';
 import type { Readiness } from '../tasks/WorkspaceReadiness';
 import { Button } from '../ui/button';
+import { DismissButton } from '../ui/DismissButton';
 import { EmptyState } from '../ui/EmptyState';
 import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
@@ -145,7 +144,6 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
 
       {project ? (
         <div className="workspace-sections">
-          {/* Workspace Page Heading */}
           <WorkspaceHeading
             title={project.name}
             description={
@@ -164,7 +162,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
               </span>
             }
             action={
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="workspace-actions">
                 <Button
                   size="sm"
                   onClick={() => {
@@ -195,6 +193,24 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
             }
           />
 
+          <section className="workspace-section workspace-stack">
+            <WorkspaceSectionHeading
+              title="Active tasks"
+              action={
+                unfinished.length > 0 ? (
+                  <Badge variant="outline">{unfinished.length} open</Badge>
+                ) : undefined
+              }
+            />
+            <ProjectReturn
+              key={project.id}
+              items={unfinished}
+              runs={allRuns}
+              queue={queue}
+              onOpen={openTask}
+            />
+          </section>
+
           <Disclosure>
             <DisclosureSummary>Start from an issue</DisclosureSummary>
             <IssuePicker
@@ -213,298 +229,88 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
             />
           </Disclosure>
 
-          {/* 4-Card Status Overview Grid */}
-          <div className="project-stat-grid">
-            {/* Git Branch Card */}
-            <Panel className="project-stat-card">
-              <Stat
-                label={
-                  <span className="project-stat-label-row">
-                    <span>Git branch</span>
-                    <GitBranch size={16} className="shrink-0" aria-hidden="true" />
-                  </span>
-                }
-                value={
-                  <span className="project-stat-value-text">
-                    {project.plainFolder
-                      ? 'No Git'
-                      : readiness?.branch || project.gitBranch || 'Default branch'}
+          <section className="workspace-section workspace-stack" aria-label="Readiness">
+            <WorkspaceSectionHeading
+              title="Readiness"
+              action={
+                isTauriEnvironment() ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busyReadiness}
+                    loading={busyReadiness}
+                    loadingLabel="Checking…"
+                    onClick={() => void fetchReadiness(project.path)}
+                  >
+                    <RefreshCw size={14} aria-hidden="true" />
+                    Check again
+                  </Button>
+                ) : undefined
+              }
+            />
+            <SettingGroup className="project-readiness">
+              <SettingRow
+                title={
+                  <span className="project-ready-title">
+                    <GitBranch size={16} aria-hidden="true" />
+                    {project.plainFolder ? 'Folder' : 'Branch'}
                   </span>
                 }
                 description={
                   project.plainFolder ? (
-                    <span className="project-stat-desc">
-                      Tasks run in this folder. Use Git to give each task its own worktree.
-                    </span>
-                  ) : !readiness ? (
-                    <span className="project-stat-desc">
-                      {busyReadiness ? 'Checking repository…' : 'Repository status unavailable'}
-                    </span>
-                  ) : readiness.changes ? (
-                    <span className="text-[var(--color-warning)] font-medium">
-                      Uncommitted changes
-                    </span>
+                    'Not a Git repository. Tasks run in this folder; use Git to give each task its own worktree.'
                   ) : (
-                    <span className="project-stat-desc">Working tree clean</span>
+                    <>
+                      <code>{readiness?.branch || project.gitBranch || 'Default branch'}</code>
+                      {' · '}
+                      {!readiness ? (
+                        busyReadiness ? (
+                          'Checking repository…'
+                        ) : (
+                          'Status unavailable'
+                        )
+                      ) : readiness.changes ? (
+                        <span className="project-ready-warning">Uncommitted changes</span>
+                      ) : (
+                        'Working tree clean'
+                      )}
+                      {readiness?.head && ` · ${readiness.head.slice(0, 7)}`}
+                    </>
                   )
                 }
-              />
-              <div className="project-stat-footer">
-                {project.plainFolder ? (
-                  <span>Not a Git repository</span>
-                ) : readiness?.head ? (
-                  <span className="font-mono">commit {readiness.head.slice(0, 7)}</span>
-                ) : (
-                  <span>{readiness ? 'Repository tracked' : 'Status not yet verified'}</span>
-                )}
-              </div>
-            </Panel>
-
-            {/* Verification Check Card */}
-            <Panel className="project-stat-card">
-              <Stat
-                label={
-                  <span className="project-stat-label-row">
-                    <span>Verification</span>
-                    <ShieldCheck size={16} className="shrink-0" aria-hidden="true" />
-                  </span>
-                }
-                value={
-                  <span
-                    className="project-stat-value-text"
-                    title={savedVerify || readiness?.verifyCommand || undefined}
-                  >
-                    {savedVerify || readiness?.verifyCommand || 'Not configured'}
-                  </span>
-                }
-                description={
-                  <span className="project-stat-desc">
-                    {savedVerify
-                      ? project.preferences?.autoVerify
-                        ? 'Runs after task execution'
-                        : 'Available for manual checks'
-                      : readiness?.verifyCommand
-                        ? 'Suggested check available'
-                        : 'Set up in project settings'}
-                  </span>
-                }
-              />
-              <div className="project-stat-footer">
-                {savedVerify ? (
-                  <Badge variant="outline">Active check</Badge>
-                ) : readiness?.verifyCommand ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      useProjectStore.getState().updateProjectPreferences(project.id, {
-                        verifyCommand: readiness.verifyCommand ?? undefined,
-                        autoVerify: true,
-                      });
-                      setSavedNotice('Verification check enabled.');
-                    }}
-                  >
-                    Enable check
-                    <ArrowRight size={13} />
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigateWorkspace('project-settings')}
-                  >
-                    Configure
-                    <ArrowRight size={13} />
-                  </Button>
-                )}
-              </div>
-            </Panel>
-
-            {/* Active Work Card */}
-            <Panel className="project-stat-card">
-              <Stat
-                label={
-                  <span className="project-stat-label-row">
-                    <span>Active work</span>
-                    <Activity size={16} className="shrink-0" aria-hidden="true" />
-                  </span>
-                }
-                value={<span className="project-stat-value-text">{unfinished.length} open</span>}
-                description={
-                  <span className="project-stat-desc">
-                    {unfinished.length > 0 ? 'In progress or awaiting review' : 'No active tasks'}
-                  </span>
-                }
-              />
-              <div className="project-stat-footer">
-                <span>{deliveries.length} merged</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    useWorkViewStore.getState().setScope('project');
-                    useExecutionStore.getState().select(null);
-                    useManagedTaskStore.getState().select(null);
-                    navigateWorkspace('kanban');
-                  }}
-                >
-                  View board
-                  <ArrowRight size={13} />
-                </Button>
-              </div>
-            </Panel>
-
-            {/* Environment Readiness Card */}
-            <Panel className="project-stat-card">
-              <Stat
-                label={
-                  <span className="project-stat-label-row">
-                    <span>Environment</span>
-                    <Terminal size={16} className="shrink-0" aria-hidden="true" />
-                  </span>
-                }
-                value={
-                  <span className="project-stat-value-text">
-                    {!readiness
-                      ? busyReadiness
-                        ? 'Checking setup…'
-                        : 'Setup unavailable'
-                      : readiness.dependenciesMissing
-                        ? 'Missing deps'
-                        : readiness?.missingConfiguration?.length
-                          ? 'Missing config'
-                          : 'Setup inspected'}
-                  </span>
-                }
-                description={
-                  !readiness ? (
-                    <span className="project-stat-desc">
-                      Inspect the workspace before running work
-                    </span>
-                  ) : readiness.dependenciesMissing ? (
-                    <span className="text-[var(--color-warning)] font-medium">
-                      node_modules not found
-                    </span>
-                  ) : readiness?.missingConfiguration?.length ? (
-                    <span className="text-[var(--color-warning)] font-medium">
-                      {readiness.missingConfiguration.length} missing env key
-                      {readiness.missingConfiguration.length > 1 ? 's' : ''}
-                    </span>
-                  ) : (
-                    <span className="project-stat-desc">No missing setup detected</span>
-                  )
-                }
-              />
-              <div className="project-stat-footer">
-                <span>Local runtime</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={busyReadiness}
-                  loading={busyReadiness}
-                  loadingLabel="Checking…"
-                  onClick={() => void fetchReadiness(project.path)}
-                >
-                  <RefreshCw size={13} className="mr-1" />
-                  Refresh
-                </Button>
-              </div>
-            </Panel>
-          </div>
-
-          {/* Active Tasks Section */}
-          <section className="workspace-section workspace-stack">
-            <WorkspaceSectionHeading
-              title="Active tasks"
-              action={
-                unfinished.length > 0 ? (
-                  <Badge variant="outline">{unfinished.length} open</Badge>
-                ) : undefined
-              }
-            />
-            <ProjectReturn
-              key={project.id}
-              project={project}
-              items={unfinished}
-              runs={allRuns}
-              queue={queue}
-              onOpen={openTask}
-            />
-          </section>
-
-          {/* Workspace Commands & Configuration */}
-          <section className="workspace-section workspace-stack">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <WorkspaceSectionHeading title="Workspace setup" />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigateWorkspace('project-settings')}
               >
-                <Settings2 size={14} className="mr-1" />
-                Project settings
-                <ArrowRight size={14} className="ml-1" />
-              </Button>
-            </div>
-
-            <Panel className="p-5 space-y-4">
-              {readiness?.dependenciesMissing && (
-                <InlineNotice tone="warning">
-                  This workspace has no node_modules folder. Dependencies may need installing before
-                  work can run.
-                </InlineNotice>
-              )}
-              {!!readiness?.missingConfiguration.length && (
-                <InlineNotice tone="warning">
-                  Configuration names missing from local environment:{' '}
-                  {readiness.missingConfiguration.join(', ')}.
-                </InlineNotice>
-              )}
-
-              <div className="project-commands-grid">
-                <div className="project-command-card">
-                  <div className="project-command-header">
-                    <span className="project-command-name">Preparation</span>
-                    {savedPrepare && <Badge variant="outline">Active</Badge>}
-                  </div>
-                  <div
-                    className={`project-command-code ${
-                      !savedPrepare && !readiness?.prepareCommand ? 'is-empty' : ''
-                    }`}
-                  >
-                    {savedPrepare || readiness?.prepareCommand || 'None configured'}
-                  </div>
-                  {!savedPrepare && readiness?.prepareCommand ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        useProjectStore.getState().updateProjectPreferences(project.id, {
-                          prepareCommand: readiness.prepareCommand ?? undefined,
-                        });
-                        setSavedNotice('Preparation command saved.');
-                      }}
-                    >
-                      Use suggested
-                    </Button>
+                {!!readiness?.changes && (
+                  <Button variant="outline" size="sm" onClick={() => navigateWorkspace('changes')}>
+                    Review changes
+                  </Button>
+                )}
+              </SettingRow>
+              <SettingRow
+                title={
+                  <span className="project-ready-title">
+                    <ShieldCheck size={16} aria-hidden="true" />
+                    Verification
+                  </span>
+                }
+                description={
+                  savedVerify ? (
+                    <>
+                      <code>{savedVerify}</code>
+                      {project.preferences?.autoVerify
+                        ? ' · runs after each task'
+                        : ' · runs when you ask'}
+                    </>
+                  ) : readiness?.verifyCommand ? (
+                    <>
+                      Suggested: <code>{readiness.verifyCommand}</code>
+                    </>
                   ) : (
-                    <div />
-                  )}
-                </div>
-
-                <div className="project-command-card">
-                  <div className="project-command-header">
-                    <span className="project-command-name">Verification</span>
-                    {savedVerify && <Badge variant="outline">Active</Badge>}
-                  </div>
-                  <div
-                    className={`project-command-code ${
-                      !savedVerify && !readiness?.verifyCommand ? 'is-empty' : ''
-                    }`}
-                  >
-                    {savedVerify || readiness?.verifyCommand || 'None configured'}
-                  </div>
-                  {!savedVerify && readiness?.verifyCommand ? (
+                    'Not configured. Tasks finish without an automatic check.'
+                  )
+                }
+              >
+                {!savedVerify &&
+                  (readiness?.verifyCommand ? (
                     <Button
                       variant="outline"
                       size="sm"
@@ -519,88 +325,133 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                       Use suggested
                     </Button>
                   ) : (
-                    <div />
-                  )}
-                </div>
-
-                <div className="project-command-card">
-                  <div className="project-command-header">
-                    <span className="project-command-name">Preview</span>
-                    {savedPreview && <Badge variant="outline">Active</Badge>}
-                  </div>
-                  <div
-                    className={`project-command-code ${
-                      !savedPreview && !readiness?.previewCommand ? 'is-empty' : ''
-                    }`}
-                  >
-                    {savedPreview || readiness?.previewCommand || 'None configured'}
-                  </div>
-                  {!savedPreview && readiness?.previewCommand ? (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        useProjectStore.getState().updateProjectPreferences(project.id, {
-                          previewCommand: readiness.previewCommand ?? undefined,
-                        });
-                        setSavedNotice('Preview command saved.');
-                      }}
+                      onClick={() => navigateWorkspace('project-settings')}
                     >
-                      Use suggested
+                      Configure
                     </Button>
+                  ))}
+              </SettingRow>
+              <SettingRow
+                title={
+                  <span className="project-ready-title">
+                    <Terminal size={16} aria-hidden="true" />
+                    Setup
+                  </span>
+                }
+                description={
+                  !readiness ? (
+                    busyReadiness ? (
+                      'Inspecting the workspace…'
+                    ) : (
+                      'Not inspected yet.'
+                    )
+                  ) : readiness.dependenciesMissing ? (
+                    <span className="project-ready-warning">
+                      Dependencies may need installing (no node_modules folder).
+                    </span>
+                  ) : readiness.missingConfiguration.length ? (
+                    <span className="project-ready-warning">
+                      Missing environment keys: {readiness.missingConfiguration.join(', ')}
+                    </span>
+                  ) : savedPrepare ? (
+                    <>
+                      <code>{savedPrepare}</code> · runs before each task
+                    </>
+                  ) : readiness.prepareCommand ? (
+                    <>
+                      Suggested: <code>{readiness.prepareCommand}</code>
+                    </>
                   ) : (
-                    <div />
-                  )}
-                </div>
-              </div>
-
-              {savedNotice && <p className="text-xs text-accent font-medium">{savedNotice}</p>}
-
-              {!!readiness?.changes && (
-                <Disclosure className="pt-2 border-t border-[var(--color-border-subtle)]">
-                  <DisclosureSummary>View uncommitted local changes</DisclosureSummary>
-                  <pre className="task-input whitespace-pre-wrap break-words mt-2 max-h-48 overflow-y-auto text-xs font-mono text-[var(--color-text-primary)]">
-                    {readiness.changes}
-                  </pre>
-                </Disclosure>
-              )}
-            </Panel>
+                    'No missing setup detected.'
+                  )
+                }
+              >
+                {!savedPrepare && readiness?.prepareCommand && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      useProjectStore.getState().updateProjectPreferences(project.id, {
+                        prepareCommand: readiness.prepareCommand ?? undefined,
+                      });
+                      setSavedNotice('Preparation command saved.');
+                    }}
+                  >
+                    Use suggested
+                  </Button>
+                )}
+              </SettingRow>
+              <SettingRow
+                title={
+                  <span className="project-ready-title">
+                    <MonitorPlay size={16} aria-hidden="true" />
+                    Preview
+                  </span>
+                }
+                description={
+                  savedPreview ? (
+                    <code>{savedPreview}</code>
+                  ) : readiness?.previewCommand ? (
+                    <>
+                      Suggested: <code>{readiness.previewCommand}</code>
+                    </>
+                  ) : (
+                    'No preview command.'
+                  )
+                }
+              >
+                {!savedPreview && readiness?.previewCommand && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      useProjectStore.getState().updateProjectPreferences(project.id, {
+                        previewCommand: readiness.previewCommand ?? undefined,
+                      });
+                      setSavedNotice('Preview command saved.');
+                    }}
+                  >
+                    Use suggested
+                  </Button>
+                )}
+              </SettingRow>
+            </SettingGroup>
+            {savedNotice && (
+              <InlineNotice
+                tone="success"
+                action={<DismissButton onDismiss={() => setSavedNotice('')} />}
+              >
+                {savedNotice}
+              </InlineNotice>
+            )}
           </section>
 
-          {/* Recent Deliveries */}
           {deliveries.length > 0 && (
             <section className="workspace-section workspace-stack">
               <WorkspaceSectionHeading title="Recent deliveries" />
-              <div className="space-y-2">
+              <SettingGroup>
                 {deliveries.map((run) => (
-                  <Panel
+                  <SettingRow
                     key={run.id}
-                    className="p-4 flex flex-wrap items-center justify-between gap-3"
+                    title={taskTitle(run.prompt)}
+                    description={`Integrated locally · ${new Date(run.startedAt).toLocaleDateString(
+                      undefined,
+                      { month: 'short', day: 'numeric', year: 'numeric' },
+                    )}`}
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm break-words text-[var(--color-text-primary)]">
-                        {taskTitle(run.prompt)}
-                      </p>
-                      <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-                        Integrated locally ·{' '}
-                        {new Date(run.startedAt).toLocaleDateString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
-                      </p>
-                    </div>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => useWorkViewStore.getState().open(run.id, 'delivery')}
                     >
                       View delivery
-                      <ArrowRight size={13} className="ml-1" />
                     </Button>
-                  </Panel>
+                  </SettingRow>
                 ))}
-              </div>
+              </SettingGroup>
             </section>
           )}
         </div>

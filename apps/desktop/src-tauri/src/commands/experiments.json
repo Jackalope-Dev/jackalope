@@ -8,8 +8,13 @@
     },
     "scope-guard": {
       "values": ["on", "off"],
-      "default": "on",
+      "default": "off",
       "environment": "JACKALOPE_SCOPE_GUARD"
+    },
+    "instruction-channel": {
+      "values": ["system", "prompt"],
+      "default": "system",
+      "environment": "JACKALOPE_INSTRUCTION_CHANNEL"
     },
     "native-tools": {
       "values": ["off", "output"],

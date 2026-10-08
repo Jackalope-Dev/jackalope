@@ -962,24 +962,135 @@ process.stdin.on('end', () => {
     assert!(std::fs::read_to_string(folder.join("args.txt"))
         .unwrap()
         .contains("--model test-model"));
+    // The invariant contract travels as developer instructions through the .cmd shim, and
+    // the delivered prompt ends with the task itself.
+    let args = std::fs::read_to_string(folder.join("args.txt")).unwrap();
+    assert!(args.contains(&format!(
+        "developer_instructions={}",
+        serde_json::to_string(super::prompt::lean_preamble().trim_end()).unwrap()
+    )));
     let delivered = std::fs::read_to_string(folder.join("input.txt")).unwrap();
-    // The prompt is ordered so the invariant preamble can stay cached across tasks and the
-    // task itself reads last. Keep both ends pinned: a reorder that buries the task, or that
-    // lets per-task text ahead of the preamble, silently costs cache hits or instruction focus.
-    assert!(delivered.starts_with("Jackalope task context:"));
-    assert!(delivered.contains(&super::prompt::lean_preamble()));
-    assert!(delivered.contains("delegate only permitted independent work"));
-    assert!(delivered.contains("Leave changes uncommitted"));
+    assert!(!delivered.contains("Jackalope task context:"));
+    assert!(!delivered.contains("delegate only permitted independent work"));
+    assert!(!delivered.contains("Separate required outcomes"));
     assert!(delivered.trim_end().ends_with("Fixture only"));
-    assert!(
-        delivered.find("Leave changes uncommitted") < delivered.find("Fixture only"),
-        "the task must follow the invariant preamble"
-    );
     policy.enabled_agents.insert("custom-fixture".into(), false);
     std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
     let mut blocked = request;
     blocked.id = "fixture-run-456".into();
     assert!(runtime.start(blocked).unwrap_err().contains("disabled"));
+    drop(runtime);
+    std::fs::remove_dir_all(folder).unwrap();
+}
+
+#[test]
+#[cfg(windows)]
+fn claude_receives_the_contract_as_system_instructions_through_a_cmd_shim() {
+    use super::super::agent_policy::{AgentPolicy, CustomAgent};
+    let folder =
+        std::env::temp_dir().join(format!("jackalope-claude-run-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&folder).unwrap();
+    let root = folder.to_str().unwrap();
+    git(root, &["init", "-b", "master"]).unwrap();
+    git(
+        root,
+        &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "Fixture",
+        ],
+    )
+    .unwrap();
+    std::fs::write(
+        folder.join("capture.cjs"),
+        r#"
+const fs = require('node:fs');
+let prompt = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', chunk => prompt += chunk);
+process.stdin.on('end', () => {
+  fs.writeFileSync('input.txt', prompt);
+  fs.writeFileSync('args.json', JSON.stringify(process.argv.slice(2)));
+  console.log(JSON.stringify({type: 'system', subtype: 'init', session_id: 'fixture-session'}));
+  console.log(JSON.stringify({type: 'result', result: 'Fixture complete', session_id: 'fixture-session'}));
+});
+"#,
+    )
+    .unwrap();
+    // npm installs Claude Code behind a .cmd shim, which re-parses arguments through cmd.exe.
+    let executable = folder.join("claude-fixture.cmd");
+    std::fs::write(&executable, "@echo off\r\nnode \"%~dp0capture.cjs\" %*\r\n").unwrap();
+    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let mut policy = AgentPolicy::default();
+    policy.default_meta_agent = "claude-fixture".into();
+    policy.custom_agents.push(CustomAgent {
+        id: "claude-fixture".into(),
+        name: "Claude fixture".into(),
+        command: executable.to_string_lossy().into(),
+        adapter: Some("claude".into()),
+        args: Vec::new(),
+    });
+    std::fs::create_dir_all(runtime.policy_path().parent().unwrap()).unwrap();
+    std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
+    runtime
+        .start(RunRequest {
+            retry_of: None,
+            live_session_id: None,
+            effort: None,
+            codex_speed: None,
+            dependency_snapshot: Default::default(),
+            monitor_change: None,
+            context_selection: Default::default(),
+            context_receipt: Default::default(),
+            id: "claude-fixture-run".into(),
+            project_id: "fixture".into(),
+            project_name: "Fixture".into(),
+            project_path: root.into(),
+            agent: "default".into(),
+            agent_profile_id: None,
+            verify_command: None,
+            prepare_command: None,
+            setup_files: Vec::new(),
+            auto_verify: false,
+            target_branch: None,
+            account_binding: None,
+            model: None,
+            prompt: "Fixture only".into(),
+            isolated: false,
+            previous_run_id: None,
+            coordination: None,
+            connection_ids: None,
+        })
+        .unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    loop {
+        let run = runtime.integration_runs().unwrap().pop().unwrap();
+        if !["starting", "running"].contains(&run.status.as_str()) {
+            assert_eq!(run.status, "review", "{:?}", run.error);
+            assert_eq!(run.result, "Fixture complete");
+            break;
+        }
+        if std::time::Instant::now() > deadline {
+            runtime.stop_all();
+            panic!("Fixture did not exit");
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    let args: Vec<String> =
+        serde_json::from_slice(&std::fs::read(folder.join("args.json")).unwrap()).unwrap();
+    let flag = args
+        .iter()
+        .position(|arg| arg == "--append-system-prompt")
+        .expect("system instructions flag");
+    assert_eq!(args[flag + 1], super::prompt::lean_preamble().trim_end());
+    let delivered = std::fs::read_to_string(folder.join("input.txt")).unwrap();
+    assert!(!delivered.contains("Jackalope task context:"));
+    assert!(delivered.trim_end().ends_with("Fixture only"));
     drop(runtime);
     std::fs::remove_dir_all(folder).unwrap();
 }

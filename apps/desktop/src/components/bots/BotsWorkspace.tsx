@@ -1,4 +1,4 @@
-import { ConfirmDialog, DropdownMenu as Menu, Switch, Textarea } from '@jackalope/ui';
+import { ConfirmDialog, DropdownMenu as Menu, SearchField, Switch, Textarea } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   AlarmClock,
@@ -13,9 +13,18 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
+  botActivity,
+  botConversations,
+  continuableConversation,
+  isUnread,
+  lastReplyAt,
+} from '../../lib/bot-conversations';
+import {
+  type BotNote,
   type BotProposal,
   botRequest,
   describeWake,
+  forgetNote,
   type HubEvent,
   needsYou,
   resolveProposal,
@@ -25,7 +34,8 @@ import {
   wakeNow,
 } from '../../lib/bot-hub';
 import { BOT_TEMPLATES, type BotTemplate } from '../../lib/bot-templates';
-import { type LiveSession, sessionCommand } from '../../lib/live-session';
+import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/live-session';
+import type { TaskRun } from '../../lib/task-runtime';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -133,8 +143,14 @@ function conversationOrigin(session: LiveSession) {
 }
 
 export function BotsWorkspace() {
-  const { bots, selectedId } = useBotStore(
-    useShallow((state) => ({ bots: state.bots, selectedId: state.selectedId })),
+  const { bots, selectedId, openId, seen, seenFloor } = useBotStore(
+    useShallow((state) => ({
+      bots: state.bots,
+      selectedId: state.selectedId,
+      openId: state.openSessionId,
+      seen: state.seen,
+      seenFloor: state.seenFloor,
+    })),
   );
   const projects = useProjectStore((state) => state.projects);
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
@@ -145,15 +161,21 @@ export function BotsWorkspace() {
       cards: state.cards,
       proposals: state.proposals,
       events: state.events,
+      notes: state.notes,
       wakes: state.wakes,
       paused: state.paused,
       error: state.error,
     })),
   );
-  const [openId, setOpenId] = useState<string | null>(null);
   const [pickingTemplate, setPickingTemplate] = useState(false);
   const open = sessions.find((session) => session.id === openId && session.persona);
   useEffect(observeLiveSessions, []);
+  // Reading a conversation, including replies that arrive while it is open, marks it read.
+  const openSessionId = open?.id;
+  const openReply = open ? lastReplyAt(open, sessionRuns) : null;
+  useEffect(() => {
+    if (openSessionId && openReply !== undefined) useBotStore.getState().markSeen(openSessionId);
+  }, [openSessionId, openReply]);
   const [editing, setEditing] = useState<{
     bot?: Bot;
     draft: BotDraft;
@@ -167,18 +189,14 @@ export function BotsWorkspace() {
     if (isTauriEnvironment()) void useLiveSessionStore.getState().refresh(null);
   }, []);
   const conversationsFor = useCallback(
-    (bot: Bot) =>
-      sessions
-        .filter((session) => session.persona?.botId === bot.id)
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    (bot: Bot) => botConversations(sessions, bot.id),
     [sessions],
   );
   // Opening another bot's conversation, such as one a message came from, selects that bot too.
   const openSession = useCallback(
     (id: string) => {
       const botId = sessions.find((session) => session.id === id)?.persona?.botId;
-      if (botId) useBotStore.getState().select(botId);
-      setOpenId(id);
+      useBotStore.getState().openConversation(id, botId);
     },
     [sessions],
   );
@@ -220,36 +238,55 @@ export function BotsWorkspace() {
         <div className="bots-layout">
           <nav className="bots-roster" aria-label="Bots">
             {roster.map((bot) => {
-              const latest = conversationsFor(bot)[0];
+              const conversations = conversationsFor(bot);
+              const latest = conversations[0];
               const waiting = needsYou(hub, bot.id).count;
+              const unread = conversations.filter((session) =>
+                isUnread(session, sessionRuns, seen, seenFloor),
+              ).length;
+              const activity = botActivity(conversations, sessionRuns);
+              const label = [
+                bot.name,
+                activity === 'working'
+                  ? 'working'
+                  : activity === 'waiting'
+                    ? 'needs an answer'
+                    : '',
+                unread ? `${unread} new ${unread === 1 ? 'reply' : 'replies'}` : '',
+                waiting ? `${waiting} waiting on you` : '',
+              ]
+                .filter(Boolean)
+                .join(', ');
               return (
                 <div
                   key={bot.id}
                   className="bots-roster-item"
                   data-selected={bot.id === selected?.id || undefined}
+                  data-unread={unread > 0 || undefined}
                 >
                   <button
                     type="button"
                     className="bots-roster-open"
                     aria-current={bot.id === selected?.id ? 'true' : undefined}
-                    aria-label={waiting ? `${bot.name}, ${waiting} waiting on you` : undefined}
-                    onClick={() => {
-                      useBotStore.getState().select(bot.id);
-                      setOpenId(null);
-                    }}
+                    aria-label={label === bot.name ? undefined : label}
+                    onClick={() => useBotStore.getState().openConversation(null, bot.id)}
                   >
-                    <BotAvatar appearance={bot.appearance} agent={bot.agent} />
+                    <BotAvatar appearance={bot.appearance} agent={bot.agent} state={activity} />
                     <span className="bots-roster-copy">
                       <strong>
                         {bot.name}
                         {bot.pinned && <Pin size={12} aria-label="Pinned" />}
                       </strong>
-                      <small>{latest?.title ?? (bot.role || 'No conversations yet')}</small>
+                      <small title={latest?.title ?? bot.role}>
+                        {latest?.title ?? (bot.role || 'No conversations yet')}
+                      </small>
                     </span>
-                    {waiting > 0 && (
+                    {waiting > 0 ? (
                       <small className="bots-roster-count" aria-hidden="true">
                         {waiting}
                       </small>
+                    ) : (
+                      unread > 0 && <span className="bots-roster-unread" aria-hidden="true" />
                     )}
                   </button>
                   <BotMenu
@@ -266,6 +303,7 @@ export function BotsWorkspace() {
               disabled={!projects.length}
               onClick={() => setPickingTemplate(true)}
             >
+              <Plus size={14} aria-hidden="true" />
               Create from template
             </button>
           </nav>
@@ -276,7 +314,7 @@ export function BotsWorkspace() {
                 session={open}
                 runs={sessionRuns}
                 initialDetailsOpen={false}
-                onBack={() => setOpenId(null)}
+                onBack={() => useBotStore.getState().openConversation(null)}
                 onOpenSession={openSession}
                 simple
               />
@@ -289,6 +327,9 @@ export function BotsWorkspace() {
                 bots={bots}
                 project={projects.find((project) => project.id === selected.projectId)}
                 conversations={conversationsFor(selected)}
+                runs={sessionRuns}
+                isUnread={(session) => isUnread(session, sessionRuns, seen, seenFloor)}
+                notes={hub.notes.filter((note) => note.botId === selected.id)}
                 proposals={hub.proposals.filter(
                   (item) => item.status === 'open' && item.fromBotId === selected.id,
                 )}
@@ -372,15 +413,20 @@ function BotTemplates({
       {heading && <WorkspaceSectionHeading title="Start from a template" />}
       <ul className="bots-templates">
         {BOT_TEMPLATES.map((template) => (
-          <li key={template.id} className="bots-template">
-            <BotAvatar appearance={template.appearance} />
-            <div>
-              <strong>{template.name}</strong>
-              <p>{template.role}</p>
-            </div>
-            <Button variant="outline" disabled={disabled} onClick={() => onUse(template)}>
-              Use template
-            </Button>
+          <li key={template.id}>
+            <button
+              type="button"
+              className="bots-template"
+              disabled={disabled}
+              onClick={() => onUse(template)}
+            >
+              <BotAvatar appearance={template.appearance} />
+              <span>
+                <strong>{template.name}</strong>
+                <span className="bots-template-role">{template.role}</span>
+              </span>
+              <Plus size={16} aria-hidden="true" className="bots-template-add" />
+            </button>
           </li>
         ))}
       </ul>
@@ -453,11 +499,29 @@ function BotMenu({
   );
 }
 
+/** Rows listed before Show all; longer conversation lists also get search. */
+const LIST_LIMIT = 12;
+
+/** The first readable line of the latest reply, for list previews. */
+function replyPreview(session: LiveSession, runs: TaskRun[]) {
+  const id = session.batches.at(-1)?.runId;
+  const result = runs.find((run) => run.id === id)?.result ?? '';
+  const line =
+    result
+      .split('\n')
+      .map((item) => item.replace(/^[\s#>*`|-]+/, '').trim())
+      .find(Boolean) ?? '';
+  return [...line].length > 140 ? `${[...line].slice(0, 139).join('')}…` : line;
+}
+
 function BotProfile({
   bot,
   bots,
   project,
   conversations,
+  runs,
+  isUnread,
+  notes,
   proposals,
   events,
   wakeStates,
@@ -469,6 +533,9 @@ function BotProfile({
   bots: Bot[];
   project?: Project;
   conversations: LiveSession[];
+  runs: TaskRun[];
+  isUnread: (session: LiveSession) => boolean;
+  notes: BotNote[];
   proposals: BotProposal[];
   events: HubEvent[];
   wakeStates: WakeState[];
@@ -478,10 +545,25 @@ function BotProfile({
 }) {
   const cards = useBotHubStore(useShallow((state) => needsYou(state, bot.id).cards));
   const draftKey = `jackalope-bot-draft:${bot.id}`;
-  const [text, setText] = useState(() => localStorage.getItem(draftKey) ?? '');
+  const [text, setText] = useState(() => {
+    try {
+      return localStorage.getItem(draftKey) ?? '';
+    } catch {
+      return '';
+    }
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const pending = useRef<{ id: string; messageId: string; text: string } | null>(null);
+  const [fresh, setFresh] = useState(false);
+  const [allEvents, setAllEvents] = useState(false);
+  const latestOpen = continuableConversation(conversations);
+  const continuing = fresh ? undefined : latestOpen;
+  const pending = useRef<{
+    id: string;
+    messageId: string;
+    text: string;
+    continues: boolean;
+  } | null>(null);
   useEffect(() => {
     try {
       if (text) localStorage.setItem(draftKey, text);
@@ -495,22 +577,45 @@ function BotProfile({
       setError('Shorten this message to 12,000 characters. Your draft is preserved.');
       return;
     }
-    // Retrying the same text reuses identifiers so a slow first attempt cannot duplicate it.
-    if (!pending.current || pending.current.text !== value)
-      pending.current = { id: crypto.randomUUID(), messageId: crypto.randomUUID(), text: value };
+    // Retrying the same text to the same place reuses identifiers so a slow first attempt
+    // cannot duplicate it.
+    const target = continuing?.id;
+    const previous = pending.current;
+    if (
+      !previous ||
+      previous.text !== value ||
+      previous.continues !== !!target ||
+      (target && previous.id !== target)
+    )
+      pending.current = {
+        id: target ?? crypto.randomUUID(),
+        messageId: crypto.randomUUID(),
+        text: value,
+        continues: !!target,
+      };
     const attempt = pending.current;
+    if (!attempt) return;
     setBusy(true);
     setError('');
     try {
-      await syncAgentConfig();
-      await sessionCommand('create', {
-        id: attempt.id,
-        request: botRequest(bot, project, attempt.id, value, true, profileFor(bot, project)),
-        firstMessage: { id: attempt.messageId, text: value },
-        limits: { maxBatches: null, pauseAtEstimatedUsd: null },
-        persona: { botId: bot.id, name: bot.name, instructions: bot.instructions },
-      });
+      if (attempt.continues)
+        await sessionCommand<SessionDraft>('send', {
+          id: attempt.id,
+          messageId: attempt.messageId,
+          text: value,
+        });
+      else {
+        await syncAgentConfig();
+        await sessionCommand('create', {
+          id: attempt.id,
+          request: botRequest(bot, project, attempt.id, value, true, profileFor(bot, project)),
+          firstMessage: { id: attempt.messageId, text: value },
+          limits: { maxBatches: null, pauseAtEstimatedUsd: null },
+          persona: { botId: bot.id, name: bot.name, instructions: bot.instructions },
+        });
+      }
       setText('');
+      setFresh(false);
       pending.current = null;
       await useLiveSessionStore.getState().refresh(attempt.id);
       onOpen(attempt.id);
@@ -524,7 +629,12 @@ function BotProfile({
   return (
     <section className="bots-profile" aria-label={bot.name}>
       <header className="bots-profile-header">
-        <BotAvatar appearance={bot.appearance} agent={bot.agent} size="lg" />
+        <BotAvatar
+          appearance={bot.appearance}
+          agent={bot.agent}
+          size="lg"
+          state={botActivity(conversations, runs)}
+        />
         <div className="bots-profile-identity">
           <h2>{bot.name}</h2>
           {bot.role && <p>{bot.role}</p>}
@@ -552,6 +662,7 @@ function BotProfile({
       >
         <Textarea
           aria-label={`Message ${bot.name}`}
+          aria-describedby={`bot-thread-${bot.id}`}
           placeholder={`Message ${bot.name}…`}
           rows={3}
           maxLength={12000}
@@ -567,11 +678,31 @@ function BotProfile({
         />
         {error && <InlineNotice tone="error">{error}</InlineNotice>}
         <div className="bots-composer-actions">
+          <span className="bots-composer-thread" id={`bot-thread-${bot.id}`}>
+            {continuing ? (
+              <>
+                Continues <strong>{continuing.title}</strong>
+              </>
+            ) : (
+              'Starts a new conversation'
+            )}
+          </span>
+          {continuing ? (
+            <Button type="button" variant="ghost" onClick={() => setFresh(true)}>
+              New conversation
+            </Button>
+          ) : (
+            latestOpen && (
+              <Button type="button" variant="ghost" onClick={() => setFresh(false)}>
+                Continue latest
+              </Button>
+            )
+          )}
           <Button
             type="submit"
             disabled={!text.trim() || !project || !isTauriEnvironment()}
             loading={busy}
-            loadingLabel="Starting…"
+            loadingLabel="Sending…"
           >
             Send
           </Button>
@@ -595,41 +726,13 @@ function BotProfile({
           </div>
         </section>
       )}
-      <section className="workspace-section workspace-stack">
-        <WorkspaceSectionHeading title="Conversations" />
-        {conversations.length ? (
-          <ul className="bots-list">
-            {conversations.slice(0, 12).map((session) => {
-              const origin = conversationOrigin(session);
-              return (
-                <li key={session.id}>
-                  <button
-                    type="button"
-                    className="bots-list-row"
-                    onClick={() => onOpen(session.id)}
-                  >
-                    {origin === 'Woke up' ? (
-                      <AlarmClock size={16} aria-hidden="true" />
-                    ) : origin ? (
-                      <ArrowRightLeft size={16} aria-hidden="true" />
-                    ) : (
-                      <MessageSquare size={16} aria-hidden="true" />
-                    )}
-                    <span>{session.title}</span>
-                    <small>
-                      {origin ? `${origin} · ` : ''}
-                      {session.closed ? 'Finished · ' : session.paused ? 'Paused · ' : ''}
-                      {new Date(session.updatedAt).toLocaleString()}
-                    </small>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <p className="task-muted">Send a message to start the first conversation.</p>
-        )}
-      </section>
+      <ConversationList
+        conversations={conversations}
+        runs={runs}
+        isUnread={isUnread}
+        onOpen={onOpen}
+      />
+      <BotMemory bot={bot} notes={notes} onOpen={onOpen} />
       <BotWakeList
         bot={bot}
         project={project}
@@ -649,7 +752,7 @@ function BotProfile({
           />
           <ul className="bots-list bots-activity">
             {events
-              .slice(-12)
+              .slice(allEvents ? 0 : -LIST_LIMIT)
               .reverse()
               .map((event) => (
                 <li key={event.id}>
@@ -661,9 +764,166 @@ function BotProfile({
                 </li>
               ))}
           </ul>
+          {events.length > LIST_LIMIT && (
+            <Button variant="ghost" onClick={() => setAllEvents(!allEvents)}>
+              {allEvents ? 'Show recent' : `Show all ${events.length}`}
+            </Button>
+          )}
         </section>
       )}
       {project && bot.routineIds.length > 0 && <BotRoutines bot={bot} />}
+    </section>
+  );
+}
+
+function ConversationList({
+  conversations,
+  runs,
+  isUnread,
+  onOpen,
+}: {
+  conversations: LiveSession[];
+  runs: TaskRun[];
+  isUnread: (session: LiveSession) => boolean;
+  onOpen: (id: string) => void;
+}) {
+  const [all, setAll] = useState(false);
+  const [query, setQuery] = useState('');
+  const search = query.trim().toLowerCase();
+  const matching = search
+    ? conversations.filter((session) =>
+        [session.title, ...session.messages.map((message) => message.text)].some((text) =>
+          text.toLowerCase().includes(search),
+        ),
+      )
+    : conversations;
+  const shown = all || search ? matching : matching.slice(0, LIST_LIMIT);
+  return (
+    <section className="workspace-section workspace-stack">
+      <WorkspaceSectionHeading title="Conversations" />
+      {conversations.length > LIST_LIMIT && (
+        <SearchField
+          aria-label="Search conversations"
+          placeholder="Search conversations…"
+          maxLength={200}
+          value={query}
+          onValueChange={setQuery}
+        />
+      )}
+      {shown.length ? (
+        <ul className="bots-list">
+          {shown.map((session) => {
+            const origin = conversationOrigin(session);
+            const unread = isUnread(session);
+            const preview = replyPreview(session, runs);
+            return (
+              <li key={session.id}>
+                <button
+                  type="button"
+                  className="bots-list-row bots-conversation-row"
+                  data-unread={unread || undefined}
+                  onClick={() => onOpen(session.id)}
+                >
+                  {origin === 'Woke up' ? (
+                    <AlarmClock size={16} aria-hidden="true" />
+                  ) : origin ? (
+                    <ArrowRightLeft size={16} aria-hidden="true" />
+                  ) : (
+                    <MessageSquare size={16} aria-hidden="true" />
+                  )}
+                  <span className="bots-conversation-copy">
+                    <span className="bots-conversation-title">
+                      {session.title}
+                      {unread && <span className="sr-only">, new reply</span>}
+                    </span>
+                    {preview && <small className="bots-conversation-preview">{preview}</small>}
+                  </span>
+                  <small>
+                    {origin ? `${origin} · ` : ''}
+                    {session.closed ? 'Finished · ' : session.paused ? 'Paused · ' : ''}
+                    {new Date(session.updatedAt).toLocaleString()}
+                  </small>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="task-muted">
+          {search ? 'No conversations match.' : 'Send a message to start the first conversation.'}
+        </p>
+      )}
+      {!search && conversations.length > LIST_LIMIT && (
+        <Button variant="ghost" onClick={() => setAll(!all)}>
+          {all ? 'Show recent' : `Show all ${conversations.length}`}
+        </Button>
+      )}
+    </section>
+  );
+}
+
+/** Notes the bot saved for its future conversations; the person can remove any of them. */
+function BotMemory({
+  bot,
+  notes,
+  onOpen,
+}: {
+  bot: Bot;
+  notes: BotNote[];
+  onOpen: (id: string) => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  return (
+    <section className="workspace-section workspace-stack">
+      <WorkspaceSectionHeading
+        title="Memory"
+        description={`What ${bot.name} brings to new conversations, with how its latest ones ended.`}
+      />
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      {notes.length ? (
+        <ul className="bots-list">
+          {notes.map((note) => (
+            <li key={note.id} className="bots-routine">
+              <span>
+                <span className="bots-note">{note.text}</span>
+                <small>{new Date(note.updatedAt).toLocaleString()}</small>
+              </span>
+              <span className="bot-wake-actions">
+                {note.sessionId && (
+                  <Button variant="ghost" onClick={() => onOpen(note.sessionId ?? '')}>
+                    Source
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  aria-label={`Remove note: ${note.text.slice(0, 60)}`}
+                  loading={busy === note.id}
+                  loadingLabel="Removing…"
+                  disabled={busy !== null}
+                  onClick={async () => {
+                    setBusy(note.id);
+                    setError('');
+                    try {
+                      await forgetNote(note.id);
+                    } catch (cause) {
+                      setError(String(cause));
+                    } finally {
+                      setBusy(null);
+                    }
+                  }}
+                >
+                  Remove
+                </Button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="task-muted">
+          Nothing saved yet. {bot.name} saves preferences, decisions and progress here as it works.
+        </p>
+      )}
     </section>
   );
 }

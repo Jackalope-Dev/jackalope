@@ -129,7 +129,12 @@ the control so scrolling dialogs and panels never clip them. Contained dialogs p
 own body and footer to line up with the header, and content sits on the dialog surface
 rather than nested background panels.
 Surfaces that belong together join as one card with a divider and no inner corner
-radius; separate surfaces keep the page gap. Pages use one vertical rhythm from their
+radius; separate surfaces keep the page gap. Use the shared radius scale
+(`--radius-xs` through `--radius-3xl` and `--radius-full`) rather than raw pixel radii;
+Tailwind `rounded-*` utilities read the same scale. Repeated tiles in a grid share one
+row height, and list rows keep one height with single-line truncation, so longer copy
+never makes neighbours uneven. The vertical workspace navigation is its own rounded
+panel on `--color-navigation`. Pages use one vertical rhythm from their
 layout gap rather than per-section margins. Transient notices, previews and errors the
 user can clear have a visible close control.
 
@@ -193,13 +198,17 @@ channel append " - dev" or " - Beta" to the title bar; stable shows only the nam
 
 Use motion to explain changes, acknowledge input or express the mascot's
 personality. Avoid competing animation, ambient pulses and unnecessary delays.
+`@jackalope/ui` owns shared motion: dialogs, menus, popovers, selects and tooltips
+animate in and out, tab panels and opened pages settle into place, and segmented
+controls slide their selection. Reuse its `--motion-*` durations and `--ease-*` curves
+instead of adding feature keyframes, and keep reduced motion static.
 Maintain the existing setup acknowledgment and workspace-entry behavior.
 
 ## Components and verification
 
 Import portable controls from @jackalope/ui. The library includes Button,
 IconButton, Input, Textarea, FormField, Select, Checkbox, Switch, Badge, Tooltip,
-DropdownMenu, Popover, Tabs, SegmentedControl, dialogs, CopyButton, InlineNotice,
+DropdownMenu, Popover, Tabs, SegmentedControl, SegmentedNav, dialogs, CopyButton, InlineNotice,
 LoadingState, EmptyState, ErrorState, PageHeader, SectionHeader, Toolbar, Stat,
 DefinitionList, Table, SearchField, Disclosure, SettingRow, SettingGroup and Panel.
 Reuse desktop compositions such as WorkspaceHeading,
@@ -223,6 +232,10 @@ settings. Do not place loose headings, rows or buttons between cards. Use Inline
 the tone from the actual outcome; use its action slot for recovery controls.
 WorkspaceToolbar owns filter/action wrapping and spacing. FilterGroup represents
 pressed filter choices; WorkspaceSubnavigation represents navigation between views.
+Every row of peer choices uses the shared segmented track: SegmentedControl for
+filters, SegmentedNav for views (it marks the open view with aria-current) and
+`Tabs.List appearance="segmented"` for panels with arrow-key navigation. Put counts in
+an item's `count` rather than the label text, and do not hand-roll tab rows.
 
 SearchField uses a controlled string value and onValueChange, forwards its input
 ref and native attributes, and returns focus to the input after clearing. Use
@@ -259,7 +272,7 @@ in a label with a comfortable hit area or use FormField. Keep specialized file,
 color, range and editor controls local when their interaction requires it.
 DropdownMenu and Popover keep Portal explicit so nested overlays can choose their
 container. Tabs use arrow-key panel navigation; SegmentedControl uses pressed
-buttons for filtering. CopyButton accepts a custom clipboard function, shows
+buttons for filtering and SegmentedNav uses aria-current for view navigation. CopyButton accepts a custom clipboard function, shows
 failure beside the action and clears stale feedback when its text changes.
 
 Use the standalone gallery with `pnpm ui:dev` at http://127.0.0.1:5190 to inspect

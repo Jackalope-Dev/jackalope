@@ -493,7 +493,8 @@
   .task-home .work-search {
     flex-basis: 120px;
   }
-  .task-home .work-layout button {
+  /* Narrow home toolbars show the layout icons only; the names stay accessible. */
+  .task-home .work-layout > .ui-segment {
     font-size: 0;
     gap: 0;
   }

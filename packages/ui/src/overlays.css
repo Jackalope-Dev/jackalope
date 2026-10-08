@@ -1,4 +1,5 @@
 @import "./foundation.css";
+@import "./motion.css";
 @layer components {
   .ui-menu,
   .ui-popover,

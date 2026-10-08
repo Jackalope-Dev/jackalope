@@ -1,4 +1,4 @@
-import { EmptyState, SearchField } from '@jackalope/ui';
+import { Badge, EmptyState, SearchField, SegmentedControl } from '@jackalope/ui';
 import {
   AlertTriangle,
   Bot,
@@ -95,34 +95,24 @@ export function AuditLogWorkspace() {
     }
   };
 
-  const getSeverityBadge = (severity: AuditSeverity) => {
-    switch (severity) {
-      case 'error':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-danger)]/15 text-[var(--color-danger)] dark:text-[var(--color-danger)] border border-[var(--color-danger)]/30">
-            <AlertTriangle size={10} /> Error
-          </span>
-        );
-      case 'warning':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-warning)]/15 text-[var(--color-warning)] border border-[var(--color-warning)]/30">
-            <AlertTriangle size={10} /> Warning
-          </span>
-        );
-      case 'success':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-success)]/15 text-[var(--color-success)] border border-[var(--color-success)]/30">
-            <CheckCircle2 size={10} /> Success
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-accent)]/15 text-[var(--color-accent-ink)] dark:text-[var(--color-accent-ink)] border border-[var(--color-accent)]/30">
-            <Info size={10} /> Info
-          </span>
-        );
-    }
-  };
+  const getSeverityBadge = (severity: AuditSeverity) =>
+    severity === 'error' ? (
+      <Badge variant="danger" icon={AlertTriangle}>
+        Error
+      </Badge>
+    ) : severity === 'warning' ? (
+      <Badge variant="warning" icon={AlertTriangle}>
+        Warning
+      </Badge>
+    ) : severity === 'success' ? (
+      <Badge variant="success" icon={CheckCircle2}>
+        Success
+      </Badge>
+    ) : (
+      <Badge variant="accent" icon={Info}>
+        Info
+      </Badge>
+    );
 
   return (
     <div className="activity-log">
@@ -195,34 +185,18 @@ export function AuditLogWorkspace() {
             </Select>
 
             {/* Category Chips */}
-            <fieldset
-              aria-label="Filter by category"
-              className="flex min-h-11 min-w-0 max-w-full flex-wrap items-center gap-1 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg p-0.5"
-            >
-              {(
-                [
-                  { id: 'all', label: 'All' },
-                  { id: 'routing', label: 'Routing' },
-                  { id: 'failover', label: 'Failovers' },
-                  { id: 'execution', label: 'Executions' },
-                  { id: 'discovery', label: 'Discovery' },
-                ] as const
-              ).map((cat) => (
-                <button
-                  type="button"
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  aria-pressed={selectedCategory === cat.id}
-                  className={`h-full shrink-0 px-2.5 py-1 rounded-md text-sm font-medium transition-colors ${
-                    selectedCategory === cat.id
-                      ? 'bg-[var(--color-action)] text-[var(--color-on-action)]'
-                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </fieldset>
+            <SegmentedControl
+              label="Filter by category"
+              value={selectedCategory}
+              onChange={setSelectedCategory}
+              items={[
+                { id: 'all', label: 'All' },
+                { id: 'routing', label: 'Routing' },
+                { id: 'failover', label: 'Failovers' },
+                { id: 'execution', label: 'Executions' },
+                { id: 'discovery', label: 'Discovery' },
+              ]}
+            />
 
             {/* Severity Filter */}
             <Select

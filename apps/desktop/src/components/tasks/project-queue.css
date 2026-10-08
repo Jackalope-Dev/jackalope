@@ -6,32 +6,7 @@
   gap: 24px;
 }
 .queue-tabs {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 4px;
   margin: 32px 0 28px;
-}
-.queue-tabs button {
-  padding: 10px 14px;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  border: 0;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.queue-tabs button[aria-pressed="true"] {
-  color: var(--color-text-primary);
-  background: var(--color-surface-elevated);
-  box-shadow: var(--shadow-selection);
-}
-.queue-tabs span {
-  background: var(--color-accent-subtle);
-  border-radius: 5px;
-  padding: 0 5px;
-  font-size: var(--text-xs);
 }
 .queue-controls {
   display: flex;

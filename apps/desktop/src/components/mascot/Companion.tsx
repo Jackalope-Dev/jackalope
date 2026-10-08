@@ -1,4 +1,4 @@
-import { ExternalLinkIcon, Popover, SearchIcon } from '@jackalope/ui';
+import { ExternalLinkIcon, Popover, SearchIcon, SegmentedNav } from '@jackalope/ui';
 import { ArrowLeft, Check, CircleCheck, CircleHelp, Info, Settings2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -227,22 +227,16 @@ export function Companion({
             <CompanionSettings />
           ) : (
             <>
-              <nav className="helper-tabs" aria-label="Helper sections">
-                <button
-                  type="button"
-                  aria-pressed={section === 'ask'}
-                  onClick={() => setSection('ask')}
-                >
-                  Ask{proposals ? ` (${proposals})` : ''}
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={section === 'activity'}
-                  onClick={() => setSection('activity')}
-                >
-                  Activity{unread.length ? ` (${unread.length})` : ''}
-                </button>
-              </nav>
+              <SegmentedNav
+                className="helper-tabs"
+                label="Helper sections"
+                value={section}
+                onChange={setSection}
+                items={[
+                  { id: 'ask', label: 'Ask', count: proposals || undefined },
+                  { id: 'activity', label: 'Activity', count: unread.length || undefined },
+                ]}
+              />
               {section === 'ask' ? (
                 <AskJackalope onNavigate={() => setOpen(false)} />
               ) : (

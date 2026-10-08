@@ -160,6 +160,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     wasFixing.current = fixing;
   }, [fixing]);
   const refreshRef = useRef<() => Promise<void>>(async () => {});
+  const [historyVersion, setHistoryVersion] = useState(0);
   const refresh = useCallback(async () => {
     if (!projectPath || !checkout || !desktop) return;
     const target = checkout;
@@ -172,6 +173,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
       });
       if (current.current !== target) return;
       setChanges(next);
+      setHistoryVersion((value) => value + 1);
       const active = useProjectStore.getState().projects.find((p) => p.path === projectPath);
       if (target === projectPath && next.branch && active && next.branch !== active.gitBranch) {
         useProjectStore.getState().updateProject(active.id, { gitBranch: next.branch });
@@ -665,7 +667,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
           </section>
         </div>
       )}
-      <CommitHistory key={checkout} projectPath={checkout} />
+      <CommitHistory key={checkout} projectPath={checkout} version={historyVersion} />
     </WorkspacePage>
   );
 }

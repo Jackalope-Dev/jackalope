@@ -263,11 +263,6 @@
   font-size: var(--text-base);
   margin-bottom: 4px;
 }
-.context-history-search {
-  margin-top: 28px;
-  padding-top: 24px;
-  border-top: 1px solid var(--color-border-subtle);
-}
 .context-history-field {
   min-width: 0;
   flex: 1;

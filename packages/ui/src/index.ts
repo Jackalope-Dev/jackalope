@@ -25,6 +25,7 @@ export * from './LoadingState';
 export * from './Panel';
 export * as Popover from './Popover';
 export * from './SearchField';
+export * from './Segmented';
 export * from './Select';
 export * from './Setting';
 export * from './Switch';

@@ -5,6 +5,7 @@ import {
   DisclosureSummary,
   DropdownMenu as Menu,
   SearchField,
+  SegmentedControl,
 } from '@jackalope/ui';
 import {
   Archive,
@@ -206,20 +207,32 @@ export function TaskCollection({
             </SelectItem>
           ))}
         </Select>
-        <fieldset className="work-layout" aria-label="Task view">
-          <button type="button" aria-pressed={layout === 'list'} onClick={() => setLayout('list')}>
-            <List size={16} />
-            List
-          </button>
-          <button
-            type="button"
-            aria-pressed={layout === 'board'}
-            onClick={() => setLayout('board')}
-          >
-            <Columns3 size={16} />
-            Board
-          </button>
-        </fieldset>
+        <SegmentedControl
+          className="work-layout"
+          label="Task view"
+          value={layout}
+          onChange={setLayout}
+          items={[
+            {
+              id: 'list',
+              label: (
+                <>
+                  <List size={16} aria-hidden="true" />
+                  List
+                </>
+              ),
+            },
+            {
+              id: 'board',
+              label: (
+                <>
+                  <Columns3 size={16} aria-hidden="true" />
+                  Board
+                </>
+              ),
+            },
+          ]}
+        />
         {onArchive && (
           <Menu.Root>
             <Menu.Trigger asChild>

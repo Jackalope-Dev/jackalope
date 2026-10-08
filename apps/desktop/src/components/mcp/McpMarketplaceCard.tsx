@@ -40,23 +40,27 @@ export function McpMarketplaceCard({
           </p>
         </div>
       </div>
-      <div className="mcp-market-labels">
-        <span>{recommendation ? 'Publisher maintained' : categoryLabel(server.category)}</span>
-        {server.isOfficial && (
-          <span title="Listed as official by AllMCPs">
-            <Shield size={12} aria-hidden="true" /> Official
-          </span>
-        )}
-        {server.githubStars > 0 && (
-          <span title={`${server.githubStars.toLocaleString()} GitHub stars`}>
-            <Star size={12} aria-hidden="true" />{' '}
-            {Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(
-              server.githubStars,
-            )}{' '}
-            stars
-          </span>
-        )}
-      </div>
+      {/* Recommendations are all publisher maintained; the section intro already says so. */}
+      {(!recommendation || server.isOfficial || server.githubStars > 0) && (
+        <div className="mcp-market-labels">
+          {!recommendation && <span>{categoryLabel(server.category)}</span>}
+          {server.isOfficial && (
+            <span title="Listed as official by AllMCPs">
+              <Shield size={12} aria-hidden="true" /> Official
+            </span>
+          )}
+          {server.githubStars > 0 && (
+            <span title={`${server.githubStars.toLocaleString()} GitHub stars`}>
+              <Star size={12} aria-hidden="true" />{' '}
+              {Intl.NumberFormat(undefined, {
+                notation: 'compact',
+                maximumFractionDigits: 1,
+              }).format(server.githubStars)}{' '}
+              stars
+            </span>
+          )}
+        </div>
+      )}
       <p className="mcp-market-description">
         {descriptionExcerpt(
           server.description || 'No description supplied. Open details for setup information.',

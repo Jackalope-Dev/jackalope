@@ -1,4 +1,4 @@
-import { DiscordIcon, FormField, Input, SearchField } from '@jackalope/ui';
+import { DiscordIcon, FormField, Input, SearchField, SegmentedControl } from '@jackalope/ui';
 import {
   Bot,
   Database,
@@ -242,23 +242,19 @@ export function SettingsPage({
         immediately unless a Save button is shown.
       </p>
       <div className="settings-scope-bar">
-        <nav className="settings-scope-switcher" aria-label="Settings scope">
-          {(['app', 'project'] as const).map((value) => (
-            <button
-              type="button"
-              key={value}
-              className={`settings-scope-pill ${scope === value ? 'is-active' : ''}`}
-              aria-pressed={scope === value}
-              onClick={() => {
-                setScope(value);
-                setCategory(value === 'app' ? 'General' : 'Project');
-                setQuery('');
-              }}
-            >
-              {value === 'app' ? 'App-wide' : 'Per project'}
-            </button>
-          ))}
-        </nav>
+        <SegmentedControl
+          label="Settings scope"
+          value={scope}
+          onChange={(value) => {
+            setScope(value);
+            setCategory(value === 'app' ? 'General' : 'Project');
+            setQuery('');
+          }}
+          items={[
+            { id: 'app', label: 'App-wide' },
+            { id: 'project', label: 'Per project' },
+          ]}
+        />
         {scope === 'project' && (
           <Select
             aria-label="Project to configure"

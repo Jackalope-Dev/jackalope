@@ -76,9 +76,6 @@
   gap: 16px;
   margin-bottom: 28px;
 }
-.worktree-summary > p {
-  max-width: 64ch;
-}
 .worktree-summary-bar {
   display: flex;
   flex-wrap: wrap;
@@ -89,16 +86,13 @@
 .worktree-counts {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px 24px;
+  margin: 0;
 }
 .worktree-counts > div {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-subtle);
+  gap: 6px;
   font-size: var(--text-sm);
 }
 .worktree-counts dt {
@@ -219,9 +213,6 @@
 .queue-heading .task-hero-title {
   font-size: var(--text-2xl);
 }
-.queue-tabs {
-  margin: 20px 0;
-}
 .task-notice {
   justify-content: flex-start;
 }
@@ -271,9 +262,6 @@ button:disabled {
   min-height: 44px;
   border-radius: 12px;
   padding: 10px 12px;
-}
-.project-switcher:hover {
-  background: var(--color-surface-hover);
 }
 .command-trigger.command-jump {
   width: clamp(200px, 23vw, 320px);
@@ -369,9 +357,6 @@ button:disabled {
 }
 .queue-page .task-back {
   margin-bottom: 4px;
-}
-.queue-page .queue-tabs {
-  margin: 12px 0;
 }
 .queue-page .queue-flow {
   margin: 16px 0 8px;
@@ -506,7 +491,7 @@ button:disabled {
   padding: 8px 12px;
   background-color: var(--color-surface-sunken);
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md, 6px);
+  border-radius: var(--radius-md);
   list-style: none;
   margin: 0;
 }
@@ -564,9 +549,6 @@ button:disabled {
 .schedule-row > div > p {
   overflow-wrap: anywhere;
 }
-.mcp-tabs {
-  flex-wrap: wrap;
-}
 .activity-log .p-6 {
   padding-inline: 0;
 }
@@ -580,27 +562,11 @@ button:disabled {
   }
 }
 
-.workspace-subnavigation,
-.workspace-tab-list {
-  display: flex;
+/* Sub-views sit above the page heading at the same gutter; the control carries its own track. */
+.workspace-subnavigation {
   flex-shrink: 0;
-  gap: 4px;
-  padding: 8px 24px;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--color-border);
-}
-.workspace-subnavigation .workspace-nav-item,
-.workspace-tab-list .workspace-nav-item {
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-.workspace-subnavigation [aria-current="page"],
-.workspace-tab-list [data-state="active"] {
-  color: var(--color-accent-ink);
-  background: var(--color-accent-subtle);
-}
-.workspace-tab-list {
-  padding-inline: 0;
+  min-width: 0;
+  padding: 16px var(--workspace-gutter, 32px) 0;
 }
 .workspace-page {
   width: 100%;
@@ -666,4 +632,12 @@ button:disabled {
 }
 .inline-notice .ui-disclosure-indicator {
   margin-left: 0;
+}
+
+/* Opening a workspace view settles it into place; switching views remounts the page. */
+@media (prefers-reduced-motion: no-preference) {
+  .workspace-canvas > :is(.workspace-page-layout, .task-page),
+  .workspace-canvas > * > :is(.workspace-page-layout, .task-page) {
+    animation: ui-rise-in var(--motion-slow) var(--ease-out);
+  }
 }

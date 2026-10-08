@@ -474,9 +474,13 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     );
   };
   return (
-    <WorkspacePage className="">
+    <WorkspacePage>
       <WorkspaceHeading
         title="Worktrees"
+        description={
+          project &&
+          'Separate checkouts of this repository, so tasks work on their own branch without touching your main folder.'
+        }
         action={
           project && (
             <div className="workspace-actions">
@@ -530,10 +534,6 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
       ) : (
         <>
           <div className="worktree-summary">
-            <p className="task-muted">
-              Worktrees are separate checkouts of this repository, so tasks can work on their own
-              branch in parallel without touching your main folder.
-            </p>
             <div className="worktree-summary-bar">
               <dl className="worktree-counts">
                 <div>

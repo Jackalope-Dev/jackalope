@@ -1,15 +1,8 @@
-.agent-workspace-actions,
-.agent-roster-heading,
 .agent-roster-name,
 .agent-presence {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-.agent-roster-heading {
-  justify-content: space-between;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
 }
 .agent-roster {
   display: grid;
@@ -162,9 +155,6 @@
   flex: 1 0 100%;
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
-}
-.agent-roster-heading {
-  flex-wrap: wrap;
 }
 
 .agent-roster-section {

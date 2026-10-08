@@ -1,7 +1,7 @@
 .bots-layout {
   display: grid;
-  grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: 17.5rem minmax(0, 1fr);
+  gap: 40px;
   align-items: start;
   min-width: 0;
 }
@@ -17,25 +17,28 @@
   border-radius: 16px;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1100px) {
+  .bots-layout {
+    grid-template-columns: 14.5rem minmax(0, 1fr);
+    gap: 28px;
+  }
+}
+
+@media (max-width: 760px) {
   .bots-layout {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
+/* A plain list like the Settings navigation; the selected bot takes a tinted fill. */
 .bots-roster {
   display: grid;
   gap: 2px;
-  padding: 6px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 14px;
-  background: var(--color-surface);
 }
 
 .bots-roster-item {
   display: flex;
   align-items: center;
-  border: 1px solid transparent;
   border-radius: 10px;
 }
 
@@ -44,8 +47,7 @@
 }
 
 .bots-roster-item[data-selected] {
-  border-color: var(--color-border);
-  background: var(--color-surface-hover);
+  background: var(--color-accent-subtle);
 }
 
 .bots-roster-open {
@@ -55,7 +57,7 @@
   gap: 10px;
   min-width: 0;
   min-height: 56px;
-  padding: 6px 8px;
+  padding: 8px 4px 8px 10px;
   border: 0;
   border-radius: 10px;
   background: transparent;
@@ -86,7 +88,7 @@
 
 .bots-roster-copy small {
   overflow: hidden;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   font-size: var(--text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -134,21 +136,32 @@
 
 .bots-profile {
   display: grid;
-  gap: 24px;
+  gap: 32px;
   min-width: 0;
+}
+
+/* The profile's own gap spaces its sections evenly. */
+.bots-profile > .workspace-section {
+  margin-top: 0;
 }
 
 .bots-profile-header {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 16px;
+  align-items: center;
+  gap: 14px;
+  min-height: 56px;
+}
+
+/* The character art has built-in padding; pull it back to the content edge. */
+.bots-profile-header > .bots-avatar {
+  margin-left: -6px;
 }
 
 .bots-profile-identity {
   display: grid;
   flex: 1;
-  gap: 6px;
+  gap: 2px;
   min-width: 12rem;
 }
 
@@ -163,13 +176,32 @@
   color: var(--color-text-secondary);
 }
 
+/* One field: the text area sits flush inside the bordered composer. */
 .bots-composer {
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: 8px;
+  padding: 12px 12px 12px 16px;
   border: 1px solid var(--color-border);
   border-radius: 14px;
-  background: var(--color-surface);
+  background: var(--color-surface-elevated);
+  transition: border-color 140ms;
+}
+
+.bots-composer:focus-within {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 1px var(--color-border-focus);
+}
+
+.bots-composer .form-control {
+  min-height: 64px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  resize: none;
+}
+
+.bots-composer .form-control:focus-visible {
+  outline: none;
 }
 
 .bots-composer-actions {
@@ -264,10 +296,16 @@
   min-height: 44px;
 }
 
+/* Every row takes the tallest card's height, so the grid reads as even tiles. */
 .bots-templates {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  grid-auto-rows: 1fr;
   gap: 12px;
+  /* Each list item lays out its tile so the tile fills the row height. */
+  & > * {
+    display: grid;
+  }
   margin: 0;
   padding: 0;
   list-style: none;
@@ -275,24 +313,55 @@
 
 .bots-template {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
-  align-items: start;
-  padding: 16px;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 72px;
+  padding: 14px 16px;
   border: 1px solid var(--color-border-subtle);
   border-radius: 14px;
   background: var(--color-surface);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 140ms,
+    background 140ms;
 }
 
-.bots-template p {
-  margin: 4px 0 0;
+.bots-template:hover:not(:disabled) {
+  border-color: var(--color-border);
+  background: var(--color-surface-hover);
+}
+
+.bots-template:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.bots-template strong {
+  display: block;
+  font-weight: 600;
+}
+
+.bots-template-role {
+  display: -webkit-box;
+  margin-top: 2px;
+  overflow: hidden;
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
-.bots-template .ui-button {
-  grid-column: 1 / -1;
-  justify-self: start;
+.bots-template-add {
+  color: var(--color-text-muted);
+}
+
+.bots-template:hover:not(:disabled) .bots-template-add {
+  color: var(--color-accent-ink);
 }
 
 .bot-editor {
@@ -589,18 +658,28 @@
 }
 
 .bots-roster-template {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   justify-self: start;
   min-height: 44px;
   padding: 0 10px;
   border: 0;
+  border-radius: 8px;
   background: none;
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
+  color: var(--color-accent-ink);
+  font-size: var(--text-sm);
+  font-weight: 500;
   cursor: pointer;
 }
 
 .bots-roster-template:hover:not(:disabled) {
-  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+
+.bots-roster-template:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
 }
 
 .bots-roster-template:focus-visible {
@@ -686,4 +765,54 @@
 .bot-editor-form::after {
   content: "";
   height: 4px;
+}
+
+/* A reply arrived since the person last read the conversation. */
+.bots-roster-unread {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.bots-conversation-row {
+  min-height: 56px;
+}
+
+.bots-list-row .bots-conversation-copy {
+  display: grid;
+}
+
+.bots-conversation-title,
+.bots-conversation-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bots-roster-item[data-unread] .bots-roster-copy small,
+.bots-conversation-row[data-unread] .bots-conversation-title {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.bots-composer-thread {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bots-composer-thread strong {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.bots-note {
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
 }

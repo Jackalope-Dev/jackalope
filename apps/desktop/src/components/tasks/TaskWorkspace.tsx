@@ -403,7 +403,8 @@ export function TaskWorkspace({
                     <Radio size={16} />
                     Save a task draft
                   </Menu.Item>
-                  {project && (
+                  {/* Build mode lists these as tools beneath the heading. */}
+                  {project && preset !== 'build' && (
                     <Menu.Item
                       className="workspace-menu-item"
                       onSelect={() => navigateWorkspace('repo-todos')}
@@ -412,7 +413,7 @@ export function TaskWorkspace({
                       Repo TODOs
                     </Menu.Item>
                   )}
-                  {project && (
+                  {project && preset !== 'build' && (
                     <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
                       <Workflow size={16} />
                       Plan feature work
@@ -511,7 +512,7 @@ export function TaskWorkspace({
                     : 'Start new work, or browse repository TODOs to find tasks.'
                 }
                 action={
-                  <div className="flex items-center gap-2">
+                  <div className="workspace-actions">
                     {projectFilter !== 'all' && projects.length > 1 && (
                       <Button variant="outline" onClick={() => setScope('all')}>
                         Show all projects

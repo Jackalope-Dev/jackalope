@@ -112,7 +112,7 @@ export function CommandPalette({
       title: session.title,
       project: session.request.projectName,
       date: session.updatedAt,
-      state: 'Chat',
+      state: session.persona ? `Bot · ${session.persona.name}` : 'Chat',
     })),
   ]
     .filter((item) => `${item.title} ${item.project} ${item.state}`.toLowerCase().includes(search))

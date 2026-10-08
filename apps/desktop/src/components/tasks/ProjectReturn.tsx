@@ -1,27 +1,22 @@
 import { Badge, Panel } from '@jackalope/ui';
-import { ArrowRight, Play } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { projectTaskPresence } from '../../lib/project-return';
 import type { QueueView } from '../../lib/queue';
 import type { WorkItem } from '../../lib/task-collection';
 import type { TaskRun } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
-import type { Project } from '../../stores/projectStore';
-import { useProjectStore } from '../../stores/projectStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AgentStack } from '../agents/AgentAvatar';
 import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 
 export function ProjectReturn({
-  project,
   items,
   runs,
   queue,
   onOpen,
 }: {
-  project: Project;
   items: WorkItem[];
   runs: TaskRun[];
   queue: QueueView;
@@ -29,26 +24,9 @@ export function ProjectReturn({
 }) {
   if (!items.length) {
     return (
-      <Panel className="p-6 text-center rounded-xl">
-        <p className="font-semibold text-base mb-1 text-[var(--color-text-primary)]">
-          All caught up
-        </p>
-        <p className="text-[var(--color-text-secondary)] text-sm mb-4">
-          No active tasks in this project.
-        </p>
-        <Button
-          onClick={() => {
-            useExecutionStore.getState().select(null);
-            useManagedTaskStore.getState().select(null);
-            useLiveSessionStore.getState().select(null);
-            useProjectStore.getState().selectProject(project.id);
-            navigateWorkspace('live-sessions');
-          }}
-        >
-          <Play size={16} />
-          Start new task
-        </Button>
-      </Panel>
+      <p className="task-muted">
+        No active tasks. Work you start in this project appears here until it is delivered.
+      </p>
     );
   }
 

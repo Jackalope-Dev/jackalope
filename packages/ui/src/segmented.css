@@ -1,0 +1,127 @@
+@import "./foundation.css";
+@import "./motion.css";
+@layer components {
+  /* One recessed track shared by filters, view navigation and segmented tab lists.
+     Segments keep the 44px target; the selected one is a raised tile with a border and
+     heavier label, so selection does not rely on colour. */
+  .ui-segmented {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    width: fit-content;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 3px;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-sunken);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .ui-segmented::-webkit-scrollbar {
+    display: none;
+  }
+  .ui-segmented {
+    position: relative;
+    isolation: isolate;
+  }
+  /* The selected fill slides between items once the track has measured them. */
+  .ui-segmented-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    display: none;
+    width: var(--segment-w, 0);
+    height: var(--segment-h, 0);
+    translate: var(--segment-x, 0) var(--segment-y, 0);
+    border: 1px solid var(--color-border);
+    border-radius: calc(var(--radius-lg) - 3px);
+    background: var(--color-surface-elevated);
+    box-shadow: var(--shadow-flat);
+    pointer-events: none;
+  }
+  .ui-segmented[data-indicator] > .ui-segmented-indicator {
+    display: block;
+  }
+  .ui-segmented[data-indicator="ready"] > .ui-segmented-indicator {
+    transition:
+      translate var(--motion-slow, 240ms) var(--ease-out, ease-out),
+      width var(--motion-slow, 240ms) var(--ease-out, ease-out);
+  }
+  :is(.ui-segment, .ui-segmented > .ui-tabs-trigger) {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-radius: calc(var(--radius-lg) - 3px);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color 140ms,
+      color 140ms,
+      border-color 140ms;
+  }
+  :is(.ui-segment, .ui-segmented > .ui-tabs-trigger):hover:not(:disabled) {
+    background: var(--color-surface-hover);
+    color: var(--color-text-primary);
+  }
+  :is(.ui-segment, .ui-segmented > .ui-tabs-trigger):is(
+    [aria-pressed="true"],
+    [aria-current="page"],
+    [data-state="active"]
+  ) {
+    border-color: var(--color-border);
+    background: var(--color-surface-elevated);
+    color: var(--color-text-primary);
+    font-weight: 600;
+    box-shadow: var(--shadow-flat);
+  }
+  :is(.ui-segment, .ui-segmented > .ui-tabs-trigger):focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: -2px;
+  }
+  :is(.ui-segment, .ui-segmented > .ui-tabs-trigger):disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  /* Counts and icons inside a segment stay quiet beside the label. */
+  .ui-segment-count {
+    min-width: 20px;
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-hover);
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+  .ui-segmented[data-indicator]
+    > :is(.ui-segment, .ui-tabs-trigger):is(
+      [aria-pressed="true"],
+      [aria-current="page"],
+      [data-state="active"]
+    ) {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :is(.ui-segment, .ui-segmented > .ui-tabs-trigger),
+    .ui-segmented[data-indicator="ready"] > .ui-segmented-indicator {
+      transition: none;
+    }
+  }
+}

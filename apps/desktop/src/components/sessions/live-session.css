@@ -315,15 +315,19 @@
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: 16px 20px;
+  padding: 16px;
   border-left: 1px solid var(--color-border-subtle);
   background: var(--color-surface);
 }
-.live-tabs {
+.live-work-bar {
   display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 14px;
+}
+.live-tabs > .ui-segment {
+  padding-inline: 10px;
 }
 .live-tabs button[aria-pressed="true"] {
   background: var(--color-surface-hover);
@@ -724,15 +728,23 @@
   overflow: hidden;
 }
 .agent-picker-body {
+  /* Fits the window above or below the trigger; the rail and the open pane each scroll
+     within it, because a grid row would otherwise grow to fit a long model list. */
+  --agent-picker-height: min(
+    28rem,
+    70vh,
+    calc(var(--radix-popover-content-available-height, 100vh) - 16px)
+  );
   display: grid;
   /* The rail sizes to its icons plus any vertical scrollbar, so it never scrolls sideways. */
   grid-template-columns: max-content minmax(0, 1fr);
-  max-height: min(28rem, 70vh);
+  max-height: var(--agent-picker-height);
 }
 .agent-picker-rail {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-height: var(--agent-picker-height);
   padding: 8px 6px;
   overflow-x: hidden;
   overflow-y: auto;
@@ -776,8 +788,11 @@
   align-content: start;
   gap: 4px;
   min-width: 0;
+  max-height: var(--agent-picker-height);
   padding: 8px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 .agent-picker-pane[hidden] {
   display: none;

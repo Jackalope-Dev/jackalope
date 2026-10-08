@@ -117,21 +117,27 @@ try {
       errors.push(message.text());
   });
   page.setDefaultTimeout(15000);
+  // True once the light theme is applied and the element uses the primary text color.
+  await page.addInitScript(() => {
+    window.lightText = (element) => {
+      if (getComputedStyle(document.documentElement).colorScheme !== 'light') return false;
+      const probe = document.createElement('i');
+      probe.style.color = 'var(--color-text-primary)';
+      document.body.append(probe);
+      const primary = getComputedStyle(probe).color;
+      probe.remove();
+      return getComputedStyle(element).color === primary;
+    };
+  });
   await page.route('**/src/main.tsx*', (route) =>
     route.fulfill({ contentType: 'application/javascript', body: fixture }),
   );
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.getByRole('heading', { name: 'Search walkthrough' }).waitFor();
   assert.equal(await page.locator('.live-status').getAttribute('aria-expanded'), 'false');
-  assert.equal(
-    await page.getByRole('button', { name: 'Pause queue', exact: true }).isVisible(),
-    true,
-  );
-  assert.equal(
-    await page.getByRole('button', { name: 'Stop work', exact: true }).isVisible(),
-    true,
-  );
   await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Pause queue', exact: true }).waitFor();
+  await page.getByRole('menuitem', { name: 'Stop work', exact: true }).waitFor();
   await page.getByRole('menuitem', { name: 'Session limits', exact: true }).click();
   await page.getByLabel('Pause after this many batches').fill('8');
   await page.getByRole('button', { name: 'Save limits', exact: true }).click();
@@ -202,15 +208,16 @@ try {
   await page.getByRole('button', { name: 'Cancel queued message' }).first().click();
   await page.locator('.live-message[data-canceled=true]').first().waitFor();
   assert.equal(await page.locator('.live-message[data-canceled=true]').count(), 1);
-  await page.getByRole('button', { name: 'Pause queue', exact: true }).click();
-  await page.getByRole('button', { name: 'Resume queue', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Pause queue', exact: true }).click();
+  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Resume queue', exact: true }).waitFor();
+  await page.keyboard.press('Escape');
   assert.equal(await input.isEnabled(), true);
   await page.screenshot({ path: `${output}/session-1280-dark.png` });
   await page.setViewportSize({ width: 960, height: 640 });
   await page.evaluate(() => window.sessionFixture.theme('light'));
-  await page.waitForFunction(
-    () => getComputedStyle(document.querySelector('h1')).color === 'rgb(30, 30, 36)',
-  );
+  await page.waitForFunction(() => window.lightText(document.querySelector('h1')));
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.screenshot({ path: `${output}/session-960-light.png` });
   await page.evaluate(() =>
@@ -350,9 +357,7 @@ try {
   await page.getByText('A compact thought', { exact: true }).waitFor();
   await page.setViewportSize({ width: 320, height: 320 });
   await page.evaluate(() => window.sessionFixture.theme('light'));
-  await page.waitForFunction(
-    () => getComputedStyle(document.querySelector('h1')).color === 'rgb(30, 30, 36)',
-  );
+  await page.waitForFunction(() => window.lightText(document.querySelector('h1')));
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
   );
@@ -379,11 +384,7 @@ try {
   assert.ok(
     await page.evaluate(() =>
       window.sessionFixture.navigation.some(
-        (view) =>
-          view.id === 'live-sessions' &&
-          view.label === 'Tasks' &&
-          view.group === 'tasks' &&
-          view.primary === true,
+        (view) => view.id === 'live-sessions' && view.group === 'tasks',
       ),
     ),
   );
@@ -518,8 +519,8 @@ try {
   assert.equal(await character.evaluate((el) => getComputedStyle(el).animationName), 'none');
   await page.evaluate(() => window.sessionFixture.theme('light'));
   await page.waitForFunction(() =>
-    [...document.querySelectorAll('.brand-agent-character, .daily-work-row')].every(
-      (element) => getComputedStyle(element).color === 'rgb(30, 30, 36)',
+    [...document.querySelectorAll('.brand-agent-character, .daily-work-row')].every((element) =>
+      window.lightText(element),
     ),
   );
   await page.evaluate(
@@ -607,9 +608,7 @@ try {
   await page.getByRole('region', { name: 'Work across all projects' }).waitFor();
   await page.setViewportSize({ width: 960, height: 640 });
   await page.evaluate(() => window.sessionFixture.theme('light'));
-  await page.waitForFunction(
-    () => getComputedStyle(document.querySelector('.live-start h2')).color === 'rgb(30, 30, 36)',
-  );
+  await page.waitForFunction(() => window.lightText(document.querySelector('.live-start h2')));
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
   );

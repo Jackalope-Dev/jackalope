@@ -1,4 +1,18 @@
 @layer theme, base, components, utilities;
+/* Shared corner radii. Controls use sm, rows and segments md, cards lg, panels xl,
+   page-level surfaces 2xl. */
+@layer theme {
+  :root {
+    --radius-xs: 6px;
+    --radius-sm: 8px;
+    --radius-md: 10px;
+    --radius-lg: 12px;
+    --radius-xl: 14px;
+    --radius-2xl: 18px;
+    --radius-3xl: 24px;
+    --radius-full: 999px;
+  }
+}
 @layer components {
   .ui-sr-only {
     position: absolute;

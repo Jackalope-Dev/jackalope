@@ -1,5 +1,46 @@
 [
   {
+    "id": "a-cleaner-more-consistent-workspace",
+    "date": "2026-10-08",
+    "status": "In development",
+    "title": "A cleaner, more consistent workspace.",
+    "description": "Pages, tabs and controls now share one look across the app, with smoother motion.",
+    "items": [
+      "Peer views such as Agents, MCP connections and Project tabs switch with one segmented control, and the selection slides between choices.",
+      "Dialogs, menus and dropdowns ease in and out, and pages settle into place as they open.",
+      "The workspace sidebar is its own rounded panel, and the branch beside the project name is a clear, clickable chip.",
+      "Project overview shows readiness as one list with a single fix for each item, and long-running tasks show hours and days instead of thousands of minutes.",
+      "Bot lists, template cards and agent options keep even sizes and alignment, and long model lists scroll inside the agent picker."
+    ]
+  },
+  {
+    "id": "bots-remember-and-keep-their-conversations-together",
+    "date": "2026-10-07",
+    "status": "In development",
+    "title": "Bots remember and keep their conversations together.",
+    "description": "Messages to a bot continue its latest conversation, and bots carry what they learn into new ones.",
+    "items": [
+      "Messaging a bot continues its latest open conversation, with a choice to start a new one.",
+      "Bots save short notes for later conversations and recall how recent ones ended; you can review and remove notes on the Bots page.",
+      "Edits to a bot's name and instructions reach its open conversations.",
+      "Bot conversations always open on the Bots page, which shows when a bot is working and which replies you have not read.",
+      "Bots can search and reread their own earlier conversations before guessing about past work.",
+      "Bots running on Grok Build, Antigravity and Gemini CLI can now message other bots, show cards and keep notes too."
+    ]
+  },
+  {
+    "id": "agents-start-sooner-and-keep-their-own-playbook",
+    "date": "2026-10-06",
+    "status": "In development",
+    "title": "Agents start sooner and keep their own playbook.",
+    "description": "Jackalope now gives agents the facts and rules of your workspace and lets each agent's own tooling decide how to work.",
+    "items": [
+      "Automatic tasks choose an agent while the workspace is still being prepared.",
+      "Agents receive a shorter set of instructions focused on your workspace, permissions and review.",
+      "Claude Code and Codex receive Jackalope's rules as system instructions, keeping the first message about your task."
+    ]
+  },
+  {
     "id": "bots-that-work-on-their-own",
     "date": "2026-10-05",
     "status": "In development",

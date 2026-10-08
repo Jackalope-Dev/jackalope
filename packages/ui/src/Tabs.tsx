@@ -1,6 +1,8 @@
 import * as Primitive from '@radix-ui/react-tabs';
 import { type ComponentPropsWithoutRef, type ComponentRef, forwardRef } from 'react';
+import { useSegmentIndicator } from './useSegmentIndicator';
 import { cn } from './utils';
+import './segmented.css';
 import './tabs.css';
 export const Root = forwardRef<
   ComponentRef<typeof Primitive.Root>,
@@ -9,12 +11,32 @@ export const Root = forwardRef<
   <Primitive.Root ref={ref} {...props} className={cn('ui-tabs', className)} />
 ));
 Root.displayName = 'Root';
-export const List = forwardRef<
+const SegmentedList = forwardRef<
   ComponentRef<typeof Primitive.List>,
   ComponentPropsWithoutRef<typeof Primitive.List>
->(({ className, ...props }, ref) => (
-  <Primitive.List ref={ref} {...props} className={cn('ui-tabs-list', className)} />
-));
+>(({ className, children, ...props }, ref) => {
+  const track = useSegmentIndicator<ComponentRef<typeof Primitive.List>>(ref);
+  return (
+    <Primitive.List ref={track} {...props} className={cn('ui-segmented', className)}>
+      <span className="ui-segmented-indicator" aria-hidden="true" />
+      {children}
+    </Primitive.List>
+  );
+});
+SegmentedList.displayName = 'SegmentedList';
+export const List = forwardRef<
+  ComponentRef<typeof Primitive.List>,
+  ComponentPropsWithoutRef<typeof Primitive.List> & {
+    /** `segmented` draws the list as the shared segmented track used by view navigation. */
+    appearance?: 'default' | 'segmented';
+  }
+>(({ className, appearance = 'default', ...props }, ref) =>
+  appearance === 'segmented' ? (
+    <SegmentedList ref={ref} {...props} className={className} />
+  ) : (
+    <Primitive.List ref={ref} {...props} className={cn('ui-tabs-list', className)} />
+  ),
+);
 List.displayName = 'List';
 export const Trigger = forwardRef<
   ComponentRef<typeof Primitive.Trigger>,

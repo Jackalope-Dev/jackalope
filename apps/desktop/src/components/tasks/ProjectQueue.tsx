@@ -1,4 +1,4 @@
-import { Badge, Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Badge, Disclosure, DisclosureSummary, SegmentedNav } from '@jackalope/ui';
 import {
   ArrowLeft,
   ArrowRight,
@@ -214,20 +214,21 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
           );
         },
       )}
-      <nav className="queue-tabs" aria-label="Feature work views">
-        <button aria-pressed={tab === 'plan'} type="button" onClick={() => setTab('plan')}>
-          Plan & progress
-        </button>
-        <button aria-pressed={tab === 'graph'} type="button" onClick={() => setTab('graph')}>
-          Execution graph
-        </button>
-        <button aria-pressed={tab === 'review'} type="button" onClick={() => setTab('review')}>
-          Review & merge
-          {items.filter((i) => state(i) === 'review').length > 0 && (
-            <span>{items.filter((i) => state(i) === 'review').length}</span>
-          )}
-        </button>
-      </nav>
+      <SegmentedNav
+        className="queue-tabs"
+        label="Feature work views"
+        value={tab}
+        onChange={setTab}
+        items={[
+          { id: 'plan', label: 'Plan & progress' },
+          { id: 'graph', label: 'Execution graph' },
+          {
+            id: 'review',
+            label: 'Review & merge',
+            count: items.filter((i) => state(i) === 'review').length || undefined,
+          },
+        ]}
+      />
       {!desktop && (
         <InlineNotice>
           Open the desktop app to coordinate agents and review real changes.

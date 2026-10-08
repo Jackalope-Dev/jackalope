@@ -21,25 +21,34 @@ import { BotAppearancePicker } from './BotAppearancePicker';
 import { BotWakes } from './BotWakes';
 
 const STEPS = [
-  { id: 'look', title: 'Name and look', description: 'Give your bot a name and a face.' },
+  {
+    id: 'look',
+    title: 'Name and look',
+    short: 'Look',
+    description: 'Give your bot a name and a face.',
+  },
   {
     id: 'work',
     title: 'Project and agent',
+    short: 'Agent',
     description: 'Choose where it works and who does the work.',
   },
   {
     id: 'brief',
     title: 'Role and instructions',
+    short: 'Role',
     description: 'Tell it what it is for and how to behave.',
   },
   {
     id: 'apps',
     title: 'Apps and tools',
+    short: 'Tools',
     description: 'Choose which connections its conversations can use.',
   },
   {
     id: 'wakes',
     title: 'Wake-ups and teamwork',
+    short: 'Wake-ups',
     description: 'Choose what wakes it on its own and whether it works with other bots.',
   },
 ] as const;
@@ -137,7 +146,9 @@ export function BotEditor({
                   <span className="bot-editor-step-mark" aria-hidden="true">
                     {index < step ? <Check size={12} strokeWidth={3} /> : index + 1}
                   </span>
-                  <span className="bot-editor-step-title">{item.title}</span>
+                  <span className="bot-editor-step-title" title={item.title}>
+                    {item.short}
+                  </span>
                 </button>
               </li>
             ))}

@@ -21,6 +21,7 @@ import { useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
+import { Tooltip } from '../ui/Tooltip';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
@@ -256,18 +257,20 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
   );
   return (
     <WorkspacePage ref={pageRef} className="managed-task workspace-stack">
-      <Button
-        className="self-start"
-        variant="outline"
-        onClick={() => {
-          select(null);
-          onBack();
-        }}
-      >
-        <ArrowLeft size={15} />
-        All tasks
-      </Button>
       <div className="managed-task-heading">
+        <Tooltip content="All tasks">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="All tasks"
+            onClick={() => {
+              select(null);
+              onBack();
+            }}
+          >
+            <ArrowLeft size={18} aria-hidden="true" />
+          </Button>
+        </Tooltip>
         <ManagedTaskAgent provider={lead?.agent ?? task.request.agent} run={lead} />
         <WorkspaceHeading
           titleRef={titleRef}
