@@ -12,6 +12,15 @@
 }
 
 @theme {
+  /* Same scale as @jackalope/ui so Tailwind rounded-* utilities match component CSS. */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
+  --radius-3xl: 24px;
+  --radius-full: 999px;
   --font-sans: "Plus Jakarta Sans Variable", "Segoe UI", system-ui, sans-serif;
   --font-display: "Bricolage Grotesque Variable", var(--font-sans);
   --font-mono: "JetBrains Mono Variable", "Cascadia Code", Consolas, monospace;

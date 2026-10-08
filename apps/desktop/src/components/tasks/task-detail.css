@@ -44,6 +44,14 @@
   align-items: center;
   min-height: 24px;
 }
+/* The state leads; agent and account follow as quieter metadata. */
+.task-progress-status .ui-badge {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.task-progress-identity .task-muted {
+  font-size: var(--text-sm);
+}
 .task-progress-action {
   margin-left: auto;
 }
@@ -98,12 +106,6 @@
   white-space: nowrap;
   min-width: 0;
 }
-/* Task sections use the standard workspace tab row: full-width divider, pill selection. */
-.task-detail .result-tabs {
-  gap: 4px;
-  padding: 0;
-  border: 0;
-}
 .task-detail .result-canvas {
   padding-block: 16px;
 }
@@ -121,10 +123,6 @@
   gap: 8px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--color-border);
-}
-.task-view-controls .result-tabs {
-  min-width: 0;
-  margin-bottom: 0;
 }
 .task-view-controls .conversation-toggle {
   align-self: center;
@@ -294,9 +292,6 @@
   min-height: 220px;
   overflow: hidden;
 }
-.task-working-area .result-tabs {
-  flex: none;
-}
 .task-working-area .result-canvas {
   flex: 1;
   min-height: 0;
@@ -361,6 +356,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
+  /* Stays at the end of the row, even when it wraps beneath the tabs. */
+  margin-left: auto;
 }
 .task-view-tools > .work-toolbar {
   margin: 0;

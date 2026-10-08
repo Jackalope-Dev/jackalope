@@ -277,7 +277,9 @@ export function BotsWorkspace() {
                         {bot.name}
                         {bot.pinned && <Pin size={12} aria-label="Pinned" />}
                       </strong>
-                      <small>{latest?.title ?? (bot.role || 'No conversations yet')}</small>
+                      <small title={latest?.title ?? bot.role}>
+                        {latest?.title ?? (bot.role || 'No conversations yet')}
+                      </small>
                     </span>
                     {waiting > 0 ? (
                       <small className="bots-roster-count" aria-hidden="true">
@@ -301,6 +303,7 @@ export function BotsWorkspace() {
               disabled={!projects.length}
               onClick={() => setPickingTemplate(true)}
             >
+              <Plus size={14} aria-hidden="true" />
               Create from template
             </button>
           </nav>
@@ -410,15 +413,20 @@ function BotTemplates({
       {heading && <WorkspaceSectionHeading title="Start from a template" />}
       <ul className="bots-templates">
         {BOT_TEMPLATES.map((template) => (
-          <li key={template.id} className="bots-template">
-            <BotAvatar appearance={template.appearance} />
-            <div>
-              <strong>{template.name}</strong>
-              <p>{template.role}</p>
-            </div>
-            <Button variant="outline" disabled={disabled} onClick={() => onUse(template)}>
-              Use template
-            </Button>
+          <li key={template.id}>
+            <button
+              type="button"
+              className="bots-template"
+              disabled={disabled}
+              onClick={() => onUse(template)}
+            >
+              <BotAvatar appearance={template.appearance} />
+              <span>
+                <strong>{template.name}</strong>
+                <span className="bots-template-role">{template.role}</span>
+              </span>
+              <Plus size={16} aria-hidden="true" className="bots-template-add" />
+            </button>
           </li>
         ))}
       </ul>

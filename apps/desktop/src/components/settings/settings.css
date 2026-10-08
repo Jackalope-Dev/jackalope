@@ -5,40 +5,6 @@
   max-width: 340px;
 }
 
-/* Top Header Bar */
-
-.settings-scope-switcher {
-  display: inline-flex;
-  align-items: center;
-  background: var(--color-surface-sunken);
-  padding: 3px;
-  border-radius: 10px;
-  border: 1px solid var(--color-border-subtle);
-}
-
-.settings-scope-pill {
-  padding: 6px 14px;
-  border-radius: 8px;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  transition:
-    background-color 140ms ease,
-    color 140ms ease;
-  cursor: pointer;
-}
-
-.settings-scope-pill:hover {
-  color: var(--color-text-primary);
-}
-
-.settings-scope-pill.is-active {
-  background: var(--color-surface-elevated);
-  color: var(--color-text-primary);
-  font-weight: 600;
-  box-shadow: var(--shadow-selection);
-}
-
 /* Main Body Layout: Sidebar + Canvas */
 .settings-body {
   display: flex;
@@ -425,6 +391,13 @@
     padding: 2px 4px 40px 2px;
     scrollbar-gutter: stable;
   }
+  /* Reserve the same scrollbar gutter as the settings column so the header search
+     ends where the cards do. */
+  .settings-page > .workspace-heading {
+    overflow: hidden;
+    scrollbar-gutter: stable;
+    padding: 2px 4px 2px 2px;
+  }
 }
 @media (max-width: 800px) {
   .settings-page .settings-body {
@@ -455,9 +428,6 @@
   align-items: center;
   gap: 12px 20px;
   padding: 8px 0 24px;
-}
-.settings-scope-pill {
-  min-height: 44px;
 }
 .settings-scope-bar p {
   flex-basis: 100%;
@@ -591,7 +561,6 @@
   max-width: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .settings-scope-pill,
   .settings-nav-item {
     transition: none;
   }

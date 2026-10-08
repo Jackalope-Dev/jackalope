@@ -8,8 +8,27 @@
   height: 60px;
   flex-shrink: 0;
 }
+/* The project name gets hover feedback sized like the branch chip beside it, inside its
+   44px target. A tint of the text colour shows on the shell in both themes. */
 .workspace-shell .workspace-chrome .project-switcher {
+  position: relative;
+  isolation: isolate;
   min-width: 0;
+  padding: 0 8px;
+  margin-left: -8px;
+  background: transparent;
+}
+.workspace-shell .workspace-chrome .project-switcher::before {
+  content: "";
+  position: absolute;
+  inset: 6px 0;
+  z-index: -1;
+  border-radius: var(--radius-sm);
+  transition: background-color 120ms ease;
+}
+.workspace-shell .workspace-chrome .project-switcher:hover::before,
+.workspace-shell .workspace-chrome .project-switcher[data-state="open"]::before {
+  background: color-mix(in srgb, var(--color-text-primary) 7%, transparent);
 }
 .workspace-shell .workspace-chrome > div:last-child {
   flex-shrink: 0;
@@ -22,12 +41,22 @@
   justify-content: flex-start;
   gap: 4px;
   padding: 8px 0;
+  overflow-x: hidden;
   overflow-y: auto;
   flex-shrink: 0;
+  transition: width 160ms ease;
 }
 .workspace-shell .workspace-navigation > nav {
   flex-direction: column;
   align-items: stretch;
+}
+/* The vertical navigation is its own rounded panel, matching the content card's radius
+   and height. Oversee keeps its horizontal bar on the shell. */
+.workspace-shell:not([data-mode="oversee"]) .workspace-navigation {
+  padding: 8px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 18px;
+  background: var(--color-navigation);
 }
 .workspace-shell .workspace-navigation .workspace-nav-item {
   text-align: left;
@@ -214,6 +243,22 @@
   width: 44px;
   height: 44px;
 }
+/* The status bar mascot draws smaller than its 44px target so it sits with the bar's text. */
+.companion-inline .companion-avatar > button {
+  display: grid;
+  place-items: center;
+}
+.companion-inline .companion-avatar > button > svg {
+  width: 32px;
+  height: 32px;
+}
+.companion-inline .companion-badge {
+  top: 2px;
+  right: -2px;
+  width: 18px;
+  height: 18px;
+  font-size: 0.6875rem;
+}
 @media (max-width: 1000px) {
   .workspace-shell .workspace-navigation {
     width: 180px;
@@ -251,10 +296,6 @@
 .app-titlebar-mac .app-titlebar-left {
   min-width: 78px;
 }
-.workspace-shell .workspace-navigation {
-  overflow-x: hidden;
-  transition: width 160ms ease;
-}
 .workspace-shell .workspace-nav-toggle {
   align-self: flex-start;
   width: auto;
@@ -262,7 +303,7 @@
   color: var(--color-text-muted);
 }
 .workspace-shell .workspace-navigation[data-collapsed] {
-  width: 52px;
+  width: 60px;
   align-items: center;
 }
 .workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-toggle {
@@ -319,24 +360,48 @@
 .workspace-statusbar .statusbar-changes:hover {
   color: var(--color-accent-ink);
 }
+/* The branch is a bordered chip beside the project name so it reads as a control and
+   its lowercase monospace label centres in a box rather than on the project's cap height.
+   The button keeps its 44px target; ::before draws the smaller chip inside it. */
 .chrome-branch {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  max-width: 220px;
-  padding: 4px 10px;
+  max-width: 240px;
+  padding: 0 8px 0 10px;
   border: 0;
-  border-radius: 999px;
   /* The header spaces items 16px apart; the branch belongs with the project. */
-  margin-left: -10px;
+  margin-left: -8px;
+  background: transparent;
   color: var(--color-text-secondary);
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: var(--text-xs);
+  line-height: 1;
   cursor: pointer;
+  transition: color 120ms ease;
+}
+.chrome-branch::before {
+  content: "";
+  position: absolute;
+  inset: 7px 0;
+  z-index: -1;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
   transition:
     background-color 120ms ease,
-    color 120ms ease;
+    border-color 120ms ease;
+}
+.chrome-branch-chevron {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  transition: rotate 160ms ease;
+}
+.chrome-branch[data-state="open"] .chrome-branch-chevron {
+  rotate: 180deg;
 }
 .chrome-branch > .chrome-branch-name {
   overflow: hidden;
@@ -345,12 +410,19 @@
 }
 .chrome-branch:hover,
 .chrome-branch[data-state="open"] {
-  background: color-mix(in srgb, var(--color-accent-ink) 18%, transparent);
-  color: var(--color-accent-ink);
+  color: var(--color-text-primary);
+}
+.chrome-branch:hover::before,
+.chrome-branch[data-state="open"]::before {
+  border-color: var(--color-border);
+  background: var(--color-surface-hover);
 }
 .chrome-branch:focus-visible {
-  outline: 2px solid var(--color-accent-ink);
-  outline-offset: 1px;
+  outline: none;
+}
+.chrome-branch:focus-visible::before {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
 }
 
 .whats-new-body {

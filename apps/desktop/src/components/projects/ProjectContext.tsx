@@ -10,7 +10,7 @@ export function ProjectContext() {
   );
   return (
     <WorkspacePage className="project-context-page">
-      <WorkspaceHeading title="Project context" description={project?.name} />
+      <WorkspaceHeading title="Project context" />
       {project ? (
         <>
           <CodebaseMemoryBar project={project} />

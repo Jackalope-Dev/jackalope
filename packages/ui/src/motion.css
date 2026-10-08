@@ -1,0 +1,115 @@
+@import "./foundation.css";
+/* Shared motion. Durations stay short and there are no delays or loops: motion explains an
+   appearing surface or a changed selection, then gets out of the way. Animations use the
+   individual `scale` and `translate` properties so they compose with any centring
+   `transform` a surface already has. Reduced motion removes them. */
+@layer components {
+  :root {
+    --motion-fast: 120ms;
+    --motion-base: 180ms;
+    --motion-slow: 240ms;
+    --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  }
+  @keyframes ui-fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes ui-fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes ui-pop-in {
+    from {
+      opacity: 0;
+      scale: 0.97;
+      translate: 0 6px;
+    }
+  }
+  @keyframes ui-pop-out {
+    to {
+      opacity: 0;
+      scale: 0.98;
+    }
+  }
+  @keyframes ui-drop-in {
+    from {
+      opacity: 0;
+      scale: 0.97;
+      translate: 0 var(--ui-drop-offset, -4px);
+    }
+  }
+  @keyframes ui-rise-in {
+    from {
+      opacity: 0;
+      translate: 0 6px;
+    }
+  }
+
+  /* Dialogs and their backdrops. */
+  :is(.ui-dialog-overlay, .task-dialog-overlay)[data-state="open"] {
+    animation: ui-fade-in var(--motion-base) var(--ease-out);
+  }
+  :is(.ui-dialog-overlay, .task-dialog-overlay)[data-state="closed"] {
+    animation: ui-fade-out var(--motion-fast) var(--ease-in) forwards;
+  }
+  :is(.ui-dialog, .task-dialog)[data-state="open"] {
+    animation: ui-pop-in var(--motion-slow) var(--ease-out);
+  }
+  :is(.ui-dialog, .task-dialog)[data-state="closed"] {
+    animation: ui-pop-out var(--motion-fast) var(--ease-in) forwards;
+  }
+
+  /* Menus, popovers, selects and tooltips grow from their trigger. */
+  :is(.ui-menu, .ui-popover, .ui-tooltip, .themed-select-menu, .workspace-menu) {
+    transform-origin: var(--radix-popper-transform-origin, top center);
+  }
+  :is(.ui-menu, .ui-popover, .ui-tooltip, .themed-select-menu, .workspace-menu):is(
+    [data-state="open"],
+    [data-state="delayed-open"],
+    [data-state="instant-open"]
+  ) {
+    animation: ui-drop-in var(--motion-base) var(--ease-out);
+  }
+  :is(.ui-menu, .ui-popover, .ui-tooltip, .themed-select-menu, .workspace-menu)[data-side="top"] {
+    --ui-drop-offset: 4px;
+  }
+  :is(.ui-menu, .ui-popover, .ui-tooltip, .themed-select-menu, .workspace-menu)[data-side="left"] {
+    --ui-drop-offset: 0px;
+  }
+  :is(
+    .ui-menu,
+    .ui-popover,
+    .ui-tooltip,
+    .themed-select-menu,
+    .workspace-menu
+  )[data-state="closed"] {
+    animation: ui-fade-out var(--motion-fast) var(--ease-in) forwards;
+  }
+
+  /* A newly shown tab panel and newly raised notices settle into place. */
+  .ui-tabs-content[data-state="active"],
+  .inline-notice {
+    animation: ui-rise-in var(--motion-base) var(--ease-out);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :is(
+        .ui-dialog-overlay,
+        .task-dialog-overlay,
+        .ui-dialog,
+        .task-dialog,
+        .ui-menu,
+        .ui-popover,
+        .ui-tooltip,
+        .themed-select-menu,
+        .workspace-menu,
+        .ui-tabs-content,
+        .inline-notice
+      ) {
+      animation: none;
+    }
+  }
+}

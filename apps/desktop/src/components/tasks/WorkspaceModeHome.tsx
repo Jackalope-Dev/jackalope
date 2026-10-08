@@ -129,11 +129,7 @@ export function WorkspaceModeHome({
         <div className="mode-section-heading">
           <div>
             <h2>{attention.length ? 'Next decisions' : 'Nothing waiting on you'}</h2>
-            <p>
-              {attention.length
-                ? 'Questions and blockers first, then the oldest reviews.'
-                : 'New questions, blockers and reviews will appear here.'}
-            </p>
+            {!attention.length && <p>New questions, blockers and reviews will appear here.</p>}
           </div>
           {!!attention.length && (
             <Button variant="outline" onClick={() => onOpen(attention[0])}>

@@ -290,12 +290,20 @@ export const canRetry = (run: TaskRun) => ['failed', 'stopped', 'interrupted'].i
 export async function retryTask(id: string): Promise<string> {
   return nativeTask<string>('task_retry', { id });
 }
-/** How long the current step has been running, as a compact `2m 14s`. */
-export function elapsedLabel(since: string, now: number = Date.now()): string {
-  const seconds = Math.max(0, Math.round((now - Date.parse(since)) / 1000));
+/** A duration as its two largest units: `45s`, `2m 14s`, `3h 05m`, `2d 4h`. */
+export function durationLabel(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.round(totalSeconds));
   if (!Number.isFinite(seconds)) return '';
   const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days) return `${days}d ${hours % 24}h`;
+  if (hours) return `${hours}h ${String(minutes % 60).padStart(2, '0')}m`;
   return minutes ? `${minutes}m ${seconds % 60}s` : `${seconds}s`;
+}
+/** How long the current step has been running, as a compact `2m 14s`. */
+export function elapsedLabel(since: string, now: number = Date.now()): string {
+  return durationLabel((now - Date.parse(since)) / 1000);
 }
 export const statusLabel: Record<TaskRun['status'], string> = {
   starting: 'Preparing workspace',

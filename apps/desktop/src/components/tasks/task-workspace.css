@@ -270,18 +270,23 @@ select option {
   padding: 5px;
   color: var(--color-text-secondary);
 }
+/* Matches the shared form-control field. */
 .task-input {
-  background: var(--color-surface-sunken);
+  background: var(--color-surface-elevated);
   border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 10px 12px;
   font-size: var(--text-sm);
 }
-.task-input:focus {
-  outline: 1px solid var(--color-accent);
+.task-input:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -1px;
+}
+.workspace-toolbar.usage-filters > .form-field {
+  flex-basis: 128px;
 }
 .usage-filters .themed-select {
-  max-width: 220px;
+  width: 100%;
 }
 .usage-filters select {
   background: var(--color-surface-elevated);

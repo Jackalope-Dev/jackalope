@@ -29,23 +29,23 @@
 }
 
 .feature-graph-node.node-active {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 1px #3b82f6;
+  border-color: var(--color-accent-ink);
+  box-shadow: 0 0 0 1px var(--color-accent-ink);
 }
 
 .feature-graph-node.node-review {
-  border-color: #a855f7;
-  box-shadow: 0 0 0 1px #a855f7;
+  border-color: var(--color-warning);
+  box-shadow: 0 0 0 1px var(--color-warning);
 }
 
 .feature-graph-node.node-merged {
-  border-color: #10b981;
+  border-color: var(--color-success);
   opacity: 0.92;
 }
 
 .feature-graph-node.node-attention {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 1px #ef4444;
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 1px var(--color-danger);
 }
 
 .feature-graph-node-title {
@@ -65,12 +65,8 @@
   font-size: 11px;
 }
 
+/* Graph nodes are small; their status badge tightens the shared Badge spacing. */
 .feature-graph-badge {
-  display: inline-flex;
-  align-items: center;
   gap: 3px;
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-weight: 500;
+  padding-block: 1px;
 }

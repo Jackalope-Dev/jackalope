@@ -28,6 +28,7 @@ import {
   Popover,
   SectionHeader,
   SegmentedControl,
+  SegmentedNav,
   Select,
   SelectItem,
   Stat,
@@ -47,6 +48,7 @@ function Gallery() {
   const [enabled, setEnabled] = useState(true);
   const [choice, setChoice] = useState('weekly');
   const [filter, setFilter] = useState('all');
+  const [view, setView] = useState('agents');
   const [menuNotice, setMenuNotice] = useState('');
   const [menuChecked, setMenuChecked] = useState(false);
   const [submitted, setSubmitted] = useState('');
@@ -332,6 +334,16 @@ function Gallery() {
           ]}
         />
         <output aria-label="Selected filter">Showing {filter}</output>
+        <SegmentedNav
+          label="Agent views"
+          value={view}
+          onChange={setView}
+          items={[
+            { id: 'agents', label: 'Agents' },
+            { id: 'connections', label: 'Connections', count: 4 },
+            { id: 'usage', label: 'Usage' },
+          ]}
+        />
       </section>
       <section className="gallery-section" id="feedback" aria-labelledby="feedback-title">
         <SectionHeader

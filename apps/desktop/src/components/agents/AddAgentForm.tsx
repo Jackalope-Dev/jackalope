@@ -4,13 +4,14 @@ import { type BuiltinAgentId, builtinAgents } from '../../lib/agent-catalog';
 import { type AgentProbeResult, probeExecutable } from '../../lib/agent-profiles';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { Button } from '../ui/button';
+import { DialogFooter } from '../ui/Dialog';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import './agent-manager.css';
 
 type AdapterChoice = BuiltinAgentId | 'acp';
 
-export function AddAgentForm({ onAdded }: { onAdded: () => void }) {
+export function AddAgentForm({ onAdded, onCancel }: { onAdded: () => void; onCancel: () => void }) {
   const adapterId = useId();
   const [name, setName] = useState('');
   const [path, setPath] = useState('');
@@ -119,10 +120,15 @@ export function AddAgentForm({ onAdded }: { onAdded: () => void }) {
                   : probe.error || 'File not found'}
           </InlineNotice>
         )}
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
         <Button type="button" onClick={add} disabled={!name.trim() || !path.trim()}>
           Add agent
         </Button>
-      </div>
+      </DialogFooter>
     </div>
   );
 }

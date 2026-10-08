@@ -36,7 +36,7 @@
   padding: 10px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--radius-lg);
 }
 
 .agent-switcher-group[data-group="other"] {
@@ -63,7 +63,7 @@
   gap: 6px;
   min-height: 44px;
   padding: 6px 10px;
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   background: transparent;
   color: var(--color-text-secondary);
@@ -114,7 +114,7 @@
   align-items: center;
   text-align: center;
   padding: 36px 24px 28px;
-  border-radius: var(--radius-lg, 20px);
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.04));
@@ -210,31 +210,32 @@
   align-items: center;
   gap: 5px;
   padding: 2px 8px;
-  border-radius: var(--radius-full, 9999px);
+  border-radius: var(--radius-full);
   font-size: var(--text-xs, 0.75rem);
   font-weight: 500;
 }
 
+/* Status tones come from theme tokens so the badges keep contrast in dark themes. */
 .agent-hero-badge-default {
-  background: var(--color-accent-subtle, rgba(234, 179, 8, 0.12));
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
   color: var(--color-warning);
   border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
 }
 
 .agent-hero-badge-ready {
-  background: rgba(34, 197, 94, 0.1);
-  color: #15803d;
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: var(--color-success);
+  border: 1px solid color-mix(in srgb, var(--color-success) 30%, transparent);
 }
 
 .agent-hero-badge-installed {
-  background: rgba(59, 130, 246, 0.1);
-  color: #1d4ed8;
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+  border: 1px solid color-mix(in srgb, var(--color-accent-ink) 30%, transparent);
 }
 
 .agent-hero-badge-unavailable {
-  background: rgba(148, 163, 184, 0.12);
+  background: var(--color-surface-sunken);
   color: var(--color-text-muted);
   border: 1px solid var(--color-border);
 }
@@ -294,7 +295,7 @@
 }
 
 .agent-settings-card {
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   overflow: hidden;
@@ -314,7 +315,7 @@
   justify-content: center;
   width: 36px;
   height: 36px;
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md);
   background: var(--color-surface-sunken);
   color: var(--color-text-secondary);
   flex-shrink: 0;

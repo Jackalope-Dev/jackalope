@@ -273,7 +273,7 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
       <WorkspaceHeading
         title="Codebase"
         action={
-          <div className="flex gap-2">
+          <div className="workspace-actions">
             {snapshot && (
               <Button variant="ghost" onClick={download}>
                 <Download size={16} />

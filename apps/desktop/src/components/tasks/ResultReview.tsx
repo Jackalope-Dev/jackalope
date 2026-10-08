@@ -92,10 +92,10 @@ export function ResultReview({
         }}
       >
         <div className="review-header">
-          <Tabs.List aria-label="Review sections" className="review-sections">
+          <Tabs.List aria-label="Review sections">
             <Tabs.Trigger value="changes">
               <FileDiff size={16} aria-hidden="true" /> Changes
-              {review ? <span className="review-section-count">{review.files.length}</span> : null}
+              {review ? <span className="ui-segment-count">{review.files.length}</span> : null}
             </Tabs.Trigger>
             {hasChecks && (
               <Tabs.Trigger value="checks">

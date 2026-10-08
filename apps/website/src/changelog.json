@@ -1,5 +1,19 @@
 [
   {
+    "id": "a-cleaner-more-consistent-workspace",
+    "date": "2026-10-08",
+    "status": "In development",
+    "title": "A cleaner, more consistent workspace.",
+    "description": "Pages, tabs and controls now share one look across the app, with smoother motion.",
+    "items": [
+      "Peer views such as Agents, MCP connections and Project tabs switch with one segmented control, and the selection slides between choices.",
+      "Dialogs, menus and dropdowns ease in and out, and pages settle into place as they open.",
+      "The workspace sidebar is its own rounded panel, and the branch beside the project name is a clear, clickable chip.",
+      "Project overview shows readiness as one list with a single fix for each item, and long-running tasks show hours and days instead of thousands of minutes.",
+      "Bot lists, template cards and agent options keep even sizes and alignment, and long model lists scroll inside the agent picker."
+    ]
+  },
+  {
     "id": "bots-remember-and-keep-their-conversations-together",
     "date": "2026-10-07",
     "status": "In development",

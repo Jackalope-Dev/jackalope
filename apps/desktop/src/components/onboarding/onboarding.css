@@ -73,7 +73,8 @@
   min-width: 0;
   max-height: 100%;
   overflow: auto;
-  scrollbar-gutter: stable;
+  /* A reserved gutter would shorten the footer divider and skew the right padding. */
+  scrollbar-width: thin;
   padding: var(--onboarding-padding);
   border-radius: 24px;
   background: linear-gradient(160deg, var(--color-surface-elevated), var(--color-surface));
@@ -113,6 +114,9 @@
 .onboarding-content h2[data-step="theme"],
 .onboarding-content h2[data-step="project"] {
   margin-bottom: 20px;
+}
+.onboarding-content .inline-notice:not(:last-child) {
+  margin-bottom: 16px;
 }
 .onboarding-folder {
   display: flex;
@@ -531,11 +535,11 @@
   gap: 8px;
   margin-bottom: 20px;
 }
-.onboarding-project-storage .ui-segmented-control {
+.onboarding-project-storage .ui-segmented {
   display: flex;
   width: 100%;
 }
-.onboarding-project-storage .ui-segmented-control > button {
+.onboarding-project-storage .ui-segmented > button {
   flex: 1;
 }
 .onboarding-project-name {
