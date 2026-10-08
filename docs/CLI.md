@@ -55,8 +55,9 @@ a usable repository is left for Git to repair.
 
 The desktop app mirrors its project list to `preferences/projects.json` and merges it
 back on load, so a repository gets the same project id in the app and the
-terminal. A repository first used from a terminal is registered and then appears
-in the app.
+terminal. A repository first used from a terminal is registered with default
+settings and an open app window adds it immediately; otherwise it appears on the
+app's next launch.
 
 Conversations use the project's default task agent, or automatic routing when no
 project default is set. An explicit `/agent` choice applies to the next conversation. Several
@@ -80,7 +81,7 @@ always message text. Unknown or misplaced options are refused with exit status 6
 
 Inside a conversation, typing `/` opens an interactive command menu, and `/help`
 lists commands: `/new`, `/bg`, `/init`, `/sessions`, `/projects`, `/agents`, `/settings`,
-`/status`, `/agent`, `/model`, `/usage`, `/learn`, `/diff`, `/stop`, `/retry`, `/finish`, `/resume`, `/pause`,
+`/status`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/files`, `/review` (or `/diff`), `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
 `/unpause`, `/copy`, `/history`, `/kill`, `/clear`, `/open` and `/quit`. Pickers
 filter as you type. `/new <message>` starts
 and shows a conversation; `/bg <message>` starts one and stays on the current one.
@@ -91,7 +92,10 @@ the queue and `/unpause` sends it. `/clear` starts a fresh conversation like `/n
 `/resume` opens the conversation picker, and Ctrl+L clears notes and finished `!` output.
 `/model` picks from the models configured for the next conversation's agent, or
 `/model <name>` sets one directly. `/usage` (or `/cost`) lists account quota
-windows and resets. `/init` asks an agent to write or refresh `AGENTS.md`.
+windows and resets. `/theme <colour>` takes orange, red, pink, purple, blue,
+teal, green, yellow or any `#rrggbb` and sets the project's accent in every
+terminal and the app: a project with its own app theme changes alone, otherwise
+the app-wide accent changes. `/init` asks an agent to write or refresh `AGENTS.md`.
 
 A line starting with `!` runs in the user's shell (`cmd` on Windows) in the
 conversation's worktree, or the project when it has none. Output streams below the
@@ -104,11 +108,23 @@ is read in the background and again after 15 seconds, so new files appear.
 
 While a conversation is open, the header shows the small mark beside the project and
 branch, the conversation's routing, other open conversations (with any that need
-you) and agent readiness. The mark and status text animate only while work runs;
-`JACKALOPE_REDUCED_MOTION=1` keeps them still. Switches such as this one and
+you) and agent readiness. While work runs, a band of accent moves along the rule
+under the header and the status text shimmers; `JACKALOPE_REDUCED_MOTION=1` keeps
+them still. Below the conversation, running work lists its newest steps (tool calls
+and narration) as the host records them, and `jackalope -p` prints the same steps
+to standard error.
+
+The changes panel lists files the conversation's checkout changed since it left
+the project's checked-out commit, committed or not, including untracked files, with
+line counts and the selected file's diff. It opens by itself the first time work
+changes a file and stays hidden for that conversation once closed. Ctrl+O or
+`/files` toggles it and Alt+Up/Down (or Shift) selects a file. It sits beside the
+conversation from 100 columns and below it on narrower terminals; with no room the
+status line shows the count. A pending question stays pinned above the input;
+`/answer` reopens its options. Switches such as this one and
 `JACKALOPE_BELL` read `1`, `true`, `yes` or `on` as on and `0`, `false`, `no`
 or `off` as off. The status line shows elapsed time,
-queued messages, running commands and brief confirmations.
+a warning once running work has reported nothing new for 45 seconds, queued messages, running commands and brief confirmations.
 
 The input soft-wraps and grows to a third of the screen. Shift+Enter (where the
 terminal supports the keyboard protocol), Alt+Enter, Ctrl+J or a trailing `\` adds a

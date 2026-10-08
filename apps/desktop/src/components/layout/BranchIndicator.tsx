@@ -1,4 +1,4 @@
-import { Popover } from '@jackalope/ui';
+import { CopyButton, Popover } from '@jackalope/ui';
 import { ChevronDown, GitBranch } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { sessionWork } from '../../lib/live-session';
@@ -167,6 +167,20 @@ export function BranchIndicator() {
             </section>
           )}
           <div className="flex flex-wrap gap-2">
+            {run?.branch || (!run && !managed && project.gitBranch) ? (
+              <CopyButton
+                variant="outline"
+                text={run ? run.branch : project.gitBranch}
+                label="Copy branch"
+              />
+            ) : null}
+            {(run ? run.workspace : !managed && project.path) ? (
+              <CopyButton
+                variant="outline"
+                text={run ? run.workspace : project.path}
+                label="Copy path"
+              />
+            ) : null}
             {!managed && (
               <Popover.Close asChild>
                 <Button onClick={() => openChanges(checkout)}>Review changes</Button>

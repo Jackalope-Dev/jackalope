@@ -8,6 +8,7 @@ import { needsYou, useBotHubStore } from '../../lib/bot-hub';
 import { observeBots } from '../../lib/bot-hub-sync';
 import { captureDraftForProject } from '../../lib/capture-draft';
 import { openCliTerminal } from '../../lib/cli-terminal';
+import { helperTheme } from '../../lib/helper-actions';
 import type { LiveSession } from '../../lib/live-session';
 import { displayShortcut, matchesShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -22,8 +23,9 @@ import { useHostContextStore } from '../../stores/hostContextStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
-import { type Project, useProjectStore } from '../../stores/projectStore';
+import { mergeProjectRegistry, type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useThemeStore } from '../../stores/themeStore';
 import { observeWorkbenchPreferences, useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AccessNoticeSlot } from '../account/AccessBoundary';
@@ -298,6 +300,24 @@ export function Shell({
     if (owner) useProjectStore.getState().selectProject(owner.id);
     openChanges(path);
   });
+  useTauriEvent('jackalope:projects-registered', () => void mergeProjectRegistry());
+  // `/theme` in the terminal: a project with its own theme changes alone,
+  // otherwise the app-wide accent changes.
+  useTauriEvent<{ projectId: string; accent: string }>(
+    'jackalope:set-accent',
+    ({ projectId, accent }) => {
+      const projects = useProjectStore.getState();
+      const own = projects.projects.find((project) => project.id === projectId)?.preferences?.theme;
+      if (own) {
+        projects.updateProjectPreferences(projectId, {
+          theme: helperTheme(own, { scope: 'project', accent }),
+        });
+      } else {
+        const themes = useThemeStore.getState();
+        themes.setAppTheme(helperTheme(themes.appTheme, { scope: 'app', accent }));
+      }
+    },
+  );
   useTauriEvent<string>('jackalope-tray-open-task', (taskId) =>
     useWorkViewStore.getState().open(taskId),
   );

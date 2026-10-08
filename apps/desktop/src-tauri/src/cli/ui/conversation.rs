@@ -10,6 +10,9 @@ use crossterm::terminal::SetTitle;
 use std::io::Write;
 use std::time::Duration;
 
+/// Silence from running work worth pointing out in the status line.
+const QUIET_AFTER: Duration = Duration::from_secs(45);
+
 impl App {
     /// Whether an agent is working, so the status line animates.
     pub(super) fn working(&self) -> bool {
@@ -18,6 +21,16 @@ impl App {
                 && view.questions.is_empty()
                 && protocol::working(view.status.as_deref())
         })
+    }
+
+    /// How long running work has reported nothing new, once that is long
+    /// enough to mention.
+    pub(super) fn quiet(&self) -> Option<Duration> {
+        self.last_progress
+            .as_ref()
+            .filter(|_| self.working())
+            .map(|(_, at)| at.elapsed())
+            .filter(|quiet| *quiet >= QUIET_AFTER)
     }
 
     /// How long the current run has been working, as the terminal saw it.

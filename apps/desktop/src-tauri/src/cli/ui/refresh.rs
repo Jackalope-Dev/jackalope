@@ -15,6 +15,8 @@ use std::time::{Duration, Instant};
 
 /// How stale the branch shown may get before it is read again.
 const BRANCH_EVERY: Duration = Duration::from_secs(5);
+/// How stale the changed-file list may get while notifications keep coming.
+const CHANGES_EVERY: Duration = Duration::from_millis(1500);
 
 pub struct Request {
     /// `App::context` when asked, so a stale answer can be dropped.
@@ -35,6 +37,29 @@ pub struct Snapshot {
     lost: Option<String>,
     /// The host answered with an error about the conversation.
     problem: Option<String>,
+    /// Files the open conversation's checkout changed, when it has one.
+    changes: Option<Vec<git::FileChange>>,
+}
+
+/// The changed files last read, for which checkout and run state, and when.
+#[derive(Default)]
+pub struct ChangesCache {
+    read: Option<(String, Instant, Option<Vec<git::FileChange>>)>,
+}
+
+impl ChangesCache {
+    fn get(&mut self, key: &str, workspace: &str, project: &str) -> Option<Vec<git::FileChange>> {
+        match &self.read {
+            Some((seen, at, changes)) if seen == key && at.elapsed() < CHANGES_EVERY => {
+                changes.clone()
+            }
+            _ => {
+                let changes = git::changes(workspace, project);
+                self.read = Some((key.to_string(), Instant::now(), changes.clone()));
+                changes
+            }
+        }
+    }
 }
 
 /// The branch last read, and for which checkout and when.
@@ -63,12 +88,13 @@ pub fn spawn(handshake: Handshake, events: Sender<Event>) -> Sender<Request> {
     std::thread::spawn(move || {
         let mut connection = Connection::lazy(handshake);
         let mut branches = BranchCache::default();
+        let mut changes = ChangesCache::default();
         while let Ok(mut request) = requests.recv() {
             // Only the newest request matters.
             while let Ok(newer) = requests.try_recv() {
                 request = newer;
             }
-            let snapshot = fetch(&mut connection, &mut branches, request);
+            let snapshot = fetch(&mut connection, &mut branches, &mut changes, request);
             if events.send(Event::Snapshot(Box::new(snapshot))).is_err() {
                 return;
             }
@@ -80,6 +106,7 @@ pub fn spawn(handshake: Handshake, events: Sender<Event>) -> Sender<Request> {
 pub fn fetch(
     connection: &mut Connection,
     branches: &mut BranchCache,
+    changes: &mut ChangesCache,
     request: Request,
 ) -> Snapshot {
     let mut snapshot = Snapshot {
@@ -91,6 +118,7 @@ pub fn fetch(
         view: None,
         lost: None,
         problem: None,
+        changes: None,
     };
     let sessions = match connection.sessions() {
         Ok(sessions) => sessions,
@@ -113,7 +141,22 @@ pub fn fetch(
     snapshot.branch = Some(branches.get(&snapshot.project.path));
     if let Some(id) = &request.session {
         match connection.session(id) {
-            Ok(view) => snapshot.view = Some(view),
+            Ok(view) => {
+                let workspace = view
+                    .workspace
+                    .clone()
+                    .filter(|path| !path.is_empty() && std::path::Path::new(path).is_dir())
+                    .unwrap_or_else(|| snapshot.project.path.clone());
+                // A run's status is part of the key so the list is re-read
+                // once work settles, however recently it was read.
+                let key = format!("{workspace}\n{:?}", view.status);
+                snapshot.changes = Some(
+                    changes
+                        .get(&key, &workspace, &snapshot.project.path)
+                        .unwrap_or_default(),
+                );
+                snapshot.view = Some(view);
+            }
             Err(error) => snapshot.problem = Some(error),
         }
     }
@@ -139,7 +182,12 @@ impl App {
     /// Re-reads on this thread, for the first frame.
     pub(super) fn refresh_now(&mut self) {
         let request = self.refresh_request();
-        let snapshot = fetch(&mut self.connection, &mut BranchCache::default(), request);
+        let snapshot = fetch(
+            &mut self.connection,
+            &mut BranchCache::default(),
+            &mut ChangesCache::default(),
+            request,
+        );
         self.apply(snapshot);
     }
 
@@ -179,6 +227,9 @@ impl App {
         if let Some(view) = snapshot.view {
             self.set_view(Some(view));
         }
+        if let Some(changes) = snapshot.changes {
+            self.set_changes(changes);
+        }
         self.track_work();
         self.offer_question();
         if self.picker.as_ref().map(|picker| picker.kind) == Some(PickerKind::Sessions) {
@@ -204,6 +255,29 @@ impl App {
             }
             Some(_) => {}
             None => self.work_started = None,
+        }
+        let progress = self.view.as_ref().filter(|_| self.working()).map(|view| {
+            format!(
+                "{:?}|{:?}|{:?}|{}|{}|{:?}",
+                view.run_id,
+                view.step,
+                view.step_detail,
+                view.result.len(),
+                view.activity.len(),
+                view.activity.last(),
+            )
+        });
+        match progress {
+            Some(progress)
+                if self
+                    .last_progress
+                    .as_ref()
+                    .is_none_or(|(seen, _)| *seen != progress) =>
+            {
+                self.last_progress = Some((progress, Instant::now()));
+            }
+            Some(_) => {}
+            None => self.last_progress = None,
         }
     }
 

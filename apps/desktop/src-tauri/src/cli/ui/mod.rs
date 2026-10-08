@@ -11,6 +11,7 @@
 //! `App` holds the state; its behaviour is split by concern across the
 //! submodules, each adding an `impl App` block.
 
+mod changes;
 mod commands;
 mod conversation;
 mod editor;
@@ -143,6 +144,13 @@ struct App {
     flash: Option<(String, Tone, Instant)>,
     /// When the current run was first seen working, for its elapsed time.
     work_started: Option<(String, Instant)>,
+    /// What the running work last reported and when that changed, to tell
+    /// a long step from one that has gone quiet.
+    last_progress: Option<(String, Instant)>,
+    /// Files the open conversation changed, and a count of list updates.
+    changes: Vec<crate::git::FileChange>,
+    changes_version: u64,
+    panel: changes::Panel,
     selection: Option<Selection>,
     /// The last drawn screen while a selection is active, which it copies from.
     screen: Option<Buffer>,
@@ -213,6 +221,10 @@ pub fn run(
         shells: Vec::new(),
         flash: None,
         work_started: None,
+        last_progress: None,
+        changes: Vec::new(),
+        changes_version: 0,
+        panel: changes::Panel::default(),
         selection: None,
         screen: None,
         body_area: Cell::new(Rect::default()),
@@ -306,6 +318,8 @@ impl App {
         self.scroll_top = None;
         self.selection = None;
         self.work_started = None;
+        self.last_progress = None;
+        self.reset_panel();
         self.refresh();
     }
 

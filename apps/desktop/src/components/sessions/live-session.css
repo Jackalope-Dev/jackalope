@@ -176,6 +176,39 @@
   margin-bottom: 22px;
   overflow-wrap: anywhere;
 }
+/* The app is unselectable by default; conversation text is meant to be copied. */
+.live-transcript :is(.live-message > p, .live-reply > div) {
+  user-select: text;
+}
+.live-transcript :is(.live-author, .live-receipt, button) {
+  user-select: none;
+}
+/* Copy appears with the message under the pointer or keyboard focus. It sits
+   in the receipt row, or under a reply, so revealing it never shifts text. */
+.live-copy {
+  min-height: 28px;
+  padding-inline: 8px;
+  font-size: var(--text-xs);
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.live-message:is(:hover, :focus-within) .live-copy {
+  opacity: 1;
+}
+@media (hover: none) {
+  .live-copy {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-copy {
+    transition: none;
+  }
+}
+.live-workspace p,
+.work-context-path {
+  user-select: text;
+}
 .live-message > p {
   white-space: pre-wrap;
   font-size: var(--text-sm);
@@ -195,7 +228,7 @@
   margin-top: 6px;
   min-height: 24px;
 }
-.live-receipt button {
+.live-receipt button:not(.live-copy) {
   display: grid;
   place-items: center;
   min-width: 28px;
@@ -328,9 +361,6 @@
 }
 .live-tabs > .ui-segment {
   padding-inline: 10px;
-}
-.live-tabs button[aria-pressed="true"] {
-  background: var(--color-surface-hover);
 }
 .live-work-row {
   display: flex;

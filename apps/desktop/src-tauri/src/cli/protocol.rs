@@ -98,6 +98,8 @@ pub enum Request {
     },
     /// Open the app's Changes page on a checkout (the project or a worktree).
     ShowChanges { path: String },
+    /// Set a project's theme accent (`#rrggbb`) in the app and every terminal.
+    SetAccent { project_id: String, accent: String },
     /// Extract learnings from a conversation's history (up to the previous /learn,
     /// if present) and save them to project context.
     SessionLearn { session_id: String },
@@ -178,6 +180,10 @@ pub struct SessionView {
     pub branch: Option<String>,
     /// The agent's output so far.
     pub result: String,
+    /// The newest steps the agent took, such as tool calls and narration,
+    /// oldest first. Older hosts omit it.
+    #[serde(default)]
+    pub activity: Vec<String>,
     pub questions: Vec<Question>,
 }
 
