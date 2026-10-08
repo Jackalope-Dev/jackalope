@@ -248,6 +248,152 @@ fn home_dir() -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
+/// A file a conversation's checkout changed, with its line counts. Counts are
+/// `None` for binary files.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FileChange {
+    pub path: String,
+    /// `M`odified, `A`dded, `D`eleted, `R`enamed or `?` untracked.
+    pub status: char,
+    pub added: Option<usize>,
+    pub removed: Option<usize>,
+}
+
+/// Lines of one file's diff kept for display.
+const DIFF_LINES: usize = 600;
+
+/// What `workspace` changed since it left `project`'s checked-out commit,
+/// committed or not, plus untracked files. A conversation working in the
+/// project itself compares against `HEAD`. `None` outside a repository.
+pub fn changes(workspace: &str, project: &str) -> Option<Vec<FileChange>> {
+    let directory = Path::new(workspace);
+    let base = base(workspace, project)?;
+    let text = |args: &[&str]| -> Option<String> {
+        let output = git(directory, args).ok()?;
+        output
+            .status
+            .success()
+            .then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+    };
+    let statuses = text(&["diff", "--name-status", "-M", "-z", &base])?;
+    let counts = text(&["diff", "--numstat", "-M", "-z", &base])?;
+    let mut changes = parse_name_status(&statuses);
+    for (path, added, removed) in parse_numstat(&counts) {
+        if let Some(change) = changes.iter_mut().find(|change| change.path == path) {
+            change.added = added;
+            change.removed = removed;
+        }
+    }
+    let untracked = text(&["ls-files", "--others", "--exclude-standard", "-z"])?;
+    for path in untracked.split('\0').filter(|path| !path.is_empty()) {
+        let lines = std::fs::read(directory.join(path))
+            .ok()
+            .filter(|bytes| !bytes.contains(&0))
+            .map(|bytes| bytes.iter().filter(|byte| **byte == b'\n').count());
+        changes.push(FileChange {
+            path: path.to_string(),
+            status: '?',
+            added: lines,
+            removed: lines.map(|_| 0),
+        });
+    }
+    changes.sort_by(|left, right| left.path.cmp(&right.path));
+    Some(changes)
+}
+
+/// The diff of one changed file, as `changes` measured it.
+pub fn file_diff(workspace: &str, project: &str, change: &FileChange) -> Vec<String> {
+    let directory = Path::new(workspace);
+    let output = if change.status == '?' {
+        // Exits 1 when the files differ, which they always do here.
+        git(
+            directory,
+            &["diff", "--no-index", "--", "/dev/null", &change.path],
+        )
+    } else {
+        match base(workspace, project) {
+            Some(base) => git(directory, &["diff", "-M", &base, "--", &change.path]),
+            None => return Vec::new(),
+        }
+    };
+    let Ok(output) = output else {
+        return Vec::new();
+    };
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .skip_while(|line| !line.starts_with("@@") && !line.starts_with("Binary"))
+        .take(DIFF_LINES)
+        .map(|line| line.replace('\t', "    "))
+        .collect()
+}
+
+/// The commit a checkout's changes are measured from.
+fn base(workspace: &str, project: &str) -> Option<String> {
+    let directory = Path::new(workspace);
+    let head = |path: &Path| -> Option<String> {
+        let output = git(path, &["rev-parse", "HEAD"]).ok()?;
+        let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        (output.status.success() && !sha.is_empty()).then_some(sha)
+    };
+    let own = head(directory)?;
+    if Path::new(workspace) == Path::new(project) {
+        return Some(own);
+    }
+    let Some(theirs) = head(Path::new(project)) else {
+        return Some(own);
+    };
+    let output = git(directory, &["merge-base", &own, &theirs]).ok()?;
+    let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Some(if output.status.success() && !sha.is_empty() {
+        sha
+    } else {
+        own
+    })
+}
+
+/// `git diff --name-status -z`: a status, then one path or, for renames and
+/// copies, the old path and the new.
+fn parse_name_status(text: &str) -> Vec<FileChange> {
+    let mut fields = text.split('\0').filter(|field| !field.is_empty());
+    let mut changes = Vec::new();
+    while let Some(code) = fields.next() {
+        let status = code.chars().next().unwrap_or('M');
+        let mut path = fields.next().unwrap_or_default().to_string();
+        if matches!(status, 'R' | 'C') {
+            path = fields.next().unwrap_or_default().to_string();
+        }
+        changes.push(FileChange {
+            path,
+            status: if status == 'C' { 'A' } else { status },
+            added: None,
+            removed: None,
+        });
+    }
+    changes
+}
+
+/// `git diff --numstat -z`: counts and a path, or for a rename counts, an
+/// empty path, then the old and new paths. Binary files count as `-`.
+fn parse_numstat(text: &str) -> Vec<(String, Option<usize>, Option<usize>)> {
+    let mut fields = text.split('\0');
+    let mut counts = Vec::new();
+    while let Some(record) = fields.next() {
+        let mut parts = record.splitn(3, '\t');
+        let (Some(added), Some(removed), Some(path)) = (parts.next(), parts.next(), parts.next())
+        else {
+            continue;
+        };
+        let path = if path.is_empty() {
+            fields.next();
+            fields.next().unwrap_or_default().to_string()
+        } else {
+            path.to_string()
+        };
+        counts.push((path, added.parse().ok(), removed.parse().ok()));
+    }
+    counts
+}
+
 fn git(directory: &Path, args: &[&str]) -> Result<Output, String> {
     Command::new("git")
         .current_dir(directory)
@@ -339,6 +485,40 @@ mod tests {
 
         let head = git(&scratch.0, &["rev-parse", "--verify", "HEAD"]).unwrap();
         assert!(head.status.success(), "a worktree needs a commit");
+    }
+
+    #[test]
+    fn changes_list_edits_renames_and_new_files_with_counts() {
+        let scratch = TempDir::new("changes");
+        std::fs::write(scratch.0.join("keep.txt"), "one\ntwo\n").unwrap();
+        std::fs::write(scratch.0.join("old.txt"), "same\nlines\nhere\n").unwrap();
+        initialize_repository(&scratch.0).unwrap();
+        std::fs::write(scratch.0.join("keep.txt"), "one\n2\nthree\n").unwrap();
+        git(&scratch.0, &["mv", "old.txt", "new.txt"]).unwrap();
+        std::fs::write(scratch.0.join("fresh.txt"), "a\nb\n").unwrap();
+
+        let path = scratch.0.to_string_lossy().into_owned();
+        let changes = changes(&path, &path).unwrap();
+        let find = |name: &str| changes.iter().find(|change| change.path == name).unwrap();
+        assert_eq!(
+            (
+                find("keep.txt").status,
+                find("keep.txt").added,
+                find("keep.txt").removed
+            ),
+            ('M', Some(2), Some(1))
+        );
+        assert_eq!(find("new.txt").status, 'R');
+        assert_eq!(
+            (find("fresh.txt").status, find("fresh.txt").added),
+            ('?', Some(2))
+        );
+
+        let diff = file_diff(&path, &path, find("keep.txt"));
+        assert!(diff[0].starts_with("@@"));
+        assert!(diff.iter().any(|line| line == "+three"));
+        let fresh = file_diff(&path, &path, find("fresh.txt"));
+        assert!(fresh.iter().any(|line| line == "+b"));
     }
 
     #[test]

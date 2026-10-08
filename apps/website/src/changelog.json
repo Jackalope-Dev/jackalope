@@ -1,5 +1,19 @@
 [
   {
+    "id": "see-what-agents-are-doing-from-the-terminal",
+    "date": "2026-10-08",
+    "status": "In development",
+    "title": "See what agents are doing from the terminal.",
+    "description": "The jackalope command shows live progress, changed files and questions as work runs.",
+    "items": [
+      "Running work lists its newest steps under the conversation, and the status line says when a run has gone quiet.",
+      "A changes panel opens beside the conversation with changed files and diffs; Ctrl+O toggles it and /review opens them in the app.",
+      "Questions stay pinned above the input, and /answer reopens their choices.",
+      "/theme sets a project's colour in every terminal and the app, and projects first used from a terminal appear in an open app right away.",
+      "Conversation text, branches and workspace paths can be selected and copied directly in the app."
+    ]
+  },
+  {
     "id": "a-cleaner-more-consistent-workspace",
     "date": "2026-10-08",
     "status": "In development",

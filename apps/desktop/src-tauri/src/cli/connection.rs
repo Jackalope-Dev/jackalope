@@ -151,6 +151,7 @@ fn read_only(request: &Request) -> bool {
             | Request::CommitPolicy { .. }
             | Request::ShowWindow
             | Request::ShowChanges { .. }
+            | Request::SetAccent { .. }
             | Request::Attached { .. }
     )
 }
