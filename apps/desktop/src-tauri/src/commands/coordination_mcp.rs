@@ -20,6 +20,7 @@ use rmcp::{
 use serde::Deserialize;
 
 mod catalog;
+mod permissions;
 
 #[derive(Clone)]
 struct CoordinationTools {
@@ -952,6 +953,78 @@ impl CoordinationTools {
     }
 
     #[tool(
+        description = "Jackalope's permission prompt for Claude Code. Called by the CLI, not by the agent.",
+        annotations(read_only_hint = false, open_world_hint = false)
+    )]
+    async fn approve_tool(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<PermissionRequest>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let run = self
+            .service
+            .authorized_run(&request_headers(&context)?)
+            .map_err(bridge_error)?;
+        let decision = |text: String| {
+            Ok(CallToolResult::success(vec![
+                rmcp::model::ContentBlock::text(text),
+            ]))
+        };
+        if adapter(&run) != "claude" {
+            return decision(permissions::deny(
+                "This permission prompt is only for Claude Code.",
+            ));
+        }
+        let key = permissions::key(&input.tool_name, &input.input);
+        if permissions::automatic(
+            &input.tool_name,
+            &input.input,
+            run.verify_command.as_deref(),
+        ) || permissions::granted(&run.id, &key)
+        {
+            return decision(permissions::allow(&input.input));
+        }
+        if run.prompts.len() >= 100 {
+            return decision(permissions::deny(
+                "This attempt has reached the question limit, so the action was not approved.",
+            ));
+        }
+        let question = super::harness::AskUserInput {
+            question: permissions::question(&input.tool_name, &input.input),
+            input_type: "choice".into(),
+            options: [
+                permissions::ALLOW_ONCE,
+                permissions::ALLOW_TASK,
+                permissions::DENY,
+            ]
+            .map(String::from)
+            .to_vec(),
+            default_value: None,
+        };
+        let mut prompt = super::harness::ask_user_async(
+            &run.id,
+            question,
+            std::time::Duration::from_secs(600),
+            |prompt| self.service.runtime.record_prompt(prompt),
+        )
+        .await;
+        if prompt.status != "answered" {
+            // The CLI needs a decision now; a later answer cannot reach it.
+            prompt.status = "expired".into();
+        }
+        self.service.runtime.record_prompt(&prompt);
+        match prompt.answer.as_deref() {
+            Some(permissions::ALLOW_ONCE) => decision(permissions::allow(&input.input)),
+            Some(permissions::ALLOW_TASK) => {
+                permissions::grant(&run.id, key);
+                decision(permissions::allow(&input.input))
+            }
+            Some(_) => decision(permissions::deny("The user denied this action. Do not retry or work around it; continue other authorized work and report what remains blocked.")),
+            None => decision(permissions::deny("The user did not answer this permission request within 10 minutes, so it was not approved. Continue other authorized work and report the action as blocked.")),
+        }
+    }
+
+    #[tool(
         description = "Record validation evidence. After implementation and final checks, include a requirements array to answer the task expectations in one call, with a status, short justification and evidence per requirement. Surfaces in review; does not grant human acceptance.",
         annotations(
             read_only_hint = false,
@@ -1086,6 +1159,9 @@ impl ServerHandler for CoordinationTools {
         if !super::decisions::agent_questions::available(&self.service.runtime, &run.project_id) {
             tools.retain(|tool| tool.name != "ask_jev");
         }
+        if adapter(&run) != "claude" {
+            tools.retain(|tool| tool.name != "approve_tool");
+        }
         if !crate::commands::experiments::is("JACKALOPE_CONTEXT_READ", "on") {
             tools.retain(|tool| tool.name != "read_context");
         }
@@ -1154,6 +1230,19 @@ impl ServerHandler for CoordinationTools {
             cache_scope: Some(rmcp::model::CacheScope::Private),
         })
     }
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+struct PermissionRequest {
+    tool_name: String,
+    #[serde(default)]
+    input: serde_json::Value,
+}
+
+fn adapter(run: &super::tasks::TaskRun) -> &str {
+    run.account_binding
+        .as_ref()
+        .map_or(run.agent.as_str(), |binding| binding.adapter.as_str())
 }
 
 fn available_tool(name: &str, discovery: bool, check: Option<&str>) -> bool {

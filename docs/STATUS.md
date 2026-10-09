@@ -306,6 +306,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   An external Harbor adapter runs prepared Git repositories through the same native
   task path with separate upstream grading and optional request metering. Its initial
   payload targets Linux x86_64/OpenCode; broader provider and benchmark acceptance remain open.
+  Claude Code tasks send actions outside accept-edits mode to a Jackalope permission
+  prompt: read-only tools, read-only shell commands and the saved check proceed, and
+  other actions become task questions that deny when unanswered.
   OpenCode tasks use an authenticated owned server for recoverable permission prompts,
   structured questions, exact-session continuation and child-session usage. Scope,
   native-output and provider-effort ablations retain matched permission policies and
