@@ -50,7 +50,9 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
   useEffect(() => {
     const refreshIfVisible = () => {
       setNow(Date.now());
-      if (!document.hidden) void fetch();
+      // A window hidden to the tray still reports itself visible, so require focus too.
+      // Quota readers launch agent CLIs, and some open console windows on Windows.
+      if (document.visibilityState === 'visible' && document.hasFocus()) void fetch();
     };
     refreshIfVisible();
     const timer = setInterval(refreshIfVisible, 30_000);

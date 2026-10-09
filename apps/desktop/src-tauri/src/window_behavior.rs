@@ -371,7 +371,44 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         .store(true, Ordering::Relaxed);
     #[cfg(target_os = "linux")]
     watch_tray_host(app.handle().clone());
+    #[cfg(windows)]
+    watch_tray_registration(app.handle().clone());
     Ok(())
+}
+
+/// Explorer forgets every notification icon when it restarts. `tray-icon` re-adds
+/// ours on `TaskbarCreated`, but makes one attempt; if the new taskbar is not ready
+/// yet the icon stays gone while the window is hidden, leaving no way back in.
+/// Windows reports a rect for registered icons, overflow included, so a missing
+/// rect means the icon is gone and we replay the message to re-add it.
+#[cfg(windows)]
+fn watch_tray_registration(app: AppHandle) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{RegisterWindowMessageW, SendMessageW};
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            let Some(tray) = app.tray_by_id("jackalope") else {
+                continue;
+            };
+            if !matches!(tray.rect(), Ok(None)) {
+                continue;
+            }
+            let _ = tray.with_inner_tray_icon(|inner| {
+                let name = "TaskbarCreated"
+                    .encode_utf16()
+                    .chain([0])
+                    .collect::<Vec<u16>>();
+                // SAFETY: the name is NUL-terminated, and the tray window belongs to
+                // this main-thread callback, so the message is handled synchronously.
+                unsafe {
+                    let message = RegisterWindowMessageW(name.as_ptr());
+                    if message != 0 {
+                        SendMessageW(inner.window_handle() as _, message, 0, 0);
+                    }
+                }
+            });
+        }
+    });
 }
 
 #[cfg(target_os = "macos")]

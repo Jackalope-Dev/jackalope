@@ -91,7 +91,8 @@ export function CapacityPanel() {
   const refresh = () => void fetch(true);
   useEffect(() => {
     const refreshIfVisible = () => {
-      if (isTauriEnvironment() && document.visibilityState === 'visible') void fetch();
+      if (isTauriEnvironment() && document.visibilityState === 'visible' && document.hasFocus())
+        void fetch();
     };
     refreshIfVisible();
     const interval = setInterval(refreshIfVisible, 60_000);
