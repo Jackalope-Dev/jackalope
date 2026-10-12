@@ -23,6 +23,9 @@ pub enum Command {
         /// `--agents a,b`: the same message to each agent in its own conversation.
         compare: Vec<String>,
         json: bool,
+        /// `--stream-json`: one JSON object per line as the work moves, ending
+        /// with the same result `--json` prints.
+        stream: bool,
         timeout: Option<Duration>,
     },
     List {
@@ -58,7 +61,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
     let mut words: Vec<String> = Vec::new();
     let (mut print, mut json, mut resume, mut help, mut version, mut init) =
         (false, false, false, false, false, false);
-    let mut pick = false;
+    let (mut pick, mut stream) = (false, false);
     let mut cold_start = None;
     let (mut agent, mut model, mut profile, mut timeout) = (None, None, None, None);
     let mut compare: Option<Vec<String>> = None;
@@ -85,6 +88,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
             "--" => only_words = true,
             "-p" | "--print" => print = true,
             "--json" => json = true,
+            "--stream-json" => stream = true,
             "-c" | "--continue" => resume = true,
             "-r" | "--resume" => pick = true,
             "-h" | "--help" => help = true,
@@ -144,7 +148,8 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
             agent: agent.take(),
             model: model.take(),
             compare: compare.take().unwrap_or_default(),
-            json,
+            json: json || stream,
+            stream,
             timeout,
         }
     } else {
@@ -225,6 +230,17 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
         command,
         Command::Once { .. } | Command::List { .. } | Command::Status { .. }
     );
+    if stream {
+        match &command {
+            Command::Once { compare, .. } if !compare.is_empty() => {
+                return Err(format!(
+                    "--stream-json follows one agent; use --json with --agents. {USAGE}"
+                ));
+            }
+            Command::Once { .. } => {}
+            _ => return Err(format!("--stream-json applies to -p. {USAGE}")),
+        }
+    }
     if json && !json_applies {
         return Err(format!("--json applies to -p, ls and status. {USAGE}"));
     }
@@ -321,6 +337,17 @@ mod tests {
         assert_eq!(command(&["--resume", "ab"]), attach);
         assert_eq!(command(&["resume", "ab"]), attach);
         assert!(parse_line(&["resume", "ab", "cd"]).is_err());
+    }
+
+    #[test]
+    fn streamed_json_implies_json_and_follows_one_run() {
+        match command(&["-p", "--stream-json", "fix", "it"]) {
+            Command::Once { json, stream, .. } => assert!(json && stream),
+            other => panic!("{other:?}"),
+        }
+        assert!(parse_line(&["ls", "--stream-json"]).is_err());
+        assert!(parse_line(&["-p", "--agents", "claude,codex", "--stream-json", "x"]).is_err());
+        assert!(parse_line(&["-p", "--stream-json=1", "x"]).is_err());
     }
 
     #[test]

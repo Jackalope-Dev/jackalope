@@ -56,6 +56,8 @@ RUNNING ONCE
   --agents <a,b>                 send the message to 2 to 4 agents, each in its own
                                  workspace, and print every reply
   --json                         print the result as JSON (also for ls, status)
+  --stream-json                  print one JSON line per step and output as the
+                                 work moves, then the result
   --timeout <seconds>            stop waiting after this long; the work continues
   Exit status: 0 done, 1 failed or stopped, 2 an agent asked a question
   (answer it with jackalope attach <id>), 3 timed out.
@@ -103,6 +105,7 @@ fn run() -> Result<(), String> {
             model,
             compare,
             json,
+            stream,
             timeout,
         } => {
             announce_repository(init)?;
@@ -111,6 +114,7 @@ fn run() -> Result<(), String> {
                 model,
                 compare,
                 json,
+                stream,
                 timeout,
                 cold_start: cli.cold_start,
             };

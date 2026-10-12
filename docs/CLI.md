@@ -147,6 +147,11 @@ conversation and workspace like the app's agent comparison; the command waits fo
 of them and prints each reply under its agent with the id to rejoin it. With `--json`
 it prints `{"results": [...]}`, one object per agent. Its exit status is the most
 serious single outcome: failure, then a question, then a timeout.
+`--stream-json` follows a single run for scripts and CI: stdout gets one JSON object
+per line, `started` with the session id, `step` when the work moves to a new step,
+`output` with text the agent added (`replace: true` when it rewrote its output rather
+than extending it), and finally `result`, the object `--json` prints, with the same
+exit status. It does not combine with `--agents`.
 `--timeout <seconds>` stops waiting (checked at least every 25 seconds) and leaves
 the work running. Progress goes to stderr when it is a terminal. Exit status is 0
 when done, 1 on failure or when the work was stopped, 2 when an agent asks a

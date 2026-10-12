@@ -6,7 +6,7 @@ use crate::connection::{short, Connection};
 use crate::host::{self, ColdStart};
 use crate::protocol::{self, SessionView};
 use crate::subcommands;
-use std::io::{IsTerminal, Read};
+use std::io::{IsTerminal, Read, Write};
 use std::time::{Duration, Instant};
 
 pub struct Options {
@@ -15,6 +15,7 @@ pub struct Options {
     /// Two or more agents each get the message in their own conversation.
     pub compare: Vec<String>,
     pub json: bool,
+    pub stream: bool,
     pub timeout: Option<Duration>,
     pub cold_start: Option<ColdStart>,
 }
@@ -39,8 +40,14 @@ pub fn run(message: String, options: Options) -> Result<i32, String> {
     let deadline = options.timeout.map(|timeout| Instant::now() + timeout);
     let mut since = 0;
     let mut last_step = String::new();
+    let mut events = options.stream.then(|| Events::start(&session_id));
     loop {
         let view = connection.session(&session_id)?;
+        if let Some(events) = events.as_mut() {
+            for event in events.advance(&view) {
+                emit(&event);
+            }
+        }
         if progress {
             let step = view
                 .step
@@ -58,6 +65,12 @@ pub fn run(message: String, options: Options) -> Result<i32, String> {
                 .map(|_| Outcome::TimedOut)
         });
         if let Some(outcome) = outcome {
+            if options.stream {
+                let mut result = result_json(&view, &session_id, &outcome);
+                result["event"] = "result".into();
+                emit(&result);
+                return Ok(outcome_code(&outcome));
+            }
             return Ok(finish(&view, &session_id, outcome, options.json));
         }
         // Blocks until work moves. A dropped watch waits briefly and re-reads;
@@ -217,6 +230,69 @@ fn result_json(view: &SessionView, session_id: &str, outcome: &Outcome) -> serde
     })
 }
 
+/// What `--stream-json` has already reported, so each line says only what is new.
+struct Events {
+    session_id: String,
+    step: String,
+    output: String,
+    started: bool,
+}
+
+impl Events {
+    fn start(session_id: &str) -> Self {
+        Self {
+            session_id: session_id.to_string(),
+            step: String::new(),
+            output: String::new(),
+            started: false,
+        }
+    }
+
+    /// Lines for what changed since the last view: the start, a new step and
+    /// output the agent added. Output that was replaced rather than extended
+    /// is sent whole with `replace`.
+    fn advance(&mut self, view: &SessionView) -> Vec<serde_json::Value> {
+        let mut events = Vec::new();
+        if !self.started {
+            self.started = true;
+            events.push(serde_json::json!({
+                "event": "started",
+                "sessionId": self.session_id,
+            }));
+        }
+        let step = view
+            .step
+            .clone()
+            .or_else(|| view.status.clone())
+            .unwrap_or_default();
+        if !step.is_empty() && step != self.step {
+            events.push(serde_json::json!({
+                "event": "step",
+                "step": step,
+                "detail": view.step_detail,
+                "agent": view.agent,
+                "model": view.model,
+            }));
+            self.step = step;
+        }
+        let output = &view.result;
+        if output != &self.output {
+            events.push(match output.strip_prefix(self.output.as_str()) {
+                Some(added) => serde_json::json!({ "event": "output", "text": added }),
+                None => serde_json::json!({ "event": "output", "text": output, "replace": true }),
+            });
+            self.output = output.clone();
+        }
+        events
+    }
+}
+
+fn emit(event: &serde_json::Value) {
+    let mut stdout = std::io::stdout().lock();
+    // A closed pipe ends the reader's interest, not the work.
+    let _ = writeln!(stdout, "{event}").and_then(|()| stdout.flush());
+}
+
 /// Piped input is appended to the message, as `git diff | jackalope -p "review"`.
 fn with_stdin(message: String) -> Result<String, String> {
     let stdin = std::io::stdin();
@@ -347,6 +423,24 @@ mod tests {
             result: String::new(),
             questions: Vec::new(),
         }
+    }
+
+    #[test]
+    fn streamed_events_report_only_what_changed() {
+        let mut events = Events::start("s1");
+        let mut running = view(Some("running"), &[("you", true)]);
+        running.result = "Reading".into();
+        let first = events.advance(&running);
+        let kinds: Vec<_> = first.iter().map(|event| event["event"].clone()).collect();
+        assert_eq!(kinds, ["started", "step", "output"]);
+        assert_eq!(first[2]["text"], "Reading");
+        assert!(events.advance(&running).is_empty());
+        running.result = "Reading files".into();
+        assert_eq!(events.advance(&running)[0]["text"], " files");
+        running.result = "Done".into();
+        let replaced = events.advance(&running);
+        assert_eq!(replaced[0]["text"], "Done");
+        assert_eq!(replaced[0]["replace"], true);
     }
 
     #[test]
