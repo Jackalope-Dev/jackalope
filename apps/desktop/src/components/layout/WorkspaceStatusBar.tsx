@@ -43,6 +43,8 @@ export function WorkspaceStatusBar({
     useExecutionStore.getState().select(null);
     useLiveSessionStore.getState().select(null);
     useManagedTaskStore.getState().select(null);
+    // The counts cover every project, so the list they open does too.
+    useWorkViewStore.getState().setScope('all');
     useWorkViewStore.getState().openList(attention ? 'attention' : 'working');
     navigateWorkspace('kanban');
   };
@@ -53,7 +55,7 @@ export function WorkspaceStatusBar({
         {host ? `${host.wsl ? 'WSL · ' : ''}${host.name}` : 'This computer'}
       </button>
       {project && !host && <StatusBarChanges projectPath={project.path} checkout={checkout} />}
-      <button type="button" onClick={activity}>
+      <button type="button" onClick={activity} title="Work across all projects">
         <ListTodo size={15} />
         {host ? 'This computer: ' : ''}
         {active} running
