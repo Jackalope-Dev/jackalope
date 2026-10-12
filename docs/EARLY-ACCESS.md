@@ -54,7 +54,7 @@ older mail remains readable without a delivery lookup reference.
 | Setting | Value / purpose |
 | --- | --- |
 | `EARLY_ACCESS_ENABLED` | `true` after migration, email and owner policy setup |
-| `OPEN_SIGNUP` | `true` approves members when they confirm their email; `false` keeps owner approval. Members already waiting are not approved by the switch |
+| `OPEN_SIGNUP` | `true` approves members when they confirm their email; `false` keeps owner approval. Members already waiting are not approved by the switch. CI deploys take it from `PRODUCTION_OPEN_SIGNUP` / `STAGING_OPEN_SIGNUP` or the `COMMUNITY_CONFIG` JSON; otherwise the tracked `false` applies |
 | `ACCESS_WEB_ORIGIN` | Exact HTTPS marketing origin, normally `https://jackalope.dev` |
 | `ACCESS_EMAIL_FROM` | Verified Sequenzy sender, `Jackalope <hello@hello.jackalope.dev>` |
 | `ACCESS_EMAIL_REPLY_TO` | `contact@jackalope.dev` |

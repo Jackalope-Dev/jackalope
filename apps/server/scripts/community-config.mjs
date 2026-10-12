@@ -2,6 +2,7 @@ export function applyCommunityConfig(settings, environment, source = process.env
   const prefix = environment === 'production' ? 'PRODUCTION_' : 'STAGING_';
   const names = [
     'EARLY_ACCESS_ENABLED',
+    'OPEN_SIGNUP',
     'ACCESS_WEB_ORIGIN',
     'ACCESS_EMAIL_FROM',
     'ACCESS_EMAIL_REPLY_TO',
@@ -92,6 +93,7 @@ export function applyCommunityConfig(settings, environment, source = process.env
           : ['RATE_SECRET'],
   };
   if (
+    (vars.OPEN_SIGNUP !== undefined && !['true', 'false'].includes(vars.OPEN_SIGNUP)) ||
     !['true', 'false'].includes(vars.INGESTION_ENABLED) ||
     !['true', 'false'].includes(vars.FEEDBACK_EMAIL_ENABLED)
   )
