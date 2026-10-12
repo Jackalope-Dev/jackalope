@@ -198,18 +198,9 @@ export function DesktopConnection({
           <p>
             {waiting
               ? 'Sign in below using your waitlist email.'
-              : 'Accepted members can sign in below using their invited email.'}{' '}
+              : 'Sign in below with your account email.'}{' '}
             If the email opens another tab, return here to confirm the connection.
           </p>
-          {!waiting && (
-            <p>
-              Still on the waitlist?{' '}
-              <a className="text-link" href="/waitlist/">
-                Sign in to your waitlist
-              </a>{' '}
-              to see your position and referral link in the app.
-            </p>
-          )}
         </div>
       ) : (
         <>

@@ -67,10 +67,9 @@ const privacy: Section[] = [
           verification, session, invitation, and delivery records to provide access, prevent
           repeated emails, and enforce invitation limits. We do not collect payment details. A
           referral link records who introduced a new signup. We keep that attribution and
-          verification status to show referral totals and, for anyone still waiting from our earlier
-          waitlist, queue priority. A first-party browser session remembers a referral while you
-          browse this site; it is not an advertising cookie. Referrers see counts, not the referred
-          email addresses.
+          verification status to show referral totals. A first-party browser session remembers a
+          referral while you browse this site; it is not an advertising cookie. Referrers see
+          counts, not the referred email addresses.
         </p>
         <p>
           We send email verification and sign-in links, referral milestone updates, and invitation
@@ -389,12 +388,11 @@ const terms: Section[] = [
     content: (
       <>
         <p>
-          Signing up is free, and confirming your email creates your account. If you joined our
-          earlier waitlist, signing up again with the same email and confirming it gives you the
-          same free account; waitlist position, referral priority, and Instant Access Passes no
-          longer affect access. An account does not guarantee a finished product, a particular
-          feature, or a future price. Desktop downloads are offered for the platforms listed on the
-          download page.
+          Signing up is free, and confirming your email creates your account. Everyone on our
+          earlier waitlist already has an account and signs in with the same email; waitlist
+          position, referral priority, and Instant Access Passes no longer affect access. An account
+          does not guarantee a finished product, a particular feature, or a future price. Desktop
+          downloads are offered for the platforms listed on the download page.
         </p>
         <p>
           Jackalope is beta software. It may contain errors, change substantially, or become
