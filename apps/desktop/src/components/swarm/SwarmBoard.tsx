@@ -87,7 +87,7 @@ export function SwarmBoard() {
       {state && !state.configured && (
         <InlineNotice
           action={
-            <Button variant="outline" onClick={() => openSettings('Connected work')}>
+            <Button variant="outline" onClick={() => openSettings('Cloudflare')}>
               Connect swarm
             </Button>
           }

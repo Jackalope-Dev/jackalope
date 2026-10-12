@@ -683,7 +683,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'connect-account',
         question: 'How do I connect my Cloudflare account?',
         paragraphs: [
-          'Artifacts requires the Workers Paid plan, and Cloudflare bills operations and storage to your account. Open Settings → Connected work and fill in Cloudflare Artifacts.',
+          'Artifacts requires the Workers Paid plan, and Cloudflare bills operations and storage to your account. Open Settings → Cloudflare and fill in Cloudflare Artifacts.',
         ],
         steps: [
           'Copy your account ID from the Cloudflare dashboard.',

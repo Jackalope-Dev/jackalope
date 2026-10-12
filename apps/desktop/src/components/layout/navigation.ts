@@ -237,7 +237,8 @@ export function openSettings(
     | 'Diagnostics'
     | 'Invitations'
     | 'Updates & support'
-    | 'Connected work',
+    | 'Connected work'
+    | 'Cloudflare',
 ) {
   window.dispatchEvent(new CustomEvent('jackalope:open-settings', { detail: category }));
 }

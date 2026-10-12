@@ -376,7 +376,7 @@ forks on Project → Swarm, which appears once a swarm Worker is connected. Fork
 See [the Worker guide](../apps/swarm/README.md).
 
 Cloudflare Artifacts (beta) connects a user's own Cloudflare account and namespace from
-Settings → Connected work. Connect Cloudflare signs in through the browser with Jackalope's
+Settings → Cloudflare. Connect Cloudflare signs in through the browser with Jackalope's
 public OAuth client (PKCE, loopback redirect on 127.0.0.1 ports 47851–47853) and lists the
 accounts the person shared; an API token remains an alternative. Tokens stay in protected
 native storage, OAuth access refreshes before expiry and disconnecting revokes it. Setup can

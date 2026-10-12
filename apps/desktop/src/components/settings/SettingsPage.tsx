@@ -1,9 +1,12 @@
 import { DiscordIcon, FormField, Input, SearchField, SegmentedControl } from '@jackalope/ui';
 import {
   Bot,
+  Cloud,
+  Cpu,
   Database,
   FolderCog,
   Gavel,
+  History,
   KeyRound,
   LifeBuoy,
   type LucideIcon,
@@ -70,6 +73,7 @@ const categories = [
   'Agents',
   'Decisions',
   'Connected work',
+  'Cloudflare',
   'Jackalope account',
   'Invitations',
   'Remote access',
@@ -80,15 +84,19 @@ const categories = [
   'Data & reset',
 ] as const;
 export type SettingsCategory = (typeof categories)[number];
-/** Sidebar sections; categories keep the order above within each. */
+/**
+ * Sidebar sections; categories keep the order above within each. Advanced holds
+ * routing, beta integrations and diagnostics that most people never change.
+ */
 const navigationGroups: { label: string; categories: SettingsCategory[] }[] = [
   {
     label: 'Workspace',
     categories: ['Project', 'General', 'Appearance', 'Desktop', 'Saved actions'],
   },
-  { label: 'Agents & tools', categories: ['Agents', 'Decisions', 'Connected work'] },
+  { label: 'Agents', categories: ['Agents', 'Connected work'] },
   { label: 'Account & access', categories: ['Jackalope account', 'Remote access', 'Privacy'] },
   { label: 'Help & data', categories: ['Updates & support', 'Data & reset'] },
+  { label: 'Advanced', categories: ['Decisions', 'Cloudflare', 'Diagnostics', 'System'] },
 ];
 const navigationIcons: Partial<Record<SettingsCategory, LucideIcon>> = {
   Project: FolderCog,
@@ -99,6 +107,9 @@ const navigationIcons: Partial<Record<SettingsCategory, LucideIcon>> = {
   Agents: Bot,
   Decisions: Gavel,
   'Connected work': Plug,
+  Cloudflare: Cloud,
+  Diagnostics: History,
+  System: Cpu,
   'Jackalope account': UserRound,
   'Remote access': Radio,
   Privacy: Shield,
@@ -106,11 +117,7 @@ const navigationIcons: Partial<Record<SettingsCategory, LucideIcon>> = {
   'Data & reset': Database,
 };
 const settingsGroup = (category: SettingsCategory): SettingsCategory =>
-  category === 'Invitations'
-    ? 'Jackalope account'
-    : category === 'System' || category === 'Diagnostics'
-      ? 'Updates & support'
-      : category;
+  category === 'Invitations' ? 'Jackalope account' : category;
 
 export function SettingsPage({
   onClose,
@@ -174,8 +181,8 @@ export function SettingsPage({
         Appearance: 'theme color light dark atmosphere picker toolbar companion mascot animations',
         Agents:
           'default models available detected allowed restrict cli command executable configuration automatic quota handoff',
-        'Connected work':
-          'GitHub Linear Jira issues pull requests API token Cloudflare Artifacts repository hosted cloud',
+        'Connected work': 'GitHub Linear Jira issues pull requests API token',
+        Cloudflare: 'Cloudflare Artifacts repository hosted cloud swarm worker forks beta',
         'Remote access': 'hosts phone companion SSH pairing Tailscale device',
         Decisions: 'Jackalope routing Jev TypeSafe API key automatic agent cost tokens capacity',
         Privacy: 'marketplace MCP network telemetry crash reporting',
@@ -340,6 +347,10 @@ export function SettingsPage({
               {c === 'Connected work' && (
                 <>
                   <IssueConnections />
+                </>
+              )}
+              {c === 'Cloudflare' && (
+                <>
                   <ArtifactsConnection />
                   <SwarmConnection />
                 </>
@@ -363,7 +374,7 @@ export function SettingsPage({
                   <SettingGroup>
                     <Setting
                       title="Guided setup"
-                      description="Walk through project, agents and appearance setup again. Your saved work stays."
+                      description="Walk through project and agent setup again. Your saved work stays."
                     >
                       <Button
                         variant="outline"

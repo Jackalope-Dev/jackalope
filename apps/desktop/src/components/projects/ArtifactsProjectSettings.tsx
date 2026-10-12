@@ -68,7 +68,7 @@ export function ArtifactsProjectSettings({
           title="Connect Cloudflare"
           description="Connect your own Cloudflare account before moving projects to Artifacts."
         >
-          <Button variant="outline" onClick={() => openSettings('Connected work')}>
+          <Button variant="outline" onClick={() => openSettings('Cloudflare')}>
             Connect account
           </Button>
         </Setting>

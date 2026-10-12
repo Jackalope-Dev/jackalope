@@ -41,7 +41,7 @@ npx wrangler secret put SWARM_TOKEN
 npx wrangler deploy
 ```
 
-In Jackalope, open Settings → Connected work → Jackalope Swarm and enter the
+In Jackalope, open Settings → Cloudflare → Jackalope Swarm and enter the
 Worker URL and the same token. Projects linked to Artifacts then sync every 15
 seconds while tasks run; open Project → Swarm to watch.
 
