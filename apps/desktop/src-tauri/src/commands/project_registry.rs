@@ -105,6 +105,27 @@ pub fn save(runtime: &TaskRuntime, projects: Vec<ProjectRecord>) -> Result<(), S
     write_ledger(&path(runtime), &Ledger { projects })
 }
 
+/// Records a terminal's accent choice so other terminals follow it before the
+/// app mirrors its own theme back.
+pub fn set_accent(runtime: &TaskRuntime, project_id: &str, accent: &str) -> Result<(), String> {
+    let valid = accent.len() == 7
+        && accent.starts_with('#')
+        && accent[1..].bytes().all(|byte| byte.is_ascii_hexdigit());
+    if !valid {
+        return Err("Use a six-digit hex color such as #8b5cf6.".into());
+    }
+    let _guard = lock().lock();
+    let file = path(runtime);
+    let mut ledger = read_ledger(&file);
+    let record = ledger
+        .projects
+        .iter_mut()
+        .find(|project| project.id == project_id)
+        .ok_or("That project is not registered.")?;
+    record.accent = Some(accent.to_ascii_lowercase());
+    write_ledger(&file, &ledger)
+}
+
 /// Returns the record for a repository, creating one when it is not known yet.
 /// Used when work starts from a terminal in a repository the app has never
 /// opened; the UI merges the new entry on its next load.

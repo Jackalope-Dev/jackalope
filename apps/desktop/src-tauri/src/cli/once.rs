@@ -41,6 +41,7 @@ pub fn run(message: String, options: Options) -> Result<i32, String> {
     let mut since = 0;
     let mut last_step = String::new();
     let mut events = options.stream.then(|| Events::start(&session_id));
+    let mut seen_activity: Vec<String> = Vec::new();
     loop {
         let view = connection.session(&session_id)?;
         if let Some(events) = events.as_mut() {
@@ -58,6 +59,12 @@ pub fn run(message: String, options: Options) -> Result<i32, String> {
                 eprintln!("· {step}");
                 last_step = step;
             }
+            for entry in fresh(&seen_activity, &view.activity) {
+                if let Some(line) = entry.lines().map(str::trim).find(|line| !line.is_empty()) {
+                    eprintln!("  {}", line.chars().take(160).collect::<String>());
+                }
+            }
+            seen_activity.clone_from(&view.activity);
         }
         let outcome = outcome(&view).or_else(|| {
             deadline
@@ -293,6 +300,16 @@ fn emit(event: &serde_json::Value) {
     let _ = writeln!(stdout, "{event}").and_then(|()| stdout.flush());
 }
 
+/// Entries of `current` not already in `seen`. Both are the tail of a list
+/// that only grows at the end, so the overlap is a suffix of `seen`.
+fn fresh<'a>(seen: &[String], current: &'a [String]) -> &'a [String] {
+    let overlap = (0..=seen.len().min(current.len()))
+        .rev()
+        .find(|&count| seen[seen.len() - count..] == current[..count])
+        .unwrap_or(0);
+    &current[overlap..]
+}
+
 /// Piped input is appended to the message, as `git diff | jackalope -p "review"`.
 fn with_stdin(message: String) -> Result<String, String> {
     let stdin = std::io::stdin();
@@ -421,6 +438,7 @@ mod tests {
             workspace: None,
             branch: None,
             result: String::new(),
+            activity: Vec::new(),
             questions: Vec::new(),
         }
     }
@@ -441,6 +459,26 @@ mod tests {
         let replaced = events.advance(&running);
         assert_eq!(replaced[0]["text"], "Done");
         assert_eq!(replaced[0]["replace"], true);
+    }
+
+    #[test]
+    fn only_new_activity_is_printed() {
+        let lines = |items: &[&str]| {
+            items
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(fresh(&[], &lines(&["a", "b"])), lines(&["a", "b"]));
+        assert_eq!(
+            fresh(&lines(&["a", "b"]), &lines(&["a", "b", "c"])),
+            lines(&["c"])
+        );
+        assert_eq!(
+            fresh(&lines(&["a", "b", "c"]), &lines(&["b", "c", "d"])),
+            lines(&["d"])
+        );
+        assert!(fresh(&lines(&["a", "b"]), &lines(&["a", "b"])).is_empty());
     }
 
     #[test]

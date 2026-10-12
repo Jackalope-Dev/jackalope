@@ -20,6 +20,10 @@ use ratatui::widgets::{Paragraph, Wrap};
 /// Output lines shown for a command; a running one shows its tail as it
 /// streams. `/copy` and selection reach anything still on screen.
 const SHELL_TAIL: usize = 40;
+/// Steps of running work shown under the conversation, and the characters
+/// kept from each.
+const ACTIVITY_SHOWN: usize = 6;
+const ACTIVITY_WIDTH: usize = 160;
 
 /// Lines with the rows each takes once wrapped to a width.
 pub struct Measured {
@@ -152,6 +156,9 @@ fn conversation(view: &SessionView) -> Vec<Line<'static>> {
         lines.push(Line::raw(""));
         lines.extend(markdown(&view.result));
     }
+    if protocol::working(view.status.as_deref()) {
+        lines.extend(activity(&view.activity));
+    }
     let warning = Style::default().fg(brand::warning());
     for question in &view.questions {
         lines.push(Line::raw(""));
@@ -189,6 +196,36 @@ fn conversation(view: &SessionView) -> Vec<Line<'static>> {
             muted,
         ));
     }
+    lines
+}
+
+/// The newest steps of running work, one line each, so a long run shows what
+/// it is doing rather than only a spinner.
+fn activity(entries: &[String]) -> Vec<Line<'static>> {
+    let muted = Style::default().fg(brand::muted());
+    let summaries: Vec<String> = entries
+        .iter()
+        .filter_map(|entry| {
+            let first = entry.lines().map(str::trim).find(|line| !line.is_empty())?;
+            let mut summary: String = first.chars().take(ACTIVITY_WIDTH).collect();
+            if first.chars().count() > ACTIVITY_WIDTH || entry.trim().lines().nth(1).is_some() {
+                summary.push('…');
+            }
+            Some(summary)
+        })
+        .collect();
+    let shown = &summaries[summaries.len().saturating_sub(ACTIVITY_SHOWN)..];
+    let Some((newest, earlier)) = shown.split_last() else {
+        return Vec::new();
+    };
+    let mut lines = vec![Line::raw("")];
+    for summary in earlier {
+        lines.push(Line::styled(format!("  │ {summary}"), muted));
+    }
+    lines.push(Line::from(vec![
+        Span::styled("  └ ", muted),
+        Span::raw(newest.clone()),
+    ]));
     lines
 }
 
@@ -353,6 +390,7 @@ mod tests {
             workspace: None,
             branch: None,
             result: String::new(),
+            activity: Vec::new(),
             questions: Vec::new(),
         };
         let shown: Vec<String> = conversation(&view).iter().map(text).collect();

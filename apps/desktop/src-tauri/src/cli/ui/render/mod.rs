@@ -2,6 +2,7 @@
 
 mod markdown;
 mod menus;
+mod panel;
 pub mod transcript;
 
 use super::commands::slash_matches;
@@ -22,7 +23,7 @@ use std::time::Duration;
 pub const TIPS: &[&str] = &[
     "Run `/learn` to extract session history into reusable project context.",
     "Type `/` to search all commands with arrow navigation and tab completion.",
-    "Run `/diff` to inspect changed files and review patches in the desktop app.",
+    "`Ctrl+O` shows changed files here; `/review` opens them in the app.",
     "Use `/agent` to choose which AI coding agent handles your next conversation.",
     "Switch between active conversations in this directory with `/sessions`.",
     "Start a fresh conversation anytime with `/new`.",
@@ -58,7 +59,8 @@ pub fn draw(frame: &mut Frame, app: &App) {
     let header: Vec<Line> = if app.view.is_none() && area.height >= 28 {
         brand::banner()
     } else if area.height >= 22 {
-        brand::header(header_info(app), app.working(), app.tick)
+        // The rule below carries the motion; the mark stays still.
+        brand::header(header_info(app), false, app.tick)
     } else {
         vec![brand::compact()]
     };
@@ -74,14 +76,22 @@ pub fn draw(frame: &mut Frame, app: &App) {
     let visible_rows = layout.rows.len().clamp(1, most_rows);
     let input_rows = visible_rows as u16 + 2;
 
-    let [header_area, body, status_area, input_area, tip_area] = Layout::vertical([
+    let card = if app.picker.is_none() && area.height >= 16 {
+        panel::question_card(app, area.width)
+    } else {
+        Vec::new()
+    };
+
+    let [header_area, body, status_area, card_area, input_area, tip_area] = Layout::vertical([
         Constraint::Length(header.len() as u16 + 1),
         Constraint::Min(3),
         Constraint::Length(1),
+        Constraint::Length(card.len() as u16),
         Constraint::Length(input_rows),
         Constraint::Length(tip_height),
     ])
     .areas(area);
+    let (body, panel_area) = panel::split(app, body);
     app.body_area.set(body);
 
     let mut header_lines = header;
@@ -101,7 +111,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
         body,
     );
 
+    if let Some(panel_area) = panel_area {
+        panel::changes(frame, app, panel_area);
+    }
     frame.render_widget(Paragraph::new(status(app)), status_area);
+    frame.render_widget(Paragraph::new(card), card_area);
 
     // The border says what Enter will do: a shell command, a slash command,
     // or a message for the agent.
@@ -264,6 +278,12 @@ fn status(app: &App) -> Line<'static> {
             if let Some(elapsed) = app.elapsed() {
                 parts.push(Span::styled(format!(" {}", duration(elapsed)), muted));
             }
+            if let Some(quiet) = app.quiet() {
+                parts.push(Span::styled(
+                    format!(" · no new output for {}", duration(quiet)),
+                    Style::default().fg(brand::warning()),
+                ));
+            }
             if let Some(agent) = &view.agent {
                 parts.push(Span::styled(" · ", muted));
                 let model = view
@@ -287,6 +307,16 @@ fn status(app: &App) -> Line<'static> {
             }
             if let Some(attempt) = view.attempt.filter(|attempt| *attempt > 1) {
                 parts.push(Span::styled(format!(" · attempt {attempt}"), muted));
+            }
+            let files = app.changes.len();
+            if files > 0 && !app.panel_shown() {
+                parts.push(Span::styled(
+                    format!(
+                        " · {files} {} changed (Ctrl+O)",
+                        if files == 1 { "file" } else { "files" }
+                    ),
+                    muted,
+                ));
             }
         }
     }

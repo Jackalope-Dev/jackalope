@@ -229,6 +229,12 @@ fn ensure_project(app: &AppHandle, path: &str) -> Result<protocol::Project, Stri
     let root = super::tasks::project_directory(path)?;
     let runtime = app.state::<TaskRuntime>();
     let record = super::project_registry::ensure(&runtime, &root)?;
+    // An open window adopts a repository first used from a terminal now,
+    // rather than on its next launch. Merging a known project changes nothing.
+    {
+        use tauri::Emitter;
+        let _ = app.emit("jackalope:projects-registered", ());
+    }
     Ok(protocol::Project {
         id: record.id,
         name: record.name,
@@ -297,6 +303,9 @@ fn attempts<'a>(run_id: &str, runs: &'a [TaskRun]) -> Vec<&'a TaskRun> {
     chain
 }
 
+/// Activity entries a terminal receives, enough to show what work is doing.
+const ACTIVITY_TAIL: usize = 12;
+
 /// Projects the newest attempt in a conversation into what a terminal renders.
 fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionView {
     let run = runs
@@ -340,6 +349,12 @@ fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionVie
         workspace: run.map(|run| run.workspace.clone()),
         branch: run.map(|run| run.branch.clone()),
         result: run.map(|run| run.result.clone()).unwrap_or_default(),
+        activity: run
+            .map(|run| {
+                let skip = run.activity.len().saturating_sub(ACTIVITY_TAIL);
+                run.activity[skip..].to_vec()
+            })
+            .unwrap_or_default(),
         questions: run
             .map(|run| {
                 run.prompts
@@ -627,6 +642,17 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             // The window may still be loading; it asks again once ready.
             let _ = app.emit("jackalope:open-changes", path);
             Ok(response)
+        }
+        Request::SetAccent { project_id, accent } => {
+            use tauri::Emitter;
+            let runtime = app.state::<TaskRuntime>();
+            super::project_registry::set_accent(&runtime, &project_id, &accent)?;
+            // The app owns theme preferences; it applies this and mirrors back.
+            let _ = app.emit(
+                "jackalope:set-accent",
+                serde_json::json!({ "projectId": project_id, "accent": accent }),
+            );
+            Ok(Response::Ok)
         }
         Request::SessionLearn { session_id } => {
             let sessions = app.state::<LiveSessions>();

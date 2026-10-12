@@ -620,6 +620,12 @@ export function LiveSessionView({
                             <X size={12} aria-hidden="true" />
                           </button>
                         )}
+                        <CopyButton
+                          className="live-copy"
+                          size="sm"
+                          text={message.text}
+                          label="Copy"
+                        />
                       </div>
                     </article>
                     {lastInBatch && run?.result && (
@@ -643,6 +649,14 @@ export function LiveSessionView({
                               onOpenLink={(url) => void act(() => openExternalUrl(url))}
                             />
                           </Suspense>
+                          {!isActive(run) && (
+                            <CopyButton
+                              className="live-copy"
+                              size="sm"
+                              text={run.result}
+                              label="Copy reply"
+                            />
+                          )}
                         </div>
                       </article>
                     )}
@@ -924,7 +938,12 @@ export function LiveSessionView({
                 <summary>Workspace</summary>
                 <p>{latest.workspace}</p>
                 <CopyButton text={latest.workspace} label="Copy path" />
-                <p>{latest.branch}</p>
+                {latest.branch && (
+                  <>
+                    <p>{latest.branch}</p>
+                    <CopyButton text={latest.branch} label="Copy branch" />
+                  </>
+                )}
               </details>
             )}
           </aside>

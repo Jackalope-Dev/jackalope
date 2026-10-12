@@ -23,13 +23,19 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("agent", "choose the agent for your next conversation"),
     ("model", "choose the model for your next conversation"),
     ("usage", "show account quota and when it resets"),
+    ("theme", "set this project's colour here and in the app"),
     (
         "learn",
         "save learnings from this session to project context",
     ),
-    ("diff", "review and commit this work in the app"),
+    ("files", "show or hide the files this work changed (Ctrl+O)"),
+    (
+        "review",
+        "open this work's changes in the app to review and commit",
+    ),
     ("stop", "stop the work that is running"),
     ("retry", "run the last message again"),
+    ("answer", "choose an answer to the agent's question"),
     ("finish", "mark this conversation done"),
     ("pause", "hold queued messages"),
     ("unpause", "send held messages"),
@@ -41,6 +47,36 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("help", "show these commands"),
     ("quit", "leave (work keeps running)"),
 ];
+
+/// Named accents `/theme` accepts besides any `#rrggbb`.
+pub const THEMES: &[(&str, &str)] = &[
+    ("orange", "#f97316"),
+    ("red", "#ef4444"),
+    ("pink", "#ec4899"),
+    ("purple", "#8b5cf6"),
+    ("blue", "#3b82f6"),
+    ("teal", "#14b8a6"),
+    ("green", "#22c55e"),
+    ("yellow", "#eab308"),
+];
+
+/// The `#rrggbb` a `/theme` argument names, if any.
+fn theme_hex(argument: &str) -> Option<String> {
+    let argument = argument.trim().to_ascii_lowercase();
+    if let Some((_, hex)) = THEMES.iter().find(|(name, _)| *name == argument) {
+        return Some((*hex).into());
+    }
+    let digits = argument.strip_prefix('#').unwrap_or(&argument);
+    let expanded: String = match digits.len() {
+        3 => digits.chars().flat_map(|c| [c, c]).collect(),
+        6 => digits.into(),
+        _ => return None,
+    };
+    expanded
+        .bytes()
+        .all(|byte| byte.is_ascii_hexdigit())
+        .then(|| format!("#{expanded}"))
+}
 
 /// Commands whose names start with what follows the `/`, while the input is
 /// still a bare command.
@@ -305,8 +341,17 @@ impl App {
                 }
             }
             "usage" | "cost" => self.usage(),
+            "theme" | "color" | "colour" => self.theme(argument),
+            "files" => self.toggle_panel(),
+            "answer" => match self.question().map(|question| question.options.is_empty()) {
+                Some(false) => self.open_picker(PickerKind::Question),
+                Some(true) => {
+                    self.note("This question has no options; type your answer and press Enter.")
+                }
+                None => self.note("Nothing is waiting on an answer."),
+            },
             "learn" => self.learn(),
-            "diff" | "changes" => {
+            "review" | "diff" | "changes" => {
                 if self
                     .request(Request::ShowChanges {
                         path: self.workspace(),
@@ -401,6 +446,34 @@ impl App {
     }
 }
 
+impl App {
+    fn theme(&mut self, argument: &str) {
+        if argument.is_empty() {
+            let names: Vec<&str> = THEMES.iter().map(|(name, _)| *name).collect();
+            self.note(format!(
+                "/theme <colour>: {} or any #rrggbb. It changes this project in the app too.",
+                names.join(", ")
+            ));
+            return;
+        }
+        let Some(accent) = theme_hex(argument) else {
+            self.note(format!(
+                "'{argument}' is not a colour /theme knows. Try purple or #8b5cf6."
+            ));
+            return;
+        };
+        let request = Request::SetAccent {
+            project_id: self.project.id.clone(),
+            accent: accent.clone(),
+        };
+        if self.request(request).is_some() {
+            crate::brand::set_accent(Some(&accent));
+            self.project.accent = Some(accent.clone());
+            self.flash(format!("Theme set to {accent}"), Tone::Success);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -432,6 +505,16 @@ mod tests {
     fn familiar_commands_follow_other_agent_clis() {
         assert_eq!(names("/res"), ["resume"]);
         assert_eq!(names("/unp"), ["unpause"]);
+        assert_eq!(names("/th"), ["theme"]);
+    }
+
+    #[test]
+    fn theme_accepts_names_and_hex() {
+        assert_eq!(theme_hex("Purple").as_deref(), Some("#8b5cf6"));
+        assert_eq!(theme_hex("#abc").as_deref(), Some("#aabbcc"));
+        assert_eq!(theme_hex("12ab34").as_deref(), Some("#12ab34"));
+        assert_eq!(theme_hex("mauve"), None);
+        assert_eq!(theme_hex("#12345g"), None);
         assert!(COMMANDS.iter().any(|(name, _)| *name == "clear"));
     }
 

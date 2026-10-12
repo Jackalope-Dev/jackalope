@@ -12,13 +12,13 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
 /// The first row to show so `selected` stays in a window of `rows`.
-fn window_start(selected: usize, rows: usize) -> usize {
+pub(super) fn window_start(selected: usize, rows: usize) -> usize {
     selected.saturating_sub(rows.saturating_sub(1))
 }
 
 /// A popup frame: a rounded border with a hint on top and, when the list is
 /// longer than it shows, where the highlight is (`3/24`) on the bottom edge.
-fn frame_block(
+pub(super) fn frame_block(
     title: Span<'static>,
     border: Style,
     position: Option<(usize, usize)>,
@@ -41,7 +41,7 @@ fn frame_block(
 }
 
 /// One list row padded to `width` so the highlight spans the whole row.
-fn row(spans: Vec<Span<'static>>, width: usize, chosen: bool) -> Line<'static> {
+pub(super) fn row(spans: Vec<Span<'static>>, width: usize, chosen: bool) -> Line<'static> {
     let used: usize = spans.iter().map(|span| span.content.chars().count()).sum();
     let mut spans = spans;
     spans.push(Span::raw(" ".repeat(width.saturating_sub(used))));

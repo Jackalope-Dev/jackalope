@@ -117,6 +117,9 @@
     border-color: transparent;
     background: transparent;
     box-shadow: none;
+    /* The sliding fill is the selected background; fading the hover tint out
+       underneath it would show a second colour mid-slide. */
+    transition: color 140ms;
   }
   @media (prefers-reduced-motion: reduce) {
     :is(.ui-segment, .ui-segmented > .ui-tabs-trigger),

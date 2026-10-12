@@ -305,10 +305,10 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
   }));
 }
 
-// Adopts repositories registered from a terminal before this window loaded,
-// then republishes so the mirror reflects any projects added while it was
+// Adopts repositories registered from a terminal, on load and whenever a
+// terminal registers one while this window is open, then republishes so the mirror reflects any projects added while it was
 // unavailable.
-async function mergeProjectRegistry() {
+export async function mergeProjectRegistry() {
   if (!isTauriEnvironment()) return;
   try {
     const records = await nativeTask<ProjectRecord[]>('project_registry_list', {});

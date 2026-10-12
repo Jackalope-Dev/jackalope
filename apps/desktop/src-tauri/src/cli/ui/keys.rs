@@ -55,6 +55,7 @@ impl App {
         let matches = slash_matches(self.editor.text());
         let mentions = self.mention_matches();
         let working = self.working();
+        let panel = self.panel_shown();
         if key.code != KeyCode::Esc {
             self.stop_armed = None;
         }
@@ -63,6 +64,9 @@ impl App {
             KeyCode::Char('l') if control => self.clear_feed(),
             KeyCode::Char('r') if control => self.open_picker(PickerKind::History),
             KeyCode::Char('z') if control => self.suspend = cfg!(unix),
+            KeyCode::Char('o') if control => self.toggle_panel(),
+            KeyCode::Up if (alt || shift) && panel => self.step_change(-1),
+            KeyCode::Down if (alt || shift) && panel => self.step_change(1),
             // Newline without sending: Shift+Enter where the terminal reports
             // it, Alt+Enter, Ctrl+J, or a trailing backslash, which works in
             // every terminal (Windows Terminal takes Alt+Enter for full screen).
