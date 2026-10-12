@@ -139,7 +139,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   reproduce embedded-page sign-in or unsaved interactions.
 - Delivery inspects local Git state and optionally reads PR/CI through the GitHub CLI.
   PR, CI and deployment preparation carry evidence into editable drafts. Failing PR
-  checks are listed openly with a draft asking the agent to reproduce and fix them. Publishing and
+  checks are listed openly with a draft asking the agent to reproduce and fix them.
+  Create pull request asks for a title, description and draft choice, then commits any
+  remaining task changes with the project's commit policy, pushes the task branch and
+  opens the PR through the GitHub CLI; nothing is published before that confirmation. Publishing and
   deployment remain explicit user-approved steps; a local merge does not establish either.
 - Live sessions capture short messages while work runs, batch them in order in one
   isolated workspace, and retain drafts, results and cumulative patch exports. Chat

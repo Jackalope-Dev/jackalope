@@ -7,10 +7,11 @@ import {
 } from '@jackalope/ui';
 import { ChevronDown, GitPullRequest } from 'lucide-react';
 import { useState } from 'react';
-import { nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { openExternalUrl } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
+import { CreatePullRequest } from './CreatePullRequest';
 
 interface DeliveryStatus {
   head: string;
@@ -80,6 +81,7 @@ export function TaskDelivery({
   const [status, setStatus] = useState<DeliveryStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [created, setCreated] = useState('');
   const inspect = async (remote: boolean) => {
     setBusy(true);
     setError('');
@@ -218,6 +220,16 @@ export function TaskDelivery({
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       <div className="space-y-2">
         <div className="flex flex-wrap gap-2">
+          {!status?.pullRequest && (
+            <CreatePullRequest
+              run={run}
+              disabled={busy || isActive(run)}
+              onCreated={(url) => {
+                setCreated(url);
+                void inspect(true);
+              }}
+            />
+          )}
           <Button variant="outline" onClick={() => void prepare('a pull request')}>
             <GitPullRequest size={16} aria-hidden="true" /> Prepare pull request
           </Button>
@@ -247,7 +259,27 @@ export function TaskDelivery({
             </Menu.Portal>
           </Menu.Root>
         </div>
-        <p className="task-muted">Prepares a draft for your review. Nothing is published.</p>
+        {created && (
+          <InlineNotice
+            tone="success"
+            action={
+              <Button
+                variant="outline"
+                onClick={() =>
+                  void openExternalUrl(created).catch((cause) => setError(String(cause)))
+                }
+              >
+                Open pull request
+              </Button>
+            }
+          >
+            Pull request opened.
+          </InlineNotice>
+        )}
+        <p className="task-muted">
+          Prepare actions draft a request for the agent. Create pull request publishes only after
+          you confirm.
+        </p>
         <CopyButton
           text={deliveryHandoff(run, integrated, 'a delivery handoff')}
           label="Copy delivery handoff"

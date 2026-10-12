@@ -249,6 +249,9 @@ release dates.
   Keep reported, estimated, stale and unavailable data distinct.
 - [ ] Evaluate protocol and credential-store migrations against real providers
   while preserving existing adapters and encrypted saved data.
+- [ ] Accept Create pull request with an authenticated GitHub CLI on each platform: commit
+  hooks and attribution, branches without an upstream, missing origin, protected bases,
+  draft and ready PRs, an existing PR for the branch and push or gh failures midway.
 - [ ] Validate read-only GitHub issue, unresolved review-thread and CI imports with
   authenticated installed CLIs, including enterprise hosts, pagination and stale heads.
   Validate editable workflow drafts and preserve explicit authorization for remote writes.

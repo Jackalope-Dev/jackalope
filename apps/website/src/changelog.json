@@ -1,5 +1,16 @@
 [
   {
+    "id": "open-pull-requests-and-fix-failing-checks-from-a-task",
+    "date": "2026-10-12",
+    "status": "In development",
+    "title": "Open pull requests and fix failing checks from a task",
+    "description": "Delivery now goes from a finished task to a pull request without leaving Jackalope.",
+    "items": [
+      "Create pull request commits the task's remaining changes with your commit settings, pushes its branch and opens a draft or ready pull request through your GitHub CLI after you confirm.",
+      "Failing pull request checks are listed openly, and Ask the agent to fix drafts a follow-up that reproduces and repairs them without pushing."
+    ]
+  },
+  {
     "id": "a-quicker-start-and-a-simpler-workspace",
     "date": "2026-10-12",
     "status": "In development",

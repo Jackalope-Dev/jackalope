@@ -413,6 +413,7 @@ pub fn run(launch: Launch) {
             commands::previews::design::task_preview_design_open,
             commands::previews::design::task_preview_design_capture,
             commands::delivery::task_delivery_status,
+            commands::delivery::task_pull_request_create,
             commands::outcomes::task_outcome_review,
             task_review,
             commands::live_sessions::live_session_limits,
