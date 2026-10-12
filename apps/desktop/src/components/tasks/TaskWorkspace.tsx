@@ -361,7 +361,7 @@ export function TaskWorkspace({
                 <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
                   <Menu.Item className="workspace-menu-item" onSelect={() => onCapture()}>
                     <Radio size={16} />
-                    Save a task draft
+                    Save a draft
                   </Menu.Item>
                   {project && (
                     <Menu.Item

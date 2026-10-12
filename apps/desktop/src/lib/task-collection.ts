@@ -11,7 +11,7 @@ export const workStages = [
   { id: 'attention', label: 'Needs you' },
   { id: 'review', label: 'Ready to review' },
   { id: 'working', label: 'Working' },
-  { id: 'ideas', label: 'Saved ideas' },
+  { id: 'ideas', label: 'Drafts' },
   { id: 'finished', label: 'Finished' },
 ] as const;
 
@@ -99,7 +99,7 @@ export function workPresence(item: WorkItem): {
         ? item.stage === 'finished'
           ? 'Open result'
           : taskNextAction(run)
-        : 'Open idea';
+        : 'Open draft';
   return { agents, state, action };
 }
 

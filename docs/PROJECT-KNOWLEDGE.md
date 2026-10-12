@@ -101,7 +101,7 @@ instruction remains the objective; the workflow supplements it. A workflow is
 limited to 6,000 bytes and never selected automatically. Missing or paused selected
 workflows block launch with an actionable error. Agent, account, connections and
 verification permissions remain controlled by the existing project/task settings.
-Saved ideas preserve the workflow selection and skipped-lesson settings.
+Saved drafts preserve the workflow selection and skipped-lesson settings.
 
 ## Local change monitors
 

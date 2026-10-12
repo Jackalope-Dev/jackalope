@@ -54,7 +54,7 @@ for (const size of [
     });
   });
   const priorities = page.getByRole('group', { name: 'Focus your work' });
-  const saved = priorities.getByRole('button', { name: '1 Saved ideas' });
+  const saved = priorities.getByRole('button', { name: '1 Drafts' });
   await saved.focus();
   await page.keyboard.press('Space');
   assert.equal(await saved.getAttribute('aria-pressed'), 'true');

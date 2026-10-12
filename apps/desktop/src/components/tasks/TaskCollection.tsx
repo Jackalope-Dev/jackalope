@@ -381,11 +381,11 @@ export function TaskCollection({
       ) : !filtered.length ? (
         <EmptyState
           icon={ListTodo}
-          title={items.length ? 'No matching tasks' : 'Room for your next idea'}
+          title={items.length ? 'No matching tasks' : 'Room for your next task'}
           description={
             items.length
               ? 'Try another stage or search.'
-              : 'Start a task now, or save an idea for later. Its work and review stay here.'
+              : 'Start a task now, or save a draft for later. Its work and review stay here.'
           }
         />
       ) : layout === 'list' ? (
