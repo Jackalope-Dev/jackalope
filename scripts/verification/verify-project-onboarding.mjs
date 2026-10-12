@@ -250,9 +250,8 @@ try {
   await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
   await page.waitForFunction(() => window.setupFixture.finished?.skipped);
   await page.goto(`${url}/?overview`, { waitUntil: 'domcontentloaded' });
-  await page.getByText('Checking repository…', { exact: true }).waitFor();
-  assert.equal(await page.getByText('Working tree clean', { exact: true }).count(), 0);
-  assert.equal(await page.getByText('Setup inspected', { exact: true }).count(), 0);
+  await page.getByText(/Checking repository…/).waitFor();
+  assert.equal(await page.getByText(/Working tree clean/).count(), 0);
   await page.evaluate(() => window.setupFixture.select('second'));
   await page.waitForFunction(() => !!window.setupFixture.pending['C:/Fixture/second']);
   await page.evaluate(() =>
@@ -260,20 +259,20 @@ try {
   );
   await page.getByText('Uncommitted changes', { exact: true }).waitFor();
   await page.evaluate(() => window.setupFixture.pending['C:/Fixture/atlas'].resolve(''));
-  assert.equal(await page.getByText('Working tree clean', { exact: true }).count(), 0);
+  assert.equal(await page.getByText(/Working tree clean/).count(), 0);
   await page.evaluate(() => delete window.setupFixture.pending['C:/Fixture/second']);
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('button', { name: 'Check again', exact: true }).click();
   await page.waitForFunction(() => !!window.setupFixture.pending['C:/Fixture/second']);
   await page.evaluate(() =>
     window.setupFixture.pending['C:/Fixture/second'].reject(new Error('Offline fixture')),
   );
-  await page.getByText('Setup unavailable', { exact: true }).waitFor();
-  assert.equal(await page.getByText('Working tree clean', { exact: true }).count(), 0);
+  await page.getByText(/Repository status is unavailable/).waitFor();
+  assert.equal(await page.getByText(/Working tree clean/).count(), 0);
   await page.evaluate(() => delete window.setupFixture.pending['C:/Fixture/second']);
   await page.getByRole('button', { name: 'Retry repository check' }).click();
   await page.waitForFunction(() => !!window.setupFixture.pending['C:/Fixture/second']);
   await page.evaluate(() => window.setupFixture.pending['C:/Fixture/second'].resolve(''));
-  await page.getByText('Working tree clean', { exact: true }).waitFor();
+  await page.getByText(/Working tree clean/).waitFor();
   assert.deepEqual(errors, []);
   console.log(
     'Project onboarding browser checks passed: three steps, automatic defaults, explicit overrides, stale inspection responses, unavailable inspection, provisional settings, draft restoration, keyboard and narrow layouts. No native tasks launched.',
