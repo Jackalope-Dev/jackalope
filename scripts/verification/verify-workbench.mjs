@@ -88,11 +88,10 @@ try {
     await page.getByRole('button', { name: 'Terminal', exact: true }).click();
     await page.getByRole('button', { name: 'Stop terminal', exact: true }).click();
     await page.getByRole('button', { name: 'Start terminal', exact: true }).waitFor();
+    // Stopping keeps keyboard focus on the toggle once it is enabled again.
+    await page.waitForFunction(() => document.activeElement.textContent === 'Start terminal');
     await page.keyboard.press('Escape');
-    assert.equal(
-      await page.getByRole('button', { name: 'Start terminal', exact: true }).count(),
-      0,
-    );
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
     await page.evaluate(() => window.fixture.openTools());
     await page.getByRole('button', { name: 'Start terminal', exact: true }).waitFor();
     await page.screenshot({ path: path.join(output, `terminal-${theme}-${width}.png`) });
@@ -240,7 +239,7 @@ try {
   );
   await missing.close();
   console.log(
-    'Workbench browser fixtures passed: layouts, terminal reconnect/control focus, popout routing, reversible topics, saved feedback and failure recovery, missing tasks, older transcript and three viewport/theme combinations. Native execution is tested separately.',
+    'Workbench browser fixtures passed: terminal reconnect/control focus, popout routing, reversible topics, saved feedback and failure recovery, missing tasks, older transcript and three viewport/theme combinations. Native execution is tested separately.',
   );
 } finally {
   await browser?.close();
