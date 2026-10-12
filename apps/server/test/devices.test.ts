@@ -634,6 +634,7 @@ it('returns bounded invitation progress to the connected desktop without exposin
   ]);
   const accepted = await call('/v1/desktop/referrals', 'GET', undefined, flow.secret);
   expect(await accepted.json()).toMatchObject({
+    openSignup: false,
     limit: 5,
     remaining: 4,
     accepted: 1,
@@ -660,6 +661,13 @@ it('returns bounded invitation progress to the connected desktop without exposin
   )
     .bind(now - 1, now, invitedId)
     .run();
+  bindings.OPEN_SIGNUP = 'true';
+  try {
+    const open = await call('/v1/desktop/referrals', 'GET', undefined, flow.secret);
+    expect(await open.json()).toMatchObject({ openSignup: true });
+  } finally {
+    bindings.OPEN_SIGNUP = 'false';
+  }
   const connected = await call('/v1/desktop/referrals', 'GET', undefined, flow.secret);
   const body = await connected.json<{
     downloaded: number;

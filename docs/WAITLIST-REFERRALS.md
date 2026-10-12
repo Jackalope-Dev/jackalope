@@ -14,7 +14,9 @@ ties. The admin defaults to that same order and can sort by most referrals or
 newest requests. Position can move in either direction; while open signup is off,
 approval remains an explicit owner action and no access date is promised. With
 `OPEN_SIGNUP` on, confirming the email approves the member, so new signups never
-enter the ranked list; members who were already waiting stay there until approved.
+enter the ranked list; members who were already waiting stay there until approved. The desktop
+referral response then reports `openSignup`, and the app hides pass prompts and offers the
+download link to share instead.
 
 The first registration fixes attribution. Repeat registrations cannot replace
 it or award another credit. Self-referrals and unverified referrers earn none.
