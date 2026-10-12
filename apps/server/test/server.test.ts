@@ -381,7 +381,27 @@ describe('resource and retention controls', () => {
       {},
       testEnv({ EARLY_ACCESS_ENABLED: 'true', GLOBAL_LIMITER: { limit: global } }),
     );
-    expect(global.mock.calls).toEqual([[{ key: 'ingestion' }], [{ key: 'desktop-session' }]]);
+    // Session polls from paired desktops are bounded per address, not by the shared cap.
+    expect(global.mock.calls).toEqual([[{ key: 'ingestion' }]]);
+  });
+  it('still limits desktop polls per address while exempting them from the shared cap', async () => {
+    const closed = { limit: async () => ({ success: false }) };
+    const poll = (bindings: Partial<Env>) =>
+      request(
+        '/v1/desktop/me',
+        undefined,
+        {},
+        testEnv({ EARLY_ACCESS_ENABLED: 'true', ...bindings }),
+      );
+    expect((await poll({ IP_LIMITER: closed })).status).toBe(429);
+    expect((await poll({ GLOBAL_LIMITER: closed })).status).not.toBe(429);
+    const start = await request(
+      '/v1/desktop/start',
+      {},
+      {},
+      testEnv({ EARLY_ACCESS_ENABLED: 'true', GLOBAL_LIMITER: closed }),
+    );
+    expect(start.status).toBe(429);
   });
   it('fails closed on missing configuration and paused ingestion', async () => {
     for (const bindings of [
