@@ -110,13 +110,13 @@ mod tests {
         assert!(runtime
             .start(request.clone())
             .unwrap_err()
-            .contains("approved Jackalope"));
+            .contains("Sign in to Jackalope"));
         let mut continuation = request.clone();
         continuation.previous_run_id = Some("previous-attempt".into());
         assert!(runtime
             .start(continuation)
             .unwrap_err()
-            .contains("approved Jackalope"));
+            .contains("Sign in to Jackalope"));
         assert!(runtime.integration_runs().unwrap().is_empty());
         assert!(!folder.join("denied-attempt.json").exists());
         assert!(!folder.join("must-not-create").exists());
@@ -125,12 +125,12 @@ mod tests {
         assert!(!runtime
             .start(request.clone())
             .unwrap_err()
-            .contains("approved Jackalope"));
+            .contains("Sign in to Jackalope"));
         runtime.access.revoke();
         assert!(runtime
             .start(request)
             .unwrap_err()
-            .contains("approved Jackalope"));
+            .contains("Sign in to Jackalope"));
         assert!(runtime.integration_runs().unwrap().is_empty());
         drop(runtime);
         let restarted = TaskRuntime::new(folder.clone()).unwrap();

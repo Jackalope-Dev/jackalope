@@ -910,7 +910,7 @@ impl BotHub {
             })
         });
         let blocked = if self.runtime.access.ensure().is_err() {
-            Some("Skipped: approved Jackalope access is required")
+            Some("Skipped: sign in to Jackalope to start new work")
         } else if state.1.as_deref().is_some_and(|id| self.sessions.busy(id)) {
             Some("Skipped: the previous wake-up is still working")
         } else if !manual && state.0 >= HOURLY_WAKES {
