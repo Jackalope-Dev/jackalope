@@ -42,6 +42,19 @@ pub enum Command {
         id: String,
         stat: bool,
     },
+    /// Merge a conversation's reviewed work into the project's target branch.
+    Merge {
+        id: String,
+        message: Option<String>,
+        yes: bool,
+    },
+    /// Commit, push and open a pull request for a conversation's work.
+    PullRequest {
+        id: String,
+        title: Option<String>,
+        ready: bool,
+        yes: bool,
+    },
     Help,
     Version,
 }
@@ -66,7 +79,8 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
     let mut words: Vec<String> = Vec::new();
     let (mut print, mut json, mut resume, mut help, mut version, mut init) =
         (false, false, false, false, false, false);
-    let (mut pick, mut stream, mut stat) = (false, false, false);
+    let (mut pick, mut stream, mut stat, mut yes, mut ready) = (false, false, false, false, false);
+    let (mut message, mut title) = (None, None);
     let mut cold_start = None;
     let (mut agent, mut model, mut profile, mut timeout) = (None, None, None, None);
     let mut compare: Option<Vec<String>> = None;
@@ -95,6 +109,10 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
             "--json" => json = true,
             "--stream-json" => stream = true,
             "--stat" => stat = true,
+            "-y" | "--yes" => yes = true,
+            "--ready" => ready = true,
+            "-m" | "--message" => message = Some(value("--message")?),
+            "--title" => title = Some(value("--title")?),
             "-c" | "--continue" => resume = true,
             "-r" | "--resume" => pick = true,
             "-h" | "--help" => help = true,
@@ -131,7 +149,13 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
         if inline.is_some()
             && !matches!(
                 name.as_str(),
-                "--agent" | "--agents" | "--model" | "--profile" | "--timeout"
+                "--agent"
+                    | "--agents"
+                    | "--model"
+                    | "--profile"
+                    | "--timeout"
+                    | "--message"
+                    | "--title"
             )
         {
             return Err(format!("{name} does not take a value. {USAGE}"));
@@ -227,6 +251,23 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
                     stat,
                 }
             }
+            Some("merge") => {
+                extra(2)?;
+                Command::Merge {
+                    id: argument().ok_or("Which conversation? Run 'jackalope ls' to see them.")?,
+                    message: message.take(),
+                    yes,
+                }
+            }
+            Some("pr") => {
+                extra(2)?;
+                Command::PullRequest {
+                    id: argument().ok_or("Which conversation? Run 'jackalope ls' to see them.")?,
+                    title: title.take(),
+                    ready,
+                    yes,
+                }
+            }
             Some("stop") => {
                 extra(2)?;
                 Command::Stop {
@@ -256,6 +297,16 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
     }
     if stat && !matches!(command, Command::Diff { .. }) {
         return Err(format!("--stat applies to diff. {USAGE}"));
+    }
+    let delivers = matches!(command, Command::Merge { .. } | Command::PullRequest { .. });
+    if yes && !delivers {
+        return Err(format!("--yes applies to merge and pr. {USAGE}"));
+    }
+    if message.is_some() {
+        return Err(format!("--message applies to merge. {USAGE}"));
+    }
+    if (title.is_some() || ready) && !matches!(command, Command::PullRequest { .. }) {
+        return Err(format!("--title and --ready apply to pr. {USAGE}"));
     }
     if json && !json_applies {
         return Err(format!("--json applies to -p, ls and status. {USAGE}"));
@@ -353,6 +404,31 @@ mod tests {
         assert_eq!(command(&["--resume", "ab"]), attach);
         assert_eq!(command(&["resume", "ab"]), attach);
         assert!(parse_line(&["resume", "ab", "cd"]).is_err());
+    }
+
+    #[test]
+    fn merge_and_pr_take_their_own_options() {
+        assert_eq!(
+            command(&["merge", "ab12", "-m", "Add search", "--yes"]),
+            Command::Merge {
+                id: "ab12".into(),
+                message: Some("Add search".into()),
+                yes: true
+            }
+        );
+        assert_eq!(
+            command(&["pr", "ab12", "--title", "Add search", "--ready"]),
+            Command::PullRequest {
+                id: "ab12".into(),
+                title: Some("Add search".into()),
+                ready: true,
+                yes: false
+            }
+        );
+        assert!(parse_line(&["merge"]).is_err());
+        assert!(parse_line(&["pr", "ab12", "-m", "x"]).is_err());
+        assert!(parse_line(&["merge", "ab12", "--ready"]).is_err());
+        assert!(parse_line(&["ls", "--yes"]).is_err());
     }
 
     #[test]

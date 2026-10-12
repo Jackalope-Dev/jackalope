@@ -1,4 +1,5 @@
-//! The one-shot commands that print and exit: `status`, `ls`, `stop` and `diff`.
+//! The one-shot commands that print and exit: `status`, `ls`, `stop`, `diff`,
+//! `merge` and `pr`.
 
 use crate::connection::{resolve, short, unexpected, Connection};
 use crate::git;
@@ -154,6 +155,173 @@ pub fn diff(preference: Option<ColdStart>, prefix: &str, stat: bool) -> Result<(
         );
     }
     Ok(())
+}
+
+/// Merges a conversation's latest reviewed attempt into the project's target
+/// branch through the app's merge review, pausing the conversation first so no
+/// new message starts mid-merge. Shows the plan and asks before applying.
+pub fn merge(
+    preference: Option<ColdStart>,
+    prefix: &str,
+    message: Option<String>,
+    yes: bool,
+) -> Result<(), String> {
+    let mut connection = host::ensure(preference)?;
+    let id = resolve(&connection.sessions()?, prefix)?;
+    let view = connection.session(&id)?;
+    if protocol::working(view.status.as_deref()) {
+        return Err("The agent is still working. Merge once it finishes.".into());
+    }
+    if !view.paused {
+        connection.call(&Request::SessionAction {
+            session_id: id.clone(),
+            action: "pause".into(),
+        })?;
+        eprintln!(
+            "Paused {} so no new message starts during the merge.",
+            view.title
+        );
+    }
+    let plan = match connection.call(&Request::MergePrepare {
+        session_id: id.clone(),
+        message,
+    })? {
+        Response::Merge { plan } => plan,
+        _ => return Err(unexpected()),
+    };
+    if !plan.conflicts.is_empty() {
+        return Err(format!(
+            "{} conflicts with {}: {}. Resolve them in the app's merge review.",
+            view.title,
+            plan.target_branch,
+            plan.conflicts.join(", ")
+        ));
+    }
+    if plan.files.is_empty() {
+        return Err("There are no changes to merge.".into());
+    }
+    let count = plan.files.len();
+    eprintln!(
+        "Merge {count} {} from {} into {}:",
+        if count == 1 { "file" } else { "files" },
+        view.title,
+        plan.target_branch
+    );
+    for file in plan.files.iter().take(20) {
+        eprintln!("  {file}");
+    }
+    if count > 20 {
+        eprintln!("  … and {} more", count - 20);
+    }
+    eprintln!(
+        "Commit message: {}",
+        plan.commit_message.lines().next().unwrap_or_default()
+    );
+    if plan.cleanup {
+        eprintln!("The worktree is removed afterwards, as your commit settings ask.");
+    }
+    if !approved(yes, "Merge now?")? {
+        eprintln!(
+            "Not merged. {} stays paused; resume it with /unpause in jackalope attach {}.",
+            view.title,
+            short(&id)
+        );
+        return Ok(());
+    }
+    match connection.call(&Request::MergeApply {
+        plan_id: plan.id,
+        cleanup: plan.cleanup,
+    })? {
+        Response::Merge { plan } => {
+            println!("Merged {} into {}.", view.title, plan.target_branch);
+            for error in plan.cleanup_errors {
+                eprintln!("Could not remove the worktree: {error}");
+            }
+            Ok(())
+        }
+        _ => Err(unexpected()),
+    }
+}
+
+/// Commits a conversation's remaining changes with the project's commit
+/// settings, pushes its branch and opens a pull request with the person's
+/// GitHub CLI, as the app's Create pull request does. Draft unless `ready`.
+pub fn pull_request(
+    preference: Option<ColdStart>,
+    prefix: &str,
+    title: Option<String>,
+    ready: bool,
+    yes: bool,
+) -> Result<(), String> {
+    let mut connection = host::ensure(preference)?;
+    let id = resolve(&connection.sessions()?, prefix)?;
+    let view = connection.session(&id)?;
+    if protocol::working(view.status.as_deref()) {
+        return Err("The agent is still working. Open a pull request once it finishes.".into());
+    }
+    let title = title
+        .map(|title| title.trim().to_string())
+        .filter(|title| !title.is_empty())
+        .unwrap_or_else(|| view.title.trim().to_string());
+    if title.is_empty() || title.contains('\n') {
+        return Err("Give the pull request a one-line title with --title.".into());
+    }
+    let body: String = view.result.trim().chars().take(4000).collect();
+    let branch = view.branch.clone().unwrap_or_default();
+    eprintln!(
+        "Commit any remaining changes with your commit settings, push {} and open a {} pull request:",
+        if branch.is_empty() { "the branch".to_string() } else { branch },
+        if ready { "ready" } else { "draft" }
+    );
+    eprintln!("  {title}");
+    if !approved(yes, "Open it?")? {
+        eprintln!("No pull request opened.");
+        return Ok(());
+    }
+    match connection.call(&Request::PullRequest {
+        session_id: id,
+        title,
+        body,
+        draft: !ready,
+    })? {
+        Response::PullRequest { url } => {
+            println!("{url}");
+            Ok(())
+        }
+        _ => Err(unexpected()),
+    }
+}
+
+/// `--yes`, or a yes typed at a terminal. A script without `--yes` is refused
+/// rather than left waiting for an answer nobody will type.
+fn approved(yes: bool, question: &str) -> Result<bool, String> {
+    use std::io::{BufRead, IsTerminal, Write};
+    if yes {
+        return Ok(true);
+    }
+    if !std::io::stdin().is_terminal() {
+        return Err("Pass --yes to go ahead without a prompt.".into());
+    }
+    loop {
+        eprint!("{question} [y/N] ");
+        std::io::stderr()
+            .flush()
+            .map_err(|error| error.to_string())?;
+        let mut line = String::new();
+        if std::io::stdin()
+            .lock()
+            .read_line(&mut line)
+            .map_err(|error| error.to_string())?
+            == 0
+        {
+            return Ok(false);
+        }
+        match line.trim().to_ascii_lowercase().as_str() {
+            "y" | "yes" => return Ok(true),
+            "n" | "no" | "" => return Ok(false),
+            _ => eprintln!("Please answer y or n."),
+        }
+    }
 }
 
 fn agents(connection: &mut Connection) -> Result<(Vec<AgentStatus>, String), String> {

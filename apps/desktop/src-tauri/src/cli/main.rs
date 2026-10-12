@@ -36,6 +36,10 @@ USAGE
   jackalope attach <id>          the same as --resume <id>
   jackalope stop <id>            stop the work a conversation is running
   jackalope diff <id> [--stat]   print a conversation's changes since it started
+  jackalope merge <id>           merge a paused conversation's work into the
+                                 project branch (-m <message>, --yes)
+  jackalope pr <id>              commit, push and open a pull request with your
+                                 GitHub CLI (--title <text>, --ready, --yes)
   jackalope status               show the host, this project and your agents
   jackalope help                 show this message
 
@@ -129,6 +133,15 @@ fn run() -> Result<(), String> {
         Command::Status { json } => subcommands::status(json),
         Command::Stop { id } => subcommands::stop(cli.cold_start, &id),
         Command::Diff { id, stat } => subcommands::diff(cli.cold_start, &id, stat),
+        Command::Merge { id, message, yes } => {
+            subcommands::merge(cli.cold_start, &id, message, yes)
+        }
+        Command::PullRequest {
+            id,
+            title,
+            ready,
+            yes,
+        } => subcommands::pull_request(cli.cold_start, &id, title, ready, yes),
         Command::Converse {
             resume,
             attach,
