@@ -253,7 +253,8 @@ impl LiveSessions {
             session.paused = true;
             if let Some(batch) = session.batches.last_mut().filter(|batch| !batch.settled) {
                 session.error = Some(
-                    "The conversation was interrupted. Review the last attempt before resuming.".into(),
+                    "The conversation was interrupted. Review the last attempt before resuming."
+                        .into(),
                 );
                 if !runs.iter().any(|run| run.id == batch.run_id) {
                     batch.error = Some("The pending launch was interrupted. Retry it explicitly after reviewing saved task history.".into());
@@ -286,7 +287,9 @@ impl LiveSessions {
     fn save(&self, ledger: &Ledger) -> Result<(), String> {
         let bytes = serde_json::to_vec(ledger).map_err(|e| e.to_string())?;
         if bytes.len() > 16_000_000 {
-            return Err("Conversation storage is full. Finish or export existing conversations.".into());
+            return Err(
+                "Conversation storage is full. Finish or export existing conversations.".into(),
+            );
         }
         std::fs::create_dir_all(self.path.parent().ok_or("Invalid session path")?)
             .map_err(|e| e.to_string())?;
