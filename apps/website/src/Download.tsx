@@ -259,12 +259,12 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
           <Ticket size={23} strokeWidth={1.5} aria-hidden="true" />
           <div>
             <h2 id="download-access-title" ref={accessHeading} tabIndex={-1}>
-              {email && !token ? 'Your early access is approved.' : 'An invitation to get started.'}
+              {email && !token ? 'Your account is ready.' : 'Create a free account to get started.'}
             </h2>
             <p>
               {email && !token
                 ? `You’re signed in as ${email}. Choose your platform above to get started.`
-                : 'Jackalope is in early access. You’ll need to be accepted from the waitlist or claim a friend’s Instant Access Pass to start using the app.'}
+                : 'Sign up with your email, confirm it, then sign in to the app with the same address.'}
             </p>
             {email && !token ? (
               <a className="text-link" href="/access/#invitations">
@@ -287,9 +287,6 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
         </a>
         <a href="/knowledge/">
           Get to know your workspace <ArrowRight size={15} aria-hidden="true" />
-        </a>
-        <a href="/waitlist/">
-          Check your place in line <ArrowRight size={15} aria-hidden="true" />
         </a>
       </nav>
     </main>

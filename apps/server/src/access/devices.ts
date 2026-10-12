@@ -319,7 +319,7 @@ export async function browserDeviceAction(
           .bind(hash)
           .run()
       : await env.DB.prepare(
-          `UPDATE access_device_links SET member_id=? WHERE verification_hash=? AND expires_at>? AND member_id IS NULL AND used_at IS NULL AND EXISTS(SELECT 1 FROM access_members WHERE id=? AND ${waiting ? "status='waiting' AND waitlist_verified_at IS NOT NULL" : "status='approved' AND verified_at IS NOT NULL"})`,
+          `UPDATE access_device_links SET member_id=? WHERE verification_hash=? AND expires_at>? AND member_id IS NULL AND used_at IS NULL AND EXISTS(SELECT 1 FROM access_members WHERE id=? AND ${waiting ? "status IN ('waiting','approved') AND waitlist_verified_at IS NOT NULL" : "status='approved' AND verified_at IS NOT NULL"})`,
         )
           .bind(member.id, hash, now, member.id)
           .run();

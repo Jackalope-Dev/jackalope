@@ -51,11 +51,11 @@ const faqs = [
   ],
   [
     'How do I get access?',
-    'Join the waitlist and verify your email. We are approving new members quickly and will email you when your account is approved; then sign in to the desktop app. A direct invitation or a claimed Instant Access Pass skips the wait. Each verified signup through your referral link earns a day of priority, and approved members receive five passes to share. No payment is needed to join.',
+    'Sign up with your email and confirm the link we send. Your account is ready as soon as you confirm; then sign in to the desktop app with the same address. No payment is needed.',
   ],
   [
     'Can I download Jackalope now?',
-    `Yes. Builds for ${platforms} are on the download page. Signing in to the app requires an approved waitlist spot or a claimed Instant Access Pass.`,
+    `Yes. Builds for ${platforms} are on the download page. Signing in to the app needs a free account with a confirmed email.`,
   ],
   [
     'Why use it instead of more terminal tabs?',
@@ -188,7 +188,7 @@ export function App({ path = '/' }: { path?: string }) {
                   </Menu.Item>
                   {[
                     ['Download Jackalope', '/download/'],
-                    ['Your waitlist place', '/waitlist/'],
+                    ['Your account', '/waitlist/'],
                     ['Member access', '/access/'],
                     ['Compare workflows', '/compare/'],
                     ['Product tour', '/tour/'],

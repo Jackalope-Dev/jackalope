@@ -323,7 +323,7 @@ const comparisons: Comparison[] = [
       {
         question: 'Can I download Jackalope now?',
         answer:
-          'Jackalope is in early access: download it for Windows, macOS or Linux, then sign in once your waitlist spot is approved. Public pricing has not been announced.',
+          'Jackalope is in early access: download it for Windows, macOS or Linux, then sign in with a free account. Public pricing has not been announced.',
       },
     ],
   },

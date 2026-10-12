@@ -2,8 +2,10 @@
 
 See [waitlist referrals and passes](WAITLIST-REFERRALS.md) for ranked waitlists,
 separate status sessions and Instant Access Pass presentation. Signup confirmation
-verifies a waitlist session and any newsletter request bound to that link; it
-cannot grant membership or download access.
+verifies a waitlist session and any newsletter request bound to that link. With
+`OPEN_SIGNUP` off it cannot grant membership or download access; with it on, the
+confirmation approves that member and also starts a member sign-in session, so the
+person can pair a desktop without a second email.
 
 The website collects admission requests in D1. An owner approves them from
 `https://api.jackalope.dev/admin/access`, behind Cloudflare Access. The worker also
@@ -52,6 +54,7 @@ older mail remains readable without a delivery lookup reference.
 | Setting | Value / purpose |
 | --- | --- |
 | `EARLY_ACCESS_ENABLED` | `true` after migration, email and owner policy setup |
+| `OPEN_SIGNUP` | `true` approves members when they confirm their email; `false` keeps owner approval. Members already waiting are not approved by the switch |
 | `ACCESS_WEB_ORIGIN` | Exact HTTPS marketing origin, normally `https://jackalope.dev` |
 | `ACCESS_EMAIL_FROM` | Verified Sequenzy sender, `Jackalope <hello@hello.jackalope.dev>` |
 | `ACCESS_EMAIL_REPLY_TO` | `contact@jackalope.dev` |

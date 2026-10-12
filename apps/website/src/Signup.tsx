@@ -70,7 +70,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
       setSurveyToken(result.surveyToken ?? '');
       setMessage(
         accessOrigin
-          ? 'Check your email to confirm your place and get your referral link.'
+          ? 'Check your email and confirm it to finish creating your account.'
           : result.optIn?.required
             ? 'Check your inbox to confirm your email and finish joining the list.'
             : 'Thanks for making room for Jackalope. Watch your inbox for launch news and occasional product notes.',
@@ -101,18 +101,13 @@ export function Signup({ popup = false }: { popup?: boolean }) {
           </div>
           {accessOrigin && (
             <a className="button button-secondary" href="/waitlist/">
-              Check my place <ArrowRight size={16} />
+              Open my account <ArrowRight size={16} />
             </a>
           )}
           {surveyToken && <WaitlistPreferences token={surveyToken} />}
         </div>
       ) : (
-        <form
-          action={action}
-          method="post"
-          onSubmit={subscribe}
-          aria-label="Join the Jackalope waitlist"
-        >
+        <form action={action} method="post" onSubmit={subscribe} aria-label="Sign up for Jackalope">
           <label htmlFor={`${id}-email`}>Email address</label>
           <div className="signup-fields">
             <Input
@@ -140,9 +135,9 @@ export function Signup({ popup = false }: { popup?: boolean }) {
               className="button button-primary button-download"
               type="submit"
               loading={state === 'sending'}
-              loadingLabel="Joining…"
+              loadingLabel="Signing up…"
             >
-              <span>Join the waitlist</span>
+              <span>Sign up free</span>
               <ArrowRight size={16} />
             </Button>
           </div>
@@ -191,7 +186,7 @@ export function WaitlistButton({ compact = false, label }: { compact?: boolean; 
       <Dialog.Trigger
         className={`button button-primary button-download ${compact ? 'button-compact' : ''}`}
       >
-        <span>{label || (compact ? 'Join waitlist' : 'Join the waitlist')}</span>
+        <span>{label || (compact ? 'Sign up' : 'Sign up free')}</span>
         <ArrowRight size={16} />
       </Dialog.Trigger>
       <Dialog.Portal>
@@ -207,7 +202,7 @@ export function WaitlistButton({ compact = false, label }: { compact?: boolean; 
           }}
         >
           <Dialog.Close asChild>
-            <IconButton className="icon-button dialog-close" label="Close waitlist">
+            <IconButton className="icon-button dialog-close" label="Close sign up">
               <X size={20} />
             </IconButton>
           </Dialog.Close>
@@ -223,8 +218,8 @@ export function WaitlistButton({ compact = false, label }: { compact?: boolean; 
             </span>
           </div>
           <div className="waitlist-body">
-            <Dialog.Title>Join the Jackalope waitlist</Dialog.Title>
-            <Dialog.Description>We’ll email you as soon as you’re approved.</Dialog.Description>
+            <Dialog.Title>Sign up for Jackalope</Dialog.Title>
+            <Dialog.Description>Confirm your email and your account is ready.</Dialog.Description>
             <Signup popup />
           </div>
         </Dialog.Content>
@@ -237,8 +232,8 @@ export function Newsletter() {
   return (
     <section id="newsletter" className="newsletter page-width" aria-labelledby="newsletter-title">
       <div>
-        <h2 id="newsletter-title">Get early access.</h2>
-        <p>We’ll email you as soon as you’re approved.</p>
+        <h2 id="newsletter-title">Start with Jackalope.</h2>
+        <p>Confirm your email and your account is ready.</p>
       </div>
       <Signup />
     </section>

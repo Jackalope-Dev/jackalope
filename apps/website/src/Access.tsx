@@ -645,7 +645,7 @@ export function AccessPage() {
                 <a href="/privacy/">Privacy</a>.
               </p>
               <a className="text-link" href="/#newsletter">
-                Need access? Join the waitlist <ArrowRight size={14} />
+                New here? Sign up free <ArrowRight size={14} />
               </a>
             </>
           )}

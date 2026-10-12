@@ -23,6 +23,7 @@ import {
 } from './service';
 import {
   acceptWaitlistToken,
+  openSignupSession,
   requestWaitlistLink,
   saveWaitlistPreferences,
   waitingMember,
@@ -227,9 +228,12 @@ export async function accessRoutes(
     if (request.method === 'POST' && path === '/v1/access/waitlist/accept') {
       const body = z.strictObject({ token: tokenSchema }).parse(await readJson(request));
       const session = await acceptWaitlistToken(env, body.token);
+      const member = await openSignupSession(env, session);
       if (ctx) ctx.waitUntil(deliverAccessMail(env));
       if (ctx) ctx.waitUntil(syncNewsletter(env));
-      return json({ success: true }, 200, { 'set-cookie': waitlistCookie(session) });
+      const response = json({ success: true }, 200, { 'set-cookie': waitlistCookie(session) });
+      if (member) response.headers.append('set-cookie', sessionCookie(member));
+      return response;
     }
     if (request.method === 'POST' && path === '/v1/access/waitlist/preferences') {
       const body = z

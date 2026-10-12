@@ -64,7 +64,7 @@ impl ExecutionAccess {
         if self.status().allowed {
             Ok(())
         } else {
-            Err("Connect an approved Jackalope account before starting new work. Saved work and running tasks remain available.".into())
+            Err("Sign in to Jackalope before starting new work. Saved work and running tasks remain available.".into())
         }
     }
 }

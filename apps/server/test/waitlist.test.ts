@@ -13,6 +13,7 @@ import {
   type Member,
   register,
   requestLink,
+  sessionMember,
 } from '../src/access/service';
 import {
   acceptWaitlistToken,
@@ -361,4 +362,39 @@ it('lets a signed-in member answer and revise the waitlist questions', async () 
     (await publicCall('waitlist/preferences', { preferences: { platforms: ['bsd'] } }, session))
       .status,
   ).toBe(400);
+});
+
+it('approves and signs in confirmed members only while open signup is on', async () => {
+  await signup('closed@example.com');
+  await acceptWaitlistToken(bindings, await mailToken('closed@example.com'));
+  expect(await person('closed@example.com')).toMatchObject({ status: 'waiting' });
+
+  const open: Env = { ...bindings, OPEN_SIGNUP: 'true' };
+  await signup('open@example.com');
+  const confirmation = await worker.fetch(
+    new Request('https://api.jackalope.dev/v1/access/waitlist/accept', {
+      method: 'POST',
+      headers: { origin: open.ACCESS_WEB_ORIGIN, 'content-type': 'application/json' },
+      body: JSON.stringify({ token: await mailToken('open@example.com') }),
+    }),
+    open,
+  );
+  expect(confirmation.status).toBe(200);
+  const member = await person('open@example.com');
+  expect(member.status).toBe('approved');
+  expect(member.verified_at).not.toBeNull();
+  const cookies = confirmation.headers.getSetCookie();
+  expect(cookies.some((cookie) => cookie.startsWith('__Host-jackalope-waitlist='))).toBe(true);
+  const signedIn = cookies.find((cookie) => cookie.startsWith('__Host-jackalope='));
+  expect(signedIn).toBeDefined();
+  const session = signedIn?.split(';')[0] ?? '';
+  expect(
+    await sessionMember(
+      new Request('https://api.jackalope.dev/v1/access/me', { headers: { cookie: session } }),
+      open,
+    ),
+  ).toMatchObject({ email: 'open@example.com' });
+
+  // Earlier waiting members are not approved by someone else's confirmation.
+  expect(await person('closed@example.com')).toMatchObject({ status: 'waiting' });
 });

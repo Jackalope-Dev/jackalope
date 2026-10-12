@@ -46,6 +46,12 @@ export async function requestWaitlistLink(env: Env, email: string, now = Date.no
   if (member) await env.DB.batch(await waitlistMailStatements(env, email, member.id, now));
 }
 
+/**
+ * With open signup, confirming the waitlist email approves the member, so new
+ * people sign in and pair a desktop without a manual review.
+ */
+export const openSignup = (env: Env) => env.OPEN_SIGNUP === 'true';
+
 export async function acceptWaitlistToken(env: Env, raw: string, now = Date.now()) {
   const hash = await tokenHash(raw);
   const session = randomToken();
@@ -59,6 +65,14 @@ export async function acceptWaitlistToken(env: Env, raw: string, now = Date.now(
     env.DB.prepare(
       `UPDATE access_members SET waitlist_verified_at=coalesce(waitlist_verified_at,?) WHERE id IN (${active}) AND status!='revoked'`,
     ).bind(now, hash, now),
+    ...(openSignup(env)
+      ? [
+          env.DB.prepare(
+            `UPDATE access_members SET status='approved',approved_at=coalesce(approved_at,?),verified_at=coalesce(verified_at,?)
+             WHERE id IN (${active}) AND status='waiting'`,
+          ).bind(now, now, hash, now),
+        ]
+      : []),
     env.DB.prepare(
       `INSERT INTO access_waitlist_sessions(hash,member_id,expires_at) SELECT ?,id,? FROM access_members WHERE id IN (${active}) AND status!='revoked'`,
     ).bind(sessionHash, now + 30 * day, hash, now),
@@ -75,6 +89,24 @@ export async function acceptWaitlistToken(env: Env, raw: string, now = Date.now(
   return session;
 }
 
+/**
+ * Under open signup a confirmed member is already approved, so the same
+ * confirmation also signs them in to their member space. Returns the session
+ * token, or null when signup is closed or the member is not approved.
+ */
+export async function openSignupSession(env: Env, waitlistSession: string, now = Date.now()) {
+  if (!openSignup(env)) return null;
+  const session = randomToken();
+  const result = await env.DB.prepare(
+    `INSERT INTO access_sessions(hash,member_id,expires_at)
+     SELECT ?,m.id,? FROM access_members m JOIN access_waitlist_sessions s ON s.member_id=m.id
+     WHERE s.hash=? AND s.expires_at>? AND m.status='approved' AND m.verified_at IS NOT NULL`,
+  )
+    .bind(await tokenHash(session), now + 30 * day, await tokenHash(waitlistSession), now)
+    .run();
+  return result.meta.changes === 1 ? session : null;
+}
+
 export function waitlistCookie(token: string, clear = false) {
   return `__Host-jackalope-waitlist=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${clear ? 0 : 30 * 86400}`;
 }
@@ -88,9 +120,9 @@ export async function waitingMember(request: Request, env: Env) {
   if (!raw) return null;
   return env.DB.prepare(
     `SELECT m.id FROM access_members m JOIN access_waitlist_sessions s ON s.member_id=m.id
-     WHERE s.hash=? AND s.expires_at>? AND m.status='waiting' AND m.waitlist_verified_at IS NOT NULL`,
+     WHERE s.hash=? AND s.expires_at>? AND m.status IN ('waiting',?) AND m.waitlist_verified_at IS NOT NULL`,
   )
-    .bind(await tokenHash(raw), Date.now())
+    .bind(await tokenHash(raw), Date.now(), openSignup(env) ? 'approved' : 'waiting')
     .first<{ id: string }>();
 }
 export async function waitlistLogout(request: Request, env: Env) {
