@@ -37,6 +37,11 @@ pub enum Command {
     Stop {
         id: String,
     },
+    /// A conversation's changes since its workspace left the project's branch.
+    Diff {
+        id: String,
+        stat: bool,
+    },
     Help,
     Version,
 }
@@ -61,7 +66,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
     let mut words: Vec<String> = Vec::new();
     let (mut print, mut json, mut resume, mut help, mut version, mut init) =
         (false, false, false, false, false, false);
-    let (mut pick, mut stream) = (false, false);
+    let (mut pick, mut stream, mut stat) = (false, false, false);
     let mut cold_start = None;
     let (mut agent, mut model, mut profile, mut timeout) = (None, None, None, None);
     let mut compare: Option<Vec<String>> = None;
@@ -89,6 +94,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
             "-p" | "--print" => print = true,
             "--json" => json = true,
             "--stream-json" => stream = true,
+            "--stat" => stat = true,
             "-c" | "--continue" => resume = true,
             "-r" | "--resume" => pick = true,
             "-h" | "--help" => help = true,
@@ -214,6 +220,13 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
                     model: None,
                 }
             }
+            Some("diff") => {
+                extra(2)?;
+                Command::Diff {
+                    id: argument().ok_or("Which conversation? Run 'jackalope ls' to see them.")?,
+                    stat,
+                }
+            }
             Some("stop") => {
                 extra(2)?;
                 Command::Stop {
@@ -240,6 +253,9 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
             Command::Once { .. } => {}
             _ => return Err(format!("--stream-json applies to -p. {USAGE}")),
         }
+    }
+    if stat && !matches!(command, Command::Diff { .. }) {
+        return Err(format!("--stat applies to diff. {USAGE}"));
     }
     if json && !json_applies {
         return Err(format!("--json applies to -p, ls and status. {USAGE}"));
@@ -337,6 +353,19 @@ mod tests {
         assert_eq!(command(&["--resume", "ab"]), attach);
         assert_eq!(command(&["resume", "ab"]), attach);
         assert!(parse_line(&["resume", "ab", "cd"]).is_err());
+    }
+
+    #[test]
+    fn diff_names_a_conversation() {
+        assert_eq!(
+            command(&["diff", "ab12", "--stat"]),
+            Command::Diff {
+                id: "ab12".into(),
+                stat: true
+            }
+        );
+        assert!(parse_line(&["diff"]).is_err());
+        assert!(parse_line(&["ls", "--stat"]).is_err());
     }
 
     #[test]

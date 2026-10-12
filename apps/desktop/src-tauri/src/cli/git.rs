@@ -34,6 +34,47 @@ pub fn branch(path: &str) -> Option<String> {
     (output.status.success() && !name.is_empty()).then_some(name)
 }
 
+/// Shows `workspace`'s changes since it left `project`'s checked-out commit on
+/// stdout, through Git's pager when it is a terminal, and returns the new files
+/// Git does not track yet, which a diff leaves out. A workspace that is the
+/// project folder shows its uncommitted edits.
+pub fn diff(workspace: &str, project: &str, stat: bool) -> Result<Vec<String>, String> {
+    let workspace = Path::new(workspace);
+    if !workspace.is_dir() {
+        return Err("This conversation's workspace no longer exists.".into());
+    }
+    let read = |directory: &Path, args: &[&str]| -> Result<String, String> {
+        let output = git(directory, args)?;
+        if !output.status.success() {
+            return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    };
+    let project_head = read(Path::new(project), &["rev-parse", "HEAD"])?;
+    let base = read(workspace, &["merge-base", "HEAD", &project_head])
+        .map_err(|_| "This workspace does not share history with the project.".to_string())?;
+    let mut args = vec!["diff"];
+    if stat {
+        args.push("--stat");
+    }
+    args.push(&base);
+    // The pager reads keys from the terminal.
+    let status = git_command(workspace)
+        .args(&args)
+        .stdin(Stdio::inherit())
+        .status()
+        .map_err(|error| format!("Could not run Git: {error}"))?;
+    if !status.success() {
+        return Err("Git could not show the changes.".into());
+    }
+    Ok(
+        read(workspace, &["ls-files", "--others", "--exclude-standard"])?
+            .lines()
+            .map(String::from)
+            .collect(),
+    )
+}
+
 /// Makes sure the current directory can host a conversation. Creates a repository
 /// when `initialize` is set or the user agrees. Otherwise the conversation edits
 /// the folder directly. `Some` is the notice to print.
@@ -248,26 +289,29 @@ fn home_dir() -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
-fn git(directory: &Path, args: &[&str]) -> Result<Output, String> {
-    Command::new("git")
+/// Git in `directory`, ignoring repository overrides inherited from the shell.
+fn git_command(directory: &Path) -> Command {
+    let mut command = Command::new("git");
+    command
         .current_dir(directory)
-        .args(args)
         .stdin(Stdio::null())
         .env_remove("GIT_DIR")
         .env_remove("GIT_WORK_TREE")
         .env_remove("GIT_INDEX_FILE")
         .env_remove("GIT_OBJECT_DIRECTORY")
         .env_remove("GIT_COMMON_DIR")
-        .env_remove("GIT_PREFIX")
-        .output()
-        .map_err(|error| {
-            if error.kind() == std::io::ErrorKind::NotFound {
-                "Git is not installed, so Jackalope cannot keep a separate copy of this work."
-                    .into()
-            } else {
-                format!("Could not run git: {error}")
-            }
-        })
+        .env_remove("GIT_PREFIX");
+    command
+}
+
+fn git(directory: &Path, args: &[&str]) -> Result<Output, String> {
+    git_command(directory).args(args).output().map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            "Git is not installed, so Jackalope cannot keep a separate copy of this work.".into()
+        } else {
+            format!("Could not run git: {error}")
+        }
+    })
 }
 
 fn stderr_text(output: &Output) -> String {
@@ -305,6 +349,53 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn a_worktree_diff_starts_where_it_left_the_project() {
+        let root = TempDir::new("diff");
+        let project = root.0.join("project");
+        std::fs::create_dir_all(&project).unwrap();
+        let run = |directory: &Path, args: &[&str]| {
+            let output = git(directory, args).unwrap();
+            assert!(output.status.success(), "{args:?}: {output:?}");
+        };
+        run(&project, &["init", "-q"]);
+        run(&project, &["config", "user.email", "test@example.com"]);
+        run(&project, &["config", "user.name", "Test"]);
+        std::fs::write(
+            project.join("a.txt"),
+            "one
+",
+        )
+        .unwrap();
+        run(&project, &["add", "."]);
+        run(&project, &["commit", "-qm", "start"]);
+        let workspace = root.0.join("workspace");
+        let workspace_text = workspace.to_string_lossy().to_string();
+        run(
+            &project,
+            &["worktree", "add", "-q", "-b", "work", &workspace_text],
+        );
+        std::fs::write(
+            workspace.join("a.txt"),
+            "two
+",
+        )
+        .unwrap();
+        run(&workspace, &["commit", "-qam", "agent"]);
+        std::fs::write(
+            workspace.join("new.txt"),
+            "new
+",
+        )
+        .unwrap();
+        let project_text = project.to_string_lossy().to_string();
+        assert_eq!(
+            diff(&workspace_text, &project_text, true).unwrap(),
+            ["new.txt"]
+        );
+        assert!(diff(&root.0.join("gone").to_string_lossy(), &project_text, true).is_err());
     }
 
     #[test]

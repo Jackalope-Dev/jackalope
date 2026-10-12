@@ -1,4 +1,4 @@
-//! The one-shot commands that print and exit: `status`, `ls` and `stop`.
+//! The one-shot commands that print and exit: `status`, `ls`, `stop` and `diff`.
 
 use crate::connection::{resolve, short, unexpected, Connection};
 use crate::git;
@@ -123,6 +123,35 @@ pub fn stop(preference: Option<ColdStart>, prefix: &str) -> Result<(), String> {
             println!("Stopping {}.", view.title);
         }
         None => println!("Nothing is running in {}.", view.title),
+    }
+    Ok(())
+}
+
+/// Prints what a conversation changed: its worktree against the commit where it
+/// left the project's branch, uncommitted edits included, or the uncommitted
+/// edits of a conversation that works in the project folder itself.
+pub fn diff(preference: Option<ColdStart>, prefix: &str, stat: bool) -> Result<(), String> {
+    let mut connection = host::ensure(preference)?;
+    let sessions = connection.sessions()?;
+    let id = resolve(&sessions, prefix)?;
+    let view = connection.session(&id)?;
+    let project_id = sessions
+        .iter()
+        .find(|session| session.id == id)
+        .map(|session| session.project_id.clone())
+        .unwrap_or_default();
+    let project = connection
+        .projects()?
+        .into_iter()
+        .find(|project| project.id == project_id)
+        .ok_or("This conversation's project is no longer in Jackalope.")?;
+    let workspace = protocol::present(view.workspace.as_deref()).unwrap_or(&project.path);
+    let untracked = git::diff(workspace, &project.path, stat)?;
+    if !untracked.is_empty() {
+        eprintln!(
+            "New files not yet added to Git, so not shown: {}",
+            untracked.join(", ")
+        );
     }
     Ok(())
 }

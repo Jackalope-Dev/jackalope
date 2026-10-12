@@ -3,10 +3,11 @@
     "id": "follow-terminal-runs-as-they-happen",
     "date": "2026-10-12",
     "status": "In development",
-    "title": "Follow terminal runs as they happen",
-    "description": "Scripts and CI can watch a jackalope -p run move instead of waiting for one final answer.",
+    "title": "Follow and review terminal runs",
+    "description": "Scripts and CI can watch a jackalope -p run as it moves, and anyone can read its changes from the terminal.",
     "items": [
-      "jackalope -p --stream-json prints one JSON line when the run starts, at each new step and as the agent writes output, then the same result --json prints, with the same exit status."
+      "jackalope -p --stream-json prints one JSON line when the run starts, at each new step and as the agent writes output, then the same result --json prints, with the same exit status.",
+      "jackalope diff <id> prints what a conversation changed since its workspace left your branch, without opening the app; --stat summarizes it."
     ]
   },
   {

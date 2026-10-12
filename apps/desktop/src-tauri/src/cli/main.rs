@@ -35,6 +35,7 @@ USAGE
   jackalope ls                   list open conversations
   jackalope attach <id>          the same as --resume <id>
   jackalope stop <id>            stop the work a conversation is running
+  jackalope diff <id> [--stat]   print a conversation's changes since it started
   jackalope status               show the host, this project and your agents
   jackalope help                 show this message
 
@@ -127,6 +128,7 @@ fn run() -> Result<(), String> {
         Command::List { json } => subcommands::list(cli.cold_start, json),
         Command::Status { json } => subcommands::status(json),
         Command::Stop { id } => subcommands::stop(cli.cold_start, &id),
+        Command::Diff { id, stat } => subcommands::diff(cli.cold_start, &id, stat),
         Command::Converse {
             resume,
             attach,

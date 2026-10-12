@@ -74,6 +74,7 @@ terminal and the app together. Leaving a terminal does not stop work.
 | `jackalope attach <id>` | Rejoins a conversation; any unambiguous id prefix works |
 | `jackalope ls` | Lists open conversations with their project, state and age |
 | `jackalope stop <id>` | Stops the work a conversation is running |
+| `jackalope diff <id>` | Prints a conversation's changes since its worktree left the project's commit, uncommitted edits included; `--stat` summarizes them. New untracked files are listed on stderr |
 | `jackalope status` | Shows the host, its endpoint and profile |
 
 `ls` and `status` accept `--json`. Options take a value as `--agent codex` or
