@@ -12,9 +12,8 @@ const privacy: Section[] = [
       <>
         <p>
           Jackalope Digital LLC, a Colorado limited liability company in the United States, operates
-          Jackalope. This policy covers our website, waitlist, early-access service, and the
-          information our desktop app sends to us. Contact {contact} with privacy questions or
-          requests.
+          Jackalope. This policy covers our website, account service, and the information our
+          desktop app sends to us. Contact {contact} with privacy questions or requests.
         </p>
         <p>
           Coding agents and other services you connect have their own privacy policies. This policy
@@ -40,6 +39,11 @@ const privacy: Section[] = [
           Fonts are served with the site. Website appearance choices reset when you reload.
         </p>
         <p>
+          Our signup form uses Cloudflare Turnstile to check that a person, not an automated script,
+          submitted it. Turnstile receives your IP address and browser and device signals for that
+          check under Cloudflare’s privacy policy. We receive the check’s result, not those signals.
+        </p>
+        <p>
           Signing in creates an essential, secure session cookie lasting up to 30 days. It is
           inaccessible to page scripts. Signing out removes the session. Blocking this cookie
           prevents the member area from working. We do not use cookies for targeted advertising;
@@ -51,29 +55,29 @@ const privacy: Section[] = [
   },
   {
     id: 'access',
-    title: 'Waitlist, sign-in, and invitations',
+    title: 'Accounts, sign-in, and invitations',
     content: (
       <>
         <p>
-          When you join, we record your email address, signup source and time, access status, and
-          optional newsletter choice. If you choose to answer our follow-up survey, we store your
-          preferred operating systems, agents, and workflows with your signup to guide product
-          plans. We record campaign labels and the signup page, without advertising cookies or
-          cross-site tracking. We also keep verification, session, invitation, and delivery records
-          to provide access, prevent repeated emails, and enforce invitation limits. We do not
-          collect payment details for the waitlist. A referral link records who introduced a new
-          signup. We keep that attribution and verification status to calculate referral totals and
-          queue priority. A first-party browser session remembers a referral while you browse this
-          site; it is not an advertising cookie. Waitlist referrers see counts, not the referred
+          When you sign up, we record your email address, signup source and time, account status,
+          and optional newsletter choice. Confirming your email creates your account. If you choose
+          to answer our follow-up survey, we store your preferred operating systems, agents, and
+          workflows with your signup to guide product plans. We record campaign labels and the
+          signup page, without advertising cookies or cross-site tracking. We also keep
+          verification, session, invitation, and delivery records to provide access, prevent
+          repeated emails, and enforce invitation limits. We do not collect payment details. A
+          referral link records who introduced a new signup. We keep that attribution and
+          verification status to show referral totals and, for anyone still waiting from our earlier
+          waitlist, queue priority. A first-party browser session remembers a referral while you
+          browse this site; it is not an advertising cookie. Referrers see counts, not the referred
           email addresses.
         </p>
         <p>
-          We send waitlist verification and sign-in links, referral milestone updates, and pass
-          approval, claim, and reservation-expiry messages needed to handle your request. Product
-          newsletters are a separate choice in the access-service signup form. A legacy email-only
-          form, including the fallback used without JavaScript, subscribes you to launch news and
-          product notes as disclosed next to that form; it does not create an approved access
-          account.
+          We send email verification and sign-in links, referral milestone updates, and invitation
+          and reservation-expiry messages needed to handle your request. Product newsletters are a
+          separate choice in the access-service signup form. A legacy email-only form, including the
+          fallback used without JavaScript, subscribes you to launch news and product notes as
+          disclosed next to that form; it does not create an account.
         </p>
         <p>
           Someone may give us your email address to invite you. The inviting member can see the
@@ -102,17 +106,19 @@ const privacy: Section[] = [
       <>
         <p>
           The desktop app stores project settings, tasks, history, and related workspace data on
-          your computer. Contributor builds can use local projects and installed agents without a
-          Jackalope cloud account. Official early-access builds may require an approved membership.
-          We do not receive your repository contents, prompts, agent transcripts, local paths, or
-          provider credentials through our usage-reporting system.
+          your computer. Starting new work requires a free, signed-in Jackalope account in every
+          build; saved work stays readable without one. We do not receive your repository contents,
+          prompts, agent transcripts, local paths, or provider credentials through our
+          usage-reporting system.
         </p>
         <p>
           Agents can read files, run commands, and send prompts, code, and other context to their
           providers. Connected tools, MCP servers, sign-in flows, and websites opened in the app may
           receive information directly. Their access depends on your configuration and their
           capabilities. Account profiles and worktrees are organizational tools, not security
-          sandboxes. Review the permissions and policies of each service you use.
+          sandboxes. Creating a pull request from a task pushes its branch and sends its title and
+          description to GitHub through your own GitHub CLI, only after you confirm. Review the
+          permissions and policies of each service you use.
         </p>
         <p>
           When you connect your Jackalope membership to the desktop, we store a device identifier,
@@ -177,12 +183,12 @@ const privacy: Section[] = [
           Quiet feedback invitations use progress stored on your desktop. Invitation preferences,
           cooldowns and completion sync with your account to avoid repeat requests across desktops.
           The optional product-notes choice on signup includes one feedback email and starts
-          unchecked. Joining the waitlist does not require it. When enabled, we link active days, up
-          to two opaque result receipts, invitation preferences and response status to your
-          membership. These milestones do not include task contents, project details or
-          agent-provider credentials, and remain separate from anonymous usage reports. Stopping
-          feedback emails stops new milestone uploads and cancels unsent invitations; a message
-          already handed to the email provider may still arrive.
+          unchecked. Signing up does not require it. When enabled, we link active days, up to two
+          opaque result receipts, invitation preferences and response status to your membership.
+          These milestones do not include task contents, project details or agent-provider
+          credentials, and remain separate from anonymous usage reports. Stopping feedback emails
+          stops new milestone uploads and cancels unsent invitations; a message already handed to
+          the email provider may still arrive.
         </p>
         <p>
           This feedback round has at most one email and two in-app invitations, with shared
@@ -222,8 +228,8 @@ const privacy: Section[] = [
     content: (
       <>
         <p>
-          We use Cloudflare for hosting, database storage, downloads, security, and service
-          infrastructure; Sequenzy for customer email; and Purelymail to handle support
+          We use Cloudflare for hosting, database storage, downloads, security, bot protection, and
+          service infrastructure; Sequenzy for customer email; and Purelymail to handle support
           correspondence. These providers process information needed for those functions. See{' '}
           <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare’s privacy policy</a> and{' '}
           <a href="https://www.sequenzy.com/privacy">Sequenzy’s privacy policy</a>, and{' '}
@@ -274,8 +280,9 @@ const privacy: Section[] = [
       <>
         <ul>
           <li>
-            Waitlist, access, consent, and referral records are kept while needed to manage your
-            request, membership, and invitation limits, unless removed following a deletion request.
+            Account, consent, and referral records, including records from our earlier waitlist, are
+            kept while needed to manage your account and invitation limits, unless removed following
+            a deletion request.
           </li>
           <li>
             Sign-in links expire after 30 minutes; welcome and invitation links after seven days.
@@ -311,9 +318,9 @@ const privacy: Section[] = [
       <>
         <p>
           Contact {contact} to request access, correction, or deletion of information held by
-          Jackalope, to leave the waitlist, or to close your early-access membership. Depending on
-          your location, you may also have rights to a portable copy, restriction of processing,
-          objection, withdrawal of consent, or a complaint to your data-protection authority.
+          Jackalope, or to close your account. Depending on your location, you may also have rights
+          to a portable copy, restriction of processing, objection, withdrawal of consent, or a
+          complaint to your data-protection authority.
         </p>
         <p>
           We may need to verify your request using information proportionate to its sensitivity. Do
@@ -336,9 +343,9 @@ const privacy: Section[] = [
     content: (
       <>
         <p>
-          Our hosted early-access service is intended for adults, not people under 18. We do not
-          knowingly collect children’s personal information. Contact us if a child has provided
-          information so we can investigate and remove it where appropriate.
+          Our hosted service is intended for adults, not people under 18. We do not knowingly
+          collect children’s personal information. Contact us if a child has provided information so
+          we can investigate and remove it where appropriate.
         </p>
         <p>
           We use safeguards including encrypted connections, restricted administrative access, and
@@ -363,39 +370,38 @@ const terms: Section[] = [
       <>
         <p>
           These terms are between you and Jackalope Digital LLC, a Colorado limited liability
-          company in the United States, and cover jackalope.dev, our waitlist, hosted early-access
-          member area, invitations, and download service. Please read them before requesting or
-          using access. If you use the service for an organization, you must have authority to act
-          on its behalf.
+          company in the United States, and cover jackalope.dev, our account service and member
+          area, invitations, and download service. Please read them before requesting or using
+          access. If you use the service for an organization, you must have authority to act on its
+          behalf.
         </p>
         <p>
-          Our hosted early-access service is for people aged 18 or older who can enter a binding
-          agreement. The <a href="/privacy/">Privacy Policy</a> explains how we handle information;
-          agreeing to these terms does not opt you into newsletters or optional usage sharing.
+          Our hosted service is for people aged 18 or older who can enter a binding agreement. The{' '}
+          <a href="/privacy/">Privacy Policy</a> explains how we handle information; agreeing to
+          these terms does not opt you into newsletters or optional usage sharing.
         </p>
       </>
     ),
   },
   {
     id: 'early-access',
-    title: 'Early access and availability',
+    title: 'Beta and availability',
     content: (
       <>
         <p>
-          Waitlist referrals are unlimited. Each new, verified referral earns one day of priority
-          against your signup time; earlier signups break ties. Your displayed position can move as
-          people join, refer, are approved, or are removed. Duplicate signups and self-referrals do
-          not earn credit. Five Instant Access Passes are granted after acceptance and are separate
-          from waitlist referrals. Joining the waitlist is free. It does not guarantee admission, an
-          invitation date, a finished product, a particular feature, or a future price. Approval
-          does not mean an installer is available yet. Jackalope is coming soon.
+          Signing up is free, and confirming your email creates your account. If you joined our
+          earlier waitlist, signing up again with the same email and confirming it gives you the
+          same free account; waitlist position, referral priority, and Instant Access Passes no
+          longer affect access. An account does not guarantee a finished product, a particular
+          feature, or a future price. Desktop downloads are offered for the platforms listed on the
+          download page.
         </p>
         <p>
-          Early-access software may contain errors, change substantially, or become unavailable.
-          Back up important work and review changes before using them. We may change, limit, or
-          discontinue the hosted service, with notice where practical and as required by law. These
-          terms do not authorize a charge; any future paid offering needs separately disclosed
-          pricing and purchase terms.
+          Jackalope is beta software. It may contain errors, change substantially, or become
+          unavailable. Back up important work and review changes before using them. We may change,
+          limit, or discontinue the hosted service, with notice where practical and as required by
+          law. These terms do not authorize a charge; any future paid offering needs separately
+          disclosed pricing and purchase terms.
         </p>
       </>
     ),
@@ -407,13 +413,14 @@ const terms: Section[] = [
       <>
         <p>
           Use an email address you control and keep sign-in links private. Do not share a signed-in
-          session, impersonate someone, or bypass admission and invitation limits. Contact us if you
-          suspect unauthorized access.
+          session, impersonate someone, or bypass sign-in, rate, bot-protection, or invitation
+          limits. Contact us if you suspect unauthorized access.
         </p>
         <p>
           Invite only people you have a legitimate reason to contact; do not send unsolicited bulk
-          invitations or sell access. Email invitations reserve a place for seven days. Shared-link
-          invitations depend on available places at verification. Limits and eligibility may change.
+          invitations or sell accounts or access. Email invitations reserve a place for seven days.
+          Shared-link invitations depend on available places at verification. Limits and eligibility
+          may change.
         </p>
         <p>
           We may suspend or revoke hosted access to address abuse, security risks, legal
@@ -507,10 +514,10 @@ const terms: Section[] = [
     content: (
       <>
         <p>
-          To the extent permitted by law, the hosted early-access service is provided “as is” and
-          “as available,” without warranties of uninterrupted service, fitness for a particular
-          purpose, merchantability, or non-infringement. The software’s license contains its own
-          warranty and liability provisions.
+          To the extent permitted by law, the hosted service is provided “as is” and “as available,”
+          without warranties of uninterrupted service, fitness for a particular purpose,
+          merchantability, or non-infringement. The software’s license contains its own warranty and
+          liability provisions.
         </p>
         <p>
           To the extent permitted by law, Jackalope Digital LLC is not liable for indirect,
@@ -552,10 +559,10 @@ export function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
         <h1>{kind === 'privacy' ? 'Privacy policy' : 'Terms of service'}</h1>
         <p className="article-deck">
           {kind === 'privacy'
-            ? 'How we handle information across the website, early access, and desktop app.'
-            : 'Using Jackalope’s website and hosted early-access service.'}
+            ? 'How we handle information across the website, your account, and the desktop app.'
+            : 'Using Jackalope’s website and hosted account service.'}
         </p>
-        <p className="article-byline">Updated September 9, 2026 · Jackalope Digital LLC</p>
+        <p className="article-byline">Updated October 12, 2026 · Jackalope Digital LLC</p>
       </header>
       <div className="article-body">
         <nav className="legal-nav" aria-label="On this page">
