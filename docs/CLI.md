@@ -142,6 +142,11 @@ Success, attention and failure use fixed green, amber and red tones.
 to settle and prints the reply; piped stdin is appended to the message, `--json`
 prints a JSON object, `--agent <id>` skips routing and `--model <id>` picks its model. The run settles when its work
 finishes, fails, is stopped or interrupted, or the conversation is paused.
+`--agents <a,b>` sends the same message to two to four agents, each in its own
+conversation and workspace like the app's agent comparison; the command waits for all
+of them and prints each reply under its agent with the id to rejoin it. With `--json`
+it prints `{"results": [...]}`, one object per agent. Its exit status is the most
+serious single outcome: failure, then a question, then a timeout.
 `--timeout <seconds>` stops waiting (checked at least every 25 seconds) and leaves
 the work running. Progress goes to stderr when it is a terminal. Exit status is 0
 when done, 1 on failure or when the work was stopped, 2 when an agent asks a

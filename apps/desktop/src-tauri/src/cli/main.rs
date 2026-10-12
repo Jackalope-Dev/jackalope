@@ -53,6 +53,8 @@ STARTING A CONVERSATION
 RUNNING ONCE
   -p, --print                    send the message, wait, and print the reply;
                                  piped stdin is appended to the message
+  --agents <a,b>                 send the message to 2 to 4 agents, each in its own
+                                 workspace, and print every reply
   --json                         print the result as JSON (also for ls, status)
   --timeout <seconds>            stop waiting after this long; the work continues
   Exit status: 0 done, 1 failed or stopped, 2 an agent asked a question
@@ -99,6 +101,7 @@ fn run() -> Result<(), String> {
             message,
             agent,
             model,
+            compare,
             json,
             timeout,
         } => {
@@ -106,6 +109,7 @@ fn run() -> Result<(), String> {
             let options = once::Options {
                 agent,
                 model,
+                compare,
                 json,
                 timeout,
                 cold_start: cli.cold_start,

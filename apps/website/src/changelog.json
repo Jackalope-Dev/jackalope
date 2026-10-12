@@ -8,7 +8,7 @@
     "items": [
       "Project setup now takes three steps: project, agents and an optional first task. Decisions, commit behavior and colors start from defaults you can change in Project settings.",
       "The workspace now has one layout: recent work stays in a sidebar you can fold away, with list and board views of your work. Focus, Build and Oversee are retired. The Agents page groups agents, tools, apps and usage under shorter tabs.",
-      "The jackalope command accepts --agent and --model when starting a conversation, as well as with -p."
+      "The jackalope command accepts --agent and --model when starting a conversation, and jackalope -p --agents claude,codex sends one message to several agents and prints every reply."
     ]
   },
   {

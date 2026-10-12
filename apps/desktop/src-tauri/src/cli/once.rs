@@ -12,6 +12,8 @@ use std::time::{Duration, Instant};
 pub struct Options {
     pub agent: Option<String>,
     pub model: Option<String>,
+    /// Two or more agents each get the message in their own conversation.
+    pub compare: Vec<String>,
     pub json: bool,
     pub timeout: Option<Duration>,
     pub cold_start: Option<ColdStart>,
@@ -27,6 +29,9 @@ pub fn run(message: String, options: Options) -> Result<i32, String> {
     }
     let mut connection = host::ensure(options.cold_start)?;
     let project = subcommands::here(&mut connection)?;
+    if !options.compare.is_empty() {
+        return compare(connection, &project.path, message, options);
+    }
     let session_id = connection.start(&project.path, message, options.agent, options.model)?;
     let progress = std::io::stderr().is_terminal() && !options.json;
     // The watch blocks, so it gets a connection of its own.
@@ -62,6 +67,154 @@ pub fn run(message: String, options: Options) -> Result<i32, String> {
             Err(_) => std::thread::sleep(Duration::from_millis(500)),
         }
     }
+}
+
+/// `--agents`: starts one conversation per agent, each in its own workspace,
+/// waits until every one settles or the timeout passes, and prints each reply.
+fn compare(
+    mut connection: Connection,
+    project_path: &str,
+    message: String,
+    options: Options,
+) -> Result<i32, String> {
+    let mut sessions = Vec::new();
+    for agent in &options.compare {
+        let id = connection.start(project_path, message.clone(), Some(agent.clone()), None)?;
+        sessions.push((agent.clone(), id));
+    }
+    let progress = std::io::stderr().is_terminal() && !options.json;
+    let mut watcher = Connection::lazy(connection.handshake().clone());
+    let deadline = options.timeout.map(|timeout| Instant::now() + timeout);
+    let mut since = 0;
+    let mut steps = vec![String::new(); sessions.len()];
+    loop {
+        let views = sessions
+            .iter()
+            .map(|(_, id)| connection.session(id))
+            .collect::<Result<Vec<_>, _>>()?;
+        if progress {
+            for (index, view) in views.iter().enumerate() {
+                let step = view
+                    .step
+                    .clone()
+                    .or_else(|| view.status.clone())
+                    .unwrap_or_default();
+                if !step.is_empty() && step != steps[index] {
+                    eprintln!("· {}: {step}", sessions[index].0);
+                    steps[index] = step;
+                }
+            }
+        }
+        let timed_out = deadline.is_some_and(|deadline| Instant::now() >= deadline);
+        let outcomes: Vec<Option<Outcome>> = views.iter().map(outcome).collect();
+        if timed_out || outcomes.iter().all(Option::is_some) {
+            let results: Vec<Compared> = views
+                .iter()
+                .zip(&sessions)
+                .zip(outcomes)
+                .map(|((view, (agent, id)), outcome)| Compared {
+                    view,
+                    agent,
+                    session_id: id,
+                    outcome: outcome.unwrap_or(Outcome::TimedOut),
+                })
+                .collect();
+            return Ok(finish_comparison(&results, options.json));
+        }
+        match watcher.watch(since) {
+            Ok(revision) => since = revision,
+            Err(_) => std::thread::sleep(Duration::from_millis(500)),
+        }
+    }
+}
+
+struct Compared<'a> {
+    view: &'a SessionView,
+    agent: &'a str,
+    session_id: &'a str,
+    outcome: Outcome,
+}
+
+/// A comparison exits with its most serious outcome: a failure, then a
+/// question, then a timeout.
+fn comparison_code(outcomes: &[&Outcome]) -> i32 {
+    [1, 2, 3]
+        .into_iter()
+        .find(|code| {
+            outcomes
+                .iter()
+                .any(|outcome| outcome_code(outcome) == *code)
+        })
+        .unwrap_or(0)
+}
+
+fn outcome_code(outcome: &Outcome) -> i32 {
+    match outcome {
+        Outcome::Done => 0,
+        Outcome::Failed(_) => 1,
+        Outcome::Asked(_) => 2,
+        Outcome::TimedOut => 3,
+    }
+}
+
+fn finish_comparison(results: &[Compared], json: bool) -> i32 {
+    let code = comparison_code(
+        &results
+            .iter()
+            .map(|result| &result.outcome)
+            .collect::<Vec<_>>(),
+    );
+    if json {
+        let values: Vec<_> = results
+            .iter()
+            .map(|result| {
+                let mut value = result_json(result.view, result.session_id, &result.outcome);
+                value["requestedAgent"] = serde_json::json!(result.agent);
+                value
+            })
+            .collect();
+        println!("{}", serde_json::json!({ "results": values }));
+        return code;
+    }
+    for result in results {
+        let label = match &result.outcome {
+            Outcome::Done => "done".to_string(),
+            Outcome::Failed(error) => format!("failed: {error}"),
+            Outcome::Asked(question) => format!("asked: {question}"),
+            Outcome::TimedOut => "still running".to_string(),
+        };
+        println!(
+            "── {} · {label} · jackalope attach {}",
+            result.agent,
+            short(result.session_id)
+        );
+        let text = reply(result.view);
+        if !text.trim().is_empty() {
+            println!("{}", text.trim_end());
+        }
+        println!();
+    }
+    code
+}
+
+fn result_json(view: &SessionView, session_id: &str, outcome: &Outcome) -> serde_json::Value {
+    let (status, detail) = match outcome {
+        Outcome::Done => ("done", None),
+        Outcome::Failed(error) => ("failed", Some(error.clone())),
+        Outcome::Asked(question) => ("question", Some(question.clone())),
+        Outcome::TimedOut => ("timeout", None),
+    };
+    serde_json::json!({
+        "sessionId": session_id,
+        "status": status,
+        "reply": reply(view),
+        "error": matches!(outcome, Outcome::Failed(_)).then(|| detail.clone()).flatten(),
+        "question": matches!(outcome, Outcome::Asked(_)).then(|| detail.clone()).flatten(),
+        "agent": view.agent,
+        "model": view.model,
+        "branch": view.branch,
+        "workspace": view.workspace,
+    })
 }
 
 /// Piped input is appended to the message, as `git diff | jackalope -p "review"`.
@@ -136,25 +289,9 @@ fn reply(view: &SessionView) -> String {
 }
 
 fn finish(view: &SessionView, session_id: &str, outcome: Outcome, json: bool) -> i32 {
-    let (status, code, detail) = match &outcome {
-        Outcome::Done => ("done", 0, None),
-        Outcome::Failed(error) => ("failed", 1, Some(error.clone())),
-        Outcome::Asked(question) => ("question", 2, Some(question.clone())),
-        Outcome::TimedOut => ("timeout", 3, None),
-    };
+    let code = outcome_code(&outcome);
     if json {
-        let value = serde_json::json!({
-            "sessionId": session_id,
-            "status": status,
-            "reply": reply(view),
-            "error": matches!(outcome, Outcome::Failed(_)).then(|| detail.clone()).flatten(),
-            "question": matches!(outcome, Outcome::Asked(_)).then(|| detail.clone()).flatten(),
-            "agent": view.agent,
-            "model": view.model,
-            "branch": view.branch,
-            "workspace": view.workspace,
-        });
-        println!("{value}");
+        println!("{}", result_json(view, session_id, &outcome));
         return code;
     }
     let text = reply(view);
@@ -248,6 +385,16 @@ mod tests {
             reply(&view(None, &[("you", true), ("agent", true)])),
             "agent text"
         );
+    }
+
+    #[test]
+    fn a_comparison_reports_its_most_serious_outcome() {
+        let done = Outcome::Done;
+        let asked = Outcome::Asked("?".into());
+        let failed = Outcome::Failed("x".into());
+        assert_eq!(comparison_code(&[&done, &done]), 0);
+        assert_eq!(comparison_code(&[&done, &Outcome::TimedOut, &asked]), 2);
+        assert_eq!(comparison_code(&[&asked, &failed]), 1);
     }
 
     #[test]

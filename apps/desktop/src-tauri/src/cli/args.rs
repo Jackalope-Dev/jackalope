@@ -20,6 +20,8 @@ pub enum Command {
         message: String,
         agent: Option<String>,
         model: Option<String>,
+        /// `--agents a,b`: the same message to each agent in its own conversation.
+        compare: Vec<String>,
         json: bool,
         timeout: Option<Duration>,
     },
@@ -48,6 +50,8 @@ pub struct Cli {
 }
 
 const USAGE: &str = "Run 'jackalope help' to see what is available.";
+/// The desktop compares at most four agents on one prompt.
+pub const MAX_COMPARED: usize = 4;
 
 pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String> {
     let mut arguments = arguments.into_iter();
@@ -57,6 +61,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
     let mut pick = false;
     let mut cold_start = None;
     let (mut agent, mut model, mut profile, mut timeout) = (None, None, None, None);
+    let mut compare: Option<Vec<String>> = None;
     let mut only_words = false;
     while let Some(argument) = arguments.next() {
         // Anything after `--`, a lone `-`, and text with spaces (a quoted
@@ -89,6 +94,20 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
             "--init" => init = true,
             "--agent" => agent = Some(value("--agent")?),
             "--model" => model = Some(value("--model")?),
+            "--agents" => {
+                let mut agents: Vec<String> = Vec::new();
+                for agent in value("--agents")?.split(',').map(str::trim) {
+                    if !agent.is_empty() && !agents.iter().any(|known| known == agent) {
+                        agents.push(agent.to_string());
+                    }
+                }
+                if !(2..=MAX_COMPARED).contains(&agents.len()) {
+                    return Err(format!(
+                        "--agents takes 2 to {MAX_COMPARED} different agents, as --agents claude,codex."
+                    ));
+                }
+                compare = Some(agents);
+            }
             "--profile" => profile = Some(value("--profile")?),
             "--timeout" => {
                 let text = value("--timeout")?;
@@ -102,7 +121,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
         if inline.is_some()
             && !matches!(
                 name.as_str(),
-                "--agent" | "--model" | "--profile" | "--timeout"
+                "--agent" | "--agents" | "--model" | "--profile" | "--timeout"
             )
         {
             return Err(format!("{name} does not take a value. {USAGE}"));
@@ -124,6 +143,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
             message: words[skip.min(words.len())..].join(" "),
             agent: agent.take(),
             model: model.take(),
+            compare: compare.take().unwrap_or_default(),
             json,
             timeout,
         }
@@ -207,6 +227,22 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
     );
     if json && !json_applies {
         return Err(format!("--json applies to -p, ls and status. {USAGE}"));
+    }
+    if compare.is_some() {
+        return Err(format!("--agents applies to -p. {USAGE}"));
+    }
+    if let Command::Once {
+        agent,
+        model,
+        compare,
+        ..
+    } = &command
+    {
+        if !compare.is_empty() && (agent.is_some() || model.is_some()) {
+            return Err(format!(
+                "--agents chooses the agents itself; use it without --agent or --model. {USAGE}"
+            ));
+        }
     }
     if agent.is_some() || model.is_some() {
         return Err(format!(
@@ -364,6 +400,19 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
+    }
+
+    #[test]
+    fn one_message_can_go_to_several_agents() {
+        match command(&["-p", "--agents", "claude, codex,claude", "fix it"]) {
+            Command::Once { compare, .. } => assert_eq!(compare, ["claude", "codex"]),
+            other => panic!("{other:?}"),
+        }
+        assert!(parse_line(&["-p", "--agents", "claude", "x"]).is_err());
+        assert!(parse_line(&["-p", "--agents=a,b,c,d,e", "x"]).is_err());
+        assert!(parse_line(&["-p", "--agents=a,b", "--agent", "c", "x"]).is_err());
+        assert!(parse_line(&["-p", "--agents=a,b", "--model", "m", "x"]).is_err());
+        assert!(parse_line(&["--agents=a,b"]).is_err());
     }
 
     #[test]
