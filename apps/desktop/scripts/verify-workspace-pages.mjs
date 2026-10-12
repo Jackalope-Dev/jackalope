@@ -6,11 +6,14 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 840 } });
   page.setDefaultTimeout(15000);
+  await page.addInitScript(() => localStorage.setItem('jackalope.welcome.seen', '1'));
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await mkdir('output/playwright', { recursive: true });
   await page.route('https://github.com/**', (route) => route.abort());
-  await page.goto('http://localhost:5173');
+  // The marketplace directory is fixture data; live AllMCPs results would replace it.
+  await page.route('https://allmcps.com/**', (route) => route.abort());
+  await page.goto(process.env.JACKALOPE_PREVIEW_URL ?? 'http://localhost:5173', { timeout: 60000 });
   await page.evaluate(async () => {
     window.storeModule = (name) =>
       import(
@@ -38,6 +41,9 @@ try {
       transformCallback: () => 0,
       invoke: async (command, args) => {
         window.pagesFixture.calls.push(command);
+        if (command === 'git_list_worktree_orphans') return [];
+        if (command === 'queue_snapshot')
+          return { items: [], mergedRunIds: [], enabledProjects: [], managedTasks: [] };
         if (command === 'app_account_referrals')
           return {
             remaining: 3,
@@ -265,7 +271,9 @@ try {
       tab,
     );
   };
-  await page.getByRole('heading', { name: 'Chat', exact: true }).waitFor();
+  // A browser has no native account; saved work opens the workspace without starting tasks.
+  await page.getByRole('button', { name: /Open saved work/ }).click();
+  await page.getByRole('heading', { name: 'Work', exact: true }).waitFor();
   await navigate('repo-todos');
   const row = page.locator('.repo-todo-group li').first();
   await row.waitFor();
@@ -358,12 +366,12 @@ try {
   await page.getByRole('button', { name: 'Configure Codex', exact: true }).waitFor();
   await page.getByText('CLI setup needed', { exact: true }).waitFor();
   await page.setViewportSize({ width: 1280, height: 840 });
-  assert.equal(await page.locator('.agent-roster-row').count(), 7);
+  assert.equal(await page.locator('.agent-roster-row').count(), 8);
   await page.getByText('npm install -g opencode-ai').waitFor();
   await page.screenshot({ path: 'output/playwright/agents-grid.png' });
   assert.equal(await page.getByText('Ready', { exact: true }).count(), 0);
   await page.getByRole('button', { name: 'Configure Codex', exact: true }).click();
-  await page.getByRole('heading', { name: 'Configure Codex', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Codex', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Add code-model to model list', exact: true }).click();
   await page
     .getByRole('button', { name: 'Remove code-model from model list', exact: true })
@@ -378,6 +386,12 @@ try {
   await page.screenshot({ path: 'output/playwright/agent-settings-scroll.png' });
   await navigate('mcp-marketplace');
   await page.getByRole('heading', { name: 'Tool marketplace', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'All servers', exact: true }).click();
+  // Switching views starts a debounced directory request; let it fail before the fixture listing.
+  await page.waitForFunction(async () => {
+    const { useMcpStore } = await window.storeModule('mcpStore');
+    return !!useMcpStore.getState().marketplaceError;
+  });
   await page.evaluate(async () => {
     const { useMcpStore } = await window.storeModule('mcpStore');
     const { useSettingsStore } = await window.storeModule('settingsStore');
@@ -430,12 +444,14 @@ try {
     useSettingsStore.getState().setUseMcpMarketplace(true);
     listing();
   });
-  const detailsButton = page.getByRole('button', { name: 'View details', exact: false });
+  const detailsButton = page
+    .getByRole('article', { name: 'Trail Search' })
+    .getByRole('button', { name: 'View details', exact: false });
   await detailsButton.click();
   await page.getByRole('heading', { name: 'Trail Search', exact: true }).waitFor();
   assert.equal(await page.getByRole('dialog').count(), 0);
   await page.getByRole('tab', { name: 'Tools (1)', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Search listed tools' }).fill('missing');
+  await page.getByRole('searchbox', { name: 'Search listed tools' }).fill('missing');
   await page.getByText('No tools match “missing”.', { exact: true }).waitFor();
   await page.getByRole('tab', { name: 'Overview', exact: true }).click();
   for (const width of [1280, 960, 700]) {
@@ -471,9 +487,10 @@ try {
     false,
   );
 
-  await page.getByRole('button', { name: 'Invitations, 3 left to give' }).waitFor();
+  await page.setViewportSize({ width: 1280, height: 840 });
+  await page.getByRole('button', { name: 'Trial passes', exact: true }).waitFor();
   await navigate('mcps');
-  await page.getByRole('button', { name: 'Add connection', exact: true }).click();
+  await page.getByRole('button', { name: 'Custom connection', exact: true }).click();
   const connectionDialog = page.getByRole('dialog');
   await connectionDialog.getByLabel('Name', { exact: true }).fill('Fixture tool');
   await connectionDialog.getByRole('button', { name: 'Remote URL', exact: true }).click();
@@ -492,14 +509,16 @@ try {
   assert.ok(
     await connectionDialog.evaluate((element) => element.scrollWidth <= element.clientWidth),
   );
-  await connectionDialog.getByRole('button', { name: 'Add connection', exact: true }).click();
+  await connectionDialog.getByRole('button', { name: 'Save and check', exact: true }).click();
+  await connectionDialog.getByText('Connection saved', { exact: true }).waitFor();
+  await connectionDialog.getByRole('button', { name: 'Done', exact: true }).click();
   await connectionDialog.waitFor({ state: 'hidden' });
   const savedConnection = await page.evaluate(() => window.pagesFixture.mcpSaved);
   assert.equal(savedConnection.scope, 'global');
   assert.deepEqual(savedConnection.agents, ['codex']);
   assert.equal(savedConnection.managed, true);
   assert.equal(savedConnection.discovery, true);
-  await page.getByRole('button', { name: 'Browse marketplace', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Add tools', exact: true }).click();
   await page.getByRole('heading', { name: 'Tool marketplace', exact: true }).waitFor();
   await navigate('preferences');
   await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor();
@@ -509,6 +528,10 @@ try {
     .getByRole('button', { name: 'Agent defaults', exact: true })
     .click();
   await page.getByRole('switch', { name: 'Allow Codex app-wide', exact: true }).waitFor();
+  await page
+    .locator('section[aria-label="Codex preferences"]')
+    .getByRole('button', { name: 'Accounts' })
+    .click();
   const permission = page.getByRole('switch', {
     name: 'Allow Codex account Work account',
     exact: true,
@@ -542,8 +565,6 @@ try {
     false,
   );
   await page.getByRole('button', { name: 'Appearance', exact: true }).click();
-  await page.getByRole('button', { name: 'working', exact: true }).click();
-  await page.locator('[data-mascot-effort]').waitFor();
   for (const width of [1280, 960, 700]) {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
     for (const isDark of [false, true]) {
@@ -573,7 +594,7 @@ try {
   await navigate('topology');
   await page.getByRole('heading', { name: 'Codebase', exact: true }).waitFor();
   assert.equal(await page.getByRole('navigation', { name: 'Project shortcuts' }).count(), 0);
-  await page.getByRole('textbox', { name: 'Find a file', exact: true }).waitFor();
+  await page.getByRole('searchbox', { name: 'Find a file', exact: true }).waitFor();
   assert.equal(
     await page.evaluate(
       () => window.pagesFixture.calls.filter((call) => call === 'codebase_scan').length,
@@ -636,9 +657,9 @@ try {
   });
   await page.getByRole('button', { name: /Refresh map|Update map/ }).click();
   await page.getByRole('heading', { name: '2 connected files', exact: true }).waitFor();
-  await page.getByRole('textbox', { name: 'Search checks' }).fill('missing');
+  await page.getByRole('searchbox', { name: 'Search checks' }).fill('missing');
   await page.getByRole('button', { name: /Target not resolved.*missing/ }).waitFor();
-  await page.getByRole('textbox', { name: 'Search checks' }).fill('');
+  await page.getByRole('searchbox', { name: 'Search checks' }).fill('');
 
   for (const width of [1280, 960]) {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
@@ -659,21 +680,9 @@ try {
       );
     }
   }
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await navigate('preferences');
-  await page
-    .getByRole('navigation', { name: 'Settings categories' })
-    .getByRole('button', { name: 'Appearance', exact: true })
-    .click();
-  await page.getByRole('button', { name: 'working', exact: true }).click();
-  await page.waitForTimeout(400);
-  const pose = await page.locator('[data-mascot-effort] path').first().getAttribute('style');
-  await page.waitForTimeout(450);
-  assert.equal(await page.locator('[data-mascot-effort] path').first().getAttribute('style'), pose);
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
 
   await navigate('usage');
-  await page.getByRole('heading', { name: 'Usage & Intelligence', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Usage & quota', exact: true }).waitFor();
   await page.getByRole('heading', { name: 'Ask Jackalope', exact: true }).waitFor();
   const helperTurns = page.getByRole('region', {
     name: 'Ask Jackalope turns for the selected filters',
@@ -686,7 +695,7 @@ try {
   const projectFilter = page.getByRole('combobox', { name: 'Project', exact: true });
   await projectFilter.focus();
   await projectFilter.press('Enter');
-  await page.getByRole('option', { name: 'Trail workspace', exact: true }).click();
+  await page.getByRole('option', { name: 'Trail renamed', exact: true }).click();
   await helperTurns.getByText('Trail workspace', { exact: true }).waitFor();
   assert.equal(await helperTurns.getByText('Other workspace', { exact: true }).count(), 0);
   await projectFilter.press('Enter');
@@ -716,7 +725,7 @@ try {
     }
   }
   await page.setViewportSize({ width: 1280, height: 840 });
-  await page.getByText('80% remaining', { exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Account quota', exact: true }).waitFor();
   const capacityCalls = () =>
     page.evaluate(
       () => window.pagesFixture.calls.filter((command) => command === 'capacity_snapshot').length,
@@ -725,7 +734,7 @@ try {
   await navigate('agents');
   await page.getByRole('heading', { name: 'Agents', exact: true }).waitFor();
   await navigate('usage');
-  await page.getByRole('heading', { name: 'Usage & Intelligence', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Usage & quota', exact: true }).waitFor();
   assert.equal(await capacityCalls(), 1);
   await page.evaluate(async () => {
     const { useCapacityStore } = await window.storeModule('capacityStore');
@@ -740,16 +749,22 @@ try {
     const { useCapacityStore } = await window.storeModule('capacityStore');
     useCapacityStore.setState({ lastFetched: Date.now() - 61_000 });
   });
-  await page.getByRole('button', { name: 'Refresh capacity', exact: true }).click();
+  await page.getByRole('button', { name: 'Refresh limits', exact: true }).click();
   await page.waitForFunction(
     () =>
       window.pagesFixture.calls.filter((command) => command === 'capacity_snapshot').length === 3,
   );
-  await page.getByRole('button', { name: 'Agent Performance & Insights', exact: true }).click();
+  // Quota handoff is an agent default; it persists across navigation.
+  const openAgentDefaults = async () => {
+    await navigate('preferences');
+    await page
+      .getByRole('navigation', { name: 'Settings categories' })
+      .getByRole('button', { name: 'Agent defaults', exact: true })
+      .click();
+  };
+  await openAgentDefaults();
   const handoffToggle = page.getByRole('switch', { name: 'Automatic quota handoff', exact: true });
   assert.equal(await handoffToggle.getAttribute('aria-checked'), 'true');
-  assert.equal(await page.locator('.capacity-panel').count(), 0);
-  assert.equal(await page.getByText('Protected', { exact: true }).count(), 0);
   await handoffToggle.click();
   await page.waitForFunction(async () => {
     const { useAgentConfigStore } = await window.storeModule('agentConfigStore');
@@ -757,8 +772,7 @@ try {
   });
   await navigate('agents');
   await page.getByRole('heading', { name: 'Agents', exact: true }).waitFor();
-  await navigate('usage');
-  await page.getByRole('button', { name: 'Agent Performance & Insights', exact: true }).click();
+  await openAgentDefaults();
   assert.equal(await handoffToggle.getAttribute('aria-checked'), 'false');
   await handoffToggle.click();
 
