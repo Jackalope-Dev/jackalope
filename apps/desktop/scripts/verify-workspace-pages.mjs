@@ -590,6 +590,20 @@ try {
     'Trail renamed',
   );
   await page.screenshot({ path: 'output/playwright/project-settings-700.png' });
+  // Schedules live under Bots rather than their own rail destination.
+  const rail = page.getByRole('navigation', { name: 'Workspace', exact: true });
+  assert.equal(await rail.getByRole('button', { name: /Automations|Schedules/ }).count(), 0);
+  await rail.getByRole('button', { name: 'Bots', exact: true }).click();
+  await page.getByRole('heading', { name: 'Bots', exact: true }).waitFor();
+  await page
+    .getByRole('navigation', { name: 'Bots views', exact: true })
+    .getByRole('button', { name: 'Schedules', exact: true })
+    .click();
+  await page.getByRole('heading', { name: 'Schedules', exact: true }).waitFor();
+  assert.equal(
+    await rail.getByRole('button', { name: 'Bots' }).getAttribute('aria-current'),
+    'page',
+  );
   await navigate('topology');
   await page.getByRole('heading', { name: 'Codebase', exact: true }).waitFor();
   assert.equal(await page.getByRole('navigation', { name: 'Project shortcuts' }).count(), 0);

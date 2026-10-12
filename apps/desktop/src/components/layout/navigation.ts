@@ -44,6 +44,14 @@ export const WORKSPACE_VIEWS = [
     primary: true,
   },
   {
+    id: 'schedules',
+    label: 'Schedules',
+    description: 'Bots: recurring tasks and their run history.',
+    icon: CalendarClock,
+    group: 'bots',
+    primary: false,
+  },
+  {
     id: 'remote-hosts',
     label: 'Hosts',
     description: 'Connect to trusted hosts and continue work from another device.',
@@ -167,14 +175,6 @@ export const WORKSPACE_VIEWS = [
     icon: FileCheck2,
     group: 'tasks',
     primary: false,
-  },
-  {
-    id: 'schedules',
-    label: 'Automations',
-    description: 'Tasks: schedules and automatic runs.',
-    icon: CalendarClock,
-    group: 'automations',
-    primary: true,
   },
   {
     id: 'agent-settings',

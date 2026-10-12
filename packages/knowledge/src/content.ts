@@ -156,7 +156,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
     title: 'Get started with the Jackalope beta',
     shortTitle: 'Getting started',
     description:
-      'Install Jackalope, connect your approved account, find your way around and send feedback while the app is in beta.',
+      'Install Jackalope, connect your account, find your way around and send feedback while the app is in beta.',
     readingTime: '3 min read',
     sections: [
       {
@@ -172,7 +172,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'connect',
         question: 'How do I connect my account?',
         paragraphs: [
-          'Running tasks needs an approved Jackalope account. Choose Connect account; your browser opens and the app shows a code. Sign in, check that the code matches and confirm. The app then shows your email and approved access.',
+          'Running tasks needs a Jackalope account. Sign up on the website if you have not, then choose Connect account; your browser opens and the app shows a code. Sign in, check that the code matches and confirm. The app then shows your email and approved access.',
           'Saved work stays readable without a connection. After you connect, new tasks keep working offline for up to 72 hours.',
         ],
       },
@@ -278,7 +278,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'A wake-up works without you: on a schedule, when the project or a path in it changes on the target branch, or when a connected app returns new data. For connected apps, choose a tool the connection marks read-only and how often to check; the first check records the current result and later differences wake the bot.',
           'It continues its latest conversation while that conversation is open, so the bot builds on earlier runs; finishing or pausing the conversation makes the next wake-up start fresh. Each wake-up shows when it runs next and what happened last. Use Run now to try one immediately. Choose Pause all wake-ups from the options beside Create a new bot to stop them for every bot; Run now still works. Wake-ups missed while Jackalope was closed are skipped, a bot wakes at most 12 times an hour, and conversations a bot starts pause after 20 replies until you resume them.',
-          'Routines created before wake-ups existed keep running as automations; manage their timing and history in Automations.',
+          'Routines created before wake-ups existed keep running as automations; manage their timing and history under Bots, then Schedules.',
         ],
       },
       {
@@ -848,7 +848,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'work-personal-segregation',
         question: 'How do work and personal account profiles differ?',
         paragraphs: [
-          'Named Codex, Claude Code, Grok, OpenCode, and Kimi Code profiles use separate supported CLI directories. The Agents page saves enable/disable, default task agent, and account choices for the selected project. Defaults and accounts (Settings → Agent defaults) offers Work/Personal group selection and allowed accounts. App settings retains app-wide limits. New work uses the project default; continuations retain their bound profile.',
+          'Named Codex, Claude Code, Grok, OpenCode, and Kimi Code profiles use separate supported CLI directories. The Agents page saves enable/disable, default task agent, and account choices for the selected project. Its Defaults section offers Work/Personal group selection, and each agent’s Configure page lists its allowed accounts. Choose All projects on that page for app-wide limits. New work uses the project default; continuations retain their bound profile.',
           'Antigravity named profiles require Gemini API keys with separate API billing. Its existing subscription login is shared and can change outside Jackalope. Profiles organize credentials; they do not isolate OS permissions or inherited provider configuration.',
         ],
       },

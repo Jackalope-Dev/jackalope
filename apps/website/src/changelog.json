@@ -1,5 +1,16 @@
 [
   {
+    "id": "agent-choices-and-schedules-in-one-place",
+    "date": "2026-10-12",
+    "status": "In development",
+    "title": "Agent choices and schedules in one place",
+    "description": "Agents and Bots each gather what used to be split across separate pages.",
+    "items": [
+      "The Agents page holds the default agent, quota handoff and project account groups beside the roster, with one switch for the active project or every project.",
+      "Schedules moved under Bots, so a bot's wake-ups and recurring tasks sit together and the sidebar has one less destination."
+    ]
+  },
+  {
     "id": "open-pull-requests-and-fix-failing-checks-from-a-task",
     "date": "2026-10-12",
     "status": "In development",

@@ -1136,7 +1136,7 @@ function BotWakeList({
   );
 }
 
-/** Schedules created as routines before wake-ups existed. Timing and history stay in Automations. */
+/** Schedules created as routines before wake-ups existed. Timing and history stay in Schedules. */
 function BotRoutines({ bot }: { bot: Bot }) {
   const [ledger, setLedger] = useState<ScheduleLedger | null>(null);
   const [error, setError] = useState('');
@@ -1153,7 +1153,7 @@ function BotRoutines({ bot }: { bot: Bot }) {
   }, [read]);
   const routines =
     ledger?.schedules.filter((schedule) => bot.routineIds.includes(schedule.definition.id)) ?? [];
-  // Routines removed in Automations are dropped from the bot once the ledger confirms it.
+  // Routines removed in Schedules are dropped from the bot once the ledger confirms it.
   useEffect(() => {
     if (!ledger) return;
     for (const id of bot.routineIds)
@@ -1165,7 +1165,7 @@ function BotRoutines({ bot }: { bot: Bot }) {
     <section className="workspace-section workspace-stack">
       <WorkspaceSectionHeading
         title="Routines"
-        description="Earlier scheduled tasks. Manage timing and history in Automations."
+        description="Earlier scheduled tasks. Manage timing and history in Schedules."
       />
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       <ul className="bots-list">

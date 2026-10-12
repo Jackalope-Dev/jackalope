@@ -629,7 +629,7 @@ export function Shell({
             view.group !== 'agents' &&
             WORKSPACE_VIEWS.filter((item) => item.group === view.group).length > 1 && (
               <WorkspaceSubnavigation
-                label={`${view.group} views`}
+                label={`${view.group.charAt(0).toUpperCase()}${view.group.slice(1)} views`}
                 value={activeTab}
                 onChange={navigate}
                 items={WORKSPACE_VIEWS.filter(
