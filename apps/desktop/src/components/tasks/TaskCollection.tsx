@@ -28,6 +28,7 @@ import {
   workGroup,
   workGroups,
   workPresence,
+  workShape,
 } from '../../lib/task-collection';
 import type { Runner } from '../../lib/task-runtime';
 import { useProjectStore } from '../../stores/projectStore';
@@ -530,6 +531,7 @@ const WorkCard = memo(
           <span className="work-item-title">{item.title}</span>
           <span className="work-item-meta">
             <span>
+              {workShape(item)} ·{' '}
               {item.session?.request.projectName ??
                 item.run?.projectName ??
                 projects.find((p) => p.id === item.idea?.projectId)?.name ??

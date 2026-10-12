@@ -16,6 +16,7 @@ import type { WorkItem } from '../../lib/task-collection';
 import { nativeTask } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { selectWork, workTarget } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
@@ -99,12 +100,11 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
     [allRuns, project, integrated, ideas, sessions, queue],
   );
   const openTask = (item: WorkItem) => {
-    useExecutionStore.getState().select(null);
-    useManagedTaskStore.getState().select(item.managed?.id ?? null);
+    // A task opens through its list row rather than straight to its page.
+    selectWork(item.run && !item.managed && !item.session ? {} : workTarget(item));
     if (item.managed) {
       navigateWorkspace('kanban');
     } else if (item.session) {
-      useLiveSessionStore.getState().select(item.session.id);
       navigateWorkspace('live-sessions');
     } else if (item.run) {
       useWorkViewStore.getState().open(item.run.id);
@@ -166,9 +166,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                 <Button
                   size="sm"
                   onClick={() => {
-                    useManagedTaskStore.getState().select(null);
-                    useExecutionStore.getState().select(null);
-                    useLiveSessionStore.getState().select(null);
+                    selectWork();
                     useProjectStore.getState().selectProject(project.id);
                     navigateWorkspace('live-sessions');
                   }}
@@ -181,8 +179,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   size="sm"
                   onClick={() => {
                     useWorkViewStore.getState().setScope('project');
-                    useExecutionStore.getState().select(null);
-                    useManagedTaskStore.getState().select(null);
+                    selectWork();
                     navigateWorkspace('kanban');
                   }}
                 >
@@ -223,7 +220,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                     'Your existing task draft is full. Send or shorten it before adding this issue.',
                   );
                 localStorage.setItem(key, combined);
-                useLiveSessionStore.getState().select(null);
+                selectWork();
                 navigateWorkspace('live-sessions');
               }}
             />

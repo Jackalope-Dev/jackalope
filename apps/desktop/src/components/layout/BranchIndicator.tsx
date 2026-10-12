@@ -3,6 +3,7 @@ import { ChevronDown, GitBranch } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { sessionWork } from '../../lib/live-session';
 import { managedTaskWork } from '../../lib/managed-task';
+import { selectWork } from '../../lib/work-selection';
 import { openChanges } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
@@ -72,9 +73,7 @@ function useSwitchTargets(checkout: string) {
       branch: project.plainFolder ? 'No Git' : project.gitBranch || 'Branch unknown',
       label: 'Project checkout',
       open: () => {
-        useExecutionStore.getState().select(null);
-        useLiveSessionStore.getState().select(null);
-        useManagedTaskStore.getState().select(null);
+        selectWork();
       },
     });
   }

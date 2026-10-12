@@ -4,8 +4,7 @@ import { projectTaskPresence } from '../../lib/project-return';
 import type { QueueView } from '../../lib/queue';
 import type { WorkItem } from '../../lib/task-collection';
 import type { TaskRun } from '../../lib/task-runtime';
-import { useExecutionStore } from '../../stores/executionStore';
-import { useManagedTaskStore } from '../../stores/managedTaskStore';
+import { selectWork } from '../../lib/work-selection';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AgentStack } from '../agents/AgentAvatar';
 import { navigateWorkspace } from '../layout/navigation';
@@ -56,7 +55,7 @@ export function ProjectReturn({
               </div>
             </div>
             <Button variant="outline" onClick={() => onOpen(item)}>
-              {item.session ? 'Open chat' : 'Open task'}
+              {item.session ? 'Open conversation' : 'Open task'}
               <ArrowRight size={14} className="ml-1" />
             </Button>
           </Panel>
@@ -72,8 +71,7 @@ export function ProjectReturn({
             variant="ghost"
             size="sm"
             onClick={() => {
-              useExecutionStore.getState().select(null);
-              useManagedTaskStore.getState().select(null);
+              selectWork();
               useWorkViewStore.getState().setScope('project');
               navigateWorkspace('kanban');
             }}

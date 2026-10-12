@@ -61,12 +61,16 @@ of a list with `NoticeRow` (quiet surface, info icon, arrow), not an underlined 
 link. Conversations put the person's messages on the right as tinted bubbles and
 replies on the left beside the speaker's character, with agent Markdown rendered.
 
+Everything in the work list is work; label its shape (Conversation, Task, Planned task or
+Draft) rather than giving it its own place. Say "conversation" in copy, never "chat" or
+"session", and select work through `selectWork` so only one item is open at a time.
+
 Task titles should be short objectives, with original instructions in task details under Activity.
 Results lead with output. Review gives the changed-file browser the full content
 width, with separate Changes, Checks and Merge views. Put approval and optional
 review actions in a toolbar above the diff; never in a competing side panel.
-File review markers are optional tracking, not acceptance or merge gates. Task, managed-task
-and chat review reuse `ResultReview`; file navigation and diffs reuse `ChangedFiles`.
+File review markers are optional tracking, not acceptance or merge gates. Task, planned-task
+and conversation review reuse `ResultReview`; file navigation and diffs reuse `ChangedFiles`.
 Keep check failures visible in navigation, preserve review inputs when switching views,
 and load optional tools on first use. Keep one follow-up composer per task. Worker links resolve to their parent task instead of a second result screen.
 Use `WorkspaceTabs` for keyboard-navigable task and review panels with the same
@@ -74,8 +78,8 @@ appearance as workspace navigation. Keep the task agent beside its heading.
 Use outlined buttons for secondary actions, visible selected tabs, and open sections
 for results, checks and next actions. Keep follow-up compact so the result remains usable
 at 960 by 640. Existing work should be visible before opening new-task capture.
-Chat leads with its composer and places work needing attention underneath. Keep
-optional session limits, workflow starters and context controls in its options menu;
+Work leads with its composer and places work needing attention underneath. Keep
+optional conversation limits, workflow starters and context controls in its options menu;
 keep the agent choice, including comparisons, and attachments visible beside Send.
 
 Visible content is the default. Use short headings, spacing, compact lists and clear

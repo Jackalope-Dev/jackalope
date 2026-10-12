@@ -1,5 +1,17 @@
 [
   {
+    "id": "one-name-for-every-kind-of-work",
+    "date": "2026-10-12",
+    "status": "In development",
+    "title": "One name for every kind of work",
+    "description": "Everything in the work list is work, labelled by how it runs.",
+    "items": [
+      "Each row shows whether it is a conversation, a task, a planned task or a draft, and the app says conversation everywhere it used to say chat or session.",
+      "Opening any piece of work closes the others, so the page never shows one item while the list highlights another.",
+      "Help now describes the three-step project setup and the composer that opens Work."
+    ]
+  },
+  {
     "id": "follow-terminal-runs-as-they-happen",
     "date": "2026-10-12",
     "status": "In development",

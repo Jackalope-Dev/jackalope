@@ -155,7 +155,7 @@ try {
         await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
         false,
       );
-      assert.equal(await page.getByText('Session limits', { exact: true }).count(), 0);
+      assert.equal(await page.getByText('Conversation limits', { exact: true }).count(), 0);
       await page.screenshot({ path: `${output}/composer-${width}-${appearance}.png` });
     }
   }

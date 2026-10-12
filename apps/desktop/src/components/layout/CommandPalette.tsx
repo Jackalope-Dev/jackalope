@@ -112,7 +112,7 @@ export function CommandPalette({
       title: session.title,
       project: session.request.projectName,
       date: session.updatedAt,
-      state: session.persona ? `Bot · ${session.persona.name}` : 'Chat',
+      state: session.persona ? `Bot · ${session.persona.name}` : 'Conversation',
     })),
   ]
     .filter((item) => `${item.title} ${item.project} ${item.state}`.toLowerCase().includes(search))
@@ -432,7 +432,7 @@ export function CommandPalette({
                 }}
               >
                 <item.icon className="size-4 text-[var(--color-accent-ink)]" />
-                <span>{item.id === 'live-sessions' ? 'Chat' : item.label}</span>
+                <span>{item.label}</span>
               </button>
             ))}
             {themes.length > 0 && <p className="menu-label">Change atmosphere</p>}

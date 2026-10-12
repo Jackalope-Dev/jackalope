@@ -159,10 +159,10 @@ const privacy: Section[] = [
           reports. You can continue without sharing, or change your choice in Settings → Privacy.
           Reports contain app version, operating system, release channel, and allowlisted app-open,
           task-state, page-visit, operation-outcome, and optional error-category events. Task states
-          include a fixed agent type and task or Chat workflow; operation outcomes include failed
-          requests and checks. Error categories can include a fixed operation or page name. Reports
-          include a random event ID to avoid counting retries twice, not an installation or account
-          ID.
+          include a fixed agent type and task or conversation workflow; operation outcomes include
+          failed requests and checks. Error categories can include a fixed operation or page name.
+          Reports include a random event ID to avoid counting retries twice, not an installation or
+          account ID.
         </p>
         <p>
           These reports do not include prompts, code, file paths, command output, error messages, or

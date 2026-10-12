@@ -137,10 +137,10 @@ try {
   await page.getByRole('heading', { name: 'Search walkthrough' }).waitFor();
   // Conversation details start open beside the work.
   assert.equal(await page.locator('.live-status').getAttribute('aria-expanded'), 'true');
-  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('button', { name: 'Conversation options', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Pause queue', exact: true }).waitFor();
   await page.getByRole('menuitem', { name: 'Stop work', exact: true }).waitFor();
-  await page.getByRole('menuitem', { name: 'Session limits', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Conversation limits', exact: true }).click();
   await page.getByLabel('Pause after this many batches').fill('8');
   await page.getByRole('button', { name: 'Save limits', exact: true }).click();
   await page.getByText('Limits saved.', { exact: true }).waitFor();
@@ -155,7 +155,7 @@ try {
   await page.keyboard.press('Escape');
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.waitForFunction(
-    () => document.activeElement?.getAttribute('aria-label') === 'Chat options',
+    () => document.activeElement?.getAttribute('aria-label') === 'Conversation options',
   );
   const input = page.getByRole('textbox', { name: 'Message', exact: true });
   await input.fill('Keep the result titles on one line.');
@@ -210,9 +210,9 @@ try {
   await page.getByRole('button', { name: 'Cancel queued message' }).first().click();
   await page.locator('.live-message[data-canceled=true]').first().waitFor();
   assert.equal(await page.locator('.live-message[data-canceled=true]').count(), 1);
-  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('button', { name: 'Conversation options', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Pause queue', exact: true }).click();
-  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('button', { name: 'Conversation options', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Resume queue', exact: true }).waitFor();
   await page.keyboard.press('Escape');
   assert.equal(await input.isEnabled(), true);
@@ -394,7 +394,7 @@ try {
   );
   assert.equal(await page.getByRole('textbox').count(), 1);
   await page.screenshot({ path: `${output}/hub-start-1280-dark.png` });
-  await page.getByRole('button', { name: 'Chat options', exact: true }).press('Enter');
+  await page.getByRole('button', { name: 'Conversation options', exact: true }).press('Enter');
   await page.getByRole('menuitem', { name: 'Codex speed', exact: true }).press('Enter');
   const speed = page.getByRole('combobox', { name: 'Codex speed', exact: true });
   await speed.press('Enter');
@@ -415,7 +415,7 @@ try {
   await page.reload({ waitUntil: 'domcontentloaded' });
   await input.waitFor();
   assert.equal(await input.inputValue(), 'Make search results easier to scan.');
-  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('button', { name: 'Conversation options', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Codex speed', exact: true }).click();
   assert.equal(await speed.textContent(), 'Fast · higher usage');
   await page.keyboard.press('Escape');
@@ -455,8 +455,8 @@ try {
   assert.equal(creates[1].title, undefined);
   assert.equal(creates[1].request.codexSpeed, 'fast');
   await input.fill('A separate draft');
-  assert.equal(await page.getByText('Session limits', { exact: true }).count(), 0);
-  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  assert.equal(await page.getByText('Conversation limits', { exact: true }).count(), 0);
+  await page.getByRole('button', { name: 'Conversation options', exact: true }).click();
   await page
     .getByRole('menuitem', { name: 'Start from a repeatable workflow', exact: true })
     .click();
@@ -469,8 +469,8 @@ try {
   assert.ok((await input.inputValue()).includes("user's explicit authorization"));
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   assert.equal(await input.evaluate((node) => node === document.activeElement), true);
-  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Session limits', exact: true }).click();
+  await page.getByRole('button', { name: 'Conversation options', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Conversation limits', exact: true }).click();
   await page.getByLabel('Pause after this many batches').fill('3');
   await page.getByLabel('Pause at estimated cost (USD)', { exact: true }).fill('5');
   await page.getByRole('button', { name: 'Save limits' }).click();
@@ -484,9 +484,9 @@ try {
   );
   await page.keyboard.press('Escape');
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
-  await page.getByRole('button', { name: 'Chat options', exact: true }).focus();
+  await page.getByRole('button', { name: 'Conversation options', exact: true }).focus();
   await page.keyboard.press('Enter');
-  await page.getByRole('menuitem', { name: 'Session limits', exact: true }).press('Enter');
+  await page.getByRole('menuitem', { name: 'Conversation limits', exact: true }).press('Enter');
   assert.equal(await page.getByLabel('Pause after this many batches').inputValue(), '3');
   assert.equal(
     await page.getByLabel('Pause at estimated cost (USD)', { exact: true }).inputValue(),
@@ -495,7 +495,7 @@ try {
   await page.keyboard.press('Escape');
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   const preservedDraft = await input.inputValue();
-  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('button', { name: 'Conversation options', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Saved project context', exact: true }).click();
   const memory = page.getByRole('checkbox', { name: 'Use matching project lessons (up to three)' });
   await memory.uncheck();
@@ -509,7 +509,7 @@ try {
     ),
     true,
   );
-  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('button', { name: 'Conversation options', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Saved project context', exact: true }).click();
   assert.equal(await memory.isChecked(), false);
   await page.keyboard.press('Escape');

@@ -14,6 +14,7 @@ import { swarmConnection } from '../../lib/swarm';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
+import { selectWork } from '../../lib/work-selection';
 import { observeWorkbenchPerformance } from '../../lib/workbench-performance';
 import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { useBotStore } from '../../stores/botStore';
@@ -192,8 +193,8 @@ export function Shell({
   const [activeTab, setActiveTab] = useState<ActiveTab>(DEFAULT_WORKSPACE_TAB);
   useEffect(() => {
     if (activeTab === 'live-sessions') {
-      useExecutionStore.getState().select(null);
-      useManagedTaskStore.getState().select(null);
+      const conversation = useLiveSessionStore.getState().selectedId ?? undefined;
+      selectWork({ conversation });
       setActiveTab('kanban');
     }
   }, [activeTab]);
@@ -207,16 +208,14 @@ export function Shell({
           .sessions.find((session) => session.id === payload.sessionId);
         if (session && openInBots(session)) return;
         if (session) useProjectStore.getState().selectProject(session.request.projectId);
-        useLiveSessionStore.getState().select(payload.sessionId);
+        selectWork({ conversation: payload.sessionId });
         useWorkViewStore.getState().open(`session:${payload.sessionId}`, payload.pane);
         setActiveTab('live-sessions');
       } else {
-        useLiveSessionStore.getState().select(null);
-        useExecutionStore.getState().select(payload.id);
+        selectWork({ task: payload.id });
         await useExecutionStore.getState().refresh();
         const run = useExecutionStore.getState().runs.find((run) => run.id === payload.id);
         if (run) useProjectStore.getState().selectProject(run.projectId);
-        useManagedTaskStore.getState().select(null);
         useWorkViewStore.getState().open(payload.id, payload.pane);
         setActiveTab('kanban');
       }
@@ -291,9 +290,7 @@ export function Shell({
   const [composerFocus, setComposerFocus] = useState(0);
   const focusComposer = useCallback(() => {
     setCapture(null);
-    useLiveSessionStore.getState().select(null);
-    useManagedTaskStore.getState().select(null);
-    useExecutionStore.getState().select(null);
+    selectWork();
     setActiveTab('kanban');
     setComposerFocus((value) => value + 1);
   }, []);
@@ -325,9 +322,7 @@ export function Shell({
     if (!project) return;
     const execution = useExecutionStore.getState();
     execution.draft('capture', captureDraftForProject(execution.drafts, project, activeProjectId));
-    execution.select(null);
-    useLiveSessionStore.getState().select(null);
-    useManagedTaskStore.getState().select(null);
+    selectWork();
     selectProject(id);
   };
   useTrackOpenWork();
@@ -355,12 +350,10 @@ export function Shell({
     if (owner && openInBots(owner)) return;
     selectProject(run.projectId);
     if (run.liveSessionId) {
-      useLiveSessionStore.getState().select(run.liveSessionId);
+      selectWork({ conversation: run.liveSessionId });
       setActiveTab('live-sessions');
     } else {
-      useLiveSessionStore.getState().select(null);
-      useManagedTaskStore.getState().select(null);
-      useExecutionStore.getState().select(run.id);
+      selectWork({ task: run.id });
       setActiveTab('kanban');
     }
   }, [workRequest, selectProject]);
@@ -553,11 +546,7 @@ export function Shell({
                 type="button"
                 key={item.id}
                 onClick={() => {
-                  if (item.id === 'kanban') {
-                    useExecutionStore.getState().select(null);
-                    useLiveSessionStore.getState().select(null);
-                    useManagedTaskStore.getState().select(null);
-                  }
+                  if (item.id === 'kanban') selectWork();
                   setActiveTab(item.id);
                 }}
                 aria-current={view.group === item.group ? 'page' : undefined}
@@ -695,7 +684,7 @@ export function Shell({
               {activeTab === 'agents' && (
                 <RunnerConnections
                   onNewTask={(agent) => {
-                    useExecutionStore.getState().select(null);
+                    selectWork();
                     setCapture({ agent });
                     setActiveTab('kanban');
                   }}
@@ -741,7 +730,7 @@ export function Shell({
                   onSourceHandled={() => setScheduleRunId(undefined)}
                   onOpenProject={openProjectSetup}
                   onPlanning={() => {
-                    useExecutionStore.getState().select(null);
+                    selectWork();
                     setActiveTab('kanban');
                   }}
                 />

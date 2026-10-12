@@ -340,18 +340,18 @@ export const knowledgeGuides: KnowledgeGuide[] = [
   {
     slug: 'chat-and-follow-ups',
     category: 'workflows',
-    title: 'Continue coding-agent work with chat and follow-ups',
-    shortTitle: 'Chat and follow-ups',
+    title: 'Continue coding-agent work with conversations and follow-ups',
+    shortTitle: 'Conversations and follow-ups',
     description:
-      'Start a chat, queue corrections, pause work, and review a saved result in Jackalope. Recover after a failed attempt or restart.',
+      'Start a conversation, queue corrections, pause work, and review a saved result in Jackalope. Recover after a failed attempt or restart.',
     readingTime: '3 min read',
     sections: [
       {
         id: 'start-chat',
-        question: 'How do I start a chat in Jackalope?',
+        question: 'How do I start a conversation in Jackalope?',
         paragraphs: [
-          'Open Work, choose your project and agent account, and send the first message. The session keeps its messages and successive batches in one isolated Git workspace. You need approved Jackalope access, a supported installed agent, and a usable provider account to run work.',
-          'Describe one observable change and how it should be checked. Use New task for a structured brief or a reviewed plan when the work needs separate assignments. A chat processes batches in order; it is not a parallel plan.',
+          'Open Work, choose your project and agent account, and send the first message. The conversation keeps its messages and successive batches in one isolated Git workspace. You need a Jackalope account, a supported installed agent, and a usable provider account to run work.',
+          'Describe one observable change and how it should be checked. Use New task for a structured brief or a reviewed plan when the work needs separate assignments. A conversation processes batches in order; it is not a parallel plan. Each row in the work list shows its shape: Conversation, Task, Planned task or Draft.',
         ],
         links: [
           { label: 'Set up an agent and account', href: '/knowledge/multi-account-and-agents/' },
@@ -373,8 +373,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'resume-session',
         question: 'What happens after failure, restart, or closing a popout?',
         paragraphs: [
-          'Failures and app restarts pause dispatch. Open the saved chat, inspect the last attempt and any required action, then explicitly resume or retry when the problem is resolved. Queued messages do not silently replay after a restart.',
-          'Pop out opens a compact chat window, and its pin keeps that window on top. Closing the popout leaves execution running. Use the task’s stop controls when you want to stop work.',
+          'Failures and app restarts pause dispatch. Open the saved conversation, inspect the last attempt and any required action, then explicitly resume or retry when the problem is resolved. Queued messages do not silently replay after a restart.',
+          'Pop out opens a compact conversation window, and its pin keeps that window on top. Closing the popout leaves execution running. Use the task’s stop controls when you want to stop work.',
         ],
         links: [
           { label: 'Diagnose a stopped task', href: '/knowledge/troubleshooting-and-diagnostics/' },
@@ -382,17 +382,17 @@ export const knowledgeGuides: KnowledgeGuide[] = [
       },
       {
         id: 'session-limits',
-        question: 'Do session limits enforce a spending cap?',
+        question: 'Do conversation limits enforce a spending cap?',
         paragraphs: [
           'No. Optional batch and estimated-cost thresholds pause subsequent batches. A running batch can exceed the threshold. If cost is unavailable and a cost threshold is set, Jackalope pauses further dispatch instead of assuming the work was free. Provider billing and usage limits remain separate.',
         ],
       },
       {
         id: 'review-chat',
-        question: 'How do I merge a finished chat?',
+        question: 'How do I merge a finished conversation?',
         paragraphs: [
           'Pause dispatch, then run or cancel queued messages. Stop any preview before integration. Review the cumulative patch and checks for the latest batch, approve the outcome when it meets your request, and explicitly merge into the intended branch.',
-          'Changes since my last review compares files with a saved review position; it does not approve or merge them. After a successful merge, continue in a new chat from the updated branch. The delivered session retains its history and cannot start more work in the old workspace.',
+          'Changes since my last review compares files with a saved review position; it does not approve or merge them. After a successful merge, continue in a new conversation from the updated branch. The delivered conversation retains its history and cannot start more work in the old workspace.',
         ],
         links: [{ label: 'Review and merge step by step', href: '/knowledge/review-and-merge/' }],
         callout: {
@@ -415,7 +415,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'review-changes',
         question: 'What should I review before merging an agent’s work?',
         paragraphs: [
-          'Review the current patch against the requested behavior, read checks that apply to that patch, and try the changed flow. In Jackalope, open Review and use Changes, Checks, and Merge to inspect each part. Tasks, planned work, and chats use the same review controls.',
+          'Review the current patch against the requested behavior, read checks that apply to that patch, and try the changed flow. In Jackalope, open Review and use Changes, Checks, and Merge to inspect each part. Tasks, planned tasks, and conversations use the same review controls.',
           'Search the changed-file list and inspect the full diff, including unexpected files. For planned work, review the combined result under the parent task. A worker’s passing checks do not prove that several changes work together.',
         ],
         steps: [
@@ -457,7 +457,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         bullets: [
           'If checks failed, inspect the output and send the relevant failure with a focused follow-up.',
           'If files or the target branch changed, refresh the prepared review and run the required checks on the new result.',
-          'For chat, pause dispatch and run or cancel queued messages before preparing integration.',
+          'For a conversation, pause it and run or cancel queued messages before preparing the merge.',
           'Stop the task’s preview before continuing, merging, or removing its workspace.',
           'Keep unrelated local changes and the source worktree until you have resolved the reported conflict.',
         ],
@@ -475,7 +475,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         ],
         links: [
           {
-            label: 'Continue a chat after delivery',
+            label: 'Continue a conversation after delivery',
             href: '/knowledge/chat-and-follow-ups/#review-chat',
           },
         ],
@@ -1385,9 +1385,9 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'first-task',
         question: 'Try it: improve one empty state',
         paragraphs: [
-          'Tasks opens Chat. Send a message to start a conversation, or open Inbox or New task for a structured brief with effort, agent, and tool choices. For a first task, describe the starting state, desired result, constraints, and how the agent should check it. Replace the example page and commands with ones that exist in your project.',
-          'Project setup walks through your repository, agents, decisions, Git behavior, appearance, and an optional first task. Preparation, check, and preview commands are detected in the background without replacing your saved choices. Review or edit them in Project Settings before starting work; setup does not run commands or enable automatic checks.',
-          'Chat offers optional starters for GitHub issues, PR feedback, failing CI and dependency updates. GitHub evidence is read through your installed, signed-in CLI. The prepared request stays editable; it does not publish, reply or resolve threads.',
+          'Work opens with a composer. Send a message to start a conversation, or use Options for a structured brief with effort, agent, and tool choices. For a first task, describe the starting state, desired result, constraints, and how the agent should check it. Replace the example page and commands with ones that exist in your project.',
+          'Project setup takes three steps: your repository, your agents, and an optional first task. Decisions, Git behavior and colors start from defaults you can change in Project Settings. Preparation, check, and preview commands are detected in the background without replacing your saved choices. Review or edit them in Project Settings before starting work; setup does not run commands or enable automatic checks.',
+          'The composer offers optional starters for GitHub issues, PR feedback, failing CI and dependency updates. GitHub evidence is read through your installed, signed-in CLI. The prepared request stays editable; it does not publish, reply or resolve threads.',
         ],
         codeBox: {
           title: 'Example task brief',
@@ -1411,7 +1411,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'task-speed',
         question: 'Can I speed up tasks without reducing model effort?',
         paragraphs: [
-          'Choose Codex speed under Customize task, or in the options for a new Chat. Provider setting keeps the existing CLI choice. Standard and Fast request an explicit processing tier for Codex workers. Fast can use more credits and requires a supported model and account; it does not change model effort. Other agents keep their own settings.',
+          'Choose Codex speed under Customize task, or in the options for a new conversation. Provider setting keeps the existing CLI choice. Standard and Fast request an explicit processing tier for Codex workers. Fast can use more credits and requires a supported model and account; it does not change model effort. Other agents keep their own settings.',
           'The choice follows planned assignments, retries and continuations. Task details record the requested tier and offer Execution timing for measured setup, context and check stages. Some stages overlap, and older records may have no measurements. Provider acceptance and actual speed gains require observation.',
           'Jackalope supplies relevant repository context and completed setup facts, reuses matching saved checks and schedules independent work through workspace safeguards. Required verification and review still apply.',
         ],

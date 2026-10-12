@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { collectWorkspaceWork } from '../../lib/task-collection';
 import type { TaskRun } from '../../lib/task-runtime';
 import { taskDecision } from '../../lib/task-workflow';
+import { selectWork, workTarget } from '../../lib/work-selection';
 import { attentionQueue } from '../../lib/workbench';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -43,14 +44,10 @@ export function NextWorkAction({ run }: { run: TaskRun }) {
         const projectId =
           next.managed?.request.projectId ?? next.session?.request.projectId ?? next.run?.projectId;
         if (projectId) useProjectStore.getState().selectProject(projectId);
-        useExecutionStore.getState().select(null);
-        useManagedTaskStore.getState().select(next.managed?.id ?? null);
+        selectWork(workTarget(next));
         if (next.managed) navigateWorkspace('kanban');
-        else if (next.session) {
-          useLiveSessionStore.getState().select(next.session.id);
-          navigateWorkspace('live-sessions');
-        } else if (next.run) {
-          useExecutionStore.getState().select(next.run.id);
+        else if (next.session) navigateWorkspace('live-sessions');
+        else if (next.run) {
           useWorkViewStore.getState().open(next.run.id, taskDecision(next.run).section);
           navigateWorkspace('kanban');
         }

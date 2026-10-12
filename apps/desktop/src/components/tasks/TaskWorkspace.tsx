@@ -1,3 +1,4 @@
+import { selectWork, workTarget } from '../../lib/work-selection';
 import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
@@ -149,19 +150,15 @@ export function TaskWorkspace({
   const openItem = useCallback(
     (item: WorkItem) => {
       lastOpened.current = item.id;
-      useLiveSessionStore.getState().select(null);
-      if (!item.managed) useManagedTaskStore.getState().select(null);
-      if (item.managed) {
-        select(null);
-        useManagedTaskStore.getState().select(item.managed.id);
-      } else if (item.session) {
-        useLiveSessionStore.getState().select(item.session.id);
-        useProjectStore.getState().selectProject(item.session.request.projectId);
-        select(null);
-      } else if (item.run) select(item.run.id);
-      else if (item.idea) onCapture(item.idea.id);
+      if (item.session) useProjectStore.getState().selectProject(item.session.request.projectId);
+      if (item.managed || item.session || item.run) selectWork(workTarget(item));
+      else if (item.idea) {
+        // A draft opens in the composer over whichever task was open.
+        selectWork({ task: useExecutionStore.getState().selectedId ?? undefined });
+        onCapture(item.idea.id);
+      }
     },
-    [select, onCapture],
+    [onCapture],
   );
   useEffect(() => {
     if (selectedId || !lastOpened.current) return;
@@ -235,20 +232,12 @@ export function TaskWorkspace({
     : undefined;
   useEffect(() => {
     if (!owningSession) return;
-    useLiveSessionStore.getState().select(owningSession.id);
-    select(null);
-  }, [owningSession, select]);
+    selectWork({ conversation: owningSession.id });
+  }, [owningSession]);
   if (managedTask)
     return (
       <Suspense fallback={<LoadingState label="Loading task…" />}>
-        <ManagedTaskView
-          key={managedTask.id}
-          task={managedTask}
-          onBack={() => {
-            managed.select(null);
-            select(null);
-          }}
-        />
+        <ManagedTaskView key={managedTask.id} task={managedTask} onBack={() => selectWork()} />
       </Suspense>
     );
   if (owningSession)
@@ -258,7 +247,7 @@ export function TaskWorkspace({
           key={owningSession.id}
           session={owningSession}
           runs={sessionRuns}
-          onBack={() => useLiveSessionStore.getState().select(null)}
+          onBack={() => selectWork()}
         />
       </Suspense>
     );
@@ -287,7 +276,7 @@ export function TaskWorkspace({
           key={selectedSession.id}
           session={selectedSession}
           runs={sessionRuns}
-          onBack={() => useLiveSessionStore.getState().select(null)}
+          onBack={() => selectWork()}
         />
       </Suspense>
     );

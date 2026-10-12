@@ -78,9 +78,9 @@ export function PrivacySettings() {
             </DisclosureSummary>
             <p className="settings-row-description">
               Counts of app opens, page visits, operation outcomes and task states by agent and task
-              or Chat workflow, plus known error categories if enabled. Grouped by app version,
-              release channel and operating system. Operation outcomes include failed requests and
-              checks.
+              or conversation workflow, plus known error categories if enabled. Grouped by app
+              version, release channel and operating system. Operation outcomes include failed
+              requests and checks.
             </p>
             <p className="settings-row-description">
               No installation or account IDs, prompts, code, paths, command output, error messages

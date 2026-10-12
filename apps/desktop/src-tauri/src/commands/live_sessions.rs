@@ -167,7 +167,7 @@ fn limit_reason(session: &LiveSession, runs: &[TaskRun]) -> Option<String> {
         .max_batches
         .is_some_and(|limit| session.batches.len() >= limit)
     {
-        return Some("The session reached its batch limit. Review the result and adjust limits before resuming.".into());
+        return Some("The conversation reached its batch limit. Review the result and adjust limits before resuming.".into());
     }
     let threshold = session.limits.pause_at_estimated_usd?;
     let mut total = 0.0;
@@ -187,11 +187,11 @@ fn limit_reason(session: &LiveSession, runs: &[TaskRun]) -> Option<String> {
         for value in usage {
             match value.estimated_cost_usd.filter(|cost| cost.is_finite() && *cost >= 0.0) {
                 Some(cost) if value.reported => total += cost,
-                _ => return Some("Estimated cost is unavailable for part of this session. Review usage or remove the cost threshold before resuming.".into()),
+                _ => return Some("Estimated cost is unavailable for part of this conversation. Review usage or remove the cost threshold before resuming.".into()),
             }
         }
     }
-    (total >= threshold).then(|| "The session reached its estimated-cost threshold. Review usage and adjust limits before resuming.".into())
+    (total >= threshold).then(|| "The conversation reached its estimated-cost threshold. Review usage and adjust limits before resuming.".into())
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -253,7 +253,7 @@ impl LiveSessions {
             session.paused = true;
             if let Some(batch) = session.batches.last_mut().filter(|batch| !batch.settled) {
                 session.error = Some(
-                    "The session was interrupted. Review the last attempt before resuming.".into(),
+                    "The conversation was interrupted. Review the last attempt before resuming.".into(),
                 );
                 if !runs.iter().any(|run| run.id == batch.run_id) {
                     batch.error = Some("The pending launch was interrupted. Retry it explicitly after reviewing saved task history.".into());
@@ -286,7 +286,7 @@ impl LiveSessions {
     fn save(&self, ledger: &Ledger) -> Result<(), String> {
         let bytes = serde_json::to_vec(ledger).map_err(|e| e.to_string())?;
         if bytes.len() > 16_000_000 {
-            return Err("Live session storage is full. Finish or export existing sessions.".into());
+            return Err("Conversation storage is full. Finish or export existing conversations.".into());
         }
         std::fs::create_dir_all(self.path.parent().ok_or("Invalid session path")?)
             .map_err(|e| e.to_string())?;
@@ -381,7 +381,7 @@ impl LiveSessions {
         if let Some(persona) = &persona {
             persona.validate()?;
         }
-        Uuid::parse_str(&id).map_err(|_| "Invalid session identifier")?;
+        Uuid::parse_str(&id).map_err(|_| "Invalid conversation identifier")?;
         if let Some(message) = &first_message {
             Uuid::parse_str(&message.id).map_err(|_| "Invalid message identifier")?;
             if message.text.trim().is_empty() || message.text.chars().count() > 12_000 {
@@ -412,7 +412,7 @@ impl LiveSessions {
             })
             .unwrap_or(title);
         if title.trim().is_empty() || title.chars().count() > 160 {
-            return Err("Use a session title up to 160 characters.".into());
+            return Err("Use a conversation title up to 160 characters.".into());
         }
         if let Some(folder) = super::tasks::plain_folder(&request.project_path)? {
             request.project_path = folder;
@@ -442,7 +442,7 @@ impl LiveSessions {
                 {
                     return Ok(id);
                 }
-                return Err("This session identifier is already in use.".into());
+                return Err("This conversation identifier is already in use.".into());
             }
             if ledger.sessions.len() >= 100 {
                 return Err("Live sessions are limited to 100 saved sessions.".into());
@@ -510,11 +510,11 @@ impl LiveSessions {
                 };
             }
             if session.closed {
-                return Err("Reopen this session before sending a message.".into());
+                return Err("Reopen this conversation before sending a message.".into());
             }
             Self::ensure_unintegrated(session, &integrated)?;
             if session.messages.len() >= 1000 {
-                return Err("Start a new session after 1,000 messages.".into());
+                return Err("Start a new conversation after 1,000 messages.".into());
             }
             let now = Utc::now().to_rfc3339();
             session.messages.push(SessionMessage {
@@ -557,7 +557,7 @@ impl LiveSessions {
             }
             Self::ensure_unintegrated(session, &integrated)?;
             if session.messages.len() >= 1000 {
-                return Err("Start a new session after 1,000 messages.".into());
+                return Err("Start a new conversation after 1,000 messages.".into());
             }
             let now = Utc::now().to_rfc3339();
             session.messages.push(SessionMessage {
@@ -808,7 +808,7 @@ impl LiveSessions {
                     session.paused = false;
                     session.error = None;
                 },
-                _ => return Err("Unknown session action.".into()),
+                _ => return Err("Unknown conversation action.".into()),
             }
             session.updated_at = Utc::now().to_rfc3339();
             Ok(())
@@ -859,7 +859,7 @@ impl LiveSessions {
                     .iter()
                     .find(|s| s.id == id)
                     .cloned()
-                    .ok_or("Session disappeared")?
+                    .ok_or("Conversation disappeared")?
             };
             if let Some(batch) = snapshot.batches.last().filter(|b| !b.settled) {
                 if let Some(run) = runs.iter().find(|r| r.id == batch.run_id) {
@@ -914,7 +914,7 @@ impl LiveSessions {
                 self.update(|ledger| {
                     let session = Self::session(ledger, &id)?;
                     session.paused = true;
-                    session.error = Some("Restore the missing attempt from task history before continuing this session.".into());
+                    session.error = Some("Restore the missing attempt from task history before continuing this conversation.".into());
                     Ok(())
                 })?;
                 changed = true;
@@ -1097,7 +1097,7 @@ impl LiveSessions {
                             for session in &mut inner.ledger.sessions {
                                 session.paused = true;
                             }
-                            inner.error = Some(format!("Session dispatch paused: {error}"));
+                            inner.error = Some(format!("Conversation paused: {error}"));
                         }
                         service.changed();
                         let _ = app.emit("live-sessions-changed", ());
@@ -1196,7 +1196,7 @@ pub async fn live_session_create(
     let result = tauri::async_runtime::spawn_blocking(move || {
         service.create_with_persona(
             id,
-            title.unwrap_or_else(|| "New session".into()),
+            title.unwrap_or_else(|| "New conversation".into()),
             request,
             first_message,
             limits.unwrap_or_default(),
@@ -1291,7 +1291,7 @@ impl LiveSessions {
             .iter()
             .any(|batch| integrated.contains(&batch.run_id))
         {
-            return Err("This session has been integrated. Start a new task from the updated target branch.".into());
+            return Err("This conversation has been merged. Start a new task from the updated target branch.".into());
         }
         Ok(())
     }
@@ -1315,7 +1315,7 @@ impl LiveSessions {
                 .sessions
                 .iter()
                 .find(|session| Some(&session.id) == run.live_session_id.as_ref())
-                .ok_or("Restore the session journal before integrating its work.")?;
+                .ok_or("Restore the conversation journal before merging its work.")?;
             if !session.paused
                 || session
                     .batches
@@ -1323,7 +1323,7 @@ impl LiveSessions {
                     .is_none_or(|batch| batch.run_id != run.id)
             {
                 return Err(
-                    "Pause this session and review its latest attempt before integration.".into(),
+                    "Pause this conversation and review its latest attempt before merging.".into(),
                 );
             }
             if session
@@ -1332,7 +1332,7 @@ impl LiveSessions {
                 .any(|message| !message.canceled && message.run_id.is_none())
             {
                 return Err(
-                    "Run or cancel the queued messages before integrating this session.".into(),
+                    "Run or cancel the queued messages before merging this conversation.".into(),
                 );
             }
         }
@@ -1353,7 +1353,7 @@ impl LiveSessions {
                 .ok_or("Session not found")?
         };
         if !session.paused {
-            return Err("Pause dispatch before reviewing session changes.".into());
+            return Err("Pause the conversation before reviewing its changes.".into());
         }
         let _guard = super::integration::execution_guard()?;
         let runs = self.runtime.integration_runs()?;
@@ -1380,7 +1380,7 @@ impl LiveSessions {
         let directory = self
             .path
             .parent()
-            .ok_or("Invalid session storage")?
+            .ok_or("Invalid conversation storage")?
             .join("exports");
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         let source = super::integration::snapshot(run, &directory)?;

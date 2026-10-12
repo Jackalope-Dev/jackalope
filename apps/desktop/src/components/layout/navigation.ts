@@ -21,7 +21,7 @@ export const WORKSPACE_VIEWS = [
   {
     id: 'live-sessions',
     label: 'Work',
-    description: 'Chat: live conversation to send a message, follow work and review changes.',
+    description: 'Work: a conversation to send a message, follow work and review changes.',
     icon: Layers3,
     group: 'tasks',
     primary: false,

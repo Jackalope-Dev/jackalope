@@ -27,7 +27,7 @@ export function ChatOptions({
       <Menu.Root>
         <Menu.Trigger asChild>
           {triggerVariant === 'button' ? (
-            <Button ref={trigger} type="button" variant="outline" aria-label="Chat options">
+            <Button ref={trigger} type="button" variant="outline" aria-label="Conversation options">
               <SlidersHorizontal size={16} aria-hidden="true" />
               <span>{triggerLabel}</span>
             </Button>
@@ -37,7 +37,7 @@ export function ChatOptions({
               type="button"
               variant="outline"
               size="icon"
-              aria-label="Chat options"
+              aria-label="Conversation options"
             >
               <MoreHorizontal size={18} aria-hidden="true" />
             </Button>

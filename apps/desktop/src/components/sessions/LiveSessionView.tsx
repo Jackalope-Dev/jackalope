@@ -33,6 +33,7 @@ import {
 import { isActive, nativeTask, respondToPrompt, type TaskRun } from '../../lib/task-runtime';
 import { taskDecision } from '../../lib/task-workflow';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { selectWork } from '../../lib/work-selection';
 import { BOT_COLORS, useBotStore } from '../../stores/botStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -119,7 +120,7 @@ export function LiveSessionView({
     const key = `jackalope-live-start:${session.request.projectId}`;
     const existing = localStorage.getItem(key)?.trim();
     localStorage.setItem(key, existing ? `${existing}\n\n${text}` : text);
-    useLiveSessionStore.getState().select(null);
+    selectWork();
   };
   const [expanded, setExpanded] = useState(initialDetailsOpen ?? !detached);
   useEffect(() => {
@@ -166,7 +167,9 @@ export function LiveSessionView({
   const append = (text: string) =>
     new Promise<void>((resolve, reject) => {
       if (session.closed) {
-        reject(new Error('This session is finished. Copy the delivery handoff into a new task.'));
+        reject(
+          new Error('This conversation is finished. Copy the delivery handoff into a new task.'),
+        );
         return;
       }
       if (addingFeedback.current) {
@@ -250,7 +253,7 @@ export function LiveSessionView({
   const pauseLabel = integrated
     ? 'Integrated'
     : session.closed
-      ? 'Reopen session'
+      ? 'Reopen conversation'
       : session.paused
         ? 'Resume queue'
         : 'Pause queue';
@@ -303,7 +306,7 @@ export function LiveSessionView({
           items={[
             {
               id: 'limits',
-              label: 'Session limits',
+              label: 'Conversation limits',
               content: () => (
                 <SessionLimits
                   embedded
@@ -712,7 +715,7 @@ export function LiveSessionView({
             <div className="live-work-bar">
               <SegmentedControl
                 className="live-tabs"
-                label="Session details"
+                label="Conversation details"
                 value={tab}
                 onChange={(value) => {
                   if (value === 'changes') showReview();
@@ -868,7 +871,7 @@ export function LiveSessionView({
                         (session.paused || integrated) &&
                         (pending ? (
                           <InlineNotice>
-                            Run or cancel queued messages before merging this session.
+                            Run or cancel queued messages before merging this conversation.
                           </InlineNotice>
                         ) : (
                           <MergeReview
