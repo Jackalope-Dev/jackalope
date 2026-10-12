@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { useWideWorkspace } from '../../hooks/useWideWorkspace';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import { waitForStoppedAttempt } from '../../lib/continue-task';
 import { projectConnections } from '../../lib/mcp-connection';
@@ -167,7 +168,8 @@ export function TaskDetail({
   const [connections, setConnections] = useState<McpServerConfig[] | null>(null);
   const applied = useCallback(() => setIntegrated(true), []);
   const key = `reply:${run.taskId}`;
-  const split = useWorkViewStore((state) => state.split[run.taskId] ?? true);
+  const wide = useWideWorkspace();
+  const split = useWorkViewStore((state) => state.split[run.taskId] ?? wide);
   const alongside = split && ['changes', 'preview', 'terminal', 'activity', 'screen'].includes(tab);
   const reply = drafts[key]?.prompt ?? '';
   const active = isActive(run);

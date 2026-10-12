@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { type CSSProperties, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
+import { useWideWorkspace } from '../../hooks/useWideWorkspace';
 import { BOT_BATCH_ALLOWANCE, batchLimitReached } from '../../lib/bot-conversations';
 import { type BotCard, useBotHubStore } from '../../lib/bot-hub';
 import {
@@ -124,7 +125,8 @@ export function LiveSessionView({
   useEffect(() => {
     if (initialDetailsOpen === undefined) setExpanded(!detached);
   }, [detached, initialDetailsOpen]);
-  const split = useWorkViewStore((state) => state.split[`session:${session.id}`] ?? true);
+  const wide = useWideWorkspace();
+  const split = useWorkViewStore((state) => state.split[`session:${session.id}`] ?? wide);
   const [collapsed, setCollapsed] = useState(false);
   const [tab, setTab] = useState(() => {
     const saved = useWorkViewStore.getState().reading[`session:${session.id}`];

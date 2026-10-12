@@ -2,6 +2,7 @@ import { FormField, IconButton, Panel, Select, SelectItem, Textarea } from '@jac
 import { Activity, ArrowLeft, RefreshCw } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { useWideWorkspace } from '../../hooks/useWideWorkspace';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import type { FeatureStep } from '../../lib/feature-plan';
 import {
@@ -83,7 +84,8 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
     handledWorkRequest.current = workRequest.revision;
     setViewTab(workRequest.section === 'changes' && hasResult ? 'review' : 'overview');
   }, [workRequest, task.id, hasResult]);
-  const split = useWorkViewStore((state) => state.split[`managed:${task.id}`] ?? true);
+  const wide = useWideWorkspace();
+  const split = useWorkViewStore((state) => state.split[`managed:${task.id}`] ?? wide);
   const alongside = split && ['review', 'preview'].includes(viewTab);
   const [planPending, setPlanPending] = useState(false);
   const [previewRevision, setPreviewRevision] = useState(0);
