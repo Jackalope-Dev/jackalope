@@ -36,9 +36,7 @@ export function SettingsSync() {
         </Disclosure>
         {!sync.owner && (
           <p role="status">
-            {sync.enabled
-              ? 'Sync starts after you connect an approved account.'
-              : 'Connect an approved account to sync settings.'}
+            {sync.enabled ? 'Sync starts after you sign in.' : 'Sign in to sync settings.'}
           </p>
         )}
         {sync.owner && (

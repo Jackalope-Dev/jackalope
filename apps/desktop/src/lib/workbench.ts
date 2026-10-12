@@ -2,17 +2,6 @@ import type { WorkItem } from './task-collection.ts';
 import type { TaskRun } from './task-runtime.ts';
 import { taskDecision } from './task-workflow.ts';
 
-export type WorkspacePreset = 'focus' | 'build' | 'oversee';
-export const workspacePresets = [
-  { id: 'focus', label: 'Focus', description: 'A quiet canvas for one task or conversation.' },
-  { id: 'build', label: 'Build', description: 'Conversation, changes and tools side by side.' },
-  {
-    id: 'oversee',
-    label: 'Oversee',
-    description: 'A live board for progress, questions and reviews.',
-  },
-] as const;
-
 export function workSummary(run: TaskRun) {
   const question = run.prompts?.find((prompt) => prompt.status === 'pending');
   const checks = run.verificationError

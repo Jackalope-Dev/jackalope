@@ -156,7 +156,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
     title: 'Get started with the Jackalope beta',
     shortTitle: 'Getting started',
     description:
-      'Install Jackalope, connect your approved account, find your way around and send feedback while the app is in beta.',
+      'Install Jackalope, connect your account, find your way around and send feedback while the app is in beta.',
     readingTime: '3 min read',
     sections: [
       {
@@ -172,7 +172,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'connect',
         question: 'How do I connect my account?',
         paragraphs: [
-          'Running tasks needs an approved Jackalope account. Choose Connect account; your browser opens and the app shows a code. Sign in, check that the code matches and confirm. The app then shows your email and approved access.',
+          'Running tasks needs a Jackalope account. Sign up on the website if you have not, then choose Connect account; your browser opens and the app shows a code. Sign in, check that the code matches and confirm. The app then shows your email and approved access.',
           'Saved work stays readable without a connection. After you connect, new tasks keep working offline for up to 72 hours.',
         ],
       },
@@ -180,8 +180,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'first-look',
         question: 'What do I see the first time I open it?',
         paragraphs: [
-          'A short welcome introduces the main features and how to reach us. Project setup then walks through your repository, agents, decisions, behavior, appearance and an optional first task.',
-          'The Work page holds your conversations, tasks and plans. Choose Focus, Build or Oversee from the layout picker at the top: Focus keeps one conversation in front of you, Build puts review, preview and terminal beside the work, and Oversee shows a full-width board of everything that is running or waiting for you.',
+          'A short welcome introduces the main features and how to reach us. Project setup then asks for your repository, its agents and an optional first task. Routing, commit behavior and colors start from defaults you can change in Project settings.',
+          'The Work page holds your conversations, tasks and plans. The sidebar lists recent work grouped by Needs you, In progress and Recent, and an open item shows review, preview and terminal beside its conversation.',
         ],
       },
       {
@@ -207,26 +207,26 @@ export const knowledgeGuides: KnowledgeGuide[] = [
   {
     slug: 'workspace-modes',
     category: 'workflows',
-    title: 'Focus, Build and Oversee: choosing a workspace layout',
-    shortTitle: 'Workspace modes',
+    title: 'Find your way around the Work page',
+    shortTitle: 'The Work page',
     description:
-      'Switch between a single conversation, a build layout with tools beside the work, and a board for everything in progress.',
+      'The sidebar keeps every piece of work in view, a board shows everything in progress, and the sidebar folds away when you want one thing on screen.',
     readingTime: '2 min read',
     sections: [
       {
         id: 'which-mode',
-        question: 'Which layout should I use?',
+        question: 'How is the Work page laid out?',
         paragraphs: [
-          'Focus shows a compact navigation rail, the conversation composer and the next task. Use it when you are working on one thing.',
-          'Build keeps recent work, project tools and the conversation beside review, preview, terminal or activity. Use it while you iterate on a change.',
-          'Oversee uses full-width navigation with live work counts, a queue of work that needs you and a board. Use it when several agents are running.',
+          'The sidebar lists your work in three groups: Needs you, In progress and Recent. Selecting an item opens its result, with review, preview, terminal and activity beside the conversation.',
+          'The work list on the page can show a list or a board. Use the board when several agents are running and you want every stage in view.',
+          'Collapse the sidebar with Ctrl+B (Cmd+B on macOS) to keep one conversation on screen, and press it again to bring your work back.',
         ],
       },
       {
         id: 'switching',
-        question: 'Do I lose anything when I switch?',
+        question: 'What happened to Focus, Build and Oversee?',
         paragraphs: [
-          'No. Modes and their work-list filters are saved for each project, and drafts are kept. Switching mode resets any conversation-layout adjustments you made, not your work.',
+          'They became one layout: a collapsed sidebar covers what Focus did, and the board view covers Oversee. Your work, drafts and saved filters are unchanged.',
           'Needs you lists recovery steps and questions first, then older reviews, so the most urgent item is always at the top.',
         ],
       },
@@ -278,7 +278,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'A wake-up works without you: on a schedule, when the project or a path in it changes on the target branch, or when a connected app returns new data. For connected apps, choose a tool the connection marks read-only and how often to check; the first check records the current result and later differences wake the bot.',
           'It continues its latest conversation while that conversation is open, so the bot builds on earlier runs; finishing or pausing the conversation makes the next wake-up start fresh. Each wake-up shows when it runs next and what happened last. Use Run now to try one immediately. Choose Pause all wake-ups from the options beside Create a new bot to stop them for every bot; Run now still works. Wake-ups missed while Jackalope was closed are skipped, a bot wakes at most 12 times an hour, and conversations a bot starts pause after 20 replies until you resume them.',
-          'Routines created before wake-ups existed keep running as automations; manage their timing and history in Automations.',
+          'Routines created before wake-ups existed keep running as automations; manage their timing and history under Bots, then Schedules.',
         ],
       },
       {
@@ -340,18 +340,18 @@ export const knowledgeGuides: KnowledgeGuide[] = [
   {
     slug: 'chat-and-follow-ups',
     category: 'workflows',
-    title: 'Continue coding-agent work with chat and follow-ups',
-    shortTitle: 'Chat and follow-ups',
+    title: 'Continue coding-agent work with conversations and follow-ups',
+    shortTitle: 'Conversations and follow-ups',
     description:
-      'Start a chat, queue corrections, pause work, and review a saved result in Jackalope. Recover after a failed attempt or restart.',
+      'Start a conversation, queue corrections, pause work, and review a saved result in Jackalope. Recover after a failed attempt or restart.',
     readingTime: '3 min read',
     sections: [
       {
         id: 'start-chat',
-        question: 'How do I start a chat in Jackalope?',
+        question: 'How do I start a conversation in Jackalope?',
         paragraphs: [
-          'Open Work, choose your project and agent account, and send the first message. The session keeps its messages and successive batches in one isolated Git workspace. You need approved Jackalope access, a supported installed agent, and a usable provider account to run work.',
-          'Describe one observable change and how it should be checked. Use New task for a structured brief or a reviewed plan when the work needs separate assignments. A chat processes batches in order; it is not a parallel plan.',
+          'Open Work, choose your project and agent account, and send the first message. The conversation keeps its messages and successive batches in one isolated Git workspace. You need a Jackalope account, a supported installed agent, and a usable provider account to run work.',
+          'Describe one observable change and how it should be checked. Use New task for a structured brief or a reviewed plan when the work needs separate assignments. A conversation processes batches in order; it is not a parallel plan. Each row in the work list shows its shape: Conversation, Task, Planned task or Draft.',
         ],
         links: [
           { label: 'Set up an agent and account', href: '/knowledge/multi-account-and-agents/' },
@@ -373,8 +373,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'resume-session',
         question: 'What happens after failure, restart, or closing a popout?',
         paragraphs: [
-          'Failures and app restarts pause dispatch. Open the saved chat, inspect the last attempt and any required action, then explicitly resume or retry when the problem is resolved. Queued messages do not silently replay after a restart.',
-          'Pop out opens a compact chat window, and its pin keeps that window on top. Closing the popout leaves execution running. Use the task’s stop controls when you want to stop work.',
+          'Failures and app restarts pause dispatch. Open the saved conversation, inspect the last attempt and any required action, then explicitly resume or retry when the problem is resolved. Queued messages do not silently replay after a restart.',
+          'Pop out opens a compact conversation window, and its pin keeps that window on top. Closing the popout leaves execution running. Use the task’s stop controls when you want to stop work.',
         ],
         links: [
           { label: 'Diagnose a stopped task', href: '/knowledge/troubleshooting-and-diagnostics/' },
@@ -382,17 +382,17 @@ export const knowledgeGuides: KnowledgeGuide[] = [
       },
       {
         id: 'session-limits',
-        question: 'Do session limits enforce a spending cap?',
+        question: 'Do conversation limits enforce a spending cap?',
         paragraphs: [
           'No. Optional batch and estimated-cost thresholds pause subsequent batches. A running batch can exceed the threshold. If cost is unavailable and a cost threshold is set, Jackalope pauses further dispatch instead of assuming the work was free. Provider billing and usage limits remain separate.',
         ],
       },
       {
         id: 'review-chat',
-        question: 'How do I merge a finished chat?',
+        question: 'How do I merge a finished conversation?',
         paragraphs: [
           'Pause dispatch, then run or cancel queued messages. Stop any preview before integration. Review the cumulative patch and checks for the latest batch, approve the outcome when it meets your request, and explicitly merge into the intended branch.',
-          'Changes since my last review compares files with a saved review position; it does not approve or merge them. After a successful merge, continue in a new chat from the updated branch. The delivered session retains its history and cannot start more work in the old workspace.',
+          'Changes since my last review compares files with a saved review position; it does not approve or merge them. After a successful merge, continue in a new conversation from the updated branch. The delivered conversation retains its history and cannot start more work in the old workspace.',
         ],
         links: [{ label: 'Review and merge step by step', href: '/knowledge/review-and-merge/' }],
         callout: {
@@ -415,7 +415,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'review-changes',
         question: 'What should I review before merging an agent’s work?',
         paragraphs: [
-          'Review the current patch against the requested behavior, read checks that apply to that patch, and try the changed flow. In Jackalope, open Review and use Changes, Checks, and Merge to inspect each part. Tasks, planned work, and chats use the same review controls.',
+          'Review the current patch against the requested behavior, read checks that apply to that patch, and try the changed flow. In Jackalope, open Review and use Changes, Checks, and Merge to inspect each part. Tasks, planned tasks, and conversations use the same review controls.',
           'Search the changed-file list and inspect the full diff, including unexpected files. For planned work, review the combined result under the parent task. A worker’s passing checks do not prove that several changes work together.',
         ],
         steps: [
@@ -457,7 +457,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         bullets: [
           'If checks failed, inspect the output and send the relevant failure with a focused follow-up.',
           'If files or the target branch changed, refresh the prepared review and run the required checks on the new result.',
-          'For chat, pause dispatch and run or cancel queued messages before preparing integration.',
+          'For a conversation, pause it and run or cancel queued messages before preparing the merge.',
           'Stop the task’s preview before continuing, merging, or removing its workspace.',
           'Keep unrelated local changes and the source worktree until you have resolved the reported conflict.',
         ],
@@ -475,7 +475,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         ],
         links: [
           {
-            label: 'Continue a chat after delivery',
+            label: 'Continue a conversation after delivery',
             href: '/knowledge/chat-and-follow-ups/#review-chat',
           },
         ],
@@ -683,7 +683,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'connect-account',
         question: 'How do I connect my Cloudflare account?',
         paragraphs: [
-          'Artifacts requires the Workers Paid plan, and Cloudflare bills operations and storage to your account. Open Settings → Connected work and fill in Cloudflare Artifacts.',
+          'Artifacts requires the Workers Paid plan, and Cloudflare bills operations and storage to your account. Open Settings → Cloudflare and fill in Cloudflare Artifacts.',
         ],
         steps: [
           'Copy your account ID from the Cloudflare dashboard.',
@@ -813,7 +813,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'kimi-code',
         question: 'What does Kimi Code support?',
         paragraphs: [
-          'Install the current Kimi Code CLI and open Agents & tools → Runners and choose Configure Kimi Code. Use kimi login for the default account or Add account & sign in for a separate profile. Named profiles use KIMI_CODE_HOME for configuration, sign-in data, and sessions; migrate legacy Python CLI setups before using them.',
+          'Install the current Kimi Code CLI and open Agents and choose Configure Kimi Code. Use kimi login for the default account or Add account & sign in for a separate profile. Named profiles use KIMI_CODE_HOME for configuration, sign-in data, and sessions; migrate legacy Python CLI setups before using them.',
           'Kimi tasks stream text and tool activity, offer the CLI’s tool approval choices and structured questions, and continue the exact saved session with its original account. Declining or leaving an approval unanswered stops the attempt. Selected models come from the account’s CLI session configuration.',
           'Kimi supports automatic routing and Ask Jackalope with tools disabled for those requests. Worker token usage uses session-total deltas; cache breakdown, cost, and helper tokens remain unknown. Membership quota requires a managed Kimi account with a current login. Detection and authentication checks do not establish signed-in execution or installed-app acceptance.',
         ],
@@ -828,7 +828,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Use a small task in a project that is appropriate for the account. This helps distinguish CLI discovery, successful sign-in, and the ability to run your chosen model.',
         ],
         steps: [
-          'Install the agent CLI, open Agents & tools → Runners and choose Configure beside the agent. Select the intended default or named account.',
+          'Install the agent CLI, open Agents and choose Configure beside the agent. Select the intended default or named account.',
           'Complete that profile’s sign-in or key setup. Review provider billing and model access for the selected account.',
           'Choose the account in the project settings, then create an explicitly assigned task: “Read the project instructions and summarize how to run the tests. Do not change files.”',
           'Inspect the bound agent/account and the result. If access fails, repair that same profile before trying a larger task.',
@@ -848,7 +848,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'work-personal-segregation',
         question: 'How do work and personal account profiles differ?',
         paragraphs: [
-          'Named Codex, Claude Code, Grok, OpenCode, and Kimi Code profiles use separate supported CLI directories. Agents & tools → Runners saves enable/disable, default task agent, and account choices for the selected project. Project agent settings offers Work/Personal group selection and allowed accounts. App settings retains app-wide limits. New work uses the project default; continuations retain their bound profile.',
+          'Named Codex, Claude Code, Grok, OpenCode, and Kimi Code profiles use separate supported CLI directories. The Agents page saves enable/disable, default task agent, and account choices for the selected project. Its Defaults section offers Work/Personal group selection, and each agent’s Configure page lists its allowed accounts. Choose All projects on that page for app-wide limits. New work uses the project default; continuations retain their bound profile.',
           'Antigravity named profiles require Gemini API keys with separate API billing. Its existing subscription login is shared and can change outside Jackalope. Profiles organize credentials; they do not isolate OS permissions or inherited provider configuration.',
         ],
       },
@@ -865,7 +865,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'credential-drift',
         question: 'How do I recover from an expired agent sign-in?',
         paragraphs: [
-          'Open Agents & tools → Runners, choose Configure beside the agent and select the affected account. Complete its sign-in flow, using Copy link or Open browser if needed. Check the same profile that the task uses; signing in to the default CLI account does not repair a separate named profile.',
+          'Open Agents, choose Configure beside the agent and select the affected account. Complete its sign-in flow, using Copy link or Open browser if needed. Check the same profile that the task uses; signing in to the default CLI account does not repair a separate named profile.',
           'Some adapters validate access only when launched. A detected executable or saved credential does not prove the provider will accept the next request.',
         ],
       },
@@ -947,7 +947,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'debugging-mcp',
         question: 'Where do I configure and diagnose connections?',
         paragraphs: [
-          'Open Agents & tools → MCP tools. Check the command and arguments for stdio, or the endpoint and transport for a remote server. Verify that the selected agent supports that transport.',
+          'Open Agents → Tools. Check the command and arguments for stdio, or the endpoint and transport for a remote server. Verify that the selected agent supports that transport.',
           'Use the connection probe for configured header or environment authentication. CLI-owned OAuth sessions must be checked in that CLI and account profile. A successful probe does not establish that every task can use the tool.',
         ],
       },
@@ -1240,7 +1240,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'mcp-overview',
         question: 'How do I connect project tools?',
         paragraphs: [
-          'Open Agents & tools → Tool marketplace for a curated collection of publisher-maintained tools. Review what a service does and its setup guide, then choose Configure. Search or choose All servers to browse the wider AllMCPs directory. Use Custom connection for your own endpoint or local command.',
+          'Open Agents → Tools and choose Add tools for a curated collection of publisher-maintained tools. Review what a service does and its setup guide, then choose Configure. Search or choose All servers to browse the wider AllMCPs directory. Use Custom connection for your own endpoint or local command.',
         ],
       },
       {
@@ -1385,9 +1385,9 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'first-task',
         question: 'Try it: improve one empty state',
         paragraphs: [
-          'Tasks opens Chat. Send a message to start a conversation, or open Inbox or New task for a structured brief with effort, agent, and tool choices. For a first task, describe the starting state, desired result, constraints, and how the agent should check it. Replace the example page and commands with ones that exist in your project.',
-          'Project setup walks through your repository, agents, decisions, Git behavior, appearance, and an optional first task. Preparation, check, and preview commands are detected in the background without replacing your saved choices. Review or edit them in Project Settings before starting work; setup does not run commands or enable automatic checks.',
-          'Chat offers optional starters for GitHub issues, PR feedback, failing CI and dependency updates. GitHub evidence is read through your installed, signed-in CLI. The prepared request stays editable; it does not publish, reply or resolve threads.',
+          'Work opens with a composer. Send a message to start a conversation, or use Options for a structured brief with effort, agent, and tool choices. For a first task, describe the starting state, desired result, constraints, and how the agent should check it. Replace the example page and commands with ones that exist in your project.',
+          'Project setup takes three steps: your repository, your agents, and an optional first task. Decisions, Git behavior and colors start from defaults you can change in Project Settings. Preparation, check, and preview commands are detected in the background without replacing your saved choices. Review or edit them in Project Settings before starting work; setup does not run commands or enable automatic checks.',
+          'The composer offers optional starters for GitHub issues, PR feedback, failing CI and dependency updates. GitHub evidence is read through your installed, signed-in CLI. The prepared request stays editable; it does not publish, reply or resolve threads.',
         ],
         codeBox: {
           title: 'Example task brief',
@@ -1411,7 +1411,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'task-speed',
         question: 'Can I speed up tasks without reducing model effort?',
         paragraphs: [
-          'Choose Codex speed under Customize task, or in the options for a new Chat. Provider setting keeps the existing CLI choice. Standard and Fast request an explicit processing tier for Codex workers. Fast can use more credits and requires a supported model and account; it does not change model effort. Other agents keep their own settings.',
+          'Choose Codex speed under Customize task, or in the options for a new conversation. Provider setting keeps the existing CLI choice. Standard and Fast request an explicit processing tier for Codex workers. Fast can use more credits and requires a supported model and account; it does not change model effort. Other agents keep their own settings.',
           'The choice follows planned assignments, retries and continuations. Task details record the requested tier and offer Execution timing for measured setup, context and check stages. Some stages overlap, and older records may have no measurements. Provider acceptance and actual speed gains require observation.',
           'Jackalope supplies relevant repository context and completed setup facts, reuses matching saved checks and schedules independent work through workspace safeguards. Required verification and review still apply.',
         ],

@@ -54,8 +54,8 @@ try {
                 };
               if (command === 'agent_profile_sign_in_stop') state.stopped.push(args.sessionId);
               if (command === 'agent_profile_sign_in_input') state.inputs.push(args.data);
-              if (command === 'plugin:shell|open') {
-                state.opened.push(args.path);
+              if (command === 'plugin:opener|open_url') {
+                state.opened.push(args.url);
                 if (state.failOpen) throw new Error('Fixture browser denial');
               }
             },

@@ -14,7 +14,7 @@
   min-height: 420px;
   overflow: hidden;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
 }
 
 @media (max-width: 1100px) {
@@ -39,7 +39,7 @@
 .bots-roster-item {
   display: flex;
   align-items: center;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .bots-roster-item:hover {
@@ -59,7 +59,7 @@
   min-height: 56px;
   padding: 8px 4px 8px 10px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--color-text-primary);
   text-align: left;
@@ -101,7 +101,7 @@
   width: 44px;
   height: 44px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -182,7 +182,7 @@
   gap: 8px;
   padding: 12px 12px 12px 16px;
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: var(--color-surface-elevated);
   transition: border-color 140ms;
 }
@@ -218,7 +218,7 @@
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   list-style: none;
 }
 
@@ -278,7 +278,7 @@
   gap: 12px;
   padding: 16px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
 }
 
@@ -321,7 +321,7 @@
   min-height: 72px;
   padding: 14px 16px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: var(--color-surface);
   color: var(--color-text-primary);
   text-align: left;
@@ -422,7 +422,7 @@
 .bot-editor-step:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 .bot-editor-step-mark {
@@ -665,7 +665,7 @@
   min-height: 44px;
   padding: 0 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--color-accent-ink);
   font-size: var(--text-sm);
@@ -685,7 +685,7 @@
 .bots-roster-template:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: -2px;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
 }
 
 .bots-template-dialog {
@@ -696,7 +696,7 @@
   flex-shrink: 0;
   min-width: 20px;
   padding: 1px 6px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--color-accent-subtle);
   color: var(--color-accent-ink);
   font-size: var(--text-xs);

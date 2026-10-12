@@ -1,5 +1,63 @@
 [
   {
+    "id": "one-name-for-every-kind-of-work",
+    "date": "2026-10-12",
+    "status": "In development",
+    "title": "One name for every kind of work",
+    "description": "Everything in the work list is work, labelled by how it runs.",
+    "items": [
+      "Each row shows whether it is a conversation, a task, a planned task or a draft, and the app says conversation everywhere it used to say chat or session.",
+      "Opening any piece of work closes the others, so the page never shows one item while the list highlights another.",
+      "Help now describes the three-step project setup and the composer that opens Work."
+    ]
+  },
+  {
+    "id": "follow-terminal-runs-as-they-happen",
+    "date": "2026-10-12",
+    "status": "In development",
+    "title": "Follow, review and ship work from the terminal",
+    "description": "Scripts and CI can watch a jackalope -p run as it moves, and anyone can read its changes from the terminal.",
+    "items": [
+      "jackalope -p --stream-json prints one JSON line when the run starts, at each new step and as the agent writes output, then the same result --json prints, with the same exit status.",
+      "jackalope diff <id> prints what a conversation changed since its workspace left your branch, without opening the app; --stat summarizes it.",
+      "jackalope merge <id> and jackalope pr <id> merge a finished conversation or open its pull request through the same checks as the app, asking before anything changes; --yes skips the question in scripts."
+    ]
+  },
+  {
+    "id": "agent-choices-and-schedules-in-one-place",
+    "date": "2026-10-12",
+    "status": "In development",
+    "title": "Agent choices and schedules in one place",
+    "description": "Agents and Bots each gather what used to be split across separate pages.",
+    "items": [
+      "The Agents page holds the default agent, quota handoff and project account groups beside the roster, with one switch for the active project or every project.",
+      "Schedules moved under Bots, so a bot's wake-ups and recurring tasks sit together and the sidebar has one less destination."
+    ]
+  },
+  {
+    "id": "open-pull-requests-and-fix-failing-checks-from-a-task",
+    "date": "2026-10-12",
+    "status": "In development",
+    "title": "Open pull requests and fix failing checks from a task",
+    "description": "Delivery now goes from a finished task to a pull request without leaving Jackalope.",
+    "items": [
+      "Create pull request commits the task's remaining changes with your commit settings, pushes its branch and opens a draft or ready pull request through your GitHub CLI after you confirm.",
+      "Failing pull request checks are listed openly, and Ask the agent to fix drafts a follow-up that reproduces and repairs them without pushing."
+    ]
+  },
+  {
+    "id": "a-quicker-start-and-a-simpler-workspace",
+    "date": "2026-10-12",
+    "status": "In development",
+    "title": "A quicker start and a simpler workspace",
+    "description": "New projects get to their first task sooner, and the workspace keeps your work in view.",
+    "items": [
+      "Project setup now takes three steps: project, agents and an optional first task. Decisions, commit behavior and colors start from defaults you can change in Project settings.",
+      "The workspace now has one layout: recent work stays in a sidebar you can fold away, with list and board views of your work. Focus, Build and Oversee are retired. The Agents page groups agents, tools, apps and usage under shorter tabs.",
+      "The jackalope command accepts --agent and --model when starting a conversation, and jackalope -p --agents claude,codex sends one message to several agents and prints every reply."
+    ]
+  },
+  {
     "id": "see-what-agents-are-doing-from-the-terminal",
     "date": "2026-10-08",
     "status": "In development",

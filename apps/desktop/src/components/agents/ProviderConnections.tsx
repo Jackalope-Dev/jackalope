@@ -26,9 +26,20 @@ import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { ManagedRuntimeProgress } from './ManagedRuntimeProgress';
 
-function ConnectProvider({ provider, onClose }: { provider: ApiProvider; onClose: () => void }) {
+function ConnectProvider({
+  provider,
+  appWide = false,
+  onClose,
+}: {
+  provider: ApiProvider;
+  /** During project setup the project is not saved yet, so the choice applies app-wide. */
+  appWide?: boolean;
+  onClose: () => void;
+}) {
   const focus = useDialogFocus();
-  const [projectId] = useState(() => useProjectStore.getState().activeProjectId ?? undefined);
+  const [projectId] = useState(() =>
+    appWide ? undefined : (useProjectStore.getState().activeProjectId ?? undefined),
+  );
   const project = useProjectStore((state) => state.projects.find((item) => item.id === projectId));
   const runner = useManagedRuntime();
   const [name, setName] = useState(provider.name as string);
@@ -37,7 +48,7 @@ function ConnectProvider({ provider, onClose }: { provider: ApiProvider; onClose
   const saved = useRef(false);
   const [catalog, setCatalog] = useState<ModelCatalog>();
   const [model, setModel] = useState('');
-  const [useForTasks, setUseForTasks] = useState(false);
+  const [useForTasks, setUseForTasks] = useState(appWide);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [keySaved, setKeySaved] = useState(false);
@@ -355,13 +366,15 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function ProviderConnections() {
+export function ProviderConnections({ setup = false }: { setup?: boolean } = {}) {
   const [provider, setProvider] = useState<ApiProvider>();
   const [endpoint, setEndpoint] = useState(false);
   return (
     <section className="workspace-stack" aria-label="Connect an API provider">
       <div>
-        <h2 className="text-base font-medium">Connect an API provider</h2>
+        <h2 className="text-base font-medium">
+          {setup ? 'No agent installed? Use an API key' : 'Connect an API provider'}
+        </h2>
         <p className="task-muted">
           Bring your own key for DeepSeek and other providers, or a local OpenAI-compatible server.
           No separate OpenCode installation or account is needed.
@@ -390,6 +403,7 @@ export function ProviderConnections() {
         <ConnectProvider
           key={provider.id}
           provider={provider}
+          appWide={setup}
           onClose={() => setProvider(undefined)}
         />
       )}

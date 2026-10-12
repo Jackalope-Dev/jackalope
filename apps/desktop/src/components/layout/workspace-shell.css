@@ -40,7 +40,7 @@
   align-items: stretch;
   justify-content: flex-start;
   gap: 4px;
-  padding: 8px 0;
+  padding: 8px;
   overflow-x: hidden;
   overflow-y: auto;
   flex-shrink: 0;
@@ -51,11 +51,10 @@
   align-items: stretch;
 }
 /* The vertical navigation is its own rounded panel, matching the content card's radius
-   and height. Oversee keeps its horizontal bar on the shell. */
-.workspace-shell:not([data-mode="oversee"]) .workspace-navigation {
-  padding: 8px;
+   and height. */
+.workspace-shell .workspace-navigation {
   border: 1px solid var(--color-border-subtle);
-  border-radius: 18px;
+  border-radius: var(--radius-2xl);
   background: var(--color-navigation);
 }
 .workspace-shell .workspace-navigation .workspace-nav-item {
@@ -66,10 +65,9 @@
   margin-top: auto;
   flex-shrink: 0;
 }
-.workspace-shell[data-mode="oversee"] .workspace-settings {
-  margin-top: 0;
-}
 .workspace-shell .workspace-canvas {
+  --workspace-page-padding: 24px;
+  --workspace-gutter: 24px;
   flex: 1;
   min-width: 0;
 }
@@ -91,7 +89,7 @@
   text-align: left;
   width: 100%;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   min-height: 44px;
 }
 .work-sidebar-item:hover {
@@ -141,7 +139,7 @@
   align-items: center;
   gap: 6px;
   min-height: 44px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 6px 8px;
 }
 /* Tinted from the text colour so the hover reads on any ground and theme. */
@@ -209,7 +207,7 @@
   min-height: 44px;
   padding: 6px 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text-secondary);
   text-align: left;
@@ -277,7 +275,6 @@
     flex-direction: row;
     flex-wrap: wrap;
     overflow: visible;
-    padding: 0;
   }
   .workspace-shell .workspace-navigation > nav {
     flex-direction: row;
@@ -327,7 +324,7 @@
   margin-left: auto;
   min-width: 20px;
   padding: 1px 6px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--color-accent-subtle);
   color: var(--color-accent-ink);
   font-size: var(--text-xs);
@@ -451,7 +448,7 @@
 }
 .whats-new-body code {
   padding: 1px 5px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: var(--color-surface-sunken);
   color: var(--color-text-primary);
   font-family: var(--font-mono);
@@ -487,7 +484,7 @@
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--color-surface-sunken);
   color: var(--color-text-secondary);
 }
@@ -496,7 +493,7 @@
   align-items: center;
   gap: 6px;
   min-height: 44px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 6px 8px;
   white-space: nowrap;
 }

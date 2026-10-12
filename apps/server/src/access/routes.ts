@@ -21,8 +21,10 @@ import {
   sessionMember,
   tokenSchema,
 } from './service';
+import { SIGNUP_ACTION, verifyTurnstile } from './turnstile';
 import {
   acceptWaitlistToken,
+  openSignupSession,
   requestWaitlistLink,
   saveWaitlistPreferences,
   waitingMember,
@@ -197,10 +199,17 @@ export async function accessRoutes(
           referral: tokenSchema.optional(),
           source: z.enum(['inline', 'popup']).default('inline'),
           website: z.string().max(200).default(''),
+          turnstile: z.string().max(2048).optional(),
         })
         .parse(await readJson(request));
       let surveyToken = randomToken();
       if (!body.website) {
+        await verifyTurnstile(
+          env,
+          body.turnstile,
+          request.headers.get('cf-connecting-ip'),
+          SIGNUP_ACTION,
+        );
         surveyToken = await register(
           env,
           body.email,
@@ -227,9 +236,12 @@ export async function accessRoutes(
     if (request.method === 'POST' && path === '/v1/access/waitlist/accept') {
       const body = z.strictObject({ token: tokenSchema }).parse(await readJson(request));
       const session = await acceptWaitlistToken(env, body.token);
+      const member = await openSignupSession(env, session);
       if (ctx) ctx.waitUntil(deliverAccessMail(env));
       if (ctx) ctx.waitUntil(syncNewsletter(env));
-      return json({ success: true }, 200, { 'set-cookie': waitlistCookie(session) });
+      const response = json({ success: true }, 200, { 'set-cookie': waitlistCookie(session) });
+      if (member) response.headers.append('set-cookie', sessionCookie(member));
+      return response;
     }
     if (request.method === 'POST' && path === '/v1/access/waitlist/preferences') {
       const body = z

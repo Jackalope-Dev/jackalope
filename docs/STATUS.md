@@ -41,11 +41,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   before the existing preparation command. Both checkouts must ignore each file;
   links, parent paths and overwrites are refused. Worktree size inspection counts
   bounded logical file sizes, labels partial results and retains existing cleanup guards.
-- Focus uses a compact navigation rail, a conversation composer and one next task.
-  Build keeps recent work, project tools and conversation beside review, preview,
-  terminal or activity. Oversee uses full-width navigation, live work counts, an
-  attention queue and a board. Modes and their work-list filters save per project;
-  selecting a mode resets conversation-layout overrides without clearing drafts.
+- The workspace has one layout: a collapsible sidebar of recent work beside the open
+  item, with review, preview, terminal or activity next to its conversation. The work
+  list offers list and board views, and its filters save per project.
   Needs you prioritizes recovery and questions, then older reviews. Task context
   retains a compact visit receipt, workspace identity and checks.
 - Task workspace tools include a native terminal with bounded reconnectable output,
@@ -57,7 +55,7 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   snapshot of up to 256 KiB per pane; it never restarts commands.
   Feedback from separate panes is saved locally for explicit addition to the reply draft.
   Separate panes retain their own task drafts; their refreshes do not replace the main
-  window's draft or selection. Queue pause and stop remain visible in Focus mode.
+  window's draft or selection. Queue pause and stop remain visible with the sidebar collapsed.
 - The `jackalope` terminal command holds routed conversations in the current
   directory, lists and rejoins sessions, and streams status from the process that
   owns the profile, starting a windowed or headless host when none runs. Outside a
@@ -88,8 +86,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Projects, saved task drafts, queues, recurring schedules and local change monitors.
   A schedule can also expose a loopback webhook. The token is shown once, and a call
   while an earlier run is still active is skipped instead of queued.
-- Project setup includes agents, decisions, Git behavior, appearance and an optional
-  first task. Background command detection fills unset preferences without running
+- Project setup asks for the project, its agents and an optional first task;
+  decisions, Git behavior and appearance start from defaults edited in Project settings.
+  When no agent is detected, the agents step offers API-key and local-server
+  connections through the private runner, applied app-wide. Background command detection fills unset preferences without running
   commands or replacing explicit choices; inspection failure does not block setup.
 - Work combines a new-conversation composer and the project-scoped work list,
   with remembered filters, compact capture and keyboard row navigation. Work rows show
@@ -138,7 +138,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   captures attach screenshots, page elements and errors to follow-up drafts; they do not
   reproduce embedded-page sign-in or unsaved interactions.
 - Delivery inspects local Git state and optionally reads PR/CI through the GitHub CLI.
-  PR, CI and deployment preparation carry evidence into editable drafts. Publishing and
+  PR, CI and deployment preparation carry evidence into editable drafts. Failing PR
+  checks are listed openly with a draft asking the agent to reproduce and fix them.
+  Create pull request asks for a title, description and draft choice, then commits any
+  remaining task changes with the project's commit policy, pushes the task branch and
+  opens the PR through the GitHub CLI; nothing is published before that confirmation. Publishing and
   deployment remain explicit user-approved steps; a local merge does not establish either.
 - Live sessions capture short messages while work runs, batch them in order in one
   isolated workspace, and retain drafts, results and cumulative patch exports. Chat
@@ -312,16 +316,17 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   independent accounting; cross-platform installed acceptance and representative
   improvement claims remain open.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.
-  Project setup includes project, agents, decisions, behavior, appearance and an optional
-  first task. Theme editors open directly; existing saved app/project choices remain compatible.
+  Project setup has three steps: project, agents and an optional first task. Theme editors open directly; existing saved app/project choices remain compatible.
 - Review views save optional local usefulness ratings and reported review minutes with
   each task. These self-reported values do not establish product retention or quality gains.
 
 ## Services and distribution
 
 The website download page lists Windows, macOS and Linux availability, prioritizes
-the visitor's likely desktop platform and explains waitlist approval and friend
-passes. Acceptance emails lead through explicit email confirmation on that page.
+the visitor's likely desktop platform and explains free signup with email
+confirmation. With the service's open-signup switch on, confirming the email
+approves the account and signs the person in; with it off, owner approval and
+friend passes still apply. Acceptance emails lead through explicit email confirmation on that page.
 Unconfigured platforms remain Coming soon; page visits never start a download.
 
 Verified waitlist members can connect the desktop to see their queue position,
@@ -371,11 +376,11 @@ links. GitHub uses the installed CLI; Linear/Jira credentials use protected nati
 Jackalope Swarm (beta) gives each live attempt on an Artifacts-linked project its own fork
 through the person's own Worker (`apps/swarm`). Every 15 seconds the desktop pushes changed
 snapshots as synthetic commits, and the Worker reports files and overlapping edits across
-forks on Project → Swarm. Forks are deleted when attempts finish; merging stays local.
+forks on Project → Swarm, which appears once a swarm Worker is connected. Forks are deleted when attempts finish; merging stays local.
 See [the Worker guide](../apps/swarm/README.md).
 
 Cloudflare Artifacts (beta) connects a user's own Cloudflare account and namespace from
-Settings → Connected work. Connect Cloudflare signs in through the browser with Jackalope's
+Settings → Cloudflare. Connect Cloudflare signs in through the browser with Jackalope's
 public OAuth client (PKCE, loopback redirect on 127.0.0.1 ports 47851–47853) and lists the
 accounts the person shared; an API token remains an alternative. Tokens stay in protected
 native storage, OAuth access refreshes before expiry and disconnecting revokes it. Setup can

@@ -1,3 +1,4 @@
+import { selectWork, workTarget } from '../../lib/work-selection';
 import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
@@ -22,14 +23,12 @@ import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { useWorkbenchStore } from '../../stores/workbenchStore';
 import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { SessionStart } from '../sessions/SessionStart';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
-import { WorkspaceModeHome } from './WorkspaceModeHome';
 
 const ManagedTaskView = lazy(() =>
   import('./ManagedTaskView').then((m) => ({ default: m.ManagedTaskView })),
@@ -62,7 +61,6 @@ export function TaskWorkspace({
   const { projects, activeProjectId } = useProjectStore(
     useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
   );
-  const preset = useWorkbenchStore((state) => state.presets[activeProjectId ?? ''] ?? 'focus');
   const managed = useManagedTaskStore(
     useShallow((s) => ({
       error: s.error,
@@ -107,27 +105,23 @@ export function TaskWorkspace({
   const [cleanupBusy, setCleanupBusy] = useState(false);
   const [parallel, setParallel] = useState(false);
   const [composerExpanded, setComposerExpanded] = useState(false);
-  const [browsing, setBrowsing] = useState(false);
   const hasWork = !!(
     runs.length ||
     ideas.length ||
     sessions.length ||
     managed.queue.managedTasks?.length
   );
-  const modeContext = `${activeProjectId}:${preset}`;
-  const previousModeContext = useRef(modeContext);
+  const previousProject = useRef(activeProjectId);
   useEffect(() => {
-    if (previousModeContext.current === modeContext) return;
-    previousModeContext.current = modeContext;
-    setBrowsing(false);
+    if (previousProject.current === activeProjectId) return;
+    previousProject.current = activeProjectId;
     setComposerExpanded(false);
     setArchived(false);
     setParallel(false);
-  }, [modeContext]);
+  }, [activeProjectId]);
   useEffect(() => {
     if (!composerFocus) return;
     setComposerExpanded(true);
-    setBrowsing(false);
     setArchived(false);
     setParallel(false);
     const frame = requestAnimationFrame(() => {
@@ -138,54 +132,33 @@ export function TaskWorkspace({
     return () => cancelAnimationFrame(frame);
   }, [composerFocus]);
   const legacyViewKey = `${projectFilter}:${archived ? 'archive' : 'current'}`;
-  const viewKey = `${legacyViewKey}:${preset}`;
-  const view = views[viewKey] ??
-    (preset === 'build' ? views[legacyViewKey] : undefined) ?? {
-      ...defaultWorkView,
-      layout: preset === 'oversee' ? ('board' as const) : ('list' as const),
-    };
+  // Filters saved while workspace layouts existed keep the Build layout's key.
+  const viewKey = `${legacyViewKey}:build`;
+  const view = views[viewKey] ?? views[legacyViewKey] ?? defaultWorkView;
   const setView = (value: typeof view) => saveView(viewKey, value);
   useEffect(() => {
     if (!listRequest) return;
-    const key = `${projectFilter}:current:${preset}`;
+    const key = `${projectFilter}:current:build`;
     const saved = useWorkViewStore.getState().views[key];
-    saveView(key, {
-      ...defaultWorkView,
-      ...saved,
-      layout: saved?.layout ?? (preset === 'oversee' ? 'board' : 'list'),
-      filter: listRequest,
-      query: '',
-    });
-    setBrowsing(true);
+    saveView(key, { ...defaultWorkView, ...saved, filter: listRequest, query: '' });
     setArchived(false);
     setParallel(false);
     clearListRequest();
-  }, [listRequest, projectFilter, preset, saveView, clearListRequest]);
-  const browse = (filter: string) => {
-    setBrowsing(true);
-    setView({ ...view, filter });
-    requestAnimationFrame(() =>
-      document.querySelector('.task-collection')?.scrollIntoView({ block: 'start' }),
-    );
-  };
+  }, [listRequest, projectFilter, saveView, clearListRequest]);
   const integratedIds = managed.queue.mergedRunIds;
   const lastOpened = useRef<string | null>(null);
   const openItem = useCallback(
     (item: WorkItem) => {
       lastOpened.current = item.id;
-      useLiveSessionStore.getState().select(null);
-      if (!item.managed) useManagedTaskStore.getState().select(null);
-      if (item.managed) {
-        select(null);
-        useManagedTaskStore.getState().select(item.managed.id);
-      } else if (item.session) {
-        useLiveSessionStore.getState().select(item.session.id);
-        useProjectStore.getState().selectProject(item.session.request.projectId);
-        select(null);
-      } else if (item.run) select(item.run.id);
-      else if (item.idea) onCapture(item.idea.id);
+      if (item.session) useProjectStore.getState().selectProject(item.session.request.projectId);
+      if (item.managed || item.session || item.run) selectWork(workTarget(item));
+      else if (item.idea) {
+        // A draft opens in the composer over whichever task was open.
+        selectWork({ task: useExecutionStore.getState().selectedId ?? undefined });
+        onCapture(item.idea.id);
+      }
     },
-    [select, onCapture],
+    [onCapture],
   );
   useEffect(() => {
     if (selectedId || !lastOpened.current) return;
@@ -259,20 +232,12 @@ export function TaskWorkspace({
     : undefined;
   useEffect(() => {
     if (!owningSession) return;
-    useLiveSessionStore.getState().select(owningSession.id);
-    select(null);
-  }, [owningSession, select]);
+    selectWork({ conversation: owningSession.id });
+  }, [owningSession]);
   if (managedTask)
     return (
       <Suspense fallback={<LoadingState label="Loading task…" />}>
-        <ManagedTaskView
-          key={managedTask.id}
-          task={managedTask}
-          onBack={() => {
-            managed.select(null);
-            select(null);
-          }}
-        />
+        <ManagedTaskView key={managedTask.id} task={managedTask} onBack={() => selectWork()} />
       </Suspense>
     );
   if (owningSession)
@@ -282,7 +247,7 @@ export function TaskWorkspace({
           key={owningSession.id}
           session={owningSession}
           runs={sessionRuns}
-          onBack={() => useLiveSessionStore.getState().select(null)}
+          onBack={() => selectWork()}
         />
       </Suspense>
     );
@@ -311,7 +276,7 @@ export function TaskWorkspace({
           key={selectedSession.id}
           session={selectedSession}
           runs={sessionRuns}
-          onBack={() => useLiveSessionStore.getState().select(null)}
+          onBack={() => selectWork()}
         />
       </Suspense>
     );
@@ -323,21 +288,11 @@ export function TaskWorkspace({
     );
 
   return (
-    <WorkspacePage className="task-home" data-mode={preset} data-browsing={browsing || undefined}>
+    <WorkspacePage className="task-home">
       <WorkspaceHeading
-        title={
-          preset === 'focus'
-            ? browsing
-              ? 'Your work'
-              : 'What will you focus on?'
-            : preset === 'oversee'
-              ? scope === 'all'
-                ? 'Activity across your projects'
-                : `Oversee ${project?.name ?? 'your work'}`
-              : `Build in ${project?.name ?? 'your workspace'}`
-        }
+        title="Work"
         description={
-          preset !== 'build' || hasWork ? undefined : (
+          hasWork ? undefined : (
             <span>
               Describe what to build, fix, or explore, or{' '}
               <button
@@ -352,17 +307,11 @@ export function TaskWorkspace({
         }
         action={
           <div className="task-home-actions">
-            {preset === 'focus' && hasWork && (
-              <Button variant="outline" onClick={() => setBrowsing(!browsing)}>
-                {browsing ? 'Back to focus' : 'All work'}
-              </Button>
-            )}
-            {!!needsYou && preset === 'build' && (
+            {!!needsYou && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  setBrowsing(true);
                   setView({
                     ...view,
                     filter: 'attention',
@@ -375,7 +324,7 @@ export function TaskWorkspace({
                 Needs you · {needsYou}
               </Button>
             )}
-            {(hasWork || preset === 'oversee') && (preset !== 'focus' || browsing) && (
+            {hasWork && (
               <Button
                 onClick={() => {
                   setComposerExpanded(true);
@@ -401,10 +350,9 @@ export function TaskWorkspace({
                 <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
                   <Menu.Item className="workspace-menu-item" onSelect={() => onCapture()}>
                     <Radio size={16} />
-                    Save a task draft
+                    Save a draft
                   </Menu.Item>
-                  {/* Build mode lists these as tools beneath the heading. */}
-                  {project && preset !== 'build' && (
+                  {project && (
                     <Menu.Item
                       className="workspace-menu-item"
                       onSelect={() => navigateWorkspace('repo-todos')}
@@ -413,7 +361,7 @@ export function TaskWorkspace({
                       Repo TODOs
                     </Menu.Item>
                   )}
-                  {project && preset !== 'build' && (
+                  {project && (
                     <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
                       <Workflow size={16} />
                       Plan feature work
@@ -425,38 +373,13 @@ export function TaskWorkspace({
           </div>
         }
       />
-      {composerVisible &&
-        ((!hasWork && preset !== 'oversee') ||
-          composerExpanded ||
-          (preset === 'focus' && !browsing)) && (
-          <SessionStart
-            embedded
-            key={project?.id ?? 'none'}
-            project={project}
-            starters={!hasWork}
-            onOpenProject={() => useOnboardingStore.getState().begin()}
-          />
-        )}
-      {preset !== 'focus' && !archived && (
-        <WorkspaceModeHome
-          key={preset}
-          preset={preset}
-          items={items}
-          filter={view.filter}
-          onOpen={openItem}
-          onFilter={browse}
-          onPlan={() => setParallel(true)}
-        />
-      )}
-      {preset === 'focus' && !browsing && (
-        <WorkspaceModeHome
-          key={preset}
-          preset={preset}
-          items={items}
-          filter={view.filter}
-          onOpen={openItem}
-          onFilter={browse}
-          onPlan={() => setParallel(true)}
+      {composerVisible && (!hasWork || composerExpanded) && (
+        <SessionStart
+          embedded
+          key={project?.id ?? 'none'}
+          project={project}
+          starters={!hasWork}
+          onOpenProject={() => useOnboardingStore.getState().begin()}
         />
       )}
       {(runs.length > 0 || ideas.length > 0 || sessions.length > 0) && (
@@ -466,7 +389,7 @@ export function TaskWorkspace({
       )}
       {loading && <LoadingState label={'Loading task history…'} />}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
-      {(preset !== 'focus' || browsing) && (hasWork || preset === 'oversee') ? (
+      {hasWork ? (
         <Suspense fallback={<LoadingState label="Loading work list…" />}>
           <TaskCollection
             key={String(archived)}

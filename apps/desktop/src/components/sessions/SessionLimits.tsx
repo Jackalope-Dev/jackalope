@@ -104,7 +104,7 @@ export function SessionLimits({
   ) : (
     <Disclosure className="my-3">
       <DisclosureSummary>
-        Session limits{initial?.maxBatches ? ` · ${initial.maxBatches} batches` : ''}
+        Conversation limits{initial?.maxBatches ? ` · ${initial.maxBatches} batches` : ''}
       </DisclosureSummary>
       {content}
     </Disclosure>

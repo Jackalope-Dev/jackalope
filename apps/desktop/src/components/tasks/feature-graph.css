@@ -2,7 +2,7 @@
   position: relative;
   width: 100%;
   height: 580px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   background: var(--color-bg);
   overflow: hidden;
@@ -10,7 +10,7 @@
 
 .feature-graph-node {
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   width: 250px;

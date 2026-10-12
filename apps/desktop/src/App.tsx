@@ -4,6 +4,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { AccessBoundary } from './components/account/AccessBoundary';
 import { Shell } from './components/layout/Shell';
 import { observeDesktopControlTheme } from './lib/desktop-control-theme';
+import { selectWork } from './lib/work-selection';
 
 const OnboardingFlow = lazy(() =>
   import('./components/onboarding/OnboardingFlow').then((m) => ({ default: m.OnboardingFlow })),
@@ -56,7 +57,7 @@ export default function App() {
         projectId: project.id,
       });
     }
-    if (entry.draftKey) useExecutionStore.getState().select(null);
+    if (entry.draftKey) selectWork();
     setInitialTaskAgent(entry.agent);
     setInitialDraftKey(entry.draftKey ? (project?.id ?? entry.draftKey) : undefined);
     setFocusWorkspace(true);

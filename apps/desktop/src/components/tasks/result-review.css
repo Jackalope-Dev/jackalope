@@ -45,7 +45,7 @@
 }
 .task-verification {
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 16px;
   background: var(--color-surface);
 }

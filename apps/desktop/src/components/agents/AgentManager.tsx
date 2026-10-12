@@ -1,4 +1,4 @@
-import { FormField, Input, RefreshIcon } from '@jackalope/ui';
+import { FormField, Input, RefreshIcon, SegmentedControl } from '@jackalope/ui';
 import {
   ArrowLeft,
   Cpu,
@@ -14,6 +14,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { navigateWorkspace } from '../layout/navigation';
@@ -35,7 +36,11 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
   const { projects, activeProjectId } = useProjectStore(
     useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
   );
-  const project = projects.find((item) => item.id === activeProjectId);
+  const activeProject = projects.find((item) => item.id === activeProjectId);
+  const { scope, setScope } = useAgentScopeStore(
+    useShallow((s) => ({ scope: s.scope, setScope: s.setScope })),
+  );
+  const project = scope === 'project' ? activeProject : undefined;
   const defaultAgent = project ? project.preferences?.preferredRunner : config.defaultMetaAgent;
   const { runners, discovering, discover } = useExecutionStore(
     useShallow((s) => ({ runners: s.runners, discovering: s.discovering, discover: s.discover })),
@@ -177,10 +182,21 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
         </section>
       </div>
 
+      {activeProject && (
+        <SegmentedControl
+          label="Apply agent choices to"
+          value={scope}
+          onChange={(value) => setScope(value as 'project' | 'app')}
+          items={[
+            { id: 'project', label: activeProject.name },
+            { id: 'app', label: 'All projects' },
+          ]}
+        />
+      )}
       <p className="task-muted">
         {project
-          ? `Agent and account choices for ${project.name}. Connections, models and executable settings are shared across projects.`
-          : 'App-wide agent settings'}
+          ? `Enablement, default and accounts apply to ${project.name}. Connections, models and executable settings are shared across projects.`
+          : 'Enablement, default and accounts apply to every project unless a project overrides them.'}
       </p>
 
       {/* Agents show their product mark; animated characters belong to bots and activity. */}

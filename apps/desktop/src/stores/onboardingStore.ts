@@ -1,10 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { JevFallback } from '../lib/decisions';
-import type { RoutingMode } from '../lib/routing-settings';
 import type { Project } from './projectStore';
 
-export type OnboardingStep = 'project' | 'agent' | 'routing' | 'behavior' | 'theme' | 'task';
+/** Routing, commit behavior and appearance use defaults and are edited later in project settings. */
+export type OnboardingStep = 'project' | 'agent' | 'task';
 export type OnboardingStatus = 'new' | 'active' | 'complete' | 'skipped';
 
 interface OnboardingState {
@@ -13,10 +12,6 @@ interface OnboardingState {
   projectId: string | null;
   pendingProject: Project | null;
   firstTask: string | null;
-  routingMode: RoutingMode | null;
-  routingFallback: JevFallback | null;
-  setRoutingFallback: (fallback: JevFallback) => void;
-  setRoutingMode: (mode: RoutingMode) => void;
   initialize: (hasProjects: boolean) => void;
   begin: (projectId?: string) => void;
   selectProject: (projectId: string) => void;
@@ -34,10 +29,6 @@ export const useOnboardingStore = create<OnboardingState>()(
       projectId: null,
       pendingProject: null,
       firstTask: null,
-      routingMode: null,
-      routingFallback: null,
-      setRoutingFallback: (routingFallback) => set({ routingFallback }),
-      setRoutingMode: (routingMode) => set({ routingMode }),
       initialize: (hasProjects) => {
         if (get().status === 'new')
           set({ status: hasProjects ? 'complete' : 'active', step: 'project' });
@@ -49,24 +40,18 @@ export const useOnboardingStore = create<OnboardingState>()(
           projectId: projectId ?? null,
           pendingProject: null,
           firstTask: null,
-          routingMode: null,
-          routingFallback: null,
         }),
       selectProject: (projectId) =>
         set((state) => ({
           projectId,
           pendingProject: state.pendingProject?.id === projectId ? state.pendingProject : null,
           firstTask: state.projectId === projectId ? state.firstTask : null,
-          routingMode: state.projectId === projectId ? state.routingMode : null,
-          routingFallback: state.projectId === projectId ? state.routingFallback : null,
         })),
       stageProject: (project, firstTask) =>
         set((state) => ({
           projectId: project.id,
           pendingProject: project,
           firstTask: firstTask ?? (state.projectId === project.id ? state.firstTask : null),
-          routingMode: state.projectId === project.id ? state.routingMode : null,
-          routingFallback: state.projectId === project.id ? state.routingFallback : null,
         })),
       setFirstTask: (firstTask) => set({ firstTask }),
       go: (step) => set({ step }),
@@ -76,8 +61,6 @@ export const useOnboardingStore = create<OnboardingState>()(
           pendingProject: null,
           firstTask: null,
           projectId: null,
-          routingMode: null,
-          routingFallback: null,
         }),
     }),
     {
@@ -86,24 +69,27 @@ export const useOnboardingStore = create<OnboardingState>()(
         const value = (
           saved && typeof saved === 'object' ? saved : {}
         ) as Partial<OnboardingState> & { step?: string };
+        const {
+          routingMode: _mode,
+          routingFallback: _fallback,
+          ...kept
+        } = value as typeof value & {
+          routingMode?: unknown;
+          routingFallback?: unknown;
+        };
+        // Earlier setups had decision, behavior and appearance steps between agents and the
+        // first task; a staged project resumes at the first task, otherwise setup restarts.
+        const legacy = ['routing', 'behavior', 'theme'].includes(value.step ?? '');
         return {
           ...current,
-          ...value,
+          ...kept,
           pendingProject: value.pendingProject ?? null,
           firstTask: value.firstTask ?? null,
-          routingFallback:
-            value.routingFallback === 'agent' || value.routingFallback === 'local'
-              ? value.routingFallback
-              : null,
-          routingMode:
-            value.routingMode === 'agent' ||
-            value.routingMode === 'jev' ||
-            value.routingMode === 'deterministic'
-              ? value.routingMode
-              : null,
-          step:
-            ((value.step !== 'theme' && value.step !== 'behavior') || value.pendingProject) &&
-            ['project', 'agent', 'routing', 'behavior', 'theme', 'task'].includes(value.step ?? '')
+          step: legacy
+            ? value.pendingProject
+              ? 'task'
+              : 'project'
+            : ['project', 'agent', 'task'].includes(value.step ?? '')
               ? (value.step as OnboardingStep)
               : 'project',
         };

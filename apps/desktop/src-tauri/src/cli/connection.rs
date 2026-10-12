@@ -115,12 +115,13 @@ impl Connection {
         project_path: &str,
         text: String,
         agent: Option<String>,
+        model: Option<String>,
     ) -> Result<String, String> {
         match self.call(&Request::StartSession {
             project_path: project_path.into(),
             text,
             agent,
-            model: None,
+            model,
         })? {
             Response::Started { session_id } => Ok(session_id),
             _ => Err(unexpected()),

@@ -2,7 +2,7 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  border-radius: 20px;
+  border-radius: var(--radius-2xl);
   background: radial-gradient(
     ellipse at 40% 30%,
     var(--color-accent-subtle),
@@ -16,7 +16,7 @@
 .agent-avatar[data-size="xs"] {
   width: 24px;
   height: 24px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 .agent-avatar[data-size="xs"] svg {
   width: 20px;
@@ -25,7 +25,7 @@
 .agent-avatar[data-size="sm"] {
   width: 40px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }
 .agent-avatar[data-size="sm"] svg {
   width: 32px;
@@ -34,7 +34,7 @@
 .agent-avatar[data-size="md"] {
   width: 48px;
   height: 48px;
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
 }
 .agent-avatar[data-size="md"] svg {
   width: 40px;

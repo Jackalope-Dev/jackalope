@@ -56,7 +56,7 @@ connection invalidates its check and discards late probe responses.
 
 ## Connected apps through Composio
 
-Agents & tools → Connected apps links the person's own Composio project. The project
+Agents → Apps links the person's own Composio project. The project
 key (`ak_…`) is validated by creating a Composio tool-router session for a stable
 per-installation user, then stored with the session identifiers in the profile's
 protected integration storage; the renderer only receives a key hint. The same key

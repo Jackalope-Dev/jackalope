@@ -1,19 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { WorkspacePreset } from '../lib/workbench';
 
 interface WorkbenchState {
-  presets: Record<string, WorkspacePreset>;
   seen: Record<string, string>;
-  setPreset: (projectId: string, preset: WorkspacePreset) => void;
   markSeen: (id: string, fingerprint: string) => void;
 }
 export const useWorkbenchStore = create<WorkbenchState>()(
   persist(
     (set) => ({
-      presets: {},
       seen: {},
-      setPreset: (id, preset) => set((state) => ({ presets: { ...state.presets, [id]: preset } })),
       markSeen: (id, fingerprint) =>
         set((state) => ({
           seen: Object.fromEntries(
@@ -23,7 +18,8 @@ export const useWorkbenchStore = create<WorkbenchState>()(
           ),
         })),
     }),
-    { name: 'jackalope-workbench' },
+    // Earlier versions also saved a per-project layout; only review fingerprints remain.
+    { name: 'jackalope-workbench', partialize: ({ seen }) => ({ seen }) },
   ),
 );
 

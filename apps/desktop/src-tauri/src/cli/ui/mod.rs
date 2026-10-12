@@ -171,11 +171,18 @@ struct App {
     quit: bool,
 }
 
+/// Agent and model chosen on the command line for the first new conversation.
+pub struct NextStart {
+    pub agent: Option<String>,
+    pub model: Option<String>,
+}
+
 pub fn run(
     connection: Connection,
     project: Project,
     session: Option<String>,
     pick: bool,
+    next: NextStart,
 ) -> Result<(), String> {
     let handshake = connection.handshake().clone();
     let (events, inbox) = mpsc::channel();
@@ -205,8 +212,8 @@ pub fn run(
         picker: None,
         slash: 0,
         editor: Editor::default(),
-        next_agent: None,
-        next_model: None,
+        next_agent: next.agent,
+        next_model: next.model,
         offered: HashSet::new(),
         history: history::load(),
         history_index: None,

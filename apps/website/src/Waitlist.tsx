@@ -162,8 +162,8 @@ export function WaitlistPage() {
         <p role="status">Finding your place…</p>
       ) : token ? (
         <Panel variant="plain" className="access-card access-entry">
-          <h2>Make your place yours.</h2>
-          <p>Confirm your email to see your number and start earning referral priority.</p>
+          <h2>Confirm your email.</h2>
+          <p>Confirming finishes creating your Jackalope account.</p>
           <div className="access-entry-actions">
             <Button
               variant="primary"
@@ -174,7 +174,7 @@ export function WaitlistPage() {
               loading={busy}
               loadingLabel="Confirming…"
             >
-              Confirm email &amp; see my place
+              Confirm email
               <ArrowRight size={18} />
             </Button>
             <Button

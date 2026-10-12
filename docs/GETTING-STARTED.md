@@ -6,8 +6,9 @@ isolated account in Agents. Each provider's own subscription and permissions
 still apply.
 
 1. Open a Git repository with at least one commit. Choose the agent you want.
-   Project setup walks through agents, decisions, Git behavior and appearance
-   before an optional first-task draft.
+   Project setup asks for the project, its agents and an optional first-task
+   draft. Decisions, Git behavior and appearance start from defaults that you can
+   change in Project settings.
 2. Setup detects preparation, check and preview commands automatically without
    running them or replacing saved choices. Review or edit them in Project Settings
    and choose a committed local target branch.

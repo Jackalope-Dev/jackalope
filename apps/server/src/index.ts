@@ -99,7 +99,9 @@ async function limit(request: Request, env: Env, feedback: boolean) {
         ? 'access-mail'
         : 'access-session'
       : 'ingestion';
-  if (!(await env.GLOBAL_LIMITER.limit({ key: group })).success)
+  // Paired desktops poll their session every minute, already bounded per address
+  // above; a shared cap on that group would lock every desktop out as installs grow.
+  if (group !== 'desktop-session' && !(await env.GLOBAL_LIMITER.limit({ key: group })).success)
     throw new ApiError(429, 'rate_limited');
 }
 async function release(request: Request, env: Env, path: string): Promise<Response> {

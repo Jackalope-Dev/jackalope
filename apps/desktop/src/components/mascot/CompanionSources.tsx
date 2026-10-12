@@ -7,6 +7,7 @@ import { useBotStore } from '../../stores/botStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useReferralStore } from '../../stores/referralStore';
 import { navigateWorkspace, openSettings } from '../layout/navigation';
 import { useCompanionNotices } from './useCompanionNotices';
 
@@ -111,9 +112,10 @@ export function CompanionSources() {
         ]
       : [],
   );
+  const openSignup = useReferralStore((state) => !!state.referrals?.openSignup);
   useCompanionNotices(
     'referrals',
-    referralAccount
+    referralAccount && !openSignup
       ? [
           {
             id: `referrals:${referralAccount}`,

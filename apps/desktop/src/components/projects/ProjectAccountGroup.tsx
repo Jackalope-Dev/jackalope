@@ -47,7 +47,8 @@ export function ProjectAccountGroup({
     <div className="settings-group p-5">
       <h2 className="text-base font-medium">Accounts for this project</h2>
       <p className="task-muted mt-2">
-        Choose a group across agents, or select individual accounts below.
+        Use one group of accounts across agents. Choose individual accounts on each agent’s
+        Configure page.
       </p>
       <div className="flex flex-wrap gap-3 mt-3">
         <Button

@@ -11,12 +11,21 @@ pub enum Command {
         attach: Option<String>,
         /// Open the conversation picker first (`--resume` without an id).
         pick: bool,
+        /// `--agent` and `--model` for a new conversation, like `/agent` and `/model`.
+        agent: Option<String>,
+        model: Option<String>,
     },
     /// `-p` / `run`: one message, one reply.
     Once {
         message: String,
         agent: Option<String>,
+        model: Option<String>,
+        /// `--agents a,b`: the same message to each agent in its own conversation.
+        compare: Vec<String>,
         json: bool,
+        /// `--stream-json`: one JSON object per line as the work moves, ending
+        /// with the same result `--json` prints.
+        stream: bool,
         timeout: Option<Duration>,
     },
     List {
@@ -27,6 +36,24 @@ pub enum Command {
     },
     Stop {
         id: String,
+    },
+    /// A conversation's changes since its workspace left the project's branch.
+    Diff {
+        id: String,
+        stat: bool,
+    },
+    /// Merge a conversation's reviewed work into the project's target branch.
+    Merge {
+        id: String,
+        message: Option<String>,
+        yes: bool,
+    },
+    /// Commit, push and open a pull request for a conversation's work.
+    PullRequest {
+        id: String,
+        title: Option<String>,
+        ready: bool,
+        yes: bool,
     },
     Help,
     Version,
@@ -44,15 +71,19 @@ pub struct Cli {
 }
 
 const USAGE: &str = "Run 'jackalope help' to see what is available.";
+/// The desktop compares at most four agents on one prompt.
+pub const MAX_COMPARED: usize = 4;
 
 pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String> {
     let mut arguments = arguments.into_iter();
     let mut words: Vec<String> = Vec::new();
     let (mut print, mut json, mut resume, mut help, mut version, mut init) =
         (false, false, false, false, false, false);
-    let mut pick = false;
+    let (mut pick, mut stream, mut stat, mut yes, mut ready) = (false, false, false, false, false);
+    let (mut message, mut title) = (None, None);
     let mut cold_start = None;
-    let (mut agent, mut profile, mut timeout) = (None, None, None);
+    let (mut agent, mut model, mut profile, mut timeout) = (None, None, None, None);
+    let mut compare: Option<Vec<String>> = None;
     let mut only_words = false;
     while let Some(argument) = arguments.next() {
         // Anything after `--`, a lone `-`, and text with spaces (a quoted
@@ -76,6 +107,12 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
             "--" => only_words = true,
             "-p" | "--print" => print = true,
             "--json" => json = true,
+            "--stream-json" => stream = true,
+            "--stat" => stat = true,
+            "-y" | "--yes" => yes = true,
+            "--ready" => ready = true,
+            "-m" | "--message" => message = Some(value("--message")?),
+            "--title" => title = Some(value("--title")?),
             "-c" | "--continue" => resume = true,
             "-r" | "--resume" => pick = true,
             "-h" | "--help" => help = true,
@@ -84,6 +121,21 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
             "--background" => cold_start = Some(ColdStart::Background),
             "--init" => init = true,
             "--agent" => agent = Some(value("--agent")?),
+            "--model" => model = Some(value("--model")?),
+            "--agents" => {
+                let mut agents: Vec<String> = Vec::new();
+                for agent in value("--agents")?.split(',').map(str::trim) {
+                    if !agent.is_empty() && !agents.iter().any(|known| known == agent) {
+                        agents.push(agent.to_string());
+                    }
+                }
+                if !(2..=MAX_COMPARED).contains(&agents.len()) {
+                    return Err(format!(
+                        "--agents takes 2 to {MAX_COMPARED} different agents, as --agents claude,codex."
+                    ));
+                }
+                compare = Some(agents);
+            }
             "--profile" => profile = Some(value("--profile")?),
             "--timeout" => {
                 let text = value("--timeout")?;
@@ -94,7 +146,18 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
             }
             _ => return Err(format!("Unknown option '{argument}'. {USAGE}")),
         }
-        if inline.is_some() && !matches!(name.as_str(), "--agent" | "--profile" | "--timeout") {
+        if inline.is_some()
+            && !matches!(
+                name.as_str(),
+                "--agent"
+                    | "--agents"
+                    | "--model"
+                    | "--profile"
+                    | "--timeout"
+                    | "--message"
+                    | "--title"
+            )
+        {
             return Err(format!("{name} does not take a value. {USAGE}"));
         }
     }
@@ -113,8 +176,11 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
         Command::Once {
             message: words[skip.min(words.len())..].join(" "),
             agent: agent.take(),
-            json,
-            timeout: timeout.take(),
+            model: model.take(),
+            compare: compare.take().unwrap_or_default(),
+            json: json || stream,
+            stream,
+            timeout,
         }
     } else {
         let argument = || words.get(1).cloned();
@@ -125,10 +191,19 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
                 .unwrap_or(Ok(()))
         };
         match first {
+            None if !resume => Command::Converse {
+                resume,
+                attach: None,
+                pick: false,
+                agent: agent.take(),
+                model: model.take(),
+            },
             None => Command::Converse {
                 resume,
                 attach: None,
                 pick: false,
+                agent: None,
+                model: None,
             },
             Some("resume") => {
                 extra(2)?;
@@ -137,11 +212,15 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
                         resume: false,
                         attach: Some(id),
                         pick: false,
+                        agent: None,
+                        model: None,
                     },
                     None => Command::Converse {
                         resume: false,
                         attach: None,
                         pick: true,
+                        agent: None,
+                        model: None,
                     },
                 }
             }
@@ -161,6 +240,32 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
                         argument().ok_or("Which conversation? Run 'jackalope ls' to see them.")?,
                     ),
                     pick: false,
+                    agent: None,
+                    model: None,
+                }
+            }
+            Some("diff") => {
+                extra(2)?;
+                Command::Diff {
+                    id: argument().ok_or("Which conversation? Run 'jackalope ls' to see them.")?,
+                    stat,
+                }
+            }
+            Some("merge") => {
+                extra(2)?;
+                Command::Merge {
+                    id: argument().ok_or("Which conversation? Run 'jackalope ls' to see them.")?,
+                    message: message.take(),
+                    yes,
+                }
+            }
+            Some("pr") => {
+                extra(2)?;
+                Command::PullRequest {
+                    id: argument().ok_or("Which conversation? Run 'jackalope ls' to see them.")?,
+                    title: title.take(),
+                    ready,
+                    yes,
                 }
             }
             Some("stop") => {
@@ -179,11 +284,56 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
         command,
         Command::Once { .. } | Command::List { .. } | Command::Status { .. }
     );
+    if stream {
+        match &command {
+            Command::Once { compare, .. } if !compare.is_empty() => {
+                return Err(format!(
+                    "--stream-json follows one agent; use --json with --agents. {USAGE}"
+                ));
+            }
+            Command::Once { .. } => {}
+            _ => return Err(format!("--stream-json applies to -p. {USAGE}")),
+        }
+    }
+    if stat && !matches!(command, Command::Diff { .. }) {
+        return Err(format!("--stat applies to diff. {USAGE}"));
+    }
+    let delivers = matches!(command, Command::Merge { .. } | Command::PullRequest { .. });
+    if yes && !delivers {
+        return Err(format!("--yes applies to merge and pr. {USAGE}"));
+    }
+    if message.is_some() {
+        return Err(format!("--message applies to merge. {USAGE}"));
+    }
+    if (title.is_some() || ready) && !matches!(command, Command::PullRequest { .. }) {
+        return Err(format!("--title and --ready apply to pr. {USAGE}"));
+    }
     if json && !json_applies {
         return Err(format!("--json applies to -p, ls and status. {USAGE}"));
     }
-    if agent.is_some() || timeout.is_some() {
-        return Err(format!("--agent and --timeout apply to -p. {USAGE}"));
+    if compare.is_some() {
+        return Err(format!("--agents applies to -p. {USAGE}"));
+    }
+    if let Command::Once {
+        agent,
+        model,
+        compare,
+        ..
+    } = &command
+    {
+        if !compare.is_empty() && (agent.is_some() || model.is_some()) {
+            return Err(format!(
+                "--agents chooses the agents itself; use it without --agent or --model. {USAGE}"
+            ));
+        }
+    }
+    if agent.is_some() || model.is_some() {
+        return Err(format!(
+            "--agent and --model apply when starting a new conversation or -p. {USAGE}"
+        ));
+    }
+    if timeout.is_some() && !matches!(command, Command::Once { .. }) {
+        return Err(format!("--timeout applies to -p. {USAGE}"));
     }
     if resume && !matches!(command, Command::Converse { attach: None, .. }) {
         return Err(format!("--continue starts the conversation view. {USAGE}"));
@@ -220,30 +370,16 @@ mod tests {
 
     #[test]
     fn a_bare_command_opens_the_conversation() {
-        assert_eq!(
-            command(&[]),
-            Command::Converse {
-                resume: false,
-                attach: None,
-                pick: false
-            }
-        );
-        assert_eq!(
-            command(&["-c"]),
-            Command::Converse {
-                resume: true,
-                attach: None,
-                pick: false
-            }
-        );
-        assert_eq!(
-            command(&["attach", "abc"]),
-            Command::Converse {
-                resume: false,
-                attach: Some("abc".into()),
-                pick: false
-            }
-        );
+        let converse = |resume, attach: Option<&str>| Command::Converse {
+            resume,
+            attach: attach.map(String::from),
+            pick: false,
+            agent: None,
+            model: None,
+        };
+        assert_eq!(command(&[]), converse(false, None));
+        assert_eq!(command(&["-c"]), converse(true, None));
+        assert_eq!(command(&["attach", "abc"]), converse(false, Some("abc")));
     }
 
     #[test]
@@ -252,11 +388,15 @@ mod tests {
             resume: false,
             attach: None,
             pick: true,
+            agent: None,
+            model: None,
         };
         let attach = Command::Converse {
             resume: false,
             attach: Some("ab".into()),
             pick: false,
+            agent: None,
+            model: None,
         };
         assert_eq!(command(&["--resume"]), picker);
         assert_eq!(command(&["-r"]), picker);
@@ -264,6 +404,55 @@ mod tests {
         assert_eq!(command(&["--resume", "ab"]), attach);
         assert_eq!(command(&["resume", "ab"]), attach);
         assert!(parse_line(&["resume", "ab", "cd"]).is_err());
+    }
+
+    #[test]
+    fn merge_and_pr_take_their_own_options() {
+        assert_eq!(
+            command(&["merge", "ab12", "-m", "Add search", "--yes"]),
+            Command::Merge {
+                id: "ab12".into(),
+                message: Some("Add search".into()),
+                yes: true
+            }
+        );
+        assert_eq!(
+            command(&["pr", "ab12", "--title", "Add search", "--ready"]),
+            Command::PullRequest {
+                id: "ab12".into(),
+                title: Some("Add search".into()),
+                ready: true,
+                yes: false
+            }
+        );
+        assert!(parse_line(&["merge"]).is_err());
+        assert!(parse_line(&["pr", "ab12", "-m", "x"]).is_err());
+        assert!(parse_line(&["merge", "ab12", "--ready"]).is_err());
+        assert!(parse_line(&["ls", "--yes"]).is_err());
+    }
+
+    #[test]
+    fn diff_names_a_conversation() {
+        assert_eq!(
+            command(&["diff", "ab12", "--stat"]),
+            Command::Diff {
+                id: "ab12".into(),
+                stat: true
+            }
+        );
+        assert!(parse_line(&["diff"]).is_err());
+        assert!(parse_line(&["ls", "--stat"]).is_err());
+    }
+
+    #[test]
+    fn streamed_json_implies_json_and_follows_one_run() {
+        match command(&["-p", "--stream-json", "fix", "it"]) {
+            Command::Once { json, stream, .. } => assert!(json && stream),
+            other => panic!("{other:?}"),
+        }
+        assert!(parse_line(&["ls", "--stream-json"]).is_err());
+        assert!(parse_line(&["-p", "--agents", "claude,codex", "--stream-json", "x"]).is_err());
+        assert!(parse_line(&["-p", "--stream-json=1", "x"]).is_err());
     }
 
     #[test]
@@ -309,7 +498,10 @@ mod tests {
     fn mistakes_are_reported_instead_of_ignored() {
         assert!(parse_line(&["-p", "--jsn", "x"]).is_err());
         assert!(parse_line(&["--agent"]).is_err());
-        assert!(parse_line(&["--agent=codex"]).is_err());
+        assert!(parse_line(&["--agent=codex", "ls"]).is_err());
+        assert!(parse_line(&["-c", "--model", "gpt"]).is_err());
+        assert!(parse_line(&["attach", "ab", "--agent", "codex"]).is_err());
+        assert!(parse_line(&["--timeout", "5"]).is_err());
         assert!(parse_line(&["attach", "--json", "x"]).is_err());
         assert!(parse_line(&["-p", "--timeout", "soon", "x"]).is_err());
         assert!(parse_line(&["ls", "extra"]).is_err());
@@ -317,6 +509,42 @@ mod tests {
         assert!(parse_line(&["frobnicate"]).is_err());
         assert!(parse_line(&["stop"]).is_err());
         assert!(parse_line(&["--init", "ls"]).is_err());
+    }
+
+    #[test]
+    fn new_conversations_take_an_agent_and_model() {
+        assert_eq!(
+            command(&["--agent", "claude", "--model=opus"]),
+            Command::Converse {
+                resume: false,
+                attach: None,
+                pick: false,
+                agent: Some("claude".into()),
+                model: Some("opus".into()),
+            }
+        );
+        match command(&["-p", "--model", "gpt-5", "fix it"]) {
+            Command::Once { model, message, .. } => {
+                assert_eq!(
+                    (model.as_deref(), message.as_str()),
+                    (Some("gpt-5"), "fix it")
+                )
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn one_message_can_go_to_several_agents() {
+        match command(&["-p", "--agents", "claude, codex,claude", "fix it"]) {
+            Command::Once { compare, .. } => assert_eq!(compare, ["claude", "codex"]),
+            other => panic!("{other:?}"),
+        }
+        assert!(parse_line(&["-p", "--agents", "claude", "x"]).is_err());
+        assert!(parse_line(&["-p", "--agents=a,b,c,d,e", "x"]).is_err());
+        assert!(parse_line(&["-p", "--agents=a,b", "--agent", "c", "x"]).is_err());
+        assert!(parse_line(&["-p", "--agents=a,b", "--model", "m", "x"]).is_err());
+        assert!(parse_line(&["--agents=a,b"]).is_err());
     }
 
     #[test]

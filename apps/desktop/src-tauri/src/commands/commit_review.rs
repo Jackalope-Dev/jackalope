@@ -349,6 +349,12 @@ pub struct CommitFailure {
     output: String,
 }
 
+impl CommitFailure {
+    pub(crate) fn message(&self) -> &str {
+        &self.message
+    }
+}
+
 impl From<String> for CommitFailure {
     fn from(message: String) -> Self {
         Self {

@@ -3,10 +3,10 @@ import { useRef, useState } from 'react';
 import { setWakeUpsPaused, useBotHubStore } from '../../lib/bot-hub';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { isActive } from '../../lib/task-runtime';
+import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
-import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { Companion } from '../mascot/Companion';
 import { FeedbackDialog } from '../settings/FeedbackDialog';
@@ -40,9 +40,9 @@ export function WorkspaceStatusBar({
     ...new Map([...runs, ...sessionRuns].map((item) => [item.id, item])).values(),
   ].filter(isActive).length;
   const activity = () => {
-    useExecutionStore.getState().select(null);
-    useLiveSessionStore.getState().select(null);
-    useManagedTaskStore.getState().select(null);
+    selectWork();
+    // The counts cover every project, so the list they open does too.
+    useWorkViewStore.getState().setScope('all');
     useWorkViewStore.getState().openList(attention ? 'attention' : 'working');
     navigateWorkspace('kanban');
   };
@@ -53,7 +53,7 @@ export function WorkspaceStatusBar({
         {host ? `${host.wsl ? 'WSL · ' : ''}${host.name}` : 'This computer'}
       </button>
       {project && !host && <StatusBarChanges projectPath={project.path} checkout={checkout} />}
-      <button type="button" onClick={activity}>
+      <button type="button" onClick={activity} title="Work across all projects">
         <ListTodo size={15} />
         {host ? 'This computer: ' : ''}
         {active} running

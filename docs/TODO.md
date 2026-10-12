@@ -22,8 +22,8 @@ release dates.
   Validate editor protocol handlers and per-project layout persistence on those systems.
   Include shell selection, both split panes, output search, HTTP links and opt-in
   stopped-output restoration without command replay.
-- [ ] Compare Focus, Build and Oversee on representative first-task, correction and
-  return-to-work journeys. Check mode changes with open tasks, chats and plans,
+- [ ] Test the single workspace layout on representative first-task, correction and
+  return-to-work journeys. Check sidebar collapse with open tasks, chats and plans,
   persisted filters, unsent drafts, questions, Stop controls and empty projects.
   Include topic regrouping, stale revisions, draft promotion,
   large histories and local timing exports; report human effort and outcome quality.
@@ -72,8 +72,8 @@ release dates.
   pending-message guards, unavailable cost and batch-limit pauses. Independent native
   task planning remains separate from the shared-workspace batch flow.
 - [ ] Validate installed onboarding, project changes, saved drafts, inferred
-  defaults and explicit overrides, including cancellation and restart. Cover all six
-  project setup steps, appearance rollback and automatic command detection.
+  defaults and explicit overrides, including cancellation and restart. Cover the three
+  project setup steps, default decisions, behavior and appearance, and automatic command detection.
 - [ ] Validate ordinary-task follow-up queues with installed providers, including
   stop-and-send, restart pauses, failed saves, cancellation and merge guards.
 - [ ] Run the [daily-use pilot](AGENT-QUALITY.md#daily-use-pilot) with consenting users
@@ -249,6 +249,9 @@ release dates.
   Keep reported, estimated, stale and unavailable data distinct.
 - [ ] Evaluate protocol and credential-store migrations against real providers
   while preserving existing adapters and encrypted saved data.
+- [ ] Accept Create pull request with an authenticated GitHub CLI on each platform: commit
+  hooks and attribution, branches without an upstream, missing origin, protected bases,
+  draft and ready PRs, an existing PR for the branch and push or gh failures midway.
 - [ ] Validate read-only GitHub issue, unresolved review-thread and CI imports with
   authenticated installed CLIs, including enterprise hosts, pagination and stale heads.
   Validate editable workflow drafts and preserve explicit authorization for remote writes.
@@ -277,6 +280,10 @@ release dates.
 
 - [ ] Validate waitlist desktop pairing, restart, referral progress, sharing, offline
   recovery and transition to approved access with the deployed service and installed app.
+- [ ] Accept open signup with the deployed service, website and installed app: signup,
+  email confirmation approving and signing in, desktop pairing without a second email,
+  Turnstile challenges and failures, existing waiting members, and per-address 429
+  rates for desktop polling, which no longer counts against the shared limit.
 
 - [ ] Validate required account access in development and release builds, including
   reconnect, revocation, offline expiry and saved-work recovery.

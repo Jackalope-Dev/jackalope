@@ -11,7 +11,7 @@ export const workStages = [
   { id: 'attention', label: 'Needs you' },
   { id: 'review', label: 'Ready to review' },
   { id: 'working', label: 'Working' },
-  { id: 'ideas', label: 'Saved ideas' },
+  { id: 'ideas', label: 'Drafts' },
   { id: 'finished', label: 'Finished' },
 ] as const;
 
@@ -44,6 +44,18 @@ export interface WorkItem {
   managed?: ManagedTask;
   statusLabel?: string;
   archiveBlocked?: string;
+}
+
+/**
+ * Every row in the work list is one piece of work; its shape says how it runs:
+ * a conversation you keep messaging, a single task, a task the agent planned
+ * into subtasks, or a draft not started yet.
+ */
+export function workShape(item: WorkItem) {
+  if (item.managed) return 'Planned task';
+  if (item.session) return 'Conversation';
+  if (item.run) return 'Task';
+  return 'Draft';
 }
 
 export function selectedManagedTask(
@@ -94,12 +106,12 @@ export function workPresence(item: WorkItem): {
           ? 'Inspect session'
           : item.stage === 'working'
             ? 'View activity'
-            : 'Open Chat'
+            : 'Open conversation'
       : run
         ? item.stage === 'finished'
           ? 'Open result'
           : taskNextAction(run)
-        : 'Open idea';
+        : 'Open draft';
   return { agents, state, action };
 }
 
@@ -174,7 +186,7 @@ export function collectWorkspaceWork(
         run: work.latest,
         session,
         statusLabel: work.status,
-        archiveBlocked: 'Chat sessions stay together. Open Chat to finish or resume it.',
+        archiveBlocked: 'A conversation stays together. Open it to finish or resume it.',
       });
     }
   return items.sort(
@@ -265,7 +277,7 @@ export function collectWork(
       run,
       statusLabel: taskDecision(run, integratedRunIds.includes(run.id)).label,
       archiveBlocked: blocked.has(run.taskId)
-        ? 'Finish or resolve all attempts and save their history first. Chat tasks stay with their session.'
+        ? 'Finish or resolve all attempts and save their history first. Tasks from a conversation stay with it.'
         : undefined,
     });
   }

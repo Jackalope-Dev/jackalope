@@ -440,7 +440,7 @@ export function LandingPage({
                 </a>
               </li>
             </ul>
-            <p className="lp-fineprint">Sign in once your waitlist spot is approved.</p>
+            <p className="lp-fineprint">Free account. Confirm your email and sign in.</p>
           </div>
           <div className="lp-hero-visual">
             <ParallelVisual />
@@ -660,12 +660,12 @@ export function LandingPage({
             <div>
               <h2 id="final-title">Make room for more agents.</h2>
               <p>
-                Join the waitlist and verify your email. We are approving new members quickly, and
-                you will get an email the moment you are in.
+                Sign up and confirm your email. Your account is ready as soon as you confirm, with
+                no review queue.
               </p>
               <ol className="lp-final-steps">
-                <li>Join the waitlist</li>
-                <li>Get approved by email</li>
+                <li>Sign up with your email</li>
+                <li>Confirm the link we send</li>
                 <li>Download and sign in</li>
               </ol>
             </div>

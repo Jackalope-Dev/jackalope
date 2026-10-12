@@ -36,6 +36,8 @@ export function accessMessage(error: unknown) {
     if (error.code === 'device_link_expired')
       return 'This desktop request expired, was canceled, or was already approved. Return to the app to check the connection or start again.';
     if (error.status === 429) return 'Please wait a minute before trying again.';
+    if (error.code === 'verification_failed')
+      return 'We couldn’t confirm this request came from a person. Complete the check and try again.';
     if (error.code === 'invitation_full')
       return 'This invitation has no places available. Request another invitation or join the waitlist.';
     if (error.code === 'link_expired')

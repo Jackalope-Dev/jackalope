@@ -28,6 +28,7 @@ import {
   workGroup,
   workGroups,
   workPresence,
+  workShape,
 } from '../../lib/task-collection';
 import type { Runner } from '../../lib/task-runtime';
 import { useProjectStore } from '../../stores/projectStore';
@@ -381,11 +382,11 @@ export function TaskCollection({
       ) : !filtered.length ? (
         <EmptyState
           icon={ListTodo}
-          title={items.length ? 'No matching tasks' : 'Room for your next idea'}
+          title={items.length ? 'No matching tasks' : 'Room for your next task'}
           description={
             items.length
               ? 'Try another stage or search.'
-              : 'Start a task now, or save an idea for later. Its work and review stay here.'
+              : 'Start a task now, or save a draft for later. Its work and review stay here.'
           }
         />
       ) : layout === 'list' ? (
@@ -530,6 +531,7 @@ const WorkCard = memo(
           <span className="work-item-title">{item.title}</span>
           <span className="work-item-meta">
             <span>
+              {workShape(item)} ·{' '}
               {item.session?.request.projectName ??
                 item.run?.projectName ??
                 projects.find((p) => p.id === item.idea?.projectId)?.name ??

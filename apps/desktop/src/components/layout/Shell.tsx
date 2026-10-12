@@ -11,10 +11,13 @@ import { openCliTerminal } from '../../lib/cli-terminal';
 import { helperTheme } from '../../lib/helper-actions';
 import type { LiveSession } from '../../lib/live-session';
 import { displayShortcut, matchesShortcut, resolveShortcuts } from '../../lib/shortcuts';
+import { swarmConnection } from '../../lib/swarm';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
+import { selectWork } from '../../lib/work-selection';
 import { observeWorkbenchPerformance } from '../../lib/workbench-performance';
+import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { useBotStore } from '../../stores/botStore';
 import { openChanges } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -26,7 +29,7 @@ import { useOnboardingStore } from '../../stores/onboardingStore';
 import { mergeProjectRegistry, type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
-import { observeWorkbenchPreferences, useWorkbenchStore } from '../../stores/workbenchStore';
+import { observeWorkbenchPreferences } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AccessNoticeSlot } from '../account/AccessBoundary';
 import { useTrackOpenWork } from '../tasks/WorkSignals';
@@ -60,11 +63,11 @@ import {
   DEFAULT_WORKSPACE_TAB,
   navigateWorkspace,
   type ProjectSettingsDestination,
+  viewLabel,
   WORKSPACE_VIEWS,
 } from './navigation';
 import { ResizeHandles } from './ResizeHandles';
 import { TitleBar } from './TitleBar';
-import { WorkspacePresetPicker } from './WorkspacePresetPicker';
 
 export type { ActiveTab } from './navigation';
 
@@ -132,6 +135,22 @@ const RemoveProjectAction = lazy(() =>
   import('../projects/RemoveProjectAction').then((m) => ({ default: m.RemoveProjectAction })),
 );
 
+/** Swarm is a beta Cloudflare integration; its project tab appears once it is connected. */
+function useSwarmConfigured() {
+  const [configured, setConfigured] = useState(false);
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    let alive = true;
+    swarmConnection()
+      .then((connection) => alive && setConfigured(connection.configured))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return configured;
+}
+
 /** Bot conversations open on the Bots page, never in Work or Chat. */
 function openInBots(session: LiveSession) {
   if (!session.persona) return false;
@@ -176,8 +195,8 @@ export function Shell({
   const [activeTab, setActiveTab] = useState<ActiveTab>(DEFAULT_WORKSPACE_TAB);
   useEffect(() => {
     if (activeTab === 'live-sessions') {
-      useExecutionStore.getState().select(null);
-      useManagedTaskStore.getState().select(null);
+      const conversation = useLiveSessionStore.getState().selectedId ?? undefined;
+      selectWork({ conversation });
       setActiveTab('kanban');
     }
   }, [activeTab]);
@@ -191,16 +210,14 @@ export function Shell({
           .sessions.find((session) => session.id === payload.sessionId);
         if (session && openInBots(session)) return;
         if (session) useProjectStore.getState().selectProject(session.request.projectId);
-        useLiveSessionStore.getState().select(payload.sessionId);
+        selectWork({ conversation: payload.sessionId });
         useWorkViewStore.getState().open(`session:${payload.sessionId}`, payload.pane);
         setActiveTab('live-sessions');
       } else {
-        useLiveSessionStore.getState().select(null);
-        useExecutionStore.getState().select(payload.id);
+        selectWork({ task: payload.id });
         await useExecutionStore.getState().refresh();
         const run = useExecutionStore.getState().runs.find((run) => run.id === payload.id);
         if (run) useProjectStore.getState().selectProject(run.projectId);
-        useManagedTaskStore.getState().select(null);
         useWorkViewStore.getState().open(payload.id, payload.pane);
         setActiveTab('kanban');
       }
@@ -275,9 +292,7 @@ export function Shell({
   const [composerFocus, setComposerFocus] = useState(0);
   const focusComposer = useCallback(() => {
     setCapture(null);
-    useLiveSessionStore.getState().select(null);
-    useManagedTaskStore.getState().select(null);
-    useExecutionStore.getState().select(null);
+    selectWork();
     setActiveTab('kanban');
     setComposerFocus((value) => value + 1);
   }, []);
@@ -327,9 +342,7 @@ export function Shell({
     if (!project) return;
     const execution = useExecutionStore.getState();
     execution.draft('capture', captureDraftForProject(execution.drafts, project, activeProjectId));
-    execution.select(null);
-    useLiveSessionStore.getState().select(null);
-    useManagedTaskStore.getState().select(null);
+    selectWork();
     selectProject(id);
   };
   useTrackOpenWork();
@@ -357,17 +370,15 @@ export function Shell({
     if (owner && openInBots(owner)) return;
     selectProject(run.projectId);
     if (run.liveSessionId) {
-      useLiveSessionStore.getState().select(run.liveSessionId);
+      selectWork({ conversation: run.liveSessionId });
       setActiveTab('live-sessions');
     } else {
-      useLiveSessionStore.getState().select(null);
-      useManagedTaskStore.getState().select(null);
-      useExecutionStore.getState().select(run.id);
+      selectWork({ task: run.id });
       setActiveTab('kanban');
     }
   }, [workRequest, selectProject]);
   const project = projects.find((item) => item.id === activeProjectId);
-  const preset = useWorkbenchStore((state) => state.presets[activeProjectId ?? ''] ?? 'focus');
+  const swarmConfigured = useSwarmConfigured();
   const view = WORKSPACE_VIEWS.find((item) => item.id === activeTab) ?? WORKSPACE_VIEWS[0];
   const navigate = useCallback((tab: ActiveTab) => {
     if (tab === 'preferences' || tab === 'audit' || tab === 'mesh') {
@@ -380,17 +391,24 @@ export function Shell({
     } else setActiveTab(tab);
   }, []);
   useWindowEvent<ActiveTab>('jackalope:navigate', navigate);
-  useWindowEvent<SettingsCategory | ProjectSettingsDestination>(
+  useWindowEvent<SettingsCategory | 'Agents' | ProjectSettingsDestination>(
     'jackalope:open-settings',
     (destination) => {
-      setSettingsCategory(typeof destination === 'string' ? destination : destination.category);
+      const category = typeof destination === 'string' ? destination : destination.category;
+      // Agent choices moved to the Agents page; older links open it at the same scope.
+      if (category === 'Agents') {
+        useAgentScopeStore.getState().setScope(typeof destination === 'string' ? 'app' : 'project');
+        setActiveTab('agents');
+        return;
+      }
+      setSettingsCategory(category);
       setSettingsProjectId(typeof destination === 'string' ? undefined : destination.projectId);
       setActiveTab('preferences');
     },
   );
   const shortcutSettings = useSettingsStore((state) => state.shortcuts);
   const shortcuts = resolveShortcuts(shortcutSettings);
-  const navCollapsed = useWorkViewStore((state) => state.navCollapsed) && preset === 'build';
+  const navCollapsed = useWorkViewStore((state) => state.navCollapsed);
   const toggleNav = useWorkViewStore((state) => state.toggleNav);
   const shortcut = displayShortcut(shortcuts.search);
   useTauriEvent<string>('desktop-action', (action) => {
@@ -411,7 +429,7 @@ export function Shell({
         event.preventDefault();
         if (activeTab === 'preferences') setActiveTab(previousView.current);
         else navigate('preferences');
-      } else if (preset === 'build' && matchesShortcut(event, bindings.sidebar)) {
+      } else if (matchesShortcut(event, bindings.sidebar)) {
         event.preventDefault();
         useWorkViewStore.getState().toggleNav();
       } else if (matchesShortcut(event, bindings.terminal)) {
@@ -425,10 +443,10 @@ export function Shell({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, focusComposer, navigate, preset, shortcutSettings]);
+  }, [activeTab, focusComposer, navigate, shortcutSettings]);
 
   return (
-    <div className="workspace-shell" data-mode={preset}>
+    <div className="workspace-shell">
       <a className="skip-link" href="#workspace-content">
         Skip to workspace
       </a>
@@ -486,7 +504,6 @@ export function Shell({
           <BranchIndicator />
         </div>
         <div className="flex items-center gap-3">
-          {project && <WorkspacePresetPicker projectId={project.id} />}
           {(activeTab !== 'kanban' || selectedTaskId || selectedSessionId || selectedManagedId) && (
             <Tooltip content={`New work (${displayShortcut(shortcuts.newWork)})`}>
               <button
@@ -529,33 +546,27 @@ export function Shell({
       </header>
       <div className="workspace-body">
         <aside className="workspace-navigation" data-collapsed={navCollapsed || undefined}>
-          {preset === 'build' && (
-            <Tooltip
-              side="right"
-              content={`${navCollapsed ? 'Expand' : 'Collapse'} sidebar (${displayShortcut(shortcuts.sidebar)})`}
+          <Tooltip
+            side="right"
+            content={`${navCollapsed ? 'Expand' : 'Collapse'} sidebar (${displayShortcut(shortcuts.sidebar)})`}
+          >
+            <button
+              type="button"
+              className="workspace-nav-item workspace-nav-toggle"
+              aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-expanded={!navCollapsed}
+              onClick={toggleNav}
             >
-              <button
-                type="button"
-                className="workspace-nav-item workspace-nav-toggle"
-                aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                aria-expanded={!navCollapsed}
-                onClick={toggleNav}
-              >
-                {navCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-              </button>
-            </Tooltip>
-          )}
+              {navCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+            </button>
+          </Tooltip>
           <nav aria-label="Workspace" className="flex items-center gap-1">
             {WORKSPACE_VIEWS.filter((item) => item.primary).map((item) => (
               <button
                 type="button"
                 key={item.id}
                 onClick={() => {
-                  if (item.id === 'kanban') {
-                    useExecutionStore.getState().select(null);
-                    useLiveSessionStore.getState().select(null);
-                    useManagedTaskStore.getState().select(null);
-                  }
+                  if (item.id === 'kanban') selectWork();
                   setActiveTab(item.id);
                 }}
                 aria-current={view.group === item.group ? 'page' : undefined}
@@ -588,9 +599,7 @@ export function Shell({
               </button>
             ))}
           </nav>
-          {preset === 'build' && !navCollapsed && (
-            <WorkSidebar onOpen={() => setActiveTab('kanban')} />
-          )}
+          {!navCollapsed && <WorkSidebar onOpen={() => setActiveTab('kanban')} />}
           <button
             type="button"
             className="workspace-nav-item workspace-settings"
@@ -614,7 +623,13 @@ export function Shell({
             <WorkspaceSubnavigation
               label="Agents views"
               items={AGENT_VIEWS}
-              value={activeTab === 'agent-settings' ? 'agents' : activeTab}
+              value={
+                activeTab === 'agent-settings'
+                  ? 'agents'
+                  : activeTab === 'mcp-marketplace'
+                    ? 'mcps'
+                    : activeTab
+              }
               onChange={navigate}
             />
           )}
@@ -623,30 +638,14 @@ export function Shell({
             view.group !== 'agents' &&
             WORKSPACE_VIEWS.filter((item) => item.group === view.group).length > 1 && (
               <WorkspaceSubnavigation
-                label={`${view.group} views`}
+                label={`${view.group.charAt(0).toUpperCase()}${view.group.slice(1)} views`}
                 value={activeTab}
                 onChange={navigate}
-                items={WORKSPACE_VIEWS.filter((item) => item.group === view.group).map((item) => ({
-                  id: item.id,
-                  label:
-                    item.id === 'live-sessions'
-                      ? 'Chat'
-                      : item.id === 'kanban'
-                        ? 'Tasks'
-                        : item.id === 'project-overview'
-                          ? 'Overview'
-                          : item.id === 'topology'
-                            ? 'Codebase'
-                            : item.id === 'agents'
-                              ? 'Runners'
-                              : item.id === 'agent-settings'
-                                ? 'Configuration'
-                                : item.id === 'mcps'
-                                  ? 'Connections'
-                                  : item.id === 'project-settings'
-                                    ? 'Settings'
-                                    : item.label,
-                }))}
+                items={WORKSPACE_VIEWS.filter(
+                  (item) =>
+                    item.group === view.group &&
+                    (item.id !== 'swarm' || swarmConfigured || activeTab === 'swarm'),
+                ).map((item) => ({ id: item.id, label: viewLabel(item.id) }))}
               />
             )}
           {activeTab === 'kanban' && <WorkTabs />}
@@ -705,7 +704,7 @@ export function Shell({
               {activeTab === 'agents' && (
                 <RunnerConnections
                   onNewTask={(agent) => {
-                    useExecutionStore.getState().select(null);
+                    selectWork();
                     setCapture({ agent });
                     setActiveTab('kanban');
                   }}
@@ -751,7 +750,7 @@ export function Shell({
                   onSourceHandled={() => setScheduleRunId(undefined)}
                   onOpenProject={openProjectSetup}
                   onPlanning={() => {
-                    useExecutionStore.getState().select(null);
+                    selectWork();
                     setActiveTab('kanban');
                   }}
                 />

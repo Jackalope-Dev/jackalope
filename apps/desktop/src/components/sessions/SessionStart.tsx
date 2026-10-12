@@ -384,7 +384,7 @@ export function SessionStart({
                   },
                   {
                     id: 'limits',
-                    label: 'Session limits',
+                    label: 'Conversation limits',
                     content: () => (
                       <SessionLimits
                         embedded

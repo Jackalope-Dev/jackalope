@@ -2,6 +2,7 @@ import { FormField, IconButton, Panel, Select, SelectItem, Textarea } from '@jac
 import { Activity, ArrowLeft, RefreshCw } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { useWideWorkspace } from '../../hooks/useWideWorkspace';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import type { FeatureStep } from '../../lib/feature-plan';
 import {
@@ -17,7 +18,6 @@ import { openExternalUrl } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -71,9 +71,8 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
   const correction = useExecutionStore((state) => state.drafts[correctionKey]?.prompt ?? '');
   const setCorrection = (prompt: string) =>
     useExecutionStore.getState().draft(correctionKey, { prompt });
-  const preset = useWorkbenchStore((state) => state.presets[task.request.projectId] ?? 'focus');
   const hasResult = !!work.combined && !isActive(work.combined);
-  const [viewTab, setViewTab] = useState(preset === 'build' && hasResult ? 'review' : 'overview');
+  const [viewTab, setViewTab] = useState('overview');
   const workRequest = useWorkViewStore((state) => state.request);
   const handledWorkRequest = useRef<number | null>(null);
   useEffect(() => {
@@ -85,9 +84,8 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
     handledWorkRequest.current = workRequest.revision;
     setViewTab(workRequest.section === 'changes' && hasResult ? 'review' : 'overview');
   }, [workRequest, task.id, hasResult]);
-  const split = useWorkViewStore(
-    (state) => state.split[`managed:${task.id}`] ?? preset === 'build',
-  );
+  const wide = useWideWorkspace();
+  const split = useWorkViewStore((state) => state.split[`managed:${task.id}`] ?? wide);
   const alongside = split && ['review', 'preview'].includes(viewTab);
   const [planPending, setPlanPending] = useState(false);
   const [previewRevision, setPreviewRevision] = useState(0);

@@ -361,7 +361,7 @@ export function TourPage({ dark }: { dark: boolean }) {
             <br />
             with Jackalope.
           </h2>
-          <p>Join the waitlist. We’ll let you know when your workspace is ready.</p>
+          <p>Sign up free. Your workspace is ready as soon as you confirm your email.</p>
         </div>
         <div>
           <Signup />

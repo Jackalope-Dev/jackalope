@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { type CSSProperties, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
+import { useWideWorkspace } from '../../hooks/useWideWorkspace';
 import { BOT_BATCH_ALLOWANCE, batchLimitReached } from '../../lib/bot-conversations';
 import { type BotCard, useBotHubStore } from '../../lib/bot-hub';
 import {
@@ -32,10 +33,10 @@ import {
 import { isActive, nativeTask, respondToPrompt, type TaskRun } from '../../lib/task-runtime';
 import { taskDecision } from '../../lib/task-workflow';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { selectWork } from '../../lib/work-selection';
 import { BOT_COLORS, useBotStore } from '../../stores/botStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useWorkbenchStore } from '../../stores/workbenchStore';
 import { useChangeStats } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { BotAvatar, botStyle } from '../bots/BotAvatar';
@@ -119,16 +120,14 @@ export function LiveSessionView({
     const key = `jackalope-live-start:${session.request.projectId}`;
     const existing = localStorage.getItem(key)?.trim();
     localStorage.setItem(key, existing ? `${existing}\n\n${text}` : text);
-    useLiveSessionStore.getState().select(null);
+    selectWork();
   };
-  const preset = useWorkbenchStore((state) => state.presets[session.request.projectId] ?? 'focus');
-  const [expanded, setExpanded] = useState(initialDetailsOpen ?? (preset === 'build' && !detached));
+  const [expanded, setExpanded] = useState(initialDetailsOpen ?? !detached);
   useEffect(() => {
-    if (initialDetailsOpen === undefined) setExpanded(preset === 'build' && !detached);
-  }, [preset, detached, initialDetailsOpen]);
-  const split = useWorkViewStore(
-    (state) => state.split[`session:${session.id}`] ?? preset === 'build',
-  );
+    if (initialDetailsOpen === undefined) setExpanded(!detached);
+  }, [detached, initialDetailsOpen]);
+  const wide = useWideWorkspace();
+  const split = useWorkViewStore((state) => state.split[`session:${session.id}`] ?? wide);
   const [collapsed, setCollapsed] = useState(false);
   const [tab, setTab] = useState(() => {
     const saved = useWorkViewStore.getState().reading[`session:${session.id}`];
@@ -136,9 +135,7 @@ export function LiveSessionView({
       ? 'changes'
       : ['work', 'changes', 'preview', 'terminal', 'screen'].includes(saved)
         ? saved
-        : preset === 'build' && latest
-          ? 'changes'
-          : 'work';
+        : 'work';
   });
   useEffect(() => {
     useWorkViewStore.getState().remember(`session:${session.id}`, tab);
@@ -170,7 +167,9 @@ export function LiveSessionView({
   const append = (text: string) =>
     new Promise<void>((resolve, reject) => {
       if (session.closed) {
-        reject(new Error('This session is finished. Copy the delivery handoff into a new task.'));
+        reject(
+          new Error('This conversation is finished. Copy the delivery handoff into a new task.'),
+        );
         return;
       }
       if (addingFeedback.current) {
@@ -254,7 +253,7 @@ export function LiveSessionView({
   const pauseLabel = integrated
     ? 'Integrated'
     : session.closed
-      ? 'Reopen session'
+      ? 'Reopen conversation'
       : session.paused
         ? 'Resume queue'
         : 'Pause queue';
@@ -307,7 +306,7 @@ export function LiveSessionView({
           items={[
             {
               id: 'limits',
-              label: 'Session limits',
+              label: 'Conversation limits',
               content: () => (
                 <SessionLimits
                   embedded
@@ -730,7 +729,7 @@ export function LiveSessionView({
             <div className="live-work-bar">
               <SegmentedControl
                 className="live-tabs"
-                label="Session details"
+                label="Conversation details"
                 value={tab}
                 onChange={(value) => {
                   if (value === 'changes') showReview();
@@ -886,7 +885,7 @@ export function LiveSessionView({
                         (session.paused || integrated) &&
                         (pending ? (
                           <InlineNotice>
-                            Run or cancel queued messages before merging this session.
+                            Run or cancel queued messages before merging this conversation.
                           </InlineNotice>
                         ) : (
                           <MergeReview

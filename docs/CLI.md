@@ -60,7 +60,9 @@ settings and an open app window adds it immediately; otherwise it appears on the
 app's next launch.
 
 Conversations use the project's default task agent, or automatic routing when no
-project default is set. An explicit `/agent` choice applies to the next conversation. Several
+project default is set. An explicit `/agent` or `/model` choice applies to the next
+conversation; `--agent <id>` and `--model <id>` make the same choice for the first new
+conversation when the command starts, and for `-p`. Several
 terminals can show different sessions at once, and one session can be open in a
 terminal and the app together. Leaving a terminal does not stop work.
 
@@ -73,6 +75,9 @@ terminal and the app together. Leaving a terminal does not stop work.
 | `jackalope attach <id>` | Rejoins a conversation; any unambiguous id prefix works |
 | `jackalope ls` | Lists open conversations with their project, state and age |
 | `jackalope stop <id>` | Stops the work a conversation is running |
+| `jackalope diff <id>` | Prints a conversation's changes since its worktree left the project's commit, uncommitted edits included; `--stat` summarizes them. New untracked files are listed on stderr |
+| `jackalope merge <id>` | Pauses the conversation, prepares a merge of its latest reviewed attempt into the project's target branch through the app's merge review, lists the files and asks before applying. `-m` sets the commit message; conflicts are reported for the app's merge review |
+| `jackalope pr <id>` | Commits remaining changes with the project's commit settings, pushes the branch and opens a draft pull request through the GitHub CLI after you confirm. `--title` replaces the conversation title; `--ready` opens it ready for review |
 | `jackalope status` | Shows the host, its endpoint and profile |
 
 `ls` and `status` accept `--json`. Options take a value as `--agent codex` or
@@ -154,8 +159,18 @@ Success, attention and failure use fixed green, amber and red tones.
 
 `jackalope -p "<message>"` (or `jackalope run`) starts a conversation, waits for it
 to settle and prints the reply; piped stdin is appended to the message, `--json`
-prints a JSON object and `--agent <id>` skips routing. The run settles when its work
+prints a JSON object, `--agent <id>` skips routing and `--model <id>` picks its model. The run settles when its work
 finishes, fails, is stopped or interrupted, or the conversation is paused.
+`--agents <a,b>` sends the same message to two to four agents, each in its own
+conversation and workspace like the app's agent comparison; the command waits for all
+of them and prints each reply under its agent with the id to rejoin it. With `--json`
+it prints `{"results": [...]}`, one object per agent. Its exit status is the most
+serious single outcome: failure, then a question, then a timeout.
+`--stream-json` follows a single run for scripts and CI: stdout gets one JSON object
+per line, `started` with the session id, `step` when the work moves to a new step,
+`output` with text the agent added (`replace: true` when it rewrote its output rather
+than extending it), and finally `result`, the object `--json` prints, with the same
+exit status. It does not combine with `--agents`.
 `--timeout <seconds>` stops waiting (checked at least every 25 seconds) and leaves
 the work running. Progress goes to stderr when it is a terminal. Exit status is 0
 when done, 1 on failure or when the work was stopped, 2 when an agent asks a

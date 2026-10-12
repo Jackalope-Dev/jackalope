@@ -390,7 +390,7 @@ export const marketingPages: MarketingPage[] = [
     ],
     related: [
       { label: 'Your first task', href: '/knowledge/task-composer-and-effort-levels/' },
-      { label: 'Chat and follow-ups', href: '/knowledge/chat-and-follow-ups/' },
+      { label: 'Conversations and follow-ups', href: '/knowledge/chat-and-follow-ups/' },
       { label: 'Review and merge', href: '/knowledge/review-and-merge/' },
     ],
   },

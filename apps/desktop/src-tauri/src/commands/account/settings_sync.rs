@@ -141,7 +141,7 @@ pub async fn app_settings_sync(
                 view.enabled = enabled;
                 Ok(view)
             }
-            _ => Err("Connect an approved Jackalope account to sync settings.".into()),
+            _ => Err("Sign in to Jackalope to sync settings.".into()),
         };
     }
     let mut record = saved.take().unwrap();
