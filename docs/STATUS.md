@@ -41,12 +41,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   before the existing preparation command. Both checkouts must ignore each file;
   links, parent paths and overwrites are refused. Worktree size inspection counts
   bounded logical file sizes, labels partial results and retains existing cleanup guards.
-- Projects open in Build unless a layout was chosen. Focus uses a compact navigation
-  rail, a conversation composer and one next task.
-  Build keeps recent work, project tools and conversation beside review, preview,
-  terminal or activity. Oversee uses full-width navigation, live work counts, an
-  attention queue and a board. Modes and their work-list filters save per project;
-  selecting a mode resets conversation-layout overrides without clearing drafts.
+- The workspace has one layout: a collapsible sidebar of recent work beside the open
+  item, with review, preview, terminal or activity next to its conversation. The work
+  list offers list and board views, and its filters save per project.
   Needs you prioritizes recovery and questions, then older reviews. Task context
   retains a compact visit receipt, workspace identity and checks.
 - Task workspace tools include a native terminal with bounded reconnectable output,
@@ -58,7 +55,7 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   snapshot of up to 256 KiB per pane; it never restarts commands.
   Feedback from separate panes is saved locally for explicit addition to the reply draft.
   Separate panes retain their own task drafts; their refreshes do not replace the main
-  window's draft or selection. Queue pause and stop remain visible in Focus mode.
+  window's draft or selection. Queue pause and stop remain visible with the sidebar collapsed.
 - The `jackalope` terminal command holds routed conversations in the current
   directory, lists and rejoins sessions, and streams status from the process that
   owns the profile, starting a windowed or headless host when none runs. Outside a

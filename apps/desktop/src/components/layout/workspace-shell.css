@@ -40,7 +40,7 @@
   align-items: stretch;
   justify-content: flex-start;
   gap: 4px;
-  padding: 8px 0;
+  padding: 8px;
   overflow-x: hidden;
   overflow-y: auto;
   flex-shrink: 0;
@@ -51,9 +51,8 @@
   align-items: stretch;
 }
 /* The vertical navigation is its own rounded panel, matching the content card's radius
-   and height. Oversee keeps its horizontal bar on the shell. */
-.workspace-shell:not([data-mode="oversee"]) .workspace-navigation {
-  padding: 8px;
+   and height. */
+.workspace-shell .workspace-navigation {
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-2xl);
   background: var(--color-navigation);
@@ -66,10 +65,9 @@
   margin-top: auto;
   flex-shrink: 0;
 }
-.workspace-shell[data-mode="oversee"] .workspace-settings {
-  margin-top: 0;
-}
 .workspace-shell .workspace-canvas {
+  --workspace-page-padding: 24px;
+  --workspace-gutter: 24px;
   flex: 1;
   min-width: 0;
 }
@@ -277,7 +275,6 @@
     flex-direction: row;
     flex-wrap: wrap;
     overflow: visible;
-    padding: 0;
   }
   .workspace-shell .workspace-navigation > nav {
     flex-direction: row;

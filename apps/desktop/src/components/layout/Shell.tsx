@@ -25,7 +25,7 @@ import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTa
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { observeWorkbenchPreferences, useWorkspacePreset } from '../../stores/workbenchStore';
+import { observeWorkbenchPreferences } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AccessNoticeSlot } from '../account/AccessBoundary';
 import { useTrackOpenWork } from '../tasks/WorkSignals';
@@ -64,7 +64,6 @@ import {
 } from './navigation';
 import { ResizeHandles } from './ResizeHandles';
 import { TitleBar } from './TitleBar';
-import { WorkspacePresetPicker } from './WorkspacePresetPicker';
 
 export type { ActiveTab } from './navigation';
 
@@ -366,7 +365,6 @@ export function Shell({
   }, [workRequest, selectProject]);
   const project = projects.find((item) => item.id === activeProjectId);
   const swarmConfigured = useSwarmConfigured();
-  const preset = useWorkspacePreset(activeProjectId);
   const view = WORKSPACE_VIEWS.find((item) => item.id === activeTab) ?? WORKSPACE_VIEWS[0];
   const navigate = useCallback((tab: ActiveTab) => {
     if (tab === 'preferences' || tab === 'audit' || tab === 'mesh') {
@@ -389,7 +387,7 @@ export function Shell({
   );
   const shortcutSettings = useSettingsStore((state) => state.shortcuts);
   const shortcuts = resolveShortcuts(shortcutSettings);
-  const navCollapsed = useWorkViewStore((state) => state.navCollapsed) && preset === 'build';
+  const navCollapsed = useWorkViewStore((state) => state.navCollapsed);
   const toggleNav = useWorkViewStore((state) => state.toggleNav);
   const shortcut = displayShortcut(shortcuts.search);
   useTauriEvent<string>('desktop-action', (action) => {
@@ -410,7 +408,7 @@ export function Shell({
         event.preventDefault();
         if (activeTab === 'preferences') setActiveTab(previousView.current);
         else navigate('preferences');
-      } else if (preset === 'build' && matchesShortcut(event, bindings.sidebar)) {
+      } else if (matchesShortcut(event, bindings.sidebar)) {
         event.preventDefault();
         useWorkViewStore.getState().toggleNav();
       } else if (matchesShortcut(event, bindings.terminal)) {
@@ -424,10 +422,10 @@ export function Shell({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, focusComposer, navigate, preset, shortcutSettings]);
+  }, [activeTab, focusComposer, navigate, shortcutSettings]);
 
   return (
-    <div className="workspace-shell" data-mode={preset}>
+    <div className="workspace-shell">
       <a className="skip-link" href="#workspace-content">
         Skip to workspace
       </a>
@@ -485,7 +483,6 @@ export function Shell({
           <BranchIndicator />
         </div>
         <div className="flex items-center gap-3">
-          {project && <WorkspacePresetPicker projectId={project.id} />}
           {(activeTab !== 'kanban' || selectedTaskId || selectedSessionId || selectedManagedId) && (
             <Tooltip content={`New work (${displayShortcut(shortcuts.newWork)})`}>
               <button
@@ -528,22 +525,20 @@ export function Shell({
       </header>
       <div className="workspace-body">
         <aside className="workspace-navigation" data-collapsed={navCollapsed || undefined}>
-          {preset === 'build' && (
-            <Tooltip
-              side="right"
-              content={`${navCollapsed ? 'Expand' : 'Collapse'} sidebar (${displayShortcut(shortcuts.sidebar)})`}
+          <Tooltip
+            side="right"
+            content={`${navCollapsed ? 'Expand' : 'Collapse'} sidebar (${displayShortcut(shortcuts.sidebar)})`}
+          >
+            <button
+              type="button"
+              className="workspace-nav-item workspace-nav-toggle"
+              aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-expanded={!navCollapsed}
+              onClick={toggleNav}
             >
-              <button
-                type="button"
-                className="workspace-nav-item workspace-nav-toggle"
-                aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                aria-expanded={!navCollapsed}
-                onClick={toggleNav}
-              >
-                {navCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-              </button>
-            </Tooltip>
-          )}
+              {navCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+            </button>
+          </Tooltip>
           <nav aria-label="Workspace" className="flex items-center gap-1">
             {WORKSPACE_VIEWS.filter((item) => item.primary).map((item) => (
               <button
@@ -587,9 +582,7 @@ export function Shell({
               </button>
             ))}
           </nav>
-          {preset === 'build' && !navCollapsed && (
-            <WorkSidebar onOpen={() => setActiveTab('kanban')} />
-          )}
+          {!navCollapsed && <WorkSidebar onOpen={() => setActiveTab('kanban')} />}
           <button
             type="button"
             className="workspace-nav-item workspace-settings"

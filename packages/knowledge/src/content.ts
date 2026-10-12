@@ -180,8 +180,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'first-look',
         question: 'What do I see the first time I open it?',
         paragraphs: [
-          'A short welcome introduces the main features and how to reach us. Project setup then walks through your repository, agents, decisions, behavior, appearance and an optional first task.',
-          'The Work page holds your conversations, tasks and plans. Projects open in Build, which keeps your recent work in the sidebar and review, preview and terminal beside the work. The layout picker at the top also offers Focus, which keeps one conversation in front of you, and Oversee, a full-width board of everything that is running or waiting for you.',
+          'A short welcome introduces the main features and how to reach us. Project setup then asks for your repository, its agents and an optional first task. Routing, commit behavior and colors start from defaults you can change in Project settings.',
+          'The Work page holds your conversations, tasks and plans. The sidebar lists recent work grouped by Needs you, In progress and Recent, and an open item shows review, preview and terminal beside its conversation.',
         ],
       },
       {
@@ -207,26 +207,26 @@ export const knowledgeGuides: KnowledgeGuide[] = [
   {
     slug: 'workspace-modes',
     category: 'workflows',
-    title: 'Focus, Build and Oversee: choosing a workspace layout',
-    shortTitle: 'Workspace modes',
+    title: 'Find your way around the Work page',
+    shortTitle: 'The Work page',
     description:
-      'Switch between a single conversation, a build layout with tools beside the work, and a board for everything in progress.',
+      'The sidebar keeps every piece of work in view, a board shows everything in progress, and the sidebar folds away when you want one thing on screen.',
     readingTime: '2 min read',
     sections: [
       {
         id: 'which-mode',
-        question: 'Which layout should I use?',
+        question: 'How is the Work page laid out?',
         paragraphs: [
-          'Focus shows a compact navigation rail, the conversation composer and the next task. Use it when you are working on one thing.',
-          'Build keeps recent work, project tools and the conversation beside review, preview, terminal or activity. Use it while you iterate on a change.',
-          'Oversee uses full-width navigation with live work counts, a queue of work that needs you and a board. Use it when several agents are running.',
+          'The sidebar lists your work in three groups: Needs you, In progress and Recent. Selecting an item opens its result, with review, preview, terminal and activity beside the conversation.',
+          'The work list on the page can show a list or a board. Use the board when several agents are running and you want every stage in view.',
+          'Collapse the sidebar with Ctrl+B (Cmd+B on macOS) to keep one conversation on screen, and press it again to bring your work back.',
         ],
       },
       {
         id: 'switching',
-        question: 'Do I lose anything when I switch?',
+        question: 'What happened to Focus, Build and Oversee?',
         paragraphs: [
-          'No. Modes and their work-list filters are saved for each project, and drafts are kept. Switching mode resets any conversation-layout adjustments you made, not your work.',
+          'They became one layout: a collapsed sidebar covers what Focus did, and the board view covers Oversee. Your work, drafts and saved filters are unchanged.',
           'Needs you lists recovery steps and questions first, then older reviews, so the most urgent item is always at the top.',
         ],
       },

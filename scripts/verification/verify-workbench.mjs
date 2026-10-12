@@ -18,7 +18,6 @@ writeFileSync(
 import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {applyThemeTokens,DEFAULT_THEME} from '@jackalope/brand/theme';
-import {WorkspacePresetPicker} from '../../src/components/layout/WorkspacePresetPicker';
 import {WorkContext} from '../../src/components/tasks/WorkContext';
 import {SessionTopics} from '../../src/components/sessions/SessionTopics';
 import {TranscriptResult} from '../../src/components/sessions/TranscriptResult';
@@ -29,12 +28,11 @@ import {saveWorkFeedback} from '../../src/lib/work-feedback';
 import {useLiveSessionStore} from '../../src/stores/liveSessionStore';
 import {useExecutionStore} from '../../src/stores/executionStore';
 import {useProjectStore} from '../../src/stores/projectStore';
-import {useWorkbenchStore} from '../../src/stores/workbenchStore';
 import {useWorkViewStore} from '../../src/stores/workViewStore';
 import '../../src/index.css';
 const run={id:'fixture-run',taskId:'fixture-task',projectId:'fixture',projectName:'Atlas',projectPath:'C:/fixture',workspace:'C:/fixture/worktree',branch:'feature/focus',baseHead:'123456',agent:'codex',account:'Default',prompt:'Keep focus visible.',status:'review',startedAt:'2026-09-18T00:00:00Z',endedAt:'2026-09-18T00:01:00Z',sessionId:null,result:'## Ready\\nFocus stays visible.',activity:[],prompts:[],diagnostics:[],usage:{input:0,output:0,reported:false},contract:{requirements:[]}};
 const chat={id:'chat',title:'Atlas work',request:{projectId:'fixture',projectName:'Atlas',projectPath:'C:/fixture',agent:'codex',isolated:true},topics:[],topicsRevision:0,messages:[{id:'one',text:'# UI\\nKeep focus',canceled:false},{id:'two',text:'# API\\nKeep retries bounded',canceled:false},{id:'three',text:'# UI\\nUse clear labels',canceled:false}],batches:[],draft:{text:'',revision:0}};
-window.fixture={calls:[],running:false,reply:'',preset:()=>useWorkbenchStore.getState().presets.fixture,openTools:()=>useWorkViewStore.getState().open(run.id,'terminal'),setDraft:prompt=>useExecutionStore.getState().draft('test',{prompt}),getDraft:()=>useExecutionStore.getState().drafts.test?.prompt};
+window.fixture={calls:[],running:false,reply:'',openTools:()=>useWorkViewStore.getState().open(run.id,'terminal'),setDraft:prompt=>useExecutionStore.getState().draft('test',{prompt}),getDraft:()=>useExecutionStore.getState().drafts.test?.prompt};
 window.__TAURI_INTERNALS__={invoke:async(command,args={})=>{
 window.fixture.calls.push({command,args});
 if(command==='task_terminal_start'){window.fixture.running=true;return;}
@@ -46,7 +44,7 @@ useProjectStore.setState({projects:[{id:'fixture',name:'Atlas',path:'C:/fixture'
 useExecutionStore.setState({runs:[run],runners:[],loading:false,discover:async()=>{},refresh:async()=>{}});
 useLiveSessionStore.setState({sessions:[chat],runs:[],refresh:async()=>{}});
 const params=new URLSearchParams(location.search);applyThemeTokens({...DEFAULT_THEME,isDark:params.get('theme')!=='light'});
-function Fixture(){if(params.has('missing'))return <WorkPaneWindow id='missing-run' pane='changes'/>;const session=useLiveSessionStore(s=>s.sessions[0]);return <main style={{padding:24,display:'grid',gap:12,height:'100vh',overflow:'auto'}}><p>Browser fixture · no native execution</p><div><WorkspacePresetPicker projectId="fixture"/></div><WorkContext run={run}><SessionTopics session={session}/></WorkContext><button onClick={()=>saveWorkFeedback(run.taskId,run.id,'Check keyboard focus on the changed button.')}>Save pane feedback</button><ProjectVerification run={{...run,verification:{command:'pnpm test',checkedAt:'2026-09-18T00:02:00Z',result:{success:false,exitCode:1,stdout:'Failed assertion',stderr:'',durationMs:100}}}} onCorrect={async()=>{throw Error('Feedback storage full')}}/><WorkFeedbackInbox taskId={run.taskId} onFeedback={text=>{window.fixture.reply=text}}/><TranscriptResult content={'## Earlier result\\nSearchable older answer'} active={false} recent={false} onOpenLink={()=>{}}/></main>};
+function Fixture(){if(params.has('missing'))return <WorkPaneWindow id='missing-run' pane='changes'/>;const session=useLiveSessionStore(s=>s.sessions[0]);return <main style={{padding:24,display:'grid',gap:12,height:'100vh',overflow:'auto'}}><p>Browser fixture · no native execution</p><WorkContext run={run}><SessionTopics session={session}/></WorkContext><button onClick={()=>saveWorkFeedback(run.taskId,run.id,'Check keyboard focus on the changed button.')}>Save pane feedback</button><ProjectVerification run={{...run,verification:{command:'pnpm test',checkedAt:'2026-09-18T00:02:00Z',result:{success:false,exitCode:1,stdout:'Failed assertion',stderr:'',durationMs:100}}}} onCorrect={async()=>{throw Error('Feedback storage full')}}/><WorkFeedbackInbox taskId={run.taskId} onFeedback={text=>{window.fixture.reply=text}}/><TranscriptResult content={'## Earlier result\\nSearchable older answer'} active={false} recent={false} onOpenLink={()=>{}}/></main>};
 createRoot(document.getElementById('root')).render(<Fixture/>);
 `,
 );
@@ -72,9 +70,6 @@ try {
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(`${origin}?theme=${theme}`);
-    await page.getByRole('button', { name: 'Workspace layout' }).click();
-    await page.getByRole('menuitem', { name: /Build/ }).click();
-    assert.equal(await page.evaluate(() => window.fixture.preset()), 'build');
     await page.getByRole('button', { name: 'Task context', exact: true }).click();
     await page.getByRole('dialog').getByText('C:/fixture/worktree', { exact: true }).waitFor();
     await page.keyboard.press('Escape');

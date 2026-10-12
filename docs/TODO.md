@@ -22,8 +22,8 @@ release dates.
   Validate editor protocol handlers and per-project layout persistence on those systems.
   Include shell selection, both split panes, output search, HTTP links and opt-in
   stopped-output restoration without command replay.
-- [ ] Compare Focus, Build and Oversee on representative first-task, correction and
-  return-to-work journeys. Check mode changes with open tasks, chats and plans,
+- [ ] Test the single workspace layout on representative first-task, correction and
+  return-to-work journeys. Check sidebar collapse with open tasks, chats and plans,
   persisted filters, unsent drafts, questions, Stop controls and empty projects.
   Include topic regrouping, stale revisions, draft promotion,
   large histories and local timing exports; report human effort and outcome quality.

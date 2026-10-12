@@ -40,7 +40,6 @@ import { listMcpServers, type McpServerConfig, openInBrowser } from '../../lib/t
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { useWorkspacePreset } from '../../stores/workbenchStore';
 import { useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
@@ -117,14 +116,13 @@ export function TaskDetail({
   const [acting, setActing] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const workRequest = useWorkViewStore((state) => state.request);
-  const preset = useWorkspacePreset(run.projectId);
   const savedTab = useWorkViewStore.getState().reading[run.taskId];
   const [tab, setTab] = useState(
     savedTab === 'context'
       ? 'activity'
       : savedTab === 'delivery'
         ? 'changes'
-        : (savedTab ?? (preset === 'build' ? 'changes' : 'result')),
+        : (savedTab ?? 'result'),
   );
   const [detailsOpen, setDetailsOpen] = useState(savedTab === 'context');
   const [reviewSection, setReviewSection] = useState<ReviewSection>(
@@ -169,7 +167,7 @@ export function TaskDetail({
   const [connections, setConnections] = useState<McpServerConfig[] | null>(null);
   const applied = useCallback(() => setIntegrated(true), []);
   const key = `reply:${run.taskId}`;
-  const split = useWorkViewStore((state) => state.split[run.taskId] ?? preset === 'build');
+  const split = useWorkViewStore((state) => state.split[run.taskId] ?? true);
   const alongside = split && ['changes', 'preview', 'terminal', 'activity', 'screen'].includes(tab);
   const reply = drafts[key]?.prompt ?? '';
   const active = isActive(run);

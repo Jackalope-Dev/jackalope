@@ -17,7 +17,6 @@ import { openExternalUrl } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useWorkspacePreset } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -71,9 +70,8 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
   const correction = useExecutionStore((state) => state.drafts[correctionKey]?.prompt ?? '');
   const setCorrection = (prompt: string) =>
     useExecutionStore.getState().draft(correctionKey, { prompt });
-  const preset = useWorkspacePreset(task.request.projectId);
   const hasResult = !!work.combined && !isActive(work.combined);
-  const [viewTab, setViewTab] = useState(preset === 'build' && hasResult ? 'review' : 'overview');
+  const [viewTab, setViewTab] = useState('overview');
   const workRequest = useWorkViewStore((state) => state.request);
   const handledWorkRequest = useRef<number | null>(null);
   useEffect(() => {
@@ -85,9 +83,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
     handledWorkRequest.current = workRequest.revision;
     setViewTab(workRequest.section === 'changes' && hasResult ? 'review' : 'overview');
   }, [workRequest, task.id, hasResult]);
-  const split = useWorkViewStore(
-    (state) => state.split[`managed:${task.id}`] ?? preset === 'build',
-  );
+  const split = useWorkViewStore((state) => state.split[`managed:${task.id}`] ?? true);
   const alongside = split && ['review', 'preview'].includes(viewTab);
   const [planPending, setPlanPending] = useState(false);
   const [previewRevision, setPreviewRevision] = useState(0);

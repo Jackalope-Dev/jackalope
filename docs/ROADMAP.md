@@ -23,8 +23,8 @@ representative benefit and installed-platform acceptance remain open.
   shortcuts, editor/shell choices, saved actions and optional local dictation.
   Split terminals can retain stopped output without replaying commands. Explicit
   ignored-file setup and bounded worktree size inspection support isolated work.
-- Per-project Focus, Build and Oversee modes provide a quiet conversation canvas,
-  a workspace with tools beside work, or a full-width activity and attention board.
+- One workspace layout keeps recent work in a collapsible sidebar beside the open item,
+  with list and board views of the work list.
   One prompt can go to several agents in separate isolated tasks for side-by-side
   comparison. Composers accept pasted images and dropped or picked files, and command
   search opens or attaches project files. Work rows show elapsed time, changed lines and
