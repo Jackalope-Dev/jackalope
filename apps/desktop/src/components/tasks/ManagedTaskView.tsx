@@ -17,7 +17,7 @@ import { openExternalUrl } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useWorkbenchStore } from '../../stores/workbenchStore';
+import { useWorkspacePreset } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -71,7 +71,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
   const correction = useExecutionStore((state) => state.drafts[correctionKey]?.prompt ?? '');
   const setCorrection = (prompt: string) =>
     useExecutionStore.getState().draft(correctionKey, { prompt });
-  const preset = useWorkbenchStore((state) => state.presets[task.request.projectId] ?? 'focus');
+  const preset = useWorkspacePreset(task.request.projectId);
   const hasResult = !!work.combined && !isActive(work.combined);
   const [viewTab, setViewTab] = useState(preset === 'build' && hasResult ? 'review' : 'overview');
   const workRequest = useWorkViewStore((state) => state.request);

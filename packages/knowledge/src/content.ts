@@ -181,7 +181,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'What do I see the first time I open it?',
         paragraphs: [
           'A short welcome introduces the main features and how to reach us. Project setup then walks through your repository, agents, decisions, behavior, appearance and an optional first task.',
-          'The Work page holds your conversations, tasks and plans. Choose Focus, Build or Oversee from the layout picker at the top: Focus keeps one conversation in front of you, Build puts review, preview and terminal beside the work, and Oversee shows a full-width board of everything that is running or waiting for you.',
+          'The Work page holds your conversations, tasks and plans. Projects open in Build, which keeps your recent work in the sidebar and review, preview and terminal beside the work. The layout picker at the top also offers Focus, which keeps one conversation in front of you, and Oversee, a full-width board of everything that is running or waiting for you.',
         ],
       },
       {
@@ -813,7 +813,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'kimi-code',
         question: 'What does Kimi Code support?',
         paragraphs: [
-          'Install the current Kimi Code CLI and open Agents & tools → Runners and choose Configure Kimi Code. Use kimi login for the default account or Add account & sign in for a separate profile. Named profiles use KIMI_CODE_HOME for configuration, sign-in data, and sessions; migrate legacy Python CLI setups before using them.',
+          'Install the current Kimi Code CLI and open Agents and choose Configure Kimi Code. Use kimi login for the default account or Add account & sign in for a separate profile. Named profiles use KIMI_CODE_HOME for configuration, sign-in data, and sessions; migrate legacy Python CLI setups before using them.',
           'Kimi tasks stream text and tool activity, offer the CLI’s tool approval choices and structured questions, and continue the exact saved session with its original account. Declining or leaving an approval unanswered stops the attempt. Selected models come from the account’s CLI session configuration.',
           'Kimi supports automatic routing and Ask Jackalope with tools disabled for those requests. Worker token usage uses session-total deltas; cache breakdown, cost, and helper tokens remain unknown. Membership quota requires a managed Kimi account with a current login. Detection and authentication checks do not establish signed-in execution or installed-app acceptance.',
         ],
@@ -828,7 +828,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Use a small task in a project that is appropriate for the account. This helps distinguish CLI discovery, successful sign-in, and the ability to run your chosen model.',
         ],
         steps: [
-          'Install the agent CLI, open Agents & tools → Runners and choose Configure beside the agent. Select the intended default or named account.',
+          'Install the agent CLI, open Agents and choose Configure beside the agent. Select the intended default or named account.',
           'Complete that profile’s sign-in or key setup. Review provider billing and model access for the selected account.',
           'Choose the account in the project settings, then create an explicitly assigned task: “Read the project instructions and summarize how to run the tests. Do not change files.”',
           'Inspect the bound agent/account and the result. If access fails, repair that same profile before trying a larger task.',
@@ -848,7 +848,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'work-personal-segregation',
         question: 'How do work and personal account profiles differ?',
         paragraphs: [
-          'Named Codex, Claude Code, Grok, OpenCode, and Kimi Code profiles use separate supported CLI directories. Agents & tools → Runners saves enable/disable, default task agent, and account choices for the selected project. Project agent settings offers Work/Personal group selection and allowed accounts. App settings retains app-wide limits. New work uses the project default; continuations retain their bound profile.',
+          'Named Codex, Claude Code, Grok, OpenCode, and Kimi Code profiles use separate supported CLI directories. The Agents page saves enable/disable, default task agent, and account choices for the selected project. Project agent settings offers Work/Personal group selection and allowed accounts. App settings retains app-wide limits. New work uses the project default; continuations retain their bound profile.',
           'Antigravity named profiles require Gemini API keys with separate API billing. Its existing subscription login is shared and can change outside Jackalope. Profiles organize credentials; they do not isolate OS permissions or inherited provider configuration.',
         ],
       },
@@ -865,7 +865,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'credential-drift',
         question: 'How do I recover from an expired agent sign-in?',
         paragraphs: [
-          'Open Agents & tools → Runners, choose Configure beside the agent and select the affected account. Complete its sign-in flow, using Copy link or Open browser if needed. Check the same profile that the task uses; signing in to the default CLI account does not repair a separate named profile.',
+          'Open Agents, choose Configure beside the agent and select the affected account. Complete its sign-in flow, using Copy link or Open browser if needed. Check the same profile that the task uses; signing in to the default CLI account does not repair a separate named profile.',
           'Some adapters validate access only when launched. A detected executable or saved credential does not prove the provider will accept the next request.',
         ],
       },
@@ -947,7 +947,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'debugging-mcp',
         question: 'Where do I configure and diagnose connections?',
         paragraphs: [
-          'Open Agents & tools → MCP tools. Check the command and arguments for stdio, or the endpoint and transport for a remote server. Verify that the selected agent supports that transport.',
+          'Open Agents → Tools. Check the command and arguments for stdio, or the endpoint and transport for a remote server. Verify that the selected agent supports that transport.',
           'Use the connection probe for configured header or environment authentication. CLI-owned OAuth sessions must be checked in that CLI and account profile. A successful probe does not establish that every task can use the tool.',
         ],
       },
@@ -1240,7 +1240,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'mcp-overview',
         question: 'How do I connect project tools?',
         paragraphs: [
-          'Open Agents & tools → Tool marketplace for a curated collection of publisher-maintained tools. Review what a service does and its setup guide, then choose Configure. Search or choose All servers to browse the wider AllMCPs directory. Use Custom connection for your own endpoint or local command.',
+          'Open Agents → Tools and choose Add tools for a curated collection of publisher-maintained tools. Review what a service does and its setup guide, then choose Configure. Search or choose All servers to browse the wider AllMCPs directory. Use Custom connection for your own endpoint or local command.',
         ],
       },
       {

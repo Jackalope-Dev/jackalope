@@ -46,11 +46,14 @@ IN A CONVERSATION
   Esc Esc                        stop the agent        Ctrl+R  search history
   Shift+Enter, \\ Enter, Ctrl+J   new line              Ctrl+N/P  switch conversation
 
+STARTING A CONVERSATION
+  --agent <id>                   use this agent instead of routing
+  --model <id>                   use this model with the agent
+
 RUNNING ONCE
   -p, --print                    send the message, wait, and print the reply;
                                  piped stdin is appended to the message
   --json                         print the result as JSON (also for ls, status)
-  --agent <id>                   use this agent instead of routing
   --timeout <seconds>            stop waiting after this long; the work continues
   Exit status: 0 done, 1 failed or stopped, 2 an agent asked a question
   (answer it with jackalope attach <id>), 3 timed out.
@@ -95,12 +98,14 @@ fn run() -> Result<(), String> {
         Command::Once {
             message,
             agent,
+            model,
             json,
             timeout,
         } => {
             announce_repository(init)?;
             let options = once::Options {
                 agent,
+                model,
                 json,
                 timeout,
                 cold_start: cli.cold_start,
@@ -118,9 +123,17 @@ fn run() -> Result<(), String> {
             resume,
             attach,
             pick,
+            agent,
+            model,
         } => {
             announce_repository(init)?;
-            converse(cli.cold_start, attach, resume, pick)
+            converse(
+                cli.cold_start,
+                attach,
+                resume,
+                pick,
+                ui::NextStart { agent, model },
+            )
         }
     }
 }
@@ -137,6 +150,7 @@ fn converse(
     attach: Option<String>,
     resume: bool,
     pick: bool,
+    next: ui::NextStart,
 ) -> Result<(), String> {
     if !std::io::stdout().is_terminal() {
         return Err("The conversation needs an interactive terminal.".into());
@@ -152,5 +166,5 @@ fn converse(
         ),
         None => None,
     };
-    ui::run(connection, project, session_id, pick)
+    ui::run(connection, project, session_id, pick, next)
 }

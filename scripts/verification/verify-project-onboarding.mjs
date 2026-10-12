@@ -67,7 +67,7 @@ try {
   );
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.getByText('Step 2 of 6', { exact: true }).waitFor();
+  await page.getByText('Step 2 of 3', { exact: true }).waitFor();
   assert.equal(
     await page.getByRole('button', { name: /Customize decisions|Use essential setup/ }).count(),
     0,
@@ -75,9 +75,6 @@ try {
   assert.deepEqual(await page.locator('.onboarding-steps li strong').allTextContents(), [
     'Project',
     'Agents',
-    'Decisions',
-    'Behavior',
-    'Appearance',
     'First task',
   ]);
   await page.waitForFunction(
@@ -94,34 +91,12 @@ try {
     1,
   );
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByText('Step 3 of 6', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByText('Step 4 of 6', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Back', exact: true }).click();
-  await page.getByText('Step 3 of 6', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByText('Step 4 of 6', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByText('Step 5 of 6', { exact: true }).waitFor();
-  const before = await page.evaluate(() =>
-    document.documentElement.style.getPropertyValue('--accent-h'),
-  );
-  await page.getByRole('button', { name: 'Mojave Sunset', exact: true }).click();
-  await page.getByRole('button', { name: 'Back', exact: true }).click();
-  await page.getByText('Step 4 of 6', { exact: true }).waitFor();
-  assert.equal(
-    await page.evaluate(() => document.documentElement.style.getPropertyValue('--accent-h')),
-    before,
-  );
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByText('Step 5 of 6', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByText('Step 6 of 6', { exact: true }).waitFor();
+  await page.getByText('Step 3 of 3', { exact: true }).waitFor();
   assert.equal(await page.getByText('Workspace readiness', { exact: true }).count(), 0);
   const prompt = page.getByLabel('Your first task (optional)', { exact: true });
   await prompt.fill('Fix the empty search state and verify keyboard access.');
   await page.getByRole('button', { name: 'Back', exact: true }).click();
-  await page.getByText('Step 5 of 6', { exact: true }).waitFor();
+  await page.getByText('Step 2 of 3', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   assert.equal(await prompt.inputValue(), 'Fix the empty search state and verify keyboard access.');
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -166,18 +141,14 @@ try {
       await page.screenshot({
         path: `${output}/setup-${width}-${dark ? 'dark' : 'light'}.png`,
       });
-      for (const step of [5, 4]) {
-        await page.getByRole('button', { name: 'Back', exact: true }).click();
-        await page.getByText(`Step ${step} of 6`, { exact: true }).waitFor();
-        assert.equal(await page.locator('.onboarding-steps li').count(), 6);
-        await page.screenshot({
-          path: `${output}/step-${step}-${width}-${dark ? 'dark' : 'light'}.png`,
-        });
-      }
-      for (const step of [5, 6]) {
-        await page.getByRole('button', { name: 'Continue', exact: true }).click();
-        await page.getByText(`Step ${step} of 6`, { exact: true }).waitFor();
-      }
+      await page.getByRole('button', { name: 'Back', exact: true }).click();
+      await page.getByText('Step 2 of 3', { exact: true }).waitFor();
+      assert.equal(await page.locator('.onboarding-steps li').count(), 3);
+      await page.screenshot({
+        path: `${output}/step-2-${width}-${dark ? 'dark' : 'light'}.png`,
+      });
+      await page.getByRole('button', { name: 'Continue', exact: true }).click();
+      await page.getByText('Step 3 of 3', { exact: true }).waitFor();
     }
   }
   await page.getByRole('button', { name: 'Review first task', exact: true }).click();
@@ -270,14 +241,12 @@ try {
     window.setupFixture.state().finish();
     window.setupFixture.pending['C:/Fixture/second'].resolve('', { verifyCommand: 'late check' });
   });
-  await page.getByText('Step 1 of 6', { exact: true }).waitFor();
+  await page.getByText('Step 1 of 3', { exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.setupFixture.state().pendingProject), null);
   await page.evaluate(() => localStorage.clear());
   await page.goto(`${url}/?unavailable`, { waitUntil: 'domcontentloaded' });
-  for (const step of [3, 4, 5, 6]) {
-    await page.getByRole('button', { name: 'Continue', exact: true }).click();
-    await page.getByText(`Step ${step} of 6`, { exact: true }).waitFor();
-  }
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByText('Step 3 of 3', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
   await page.waitForFunction(() => window.setupFixture.finished?.skipped);
   await page.goto(`${url}/?overview`, { waitUntil: 'domcontentloaded' });
@@ -307,7 +276,7 @@ try {
   await page.getByText('Working tree clean', { exact: true }).waitFor();
   assert.deepEqual(errors, []);
   console.log(
-    'Project onboarding browser checks passed: all six steps by default, automatic defaults, explicit overrides, stale inspection responses, unavailable inspection, provisional settings, draft restoration, theme rollback, keyboard and narrow layouts. No native tasks launched.',
+    'Project onboarding browser checks passed: three steps, automatic defaults, explicit overrides, stale inspection responses, unavailable inspection, provisional settings, draft restoration, keyboard and narrow layouts. No native tasks launched.',
   );
 } finally {
   await browser.close();

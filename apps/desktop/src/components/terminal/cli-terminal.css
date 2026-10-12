@@ -39,7 +39,7 @@
 .cli-terminal-screen {
   flex: 1;
   min-height: 240px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   padding: 8px;
   background: var(--color-surface-sunken);

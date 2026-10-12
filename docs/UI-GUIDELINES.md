@@ -150,7 +150,8 @@ has no cancel exit; users reach the final step before entering the workspace.
 The first task remains optional on that final step. Give slow or failed checks a
 clear retry path.
 
-Project setup is project → agents → decisions → behavior → appearance → first task.
+Project setup is project → agents → first task. Decisions, commit behavior and
+appearance use defaults and are edited in Project settings, not added as setup steps.
 Show every step in the progress list and preserve saved setup on reload.
 Detect workspace command defaults in
 the background without a manual inspection step. Preserve explicit choices, including

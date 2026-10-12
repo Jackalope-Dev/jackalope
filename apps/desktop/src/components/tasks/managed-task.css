@@ -190,7 +190,7 @@
 .managed-plan-scopes code {
   display: inline-block;
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: var(--color-surface-sunken);
   font-size: var(--text-xs);
 }

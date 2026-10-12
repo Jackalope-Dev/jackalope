@@ -17,7 +17,7 @@
   align-items: start;
   padding: 24px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 24px;
+  border-radius: var(--radius-3xl);
   background: var(--color-surface);
 }
 /* Sits outside the card grid so it never competes with the action row. */
@@ -29,7 +29,7 @@
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   cursor: pointer;
 }
@@ -188,7 +188,7 @@
   min-width: 22px;
   height: 22px;
   padding: 0 6px;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   font-size: var(--text-xs);
   font-weight: 500;
   background: var(--color-surface-sunken);
@@ -211,7 +211,7 @@
   gap: 8px;
   margin-top: 4px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface-sunken);
   border: 1px solid var(--color-border-subtle);
 }
@@ -251,7 +251,7 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border-subtle);
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   user-select: all;
 }
 
@@ -272,7 +272,7 @@
   padding: 0 12px;
   font-size: var(--text-xs);
   font-weight: 500;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   border: 1px solid var(--color-border-subtle);
   background: var(--color-surface);
   color: var(--color-text-secondary);
@@ -303,7 +303,7 @@
   align-items: center;
   gap: 8px 16px;
   padding: 12px 12px 12px 16px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }
 .agent-roster-row > .agent-configure {
   position: static;

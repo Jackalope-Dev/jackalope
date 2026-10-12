@@ -41,7 +41,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   before the existing preparation command. Both checkouts must ignore each file;
   links, parent paths and overwrites are refused. Worktree size inspection counts
   bounded logical file sizes, labels partial results and retains existing cleanup guards.
-- Focus uses a compact navigation rail, a conversation composer and one next task.
+- Projects open in Build unless a layout was chosen. Focus uses a compact navigation
+  rail, a conversation composer and one next task.
   Build keeps recent work, project tools and conversation beside review, preview,
   terminal or activity. Oversee uses full-width navigation, live work counts, an
   attention queue and a board. Modes and their work-list filters save per project;
@@ -88,8 +89,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Projects, saved task drafts, queues, recurring schedules and local change monitors.
   A schedule can also expose a loopback webhook. The token is shown once, and a call
   while an earlier run is still active is skipped instead of queued.
-- Project setup includes agents, decisions, Git behavior, appearance and an optional
-  first task. Background command detection fills unset preferences without running
+- Project setup asks for the project, its agents and an optional first task;
+  decisions, Git behavior and appearance start from defaults edited in Project settings. Background command detection fills unset preferences without running
   commands or replacing explicit choices; inspection failure does not block setup.
 - Work combines a new-conversation composer and the project-scoped work list,
   with remembered filters, compact capture and keyboard row navigation. Work rows show
@@ -312,16 +313,17 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   independent accounting; cross-platform installed acceptance and representative
   improvement claims remain open.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.
-  Project setup includes project, agents, decisions, behavior, appearance and an optional
-  first task. Theme editors open directly; existing saved app/project choices remain compatible.
+  Project setup has three steps: project, agents and an optional first task. Theme editors open directly; existing saved app/project choices remain compatible.
 - Review views save optional local usefulness ratings and reported review minutes with
   each task. These self-reported values do not establish product retention or quality gains.
 
 ## Services and distribution
 
 The website download page lists Windows, macOS and Linux availability, prioritizes
-the visitor's likely desktop platform and explains waitlist approval and friend
-passes. Acceptance emails lead through explicit email confirmation on that page.
+the visitor's likely desktop platform and explains free signup with email
+confirmation. With the service's open-signup switch on, confirming the email
+approves the account and signs the person in; with it off, owner approval and
+friend passes still apply. Acceptance emails lead through explicit email confirmation on that page.
 Unconfigured platforms remain Coming soon; page visits never start a download.
 
 Verified waitlist members can connect the desktop to see their queue position,
@@ -371,7 +373,7 @@ links. GitHub uses the installed CLI; Linear/Jira credentials use protected nati
 Jackalope Swarm (beta) gives each live attempt on an Artifacts-linked project its own fork
 through the person's own Worker (`apps/swarm`). Every 15 seconds the desktop pushes changed
 snapshots as synthetic commits, and the Worker reports files and overlapping edits across
-forks on Project → Swarm. Forks are deleted when attempts finish; merging stays local.
+forks on Project → Swarm, which appears once a swarm Worker is connected. Forks are deleted when attempts finish; merging stays local.
 See [the Worker guide](../apps/swarm/README.md).
 
 Cloudflare Artifacts (beta) connects a user's own Cloudflare account and namespace from

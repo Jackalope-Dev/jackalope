@@ -8,7 +8,7 @@
   padding: 16px 18px;
   background: var(--color-surface-sunken);
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   margin-bottom: 16px;
 }
 .capture-dialog .task-composer .composer-intent:focus-visible {
@@ -24,7 +24,7 @@
 }
 .composer-effort {
   padding: 16px 18px 12px;
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: linear-gradient(120deg, var(--color-accent-subtle), var(--color-surface-sunken));
 }
 .composer-tool-list svg {
@@ -86,7 +86,7 @@
 
   left: calc(var(--effort-position) * 2 / 3);
 
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--color-surface-elevated);
   box-shadow: 0 2px 12px -6px var(--color-accent-glow);
   border: 1px solid var(--color-accent-ink);
@@ -99,7 +99,7 @@
   justify-content: center;
   gap: 8px;
   min-height: 44px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -126,7 +126,7 @@
   gap: 8px;
   padding: 12px 10px;
   text-align: left;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   min-width: 0;
   cursor: pointer;
@@ -189,7 +189,7 @@
   padding: 12px;
   text-align: left;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   min-height: 56px;
   cursor: pointer;
 }
@@ -319,7 +319,7 @@
   font-size: var(--text-xl);
   line-height: 1.6;
   margin-bottom: 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 .task-inline-capture .task-composer .composer-intent:focus-visible {
   outline: 2px solid var(--color-accent-ink);

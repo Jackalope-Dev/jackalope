@@ -84,7 +84,7 @@
   }
   ::-webkit-scrollbar-thumb {
     background: var(--color-border);
-    border-radius: 9999px;
+    border-radius: var(--radius-full);
   }
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-text-muted);
@@ -174,7 +174,7 @@ body {
   height: 24px;
   margin-right: 6px;
   padding: 0 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-action);
   color: var(--color-on-action);
   font-size: var(--text-xs);
@@ -332,7 +332,7 @@ body {
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--color-header-search, var(--color-surface-sunken));
   cursor: pointer;
 }
@@ -354,7 +354,7 @@ body {
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   color: var(--color-text-secondary);
 }
@@ -364,7 +364,7 @@ body {
 }
 .appearance-trigger {
   background: transparent;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 .appearance-trigger:hover {
   background: var(--color-surface-hover);
@@ -383,7 +383,7 @@ body {
   align-items: center;
   gap: 8px;
   padding: 9px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
   cursor: pointer;
@@ -408,14 +408,14 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: var(--radius-2xl);
   border: 1px solid var(--color-border-subtle);
   background: var(--color-bg);
   box-shadow: var(--shadow-surface);
 }
 .workspace-menu,
 .appearance-panel {
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: var(--color-surface-elevated);
   box-shadow: var(--shadow-pop);
   color: var(--color-text-primary);
@@ -428,7 +428,7 @@ body {
   display: flex;
   gap: 12px;
   align-items: center;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 12px;
   outline: none;
   font-size: var(--text-xs);
@@ -454,7 +454,7 @@ body {
   height: 24px;
   background: transparent;
   cursor: ew-resize;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }
 .theme-range:focus-visible {
   outline: 2px solid var(--color-accent-ink);
@@ -462,19 +462,19 @@ body {
 }
 .theme-range::-webkit-slider-runnable-track {
   height: 20px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: linear-gradient(90deg, var(--color-border), var(--color-accent));
 }
 .theme-range::-moz-range-track {
   height: 20px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: linear-gradient(90deg, var(--color-border), var(--color-accent));
 }
 .appearance-mode {
   display: flex;
   gap: 4px;
   padding: 4px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface-sunken);
 }
 .appearance-mode-option {
@@ -508,7 +508,7 @@ body {
   width: 12px;
   height: 24px;
   margin-top: -2px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-text-primary);
   border: 2px solid var(--color-surface-elevated);
   box-shadow: var(--shadow-selection);
@@ -517,7 +517,7 @@ body {
   box-sizing: border-box;
   width: 12px;
   height: 24px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-text-primary);
   border: 2px solid var(--color-surface-elevated);
   box-shadow: var(--shadow-selection);
@@ -588,7 +588,7 @@ img[src="/mascot.svg"] {
   min-height: 44px;
   padding: 0 16px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-surface);
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
@@ -614,7 +614,7 @@ img[src="/mascot.svg"] {
   min-height: 44px;
   padding: 8px 12px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--color-surface-sunken);
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
@@ -645,7 +645,7 @@ img[src="/mascot.svg"] {
   width: max-content;
   max-width: min(320px, calc(100vw - 48px));
   padding: 8px 8px 8px 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: var(--color-text-primary);
   color: var(--color-surface-elevated);
   box-shadow: var(--shadow-pop);
@@ -689,7 +689,7 @@ img[src="/mascot.svg"] {
   min-height: 32px;
   margin: 8px 0 2px;
   padding: 0 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-surface-elevated);
   color: var(--color-text-primary);
   font-size: var(--text-xs);
@@ -738,7 +738,7 @@ img[src="/mascot.svg"] {
   width: 28px;
   height: 28px;
   margin: -4px 0 -4px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: inherit;
   opacity: 0.7;
 }
@@ -785,7 +785,7 @@ img[src="/mascot.svg"] {
 .shortcut-sheet kbd {
   padding: 2px 6px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: var(--color-surface-sunken);
   color: var(--color-text-secondary);
   font-family: var(--font-mono, monospace);

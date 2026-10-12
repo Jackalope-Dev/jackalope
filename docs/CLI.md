@@ -59,7 +59,9 @@ terminal. A repository first used from a terminal is registered and then appears
 in the app.
 
 Conversations use the project's default task agent, or automatic routing when no
-project default is set. An explicit `/agent` choice applies to the next conversation. Several
+project default is set. An explicit `/agent` or `/model` choice applies to the next
+conversation; `--agent <id>` and `--model <id>` make the same choice for the first new
+conversation when the command starts, and for `-p`. Several
 terminals can show different sessions at once, and one session can be open in a
 terminal and the app together. Leaving a terminal does not stop work.
 
@@ -138,7 +140,7 @@ Success, attention and failure use fixed green, amber and red tones.
 
 `jackalope -p "<message>"` (or `jackalope run`) starts a conversation, waits for it
 to settle and prints the reply; piped stdin is appended to the message, `--json`
-prints a JSON object and `--agent <id>` skips routing. The run settles when its work
+prints a JSON object, `--agent <id>` skips routing and `--model <id>` picks its model. The run settles when its work
 finishes, fails, is stopped or interrupted, or the conversation is paused.
 `--timeout <seconds>` stops waiting (checked at least every 25 seconds) and leaves
 the work running. Progress goes to stderr when it is a terminal. Exit status is 0

@@ -35,7 +35,7 @@ import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { BOT_COLORS, useBotStore } from '../../stores/botStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useWorkbenchStore } from '../../stores/workbenchStore';
+import { useWorkspacePreset } from '../../stores/workbenchStore';
 import { useChangeStats } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { BotAvatar, botStyle } from '../bots/BotAvatar';
@@ -121,7 +121,7 @@ export function LiveSessionView({
     localStorage.setItem(key, existing ? `${existing}\n\n${text}` : text);
     useLiveSessionStore.getState().select(null);
   };
-  const preset = useWorkbenchStore((state) => state.presets[session.request.projectId] ?? 'focus');
+  const preset = useWorkspacePreset(session.request.projectId);
   const [expanded, setExpanded] = useState(initialDetailsOpen ?? (preset === 'build' && !detached));
   useEffect(() => {
     if (initialDetailsOpen === undefined) setExpanded(preset === 'build' && !detached);

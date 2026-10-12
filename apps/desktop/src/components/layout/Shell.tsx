@@ -10,6 +10,7 @@ import { captureDraftForProject } from '../../lib/capture-draft';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import type { LiveSession } from '../../lib/live-session';
 import { displayShortcut, matchesShortcut, resolveShortcuts } from '../../lib/shortcuts';
+import { swarmConnection } from '../../lib/swarm';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
@@ -24,7 +25,7 @@ import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTa
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { observeWorkbenchPreferences, useWorkbenchStore } from '../../stores/workbenchStore';
+import { observeWorkbenchPreferences, useWorkspacePreset } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AccessNoticeSlot } from '../account/AccessBoundary';
 import { useTrackOpenWork } from '../tasks/WorkSignals';
@@ -58,6 +59,7 @@ import {
   DEFAULT_WORKSPACE_TAB,
   navigateWorkspace,
   type ProjectSettingsDestination,
+  viewLabel,
   WORKSPACE_VIEWS,
 } from './navigation';
 import { ResizeHandles } from './ResizeHandles';
@@ -129,6 +131,22 @@ const CaptureTask = lazy(() =>
 const RemoveProjectAction = lazy(() =>
   import('../projects/RemoveProjectAction').then((m) => ({ default: m.RemoveProjectAction })),
 );
+
+/** Swarm is a beta Cloudflare integration; its project tab appears once it is connected. */
+function useSwarmConfigured() {
+  const [configured, setConfigured] = useState(false);
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    let alive = true;
+    swarmConnection()
+      .then((connection) => alive && setConfigured(connection.configured))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return configured;
+}
 
 /** Bot conversations open on the Bots page, never in Work or Chat. */
 function openInBots(session: LiveSession) {
@@ -347,7 +365,8 @@ export function Shell({
     }
   }, [workRequest, selectProject]);
   const project = projects.find((item) => item.id === activeProjectId);
-  const preset = useWorkbenchStore((state) => state.presets[activeProjectId ?? ''] ?? 'focus');
+  const swarmConfigured = useSwarmConfigured();
+  const preset = useWorkspacePreset(activeProjectId);
   const view = WORKSPACE_VIEWS.find((item) => item.id === activeTab) ?? WORKSPACE_VIEWS[0];
   const navigate = useCallback((tab: ActiveTab) => {
     if (tab === 'preferences' || tab === 'audit' || tab === 'mesh') {
@@ -594,7 +613,13 @@ export function Shell({
             <WorkspaceSubnavigation
               label="Agents views"
               items={AGENT_VIEWS}
-              value={activeTab === 'agent-settings' ? 'agents' : activeTab}
+              value={
+                activeTab === 'agent-settings'
+                  ? 'agents'
+                  : activeTab === 'mcp-marketplace'
+                    ? 'mcps'
+                    : activeTab
+              }
               onChange={navigate}
             />
           )}
@@ -606,27 +631,11 @@ export function Shell({
                 label={`${view.group} views`}
                 value={activeTab}
                 onChange={navigate}
-                items={WORKSPACE_VIEWS.filter((item) => item.group === view.group).map((item) => ({
-                  id: item.id,
-                  label:
-                    item.id === 'live-sessions'
-                      ? 'Chat'
-                      : item.id === 'kanban'
-                        ? 'Tasks'
-                        : item.id === 'project-overview'
-                          ? 'Overview'
-                          : item.id === 'topology'
-                            ? 'Codebase'
-                            : item.id === 'agents'
-                              ? 'Runners'
-                              : item.id === 'agent-settings'
-                                ? 'Configuration'
-                                : item.id === 'mcps'
-                                  ? 'Connections'
-                                  : item.id === 'project-settings'
-                                    ? 'Settings'
-                                    : item.label,
-                }))}
+                items={WORKSPACE_VIEWS.filter(
+                  (item) =>
+                    item.group === view.group &&
+                    (item.id !== 'swarm' || swarmConfigured || activeTab === 'swarm'),
+                ).map((item) => ({ id: item.id, label: viewLabel(item.id) }))}
               />
             )}
           {activeTab === 'kanban' && <WorkTabs />}

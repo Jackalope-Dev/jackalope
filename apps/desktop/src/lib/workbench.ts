@@ -13,6 +13,12 @@ export const workspacePresets = [
   },
 ] as const;
 
+/**
+ * Build keeps the work list beside the canvas, the layout people expect from
+ * agent workspaces. Focus and Oversee remain explicit per-project choices.
+ */
+export const DEFAULT_WORKSPACE_PRESET = 'build' satisfies WorkspacePreset;
+
 export function workSummary(run: TaskRun) {
   const question = run.prompts?.find((prompt) => prompt.status === 'pending');
   const checks = run.verificationError

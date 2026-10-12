@@ -1,16 +1,8 @@
-import {
-  ArrowRight,
-  BookOpen,
-  GitBranch,
-  GitCommitHorizontal,
-  ListTodo,
-  Workflow,
-} from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { matchesWorkFilter, type WorkItem, workPresence } from '../../lib/task-collection';
 import { attentionQueue, type WorkspacePreset } from '../../lib/workbench';
 import { useChangeStats } from '../../stores/workSignalsStore';
 import { AgentStack } from '../agents/AgentAvatar';
-import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { NoticeRow } from '../ui/NoticeRow';
 import { isUnread, useOpenSignalKey, useWorkSignals, WorkSignals } from './WorkSignals';
@@ -22,14 +14,12 @@ export function WorkspaceModeHome({
   filter,
   onOpen,
   onFilter,
-  onPlan,
 }: {
   preset: WorkspacePreset;
   items: WorkItem[];
   filter: string;
   onOpen: (item: WorkItem) => void;
   onFilter: (filter: string) => void;
-  onPlan: () => void;
 }) {
   const attention = attentionQueue(items);
   if (preset === 'focus') {
@@ -52,55 +42,8 @@ export function WorkspaceModeHome({
       </section>
     ) : null;
   }
-  if (preset === 'build')
-    return (
-      <nav className="build-tool-shelf" aria-label="Build tools">
-        {[
-          {
-            label: 'Project context',
-            detail: 'Guidance and saved lessons',
-            icon: BookOpen,
-            view: 'project-knowledge',
-          },
-          {
-            label: 'Changes',
-            detail: 'Review and commit work',
-            icon: GitCommitHorizontal,
-            view: 'changes',
-          },
-          {
-            label: 'Worktrees',
-            detail: 'Branches and local workspaces',
-            icon: GitBranch,
-            view: 'worktrees',
-          },
-          {
-            label: 'Repo TODOs',
-            detail: 'Find the next change',
-            icon: ListTodo,
-            view: 'repo-todos',
-          },
-        ].map(({ label, detail, icon: Icon, view }) => (
-          <button
-            key={view}
-            type="button"
-            title={detail}
-            onClick={() =>
-              navigateWorkspace(
-                view as 'project-knowledge' | 'changes' | 'worktrees' | 'repo-todos',
-              )
-            }
-          >
-            <Icon size={16} aria-hidden="true" />
-            {label}
-          </button>
-        ))}
-        <button type="button" title="Coordinate a larger change" onClick={onPlan}>
-          <Workflow size={16} aria-hidden="true" />
-          Plan feature work
-        </button>
-      </nav>
-    );
+  // Build keeps its work list in the sidebar; project tools live under Project.
+  if (preset === 'build') return null;
   // Counts only help once there is work to filter; an empty project shows its empty state.
   if (!items.length) return null;
   return (

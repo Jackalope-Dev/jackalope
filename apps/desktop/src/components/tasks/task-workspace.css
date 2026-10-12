@@ -144,7 +144,7 @@ select option {
   overflow-x: auto;
   margin: 14px 0 18px;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 .task-result-table:focus-visible {
   outline: 2px solid var(--color-accent-ink);
@@ -197,7 +197,7 @@ select option {
   width: 100%;
   padding: 15px;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   margin: 10px 0 14px;
   background: var(--color-surface-elevated);
   resize: vertical;
@@ -274,7 +274,7 @@ select option {
 .task-input {
   background: var(--color-surface-elevated);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 10px 12px;
   font-size: var(--text-sm);
 }

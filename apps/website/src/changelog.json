@@ -1,5 +1,17 @@
 [
   {
+    "id": "a-quicker-start-and-a-simpler-workspace",
+    "date": "2026-10-12",
+    "status": "In development",
+    "title": "A quicker start and a simpler workspace",
+    "description": "New projects get to their first task sooner, and the workspace keeps your work in view.",
+    "items": [
+      "Project setup now takes three steps: project, agents and an optional first task. Decisions, commit behavior and colors start from defaults you can change in Project settings.",
+      "Projects open with your recent work in the sidebar, and the Agents page groups agents, tools, apps and usage under shorter tabs.",
+      "The jackalope command accepts --agent and --model when starting a conversation, as well as with -p."
+    ]
+  },
+  {
     "id": "a-cleaner-more-consistent-workspace",
     "date": "2026-10-08",
     "status": "In development",

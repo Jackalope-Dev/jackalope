@@ -40,7 +40,7 @@ import { listMcpServers, type McpServerConfig, openInBrowser } from '../../lib/t
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { useWorkbenchStore } from '../../stores/workbenchStore';
+import { useWorkspacePreset } from '../../stores/workbenchStore';
 import { useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
@@ -117,7 +117,7 @@ export function TaskDetail({
   const [acting, setActing] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const workRequest = useWorkViewStore((state) => state.request);
-  const preset = useWorkbenchStore((state) => state.presets[run.projectId] ?? 'focus');
+  const preset = useWorkspacePreset(run.projectId);
   const savedTab = useWorkViewStore.getState().reading[run.taskId];
   const [tab, setTab] = useState(
     savedTab === 'context'

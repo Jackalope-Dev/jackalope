@@ -249,11 +249,11 @@ export function McpWorkspace({
       ) : (
         <>
           <WorkspaceHeading
-            title={activeTab === 'configured' ? 'MCP connections' : 'MCP marketplace'}
+            title={activeTab === 'configured' ? 'Tools' : 'Tool marketplace'}
             description={
               activeTab === 'marketplace'
-                ? 'Discover and connect MCP servers to extend your agents’ capabilities.'
-                : undefined
+                ? 'Discover MCP servers and connect them to your agents.'
+                : 'MCP servers your agents can use in this project or every project.'
             }
             action={
               <div className="workspace-actions">

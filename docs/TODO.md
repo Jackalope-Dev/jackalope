@@ -72,8 +72,8 @@ release dates.
   pending-message guards, unavailable cost and batch-limit pauses. Independent native
   task planning remains separate from the shared-workspace batch flow.
 - [ ] Validate installed onboarding, project changes, saved drafts, inferred
-  defaults and explicit overrides, including cancellation and restart. Cover all six
-  project setup steps, appearance rollback and automatic command detection.
+  defaults and explicit overrides, including cancellation and restart. Cover the three
+  project setup steps, default decisions, behavior and appearance, and automatic command detection.
 - [ ] Validate ordinary-task follow-up queues with installed providers, including
   stop-and-send, restart pauses, failed saves, cancellation and merge guards.
 - [ ] Run the [daily-use pilot](AGENT-QUALITY.md#daily-use-pilot) with consenting users

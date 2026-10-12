@@ -2,7 +2,7 @@
   display: flex;
   gap: 4px;
   padding: 4px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface-sunken);
 }
 .theme-harmony-option {
@@ -58,7 +58,7 @@
 }
 .theme-palette-strip {
   height: 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 .theme-palette-colors {
   display: flex;

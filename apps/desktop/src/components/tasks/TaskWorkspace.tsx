@@ -22,7 +22,7 @@ import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { useWorkbenchStore } from '../../stores/workbenchStore';
+import { useWorkspacePreset } from '../../stores/workbenchStore';
 import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { SessionStart } from '../sessions/SessionStart';
@@ -62,7 +62,7 @@ export function TaskWorkspace({
   const { projects, activeProjectId } = useProjectStore(
     useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
   );
-  const preset = useWorkbenchStore((state) => state.presets[activeProjectId ?? ''] ?? 'focus');
+  const preset = useWorkspacePreset(activeProjectId);
   const managed = useManagedTaskStore(
     useShallow((s) => ({
       error: s.error,
@@ -334,7 +334,7 @@ export function TaskWorkspace({
               ? scope === 'all'
                 ? 'Activity across your projects'
                 : `Oversee ${project?.name ?? 'your work'}`
-              : `Build in ${project?.name ?? 'your workspace'}`
+              : 'Work'
         }
         description={
           preset !== 'build' || hasWork ? undefined : (
@@ -403,8 +403,7 @@ export function TaskWorkspace({
                     <Radio size={16} />
                     Save a task draft
                   </Menu.Item>
-                  {/* Build mode lists these as tools beneath the heading. */}
-                  {project && preset !== 'build' && (
+                  {project && (
                     <Menu.Item
                       className="workspace-menu-item"
                       onSelect={() => navigateWorkspace('repo-todos')}
@@ -413,7 +412,7 @@ export function TaskWorkspace({
                       Repo TODOs
                     </Menu.Item>
                   )}
-                  {project && preset !== 'build' && (
+                  {project && (
                     <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
                       <Workflow size={16} />
                       Plan feature work
@@ -445,7 +444,6 @@ export function TaskWorkspace({
           filter={view.filter}
           onOpen={openItem}
           onFilter={browse}
-          onPlan={() => setParallel(true)}
         />
       )}
       {preset === 'focus' && !browsing && (
@@ -456,7 +454,6 @@ export function TaskWorkspace({
           filter={view.filter}
           onOpen={openItem}
           onFilter={browse}
-          onPlan={() => setParallel(true)}
         />
       )}
       {(runs.length > 0 || ideas.length > 0 || sessions.length > 0) && (

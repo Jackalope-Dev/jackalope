@@ -112,7 +112,7 @@
   min-height: 72px;
   padding: 16px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   text-align: left;
 }
@@ -142,32 +142,6 @@
 .focus-resume > .notice-row {
   margin-top: 8px;
 }
-/* Quick links to project tools: one compact row, since the Project tabs hold the full views. */
-.build-tool-shelf {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 24px;
-}
-/* An opened composer sits between the heading and the tools. */
-:not(.workspace-heading) + .build-tool-shelf {
-  margin-top: 16px;
-}
-.build-tool-shelf > button {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 14px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 10px;
-  background: var(--color-surface);
-  font-size: var(--text-sm);
-}
-.build-tool-shelf svg {
-  flex-shrink: 0;
-  color: var(--color-text-secondary);
-}
 .oversee-counts {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -187,7 +161,7 @@
   min-height: 56px;
   padding: 12px 16px;
   text-align: left;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border-subtle);
   background: var(--color-surface);
 }
@@ -220,11 +194,10 @@
 .oversee-inbox {
   padding: 20px;
   margin-bottom: 24px;
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: var(--color-surface-sunken);
 }
 .mode-work-item:hover,
-.build-tool-shelf > button:hover,
 .oversee-counts button:hover {
   background: var(--color-surface-hover);
 }
@@ -253,9 +226,6 @@
     flex-direction: row;
     flex-wrap: wrap;
     gap: 4px;
-  }
-  .build-tool-shelf {
-    grid-template-columns: minmax(0, 1fr);
   }
   .task-home[data-mode="focus"]:not([data-browsing]) {
     padding-top: 24px;

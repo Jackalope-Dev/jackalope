@@ -11,11 +11,15 @@ pub enum Command {
         attach: Option<String>,
         /// Open the conversation picker first (`--resume` without an id).
         pick: bool,
+        /// `--agent` and `--model` for a new conversation, like `/agent` and `/model`.
+        agent: Option<String>,
+        model: Option<String>,
     },
     /// `-p` / `run`: one message, one reply.
     Once {
         message: String,
         agent: Option<String>,
+        model: Option<String>,
         json: bool,
         timeout: Option<Duration>,
     },
@@ -52,7 +56,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
         (false, false, false, false, false, false);
     let mut pick = false;
     let mut cold_start = None;
-    let (mut agent, mut profile, mut timeout) = (None, None, None);
+    let (mut agent, mut model, mut profile, mut timeout) = (None, None, None, None);
     let mut only_words = false;
     while let Some(argument) = arguments.next() {
         // Anything after `--`, a lone `-`, and text with spaces (a quoted
@@ -84,6 +88,7 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
             "--background" => cold_start = Some(ColdStart::Background),
             "--init" => init = true,
             "--agent" => agent = Some(value("--agent")?),
+            "--model" => model = Some(value("--model")?),
             "--profile" => profile = Some(value("--profile")?),
             "--timeout" => {
                 let text = value("--timeout")?;
@@ -94,7 +99,12 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
             }
             _ => return Err(format!("Unknown option '{argument}'. {USAGE}")),
         }
-        if inline.is_some() && !matches!(name.as_str(), "--agent" | "--profile" | "--timeout") {
+        if inline.is_some()
+            && !matches!(
+                name.as_str(),
+                "--agent" | "--model" | "--profile" | "--timeout"
+            )
+        {
             return Err(format!("{name} does not take a value. {USAGE}"));
         }
     }
@@ -113,8 +123,9 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
         Command::Once {
             message: words[skip.min(words.len())..].join(" "),
             agent: agent.take(),
+            model: model.take(),
             json,
-            timeout: timeout.take(),
+            timeout,
         }
     } else {
         let argument = || words.get(1).cloned();
@@ -125,10 +136,19 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
                 .unwrap_or(Ok(()))
         };
         match first {
+            None if !resume => Command::Converse {
+                resume,
+                attach: None,
+                pick: false,
+                agent: agent.take(),
+                model: model.take(),
+            },
             None => Command::Converse {
                 resume,
                 attach: None,
                 pick: false,
+                agent: None,
+                model: None,
             },
             Some("resume") => {
                 extra(2)?;
@@ -137,11 +157,15 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
                         resume: false,
                         attach: Some(id),
                         pick: false,
+                        agent: None,
+                        model: None,
                     },
                     None => Command::Converse {
                         resume: false,
                         attach: None,
                         pick: true,
+                        agent: None,
+                        model: None,
                     },
                 }
             }
@@ -161,6 +185,8 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
                         argument().ok_or("Which conversation? Run 'jackalope ls' to see them.")?,
                     ),
                     pick: false,
+                    agent: None,
+                    model: None,
                 }
             }
             Some("stop") => {
@@ -182,8 +208,13 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
     if json && !json_applies {
         return Err(format!("--json applies to -p, ls and status. {USAGE}"));
     }
-    if agent.is_some() || timeout.is_some() {
-        return Err(format!("--agent and --timeout apply to -p. {USAGE}"));
+    if agent.is_some() || model.is_some() {
+        return Err(format!(
+            "--agent and --model apply when starting a new conversation or -p. {USAGE}"
+        ));
+    }
+    if timeout.is_some() && !matches!(command, Command::Once { .. }) {
+        return Err(format!("--timeout applies to -p. {USAGE}"));
     }
     if resume && !matches!(command, Command::Converse { attach: None, .. }) {
         return Err(format!("--continue starts the conversation view. {USAGE}"));
@@ -220,30 +251,16 @@ mod tests {
 
     #[test]
     fn a_bare_command_opens_the_conversation() {
-        assert_eq!(
-            command(&[]),
-            Command::Converse {
-                resume: false,
-                attach: None,
-                pick: false
-            }
-        );
-        assert_eq!(
-            command(&["-c"]),
-            Command::Converse {
-                resume: true,
-                attach: None,
-                pick: false
-            }
-        );
-        assert_eq!(
-            command(&["attach", "abc"]),
-            Command::Converse {
-                resume: false,
-                attach: Some("abc".into()),
-                pick: false
-            }
-        );
+        let converse = |resume, attach: Option<&str>| Command::Converse {
+            resume,
+            attach: attach.map(String::from),
+            pick: false,
+            agent: None,
+            model: None,
+        };
+        assert_eq!(command(&[]), converse(false, None));
+        assert_eq!(command(&["-c"]), converse(true, None));
+        assert_eq!(command(&["attach", "abc"]), converse(false, Some("abc")));
     }
 
     #[test]
@@ -252,11 +269,15 @@ mod tests {
             resume: false,
             attach: None,
             pick: true,
+            agent: None,
+            model: None,
         };
         let attach = Command::Converse {
             resume: false,
             attach: Some("ab".into()),
             pick: false,
+            agent: None,
+            model: None,
         };
         assert_eq!(command(&["--resume"]), picker);
         assert_eq!(command(&["-r"]), picker);
@@ -309,7 +330,10 @@ mod tests {
     fn mistakes_are_reported_instead_of_ignored() {
         assert!(parse_line(&["-p", "--jsn", "x"]).is_err());
         assert!(parse_line(&["--agent"]).is_err());
-        assert!(parse_line(&["--agent=codex"]).is_err());
+        assert!(parse_line(&["--agent=codex", "ls"]).is_err());
+        assert!(parse_line(&["-c", "--model", "gpt"]).is_err());
+        assert!(parse_line(&["attach", "ab", "--agent", "codex"]).is_err());
+        assert!(parse_line(&["--timeout", "5"]).is_err());
         assert!(parse_line(&["attach", "--json", "x"]).is_err());
         assert!(parse_line(&["-p", "--timeout", "soon", "x"]).is_err());
         assert!(parse_line(&["ls", "extra"]).is_err());
@@ -317,6 +341,29 @@ mod tests {
         assert!(parse_line(&["frobnicate"]).is_err());
         assert!(parse_line(&["stop"]).is_err());
         assert!(parse_line(&["--init", "ls"]).is_err());
+    }
+
+    #[test]
+    fn new_conversations_take_an_agent_and_model() {
+        assert_eq!(
+            command(&["--agent", "claude", "--model=opus"]),
+            Command::Converse {
+                resume: false,
+                attach: None,
+                pick: false,
+                agent: Some("claude".into()),
+                model: Some("opus".into()),
+            }
+        );
+        match command(&["-p", "--model", "gpt-5", "fix it"]) {
+            Command::Once { model, message, .. } => {
+                assert_eq!(
+                    (model.as_deref(), message.as_str()),
+                    (Some("gpt-5"), "fix it")
+                )
+            }
+            other => panic!("{other:?}"),
+        }
     }
 
     #[test]

@@ -4,13 +4,13 @@ import { workspacePresets } from '../../lib/workbench';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
-import { useWorkbenchStore } from '../../stores/workbenchStore';
+import { useWorkbenchStore, useWorkspacePreset } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import '../tasks/workbench.css';
 import { navigateWorkspace } from './navigation';
 
 export function WorkspacePresetPicker({ projectId }: { projectId: string }) {
-  const preset = useWorkbenchStore((state) => state.presets[projectId] ?? 'focus');
+  const preset = useWorkspacePreset(projectId);
   const Icon = preset === 'focus' ? Scan : preset === 'build' ? Hammer : Columns3;
   return (
     <Menu.Root>

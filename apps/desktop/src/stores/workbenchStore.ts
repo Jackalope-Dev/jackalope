@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { WorkspacePreset } from '../lib/workbench';
+import { DEFAULT_WORKSPACE_PRESET, type WorkspacePreset } from '../lib/workbench';
 
 interface WorkbenchState {
   presets: Record<string, WorkspacePreset>;
@@ -33,4 +33,9 @@ export function observeWorkbenchPreferences() {
   };
   window.addEventListener('storage', update);
   return () => window.removeEventListener('storage', update);
+}
+
+/** The project's chosen layout; projects that never chose one use the work sidebar layout. */
+export function useWorkspacePreset(projectId: string | null | undefined): WorkspacePreset {
+  return useWorkbenchStore((state) => state.presets[projectId ?? ''] ?? DEFAULT_WORKSPACE_PRESET);
 }

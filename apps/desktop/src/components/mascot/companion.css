@@ -108,7 +108,7 @@
 .companion-panel button:focus-visible {
   outline: 2px solid var(--color-accent-ink);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
 }
 .companion-section-heading button {
   display: inline-flex;
@@ -164,7 +164,7 @@
   font-size: var(--text-xs);
   font-weight: 500;
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   border: 1px solid var(--color-border-subtle);
   background: var(--color-surface);
   color: var(--color-text-primary);

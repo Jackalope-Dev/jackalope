@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 
 pub struct Options {
     pub agent: Option<String>,
+    pub model: Option<String>,
     pub json: bool,
     pub timeout: Option<Duration>,
     pub cold_start: Option<ColdStart>,
@@ -26,7 +27,7 @@ pub fn run(message: String, options: Options) -> Result<i32, String> {
     }
     let mut connection = host::ensure(options.cold_start)?;
     let project = subcommands::here(&mut connection)?;
-    let session_id = connection.start(&project.path, message, options.agent)?;
+    let session_id = connection.start(&project.path, message, options.agent, options.model)?;
     let progress = std::io::stderr().is_terminal() && !options.json;
     // The watch blocks, so it gets a connection of its own.
     let mut watcher = Connection::lazy(connection.handshake().clone());
