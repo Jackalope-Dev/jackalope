@@ -2,11 +2,6 @@
   --workspace-heading-gap: 16px;
   --workspace-section-gap: 20px;
 }
-.live-hub-canvas > .managed-task {
-  flex: none;
-  min-height: 100%;
-  overflow: visible;
-}
 .managed-task-tabs,
 .managed-overview,
 .managed-activity,

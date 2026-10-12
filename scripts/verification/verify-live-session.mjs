@@ -9,7 +9,7 @@ const fixture = `
 import React from '/node_modules/.vite/deps/react.js';
 import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';
 import { LiveSessionView } from '/src/components/sessions/LiveSessionView.tsx';
-import { LiveSessions } from '/src/components/sessions/LiveSessions.tsx';
+import { SessionStart } from '/src/components/sessions/SessionStart.tsx';
 import { WORKSPACE_VIEWS } from '/src/components/layout/navigation.ts';
 import { useLiveSessionStore } from '/src/stores/liveSessionStore.ts';
 import { useProjectStore } from '/src/stores/projectStore.ts';
@@ -33,7 +33,8 @@ const f = window.sessionFixture = {
  update: changes => useLiveSessionStore.setState(s=>({sessions:s.sessions.map(item=>({...item,...changes}))})),
  run: changes => useLiveSessionStore.setState(s=>({runs:s.runs.map(item=>({...item,...changes}))})),
 };
-window.__TAURI_INTERNALS__ = { transformCallback:()=>0, metadata:{currentWindow:{label:'live-session-session'}}, invoke: async (command,args={}) => {
+window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
+window.__TAURI_INTERNALS__ = { transformCallback:()=>0, metadata:{currentWindow:{label:'live-session-session'},currentWebview:{label:'live-session-session'}}, invoke: async (command,args={}) => {
  f.calls.push({command,...args});
  const s = useLiveSessionStore.getState().sessions[0];
  switch(command) {
@@ -101,7 +102,7 @@ f.history=()=>useLiveSessionStore.setState(s=>({sessions:[...s.sessions,
  {...session,id:'attention',title:'Resolve a failed check',error:'Checks failed',batches:[]},
  session],runs:[run,{...run,id:'review-run',status:'review',endedAt:'2026-09-12T12:00:00Z'}]}));
 f.theme('dark');
-function Example(){const {sessions,runs}=useLiveSessionStore();return React.createElement('main',{style:{height:'100vh',display:'flex',flexDirection:'column'}},React.createElement('p',{style:{fontSize:11,padding:'4px 14px',color:'var(--color-text-muted)'}},'Browser fixture only; no native tasks launched.'),hub?React.createElement(LiveSessions,{project:{id:'atlas',name:'Atlas',path:run.projectPath,gitBranch:'main'},onOpenProject:()=>{}}):React.createElement(LiveSessionView,{session:sessions[0],runs,detached:location.search.includes('compact'),onBack:()=>{}}));}
+function Example(){const {sessions,runs}=useLiveSessionStore();return React.createElement('main',{style:{height:'100vh',display:'flex',flexDirection:'column'}},React.createElement('p',{style:{fontSize:11,padding:'4px 14px',color:'var(--color-text-muted)'}},'Browser fixture only; no native tasks launched.'),hub?React.createElement(SessionStart,{project:{id:'atlas',name:'Atlas',path:run.projectPath,gitBranch:'main'},onOpenProject:()=>{}}):React.createElement(LiveSessionView,{session:sessions[0],runs,detached:location.search.includes('compact'),onBack:()=>{}}));}
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Example));
 `;
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
@@ -134,7 +135,8 @@ try {
   );
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.getByRole('heading', { name: 'Search walkthrough' }).waitFor();
-  assert.equal(await page.locator('.live-status').getAttribute('aria-expanded'), 'false');
+  // Conversation details start open beside the work.
+  assert.equal(await page.locator('.live-status').getAttribute('aria-expanded'), 'true');
   await page.getByRole('button', { name: 'Chat options', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Pause queue', exact: true }).waitFor();
   await page.getByRole('menuitem', { name: 'Stop work', exact: true }).waitFor();
@@ -234,6 +236,7 @@ try {
   const reviewWidth = await page
     .locator('.task-review')
     .evaluate((el) => el.getBoundingClientRect().width);
+  // Narrow windows give review the full width; wide ones open it beside the conversation.
   assert.ok(reviewWidth > 800, 'Session review uses the full workspace width');
   assert.equal(await input.isVisible(), true, 'Follow-up stays available during review');
   const reviewPanel = await page.locator('.live-work').boundingBox();
@@ -297,7 +300,7 @@ try {
   assert.equal(await input.inputValue(), 'Preserve this if stopping fails.');
   await page.evaluate(() => window.sessionFixture.run({ status: 'review' }));
   await input.fill('x'.repeat(11990));
-  await page.locator('.live-status').click();
+  assert.equal(await page.locator('.live-status').getAttribute('aria-expanded'), 'true');
   await page.getByRole('button', { name: 'Preview', exact: true }).click();
   assert.equal(
     await page.getByRole('textbox', { name: 'What should change?', exact: true }).count(),
@@ -379,8 +382,9 @@ try {
   assert.ok(closeCalls.some((c) => c.command === 'plugin:window|close'));
   assert.ok(!closeCalls.some((c) => c.command === 'task_stop'));
   await page.setViewportSize({ width: 1280, height: 840 });
+  // The new-work composer on its own: options, drafts and session creation.
   await page.goto(`${url}/?hub`, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('heading', { name: 'Atlas', exact: true }).waitFor();
+  await input.waitFor();
   assert.ok(
     await page.evaluate(() =>
       window.sessionFixture.navigation.some(
@@ -389,8 +393,6 @@ try {
     ),
   );
   assert.equal(await page.getByRole('textbox').count(), 1);
-  assert.equal(await page.getByRole('button', { name: 'New chat', exact: true }).count(), 0);
-  assert.ok(await input.evaluate((element) => element === document.activeElement));
   await page.screenshot({ path: `${output}/hub-start-1280-dark.png` });
   await page.getByRole('button', { name: 'Chat options', exact: true }).press('Enter');
   await page.getByRole('menuitem', { name: 'Codex speed', exact: true }).press('Enter');
@@ -408,6 +410,7 @@ try {
   assert.equal(await input.evaluate((element) => element === document.activeElement), true);
   await page.setViewportSize({ width: 1280, height: 840 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.evaluate(() => window.sessionFixture.theme('dark'));
   await input.fill('Make search results easier to scan.');
   await page.reload({ waitUntil: 'domcontentloaded' });
   await input.waitFor();
@@ -434,118 +437,24 @@ try {
     window.sessionFixture.holdCreate = false;
     window.sessionFixture.release();
   });
-  await page
-    .getByRole('heading', { name: 'Make search results easier to scan.', exact: true })
-    .waitFor();
-  assert.equal(await input.inputValue(), 'And keep keyboard focus in the search box.');
+  await page.waitForFunction(
+    () =>
+      window.sessionFixture.calls.filter((call) => call.command === 'live_session_create')
+        .length === 2,
+  );
+  // Text typed while the first message was being saved stays as the next draft.
+  await page.waitForFunction(
+    () => document.querySelector('textarea').value === 'And keep keyboard focus in the search box.',
+  );
   const creates = await page.evaluate(() =>
     window.sessionFixture.calls.filter((call) => call.command === 'live_session_create'),
   );
-  assert.equal(creates.length, 2);
   assert.equal(creates[0].id, creates[1].id);
   assert.equal(creates[0].firstMessage.id, creates[1].firstMessage.id);
   assert.equal(creates[1].firstMessage.text, 'Make search results easier to scan.');
   assert.equal(creates[1].title, undefined);
   assert.equal(creates[1].request.codexSpeed, 'fast');
-  assert.equal(await page.locator('.live-message').count(), 1);
-  await page.evaluate(() => window.sessionFixture.history());
-  const history = page.getByRole('navigation', { name: 'Chats', exact: true });
-  await history.getByRole('heading', { name: 'Finished', exact: true }).waitFor();
-  assert.deepEqual(await history.getByRole('heading').allTextContents(), [
-    'Needs attention',
-    'In progress',
-    'Recent',
-    'Finished',
-  ]);
-  const titles = await history.locator('strong').allTextContents();
-  assert.equal(titles[0], 'Resolve a failed check');
-  assert.ok(titles.indexOf('Review new results') < titles.indexOf('Earlier session'));
-  assert.equal(titles.at(-1), 'Finished walkthrough');
-  await page.screenshot({ path: `${output}/hub-1280-dark.png` });
-  await page.getByRole('button', { name: 'New chat', exact: true }).click();
-  const daily = page.getByRole('region', { name: 'Work across all projects', exact: true });
-  assert.equal(await daily.getByText('No loaded work is waiting for your review.').count(), 0);
-  for (const button of [
-    daily.getByRole('button', { name: 'All projects', exact: true }),
-    daily.getByRole('button', { name: /in progress/ }),
-  ]) {
-    assert.notEqual(
-      await button.evaluate((el) => getComputedStyle(el).backgroundColor),
-      'rgba(0, 0, 0, 0)',
-    );
-  }
-  await page.evaluate(async () => {
-    const { useManagedTaskStore } = await import('/src/stores/managedTaskStore.ts');
-    const { useExecutionStore } = await import('/src/stores/executionStore.ts');
-    const run = {
-      ...(await import('/src/stores/liveSessionStore.ts')).useLiveSessionStore.getState().runs[0],
-      id: 'working-run',
-      taskId: 'working-run',
-      projectId: 'atlas',
-      status: 'running',
-      liveSessionId: null,
-    };
-    const queue = {
-      ...useManagedTaskStore.getState().queue,
-      managedTasks: [
-        {
-          id: 'working-task',
-          title: 'Implement search controls',
-          request: { projectId: 'atlas', agent: 'codex' },
-          plannerRunId: 'planner',
-          runIds: [run.id],
-          started: true,
-          error: null,
-        },
-      ],
-      items: [],
-      enabledProjects: ['managed:working-task'],
-    };
-    window.sessionFixture.managedQueue = queue;
-    useExecutionStore.setState({ runs: [run] });
-    useManagedTaskStore.setState({ queue });
-  });
-  const working = history.getByRole('button', {
-    name: 'Implement search controls Working',
-    exact: true,
-  });
-  const character = working.locator('.brand-agent-character');
-  await character.waitFor();
-  assert.equal(await character.getAttribute('data-state'), 'working');
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  assert.notEqual(await character.evaluate((el) => getComputedStyle(el).animationName), 'none');
-  await page.screenshot({ path: `${output}/hub-active-controls-dark.png` });
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  assert.equal(await character.evaluate((el) => getComputedStyle(el).animationName), 'none');
-  await page.evaluate(() => window.sessionFixture.theme('light'));
-  await page.waitForFunction(() =>
-    [...document.querySelectorAll('.brand-agent-character, .daily-work-row')].every((element) =>
-      window.lightText(element),
-    ),
-  );
-  await page.evaluate(
-    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-  );
-  await page.screenshot({ path: `${output}/hub-active-controls-light.png` });
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.evaluate(async () => {
-    const { useManagedTaskStore } = await import('/src/stores/managedTaskStore.ts');
-    const queue = { ...useManagedTaskStore.getState().queue, managedTasks: [] };
-    window.sessionFixture.managedQueue = queue;
-    useManagedTaskStore.setState({ queue });
-    (await import('/src/stores/executionStore.ts')).useExecutionStore.setState({ runs: [] });
-    window.sessionFixture.theme('dark');
-  });
-
-  await page.getByRole('button', { name: 'New chat', exact: true }).click();
-  assert.equal(await input.inputValue(), '');
   await input.fill('A separate draft');
-  await history
-    .getByRole('button', { name: 'Make search results easier to scan.', exact: false })
-    .click();
-  assert.equal(await input.inputValue(), 'And keep keyboard focus in the search box.');
-  await page.getByRole('button', { name: 'New chat', exact: true }).click();
-  assert.equal(await input.inputValue(), 'A separate draft');
   assert.equal(await page.getByText('Session limits', { exact: true }).count(), 0);
   await page.getByRole('button', { name: 'Chat options', exact: true }).click();
   await page
@@ -605,10 +514,8 @@ try {
   assert.equal(await memory.isChecked(), false);
   await page.keyboard.press('Escape');
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
-  await page.getByRole('region', { name: 'Work across all projects' }).waitFor();
   await page.setViewportSize({ width: 960, height: 640 });
   await page.evaluate(() => window.sessionFixture.theme('light'));
-  await page.waitForFunction(() => window.lightText(document.querySelector('.live-start h2')));
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
   );
