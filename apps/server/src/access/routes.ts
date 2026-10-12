@@ -21,6 +21,7 @@ import {
   sessionMember,
   tokenSchema,
 } from './service';
+import { SIGNUP_ACTION, verifyTurnstile } from './turnstile';
 import {
   acceptWaitlistToken,
   openSignupSession,
@@ -198,10 +199,17 @@ export async function accessRoutes(
           referral: tokenSchema.optional(),
           source: z.enum(['inline', 'popup']).default('inline'),
           website: z.string().max(200).default(''),
+          turnstile: z.string().max(2048).optional(),
         })
         .parse(await readJson(request));
       let surveyToken = randomToken();
       if (!body.website) {
+        await verifyTurnstile(
+          env,
+          body.turnstile,
+          request.headers.get('cf-connecting-ip'),
+          SIGNUP_ACTION,
+        );
         surveyToken = await register(
           env,
           body.email,

@@ -7,6 +7,7 @@ import { ArrowRight, Check, X } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { BrandMark } from './BrandMark';
 import { signupActions } from './signup-config';
+import { type TurnstileHandle, TurnstileWidget } from './Turnstile';
 import { signupCampaign, WaitlistPreferences } from './WaitlistPreferences';
 
 export function Signup({ popup = false }: { popup?: boolean }) {
@@ -15,6 +16,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
   const [state, setState] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const request = useRef<AbortController | null>(null);
+  const challenge = useRef<TurnstileHandle | null>(null);
   useEffect(() => () => request.current?.abort(), []);
   const action = popup ? signupActions.popup : signupActions.inline;
   async function subscribe(event: FormEvent<HTMLFormElement>) {
@@ -53,6 +55,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
               source: popup ? 'popup' : 'inline',
               campaign: signupCampaign(),
               referral: waitlistReferral(),
+              turnstile: challenge.current?.token() || undefined,
             },
             controller.signal,
           )
@@ -84,6 +87,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
       );
       setState('error');
     } finally {
+      challenge.current?.reset();
       clearTimeout(timeout);
       request.current = null;
     }
@@ -141,6 +145,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
               <ArrowRight size={16} />
             </Button>
           </div>
+          {accessOrigin && <TurnstileWidget action="signup" handle={challenge} />}
           <p id={`${id}-consent`} className="signup-consent">
             {!accessOrigin && (
               <>

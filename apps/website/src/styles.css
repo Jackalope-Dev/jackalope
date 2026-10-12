@@ -807,6 +807,13 @@ fieldset {
   height: 1px;
   overflow: hidden;
 }
+/* The challenge shows only when Cloudflare needs an interaction; it takes no space otherwise. */
+.signup-turnstile:empty {
+  display: none;
+}
+.signup-turnstile {
+  margin-top: 12px;
+}
 .signup-consent {
   margin-top: 14px;
   color: var(--color-text-muted);

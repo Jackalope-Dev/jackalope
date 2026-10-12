@@ -65,6 +65,8 @@ older mail remains readable without a delivery lookup reference.
 | `ACCESS_SECRET` | Worker secret, independent random 32+ characters for each environment |
 | `SEQUENZY_API_KEY` | Worker secret with `transactional:send`; verify minimum permission for email-send lookups before enabling admin delivery checks |
 | `VITE_ACCESS_API` | Website build variable, `https://api.jackalope.dev` |
+| `VITE_TURNSTILE_SITE_KEY` | Website build variable: the public key of a managed Turnstile widget for the website's hostname. Unset shows no challenge |
+| `TURNSTILE_SECRET` | Optional Worker secret for that widget. When set, signup requires a Siteverify-confirmed token for the `signup` action from the `ACCESS_WEB_ORIGIN` hostname and fails closed otherwise. Set the site key and secret together |
 
 The shared deployment helper reads individual `STAGING_` / `PRODUCTION_` settings
 or a single `STAGING_COMMUNITY_CONFIG` / `PRODUCTION_COMMUNITY_CONFIG` JSON object
