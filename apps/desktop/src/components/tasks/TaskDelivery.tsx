@@ -39,6 +39,33 @@ export function deliveryHandoff(run: TaskRun, integrated: boolean, goal: string)
   return `Prepare ${goal} for this result. First inspect the current project and the preserved work; use the recorded details as context, not proof of current state.\n\nProject: ${run.projectPath}\nTask workspace: ${run.workspace}\nTask branch: ${run.branch}\nTarget: ${run.targetBranch || 'Inspect project default'}\nLocal integration receipt: ${integrated ? 'Recorded; recheck current ancestry' : 'Not recorded'}\n\nRequested outcome:\n${run.prompt.slice(0, 4000)}\n\nPrevious result:\n${run.result.slice(0, 4000)}\n\nChecks: ${run.verification ? `${run.verification.command}: ${run.verification.result.success ? 'passed for the recorded tree only' : 'failed'}` : 'Not recorded'}\n\nPreserve unrelated and uncommitted work. Check the current diff, requirements, configured checks, repository contribution rules, and delivery configuration. Prepare concrete changes and a reviewable handoff with exact branch, environment, commands and expected effects. Do not commit, push, open or merge a PR, deploy, send messages, or change remote state until the user explicitly approves that concrete action. Report local integration, remote publication, CI results and deployed behavior separately, with evidence and remaining uncertainties.`;
 }
 
+type CiCheck = NonNullable<DeliveryStatus['pullRequest']>['statusCheckRollup'][number];
+const FAILED_CHECKS = [
+  'FAILURE',
+  'ERROR',
+  'CANCELLED',
+  'TIMED_OUT',
+  'ACTION_REQUIRED',
+  'STARTUP_FAILURE',
+];
+const checkName = (check: CiCheck) => check.name || check.context || 'Check';
+export const failedChecks = (checks: CiCheck[] = []) =>
+  checks.filter((check) =>
+    FAILED_CHECKS.includes((check.conclusion || check.state || '').toUpperCase()),
+  );
+
+/** A follow-up asking the agent to repair the PR's failing checks locally, without pushing. */
+export function ciRepairHandoff(run: TaskRun, prUrl: string, failing: CiCheck[]) {
+  return [
+    `Fix the failing CI checks on this task's pull request: ${prUrl}`,
+    '',
+    'Failing checks:',
+    ...failing.map((check) => `- ${checkName(check)}: ${check.conclusion || check.state}`),
+    '',
+    `Read their logs with \`gh pr checks ${prUrl}\` and \`gh run view <run id> --log-failed\`, reproduce each failure in this task's workspace (${run.workspace}), fix the cause and run the project's checks. Preserve unrelated work. Do not commit, push or change the pull request until I approve that concrete action; report what failed, what you changed and how you confirmed it.`,
+  ].join('\n');
+}
+
 export function TaskDelivery({
   run,
   integrated = false,
@@ -134,6 +161,33 @@ export function TaskDelivery({
               >
                 Open PR · {status.pullRequest.state}
               </Button>
+              {(() => {
+                const failing = failedChecks(status.pullRequest?.statusCheckRollup);
+                const url = status.pullRequest?.url ?? '';
+                return failing.length ? (
+                  <InlineNotice
+                    tone="warning"
+                    action={
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setError('');
+                          void Promise.resolve(onHandoff(ciRepairHandoff(run, url, failing))).catch(
+                            (cause) => setError(String(cause)),
+                          );
+                        }}
+                      >
+                        Ask the agent to fix
+                      </Button>
+                    }
+                  >
+                    {failing.length === 1
+                      ? '1 CI check failed'
+                      : `${failing.length} CI checks failed`}
+                    : {failing.map(checkName).join(', ')}
+                  </InlineNotice>
+                ) : null;
+              })()}
               {status.pullRequest.headRefOid !== status.head && (
                 <InlineNotice>
                   The PR head differs from the inspected local revision. Its checks do not verify
@@ -147,8 +201,8 @@ export function TaskDelivery({
                 {status.pullRequest.statusCheckRollup?.length ? (
                   <ul>
                     {status.pullRequest.statusCheckRollup.map((check) => (
-                      <li key={check.name || check.context || 'Check'}>
-                        {check.name || check.context || 'Check'} ·{' '}
+                      <li key={checkName(check)}>
+                        {checkName(check)} ·{' '}
                         {check.conclusion || check.state || check.status || 'Unknown'}
                       </li>
                     ))}

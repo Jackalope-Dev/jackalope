@@ -277,6 +277,11 @@ try {
   await page
     .getByText('The PR head differs from the inspected local revision.', { exact: false })
     .waitFor();
+  await page.getByText('1 CI check failed', { exact: false }).waitFor();
+  await page.getByRole('button', { name: 'Ask the agent to fix', exact: true }).click();
+  const repair = await page.evaluate(() => window.coreFixture.handoff);
+  assert.match(repair, /- Build: FAILURE/);
+  assert.match(repair, /Do not commit, push/);
   await page.getByRole('button', { name: 'More delivery actions' }).click();
   await page.getByRole('menuitem', { name: 'Prepare a deployment' }).click();
   assert.match(await page.evaluate(() => window.coreFixture.handoff), /Do not commit, push/);
