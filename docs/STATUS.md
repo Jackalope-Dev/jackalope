@@ -87,7 +87,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   A schedule can also expose a loopback webhook. The token is shown once, and a call
   while an earlier run is still active is skipped instead of queued.
 - Project setup asks for the project, its agents and an optional first task;
-  decisions, Git behavior and appearance start from defaults edited in Project settings. Background command detection fills unset preferences without running
+  decisions, Git behavior and appearance start from defaults edited in Project settings.
+  When no agent is detected, the agents step offers API-key and local-server
+  connections through the private runner, applied app-wide. Background command detection fills unset preferences without running
   commands or replacing explicit choices; inspection failure does not block setup.
 - Work combines a new-conversation composer and the project-scoped work list,
   with remembered filters, compact capture and keyboard row navigation. Work rows show

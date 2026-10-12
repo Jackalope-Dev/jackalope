@@ -16,6 +16,7 @@ import { type OnboardingStep, useOnboardingStore } from '../../stores/onboarding
 import { useProjectStore } from '../../stores/projectStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { LocalAiSetup } from '../agents/LocalAiSetup';
+import { ProviderConnections } from '../agents/ProviderConnections';
 import { ProviderMark } from '../agents/ProviderMark';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
@@ -449,10 +450,13 @@ export function OnboardingFlow({
                         <p className="task-muted" role="status">
                           {execution.discovering
                             ? 'Looking for installed agents…'
-                            : 'No agents found yet. Install and sign in to your preferred agent, then re-scan agents.'}
+                            : 'No agents found yet. Connect an API key below, or install and sign in to an agent and re-scan.'}
                         </p>
                       )}
                     </fieldset>
+                    {!detectedAgents.length && !execution.discovering && (
+                      <ProviderConnections setup />
+                    )}
                     {localAi}
                     <AgentInstallCatalog agents={installableAgents} />
                   </>
