@@ -23,7 +23,7 @@ export function TaskTools({ onClose }: { onClose: () => void }) {
     >
       <DialogContent {...focus} className="task-tools-dialog">
         <DialogHeader
-          title="Agents & project tools"
+          title="Agents and tools"
           description={
             <>
               Your task and draft stay in place.{' '}
@@ -39,9 +39,9 @@ export function TaskTools({ onClose }: { onClose: () => void }) {
           value={tab}
           onChange={setTab}
           items={[
-            { id: 'connections', label: 'Connections' },
+            { id: 'connections', label: 'Tools' },
             { id: 'agents', label: 'Agents' },
-            { id: 'project', label: 'Project defaults' },
+            { id: 'project', label: 'Project settings' },
           ]}
         />
         {tab === 'connections' && <McpWorkspace />}

@@ -454,7 +454,7 @@ export function RunnerConnections({
                   project ? openProjectSettings(project.id, 'Agents') : openSettings('Agents')
                 }
               >
-                {project ? 'Project agent settings' : 'Agent settings'}
+                Defaults and accounts
               </Button>
               <Button
                 variant="outline"

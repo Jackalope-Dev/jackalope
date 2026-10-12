@@ -12,10 +12,12 @@ import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccoun
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { ProviderMark } from '../agents/ProviderMark';
+import { navigateWorkspace } from '../layout/navigation';
 import { ProjectAccountGroup } from '../projects/ProjectAccountGroup';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
+import { NoticeRow } from '../ui/NoticeRow';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { Setting, SettingGroup } from './Setting';
@@ -57,6 +59,9 @@ export function AgentPreferences({ projectId }: { projectId?: string }) {
     : agents.defaultMetaAgent || 'none';
   return (
     <div className="agent-preferences">
+      <NoticeRow onClick={() => navigateWorkspace('agents')}>
+        Connect agents, sign in and choose models on the Agents page
+      </NoticeRow>
       <SettingGroup>
         <Setting
           title={project ? 'Default task agent' : 'Default orchestration agent'}

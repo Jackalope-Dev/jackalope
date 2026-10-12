@@ -38,7 +38,7 @@ const setupTips: Record<OnboardingStep, string[]> = {
   project: ['Choose the Git repository your agent will work in, or create a new project.'],
   agent: [
     'This preference belongs to this project. Other projects keep their own agent choices.',
-    'Add agents, supported accounts and models later in Settings → Agents.',
+    'Add agents, accounts and models later on the Agents page.',
     'Routing, commits and colors start with defaults. Change them any time in Project settings.',
   ],
   task: [

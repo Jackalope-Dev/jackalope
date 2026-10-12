@@ -9,7 +9,7 @@ Canceling unfinished setup removes its pending account. CLI sign-in remains
 available for providers and authentication methods outside this key-only catalog.
 
 The Agents page applies enable/disable, default task agent and account choices to
-the selected project. Project agent settings also offers an allowed account list
+the selected project. Defaults and accounts (Settings → Agent defaults) also offers an allowed account list
 and Work/Personal group selection. New task and plan drafts, chats and terminal
 conversations use the project's default; explicit task choices and saved drafts
 remain unchanged. Automatic routing and its coordinating agent respect the project's

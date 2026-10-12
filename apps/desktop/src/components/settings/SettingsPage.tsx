@@ -116,6 +116,8 @@ const navigationIcons: Partial<Record<SettingsCategory, LucideIcon>> = {
   'Updates & support': LifeBuoy,
   'Data & reset': Database,
 };
+/** Shown names that differ from the category id that links and saved state use. */
+const categoryLabels: Partial<Record<SettingsCategory, string>> = { Agents: 'Agent defaults' };
 const settingsGroup = (category: SettingsCategory): SettingsCategory =>
   category === 'Invitations' ? 'Jackalope account' : category;
 
@@ -180,7 +182,7 @@ export function SettingsPage({
         'Saved actions': 'prompt presets commands shortcuts reuse global project',
         Appearance: 'theme color light dark atmosphere picker toolbar companion mascot animations',
         Agents:
-          'default models available detected allowed restrict cli command executable configuration automatic quota handoff',
+          'agent defaults default models available detected allowed restrict cli command executable configuration automatic quota handoff accounts',
         'Connected work': 'GitHub Linear Jira issues pull requests API token',
         Cloudflare: 'Cloudflare Artifacts repository hosted cloud swarm worker forks beta',
         'Remote access': 'hosts phone companion SSH pairing Tailscale device',
@@ -311,7 +313,7 @@ export function SettingsPage({
                       }}
                     >
                       <Icon size={16} aria-hidden="true" />
-                      {c}
+                      {categoryLabels[c] ?? c}
                     </button>
                   );
                 })}
@@ -336,7 +338,7 @@ export function SettingsPage({
               ref={c === category ? selectedSection : undefined}
             >
               <WorkspaceSectionHeading
-                title={c === 'Project' ? 'Project settings' : c}
+                title={c === 'Project' ? 'Project settings' : (categoryLabels[c] ?? c)}
                 description={
                   c === 'Project' && project ? `${project.name} · ${project.path}` : undefined
                 }

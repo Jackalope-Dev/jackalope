@@ -377,7 +377,7 @@ try {
   );
   await page.screenshot({ path: 'output/playwright/agent-settings-scroll.png' });
   await navigate('mcp-marketplace');
-  await page.getByRole('heading', { name: 'MCP marketplace', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Tool marketplace', exact: true }).waitFor();
   await page.evaluate(async () => {
     const { useMcpStore } = await window.storeModule('mcpStore');
     const { useSettingsStore } = await window.storeModule('settingsStore');
@@ -500,13 +500,13 @@ try {
   assert.equal(savedConnection.managed, true);
   assert.equal(savedConnection.discovery, true);
   await page.getByRole('button', { name: 'Browse marketplace', exact: true }).first().click();
-  await page.getByRole('heading', { name: 'MCP marketplace', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Tool marketplace', exact: true }).waitFor();
   await navigate('preferences');
   await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor();
   assert.equal(await page.getByRole('dialog').count(), 0);
   await page
     .getByRole('navigation', { name: 'Settings categories' })
-    .getByRole('button', { name: 'Agents', exact: true })
+    .getByRole('button', { name: 'Agent defaults', exact: true })
     .click();
   await page.getByRole('switch', { name: 'Allow Codex app-wide', exact: true }).waitFor();
   const permission = page.getByRole('switch', {
