@@ -27,10 +27,10 @@ export const roadmapStages = [
           'Comment on changed lines and collect feedback into one follow-up. Keep the conversation beside Review or Preview. Select an element in a persistent preview browser to capture its current state, screenshot and style context. Browse GitHub, Linear and Jira issues, then review the task draft before starting. These workflows use the existing workspace controls and remain subject to installed acceptance.',
       },
       {
-        title: 'Your place before early access.',
-        summary: 'Waitlist progress and referral sharing in the desktop app.',
+        title: 'Sign up and start.',
+        summary: 'Free signup with email confirmation, then pair the desktop.',
         detail:
-          'Verified waitlist members can connect the app, check their position, copy their referral link and share message, and explore the website and app tour. Connections survive restarts and detect approval. The download page shows desktop platform availability and guides accepted members and friends through email confirmation. Running tasks still requires approved access; deployed and installed checks remain in progress.',
+          'Sign up with your email and confirm it to create your account, then connect the desktop by comparing a code. Optional bot protection guards signup. Connections survive restarts, and the download page shows desktop platform availability. Deployed and installed acceptance remain in progress.',
       },
       {
         title: 'From request to a result you can inspect.',
@@ -48,7 +48,7 @@ export const roadmapStages = [
         title: 'A clearer path through daily work.',
         summary: 'Faster project setup, review checkpoints, and reusable task starters.',
         detail:
-          'Project setup walks through your repository, agents, decisions, Git behavior, appearance, and an optional first task. Setup detects project commands automatically and preserves your saved choices. The Work sidebar surfaces work waiting for you, and results remember the section you were reading. Track reviewed files, approve outcomes, and prepare a review request for another agent from the diff toolbar. Compare changes since your last review, inspect why lessons were included, and prepare editable issue, PR-feedback, CI-repair, or dependency-update requests. GitHub imports are read-only. Optional usefulness ratings and review minutes stay local to each task. Installed testing and observed daily-use trials remain open.',
+          'Project setup asks for your repository, its agents, and an optional first task, and offers an API key when no agent is installed. Routing, Git behavior and colors start from defaults you can change later. Setup detects project commands automatically and preserves your saved choices. The Work sidebar surfaces work waiting for you, and results remember the section you were reading. Track reviewed files, approve outcomes, and prepare a review request for another agent from the diff toolbar. Compare changes since your last review, inspect why lessons were included, and prepare editable issue, PR-feedback, CI-repair, or dependency-update requests. GitHub imports are read-only. Optional usefulness ratings and review minutes stay local to each task. Installed testing and observed daily-use trials remain open.',
       },
       {
         title: 'Your agents. One workspace.',

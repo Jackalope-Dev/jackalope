@@ -277,6 +277,10 @@ release dates.
 
 - [ ] Validate waitlist desktop pairing, restart, referral progress, sharing, offline
   recovery and transition to approved access with the deployed service and installed app.
+- [ ] Accept open signup with the deployed service, website and installed app: signup,
+  email confirmation approving and signing in, desktop pairing without a second email,
+  Turnstile challenges and failures, existing waiting members, and 429 rates as
+  paired desktops grow against the shared desktop-session limit.
 
 - [ ] Validate required account access in development and release builds, including
   reconnect, revocation, offline expiry and saved-work recovery.

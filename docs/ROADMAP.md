@@ -51,8 +51,9 @@ representative benefit and installed-platform acceptance remain open.
   connections with curated discovery and guided setup, browser tools and Ask Jackalope.
 - Shared appearance, guided setup, history recovery, archiving and optional local
   usefulness ratings. Optional local-model setup checks editing and continuation.
-- Account connection, waitlist/referral progress, platform download guidance and
-  optional settings sync, feedback and reporting.
+- Account connection with optional open signup and Turnstile-protected signup,
+  waitlist/referral progress, platform download guidance and optional settings sync,
+  feedback and reporting.
 
 These capabilities describe source behavior. Provider, platform, delivery and
 installed-app acceptance remain separate. See [current capabilities and limits](STATUS.md)
