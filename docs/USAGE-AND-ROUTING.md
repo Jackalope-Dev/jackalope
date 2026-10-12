@@ -175,7 +175,7 @@ They cannot increase project permissions or tools. If the default is also exhaus
 a saved ranking can select the next currently eligible option; without one, work
 stops with an actionable error. Explicit tasks and continuing sessions are pinned.
 Codex, Claude, Grok, OpenCode and Kimi can coordinate; Antigravity and Gemini CLI are worker-only.
-Automatic quota handoff can be enabled or disabled in app Settings → Agent defaults.
+Automatic quota handoff can be enabled or disabled in the Defaults section of the Agents page with All projects selected.
 
 Routing attempts and failed worker legs retain separate provider usage with
 agent/model/account attribution. Decision copies are explanatory and excluded from

@@ -1,4 +1,4 @@
-import { RefreshIcon } from '@jackalope/ui';
+import { RefreshIcon, SegmentedControl } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   ArrowRight,
@@ -19,15 +19,17 @@ import { isActive, type Runner, type TaskRun } from '../../lib/task-runtime';
 import { isTauriEnvironment, openInBrowser } from '../../lib/tauri-bridge';
 import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { accountForAgent, useCapacityStore } from '../../stores/capacityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { AddAgentForm } from '../agents/AddAgentForm';
+import { AgentDefaults } from '../agents/AgentDefaults';
 import { AgentInstallGuide } from '../agents/AgentInstallGuide';
 import { LocalAiSetup } from '../agents/LocalAiSetup';
 import { ProviderConnections } from '../agents/ProviderConnections';
 import { ProviderMark } from '../agents/ProviderMark';
-import { openAgentConfiguration, openProjectSettings, openSettings } from '../layout/navigation';
+import { openAgentConfiguration } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { EmptyState } from '../ui/EmptyState';
@@ -129,7 +131,12 @@ export function RunnerConnections({
     useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
   );
   const project = projects.find((item) => item.id === activeProjectId);
-  const defaultAgent = project ? project.preferences?.preferredRunner : config.defaultMetaAgent;
+  // Enablement, defaults and account choices apply to this project or every project.
+  const { scope, setScope } = useAgentScopeStore(
+    useShallow((s) => ({ scope: s.scope, setScope: s.setScope })),
+  );
+  const scoped = scope === 'project' ? project : undefined;
+  const defaultAgent = scoped ? scoped.preferences?.preferredRunner : config.defaultMetaAgent;
   const capacity = useCapacityStore();
   const accounts = useAgentAccountsStore((state) => state.agents);
   const accountAgents = JSON.stringify([
@@ -197,7 +204,7 @@ export function RunnerConnections({
   });
 
   const isRunnerReady = (runner: Runner) => {
-    const enabled = config.isAgentEnabled(runner.id, project?.id);
+    const enabled = config.isAgentEnabled(runner.id, scoped?.id);
     const options = config.runnerOptions[runner.id];
     const blockedModels = options?.restrictModels && !options.models.some((m) => m.trim());
     const needsSignIn = !runner.signedIn && runner.detail.startsWith('Sign in ');
@@ -234,7 +241,7 @@ export function RunnerConnections({
       run.prompts?.some((prompt) => prompt.status === 'pending'),
     );
     const reviewRun = agentRuns.find((run) => run.status === 'review');
-    const enabled = config.isAgentEnabled(runner.id, project?.id);
+    const enabled = config.isAgentEnabled(runner.id, scoped?.id);
     const options = config.runnerOptions[runner.id];
     const blockedModels = options?.restrictModels && !options.models.some((model) => model.trim());
     const needsSignIn = !runner.signedIn && runner.detail.startsWith('Sign in ');
@@ -262,9 +269,11 @@ export function RunnerConnections({
     const detail = working
       ? `${activeRuns.length} active ${activeRuns.length === 1 ? 'task' : 'tasks'}`
       : !enabled
-        ? config.isAgentEnabled(runner.id)
-          ? 'Enable this agent for this project.'
-          : 'Disabled in app settings.'
+        ? !scoped || config.isAgentEnabled(runner.id)
+          ? scoped
+            ? 'Enable this agent for this project.'
+            : 'Enable this agent to let it take work.'
+          : 'Disabled for all projects.'
         : blockedModels
           ? 'The allowed model list is empty.'
           : !runner.available || needsSignIn
@@ -280,9 +289,9 @@ export function RunnerConnections({
       ? accountProfiles(accountData.view, accountData.statuses).filter(
           (profile) =>
             !config.disabledAccounts[provider]?.includes(profile.id) &&
-            !project?.preferences?.disabledAccounts?.[provider]?.includes(profile.id) &&
-            (!project?.preferences?.agentAccounts?.[provider] ||
-              project.preferences.agentAccounts[provider] === profile.id),
+            !scoped?.preferences?.disabledAccounts?.[provider]?.includes(profile.id) &&
+            (!scoped?.preferences?.agentAccounts?.[provider] ||
+              scoped.preferences.agentAccounts[provider] === profile.id),
         )
       : [];
     const accountLabels = profiles.map((profile) => {
@@ -387,13 +396,13 @@ export function RunnerConnections({
           <div className="agent-enable">
             <Switch
               checked={enabled}
-              disabled={!desktop || (!!project && !config.isAgentEnabled(runner.id))}
+              disabled={!desktop || (!!scoped && !config.isAgentEnabled(runner.id))}
               onCheckedChange={(value) => {
                 setCheckError('');
-                config.toggleAgent(runner.id, value, project?.id);
+                config.toggleAgent(runner.id, value, scoped?.id);
                 void syncAgentConfig().catch((cause) => setCheckError(String(cause)));
               }}
-              label={`Enable ${custom?.name ?? runner.name}${project ? ` for ${project.name}` : ' app-wide'}`}
+              label={`Enable ${custom?.name ?? runner.name}${scoped ? ` for ${scoped.name}` : ' app-wide'}`}
             />
             <span aria-hidden="true">{enabled ? 'Enabled' : 'Disabled'}</span>
           </div>
@@ -441,20 +450,11 @@ export function RunnerConnections({
       <div className="agents-page-content workspace-stack">
         <WorkspaceHeading
           title="Agents"
-          description={project ? `Agent choices for ${project.name}` : 'App-wide agent settings'}
           action={
             <div className="workspace-actions">
               <Button onClick={() => setAdding(true)}>
                 <Plus size={18} />
                 Add agent
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  project ? openProjectSettings(project.id, 'Agents') : openSettings('Agents')
-                }
-              >
-                Defaults and accounts
               </Button>
               <Button
                 variant="outline"
@@ -470,9 +470,21 @@ export function RunnerConnections({
             </div>
           }
         />
+        {project && (
+          <SegmentedControl
+            label="Apply agent choices to"
+            value={scope}
+            onChange={(value) => setScope(value as 'project' | 'app')}
+            items={[
+              { id: 'project', label: project.name },
+              { id: 'app', label: 'All projects' },
+            ]}
+          />
+        )}
         {(checkError || error || capacity.error) && (
           <InlineNotice tone="error">{checkError || error || capacity.error}</InlineNotice>
         )}
+        <AgentDefaults key={scoped?.id ?? 'app'} projectId={scoped?.id} />
         {!desktop && <p className="task-muted">Agent discovery requires the desktop app.</p>}
         {allRunners.length === 0 && (discovering || checking) ? (
           <LoadingState label="Looking for your agents…" />

@@ -520,20 +520,15 @@ try {
   assert.equal(savedConnection.discovery, true);
   await page.getByRole('button', { name: 'Add tools', exact: true }).click();
   await page.getByRole('heading', { name: 'Tool marketplace', exact: true }).waitFor();
-  await navigate('preferences');
-  await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor();
-  assert.equal(await page.getByRole('dialog').count(), 0);
-  await page
-    .getByRole('navigation', { name: 'Settings categories' })
-    .getByRole('button', { name: 'Agent defaults', exact: true })
-    .click();
-  await page.getByRole('switch', { name: 'Allow Codex app-wide', exact: true }).waitFor();
-  await page
-    .locator('section[aria-label="Codex preferences"]')
-    .getByRole('button', { name: 'Accounts' })
-    .click();
+  // Choices for every project live on the Agents page and carry to an agent's page.
+  await navigate('agents');
+  await page.getByRole('heading', { name: 'Agents', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'All projects', exact: true }).click();
+  await page.getByRole('switch', { name: 'Enable Codex app-wide', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Configure Codex', exact: true }).click();
+  await page.getByRole('heading', { name: 'Codex', exact: true }).waitFor();
   const permission = page.getByRole('switch', {
-    name: 'Allow Codex account Work account',
+    name: 'Allow Codex account Work account app-wide',
     exact: true,
   });
   await permission.click();
@@ -541,6 +536,10 @@ try {
     window.pagesFixture.policy?.disabledAccounts?.codex?.includes('fixture-account'),
   );
   await permission.click();
+  await page.getByRole('button', { name: 'Trail workspace', exact: true }).first().click();
+  await navigate('preferences');
+  await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor();
+  assert.equal(await page.getByRole('dialog').count(), 0);
   await page.getByRole('button', { name: 'Per project', exact: true }).click();
   await page.getByLabel('Project name', { exact: true }).fill('Trail renamed');
   await page.getByRole('button', { name: 'Appearance', exact: true }).click();
@@ -754,13 +753,11 @@ try {
     () =>
       window.pagesFixture.calls.filter((command) => command === 'capacity_snapshot').length === 3,
   );
-  // Quota handoff is an agent default; it persists across navigation.
+  // Quota handoff is an agent default for every project; it persists across navigation.
   const openAgentDefaults = async () => {
-    await navigate('preferences');
-    await page
-      .getByRole('navigation', { name: 'Settings categories' })
-      .getByRole('button', { name: 'Agent defaults', exact: true })
-      .click();
+    await navigate('agents');
+    await page.getByRole('heading', { name: 'Agents', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'All projects', exact: true }).click();
   };
   await openAgentDefaults();
   const handoffToggle = page.getByRole('switch', { name: 'Automatic quota handoff', exact: true });
@@ -770,8 +767,8 @@ try {
     const { useAgentConfigStore } = await window.storeModule('agentConfigStore');
     return !useAgentConfigStore.getState().automaticQuotaHandoff;
   });
-  await navigate('agents');
-  await page.getByRole('heading', { name: 'Agents', exact: true }).waitFor();
+  await navigate('usage');
+  await page.getByRole('heading', { name: 'Usage & quota', exact: true }).waitFor();
   await openAgentDefaults();
   assert.equal(await handoffToggle.getAttribute('aria-checked'), 'false');
   await handoffToggle.click();

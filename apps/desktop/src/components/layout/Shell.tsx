@@ -15,6 +15,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { observeWorkbenchPerformance } from '../../lib/workbench-performance';
+import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { useBotStore } from '../../stores/botStore';
 import { openChanges } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -377,10 +378,17 @@ export function Shell({
     } else setActiveTab(tab);
   }, []);
   useWindowEvent<ActiveTab>('jackalope:navigate', navigate);
-  useWindowEvent<SettingsCategory | ProjectSettingsDestination>(
+  useWindowEvent<SettingsCategory | 'Agents' | ProjectSettingsDestination>(
     'jackalope:open-settings',
     (destination) => {
-      setSettingsCategory(typeof destination === 'string' ? destination : destination.category);
+      const category = typeof destination === 'string' ? destination : destination.category;
+      // Agent choices moved to the Agents page; older links open it at the same scope.
+      if (category === 'Agents') {
+        useAgentScopeStore.getState().setScope(typeof destination === 'string' ? 'app' : 'project');
+        setActiveTab('agents');
+        return;
+      }
+      setSettingsCategory(category);
       setSettingsProjectId(typeof destination === 'string' ? undefined : destination.projectId);
       setActiveTab('preferences');
     },

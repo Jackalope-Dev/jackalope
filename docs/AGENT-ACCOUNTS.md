@@ -9,11 +9,12 @@ Canceling unfinished setup removes its pending account. CLI sign-in remains
 available for providers and authentication methods outside this key-only catalog.
 
 The Agents page applies enable/disable, default task agent and account choices to
-the selected project. Defaults and accounts (Settings → Agent defaults) also offers an allowed account list
-and Work/Personal group selection. New task and plan drafts, chats and terminal
+the selected project or, with All projects selected, every project. Its Defaults section
+holds the default agent, quota handoff and the project's Work/Personal account groups;
+each agent's Configure page offers an allowed account list. New task and plan drafts, chats and terminal
 conversations use the project's default; explicit task choices and saved drafts
 remain unchanged. Automatic routing and its coordinating agent respect the project's
-agent and account restrictions. Settings → App → Agents retains app-wide limits
+agent and account restrictions. The Agents page with All projects selected holds app-wide limits
 and defaults; a project cannot enable an agent or account disabled there.
 Connections, account names, model preferences and executable configuration are shared.
 

@@ -1,6 +1,5 @@
 import { DiscordIcon, FormField, Input, SearchField, SegmentedControl } from '@jackalope/ui';
 import {
-  Bot,
   Cloud,
   Cpu,
   Database,
@@ -37,7 +36,6 @@ import { Switch } from '../ui/Switch';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
-import { AgentPreferences } from './AgentPreferences';
 import { AppearancePreferences } from './AppearancePreferences';
 import { ArchivedHistory } from './ArchivedHistory';
 import { JackalopeAccount } from './JackalopeAccount';
@@ -70,7 +68,6 @@ const categories = [
   'Appearance',
   'Desktop',
   'Saved actions',
-  'Agents',
   'Decisions',
   'Connected work',
   'Cloudflare',
@@ -93,7 +90,7 @@ const navigationGroups: { label: string; categories: SettingsCategory[] }[] = [
     label: 'Workspace',
     categories: ['Project', 'General', 'Appearance', 'Desktop', 'Saved actions'],
   },
-  { label: 'Agents', categories: ['Agents', 'Connected work'] },
+  { label: 'Agents', categories: ['Connected work'] },
   { label: 'Account & access', categories: ['Jackalope account', 'Remote access', 'Privacy'] },
   { label: 'Help & data', categories: ['Updates & support', 'Data & reset'] },
   { label: 'Advanced', categories: ['Decisions', 'Cloudflare', 'Diagnostics', 'System'] },
@@ -104,7 +101,6 @@ const navigationIcons: Partial<Record<SettingsCategory, LucideIcon>> = {
   Appearance: Palette,
   Desktop: Monitor,
   'Saved actions': Zap,
-  Agents: Bot,
   Decisions: Gavel,
   'Connected work': Plug,
   Cloudflare: Cloud,
@@ -116,8 +112,6 @@ const navigationIcons: Partial<Record<SettingsCategory, LucideIcon>> = {
   'Updates & support': LifeBuoy,
   'Data & reset': Database,
 };
-/** Shown names that differ from the category id that links and saved state use. */
-const categoryLabels: Partial<Record<SettingsCategory, string>> = { Agents: 'Agent defaults' };
 const settingsGroup = (category: SettingsCategory): SettingsCategory =>
   category === 'Invitations' ? 'Jackalope account' : category;
 
@@ -144,7 +138,7 @@ export function SettingsPage({
   const project = projects.find((project) => project.id === selectedProjectId);
   const scopedCategories =
     scope === 'project'
-      ? categories.filter((c) => ['Project', 'Appearance', 'Agents', 'Decisions'].includes(c))
+      ? categories.filter((c) => ['Project', 'Appearance', 'Decisions'].includes(c))
       : categories.filter((c) => c !== 'Project');
   const [category, setCategory] = useState<SettingsCategory>(
     initialCategory ?? (initialScope === 'project' ? 'Project' : 'General'),
@@ -181,8 +175,6 @@ export function SettingsPage({
           'keyboard shortcuts zoom terminal shell font editor keep awake sleep power WSL links running services previews ports disk worktrees',
         'Saved actions': 'prompt presets commands shortcuts reuse global project',
         Appearance: 'theme color light dark atmosphere picker toolbar companion mascot animations',
-        Agents:
-          'agent defaults default models available detected allowed restrict cli command executable configuration automatic quota handoff accounts',
         'Connected work': 'GitHub Linear Jira issues pull requests API token',
         Cloudflare: 'Cloudflare Artifacts repository hosted cloud swarm worker forks beta',
         'Remote access': 'hosts phone companion SSH pairing Tailscale device',
@@ -313,7 +305,7 @@ export function SettingsPage({
                       }}
                     >
                       <Icon size={16} aria-hidden="true" />
-                      {categoryLabels[c] ?? c}
+                      {c}
                     </button>
                   );
                 })}
@@ -338,7 +330,7 @@ export function SettingsPage({
               ref={c === category ? selectedSection : undefined}
             >
               <WorkspaceSectionHeading
-                title={c === 'Project' ? 'Project settings' : (categoryLabels[c] ?? c)}
+                title={c === 'Project' ? 'Project settings' : c}
                 description={
                   c === 'Project' && project ? `${project.name} · ${project.path}` : undefined
                 }
@@ -393,12 +385,6 @@ export function SettingsPage({
               )}
               {c === 'Appearance' && (scope === 'app' || project) && (
                 <AppearancePreferences projectId={scope === 'project' ? project?.id : undefined} />
-              )}
-              {c === 'Agents' && (scope === 'app' || project) && (
-                <AgentPreferences
-                  key={scope === 'project' ? project?.id : 'app'}
-                  projectId={scope === 'project' ? project?.id : undefined}
-                />
               )}
               {c === 'Privacy' && (
                 <>

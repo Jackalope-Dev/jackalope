@@ -11,7 +11,6 @@ import ReactDOM from 'react-dom/client';
 import { RunnerConnections } from '/src/components/tasks/RunnerConnections.tsx';
 import { AgentManager } from '/src/components/agents/AgentManager.tsx';
 import { CaptureTask } from '/src/components/tasks/CaptureTask.tsx';
-import { AgentPreferences } from '/src/components/settings/AgentPreferences.tsx';
 import { useProjectStore } from '/src/stores/projectStore.ts';
 import { useAgentConfigStore } from '/src/stores/agentConfigStore.ts';
 import { useExecutionStore } from '/src/stores/executionStore.ts';
@@ -50,10 +49,9 @@ function App(){
  return React.createElement('main',{style:{height:'100vh',overflow:'auto'}},
  React.createElement('nav',{style:{display:'flex',gap:16,padding:16}},
  ...['work','personal'].map(id=>React.createElement('button',{key:id,onClick:()=>useProjectStore.setState({activeProjectId:id})},'Project '+id)),
- ...['roster','manager','capture','settings'].map(id=>React.createElement('button',{key:id,onClick:()=>setScreen(id)},'View '+id))),
+ ...['roster','manager','capture'].map(id=>React.createElement('button',{key:id,onClick:()=>setScreen(id)},'View '+id))),
  screen==='roster'?React.createElement(RunnerConnections,{onNewTask:id=>{setAgent(id);setScreen('capture')},onRun:()=>{}}):
  screen==='manager'?React.createElement(AgentManager,{key:active,initialAgentId:agent}):
- screen==='settings'?React.createElement(AgentPreferences,{key:active,projectId:active}):
  React.createElement(CaptureTask,{key:active,draftKey:'fixture:'+active,inline:true,onClose:()=>{},onStarted:()=>{}}));
 }
 f.theme(true);

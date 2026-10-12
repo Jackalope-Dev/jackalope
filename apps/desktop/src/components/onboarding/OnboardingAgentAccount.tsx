@@ -103,7 +103,7 @@ export function OnboardingAgentAccount({
         </>
       ) : (
         <p className="task-muted" role="status">
-          No enabled accounts. Allow one in Settings → Agent defaults.
+          No enabled accounts. Allow one on the Agents page.
         </p>
       )}
     </div>
