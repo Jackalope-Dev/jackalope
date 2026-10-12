@@ -37,7 +37,7 @@ Parallel planning remains inside Work with the existing ownership and dependency
 contracts; plans stay editable before dispatch.
 
 The Work page keeps recent work in a collapsible sidebar and opens task review beside
-the conversation. Other tool tabs can retain the conversation, including terminals and
+the conversation on wide windows, or at full width on narrower ones. Other tool tabs can retain the conversation, including terminals and
 activity. The work list offers list and board views; New work opens its composer
 explicitly once a project has work. Questions and Stop remain available with the
 sidebar collapsed. The composer options menu holds session limits, workflow starters

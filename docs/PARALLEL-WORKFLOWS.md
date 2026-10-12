@@ -7,7 +7,8 @@ isolated parallel work, coordination and review before integration.
 
 ### Live sessions
 
-Task review and preview open beside the conversation by default. Individual
+Task review and preview open beside the conversation on windows at least 1280 pixels
+wide and take the full width on narrower ones. Individual
 conversation toggles remain available and are saved per task.
 
 The task toolbar shows the branch and changes since a previous visit. Task context
