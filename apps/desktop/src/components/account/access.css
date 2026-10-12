@@ -13,7 +13,7 @@
 .access-privacy {
   margin: 24px 0;
   text-align: left;
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   background: var(--color-surface-elevated);
 }
 .access-privacy > summary {
@@ -37,7 +37,7 @@
 .access-privacy > summary:focus-visible {
   outline: 2px solid var(--color-accent-ink);
   outline-offset: 3px;
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
 }
 .access-privacy-controls {
   padding: 8px 20px 24px;

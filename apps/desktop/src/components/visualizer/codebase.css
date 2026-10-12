@@ -38,7 +38,7 @@
   grid-template-columns: 250px minmax(0, 1fr);
   height: clamp(360px, calc(100dvh - 370px), 720px);
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   background: linear-gradient(to bottom, var(--color-surface), var(--color-surface-sunken));
   box-shadow: 0 8px 28px color-mix(in srgb, var(--color-accent) 6%, transparent);
   border: 1px solid var(--color-border);
@@ -353,7 +353,7 @@
   padding: 20px;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   cursor: pointer;
 }
 .codebase-check-overview > button[aria-pressed="true"] {

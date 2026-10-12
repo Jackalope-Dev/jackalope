@@ -47,7 +47,7 @@
   overflow-x: auto;
   margin-bottom: 20px;
   padding: 8px;
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   background: var(--color-surface-sunken);
 }
 .work-now-item {

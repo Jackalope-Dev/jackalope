@@ -40,7 +40,7 @@
   place-items: center;
   width: 56px;
   height: 56px;
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   color: var(--color-accent-ink);
   background: var(--color-accent-subtle);
 }

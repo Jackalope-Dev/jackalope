@@ -17,7 +17,7 @@
   justify-content: center;
   gap: 7px;
   padding: 6px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }

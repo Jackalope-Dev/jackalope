@@ -14,7 +14,7 @@
   min-height: 420px;
   overflow: hidden;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
 }
 
 @media (max-width: 1100px) {
@@ -422,7 +422,7 @@
 .bot-editor-step:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 .bot-editor-step-mark {
@@ -696,7 +696,7 @@
   flex-shrink: 0;
   min-width: 20px;
   padding: 1px 6px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--color-accent-subtle);
   color: var(--color-accent-ink);
   font-size: var(--text-xs);

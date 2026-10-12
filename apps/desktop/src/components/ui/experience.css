@@ -12,7 +12,7 @@
 .worktree-form {
   padding: 24px;
   background: var(--color-surface);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   margin: 20px 0;
 }
 .worktree-fields {
@@ -428,7 +428,7 @@ button:disabled {
   .empty-state-icon {
     flex-basis: 48px;
     height: 48px;
-    border-radius: 16px;
+    border-radius: var(--radius-2xl);
   }
   .queue-controls {
     flex-wrap: wrap;
@@ -618,7 +618,7 @@ button:disabled {
   align-items: center;
   min-width: 24px;
   padding: 3px 7px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--color-accent-subtle);
   color: var(--color-accent-ink);
   font-weight: 600;

@@ -6,7 +6,7 @@
   padding: 20px;
   text-align: left;
   border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   background: linear-gradient(
     115deg,
     color-mix(in srgb, var(--color-accent) 10%, var(--color-surface)),
@@ -67,7 +67,7 @@
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--color-border);
-  border-radius: 22px;
+  border-radius: var(--radius-3xl);
   background: var(--color-bg);
   color: var(--color-text-primary);
   box-shadow: 0 24px 100px rgb(0 0 0 / 0.3);
@@ -247,7 +247,7 @@
   font-size: 11px;
   line-height: 1.4;
   padding: 5px 8px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
   color: var(--color-accent-ink);
 }

@@ -148,7 +148,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 28px;
+  border-radius: var(--radius-3xl);
   background: radial-gradient(
     circle at 50% 35%,
     var(--color-accent-subtle, rgba(255, 255, 255, 0.08)),
@@ -491,7 +491,7 @@
   gap: 12px;
   padding: 20px;
   border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   background: var(--color-surface-elevated);
 }
 .agent-account-add-heading {

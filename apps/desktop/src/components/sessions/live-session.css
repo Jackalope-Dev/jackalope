@@ -212,7 +212,7 @@
   max-width: min(78%, 40rem);
   margin: 0;
   padding: 10px 14px;
-  border-radius: 16px 16px 4px 16px;
+  border-radius: var(--radius-2xl) var(--radius-2xl) var(--radius-xs) var(--radius-2xl);
   background: var(--color-accent-subtle);
   line-height: 1.5;
 }
@@ -229,7 +229,7 @@
   max-width: min(88%, 52rem);
   padding: 10px 14px 12px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 4px 16px 16px 16px;
+  border-radius: var(--radius-xs) var(--radius-2xl) var(--radius-2xl) var(--radius-2xl);
   background: var(--color-surface);
 }
 .live-reply .live-mascot {
@@ -439,7 +439,7 @@
   position: relative;
   padding: 14px 14px 12px 16px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   background: var(--color-surface-elevated);
   text-align: left;
 }
@@ -577,7 +577,7 @@
   min-width: 28px;
   min-height: 28px;
   padding: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
 }
 .live-session-detached .app-titlebar-controls svg {
   width: 15px;
@@ -920,7 +920,7 @@
   margin: 0;
   padding: 10px 14px;
   border: 1px dashed var(--color-border);
-  border-radius: 4px 16px 16px 16px;
+  border-radius: var(--radius-xs) var(--radius-2xl) var(--radius-2xl) var(--radius-2xl);
   background: var(--color-surface-sunken);
   line-height: 1.5;
 }
@@ -946,7 +946,7 @@
 .live-origin-link:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 .live-card {
   margin: -10px 0 22px 46px;

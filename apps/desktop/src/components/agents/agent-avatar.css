@@ -2,7 +2,7 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  border-radius: 20px;
+  border-radius: var(--radius-2xl);
   background: radial-gradient(
     ellipse at 40% 30%,
     var(--color-accent-subtle),
