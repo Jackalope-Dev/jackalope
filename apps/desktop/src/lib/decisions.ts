@@ -12,8 +12,9 @@ export type DecisionKind =
   | 'task_review'
   | 'monitor_relevance'
   | 'assignment_matching';
-export type DecisionProvider = 'local_rules' | 'agent' | 'jev';
+type DecisionProvider = 'local_rules' | 'agent' | 'jev';
 
+/** @public Named in the return type of decision-usage.ts exports. */
 export interface DecisionAttempt {
   provider: DecisionProvider;
   usage: RunUsage;

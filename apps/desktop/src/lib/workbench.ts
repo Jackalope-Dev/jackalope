@@ -32,7 +32,7 @@ export function workSummary(run: TaskRun) {
   };
 }
 
-export function attentionPriority(item: WorkItem) {
+function attentionPriority(item: WorkItem) {
   if (item.run?.persistenceError) return 0;
   if (item.run?.prompts?.some((prompt) => prompt.status === 'pending')) return 1;
   if (item.stage === 'attention') return 2;

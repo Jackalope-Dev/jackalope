@@ -119,3 +119,6 @@ dist-lab/
 /patches/glib/Cargo.lock
 
 /apps/server/src/generated/admin-assets.ts
+
+# pnpm only; an npm lockfile here is always accidental
+package-lock.json

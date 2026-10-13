@@ -5,7 +5,7 @@ import { createPersistStorage } from '../lib/persist-storage.ts';
 import { nativeTask } from '../lib/task-runtime.ts';
 import { isAgentAllowedForProject, useProjectStore } from './projectStore.ts';
 
-export interface CustomAgentConfig {
+interface CustomAgentConfig {
   id: string;
   name: string;
   command: string;

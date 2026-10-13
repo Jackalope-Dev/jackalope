@@ -7,7 +7,7 @@ import { isActive, type TaskRun } from './task-runtime.ts';
 import { taskTitle } from './task-title.ts';
 import { taskDecision, taskNextAction } from './task-workflow.ts';
 
-export const workStages = [
+const workStages = [
   { id: 'attention', label: 'Needs you' },
   { id: 'review', label: 'Ready to review' },
   { id: 'working', label: 'Working' },

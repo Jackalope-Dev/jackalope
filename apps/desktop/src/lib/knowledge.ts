@@ -5,7 +5,7 @@ import { createReadCache } from './read-cache';
 import { nativeTask } from './task-runtime';
 import { isTauriEnvironment } from './tauri-bridge';
 
-export interface ProcessTemplate {
+interface ProcessTemplate {
   outcomes: string[];
   steps: string[];
   inputs: string[];
@@ -53,7 +53,7 @@ export interface ContextReceipt {
   bytes: number;
 }
 
-export interface JevPreparation {
+interface JevPreparation {
   state: string | Record<string, unknown> | unknown[];
   questions: Record<
     string,

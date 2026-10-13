@@ -1,1 +1,1 @@
-export { Switch, type SwitchProps } from '@jackalope/ui';
+export { Switch } from '@jackalope/ui';

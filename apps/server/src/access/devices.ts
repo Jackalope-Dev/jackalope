@@ -16,7 +16,7 @@ export async function connectedDevices(env: Env, memberId: string) {
       .all()
   ).results;
 }
-export async function deviceMember(env: Env, hash: string, now = Date.now()) {
+async function deviceMember(env: Env, hash: string, now = Date.now()) {
   return accountDevice(env, hash, now, false);
 }
 async function accountDevice(env: Env, hash: string, now: number, includeWaiting = true) {

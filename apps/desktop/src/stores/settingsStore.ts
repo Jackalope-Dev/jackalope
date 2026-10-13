@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { BuiltinAgentId } from '../lib/agent-catalog';
 import { createPersistStorage } from '../lib/persist-storage.ts';
 
-export type DefaultRunnerId = BuiltinAgentId;
+type DefaultRunnerId = BuiltinAgentId;
 export type NotificationLevel = 'all' | 'failures-only' | 'none';
 
 export interface SettingsState {

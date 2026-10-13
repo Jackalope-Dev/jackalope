@@ -1,0 +1,41 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+  "workspaces": {
+    ".": {
+      // Release, evaluation and verification scripts are run by hand or from workflows.
+      "entry": ["scripts/**/*.{js,mjs}"],
+      "project": ["scripts/**/*.{js,mjs}"]
+    },
+    "apps/desktop": {
+      // highlighter-bundle.ts is swapped in through a resolve.alias in vite.config.ts.
+      "entry": ["src/design-lab.tsx", "src/lib/highlighter-bundle.ts", "scripts/**/*.{js,mjs}"],
+      "project": ["src/**/*.{ts,tsx,css}", "scripts/**/*.{js,mjs}"]
+    },
+    "apps/server": {
+      "entry": ["admin/main.tsx"],
+      "project": ["src/**/*.ts", "admin/**/*.{ts,tsx}", "test/**/*.ts"]
+    },
+    "apps/website": {
+      "entry": ["src/entry-server.tsx", "scripts/**/*.{js,mjs}"],
+      "project": ["src/**/*.{ts,tsx}", "scripts/**/*.{js,mjs}"]
+    },
+    "packages/ui": {
+      "entry": ["gallery/main.tsx"],
+      "project": ["src/**/*.{ts,tsx}", "gallery/**/*.{ts,tsx}"]
+    }
+  },
+  "ignoreDependencies": [
+    // `cloudflare:workers` / `cloudflare:test` virtual modules from the Workers runtime.
+    "cloudflare",
+    // Bundled native binary; src-tauri/build.rs reads it from node_modules.
+    "agent-browser"
+  ],
+  "ignoreUnresolved": [
+    // Browser-side imports evaluated by Playwright inside the Vite dev server.
+    "^/src/",
+    // TODO: verify-waitlist.mjs still imports the pre-SPA admin page, which was removed.
+    "admin-page\\.ts$"
+  ],
+  // Platform tools invoked by release and evaluation scripts, not npm packages.
+  "ignoreBinaries": ["tiffutil", "codex", "opencode", "pwsh", "ffmpeg"]
+}

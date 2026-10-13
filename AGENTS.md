@@ -14,7 +14,8 @@
   decision records, experiment reports, dated test results, work summaries or owner
   handoffs. Put detailed evidence in the task/PR response or ignored scratch/output.
   New guides need a distinct contributor purpose and a docs/README.md entry.
-- Before removing unused files, inspect imports, generated paths, package scripts,
+- `pnpm knip` lists unused files, exports and dependencies; it runs inside `pnpm verify`.
+  Before removing unused files, inspect imports, generated paths, package scripts,
   native registration, packaging and manual test consumers. Preserve compatibility
   data and required notices. Remove orphaned references and prevent regeneration.
 - Reserve the public changelog for notable features, meaningful improvements and

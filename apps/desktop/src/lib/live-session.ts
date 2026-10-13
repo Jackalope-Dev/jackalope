@@ -17,7 +17,7 @@ export interface MessageOrigin {
   botName?: string;
   sessionId?: string;
 }
-export interface SessionBatch {
+interface SessionBatch {
   runId: string;
   messageIds: string[];
   previousRunId: string | null;
@@ -29,7 +29,7 @@ export interface SessionDraft {
   revision: number;
 }
 /** Standing instructions from a saved bot, repeated natively in every batch. */
-export interface SessionPersona {
+interface SessionPersona {
   botId: string;
   name: string;
   instructions: string;

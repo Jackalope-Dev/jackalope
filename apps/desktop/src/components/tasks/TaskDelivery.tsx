@@ -50,13 +50,13 @@ const FAILED_CHECKS = [
   'STARTUP_FAILURE',
 ];
 const checkName = (check: CiCheck) => check.name || check.context || 'Check';
-export const failedChecks = (checks: CiCheck[] = []) =>
+const failedChecks = (checks: CiCheck[] = []) =>
   checks.filter((check) =>
     FAILED_CHECKS.includes((check.conclusion || check.state || '').toUpperCase()),
   );
 
 /** A follow-up asking the agent to repair the PR's failing checks locally, without pushing. */
-export function ciRepairHandoff(run: TaskRun, prUrl: string, failing: CiCheck[]) {
+function ciRepairHandoff(run: TaskRun, prUrl: string, failing: CiCheck[]) {
   return [
     `Fix the failing CI checks on this task's pull request: ${prUrl}`,
     '',
