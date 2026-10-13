@@ -165,6 +165,8 @@ struct App {
     transcript: RefCell<Option<render::transcript::Cache>>,
     /// Animation frame for the working indicator.
     tick: usize,
+    /// When the screen first drew, for the start-up reveal.
+    opened: Instant,
     /// Currently displayed rotating tip.
     tip_index: usize,
     last_tip_change: Instant,
@@ -240,6 +242,7 @@ pub fn run(
         max_scroll: Cell::new(0),
         transcript: RefCell::new(None),
         tick: 0,
+        opened: Instant::now(),
         tip_index: 0,
         last_tip_change: Instant::now(),
         quit: false,

@@ -115,15 +115,21 @@ const DENY: &str = "Deny";
 const PERMISSION_WAIT_SECS: u64 = 1800;
 
 fn permission_question(input: &PermissionPromptInput) -> String {
+    // Show what would run the way a person reads it: a shell command or file
+    // path as written, anything else as its JSON input.
+    let detail = ["command", "file_path", "url", "pattern"]
+        .iter()
+        .find_map(|key| input.input[*key].as_str())
+        .map(str::to_string)
+        .unwrap_or_else(|| input.input.to_string());
+    let reason = input.input["description"]
+        .as_str()
+        .map(|text| format!("\n{}", text.chars().take(300).collect::<String>()))
+        .unwrap_or_default();
     format!(
-        "Claude Code requests permission: {}\n{}",
+        "Allow Claude Code to use {}?\n{}{reason}",
         input.tool_name.chars().take(200).collect::<String>(),
-        input
-            .input
-            .to_string()
-            .chars()
-            .take(3000)
-            .collect::<String>()
+        detail.chars().take(3000).collect::<String>()
     )
 }
 
