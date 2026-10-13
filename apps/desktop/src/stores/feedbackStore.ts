@@ -11,7 +11,7 @@ export interface FeedbackView {
   eligible: boolean;
   claimed: boolean;
 }
-export type FeedbackAction =
+type FeedbackAction =
   | { action: 'status' | 'stop' | 'completed' }
   | { action: 'activity'; runId?: string }
   | { action: 'preferences'; enabled: boolean; promptsEnabled: boolean }

@@ -11,7 +11,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 
 /** Window event that opens the keyboard shortcut sheet. */
-export const OPEN_SHORTCUTS = 'jackalope:open-shortcuts';
+const OPEN_SHORTCUTS = 'jackalope:open-shortcuts';
 
 function typing(target: EventTarget | null) {
   return (

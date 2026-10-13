@@ -1,1 +1,1 @@
-export { Button, type ButtonProps } from '@jackalope/ui';
+export { Button } from '@jackalope/ui';

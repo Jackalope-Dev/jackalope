@@ -12,7 +12,7 @@ export type Feature =
   | 'schedules'
   | 'browser'
   | 'queue';
-export type ErrorCode =
+type ErrorCode =
   | 'history_save_failed'
   | 'verification_failed'
   | 'update_failed'
@@ -80,7 +80,7 @@ export const agents = [
   'other',
 ] as const;
 export type TelemetryAgent = (typeof agents)[number];
-export type Workflow = 'task' | 'chat';
+type Workflow = 'task' | 'chat';
 export type TaskState =
   | 'starting'
   | 'running'

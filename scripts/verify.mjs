@@ -20,6 +20,7 @@ const sharedChecks = [
   [process.execPath, ['scripts/evaluation/website.mjs', '--check']],
   [process.execPath, ['scripts/knowledge.mjs', '--check']],
   [process.execPath, [pnpm, 'check']],
+  [process.execPath, [pnpm, 'knip']],
   [process.execPath, [pnpm, 'typecheck']],
   [process.execPath, [pnpm, 'test:hooks']],
   [process.execPath, ['--test', 'scripts/docs-policy.test.mjs']],

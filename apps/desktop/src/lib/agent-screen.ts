@@ -1,6 +1,6 @@
 import { nativeTask } from './task-runtime.ts';
 
-export interface AgentBrowserView {
+interface AgentBrowserView {
   status: 'live' | 'busy' | 'stopped' | 'unavailable';
   url: string | null;
   /** Base64 PNG of the visible viewport. */

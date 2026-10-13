@@ -4,7 +4,7 @@ import type { Project } from './projectStore';
 
 /** Routing, commit behavior and appearance use defaults and are edited later in project settings. */
 export type OnboardingStep = 'project' | 'agent' | 'task';
-export type OnboardingStatus = 'new' | 'active' | 'complete' | 'skipped';
+type OnboardingStatus = 'new' | 'active' | 'complete' | 'skipped';
 
 interface OnboardingState {
   status: OnboardingStatus;

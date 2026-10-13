@@ -76,7 +76,7 @@ export function TaskFailure({
  * The line shown for a failure. Providers often wrap the useful text in a JSON
  * body after a short prefix, so a trailing object's "message" is preferred.
  */
-export function failureSummary(message: string) {
+function failureSummary(message: string) {
   const text = message.trim();
   const firstLine = text.split('\n')[0];
   const start = text.indexOf('{');

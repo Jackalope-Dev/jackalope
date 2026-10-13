@@ -22,7 +22,7 @@ export interface QueueItem {
   /** Set on subtasks an agent split off with propose_subtask. */
   parentTaskId?: string | null;
 }
-export interface QueueMessage {
+interface QueueMessage {
   report?: { completed: string[]; remaining: string[]; artifacts: string[] } | null;
   runId?: string | null;
   sourceTree?: string | null;
@@ -36,7 +36,7 @@ export interface QueueMessage {
   recipientTaskId?: string | null;
   acknowledgedBy?: string[];
 }
-export interface CoordinationAgreement {
+interface CoordinationAgreement {
   rejectedBy?: string | null;
   resolutionRun?: string | null;
   id: string;
@@ -51,7 +51,7 @@ export interface CoordinationAgreement {
   status: string;
   revision: number;
 }
-export interface ScopeAudit {
+interface ScopeAudit {
   projectId: string;
   taskId: string;
   runId: string;
@@ -61,7 +61,7 @@ export interface ScopeAudit {
   error: string | null;
   acceptedTree: string | null;
 }
-export interface AssistPolicy {
+interface AssistPolicy {
   projectId: string;
   projectPath: string;
   projectName: string;
@@ -70,7 +70,7 @@ export interface AssistPolicy {
   resolve: boolean;
   merge: boolean;
 }
-export interface ReconciliationJob {
+interface ReconciliationJob {
   id: string;
   projectId: string;
   sourceIds: string[];
