@@ -20,7 +20,7 @@ export const STATUS = {
   conflicted: { letter: '!', label: 'Conflict' },
 } as const;
 
-export function splitPath(path: string) {
+function splitPath(path: string) {
   const index = path.lastIndexOf('/');
   return index < 0
     ? { dir: '', name: path }

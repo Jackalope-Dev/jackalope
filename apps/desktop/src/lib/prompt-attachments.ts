@@ -8,7 +8,7 @@ function normalize(path: string) {
   return path.replace(SEPARATORS, '/').replace(/\/$/, '');
 }
 
-export function isImagePath(path: string) {
+function isImagePath(path: string) {
   const extension = path.split('.').pop()?.toLowerCase() ?? '';
   return IMAGE_EXTENSIONS.has(extension);
 }

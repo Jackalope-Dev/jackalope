@@ -11,7 +11,7 @@ export interface SwarmFile {
   head: string | null;
 }
 
-export interface SwarmFork {
+interface SwarmFork {
   fork: string;
   attemptId: string;
   agent: string;
@@ -25,7 +25,7 @@ export interface SwarmFork {
   updatedAt: string;
 }
 
-export type SwarmConflictKind = 'overlapping-lines' | 'delete-vs-edit' | 'both-added' | 'same-file';
+type SwarmConflictKind = 'overlapping-lines' | 'delete-vs-edit' | 'both-added' | 'same-file';
 
 export interface SwarmConflict {
   forks: [string, string];

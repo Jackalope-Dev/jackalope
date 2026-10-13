@@ -85,6 +85,11 @@ They cover drafts, readiness races, guided setup, review, merge handoffs, limits
 keyboard access and responsive themes. Screenshots go to ignored `output/playwright/`;
 they do not prove provider execution or installed-app acceptance.
 
+`pnpm knip` reports unused files, exports and dependencies across the workspaces
+(configured in `knip.jsonc`, part of `pnpm verify`). Delete dead code rather than
+ignoring it; an ignore entry needs a comment naming what loads the file. Knip does
+not see `import('./x').Type` type queries, so prefer `import type`.
+
 Run the full verification gate before submitting changes:
 
 ```powershell

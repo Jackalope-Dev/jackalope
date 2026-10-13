@@ -3,7 +3,6 @@ import { ServiceError as AccessError } from '../errors';
 
 // Store package flights are managed by hand in Partner Center, so a request is
 // a to-do for the operator rather than an automatic membership change.
-export type BetaStatus = 'pending' | 'done' | 'declined' | 'withdrawn';
 const fields =
   'id,kind,store_email AS storeEmail,status,app_version AS appVersion,created_at AS createdAt,resolved_at AS resolvedAt';
 

@@ -8,7 +8,7 @@ export interface ForkSnapshot {
   files: ChangedFile[];
 }
 
-export type ConflictKind =
+type ConflictKind =
   /** Both agents edited the same or adjacent lines. */
   | 'overlapping-lines'
   /** One agent deleted a file the other changed. */

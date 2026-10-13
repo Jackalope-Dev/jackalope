@@ -5,7 +5,7 @@ import type { usageEntries } from './usage-entries.ts';
 export type UsageEntry = ReturnType<typeof usageEntries>[number];
 export const usageAccountKey = (r: UsageEntry) =>
   `${r.accountBinding?.adapter ?? r.agent}:${r.accountBinding?.profileId ?? 'cli-default'}`;
-export const usageTaskKey = (r: TaskRun) => JSON.stringify([r.projectId, r.projectPath, r.taskId]);
+const usageTaskKey = (r: TaskRun) => JSON.stringify([r.projectId, r.projectPath, r.taskId]);
 export const usageDateKey = (date: string, monthly = false) => {
   const d = new Date(date);
   if (!Number.isFinite(d.getTime())) return 'Undated';

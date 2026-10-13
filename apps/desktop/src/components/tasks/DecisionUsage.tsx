@@ -11,8 +11,6 @@ import { summarizeUsage } from '../../lib/usage-insights';
 import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 
-export { countedTaskDecisions, readTaskDecisionUsage } from '../../lib/decision-usage';
-
 export function useTaskDecisionUsage(enabled = true) {
   const [records, setRecords] = useState<TaskDecisionUsage[]>([]);
   const [error, setError] = useState('');

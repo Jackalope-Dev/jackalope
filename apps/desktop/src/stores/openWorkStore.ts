@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export const MAX_OPEN_WORK = 8;
+const MAX_OPEN_WORK = 8;
 
 /** Recently opened tasks, chats and plans shown as tabs, keyed like work signals. */
 interface OpenWorkState {

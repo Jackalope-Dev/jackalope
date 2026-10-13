@@ -12,7 +12,7 @@ declare global {
 }
 
 /** Public site key; signup shows no challenge while it is unset. */
-export const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() || '';
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() || '';
 const script = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 let loading: Promise<void> | null = null;
 

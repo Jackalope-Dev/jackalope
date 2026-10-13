@@ -84,7 +84,7 @@ export const useThemeStore = create<ThemeState>()(
   ),
 );
 
-export function refreshProjectTheme() {
+function refreshProjectTheme() {
   const { projects, activeProjectId } = useProjectStore.getState();
   const theme =
     projects.find((project) => project.id === activeProjectId)?.preferences?.theme ??

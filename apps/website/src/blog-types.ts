@@ -1,4 +1,4 @@
-export type BlogLink = { label: string; href: string };
+type BlogLink = { label: string; href: string };
 
 export type EditorialCover = {
   kind:

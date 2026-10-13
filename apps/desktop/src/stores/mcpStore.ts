@@ -45,14 +45,14 @@ export interface AllMcpsServer {
   markdownUrl?: string;
 }
 
-export interface AllMcpsSearchResponse {
+interface AllMcpsSearchResponse {
   total: number;
   query: string | null;
   category: string | null;
   servers: AllMcpsServer[];
 }
 
-export interface AllMcpsDetails {
+interface AllMcpsDetails {
   description?: string;
   aiOverview?: string | null;
   aiFeatures?: string[];

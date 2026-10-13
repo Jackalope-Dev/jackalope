@@ -17,7 +17,7 @@ const errors: Record<string, string> = {
 };
 export const message = (error: unknown) =>
   error instanceof Error ? error.message : 'Could not complete the request. Try again.';
-export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, { credentials: 'same-origin', redirect: 'error', ...options });
   if (!response.headers.get('content-type')?.includes('application/json'))
     throw new Error('Your admin session may have expired. Sign in again.');
@@ -76,7 +76,7 @@ export interface Readiness {
   version: string | null;
   distribution?: 'store';
 }
-export type Status = 'waiting' | 'approved' | 'revoked';
+type Status = 'waiting' | 'approved' | 'revoked';
 export interface Member {
   id: string;
   email: string;
@@ -144,7 +144,7 @@ export interface Summary {
   feedback: { status: string; count: number }[];
   mail: { needsAttention: number };
 }
-export interface Metric {
+interface Metric {
   day: string;
   version: string;
   channel: string;
@@ -182,7 +182,7 @@ export interface Insights {
   priorities: Count[];
   sources: Count[];
 }
-export interface Count {
+interface Count {
   label: string;
   count: number;
 }

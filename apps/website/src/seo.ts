@@ -13,7 +13,7 @@ const escapeHtml = (value: string) =>
       character,
   );
 export const routes = pages.map((page) => page.path);
-export const indexablePages = pages.filter((page) => !page.noindex);
+const indexablePages = pages.filter((page) => !page.noindex);
 
 function lastModified(path: string) {
   const comparison = marketingPages.find((page) => page.path === path)?.comparison;

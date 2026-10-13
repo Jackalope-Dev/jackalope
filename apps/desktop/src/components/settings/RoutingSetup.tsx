@@ -24,7 +24,7 @@ import { SettingActions, SettingBody, SettingGroup } from './Setting';
 import './routing.css';
 import { DecisionOptions } from './DecisionOptions';
 
-export function RoutingCircuit({ mode }: { mode: RoutingMode }) {
+function RoutingCircuit({ mode }: { mode: RoutingMode }) {
   return (
     <div className="routing-circuit" aria-hidden="true" key={mode}>
       <svg viewBox="0 0 520 146" fill="none" aria-hidden="true">
@@ -70,7 +70,7 @@ export function RoutingCircuit({ mode }: { mode: RoutingMode }) {
   );
 }
 
-export function RoutingSetup({
+function RoutingSetup({
   projectId,
   mode,
   onModeChange,

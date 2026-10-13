@@ -1,1 +1,1 @@
-export { Input, type InputProps } from '@jackalope/ui';
+export { Input } from '@jackalope/ui';
