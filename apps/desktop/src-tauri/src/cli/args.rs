@@ -37,6 +37,11 @@ pub enum Command {
     Stop {
         id: String,
     },
+    /// Show or answer the question a conversation is waiting on.
+    Answer {
+        id: String,
+        text: Option<String>,
+    },
     /// A conversation's changes since its workspace left the project's branch.
     Diff {
         id: String,
@@ -172,6 +177,13 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
     } else if version {
         Command::Version
     } else if print || first == Some("run") {
+        // A reply to an existing conversation would otherwise be sent as the
+        // first message of a new one.
+        if pick || resume {
+            return Err(
+                "-p starts a new conversation. To reply to one, use 'jackalope attach <id>', or 'jackalope answer <id>' for a waiting question.".into(),
+            );
+        }
         let skip = usize::from(!print);
         Command::Once {
             message: words[skip.min(words.len())..].join(" "),
@@ -268,6 +280,10 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
                     yes,
                 }
             }
+            Some("answer") => Command::Answer {
+                id: argument().ok_or("Which conversation? Run 'jackalope ls' to see them.")?,
+                text: Some(words[2.min(words.len())..].join(" ")).filter(|text| !text.is_empty()),
+            },
             Some("stop") => {
                 extra(2)?;
                 Command::Stop {
@@ -561,5 +577,21 @@ mod tests {
         assert_eq!(command(&["-V"]), Command::Version);
         assert_eq!(command(&["ls", "--json"]), Command::List { json: true });
         assert_eq!(command(&["stop", "ab"]), Command::Stop { id: "ab".into() });
+        assert_eq!(
+            command(&["answer", "ab"]),
+            Command::Answer {
+                id: "ab".into(),
+                text: None
+            }
+        );
+        assert_eq!(
+            command(&["answer", "ab", "Allow", "once"]),
+            Command::Answer {
+                id: "ab".into(),
+                text: Some("Allow once".into())
+            }
+        );
+        assert!(parse_line(&["-p", "-r", "ab", "hello"]).is_err());
+        assert!(parse_line(&["-p", "-c", "hello"]).is_err());
     }
 }

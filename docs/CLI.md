@@ -75,6 +75,7 @@ terminal and the app together. Leaving a terminal does not stop work.
 | `jackalope attach <id>` | Rejoins a conversation; any unambiguous id prefix works |
 | `jackalope ls` | Lists open conversations with their project, state and age |
 | `jackalope stop <id>` | Stops the work a conversation is running |
+| `jackalope answer <id> [reply]` | Shows the question a conversation is waiting on, or answers it by text or option number |
 | `jackalope diff <id>` | Prints a conversation's changes since its worktree left the project's commit, uncommitted edits included; `--stat` summarizes them. New untracked files are listed on stderr |
 | `jackalope merge <id>` | Pauses the conversation, prepares a merge of its latest reviewed attempt into the project's target branch through the app's merge review, lists the files and asks before applying. `-m` sets the commit message; conflicts are reported for the app's merge review |
 | `jackalope pr <id>` | Commits remaining changes with the project's commit settings, pushes the branch and opens a draft pull request through the GitHub CLI after you confirm. `--title` replaces the conversation title; `--ready` opens it ready for review |
