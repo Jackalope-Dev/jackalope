@@ -24,6 +24,7 @@
     "dev:website": "pnpm --filter @jackalope/website dev",
     "build:website": "pnpm --filter @jackalope/website build",
     "verify": "node scripts/verify.mjs",
+    "verify:quick": "biome check --changed --since=origin/master --no-errors-on-unmatched --error-on-warnings && pnpm typecheck && pnpm knip",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:dependencies": "node scripts/security/dependencies.mjs",
     "evaluate:execution": "node scripts/evaluation/run.mjs",
@@ -60,7 +61,7 @@
   "license": "Apache-2.0",
   "packageManager": "pnpm@10.11.0",
   "devDependencies": {
-    "@biomejs/biome": "^2.5.12",
+    "@biomejs/biome": "^2.5.15",
     "agent-browser": "0.38.1",
     "knip": "^6.41.0",
     "lefthook": "2.1.14",

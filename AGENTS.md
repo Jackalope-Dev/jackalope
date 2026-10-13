@@ -1,12 +1,15 @@
 # Agent guidance
 
-- Do not commit code. Leave changes for the maintainer to review and commit.
+- Commit your own work on a branch under .worktrees/<task>, as the configured git user,
+  with no Co-Authored-By or agent trailers. Stage only the files you changed. Never
+  commit to master, push unless asked, force-push, reset --hard or clean. Releases
+  follow the jackalope-release skill, which does not commit.
 - Read docs/STATUS.md, docs/TODO.md and docs/UI-GUIDELINES.md before changes. Check git
   status and worktree list; preserve existing work.
 - Start isolated concurrent work from current master under .worktrees/<task>.
   Older worktrees are snapshots, not the current baseline.
-- Confirm the baseline with pnpm build. Use targeted checks while working, finish
-  with pnpm verify. Update status/backlog only when capabilities or open scope change. Do not claim
+- Confirm the baseline with pnpm build. Use targeted checks while working
+  (pnpm verify:quick: Biome on changed files, typecheck, knip), finish with pnpm verify. Update status/backlog only when capabilities or open scope change. Do not claim
   native or installed-app acceptance from a frontend build.
 - Keep comments for non-obvious behavior and contracts, not narration or task history.
 - Follow docs/DOCUMENTATION.md for every tracked document. Keep only current behavior,
@@ -39,6 +42,15 @@
 - Keep credentials and live deployment state out of source. Use explicit private
   server configuration and isolated native test profiles. Do not stop another
   user's working app to run a test.
+
+Quick facts that trip people up:
+
+- pnpm only (pinned in package.json); never npm or bun here. Lockfile patches and
+  overrides live in pnpm-workspace.yaml.
+- src-tauri/build.rs reads node_modules/agent-browser; the desktop bundles that binary.
+- apps/server/admin is a separate SPA built by admin:build, not part of the Worker.
+- Browser verification scripts import /src/... inside the Vite dev server, so those
+  paths only resolve at runtime.
 
 Read docs/PARALLEL-WORKFLOWS.md for integration rules and docs/SELF-DEVELOPMENT.md for
 native testing. Repository skills point to these shared guides.
