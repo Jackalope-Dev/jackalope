@@ -19,6 +19,8 @@ export interface ReferralView {
   connected: number;
   shareUrl: string;
   invites: ReferralInvite[];
+  /** The service admits anyone who confirms an email, so passes no longer skip a wait. */
+  openSignup?: boolean;
 }
 
 let pending: Promise<void> | undefined;

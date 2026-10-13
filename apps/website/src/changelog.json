@@ -1,5 +1,143 @@
 [
   {
+    "id": "one-name-for-every-kind-of-work",
+    "date": "2026-10-12",
+    "status": "In development",
+    "title": "One name for every kind of work",
+    "description": "Everything in the work list is work, labelled by how it runs.",
+    "items": [
+      "Each row shows whether it is a conversation, a task, a planned task or a draft, and the app says conversation everywhere it used to say chat or session.",
+      "Opening any piece of work closes the others, so the page never shows one item while the list highlights another.",
+      "Help now describes the three-step project setup and the composer that opens Work."
+    ]
+  },
+  {
+    "id": "follow-terminal-runs-as-they-happen",
+    "date": "2026-10-12",
+    "status": "In development",
+    "title": "Follow, review and ship work from the terminal",
+    "description": "Scripts and CI can watch a jackalope -p run as it moves, and anyone can read its changes from the terminal.",
+    "items": [
+      "jackalope -p --stream-json prints one JSON line when the run starts, at each new step and as the agent writes output, then the same result --json prints, with the same exit status.",
+      "jackalope diff <id> prints what a conversation changed since its workspace left your branch, without opening the app; --stat summarizes it.",
+      "jackalope merge <id> and jackalope pr <id> merge a finished conversation or open its pull request through the same checks as the app, asking before anything changes; --yes skips the question in scripts."
+    ]
+  },
+  {
+    "id": "agent-choices-and-schedules-in-one-place",
+    "date": "2026-10-12",
+    "status": "In development",
+    "title": "Agent choices and schedules in one place",
+    "description": "Agents and Bots each gather what used to be split across separate pages.",
+    "items": [
+      "The Agents page holds the default agent, quota handoff and project account groups beside the roster, with one switch for the active project or every project.",
+      "Schedules moved under Bots, so a bot's wake-ups and recurring tasks sit together and the sidebar has one less destination."
+    ]
+  },
+  {
+    "id": "open-pull-requests-and-fix-failing-checks-from-a-task",
+    "date": "2026-10-12",
+    "status": "In development",
+    "title": "Open pull requests and fix failing checks from a task",
+    "description": "Delivery now goes from a finished task to a pull request without leaving Jackalope.",
+    "items": [
+      "Create pull request commits the task's remaining changes with your commit settings, pushes its branch and opens a draft or ready pull request through your GitHub CLI after you confirm.",
+      "Failing pull request checks are listed openly, and Ask the agent to fix drafts a follow-up that reproduces and repairs them without pushing."
+    ]
+  },
+  {
+    "id": "a-quicker-start-and-a-simpler-workspace",
+    "date": "2026-10-12",
+    "status": "In development",
+    "title": "A quicker start and a simpler workspace",
+    "description": "New projects get to their first task sooner, and the workspace keeps your work in view.",
+    "items": [
+      "Project setup now takes three steps: project, agents and an optional first task. Decisions, commit behavior and colors start from defaults you can change in Project settings.",
+      "The workspace now has one layout: recent work stays in a sidebar you can fold away, with list and board views of your work. Focus, Build and Oversee are retired. The Agents page groups agents, tools, apps and usage under shorter tabs.",
+      "The jackalope command accepts --agent and --model when starting a conversation, and jackalope -p --agents claude,codex sends one message to several agents and prints every reply."
+    ]
+  },
+  {
+    "id": "see-what-agents-are-doing-from-the-terminal",
+    "date": "2026-10-08",
+    "status": "In development",
+    "title": "See what agents are doing from the terminal.",
+    "description": "The jackalope command shows live progress, changed files and questions as work runs.",
+    "items": [
+      "Running work lists its newest steps under the conversation, and the status line says when a run has gone quiet.",
+      "A changes panel opens beside the conversation with changed files and diffs; Ctrl+O toggles it and /review opens them in the app.",
+      "Questions stay pinned above the input, and /answer reopens their choices.",
+      "/theme sets a project's colour in every terminal and the app, and projects first used from a terminal appear in an open app right away.",
+      "Conversation text, branches and workspace paths can be selected and copied directly in the app."
+    ]
+  },
+  {
+    "id": "a-cleaner-more-consistent-workspace",
+    "date": "2026-10-08",
+    "status": "In development",
+    "title": "A cleaner, more consistent workspace.",
+    "description": "Pages, tabs and controls now share one look across the app, with smoother motion.",
+    "items": [
+      "Peer views such as Agents, MCP connections and Project tabs switch with one segmented control, and the selection slides between choices.",
+      "Dialogs, menus and dropdowns ease in and out, and pages settle into place as they open.",
+      "The workspace sidebar is its own rounded panel, and the branch beside the project name is a clear, clickable chip.",
+      "Project overview shows readiness as one list with a single fix for each item, and long-running tasks show hours and days instead of thousands of minutes.",
+      "Bot lists, template cards and agent options keep even sizes and alignment, and long model lists scroll inside the agent picker."
+    ]
+  },
+  {
+    "id": "bots-remember-and-keep-their-conversations-together",
+    "date": "2026-10-07",
+    "status": "In development",
+    "title": "Bots remember and keep their conversations together.",
+    "description": "Messages to a bot continue its latest conversation, and bots carry what they learn into new ones.",
+    "items": [
+      "Messaging a bot continues its latest open conversation, with a choice to start a new one.",
+      "Bots save short notes for later conversations and recall how recent ones ended; you can review and remove notes on the Bots page.",
+      "Edits to a bot's name and instructions reach its open conversations.",
+      "Bot conversations always open on the Bots page, which shows when a bot is working and which replies you have not read.",
+      "Bots can search and reread their own earlier conversations before guessing about past work.",
+      "Bots running on Grok Build, Antigravity and Gemini CLI can now message other bots, show cards and keep notes too."
+    ]
+  },
+  {
+    "id": "agents-start-sooner-and-keep-their-own-playbook",
+    "date": "2026-10-06",
+    "status": "In development",
+    "title": "Agents start sooner and keep their own playbook.",
+    "description": "Jackalope now gives agents the facts and rules of your workspace and lets each agent's own tooling decide how to work.",
+    "items": [
+      "Automatic tasks choose an agent while the workspace is still being prepared.",
+      "Agents receive a shorter set of instructions focused on your workspace, permissions and review.",
+      "Claude Code and Codex receive Jackalope's rules as system instructions, keeping the first message about your task."
+    ]
+  },
+  {
+    "id": "bots-that-work-on-their-own",
+    "date": "2026-10-05",
+    "status": "In development",
+    "title": "Bots that work on their own.",
+    "description": "Bots can now wake themselves up, work with each other and bring you the decisions that need you.",
+    "items": [
+      "Wake a bot on a schedule, when the project changes or when a connected app returns new data.",
+      "Bots find and message each other, and replies come back to the conversation that asked.",
+      "Decisions, questions, next steps and sources appear as cards you can answer from the conversation or the Bots page.",
+      "Bots can suggest new bots for you to review, and every wake-up and message is labelled in their conversations."
+    ]
+  },
+  {
+    "id": "download-jackalope-on-windows-macos-and-linux",
+    "date": "2026-10-04",
+    "status": "Released",
+    "title": "Download Jackalope on Windows, macOS and Linux.",
+    "description": "Desktop builds are now public on every platform. Signing in still needs an approved waitlist spot or an Instant Access Pass.",
+    "items": [
+      "Get Jackalope for Windows from the Microsoft Store.",
+      "Download Apple silicon and Intel builds for macOS, or an AppImage for Linux.",
+      "Choose the Stable release, or opt into Beta builds that arrive sooner."
+    ]
+  },
+  {
     "id": "a-warmer-welcome-and-faster-updates",
     "date": "2026-10-02",
     "status": "In development",

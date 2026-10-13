@@ -1,5 +1,5 @@
 import { graphlib, layout } from '@dagrejs/dagre';
-import { EmptyState } from '@jackalope/ui';
+import { Badge, EmptyState } from '@jackalope/ui';
 import {
   Background,
   Controls,
@@ -150,24 +150,27 @@ export function FeatureGraphView({
               </div>
 
               <div className="flex items-center justify-between mt-2 pt-1 border-t border-[var(--color-border)]/50">
-                <span
-                  className={`feature-graph-badge ${
+                <Badge
+                  className="feature-graph-badge"
+                  variant={
                     state === 'merged'
-                      ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
+                      ? 'success'
                       : state === 'active'
-                        ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent-ink)]'
+                        ? 'accent'
                         : state === 'review'
-                          ? 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
+                          ? 'warning'
                           : state === 'attention'
-                            ? 'bg-[var(--color-danger)]/15 text-[var(--color-danger)]'
-                            : 'bg-[var(--color-surface-sunken)] text-[var(--color-text-muted)]'
-                  }`}
+                            ? 'danger'
+                            : 'default'
+                  }
                 >
-                  {state === 'merged' && <CheckCircle2 size={10} />}
-                  {state === 'active' && <Loader2 size={10} className="animate-spin" />}
-                  {state === 'review' && <CheckCircle2 size={10} />}
-                  {state === 'attention' && <AlertCircle size={10} />}
-                  {state === 'queued' && <Clock size={10} />}
+                  {state === 'merged' && <CheckCircle2 size={10} aria-hidden="true" />}
+                  {state === 'active' && (
+                    <Loader2 size={10} className="animate-spin" aria-hidden="true" />
+                  )}
+                  {state === 'review' && <CheckCircle2 size={10} aria-hidden="true" />}
+                  {state === 'attention' && <AlertCircle size={10} aria-hidden="true" />}
+                  {state === 'queued' && <Clock size={10} aria-hidden="true" />}
                   {state === 'merged'
                     ? 'Integrated'
                     : state === 'active'
@@ -177,7 +180,7 @@ export function FeatureGraphView({
                         : state === 'attention'
                           ? 'Needs you'
                           : 'Waiting'}
-                </span>
+                </Badge>
 
                 {item.scopes.length > 0 && (
                   <span className="text-[10px] text-[var(--color-text-muted)] font-mono truncate max-w-[110px]">
@@ -278,26 +281,15 @@ export function FeatureGraphView({
         {/* Live Status Badges */}
         <div className="flex items-center gap-2 text-xs">
           {stats.active > 0 && (
-            <span className="px-2 py-0.5 rounded bg-[var(--color-accent)]/10 text-[var(--color-accent-ink)] font-medium flex items-center gap-1">
-              <Loader2 size={11} className="animate-spin" /> {stats.active} active
-            </span>
+            <Badge variant="accent">
+              <Loader2 size={11} className="animate-spin" aria-hidden="true" /> {stats.active}{' '}
+              active
+            </Badge>
           )}
-          {stats.review > 0 && (
-            <span className="px-2 py-0.5 rounded bg-[var(--color-warning)]/10 text-[var(--color-warning)] font-medium">
-              {stats.review} in review
-            </span>
-          )}
-          {stats.merged > 0 && (
-            <span className="px-2 py-0.5 rounded bg-[var(--color-success)]/10 text-[var(--color-success)] font-medium">
-              {stats.merged} merged
-            </span>
-          )}
-          {stats.attention > 0 && (
-            <span className="px-2 py-0.5 rounded bg-[var(--color-danger)]/10 text-[var(--color-danger)] font-medium">
-              {stats.attention} needs attention
-            </span>
-          )}
-          <span className="text-[var(--color-text-muted)] text-[11px]">{stats.queued} queued</span>
+          {stats.review > 0 && <Badge variant="warning">{stats.review} in review</Badge>}
+          {stats.merged > 0 && <Badge variant="success">{stats.merged} merged</Badge>}
+          {stats.attention > 0 && <Badge variant="danger">{stats.attention} needs attention</Badge>}
+          <Badge appearance="plain">{stats.queued} queued</Badge>
 
           <Button
             variant="ghost"

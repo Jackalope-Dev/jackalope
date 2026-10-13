@@ -516,9 +516,6 @@ export function AccessPage() {
         </>
       ) : (
         <Panel variant="plain" className="access-card access-entry">
-          <p>
-            Still waiting? <a href="/waitlist/">Check your place & referrals</a>.
-          </p>
           {token ? (
             <>
               <h2>Confirm sign-in</h2>
@@ -645,7 +642,7 @@ export function AccessPage() {
                 <a href="/privacy/">Privacy</a>.
               </p>
               <a className="text-link" href="/#newsletter">
-                Need access? Join the waitlist <ArrowRight size={14} />
+                New here? Sign up free <ArrowRight size={14} />
               </a>
             </>
           )}

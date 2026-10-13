@@ -87,7 +87,7 @@ export function ArchivedHistory() {
       aria-label="Archived task history"
       title="Archived task history"
       action={
-        <div className="flex flex-wrap gap-2">
+        <div className="workspace-actions">
           <Button
             variant="outline"
             disabled={!desktop || importing}

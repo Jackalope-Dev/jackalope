@@ -293,40 +293,47 @@ pub fn mark_glyph(mark: Mark) -> &'static str {
     }
 }
 
-/// The dotted rule while an agent works: a short accent comet runs along it,
-/// brightest at its head. Still (the plain rule) under reduced motion or
-/// without colour.
+/// The dotted rule while an agent works: a soft band of accent glides along
+/// the same dots, so only colour moves and the rule keeps its shape. Still
+/// (the plain rule) under reduced motion or without colour.
 pub fn divider_active(width: u16, tick: usize) -> Line<'static> {
     if !motion() || !colored() {
         return divider(width);
     }
-    let (dot, head) = if unicode() {
-        ("⠒", "━")
-    } else {
-        ("-", "=")
-    };
+    let dot = if unicode() { "⠒" } else { "-" };
     let width = width as usize;
+    const HALF: isize = 10;
     // One pass every few seconds regardless of width, so wide terminals are
     // not slower.
-    let span = width + 16;
-    let position = (tick * span / 40) % span;
+    let span = width + 2 * HALF as usize;
+    let center = (tick * span / 48) % span;
     let spans = (0..width)
         .map(|column| {
-            let behind = position as isize - column as isize;
-            if (0..12).contains(&behind) {
-                let weight = 1.0 - behind as f32 / 12.0;
-                let color = if truecolor() {
-                    lifted(weight * 0.6)
-                } else {
-                    accent()
-                };
-                Span::styled(head, Style::default().fg(color))
+            let distance = (center as isize - HALF - column as isize).abs();
+            let style = if distance >= HALF {
+                Style::default().fg(muted())
+            } else if truecolor() {
+                // Eased so the band has no hard edges.
+                let weight = 1.0 - (distance as f32 / HALF as f32).powi(2);
+                Style::default().fg(mix(muted(), accent(), weight))
             } else {
-                Span::styled(dot, Style::default().fg(muted()))
-            }
+                Style::default().fg(accent())
+            };
+            Span::styled(dot, style)
         })
         .collect::<Vec<_>>();
     Line::from(spans)
+}
+
+/// `from` moved `amount` of the way toward `to`, when both are true colour.
+fn mix(from: Color, to: Color, amount: f32) -> Color {
+    match (from, to) {
+        (Color::Rgb(r1, g1, b1), Color::Rgb(r2, g2, b2)) => {
+            let step = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * amount).round() as u8;
+            Color::Rgb(step(r1, r2), step(g1, g2), step(b1, b2))
+        }
+        _ => to,
+    }
 }
 
 /// A dotted rule across `width` columns.
@@ -779,16 +786,24 @@ mod tests {
 
     #[test]
     fn the_working_rule_keeps_its_width_and_moves() {
-        let rule = |tick| -> String {
+        let text = |tick| -> String {
             divider_active(40, tick)
                 .spans
                 .iter()
                 .map(|span| span.content.to_string())
                 .collect()
         };
-        assert_eq!(rule(5).chars().count(), 40);
+        let colors = |tick| -> Vec<_> {
+            divider_active(40, tick)
+                .spans
+                .iter()
+                .map(|span| span.style.fg)
+                .collect()
+        };
+        assert_eq!(text(5).chars().count(), 40);
+        assert_eq!(text(5), text(15), "only colour moves");
         if motion() && colored() {
-            assert_ne!(rule(5), rule(15), "the comet advances between frames");
+            assert_ne!(colors(5), colors(15), "the band advances between frames");
         }
     }
 }

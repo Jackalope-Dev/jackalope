@@ -21,7 +21,7 @@ type Campaign = {
 const eligibleSql = `completed_at IS NULL AND (enabled=0
   OR NOT EXISTS(SELECT 1 FROM access_members WHERE id=member_id AND newsletter=1 AND newsletter_confirmed_at IS NOT NULL)
   OR (active_days=2 AND json_array_length(results)=2))`;
-export const feedbackAction = z.discriminatedUnion('action', [
+const feedbackAction = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('status') }),
   z.strictObject({
     action: z.literal('preferences'),

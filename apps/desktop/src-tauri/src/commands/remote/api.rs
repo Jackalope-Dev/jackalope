@@ -228,7 +228,11 @@ fn dispatch(service: &RemoteAccess, config: &Config, action: Action) -> Result<V
                 id.clone(),
                 "Remote task".into(),
                 template,
-                Some(FirstMessage { id, text }),
+                Some(FirstMessage {
+                    id,
+                    text,
+                    origin: None,
+                }),
                 SessionLimits::default(),
             )?;
             Ok(json!({"sessionId":session}))

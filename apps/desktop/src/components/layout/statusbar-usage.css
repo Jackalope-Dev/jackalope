@@ -25,7 +25,7 @@
 .allowance-meter {
   display: block;
   height: 7px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
   background: var(--color-border-subtle);
 }

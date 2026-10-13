@@ -110,8 +110,8 @@ export const posts: BlogPost[] = [
       {
         title: 'Growing in the open.',
         paragraphs: [
-          'Join the waitlist to hear when early access opens. The app tour gives you a look at the workspace using sample project data.',
-          'We will share development notes and public release announcements here. Join the waitlist for early-access news.',
+          'Sign up free to start using Jackalope. The app tour gives you a look at the workspace using sample project data.',
+          'We will share development notes and release announcements here.',
         ],
       },
     ],
@@ -178,13 +178,13 @@ export const pages: SitePage[] = [
     path: '/',
     title: 'Jackalope: Run AI coding agents in parallel',
     description:
-      'Run coding agents in parallel Git worktrees. Match project guidance, automate checks, explore code dependencies, and review changes in one desktop workspace.',
+      'Run Codex, Claude Code, Gemini CLI and more in parallel, each in its own Git worktree. Review every change in one desktop app for Windows, macOS and Linux.',
   },
   {
     path: '/download/',
     title: 'Download Jackalope for Windows, macOS & Linux',
     description:
-      'Find Jackalope desktop downloads and platform availability. Join the waitlist or claim a friend’s Instant Access Pass for early access.',
+      'Find Jackalope desktop downloads and platform availability. Sign up free and confirm your email to start.',
   },
   {
     path: '/benchmarks/',
@@ -229,8 +229,8 @@ export const pages: SitePage[] = [
   {
     path: '/waitlist/',
     noindex: true,
-    title: 'Your waitlist place | Jackalope',
-    description: 'Your private waitlist position and referral progress.',
+    title: 'Your account | Jackalope',
+    description: 'Confirm your email and manage your Jackalope account.',
   },
   {
     path: '/access/',

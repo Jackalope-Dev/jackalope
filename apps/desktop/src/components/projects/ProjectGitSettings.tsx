@@ -32,10 +32,13 @@ export function ProjectGitSettings({
   projectPath,
   onDraftChange,
   disabled = false,
+  titled = true,
 }: {
   projectPath: string;
   onDraftChange?: (policy: CommitPolicy | undefined) => void;
   disabled?: boolean;
+  /** Off when the surrounding page already names this section. */
+  titled?: boolean;
 }) {
   const id = useId();
   const [policy, setPolicy] = useState<CommitPolicy>();
@@ -86,7 +89,7 @@ export function ProjectGitSettings({
   };
   const dirty = JSON.stringify(policy) !== JSON.stringify(saved);
   return (
-    <SettingGroup title="Commits and cleanup">
+    <SettingGroup title={titled ? 'Commits and cleanup' : undefined}>
       {policy && (
         <fieldset disabled={busy || disabled} className="project-git-fields">
           <legend className="sr-only">Commit attribution</legend>

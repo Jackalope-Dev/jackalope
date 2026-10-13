@@ -32,12 +32,32 @@ pub struct SessionMessage {
     pub created_at: String,
     pub run_id: Option<String>,
     pub canceled: bool,
+    /// Who sent a message that did not come from the person: a wake-up, another bot or a card answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<MessageOrigin>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageOrigin {
+    /// `wake`, `bot`, `reply` or `card`.
+    pub kind: String,
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bot_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bot_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
 }
 
 #[derive(Deserialize)]
 pub struct FirstMessage {
     pub(super) id: String,
     pub(super) text: String,
+    /// Set natively by the bot hub; renderer requests cannot claim an origin.
+    #[serde(skip)]
+    pub(super) origin: Option<MessageOrigin>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -111,6 +131,14 @@ impl SessionPersona {
     }
 }
 
+pub(in crate::commands) struct MessageState {
+    pub run_id: Option<String>,
+    pub settled: bool,
+    pub canceled: bool,
+    pub closed: bool,
+    pub error: Option<String>,
+}
+
 #[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionLimits {
@@ -139,7 +167,7 @@ fn limit_reason(session: &LiveSession, runs: &[TaskRun]) -> Option<String> {
         .max_batches
         .is_some_and(|limit| session.batches.len() >= limit)
     {
-        return Some("The session reached its batch limit. Review the result and adjust limits before resuming.".into());
+        return Some("The conversation reached its batch limit. Review the result and adjust limits before resuming.".into());
     }
     let threshold = session.limits.pause_at_estimated_usd?;
     let mut total = 0.0;
@@ -159,17 +187,20 @@ fn limit_reason(session: &LiveSession, runs: &[TaskRun]) -> Option<String> {
         for value in usage {
             match value.estimated_cost_usd.filter(|cost| cost.is_finite() && *cost >= 0.0) {
                 Some(cost) if value.reported => total += cost,
-                _ => return Some("Estimated cost is unavailable for part of this session. Review usage or remove the cost threshold before resuming.".into()),
+                _ => return Some("Estimated cost is unavailable for part of this conversation. Review usage or remove the cost threshold before resuming.".into()),
             }
         }
     }
-    (total >= threshold).then(|| "The session reached its estimated-cost threshold. Review usage and adjust limits before resuming.".into())
+    (total >= threshold).then(|| "The conversation reached its estimated-cost threshold. Review usage and adjust limits before resuming.".into())
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 struct Ledger {
     sessions: Vec<LiveSession>,
 }
+
+/// Other conversations a bot's new conversation is told about.
+const RECENT_CONVERSATIONS: usize = 5;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -222,7 +253,8 @@ impl LiveSessions {
             session.paused = true;
             if let Some(batch) = session.batches.last_mut().filter(|batch| !batch.settled) {
                 session.error = Some(
-                    "The session was interrupted. Review the last attempt before resuming.".into(),
+                    "The conversation was interrupted. Review the last attempt before resuming."
+                        .into(),
                 );
                 if !runs.iter().any(|run| run.id == batch.run_id) {
                     batch.error = Some("The pending launch was interrupted. Retry it explicitly after reviewing saved task history.".into());
@@ -255,7 +287,9 @@ impl LiveSessions {
     fn save(&self, ledger: &Ledger) -> Result<(), String> {
         let bytes = serde_json::to_vec(ledger).map_err(|e| e.to_string())?;
         if bytes.len() > 16_000_000 {
-            return Err("Live session storage is full. Finish or export existing sessions.".into());
+            return Err(
+                "Conversation storage is full. Finish or export existing conversations.".into(),
+            );
         }
         std::fs::create_dir_all(self.path.parent().ok_or("Invalid session path")?)
             .map_err(|e| e.to_string())?;
@@ -350,15 +384,22 @@ impl LiveSessions {
         if let Some(persona) = &persona {
             persona.validate()?;
         }
-        Uuid::parse_str(&id).map_err(|_| "Invalid session identifier")?;
+        Uuid::parse_str(&id).map_err(|_| "Invalid conversation identifier")?;
         if let Some(message) = &first_message {
             Uuid::parse_str(&message.id).map_err(|_| "Invalid message identifier")?;
             if message.text.trim().is_empty() || message.text.chars().count() > 12_000 {
                 return Err("Use a message between 1 and 12,000 characters.".into());
             }
         }
+        // Wake-ups and card answers keep the title naming what started them.
         let title = first_message
             .as_ref()
+            .filter(|message| {
+                message
+                    .origin
+                    .as_ref()
+                    .is_none_or(|origin| origin.kind == "bot")
+            })
             .map(|message| {
                 let text = message
                     .text
@@ -374,7 +415,7 @@ impl LiveSessions {
             })
             .unwrap_or(title);
         if title.trim().is_empty() || title.chars().count() > 160 {
-            return Err("Use a session title up to 160 characters.".into());
+            return Err("Use a conversation title up to 160 characters.".into());
         }
         if let Some(folder) = super::tasks::plain_folder(&request.project_path)? {
             request.project_path = folder;
@@ -404,7 +445,7 @@ impl LiveSessions {
                 {
                     return Ok(id);
                 }
-                return Err("This session identifier is already in use.".into());
+                return Err("This conversation identifier is already in use.".into());
             }
             if ledger.sessions.len() >= 100 {
                 return Err("Live sessions are limited to 100 saved sessions.".into());
@@ -418,6 +459,7 @@ impl LiveSessions {
                     created_at: now.clone(),
                     run_id: None,
                     canceled: false,
+                    origin: message.origin,
                 })
                 .collect();
             ledger.sessions.push(LiveSession {
@@ -471,11 +513,11 @@ impl LiveSessions {
                 };
             }
             if session.closed {
-                return Err("Reopen this session before sending a message.".into());
+                return Err("Reopen this conversation before sending a message.".into());
             }
             Self::ensure_unintegrated(session, &integrated)?;
             if session.messages.len() >= 1000 {
-                return Err("Start a new session after 1,000 messages.".into());
+                return Err("Start a new conversation after 1,000 messages.".into());
             }
             let now = Utc::now().to_rfc3339();
             session.messages.push(SessionMessage {
@@ -484,6 +526,7 @@ impl LiveSessions {
                 created_at: now.clone(),
                 run_id: None,
                 canceled: false,
+                origin: None,
             });
             session.updated_at = now;
             if draft_revision == Some(session.draft.revision) {
@@ -493,6 +536,228 @@ impl LiveSessions {
                 };
             }
             Ok(session.draft.clone())
+        })
+    }
+
+    /// Queues a message the person did not type, such as a bot reply, without touching the draft.
+    pub(in crate::commands) fn post(
+        &self,
+        id: &str,
+        text: &str,
+        origin: MessageOrigin,
+    ) -> Result<String, String> {
+        let text: String = text.trim().chars().take(12_000).collect();
+        if text.is_empty() {
+            return Err("Use a nonempty message.".into());
+        }
+        let message_id = Uuid::new_v4().to_string();
+        let _gate = self.gate.lock().map_err(|e| e.to_string())?;
+        let integrated = self.integrated_ids()?;
+        self.update(|ledger| {
+            let session = Self::session(ledger, id)?;
+            if session.closed {
+                return Err("This conversation is finished.".into());
+            }
+            Self::ensure_unintegrated(session, &integrated)?;
+            if session.messages.len() >= 1000 {
+                return Err("Start a new conversation after 1,000 messages.".into());
+            }
+            let now = Utc::now().to_rfc3339();
+            session.messages.push(SessionMessage {
+                id: message_id.clone(),
+                text,
+                created_at: now.clone(),
+                run_id: None,
+                canceled: false,
+                origin: Some(origin),
+            });
+            session.updated_at = now;
+            Ok(())
+        })?;
+        Ok(message_id)
+    }
+
+    /// The bot behind a conversation, if it has one.
+    pub(in crate::commands) fn persona(&self, id: &str) -> Option<SessionPersona> {
+        let inner = self.inner.lock().ok()?;
+        inner
+            .ledger
+            .sessions
+            .iter()
+            .find(|session| session.id == id)
+            .and_then(|session| session.persona.clone())
+    }
+
+    /// Brings open conversations up to date with their bots' current names and instructions,
+    /// so an edited bot's next batch follows its new instructions.
+    pub(in crate::commands) fn refresh_personas(
+        &self,
+        bots: &[(String, String, String)],
+    ) -> Result<(), String> {
+        let stale = |session: &LiveSession| {
+            let persona = session.persona.as_ref()?;
+            let (_, name, instructions) = bots.iter().find(|bot| bot.0 == persona.bot_id)?;
+            (!session.closed
+                && (persona.name != name.trim() || persona.instructions != instructions.trim()))
+            .then(|| (name.trim().to_owned(), instructions.trim().to_owned()))
+        };
+        {
+            let inner = self.inner.lock().map_err(|e| e.to_string())?;
+            if inner.error.is_some() || !inner.ledger.sessions.iter().any(|s| stale(s).is_some()) {
+                return Ok(());
+            }
+        }
+        let _gate = self.gate.lock().map_err(|e| e.to_string())?;
+        self.update(|ledger| {
+            for session in &mut ledger.sessions {
+                if let Some((name, instructions)) = stale(session) {
+                    if let Some(persona) = session.persona.as_mut() {
+                        persona.name = name;
+                        persona.instructions = instructions;
+                    }
+                }
+            }
+            Ok(())
+        })?;
+        self.changed();
+        Ok(())
+    }
+
+    /// What a bot carries between conversations: its saved notes, and when a conversation
+    /// starts, how its latest other conversations ended.
+    pub(in crate::commands) fn bot_memory(
+        &self,
+        session: &LiveSession,
+        runs: &[TaskRun],
+    ) -> String {
+        let Some(persona) = &session.persona else {
+            return String::new();
+        };
+        let mut memory = super::bot_hub::installed()
+            .map(|hub| hub.notes_prompt(&persona.bot_id))
+            .unwrap_or_default();
+        if !session.batches.is_empty() {
+            return memory;
+        }
+        let recent: Vec<(String, String, Option<String>)> = {
+            let Ok(inner) = self.inner.lock() else {
+                return memory;
+            };
+            let mut others: Vec<_> = inner
+                .ledger
+                .sessions
+                .iter()
+                .filter(|other| {
+                    other.id != session.id
+                        && other
+                            .persona
+                            .as_ref()
+                            .is_some_and(|other| other.bot_id == persona.bot_id)
+                        && !other.messages.is_empty()
+                })
+                .collect();
+            others.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+            others
+                .into_iter()
+                .take(RECENT_CONVERSATIONS)
+                .map(|other| {
+                    (
+                        other.title.clone(),
+                        other.updated_at.chars().take(10).collect(),
+                        other.batches.last().map(|batch| batch.run_id.clone()),
+                    )
+                })
+                .collect()
+        };
+        if recent.is_empty() {
+            return memory;
+        }
+        memory.push_str("Your latest other conversations, newest first (the user can open them on the Bots page):\n");
+        for (title, date, run) in recent {
+            let result = run
+                .and_then(|id| runs.iter().find(|run| run.id == id))
+                .map(|run| super::bot_hub::clip(&run.result.replace('\n', " "), 400))
+                .filter(|result| !result.is_empty())
+                .unwrap_or_else(|| "(no reply yet)".into());
+            memory.push_str(&format!("- {date} · {title}: {result}\n"));
+        }
+        memory
+    }
+
+    /// A bot's conversations, newest first, for recalling earlier work.
+    pub(in crate::commands) fn bot_sessions(&self, bot_id: &str) -> Vec<LiveSession> {
+        let Ok(inner) = self.inner.lock() else {
+            return vec![];
+        };
+        let mut sessions: Vec<_> = inner
+            .ledger
+            .sessions
+            .iter()
+            .filter(|session| {
+                session
+                    .persona
+                    .as_ref()
+                    .is_some_and(|persona| persona.bot_id == bot_id)
+            })
+            .cloned()
+            .collect();
+        sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        sessions
+    }
+
+    /// Whether new messages here would run: open, not paused by an error and not integrated.
+    pub(in crate::commands) fn accepting(&self, id: &str) -> bool {
+        let Ok(inner) = self.inner.lock() else {
+            return false;
+        };
+        inner.ledger.sessions.iter().any(|session| {
+            session.id == id && !session.closed && session.error.is_none() && !session.paused
+        })
+    }
+
+    /// Whether a conversation still has queued or running work. Paused conversations wait
+    /// on the person, so they do not count.
+    pub(in crate::commands) fn busy(&self, id: &str) -> bool {
+        let Ok(inner) = self.inner.lock() else {
+            return false;
+        };
+        inner.ledger.sessions.iter().any(|session| {
+            session.id == id
+                && !session.closed
+                && !session.paused
+                && (session.batches.last().is_some_and(|batch| !batch.settled)
+                    || session
+                        .messages
+                        .iter()
+                        .any(|message| message.run_id.is_none() && !message.canceled))
+        })
+    }
+
+    /// Where a message stands: its run once dispatched, and whether that batch settled.
+    pub(in crate::commands) fn message_state(
+        &self,
+        session: &str,
+        message: &str,
+    ) -> Option<MessageState> {
+        let inner = self.inner.lock().ok()?;
+        let session = inner
+            .ledger
+            .sessions
+            .iter()
+            .find(|item| item.id == session)?;
+        let found = session.messages.iter().find(|item| item.id == message)?;
+        let batch = found
+            .run_id
+            .as_ref()
+            .and_then(|run| session.batches.iter().find(|batch| &batch.run_id == run));
+        Some(MessageState {
+            run_id: found.run_id.clone(),
+            settled: batch.is_some_and(|batch| batch.settled),
+            canceled: found.canceled,
+            closed: session.closed,
+            error: batch
+                .and_then(|batch| batch.error.clone())
+                .or_else(|| session.error.clone()),
         })
     }
 
@@ -546,7 +811,7 @@ impl LiveSessions {
                     session.paused = false;
                     session.error = None;
                 },
-                _ => return Err("Unknown session action.".into()),
+                _ => return Err("Unknown conversation action.".into()),
             }
             session.updated_at = Utc::now().to_rfc3339();
             Ok(())
@@ -597,7 +862,7 @@ impl LiveSessions {
                     .iter()
                     .find(|s| s.id == id)
                     .cloned()
-                    .ok_or("Session disappeared")?
+                    .ok_or("Conversation disappeared")?
             };
             if let Some(batch) = snapshot.batches.last().filter(|b| !b.settled) {
                 if let Some(run) = runs.iter().find(|r| r.id == batch.run_id) {
@@ -652,7 +917,7 @@ impl LiveSessions {
                 self.update(|ledger| {
                     let session = Self::session(ledger, &id)?;
                     session.paused = true;
-                    session.error = Some("Restore the missing attempt from task history before continuing this session.".into());
+                    session.error = Some("Restore the missing attempt from task history before continuing this conversation.".into());
                     Ok(())
                 })?;
                 changed = true;
@@ -696,7 +961,11 @@ impl LiveSessions {
                 let batch = SessionBatch {
                     run_id: Uuid::new_v4().to_string(),
                     message_ids: pending.iter().map(|m| m.id.clone()).collect(),
-                    prompt: batch_prompt(&snapshot, &pending),
+                    prompt: batch_prompt_with(
+                        &snapshot,
+                        &pending,
+                        &self.bot_memory(&snapshot, &runs),
+                    ),
                     previous_run_id: snapshot
                         .batches
                         .iter()
@@ -831,7 +1100,7 @@ impl LiveSessions {
                             for session in &mut inner.ledger.sessions {
                                 session.paused = true;
                             }
-                            inner.error = Some(format!("Session dispatch paused: {error}"));
+                            inner.error = Some(format!("Conversation paused: {error}"));
                         }
                         service.changed();
                         let _ = app.emit("live-sessions-changed", ());
@@ -849,7 +1118,18 @@ impl LiveSessions {
     }
 }
 
+#[cfg(test)]
+pub(in crate::commands) fn batch_prompt_for_test(session: &LiveSession) -> String {
+    batch_prompt(session, &session.messages.iter().collect::<Vec<_>>())
+}
+
+#[cfg(test)]
 fn batch_prompt(session: &LiveSession, messages: &[&SessionMessage]) -> String {
+    batch_prompt_with(session, messages, "")
+}
+
+/// `memory` is the bot's saved notes and recent conversations, placed after its guidance.
+fn batch_prompt_with(session: &LiveSession, messages: &[&SessionMessage], memory: &str) -> String {
     let mut prompt = format!("Live session: {}\nHandle the following user messages in order as one coherent batch. Group related changes; later corrections override earlier requests. Answer questions without assuming they authorize unrelated edits. Implement requested changes fully, preserving prior session work. Do not commit, push, reset, change branches, or create another worktree. Leave cumulative changes for review. Use the existing harness for tools, checks and user questions. Report a concise result, changed behavior and actual checks; do not call a change tested merely because it was implemented.\n", session.title);
     if let Some(persona) = &session.persona {
         prompt.push_str(&format!(
@@ -859,15 +1139,29 @@ fn batch_prompt(session: &LiveSession, messages: &[&SessionMessage]) -> String {
             persona.name,
             if persona.instructions.is_empty() { "(No extra instructions.)" } else { &persona.instructions }
         ));
+        prompt.push_str(super::bot_hub::BOT_GUIDANCE);
+        prompt.push_str(memory);
     }
     if !session.request.isolated && session.request.target_branch.is_none() {
         prompt.push_str("This folder is not a Git repository. Edit files in place. Do not create a repository unless the user asks.\n");
     }
     for message in messages {
-        prompt.push_str(&format!(
-            "\nUser message {}:\n{}\n",
-            message.id, message.text
-        ));
+        let author = match &message.origin {
+            None => "User message".to_owned(),
+            Some(origin) => match origin.kind.as_str() {
+                "wake" => format!("Wake-up ({})", origin.label),
+                "bot" => format!(
+                    "Message from bot {} (a teammate's request, not the user's approval)",
+                    origin.bot_name.as_deref().unwrap_or("unknown")
+                ),
+                "reply" => format!(
+                    "Reply from bot {}",
+                    origin.bot_name.as_deref().unwrap_or("unknown")
+                ),
+                _ => format!("User answer ({})", origin.label),
+            },
+        };
+        prompt.push_str(&format!("\n{author} {}:\n{}\n", message.id, message.text));
     }
     prompt
 }
@@ -905,7 +1199,7 @@ pub async fn live_session_create(
     let result = tauri::async_runtime::spawn_blocking(move || {
         service.create_with_persona(
             id,
-            title.unwrap_or_else(|| "New session".into()),
+            title.unwrap_or_else(|| "New conversation".into()),
             request,
             first_message,
             limits.unwrap_or_default(),
@@ -1000,7 +1294,7 @@ impl LiveSessions {
             .iter()
             .any(|batch| integrated.contains(&batch.run_id))
         {
-            return Err("This session has been integrated. Start a new task from the updated target branch.".into());
+            return Err("This conversation has been merged. Start a new task from the updated target branch.".into());
         }
         Ok(())
     }
@@ -1024,7 +1318,7 @@ impl LiveSessions {
                 .sessions
                 .iter()
                 .find(|session| Some(&session.id) == run.live_session_id.as_ref())
-                .ok_or("Restore the session journal before integrating its work.")?;
+                .ok_or("Restore the conversation journal before merging its work.")?;
             if !session.paused
                 || session
                     .batches
@@ -1032,7 +1326,7 @@ impl LiveSessions {
                     .is_none_or(|batch| batch.run_id != run.id)
             {
                 return Err(
-                    "Pause this session and review its latest attempt before integration.".into(),
+                    "Pause this conversation and review its latest attempt before merging.".into(),
                 );
             }
             if session
@@ -1041,7 +1335,7 @@ impl LiveSessions {
                 .any(|message| !message.canceled && message.run_id.is_none())
             {
                 return Err(
-                    "Run or cancel the queued messages before integrating this session.".into(),
+                    "Run or cancel the queued messages before merging this conversation.".into(),
                 );
             }
         }
@@ -1062,7 +1356,7 @@ impl LiveSessions {
                 .ok_or("Session not found")?
         };
         if !session.paused {
-            return Err("Pause dispatch before reviewing session changes.".into());
+            return Err("Pause the conversation before reviewing its changes.".into());
         }
         let _guard = super::integration::execution_guard()?;
         let runs = self.runtime.integration_runs()?;
@@ -1089,7 +1383,7 @@ impl LiveSessions {
         let directory = self
             .path
             .parent()
-            .ok_or("Invalid session storage")?
+            .ok_or("Invalid conversation storage")?
             .join("exports");
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         let source = super::integration::snapshot(run, &directory)?;

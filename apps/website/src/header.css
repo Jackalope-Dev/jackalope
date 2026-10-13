@@ -1,0 +1,126 @@
+/* Floating header: the wordmark, navigation and actions sit in separate pills over the page. */
+:root {
+  --header-height: 76px;
+}
+.site-header,
+.site-header.landing-header {
+  height: var(--header-height);
+  border: 0;
+  background: none;
+  backdrop-filter: none;
+  pointer-events: none;
+}
+.site-header .header-inner {
+  max-width: 1400px;
+  gap: 12px;
+}
+.site-header :is(.wordmark, .desktop-nav, .header-actions) {
+  --pill-surface: color-mix(in srgb, var(--color-surface-elevated) 78%, transparent);
+  height: 52px;
+  border: 1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent);
+  border-radius: 999px;
+  background: var(--pill-surface);
+  backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--color-text-primary) 6%, transparent),
+    0 10px 30px -18px color-mix(in srgb, var(--color-text-primary) 35%, transparent);
+  pointer-events: auto;
+}
+.site-header .wordmark {
+  padding: 0 20px 0 16px;
+  font-size: 18px;
+}
+.site-header .wordmark svg {
+  width: 22px;
+  height: 26px;
+}
+.site-header .desktop-nav {
+  gap: 2px;
+  padding: 0 5px;
+  font-size: 13px;
+}
+.site-header .desktop-nav a {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  transition:
+    color var(--motion-fast),
+    background var(--motion-fast);
+}
+.site-header .desktop-nav a:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+.site-header .desktop-nav a[aria-current="page"] {
+  color: var(--color-text-primary);
+  background: var(--color-accent-subtle);
+}
+.site-header .header-actions {
+  gap: 4px;
+  padding: 0 5px 0 8px;
+}
+.site-header .member-entry {
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 999px;
+}
+.site-header .member-entry:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+.site-header .header-actions .icon-button {
+  border-radius: 999px;
+}
+.site-header .github-link {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  transition:
+    color var(--motion-fast),
+    background var(--motion-fast);
+}
+.site-header .github-link:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+.site-header .header-actions .button {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+}
+.site-header .header-actions .text-link {
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  :root {
+    --header-height: 68px;
+  }
+  .site-header .header-inner {
+    padding-inline: 12px;
+  }
+  .site-header :is(.wordmark, .header-actions) {
+    height: 48px;
+  }
+  .site-header .wordmark {
+    padding: 0 16px 0 12px;
+    font-size: 17px;
+  }
+}
+@media (max-width: 420px) {
+  .site-header :is(.github-link, .header-actions .text-link) {
+    display: none;
+  }
+}
+@media (max-width: 360px) {
+  .site-header .wordmark {
+    padding: 0 12px 0 10px;
+  }
+  .site-header .header-actions .button {
+    padding: 0 10px;
+  }
+}

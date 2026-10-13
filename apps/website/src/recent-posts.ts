@@ -45,8 +45,8 @@ export const recentPosts: BlogPost[] = [
         id: 'routines',
         title: 'Let it run on a schedule',
         paragraphs: [
-          'Give a bot a routine and it works on its own: a daily review, a weekly test-gap pass, a weekly security review. Routines are ordinary Automations, so timing, history and pausing all live in one place.',
-          'Bots are in development and need an approved Jackalope account. Installed testing with real accounts is still in progress.',
+          'Give a bot a routine and it works on its own: a daily review, a weekly test-gap pass, a weekly security review. Routines are ordinary schedules, so timing, history and pausing all live in one place.',
+          'Bots are in beta and need a Jackalope account. Installed testing with real accounts is still in progress.',
         ],
         links: [
           { label: 'Explore the roadmap', href: '/roadmap/' },
@@ -118,7 +118,7 @@ export const recentPosts: BlogPost[] = [
         title: 'Review the result where review belongs',
         paragraphs: [
           'A terminal is a good place to start and steer work; a diff with checks beside it is a better place to accept it. When the work is ready, /diff opens the changes in the app so you can inspect files and check output, then commit or merge deliberately.',
-          'The jackalope command installs with the app on macOS, Windows and Linux. Jackalope is in early access: running work requires an approved account and an installed, signed-in agent CLI or a connected API provider.',
+          'The jackalope command installs with the app on macOS, Windows and Linux. Jackalope is in beta: running work requires a Jackalope account and an installed, signed-in agent CLI or a connected API provider.',
         ],
         links: [
           { label: 'Terminal command guide', href: '/knowledge/terminal-command/' },

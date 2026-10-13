@@ -246,8 +246,8 @@ export function JournalPage({ path }: { path: string }) {
             Follow what’s taking shape <ArrowRight size={16} />
           </a>
           <p>
-            <a href="/tour/">Watch the app tour</a> or{' '}
-            <a href="/#workflow">explore the task workspace</a>.
+            <a href="/tour/">Watch the app tour</a> or <a href="/#how-it-works">see how it works</a>
+            .
           </p>
           {post.related && (
             <p>

@@ -35,6 +35,11 @@ USAGE
   jackalope ls                   list open conversations
   jackalope attach <id>          the same as --resume <id>
   jackalope stop <id>            stop the work a conversation is running
+  jackalope diff <id> [--stat]   print a conversation's changes since it started
+  jackalope merge <id>           merge a paused conversation's work into the
+                                 project branch (-m <message>, --yes)
+  jackalope pr <id>              commit, push and open a pull request with your
+                                 GitHub CLI (--title <text>, --ready, --yes)
   jackalope status               show the host, this project and your agents
   jackalope help                 show this message
 
@@ -46,11 +51,18 @@ IN A CONVERSATION
   Esc Esc                        stop the agent        Ctrl+R  search history
   Shift+Enter, \\ Enter, Ctrl+J   new line              Ctrl+N/P  switch conversation
 
+STARTING A CONVERSATION
+  --agent <id>                   use this agent instead of routing
+  --model <id>                   use this model with the agent
+
 RUNNING ONCE
   -p, --print                    send the message, wait, and print the reply;
                                  piped stdin is appended to the message
+  --agents <a,b>                 send the message to 2 to 4 agents, each in its own
+                                 workspace, and print every reply
   --json                         print the result as JSON (also for ls, status)
-  --agent <id>                   use this agent instead of routing
+  --stream-json                  print one JSON line per step and output as the
+                                 work moves, then the result
   --timeout <seconds>            stop waiting after this long; the work continues
   Exit status: 0 done, 1 failed or stopped, 2 an agent asked a question
   (answer it with jackalope attach <id>), 3 timed out.
@@ -95,13 +107,19 @@ fn run() -> Result<(), String> {
         Command::Once {
             message,
             agent,
+            model,
+            compare,
             json,
+            stream,
             timeout,
         } => {
             announce_repository(init)?;
             let options = once::Options {
                 agent,
+                model,
+                compare,
                 json,
+                stream,
                 timeout,
                 cold_start: cli.cold_start,
             };
@@ -114,13 +132,31 @@ fn run() -> Result<(), String> {
         Command::List { json } => subcommands::list(cli.cold_start, json),
         Command::Status { json } => subcommands::status(json),
         Command::Stop { id } => subcommands::stop(cli.cold_start, &id),
+        Command::Diff { id, stat } => subcommands::diff(cli.cold_start, &id, stat),
+        Command::Merge { id, message, yes } => {
+            subcommands::merge(cli.cold_start, &id, message, yes)
+        }
+        Command::PullRequest {
+            id,
+            title,
+            ready,
+            yes,
+        } => subcommands::pull_request(cli.cold_start, &id, title, ready, yes),
         Command::Converse {
             resume,
             attach,
             pick,
+            agent,
+            model,
         } => {
             announce_repository(init)?;
-            converse(cli.cold_start, attach, resume, pick)
+            converse(
+                cli.cold_start,
+                attach,
+                resume,
+                pick,
+                ui::NextStart { agent, model },
+            )
         }
     }
 }
@@ -137,6 +173,7 @@ fn converse(
     attach: Option<String>,
     resume: bool,
     pick: bool,
+    next: ui::NextStart,
 ) -> Result<(), String> {
     if !std::io::stdout().is_terminal() {
         return Err("The conversation needs an interactive terminal.".into());
@@ -152,5 +189,5 @@ fn converse(
         ),
         None => None,
     };
-    ui::run(connection, project, session_id, pick)
+    ui::run(connection, project, session_id, pick, next)
 }

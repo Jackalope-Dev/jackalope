@@ -1,5 +1,11 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { GitCompareArrows, Layers, Megaphone, MessageCircleHeart, Sparkles } from 'lucide-react';
+import {
+  GitCompareArrows,
+  Layers,
+  Megaphone,
+  MessageCircleHeart,
+  SquareTerminal,
+} from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
@@ -40,9 +46,9 @@ const features = [
     detail: 'Changes, checks and merge sit together. Nothing reaches your branch unseen.',
   },
   {
-    icon: Sparkles,
-    title: 'Focus, Build or Oversee',
-    detail: 'Pick the layout that fits the moment, from one task to a full board.',
+    icon: SquareTerminal,
+    title: 'App or terminal',
+    detail: 'Type jackalope in any repository. Work started there appears here, and the reverse.',
   },
   {
     icon: MessageCircleHeart,

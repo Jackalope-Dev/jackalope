@@ -51,6 +51,22 @@ test('deployment rejects unknown settings, unprotected admin and public installe
   }
 });
 
+test('open signup follows the environment setting and stays a strict flag', () => {
+  const settings = { vars: { ...defaults().vars, OPEN_SIGNUP: 'false' } };
+  applyCommunityConfig(settings, 'production', { PRODUCTION_OPEN_SIGNUP: '' });
+  assert.equal(settings.vars.OPEN_SIGNUP, 'false');
+  applyCommunityConfig(settings, 'production', { PRODUCTION_OPEN_SIGNUP: 'true' });
+  assert.equal(settings.vars.OPEN_SIGNUP, 'true');
+  applyCommunityConfig(settings, 'staging', {
+    STAGING_COMMUNITY_CONFIG: JSON.stringify({ OPEN_SIGNUP: 'false' }),
+  });
+  assert.equal(settings.vars.OPEN_SIGNUP, 'false');
+  assert.throws(
+    () => applyCommunityConfig(settings, 'production', { PRODUCTION_OPEN_SIGNUP: 'yes' }),
+    /true or false/,
+  );
+});
+
 test('empty CI variables preserve bundled configuration and disabled defaults', () => {
   const settings = defaults();
   applyCommunityConfig(settings, 'production', {

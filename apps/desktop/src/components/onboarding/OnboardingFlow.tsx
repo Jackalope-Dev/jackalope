@@ -1,12 +1,10 @@
-import { applyThemeTokens, type ThemePalette } from '@jackalope/brand/theme';
+import { applyThemeTokens } from '@jackalope/brand/theme';
 import { RefreshIcon, Textarea } from '@jackalope/ui';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents, getAgentMetadata } from '../../lib/agent-catalog';
 import { missingProjectDefaults, type ProjectDefaults } from '../../lib/context/project-defaults';
-import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
-import { routingSettings } from '../../lib/routing-settings';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -18,43 +16,30 @@ import { type OnboardingStep, useOnboardingStore } from '../../stores/onboarding
 import { useProjectStore } from '../../stores/projectStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { LocalAiSetup } from '../agents/LocalAiSetup';
+import { ProviderConnections } from '../agents/ProviderConnections';
 import { ProviderMark } from '../agents/ProviderMark';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
-import { ProjectGitSettings } from '../projects/ProjectGitSettings';
-import { RoutingSetup } from '../settings/RoutingSetup';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
 import { AgentInstallCatalog, CommandCopy } from './AgentInstallCatalog';
 import { OnboardingAgentAccount } from './OnboardingAgentAccount';
 import { OnboardingProjectStep } from './OnboardingProjectStep';
-import { ProjectThemeStep } from './ProjectThemeStep';
 import './onboarding.css';
 
 const steps: { id: OnboardingStep; label: string }[] = [
   { id: 'project', label: 'Project' },
   { id: 'agent', label: 'Agents' },
-  { id: 'routing', label: 'Decisions' },
-  { id: 'behavior', label: 'Behavior' },
-  { id: 'theme', label: 'Appearance' },
   { id: 'task', label: 'First task' },
 ];
 const setupTips: Record<OnboardingStep, string[]> = {
   project: ['Choose the Git repository your agent will work in, or create a new project.'],
   agent: [
     'This preference belongs to this project. Other projects keep their own agent choices.',
-    'Add agents, supported accounts and models later in Settings → Agents.',
-  ],
-  routing: [
-    'Choose how Automatic selects a worker. Your agents still write code and run checks. You can change this later in Settings → Decisions.',
-  ],
-  behavior: [
-    'Set commit author attribution, checkpointing, and branch cleanup for this repository.',
-  ],
-  theme: [
-    'Keep the app theme or give this project its own colors. Your choices are saved when setup finishes.',
+    'Add agents, accounts and models later on the Agents page.',
+    'Routing, commits and colors start with defaults. Change them any time in Project settings.',
   ],
   task: [
     'Describe the result you want. Choose a check so you can tell when the work is done.',
@@ -73,8 +58,6 @@ export function OnboardingFlow({
   const project =
     onboarding.pendingProject ?? projects.find((item) => item.id === onboarding.projectId);
   const appTheme = useThemeStore((state) => state.appTheme);
-  const [commitPolicy, setCommitPolicy] = useState<CommitPolicy>();
-  const [themePreview, setThemePreview] = useState<ThemePalette>();
   const execution = useExecutionStore(
     useShallow((s) => ({
       drafts: s.drafts,
@@ -109,7 +92,6 @@ export function OnboardingFlow({
   const attempting = useRef(false);
   const busy = working || nodding;
   const [error, setError] = useState('');
-  const [routingReady, setRoutingReady] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const errorMessage = useRef<HTMLDivElement>(null);
   const tipIndex = useRef(0);
@@ -118,8 +100,7 @@ export function OnboardingFlow({
   const index = steps.findIndex((item) => item.id === step);
   const draft =
     onboarding.firstTask ?? (project ? (execution.drafts[project.id]?.prompt ?? '') : '');
-  const preview =
-    step === 'theme' && themePreview ? themePreview : (project?.preferences?.theme ?? appTheme);
+  const preview = project?.preferences?.theme ?? appTheme;
   const previewProjectId = project?.id;
   const projectPath = project?.path;
   useEffect(() => {
@@ -263,29 +244,7 @@ export function OnboardingFlow({
       await syncAgentConfig();
       await execution.discover();
     });
-  const completeSetup = async (action: () => void) => {
-    if (onboarding.routingMode) {
-      try {
-        const current = await routingSettings.read(project?.id);
-        if (onboarding.routingMode === 'jev' && !current.connected)
-          throw new Error('Reconnect Jev or choose another decision method before continuing.');
-        if (
-          current.projectMode !== onboarding.routingMode ||
-          current.jevFallback !== onboarding.routingFallback
-        )
-          await routingSettings.setMode(
-            onboarding.routingMode,
-            current.revision,
-            project?.id,
-            onboarding.routingFallback ?? 'local',
-          );
-      } catch (error) {
-        onboarding.go('routing');
-        throw error;
-      }
-    }
-    advance(action);
-  };
+  const completeSetup = (action: () => void) => advance(action);
   const finish = () => {
     if (!project || !runner?.available || !available(agent) || !projectEnabled(agent)) {
       onboarding.go('agent');
@@ -293,7 +252,7 @@ export function OnboardingFlow({
     }
     if (!draft.trim()) return;
     onboarding.stageProject(project, draft);
-    void attempt(() => completeSetup(() => onFinish(agent, project.id)));
+    completeSetup(() => onFinish(agent, project.id));
   };
   return (
     <div className="onboarding-shell">
@@ -346,24 +305,12 @@ export function OnboardingFlow({
               </Button>
             )}
           </div>
-          <h2
-            id="onboarding-heading"
-            ref={heading}
-            data-step={step}
-            tabIndex={-1}
-            className={step === 'behavior' ? 'sr-only' : undefined}
-          >
+          <h2 id="onboarding-heading" ref={heading} data-step={step} tabIndex={-1}>
             {step === 'project'
               ? 'Choose a project'
               : step === 'agent'
                 ? 'Choose agents for this project'
-                : step === 'routing'
-                  ? 'Jackalope Decisions'
-                  : step === 'behavior'
-                    ? 'Commits and cleanup'
-                    : step === 'theme'
-                      ? 'Choose this project’s appearance'
-                      : 'Describe your first task'}
+                : 'Describe your first task'}
           </h2>
           {step === 'project' && (
             <OnboardingProjectStep
@@ -384,7 +331,6 @@ export function OnboardingFlow({
                 );
                 setAgent(opened.preferences?.preferredRunner ?? config.defaultMetaAgent);
                 setAllowedAgents(opened.preferences?.allowedAgents ?? null);
-                setThemePreview(undefined);
                 await execution.discover();
                 advance(() => onboarding.go('agent'));
               }}
@@ -504,10 +450,13 @@ export function OnboardingFlow({
                         <p className="task-muted" role="status">
                           {execution.discovering
                             ? 'Looking for installed agents…'
-                            : 'No agents found yet. Install and sign in to your preferred agent, then re-scan agents.'}
+                            : 'No agents found yet. Connect an API key below, or install and sign in to an agent and re-scan.'}
                         </p>
                       )}
                     </fieldset>
+                    {!detectedAgents.length && !execution.discovering && (
+                      <ProviderConnections setup />
+                    )}
                     {localAi}
                     <AgentInstallCatalog agents={installableAgents} />
                   </>
@@ -561,7 +510,7 @@ export function OnboardingFlow({
                         },
                         draft,
                       );
-                      advance(() => onboarding.go('routing'));
+                      advance(() => onboarding.go('task'));
                     })
                   }
                 >
@@ -570,86 +519,6 @@ export function OnboardingFlow({
                 </Button>
               </div>
             </>
-          )}
-          {step === 'routing' && (
-            <>
-              <RoutingSetup
-                key={project?.id}
-                projectId={project?.id}
-                mode={onboarding.routingMode}
-                onModeChange={onboarding.setRoutingMode}
-                jevFallback={onboarding.routingFallback}
-                onFallbackChange={onboarding.setRoutingFallback}
-                onReadyChange={setRoutingReady}
-                disabled={busy}
-              />
-              <div className="onboarding-actions">
-                <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('agent')}>
-                  <ArrowLeft size={16} />
-                  Back
-                </Button>
-                <Button
-                  disabled={busy || !routingReady}
-                  onClick={() => advance(() => onboarding.go('behavior'))}
-                >
-                  Continue
-                  <ArrowRight size={16} />
-                </Button>
-              </div>
-            </>
-          )}
-          {step === 'behavior' && project && (
-            <>
-              <div className="onboarding-behavior-section">
-                <ProjectGitSettings
-                  key={project.path}
-                  projectPath={project.path}
-                  onDraftChange={setCommitPolicy}
-                  disabled={busy}
-                />
-              </div>
-
-              <div className="onboarding-actions">
-                <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('routing')}>
-                  <ArrowLeft size={16} />
-                  Back
-                </Button>
-                <Button
-                  disabled={busy || !commitPolicy}
-                  onClick={() =>
-                    void attempt(async () => {
-                      if (!commitPolicy) return;
-                      await projectGitPolicy(project.path, commitPolicy);
-                      setThemePreview(undefined);
-                      advance(() => onboarding.go('theme'));
-                    })
-                  }
-                >
-                  Continue
-                  <ArrowRight size={16} />
-                </Button>
-              </div>
-            </>
-          )}
-          {step === 'theme' && project && (
-            <ProjectThemeStep
-              key={project.id}
-              initialTheme={project.preferences?.theme}
-              appTheme={appTheme}
-              busy={busy}
-              onPreview={setThemePreview}
-              onBack={() => {
-                setThemePreview(undefined);
-                onboarding.go('behavior');
-              }}
-              onContinue={(theme) => {
-                onboarding.stageProject(
-                  { ...project, preferences: { ...project.preferences, theme } },
-                  draft,
-                );
-                advance(() => onboarding.go('task'));
-              }}
-            />
           )}
           {step === 'task' && (
             <>
@@ -696,14 +565,7 @@ export function OnboardingFlow({
                 </fieldset>
               )}
               <div className="onboarding-actions">
-                <Button
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => {
-                    setThemePreview(undefined);
-                    onboarding.go('theme');
-                  }}
-                >
+                <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('agent')}>
                   <ArrowLeft size={16} />
                   Back
                 </Button>
@@ -712,7 +574,7 @@ export function OnboardingFlow({
                   disabled={busy}
                   onClick={() => {
                     if (project) onboarding.stageProject(project, draft);
-                    void attempt(() => completeSetup(onSkip));
+                    completeSetup(onSkip);
                   }}
                 >
                   Skip for now

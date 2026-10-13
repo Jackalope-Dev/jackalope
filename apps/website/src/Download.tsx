@@ -16,6 +16,8 @@ import {
   type DesktopPlatform,
   detectDesktopPlatform,
   type PlatformDownload,
+  publicReleaseBuilds,
+  type ReleaseBuild,
 } from './platform-downloads';
 import { WaitlistButton } from './Signup';
 import './download.css';
@@ -28,17 +30,14 @@ interface DownloadMember {
   macos?: ReleaseBuild[];
   linux?: ReleaseBuild[];
 }
-interface ReleaseBuild {
-  id: string;
-  label: string;
-  channel: 'stable' | 'beta';
-  url: string;
-}
 const channelNames = { stable: 'Stable', beta: 'Beta' } as const;
 
 /** The member's builds for one platform, with a release channel choice when several are offered. */
 function ReleaseDownloads({ builds }: { builds: ReleaseBuild[] }) {
-  const channels = [...new Set(builds.map((build) => build.channel))];
+  // Stable leads and is the default; beta stays available for people who choose it.
+  const channels = [...new Set(builds.map((build) => build.channel))].sort(
+    (a, b) => Number(b === 'stable') - Number(a === 'stable'),
+  );
   const [channel, setChannel] = useState(channels[0]);
   const selected = channels.includes(channel) ? channel : channels[0];
   return (
@@ -161,7 +160,6 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
     <main id="main" className="download-page page-width">
       <header className="download-heading">
         <div>
-          <p className="download-eyebrow">Your next workspace</p>
           <h1>Download Jackalope.</h1>
           <p className="download-lede">
             A little more room for your projects, coding agents, and ideas.
@@ -209,7 +207,12 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
       <section className="download-platforms" aria-label="Desktop downloads">
         {ordered.map((option) => {
           const Icon = platformIcons[option.id];
-          const builds = option.id === 'windows' ? undefined : member?.[option.id];
+          const builds =
+            option.id === 'windows'
+              ? undefined
+              : member?.[option.id]?.length
+                ? member[option.id]
+                : publicReleaseBuilds(option.id);
           return (
             <article
               className={`download-platform${option.id === platform ? ' download-platform-detected' : ''}`}
@@ -256,12 +259,12 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
           <Ticket size={23} strokeWidth={1.5} aria-hidden="true" />
           <div>
             <h2 id="download-access-title" ref={accessHeading} tabIndex={-1}>
-              {email && !token ? 'Your early access is approved.' : 'An invitation to get started.'}
+              {email && !token ? 'Your account is ready.' : 'Create a free account to get started.'}
             </h2>
             <p>
               {email && !token
-                ? `You’re signed in as ${email}. ${downloads.some((option) => option.url) || member?.macos?.length || member?.linux?.length ? 'Choose your platform above to get started.' : 'Downloads are coming soon. Your early access is ready when they arrive.'}`
-                : 'Jackalope is in early access. You’ll need to be accepted from the waitlist or claim a friend’s Instant Access Pass to start using the app.'}
+                ? `You’re signed in as ${email}. Choose your platform above to get started.`
+                : 'Sign up with your email, confirm it, then sign in to the app with the same address.'}
             </p>
             {email && !token ? (
               <a className="text-link" href="/access/#invitations">
@@ -284,9 +287,6 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
         </a>
         <a href="/knowledge/">
           Get to know your workspace <ArrowRight size={15} aria-hidden="true" />
-        </a>
-        <a href="/waitlist/">
-          Check your place in line <ArrowRight size={15} aria-hidden="true" />
         </a>
       </nav>
     </main>

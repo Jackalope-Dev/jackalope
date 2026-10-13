@@ -13,7 +13,7 @@
 .access-privacy {
   margin: 24px 0;
   text-align: left;
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   background: var(--color-surface-elevated);
 }
 .access-privacy > summary {
@@ -37,7 +37,7 @@
 .access-privacy > summary:focus-visible {
   outline: 2px solid var(--color-accent-ink);
   outline-offset: 3px;
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
 }
 .access-privacy-controls {
   padding: 8px 20px 24px;
@@ -209,7 +209,7 @@
 }
 .access-account-actions > button {
   min-height: 48px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }
 .access-pairing {
   display: grid;
@@ -222,7 +222,7 @@
   padding: 14px 16px;
   margin: 4px 0;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface-elevated);
   font-family: var(--font-mono);
   font-size: var(--text-2xl);
@@ -326,7 +326,7 @@
   margin: 4px 0 8px;
   padding: 8px 8px 8px 16px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--radius-lg);
   background: var(--color-surface-elevated);
   font-size: 14px;
 }

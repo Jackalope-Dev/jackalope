@@ -154,6 +154,8 @@ export function themeTokens(theme: ThemePalette) {
   set('--color-accent-secondary', (colors[1] ?? colors[0]).css);
   set('--color-accent-tertiary', (colors[2] ?? colors[1] ?? colors[0]).css);
   set('--color-shell', tone(dark ? 11 : 94, shellSaturation));
+  // Sits a step below the shell in both themes so the navigation reads as its own panel.
+  set('--color-navigation', tone(dark ? 7 : 90.5, shellSaturation));
   set('--color-shell-end', `hsl(${lastHue} ${shellSaturation}% ${dark ? 8 : 96}%)`);
   const shellStops =
     colors.length === 3

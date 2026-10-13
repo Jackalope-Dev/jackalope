@@ -12,7 +12,7 @@
 .worktree-form {
   padding: 24px;
   background: var(--color-surface);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   margin: 20px 0;
 }
 .worktree-fields {
@@ -34,7 +34,7 @@
   gap: 16px;
   padding: 16px 18px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: var(--color-surface);
   transition: border-color 120ms ease;
 }
@@ -49,7 +49,7 @@
   place-items: center;
   flex: 0 0 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   color: var(--color-accent-ink);
   background: color-mix(in srgb, var(--color-accent-ink) 12%, transparent);
 }
@@ -76,9 +76,6 @@
   gap: 16px;
   margin-bottom: 28px;
 }
-.worktree-summary > p {
-  max-width: 64ch;
-}
 .worktree-summary-bar {
   display: flex;
   flex-wrap: wrap;
@@ -89,16 +86,13 @@
 .worktree-counts {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px 24px;
+  margin: 0;
 }
 .worktree-counts > div {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-subtle);
+  gap: 6px;
   font-size: var(--text-sm);
 }
 .worktree-counts dt {
@@ -186,7 +180,7 @@
   height: 44px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   top: 8px;
   right: 8px;
 }
@@ -219,9 +213,6 @@
 .queue-heading .task-hero-title {
   font-size: var(--text-2xl);
 }
-.queue-tabs {
-  margin: 20px 0;
-}
 .task-notice {
   justify-content: flex-start;
 }
@@ -232,7 +223,7 @@
   padding: 12px 20px;
   z-index: 100;
   background: var(--color-surface-elevated);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 .skip-link:focus {
   top: 12px;
@@ -269,11 +260,8 @@ button:disabled {
 .project-switcher,
 .command-trigger {
   min-height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 10px 12px;
-}
-.project-switcher:hover {
-  background: var(--color-surface-hover);
 }
 .command-trigger.command-jump {
   width: clamp(200px, 23vw, 320px);
@@ -370,9 +358,6 @@ button:disabled {
 .queue-page .task-back {
   margin-bottom: 4px;
 }
-.queue-page .queue-tabs {
-  margin: 12px 0;
-}
 .queue-page .queue-flow {
   margin: 16px 0 8px;
 }
@@ -443,7 +428,7 @@ button:disabled {
   .empty-state-icon {
     flex-basis: 48px;
     height: 48px;
-    border-radius: 16px;
+    border-radius: var(--radius-2xl);
   }
   .queue-controls {
     flex-wrap: wrap;
@@ -506,7 +491,7 @@ button:disabled {
   padding: 8px 12px;
   background-color: var(--color-surface-sunken);
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md, 6px);
+  border-radius: var(--radius-md);
   list-style: none;
   margin: 0;
 }
@@ -564,9 +549,6 @@ button:disabled {
 .schedule-row > div > p {
   overflow-wrap: anywhere;
 }
-.mcp-tabs {
-  flex-wrap: wrap;
-}
 .activity-log .p-6 {
   padding-inline: 0;
 }
@@ -580,27 +562,11 @@ button:disabled {
   }
 }
 
-.workspace-subnavigation,
-.workspace-tab-list {
-  display: flex;
+/* Sub-views sit above the page heading at the same gutter; the control carries its own track. */
+.workspace-subnavigation {
   flex-shrink: 0;
-  gap: 4px;
-  padding: 8px 24px;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--color-border);
-}
-.workspace-subnavigation .workspace-nav-item,
-.workspace-tab-list .workspace-nav-item {
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-.workspace-subnavigation [aria-current="page"],
-.workspace-tab-list [data-state="active"] {
-  color: var(--color-accent-ink);
-  background: var(--color-accent-subtle);
-}
-.workspace-tab-list {
-  padding-inline: 0;
+  min-width: 0;
+  padding: 16px var(--workspace-gutter, 32px) 0;
 }
 .workspace-page {
   width: 100%;
@@ -626,7 +592,7 @@ button:disabled {
   flex: none;
   white-space: nowrap;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   color: var(--color-text-secondary);
   background: var(--color-surface);
   font-weight: 500;
@@ -637,14 +603,14 @@ button:disabled {
   gap: 8px;
   min-height: 44px;
   padding: 8px 10px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }
 .workspace-invitations button:hover {
   background: var(--color-surface-hover);
 }
 .workspace-invitations .quiet-icon {
   color: var(--color-text-secondary);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }
 .workspace-invitations .invitation-count {
   display: inline-flex;
@@ -652,7 +618,7 @@ button:disabled {
   align-items: center;
   min-width: 24px;
   padding: 3px 7px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--color-accent-subtle);
   color: var(--color-accent-ink);
   font-weight: 600;
@@ -666,4 +632,12 @@ button:disabled {
 }
 .inline-notice .ui-disclosure-indicator {
   margin-left: 0;
+}
+
+/* Opening a workspace view settles it into place; switching views remounts the page. */
+@media (prefers-reduced-motion: no-preference) {
+  .workspace-canvas > :is(.workspace-page-layout, .task-page),
+  .workspace-canvas > * > :is(.workspace-page-layout, .task-page) {
+    animation: ui-rise-in var(--motion-slow) var(--ease-out);
+  }
 }

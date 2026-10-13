@@ -1,9 +1,11 @@
-import { DiscordIcon, FormField, Input, SearchField } from '@jackalope/ui';
+import { DiscordIcon, FormField, Input, SearchField, SegmentedControl } from '@jackalope/ui';
 import {
-  Bot,
+  Cloud,
+  Cpu,
   Database,
   FolderCog,
   Gavel,
+  History,
   KeyRound,
   LifeBuoy,
   type LucideIcon,
@@ -34,7 +36,6 @@ import { Switch } from '../ui/Switch';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
-import { AgentPreferences } from './AgentPreferences';
 import { AppearancePreferences } from './AppearancePreferences';
 import { ArchivedHistory } from './ArchivedHistory';
 import { JackalopeAccount } from './JackalopeAccount';
@@ -67,9 +68,9 @@ const categories = [
   'Appearance',
   'Desktop',
   'Saved actions',
-  'Agents',
   'Decisions',
   'Connected work',
+  'Cloudflare',
   'Jackalope account',
   'Invitations',
   'Remote access',
@@ -80,15 +81,19 @@ const categories = [
   'Data & reset',
 ] as const;
 export type SettingsCategory = (typeof categories)[number];
-/** Sidebar sections; categories keep the order above within each. */
+/**
+ * Sidebar sections; categories keep the order above within each. Advanced holds
+ * routing, beta integrations and diagnostics that most people never change.
+ */
 const navigationGroups: { label: string; categories: SettingsCategory[] }[] = [
   {
     label: 'Workspace',
     categories: ['Project', 'General', 'Appearance', 'Desktop', 'Saved actions'],
   },
-  { label: 'Agents & tools', categories: ['Agents', 'Decisions', 'Connected work'] },
+  { label: 'Agents', categories: ['Connected work'] },
   { label: 'Account & access', categories: ['Jackalope account', 'Remote access', 'Privacy'] },
   { label: 'Help & data', categories: ['Updates & support', 'Data & reset'] },
+  { label: 'Advanced', categories: ['Decisions', 'Cloudflare', 'Diagnostics', 'System'] },
 ];
 const navigationIcons: Partial<Record<SettingsCategory, LucideIcon>> = {
   Project: FolderCog,
@@ -96,9 +101,11 @@ const navigationIcons: Partial<Record<SettingsCategory, LucideIcon>> = {
   Appearance: Palette,
   Desktop: Monitor,
   'Saved actions': Zap,
-  Agents: Bot,
   Decisions: Gavel,
   'Connected work': Plug,
+  Cloudflare: Cloud,
+  Diagnostics: History,
+  System: Cpu,
   'Jackalope account': UserRound,
   'Remote access': Radio,
   Privacy: Shield,
@@ -106,11 +113,7 @@ const navigationIcons: Partial<Record<SettingsCategory, LucideIcon>> = {
   'Data & reset': Database,
 };
 const settingsGroup = (category: SettingsCategory): SettingsCategory =>
-  category === 'Invitations'
-    ? 'Jackalope account'
-    : category === 'System' || category === 'Diagnostics'
-      ? 'Updates & support'
-      : category;
+  category === 'Invitations' ? 'Jackalope account' : category;
 
 export function SettingsPage({
   onClose,
@@ -135,15 +138,18 @@ export function SettingsPage({
   const project = projects.find((project) => project.id === selectedProjectId);
   const scopedCategories =
     scope === 'project'
-      ? categories.filter((c) => ['Project', 'Appearance', 'Agents', 'Decisions'].includes(c))
+      ? categories.filter((c) => ['Project', 'Appearance', 'Decisions'].includes(c))
       : categories.filter((c) => c !== 'Project');
   const [category, setCategory] = useState<SettingsCategory>(
     initialCategory ?? (initialScope === 'project' ? 'Project' : 'General'),
   );
   const selectedSection = useRef<HTMLElement>(null);
+  const content = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (settingsGroup(category) !== category)
       selectedSection.current?.scrollIntoView({ block: 'start' });
+    // The content panel scrolls on its own, so a new page starts at its top.
+    else content.current?.scrollTo({ top: 0 });
   }, [category]);
   const [query, setQuery] = useState('');
   const [message, setMessage] = useState('');
@@ -169,10 +175,8 @@ export function SettingsPage({
           'keyboard shortcuts zoom terminal shell font editor keep awake sleep power WSL links running services previews ports disk worktrees',
         'Saved actions': 'prompt presets commands shortcuts reuse global project',
         Appearance: 'theme color light dark atmosphere picker toolbar companion mascot animations',
-        Agents:
-          'default models available detected allowed restrict cli command executable configuration automatic quota handoff',
-        'Connected work':
-          'GitHub Linear Jira issues pull requests API token Cloudflare Artifacts repository hosted cloud',
+        'Connected work': 'GitHub Linear Jira issues pull requests API token',
+        Cloudflare: 'Cloudflare Artifacts repository hosted cloud swarm worker forks beta',
         'Remote access': 'hosts phone companion SSH pairing Tailscale device',
         Decisions: 'Jackalope routing Jev TypeSafe API key automatic agent cost tokens capacity',
         Privacy: 'marketplace MCP network telemetry crash reporting',
@@ -239,23 +243,19 @@ export function SettingsPage({
         immediately unless a Save button is shown.
       </p>
       <div className="settings-scope-bar">
-        <nav className="settings-scope-switcher" aria-label="Settings scope">
-          {(['app', 'project'] as const).map((value) => (
-            <button
-              type="button"
-              key={value}
-              className={`settings-scope-pill ${scope === value ? 'is-active' : ''}`}
-              aria-pressed={scope === value}
-              onClick={() => {
-                setScope(value);
-                setCategory(value === 'app' ? 'General' : 'Project');
-                setQuery('');
-              }}
-            >
-              {value === 'app' ? 'App-wide' : 'Per project'}
-            </button>
-          ))}
-        </nav>
+        <SegmentedControl
+          label="Settings scope"
+          value={scope}
+          onChange={(value) => {
+            setScope(value);
+            setCategory(value === 'app' ? 'General' : 'Project');
+            setQuery('');
+          }}
+          items={[
+            { id: 'app', label: 'App-wide' },
+            { id: 'project', label: 'Per project' },
+          ]}
+        />
         {scope === 'project' && (
           <Select
             aria-label="Project to configure"
@@ -321,7 +321,7 @@ export function SettingsPage({
             Join the Discord
           </button>
         </nav>
-        <div className="settings-content">
+        <div className="settings-content" ref={content}>
           {!visible.length && <p>No settings match “{query}”.</p>}
           {visible.map((c) => (
             <section
@@ -341,6 +341,10 @@ export function SettingsPage({
               {c === 'Connected work' && (
                 <>
                   <IssueConnections />
+                </>
+              )}
+              {c === 'Cloudflare' && (
+                <>
                   <ArtifactsConnection />
                   <SwarmConnection />
                 </>
@@ -364,7 +368,7 @@ export function SettingsPage({
                   <SettingGroup>
                     <Setting
                       title="Guided setup"
-                      description="Walk through project, agents and appearance setup again. Your saved work stays."
+                      description="Walk through project and agent setup again. Your saved work stays."
                     >
                       <Button
                         variant="outline"
@@ -381,12 +385,6 @@ export function SettingsPage({
               )}
               {c === 'Appearance' && (scope === 'app' || project) && (
                 <AppearancePreferences projectId={scope === 'project' ? project?.id : undefined} />
-              )}
-              {c === 'Agents' && (scope === 'app' || project) && (
-                <AgentPreferences
-                  key={scope === 'project' ? project?.id : 'app'}
-                  projectId={scope === 'project' ? project?.id : undefined}
-                />
               )}
               {c === 'Privacy' && (
                 <>

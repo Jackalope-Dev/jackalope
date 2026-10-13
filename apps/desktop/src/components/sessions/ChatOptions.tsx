@@ -7,11 +7,14 @@ import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 
 export function ChatOptions({
   items,
+  actions = [],
   onClose,
   triggerVariant = 'icon',
   triggerLabel = 'Options',
 }: {
   items: { id: string; label: string; content: (close: () => void) => ReactNode }[];
+  /** Immediate commands listed above the items that open a panel. */
+  actions?: { id: string; label: string; onSelect: () => void; disabled?: boolean }[];
   onClose?: () => void;
   triggerVariant?: 'icon' | 'button';
   triggerLabel?: string;
@@ -24,7 +27,7 @@ export function ChatOptions({
       <Menu.Root>
         <Menu.Trigger asChild>
           {triggerVariant === 'button' ? (
-            <Button ref={trigger} type="button" variant="outline" aria-label="Chat options">
+            <Button ref={trigger} type="button" variant="outline" aria-label="Conversation options">
               <SlidersHorizontal size={16} aria-hidden="true" />
               <span>{triggerLabel}</span>
             </Button>
@@ -34,7 +37,7 @@ export function ChatOptions({
               type="button"
               variant="outline"
               size="icon"
-              aria-label="Chat options"
+              aria-label="Conversation options"
             >
               <MoreHorizontal size={18} aria-hidden="true" />
             </Button>
@@ -50,6 +53,17 @@ export function ChatOptions({
               if (item) event.preventDefault();
             }}
           >
+            {actions.map((entry) => (
+              <Menu.Item
+                key={entry.id}
+                className="workspace-menu-item"
+                disabled={entry.disabled}
+                onSelect={entry.onSelect}
+              >
+                {entry.label}
+              </Menu.Item>
+            ))}
+            {!!actions.length && !!items.length && <Menu.Separator className="menu-separator" />}
             {items.map((entry) => (
               <Menu.Item
                 key={entry.id}

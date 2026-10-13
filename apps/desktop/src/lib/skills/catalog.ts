@@ -7,7 +7,7 @@
  * - SWE-agent Thought-Action-Observation loops (MIT)
  */
 
-export type SkillCategory =
+type SkillCategory =
   | 'debugging'
   | 'feature'
   | 'refactor'

@@ -502,7 +502,7 @@ export function TaskComposer({
             disabled={!current.prompt.trim() || submitting}
             onClick={onSave}
           >
-            {editingIdea ? 'Save idea' : 'Save for later'}
+            {editingIdea ? 'Save draft' : 'Save for later'}
           </Button>
           {executionReady && (
             <Button

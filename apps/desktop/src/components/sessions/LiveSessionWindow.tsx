@@ -49,7 +49,7 @@ export default function LiveSessionWindow({ id }: { id: string }) {
         {session ? (
           <LiveSessionView session={session} runs={runs} detached />
         ) : (
-          <p role="status">{loading ? 'Loading session…' : 'Session unavailable.'}</p>
+          <p role="status">{loading ? 'Loading conversation…' : 'Conversation unavailable.'}</p>
         )}
       </main>
     </MotionConfig>

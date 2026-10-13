@@ -194,7 +194,7 @@ export interface McpServerConfig {
   enabled?: boolean;
 }
 
-export interface McpToolInfo {
+interface McpToolInfo {
   name: string;
   description?: string;
   inputSchema?: unknown;

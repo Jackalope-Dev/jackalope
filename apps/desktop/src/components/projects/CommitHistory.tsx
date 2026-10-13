@@ -1,8 +1,6 @@
-import { RefreshIcon } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './commit-history.css';
@@ -19,42 +17,26 @@ interface GraphLine {
 }
 
 /** Recent commits across local branches, drawn with Git's own branch graph. */
-export function CommitHistory({ projectPath }: { projectPath: string }) {
+export function CommitHistory({ projectPath, version }: { projectPath: string; version: number }) {
   const [lines, setLines] = useState<GraphLine[] | null>(null);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const load = useCallback(async () => {
     if (!projectPath || !isTauriEnvironment()) return;
-    setLoading(true);
     setError('');
     try {
       setLines(await nativeTask<GraphLine[]>('project_commit_graph', { projectPath, limit: 40 }));
     } catch (cause) {
       setError(String(cause));
-    } finally {
-      setLoading(false);
     }
   }, [projectPath]);
+  // The page's Refresh and each change refresh bump `version`, so history follows new commits.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: version is a reload signal
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, version]);
   return (
     <section className="workspace-section workspace-stack commit-history" aria-label="History">
-      <WorkspaceSectionHeading
-        title="History"
-        action={
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => void load()}
-            loading={loading}
-            loadingLabel="Refreshing…"
-          >
-            <RefreshIcon size={16} />
-            Refresh
-          </Button>
-        }
-      />
+      <WorkspaceSectionHeading title="History" />
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {lines && !lines.length && !error && <p className="task-muted">No commits yet.</p>}
       {!!lines?.length && (

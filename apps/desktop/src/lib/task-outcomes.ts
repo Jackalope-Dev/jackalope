@@ -1,4 +1,4 @@
-export interface OutcomeReceipt {
+interface OutcomeReceipt {
   accepted: boolean;
   evidence: string;
   note: string;

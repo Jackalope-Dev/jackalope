@@ -9,7 +9,7 @@ import { useProjectStore } from './projectStore';
 import { useSettingsStore } from './settingsStore';
 import { useThemeStore } from './themeStore';
 
-export interface HelperTurn {
+interface HelperTurn {
   id: string;
   prompt: string;
   answer: string;
@@ -133,7 +133,7 @@ export function helperPreferences() {
   };
 }
 
-export function helperContext() {
+function helperContext() {
   const { screen, sharePreferences, shareProjects } = useHelperStore.getState();
   const config = useAgentConfigStore.getState();
   const { projects, activeProjectId } = useProjectStore.getState();

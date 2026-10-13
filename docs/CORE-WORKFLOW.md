@@ -36,17 +36,14 @@ work rows; command search also finds projects, tasks, sessions and current-task 
 Parallel planning remains inside Work with the existing ownership and dependency
 contracts; plans stay editable before dispatch.
 
-Focus leads with a message composer and one task to resume, using a compact navigation
-rail. All work opens the searchable list. Build keeps recent work in the sidebar,
-offers project tools and opens task review beside the conversation. Other tool tabs
-can retain the conversation, including terminals and activity. Oversee uses full-width
-navigation, counts from current work, prioritized decisions and a board; New work
-opens its composer explicitly. Questions and Stop remain available in every mode.
-The composer options menu holds session limits, workflow starters and saved project
-context. Modes save per project, preserve unsent drafts and reset conversation-layout
-overrides when selected. The last task or
-session section persists across navigation. Project setup covers project, agents,
-decisions, behavior, appearance and an optional first task.
+The Work page keeps recent work in a collapsible sidebar and opens task review beside
+the conversation on wide windows, or at full width on narrower ones. Other tool tabs can retain the conversation, including terminals and
+activity. The work list offers list and board views; New work opens its composer
+explicitly once a project has work. Questions and Stop remain available with the
+sidebar collapsed. The composer options menu holds session limits, workflow starters
+and saved project context. The last task or
+session section persists across navigation. Project setup covers project, agents and an
+optional first task; decisions, behavior and appearance use editable defaults.
 Workspace inspection can suggest preparation, checks and preview commands without
 executing them. Failed or pending inspection never establishes a clean checkout.
 

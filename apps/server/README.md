@@ -57,6 +57,15 @@ retention locally, request `http://localhost:8787/__scheduled?cron=*/5+*+*+*+*`.
 | `POST /v2/feedback` | Explicit free-text feedback with optional bounded counters |
 | `GET, HEAD /updates/stable/latest.json` | Current updater manifest from R2; 60-second cache lifetime |
 | `GET, HEAD /updates/releases/vVERSION/FILE` | Immutable Windows EXE/MSI, matching `.sig`, or `checksums.json` |
+| `GET /api/lopebase/*` | Read-only LopeBase adapter; 404 unless `LOPEBASE_SIGNING_SECRET` is set |
+
+The LopeBase adapter ([lopebase.ts](src/lopebase.ts)) accepts only HMAC-signed
+requests and serves member and desktop-device identifiers, states, dates and counts.
+It runs with `personalData: "ids_only"`, so emails, device names, Store emails and
+tokens never leave the Worker. Rotate by setting the old value as
+`LOPEBASE_SIGNING_SECRET_PREVIOUS` until LopeBase holds the new one. The secret is
+optional and not declared in `secrets.required`, so local `wrangler dev` needs
+`--var LOPEBASE_SIGNING_SECRET:<value>` to serve it.
 
 Public ingestion/update routes reject query strings; private admin filters are validated. Ingestion accepts JSON (optional UTF-8 charset),
 at most 32,768 **bytes**, with a 10-second body-read deadline. Encoded bodies and

@@ -112,8 +112,17 @@ try {
       await page.locator('.download-platform').first().getAttribute('data-platform'),
       expected,
     );
-    assert.equal(await page.getByText('Coming soon', { exact: true }).count(), 3);
-    assert.equal(await page.locator('.download-platform-action a').count(), 0);
+    assert.equal(await page.getByText('Coming soon', { exact: true }).count(), 1);
+    assert.deepEqual(
+      await page
+        .locator('.download-platform-action a')
+        .evaluateAll((links) => links.map((link) => link.getAttribute('href')).sort()),
+      ['appimage-x86_64', 'dmg-aarch64', 'dmg-x86_64'].map(
+        (platform) =>
+          `https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/${platform}?channel=stable`,
+      ),
+      'Public macOS and Linux builds default to Stable',
+    );
     assert.equal(attempts(), 0);
     await noOverflow(page);
     if (expected === 'windows') {
@@ -177,8 +186,8 @@ try {
     );
     assert.equal(
       await page.getByText('Coming soon', { exact: true }).count(),
-      3,
-      'Approval does not invent a release',
+      1,
+      'Approval does not invent a Windows release',
     );
     await page.screenshot({ path: `${output}/download-approved.png`, fullPage: true });
     await context.close();

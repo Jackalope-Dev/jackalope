@@ -7,9 +7,9 @@ isolated parallel work, coordination and review before integration.
 
 ### Live sessions
 
-The project toolbar offers Focus, Build and Oversee layouts. Build starts review and
-preview beside the conversation; Oversee opens Needs you. Choosing a preset resets
-that project's task layout overrides. Individual conversation toggles remain available.
+Task review and preview open beside the conversation on windows at least 1280 pixels
+wide and take the full width on narrower ones. Individual
+conversation toggles remain available and are saved per task.
 
 The task toolbar shows the branch and changes since a previous visit. Task context
 opens the workspace and saved checks. Terminal opens a shell view in that exact

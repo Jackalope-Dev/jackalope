@@ -74,7 +74,7 @@ pub struct ScheduleLedger {
     pub error: Option<String>,
 }
 
-fn next_at(
+pub(super) fn next_at(
     expression: &str,
     timezone: &str,
     after: DateTime<Utc>,
@@ -394,7 +394,7 @@ impl Scheduler {
                 due_at: saved.next_at,
                 run_id: (!skip).then(|| request.id.clone()),
                 outcome: if access_denied {
-                    "Skipped: approved Jackalope access is required"
+                    "Skipped: sign in to Jackalope to start new work"
                 } else if overlap {
                     "Skipped: earlier run is active or interrupted"
                 } else if capacity_busy {
@@ -969,7 +969,7 @@ mod tests {
         scheduler.tick(now).unwrap();
         let ledger = scheduler.ledger.lock().unwrap().clone();
         let schedule = &ledger.schedules[0];
-        assert!(schedule.history[0].outcome.contains("approved Jackalope"));
+        assert!(schedule.history[0].outcome.contains("sign in to Jackalope"));
         assert!(schedule.history[0].run_id.is_none());
         assert!(schedule.last_run_id.is_none());
         assert!(schedule.next_at > now);

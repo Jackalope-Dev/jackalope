@@ -475,6 +475,7 @@ mod tests {
             created_at: "2026-09-01T00:00:00Z".into(),
             run_id: None,
             canceled: false,
+            origin: None,
         };
         let msg2 = SessionMessage {
             id: "m2".into(),
@@ -482,6 +483,7 @@ mod tests {
             created_at: "2026-09-01T00:01:00Z".into(),
             run_id: None,
             canceled: false,
+            origin: None,
         };
         let msg3 = SessionMessage {
             id: "m3".into(),
@@ -489,6 +491,7 @@ mod tests {
             created_at: "2026-09-01T00:02:00Z".into(),
             run_id: None,
             canceled: false,
+            origin: None,
         };
         let messages = vec![&msg1, &msg2, &msg3];
 

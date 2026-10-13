@@ -271,7 +271,16 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
       unsubscribeSettings();
     };
   }, [run.taskId, run.workspace, slot, terminalId]);
+  // The button is disabled while a start or stop runs, which drops focus to the
+  // page; keyboard users get it back once the button is enabled again.
+  const restoreFocus = useRef(false);
+  useEffect(() => {
+    if (busy || !restoreFocus.current) return;
+    restoreFocus.current = false;
+    if (document.activeElement === document.body) action.current?.focus();
+  }, [busy]);
   const change = async () => {
+    restoreFocus.current = document.activeElement === action.current;
     setBusy(true);
     setError('');
     try {

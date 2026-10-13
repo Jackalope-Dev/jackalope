@@ -61,12 +61,16 @@ of a list with `NoticeRow` (quiet surface, info icon, arrow), not an underlined 
 link. Conversations put the person's messages on the right as tinted bubbles and
 replies on the left beside the speaker's character, with agent Markdown rendered.
 
+Everything in the work list is work; label its shape (Conversation, Task, Planned task or
+Draft) rather than giving it its own place. Say "conversation" in copy, never "chat" or
+"session", and select work through `selectWork` so only one item is open at a time.
+
 Task titles should be short objectives, with original instructions in task details under Activity.
 Results lead with output. Review gives the changed-file browser the full content
 width, with separate Changes, Checks and Merge views. Put approval and optional
 review actions in a toolbar above the diff; never in a competing side panel.
-File review markers are optional tracking, not acceptance or merge gates. Task, managed-task
-and chat review reuse `ResultReview`; file navigation and diffs reuse `ChangedFiles`.
+File review markers are optional tracking, not acceptance or merge gates. Task, planned-task
+and conversation review reuse `ResultReview`; file navigation and diffs reuse `ChangedFiles`.
 Keep check failures visible in navigation, preserve review inputs when switching views,
 and load optional tools on first use. Keep one follow-up composer per task. Worker links resolve to their parent task instead of a second result screen.
 Use `WorkspaceTabs` for keyboard-navigable task and review panels with the same
@@ -74,8 +78,8 @@ appearance as workspace navigation. Keep the task agent beside its heading.
 Use outlined buttons for secondary actions, visible selected tabs, and open sections
 for results, checks and next actions. Keep follow-up compact so the result remains usable
 at 960 by 640. Existing work should be visible before opening new-task capture.
-Chat leads with its composer and places work needing attention underneath. Keep
-optional session limits, workflow starters and context controls in its options menu;
+Work leads with its composer and places work needing attention underneath. Keep
+optional conversation limits, workflow starters and context controls in its options menu;
 keep the agent choice, including comparisons, and attachments visible beside Send.
 
 Visible content is the default. Use short headings, spacing, compact lists and clear
@@ -129,7 +133,12 @@ the control so scrolling dialogs and panels never clip them. Contained dialogs p
 own body and footer to line up with the header, and content sits on the dialog surface
 rather than nested background panels.
 Surfaces that belong together join as one card with a divider and no inner corner
-radius; separate surfaces keep the page gap. Pages use one vertical rhythm from their
+radius; separate surfaces keep the page gap. Use the shared radius scale
+(`--radius-xs` through `--radius-3xl` and `--radius-full`) rather than raw pixel radii;
+Tailwind `rounded-*` utilities read the same scale. Repeated tiles in a grid share one
+row height, and list rows keep one height with single-line truncation, so longer copy
+never makes neighbours uneven. The vertical workspace navigation is its own rounded
+panel on `--color-navigation`. Pages use one vertical rhythm from their
 layout gap rather than per-section margins. Transient notices, previews and errors the
 user can clear have a visible close control.
 
@@ -145,7 +154,8 @@ has no cancel exit; users reach the final step before entering the workspace.
 The first task remains optional on that final step. Give slow or failed checks a
 clear retry path.
 
-Project setup is project → agents → decisions → behavior → appearance → first task.
+Project setup is project → agents → first task. Decisions, commit behavior and
+appearance use defaults and are edited in Project settings, not added as setup steps.
 Show every step in the progress list and preserve saved setup on reload.
 Detect workspace command defaults in
 the background without a manual inspection step. Preserve explicit choices, including
@@ -193,13 +203,17 @@ channel append " - dev" or " - Beta" to the title bar; stable shows only the nam
 
 Use motion to explain changes, acknowledge input or express the mascot's
 personality. Avoid competing animation, ambient pulses and unnecessary delays.
+`@jackalope/ui` owns shared motion: dialogs, menus, popovers, selects and tooltips
+animate in and out, tab panels and opened pages settle into place, and segmented
+controls slide their selection. Reuse its `--motion-*` durations and `--ease-*` curves
+instead of adding feature keyframes, and keep reduced motion static.
 Maintain the existing setup acknowledgment and workspace-entry behavior.
 
 ## Components and verification
 
 Import portable controls from @jackalope/ui. The library includes Button,
 IconButton, Input, Textarea, FormField, Select, Checkbox, Switch, Badge, Tooltip,
-DropdownMenu, Popover, Tabs, SegmentedControl, dialogs, CopyButton, InlineNotice,
+DropdownMenu, Popover, Tabs, SegmentedControl, SegmentedNav, dialogs, CopyButton, InlineNotice,
 LoadingState, EmptyState, ErrorState, PageHeader, SectionHeader, Toolbar, Stat,
 DefinitionList, Table, SearchField, Disclosure, SettingRow, SettingGroup and Panel.
 Reuse desktop compositions such as WorkspaceHeading,
@@ -223,6 +237,10 @@ settings. Do not place loose headings, rows or buttons between cards. Use Inline
 the tone from the actual outcome; use its action slot for recovery controls.
 WorkspaceToolbar owns filter/action wrapping and spacing. FilterGroup represents
 pressed filter choices; WorkspaceSubnavigation represents navigation between views.
+Every row of peer choices uses the shared segmented track: SegmentedControl for
+filters, SegmentedNav for views (it marks the open view with aria-current) and
+`Tabs.List appearance="segmented"` for panels with arrow-key navigation. Put counts in
+an item's `count` rather than the label text, and do not hand-roll tab rows.
 
 SearchField uses a controlled string value and onValueChange, forwards its input
 ref and native attributes, and returns focus to the input after clearing. Use
@@ -259,7 +277,7 @@ in a label with a comfortable hit area or use FormField. Keep specialized file,
 color, range and editor controls local when their interaction requires it.
 DropdownMenu and Popover keep Portal explicit so nested overlays can choose their
 container. Tabs use arrow-key panel navigation; SegmentedControl uses pressed
-buttons for filtering. CopyButton accepts a custom clipboard function, shows
+buttons for filtering and SegmentedNav uses aria-current for view navigation. CopyButton accepts a custom clipboard function, shows
 failure beside the action and clears stale feedback when its text changes.
 
 Use the standalone gallery with `pnpm ui:dev` at http://127.0.0.1:5190 to inspect

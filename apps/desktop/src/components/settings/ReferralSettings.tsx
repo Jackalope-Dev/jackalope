@@ -87,6 +87,22 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
         </SettingActions>
       </SettingGroup>
     );
+  if (referrals.openSignup) {
+    const signup = new URL('/download/', referrals.shareUrl).href;
+    return (
+      <SettingGroup
+        title="Invite friends"
+        description="Anyone can create a free account now, so passes are no longer needed. Share the download page instead."
+      >
+        <SettingActions>
+          <CopyButton text={signup} label="Copy download link" />
+          <Button variant="outline" onClick={() => void openInBrowser(signup)}>
+            <ExternalLinkIcon /> Open download page
+          </Button>
+        </SettingActions>
+      </SettingGroup>
+    );
+  }
   return (
     <SettingGroup title="Instant Access Passes">
       <SettingBody className="referral-settings">

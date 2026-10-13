@@ -36,7 +36,7 @@ line counts and keyboard access to the final line; a main-thread fallback cannot
 silently satisfy worker acceptance. The isolated preview selects an available port.
 
 Run `node scripts/verification/verify-workbench.mjs` for isolated browser checks of
-workspace layouts, terminal focus and reconnect, topic selection in large conversations,
+the workspace sidebar, terminal focus and reconnect, topic selection in large conversations,
 detached-window drafts and feedback recovery. It starts its own Vite server and uses
 mock native commands; it does not prove installed shell or window behavior.
 

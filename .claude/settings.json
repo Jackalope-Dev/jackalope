@@ -1,0 +1,58 @@
+{
+  "$comment": "Jackalope Digital baseline (jackalope-digital-hub/templates/.claude). Per-user overrides go in .claude/settings.local.json.",
+  "permissions": {
+    "allow": [
+      "Bash(pnpm run:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm exec biome:*)",
+      "Bash(pnpm exec knip:*)",
+      "Bash(pnpm exec tsc:*)",
+      "Bash(pnpm exec vitest:*)",
+      "Bash(pnpm test:*)",
+      "Bash(node scripts/:*)",
+      "Bash(node --test:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git worktree list:*)",
+      "Bash(git worktree add:*)",
+      "Bash(git fetch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git switch:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git grep:*)",
+      "Bash(gitleaks:*)",
+      "Bash(rg:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(jq:*)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean:*)",
+      "Bash(git checkout -- :*)",
+      "Bash(git stash:*)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/.env.local)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/block-secrets.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

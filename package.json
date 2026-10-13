@@ -1,6 +1,6 @@
 {
   "name": "jackalope-monorepo",
-  "version": "0.1.15",
+  "version": "0.1.21",
   "private": true,
   "description": "Jackalope - Ultra-performant desktop shell and harness for agentic workflows",
   "scripts": {
@@ -13,6 +13,7 @@
     "format": "biome format --write .",
     "check": "biome check . --error-on-warnings",
     "check:write": "biome check --write .",
+    "knip": "knip",
     "typecheck": "pnpm --filter @jackalope/ui --filter @jackalope/desktop --filter @jackalope/website typecheck",
     "test": "pnpm test:release && pnpm --filter @jackalope/desktop --filter @jackalope/server test",
     "test:release": "node --test \"scripts/release/*.test.mjs\"",
@@ -23,6 +24,7 @@
     "dev:website": "pnpm --filter @jackalope/website dev",
     "build:website": "pnpm --filter @jackalope/website build",
     "verify": "node scripts/verify.mjs",
+    "verify:quick": "biome check --changed --since=origin/master --no-errors-on-unmatched --error-on-warnings && pnpm typecheck && pnpm knip",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:dependencies": "node scripts/security/dependencies.mjs",
     "evaluate:execution": "node scripts/evaluation/run.mjs",
@@ -44,7 +46,8 @@
     "licenses:generate": "node scripts/licenses.mjs",
     "ui:dev": "pnpm --filter @jackalope/ui dev",
     "ui:build": "pnpm --filter @jackalope/ui build",
-    "ui:test": "node scripts/verification/verify-ui.mjs"
+    "ui:test": "node scripts/verification/verify-ui.mjs",
+    "worktrees": "node scripts/worktree-report.mjs"
   },
   "keywords": [
     "tauri",
@@ -59,10 +62,12 @@
   "license": "Apache-2.0",
   "packageManager": "pnpm@10.11.0",
   "devDependencies": {
-    "@biomejs/biome": "^2.5.12",
+    "@biomejs/biome": "^2.5.15",
     "agent-browser": "0.38.1",
+    "knip": "^6.41.0",
     "lefthook": "2.1.14",
-    "playwright-core": "1.63.0"
+    "playwright-core": "1.63.0",
+    "vite": "^8.3.1"
   },
   "engines": {
     "node": ">=26.9.0 <27"

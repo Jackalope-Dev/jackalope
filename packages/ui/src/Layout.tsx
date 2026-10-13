@@ -1,5 +1,4 @@
 import type { ComponentPropsWithoutRef, ReactNode, Ref } from 'react';
-import { Button } from './Button';
 import { cn } from './utils';
 import './layout.css';
 export function PageHeader({
@@ -65,39 +64,4 @@ export function SectionHeader({
 }
 export function Toolbar({ className, ...props }: ComponentPropsWithoutRef<'div'>) {
   return <div {...props} className={cn('ui-toolbar', className)} />;
-}
-export function SegmentedControl<T extends string>({
-  label,
-  items,
-  value,
-  onChange,
-  activeRef,
-  className,
-}: {
-  label: string;
-  items: readonly { id: T; label: ReactNode; disabled?: boolean }[];
-  value: T;
-  onChange: (value: T) => void;
-  activeRef?: Ref<HTMLButtonElement>;
-  className?: string;
-}) {
-  return (
-    <fieldset className={cn('ui-segmented-control', className)}>
-      <legend className="ui-sr-only">{label}</legend>
-      {items.map((item) => (
-        <Button
-          key={item.id}
-          ref={value === item.id ? activeRef : undefined}
-          type="button"
-          size="sm"
-          variant={value === item.id ? 'secondary' : 'ghost'}
-          aria-pressed={value === item.id}
-          disabled={item.disabled}
-          onClick={() => onChange(item.id)}
-        >
-          {item.label}
-        </Button>
-      ))}
-    </fieldset>
-  );
 }

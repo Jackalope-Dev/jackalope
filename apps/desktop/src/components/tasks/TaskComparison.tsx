@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import {
+  durationLabel,
   elapsedLabel,
   isActive,
   nativeTask,
@@ -28,11 +29,7 @@ interface Stats {
 }
 
 function duration(run: TaskRun) {
-  if (run.durationMs != null) {
-    const seconds = Math.round(run.durationMs / 1000);
-    const minutes = Math.floor(seconds / 60);
-    return minutes ? `${minutes}m ${seconds % 60}s` : `${seconds}s`;
-  }
+  if (run.durationMs != null) return durationLabel(run.durationMs / 1000);
   return run.endedAt
     ? elapsedLabel(run.startedAt, Date.parse(run.endedAt))
     : elapsedLabel(run.startedAt);

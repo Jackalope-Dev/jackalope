@@ -214,6 +214,51 @@ async function _captureSetup(page) {
               expiresAt: null,
             }
           );
+        if (command === 'app_community_settings')
+          return {
+            reviewed: true,
+            telemetry: false,
+            errors: false,
+            configured: true,
+            buildChannel: 'stable',
+          };
+        // Newer workspace surfaces start empty so the captured views stay focused.
+        const quiet = {
+          project_registry_list: [],
+          project_registry_save: null,
+          desktop_zoom: null,
+          desktop_control_theme: null,
+          desktop_unread_badge: null,
+          notification_take_open: null,
+          notification_configure: { supported: true, enabled: false, error: null },
+          app_release_status: {
+            currentVersion: '0.1.15',
+            channel: 'stable',
+            betaAvailable: true,
+            configured: false,
+            availableVersion: null,
+            notes: null,
+          },
+          app_settings_sync: { enabled: false },
+          app_account_feedback: null,
+          schedule_list: { schedules: [], error: null },
+          git_working_changes: { branch: 'main', head: null, files: [] },
+          live_session_snapshot: { revision: 1, runs: [], ids: [] },
+          helper_sync: null,
+          capacity_snapshot: [],
+          task_change_stats: {},
+          task_preview_status: null,
+          task_followup_snapshot: [],
+          agent_profile_list: { profiles: [], activeId: null, envVar: null },
+          helper_snapshot: { turns: [], actions: [], connected: false, error: null },
+        };
+        if (command in quiet) return quiet[command];
+        if (command === 'task_changes')
+          return {
+            revision: 1,
+            runs: window.__auditRuns,
+            ids: window.__auditRuns.map((run) => run.id),
+          };
         if (command === 'app_account_referrals') {
           if (!window.__referrals) throw new Error('Connect your Jackalope account first.');
           return window.__referrals;

@@ -33,8 +33,10 @@ verification emails retain their existing routes.
    share link and acceptance, download and connection milestones. Sharing is always
    user initiated; email invitation management opens the authenticated website.
 
-Waitlist members follow the browser's waitlist sign-in link, verify their email,
-and confirm the matching desktop code. Their connection persists across restarts
+With the service's `OPEN_SIGNUP` setting on, confirming the signup email approves
+the account and signs the browser in, so a new member pairs the desktop as an
+approved member. With it off, waitlist members follow the browser's waitlist
+sign-in link, verify their email, and confirm the matching desktop code. Their connection persists across restarts
 for the device credential's lifetime. Desktop shows their current queue position,
 verified and pending referrals, earned priority, and copyable referral link and
 share message. Each verified referral earns one day of priority using the same

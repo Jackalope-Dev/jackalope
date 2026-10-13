@@ -13,7 +13,7 @@
   flex-shrink: 0;
   align-items: center;
   max-width: 240px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   color: var(--color-text-secondary);
 }
 .work-tab:hover {
@@ -48,7 +48,7 @@
   place-items: center;
   width: 36px;
   height: 44px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   color: var(--color-text-muted);
 }
 .work-tab-close:hover {
@@ -58,5 +58,5 @@
 .work-tab-close:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: -2px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }

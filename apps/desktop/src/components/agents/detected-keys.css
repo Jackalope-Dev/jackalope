@@ -4,6 +4,6 @@
 }
 
 .privacy-guarantee-banner {
-  background-color: rgba(16, 185, 129, 0.08);
-  border-color: rgba(16, 185, 129, 0.25);
+  background-color: color-mix(in srgb, var(--color-success) 8%, transparent);
+  border-color: color-mix(in srgb, var(--color-success) 25%, transparent);
 }

@@ -22,8 +22,8 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | @biomejs/cli-win32-x64 | 2.5.14 | MIT OR Apache-2.0 |
 | @cloudflare/kv-asset-handler | 0.5.0 | MIT OR Apache-2.0 |
 | @cloudflare/unenv-preset | 2.16.2 | MIT OR Apache-2.0 |
-| @cloudflare/vitest-plugin | 1.2.5 | MIT |
-| @cloudflare/workerd-windows-64 | 1.20260921.1 | Apache-2.0 |
+| @cloudflare/vitest-plugin | 1.2.6 | MIT |
+| @cloudflare/workerd-windows-64 | 1.20260923.1 | Apache-2.0 |
 | @cspotcode/source-map-support | 0.8.1 | MIT |
 | @dagrejs/dagre | 3.1.1 | MIT |
 | @dagrejs/graphlib | 4.0.5 | MIT |
@@ -32,16 +32,18 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | @floating-ui/dom | 1.8.0 | MIT |
 | @floating-ui/react-dom | 2.1.9 | MIT |
 | @floating-ui/utils | 0.2.12 | MIT |
+| @fontsource-variable/bricolage-grotesque | 5.3.0 | OFL-1.1 |
 | @fontsource-variable/jetbrains-mono | 5.3.0 | OFL-1.1 |
 | @fontsource-variable/plus-jakarta-sans | 5.3.0 | OFL-1.1 |
 | @img/colour | 1.1.0 | MIT |
-| @img/sharp-win32-x64 | 0.35.4 | Apache-2.0 AND LGPL-3.0-or-later |
+| @img/sharp-win32-x64 | 0.35.5 | Apache-2.0 AND LGPL-3.0-or-later |
 | @jridgewell/gen-mapping | 0.3.13 | MIT |
 | @jridgewell/remapping | 2.3.5 | MIT |
 | @jridgewell/resolve-uri | 3.1.2 | MIT |
 | @jridgewell/sourcemap-codec | 1.6.0 | MIT |
 | @jridgewell/trace-mapping | 0.3.9, 0.3.31 | MIT |
-| @oxc-project/types | 0.148.0 | MIT |
+| @lopebase/adapter | 0.2.0 | MIT |
+| @oxc-project/types | 0.151.0 | MIT |
 | @pierre/diffs | 1.4.1 | apache-2.0 |
 | @pierre/theme | 2.0.0 | apache-2.0 |
 | @pierre/theming | 1.0.1 | apache-2.0 |
@@ -84,7 +86,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | @radix-ui/rect | 1.1.3 | MIT |
 | @resvg/resvg-js | 2.6.2 | MPL-2.0 |
 | @resvg/resvg-js-win32-x64-msvc | 2.6.2 | MPL-2.0 |
-| @rolldown/binding-win32-x64-msvc | 1.2.7 | MIT |
+| @rolldown/binding-win32-x64-msvc | 1.2.11 | MIT |
 | @rolldown/pluginutils | 1.0.1 | MIT |
 | @shikijs/core | 4.4.3 | MIT |
 | @shikijs/engine-javascript | 4.4.3 | MIT |
@@ -103,9 +105,9 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | @tailwindcss/oxide | 4.3.3 | MIT |
 | @tailwindcss/oxide-win32-x64-msvc | 4.3.3 | MIT |
 | @tailwindcss/vite | 4.3.3 | MIT |
-| @tauri-apps/api | 2.11.1, 2.12.0 | Apache-2.0 OR MIT |
-| @tauri-apps/cli | 2.11.4 | Apache-2.0 OR MIT |
-| @tauri-apps/cli-win32-x64-msvc | 2.11.4 | Apache-2.0 OR MIT |
+| @tauri-apps/api | 2.11.1 | Apache-2.0 OR MIT |
+| @tauri-apps/cli | 2.11.5 | Apache-2.0 OR MIT |
+| @tauri-apps/cli-win32-x64-msvc | 2.11.5 | Apache-2.0 OR MIT |
 | @tauri-apps/plugin-opener | 2.5.5 | MIT OR Apache-2.0 |
 | @types/chai | 5.2.3 | MIT |
 | @types/d3-color | 3.1.3 | MIT |
@@ -121,7 +123,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | @types/hast | 3.0.5 | MIT |
 | @types/mdast | 4.0.4 | MIT |
 | @types/ms | 2.1.0 | MIT |
-| @types/node | 26.6.1 | MIT |
+| @types/node | 26.6.3 | MIT |
 | @types/react | 19.3.0 | MIT |
 | @types/react-dom | 19.3.0 | MIT |
 | @types/unist | 2.0.11, 3.0.3 | MIT |
@@ -138,8 +140,8 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | @xterm/addon-fit | 0.11.0 | MIT |
 | @xterm/addon-web-links | 0.12.0 | MIT |
 | @xterm/xterm | 6.0.0 | MIT |
-| @xyflow/react | 12.11.6 | MIT |
-| @xyflow/system | 0.0.82 | MIT |
+| @xyflow/react | 12.12.0 | MIT |
+| @xyflow/system | 0.0.83 | MIT |
 | agent-browser | 0.38.1 | Apache-2.0 |
 | aria-hidden | 1.2.6 | MIT |
 | assertion-error | 2.0.1 | MIT |
@@ -185,7 +187,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | expect-type | 1.4.0 | Apache-2.0 |
 | extend | 3.0.2 | MIT |
 | fdir | 6.5.0 | MIT |
-| framer-motion | 13.4.0 | MIT |
+| framer-motion | 13.4.6 | MIT |
 | get-nonce | 1.0.1 | MIT |
 | graceful-fs | 4.2.11 | ISC |
 | hast-util-from-parse5 | 8.0.3 | MIT |
@@ -214,7 +216,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | lightningcss-win32-x64-msvc | 1.32.0, 1.33.0 | MPL-2.0 |
 | longest-streak | 3.1.0 | MIT |
 | lru_map | 0.4.1 | MIT |
-| lucide-react | 1.47.0 | ISC |
+| lucide-react | 1.48.0 | ISC |
 | magic-string | 0.30.21 | MIT |
 | markdown-table | 3.0.4 | MIT |
 | marked | 17.0.6 | MIT |
@@ -261,9 +263,9 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | micromark-util-subtokenize | 2.1.0 | MIT |
 | micromark-util-symbol | 2.0.1 | MIT |
 | micromark-util-types | 2.0.2 | MIT |
-| miniflare | 5.20260921.1-alpha | MIT |
-| motion | 13.4.0 | MIT |
-| motion-dom | 13.3.0 | MIT |
+| miniflare | 5.20260923.0-alpha | MIT |
+| motion | 13.4.6 | MIT |
+| motion-dom | 13.4.5 | MIT |
 | motion-utils | 13.3.0 | MIT |
 | ms | 2.1.3 | MIT |
 | nanoid | 3.3.18 | MIT |
@@ -296,13 +298,13 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | remark-rehype | 11.1.2 | MIT |
 | remark-stringify | 11.0.0 | MIT |
 | remend | 1.3.1 | Apache-2.0 |
-| rolldown | 1.2.7 | MIT |
+| rolldown | 1.2.11 | MIT |
 | scheduler | 0.28.0 | MIT |
 | semver | 7.8.5 | ISC |
-| sharp | 0.35.4 | Apache-2.0 |
+| sharp | 0.35.5 | Apache-2.0 |
 | shiki | 4.4.3 | MIT |
 | siginfo | 2.0.0 | ISC |
-| source-map-js | 1.2.1 | BSD-3-Clause |
+| source-map-js | 1.2.2 | BSD-3-Clause |
 | space-separated-tokens | 2.0.2 | MIT |
 | stackback | 0.0.2 | MIT |
 | std-env | 4.2.0 | MIT |
@@ -322,7 +324,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | trough | 2.2.0 | MIT |
 | tslib | 2.8.1 | 0BSD |
 | typescript | 7.0.2 | Apache-2.0 |
-| undici | 7.29.0 | MIT |
+| undici | 7.29.1 | MIT |
 | undici-types | 8.9.0 | MIT |
 | unenv | 2.0.0-rc.24 | MIT |
 | unified | 11.0.5 | MIT |
@@ -337,12 +339,12 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | vfile | 6.0.3 | MIT |
 | vfile-location | 5.0.3 | MIT |
 | vfile-message | 4.0.3 | MIT |
-| vite | 8.3.0 | MIT |
+| vite | 8.3.1 | MIT |
 | vitest | 4.1.11 | MIT |
 | web-namespaces | 2.0.1 | MIT |
 | why-is-node-running | 2.3.0 | MIT |
-| workerd | 1.20260921.1 | Apache-2.0 |
-| wrangler | 4.138.0 | MIT OR Apache-2.0 |
+| workerd | 1.20260923.1 | Apache-2.0 |
+| wrangler | 4.139.0 | MIT OR Apache-2.0 |
 | ws | 8.21.0 | MIT |
 | youch | 4.1.0-beta.10 | MIT |
 | youch-core | 0.3.3 | MIT |

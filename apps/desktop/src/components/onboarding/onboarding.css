@@ -73,9 +73,10 @@
   min-width: 0;
   max-height: 100%;
   overflow: auto;
-  scrollbar-gutter: stable;
+  /* A reserved gutter would shorten the footer divider and skew the right padding. */
+  scrollbar-width: thin;
   padding: var(--onboarding-padding);
-  border-radius: 24px;
+  border-radius: var(--radius-3xl);
   background: linear-gradient(160deg, var(--color-surface-elevated), var(--color-surface));
   box-shadow: 0 16px 60px color-mix(in srgb, var(--color-accent) 7%, transparent);
 }
@@ -113,6 +114,9 @@
 .onboarding-content h2[data-step="theme"],
 .onboarding-content h2[data-step="project"] {
   margin-bottom: 20px;
+}
+.onboarding-content .inline-notice:not(:last-child) {
+  margin-bottom: 16px;
 }
 .onboarding-folder {
   display: flex;
@@ -158,12 +162,8 @@
   margin: 28px calc(-1 * var(--onboarding-padding)) calc(-1 * var(--onboarding-padding));
   padding: 16px var(--onboarding-padding);
   border-top: 1px solid var(--color-border-subtle);
-  border-radius: 0 0 24px 24px;
+  border-radius: 0 0 var(--radius-3xl) var(--radius-3xl);
   background: var(--color-surface);
-}
-.onboarding-theme-editor {
-  width: 100%;
-  min-width: 0;
 }
 .onboarding-runner-list {
   display: grid;
@@ -179,7 +179,7 @@
 }
 .onboarding-agent-card {
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
 }
 .onboarding-agent-card[data-selected="true"] {
@@ -192,10 +192,6 @@
 }
 .onboarding-local-agent {
   margin: 16px 0 0 0;
-}
-.onboarding-behavior-section {
-  margin-top: 0;
-  padding-top: 0;
 }
 .onboarding-agent-choice {
   display: flex;
@@ -258,7 +254,7 @@
 .onboarding-signin-tip {
   margin-top: 12px;
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--color-surface-elevated);
   border: 1px solid var(--color-border);
 }
@@ -273,7 +269,7 @@
   gap: 8px;
   background: var(--color-surface-sunken);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   padding: 4px 8px;
 }
 .onboarding-command-box code {
@@ -290,7 +286,7 @@
 .onboarding-install-catalog {
   margin-top: 16px;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 12px;
   background: var(--color-surface-elevated);
 }
@@ -310,7 +306,7 @@
 .onboarding-catalog-card {
   min-width: 0;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 10px 12px;
   background: var(--color-surface);
 }
@@ -475,7 +471,7 @@
 .onboarding-privacy-panel {
   margin-top: 20px;
   border: 1px solid color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--color-accent-subtle);
 }
 .onboarding-privacy-panel summary {
@@ -487,7 +483,7 @@
   cursor: pointer;
   list-style: none;
   color: var(--color-accent-ink);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }
 .onboarding-privacy-panel summary::-webkit-details-marker {
   display: none;
@@ -531,11 +527,11 @@
   gap: 8px;
   margin-bottom: 20px;
 }
-.onboarding-project-storage .ui-segmented-control {
+.onboarding-project-storage .ui-segmented {
   display: flex;
   width: 100%;
 }
-.onboarding-project-storage .ui-segmented-control > button {
+.onboarding-project-storage .ui-segmented > button {
   flex: 1;
 }
 .onboarding-project-name {

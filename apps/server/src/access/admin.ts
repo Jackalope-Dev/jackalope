@@ -13,7 +13,7 @@ import { accessEmail } from './mail';
 import { checkMailDelivery } from './mail-status';
 import type { Mail } from './mail-templates';
 import { markAudienceStale } from './newsletter';
-import { installerKey, linuxChannels, macChannels, storeUrl } from './routes';
+import { installerKey, linuxChannels, macChannels, stableDownloads, storeUrl } from './routes';
 import { AccessError, approve, requestLink } from './service';
 import { waitlistRankSql } from './waitlist';
 
@@ -94,7 +94,7 @@ export async function accessAdmin(
                 kind: kind === 'invite' ? 'invite' : kind === 'login' ? 'login' : 'welcome',
                 token: 'preview-only',
               };
-    return new Response(accessEmail(mail, env.ACCESS_WEB_ORIGIN).body, {
+    return new Response(accessEmail(mail, env.ACCESS_WEB_ORIGIN, stableDownloads(env)).body, {
       headers: {
         ...headers,
         'content-type': 'text/html; charset=utf-8',

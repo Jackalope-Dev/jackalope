@@ -7,8 +7,17 @@ export interface SessionMessage {
   createdAt: string;
   runId: string | null;
   canceled: boolean;
+  /** Set when the message came from a wake-up, another bot or a card answer rather than typing. */
+  origin?: MessageOrigin;
 }
-export interface SessionBatch {
+export interface MessageOrigin {
+  kind: 'wake' | 'bot' | 'reply' | 'card';
+  label: string;
+  botId?: string;
+  botName?: string;
+  sessionId?: string;
+}
+interface SessionBatch {
   runId: string;
   messageIds: string[];
   previousRunId: string | null;
@@ -20,7 +29,7 @@ export interface SessionDraft {
   revision: number;
 }
 /** Standing instructions from a saved bot, repeated natively in every batch. */
-export interface SessionPersona {
+interface SessionPersona {
   botId: string;
   name: string;
   instructions: string;

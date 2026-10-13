@@ -432,6 +432,7 @@ impl Coordinator {
                         .route("/v1/peers/adopt", post(peers::bridge_peer_adopt))
                         .route("/v1/subtasks", post(subtasks::bridge_propose_subtask))
                         .route("/v1/agreements", post(agreements::bridge_agreement))
+                        .route("/v1/bots/{tool}", post(bridge_bot_tool))
                         .route("/v1/tools/search", post(bridge_tool_search))
                         .route("/v1/tools/execute", post(bridge_tool_execute))
                         .route("/v1/tools/read", post(bridge_tool_read))

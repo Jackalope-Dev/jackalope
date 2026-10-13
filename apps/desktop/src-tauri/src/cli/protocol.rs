@@ -98,11 +98,32 @@ pub enum Request {
     },
     /// Open the app's Changes page on a checkout (the project or a worktree).
     ShowChanges { path: String },
+    /// Set a project's theme accent (`#rrggbb`) in the app and every terminal.
+    SetAccent { project_id: String, accent: String },
     /// Extract learnings from a conversation's history (up to the previous /learn,
     /// if present) and save them to project context.
     SessionLearn { session_id: String },
     /// Account quota windows, as the app's status bar shows them.
     Usage,
+    /// Prepares a merge of a paused conversation's latest attempt into the
+    /// project's target branch, as the app's merge review does. Nothing
+    /// changes in the project until `MergeApply`.
+    MergePrepare {
+        session_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        message: Option<String>,
+    },
+    /// Applies a prepared merge; `cleanup` removes the merged worktree after.
+    MergeApply { plan_id: String, cleanup: bool },
+    /// Commits a conversation's remaining changes with the project's commit
+    /// settings, pushes its branch and opens a pull request through the
+    /// person's GitHub CLI, as the app's Create pull request does.
+    PullRequest {
+        session_id: String,
+        title: String,
+        body: String,
+        draft: bool,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -178,6 +199,10 @@ pub struct SessionView {
     pub branch: Option<String>,
     /// The agent's output so far.
     pub result: String,
+    /// The newest steps the agent took, such as tool calls and narration,
+    /// oldest first. Older hosts omit it.
+    #[serde(default)]
+    pub activity: Vec<String>,
     pub questions: Vec<Question>,
 }
 
@@ -265,6 +290,30 @@ pub enum Response {
     Usage {
         accounts: Vec<UsageAccount>,
     },
+    Merge {
+        plan: MergePlan,
+    },
+    PullRequest {
+        url: String,
+    },
+}
+
+/// A prepared or applied merge, as a terminal shows it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergePlan {
+    pub id: String,
+    /// `ready`, `conflicted`, `applying` or `applied`.
+    pub status: String,
+    pub target_branch: String,
+    pub files: Vec<String>,
+    pub conflicts: Vec<String>,
+    pub commit_message: String,
+    /// Whether the project's commit settings remove the worktree after a merge.
+    pub cleanup: bool,
+    /// Worktrees that could not be removed after the merge, with the reason.
+    #[serde(default)]
+    pub cleanup_errors: Vec<String>,
 }
 
 impl Response {
@@ -334,6 +383,18 @@ type Stream = std::fs::File;
 /// Longest wait for one response. The host answers `watch` within 25 seconds
 /// even when nothing changes, so anything slower means it is wedged.
 const RESPONSE_TIMEOUT: Duration = Duration::from_secs(40);
+/// Merging and pull requests run the repository's commit and push hooks, which
+/// can take as long as its whole test suite.
+const DELIVERY_TIMEOUT: Duration = Duration::from_secs(20 * 60);
+
+fn response_timeout(request: &Request) -> Duration {
+    match request {
+        Request::MergePrepare { .. } | Request::MergeApply { .. } | Request::PullRequest { .. } => {
+            DELIVERY_TIMEOUT
+        }
+        _ => RESPONSE_TIMEOUT,
+    }
+}
 
 #[cfg(unix)]
 fn open(endpoint: &str) -> std::io::Result<Stream> {
@@ -424,13 +485,14 @@ impl Client {
         if self.broken {
             return Err("The connection to Jackalope was lost.".into());
         }
+        let timeout = response_timeout(request);
         let mut encoded = serde_json::to_vec(request).map_err(|error| error.to_string())?;
         encoded.push(b'\n');
         let sent = self
             .requests
             .as_ref()
             .is_some_and(|requests| requests.send(encoded).is_ok());
-        let line = match sent.then(|| self.responses.recv_timeout(RESPONSE_TIMEOUT)) {
+        let line = match sent.then(|| self.responses.recv_timeout(timeout)) {
             Some(Ok(Ok(line))) => line,
             Some(Ok(Err(error))) if error.kind() != std::io::ErrorKind::UnexpectedEof => {
                 self.broken = true;

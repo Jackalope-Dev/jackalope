@@ -130,9 +130,107 @@ pub async fn task_delivery_status(
     .map_err(|error| error.to_string())?
 }
 
+/// Checks a pull request's title and description before anything reaches GitHub.
+fn pull_request_text(title: &str, body: &str) -> Result<(String, String), String> {
+    let title = title.trim();
+    if title.is_empty() || title.contains('\n') || title.chars().count() > 256 {
+        return Err("Write a one-line pull request title under 256 characters.".into());
+    }
+    let body = body.trim();
+    if body.chars().count() > 60_000 {
+        return Err("Shorten the pull request description.".into());
+    }
+    Ok((title.into(), body.into()))
+}
+
+/// The pull request URL `gh pr create` prints on its last line.
+fn created_url(stdout: &str) -> Option<String> {
+    stdout
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|line| line.starts_with("https://"))
+        .map(String::from)
+}
+
+/// Opens a pull request for a task's pushed branch through the person's GitHub
+/// CLI. The branch must already be committed and pushed; this never commits,
+/// pushes or merges, and Git and GitHub never prompt.
+#[tauri::command]
+pub async fn task_pull_request_create(
+    id: String,
+    title: String,
+    body: String,
+    draft: bool,
+    state: State<'_, TaskRuntime>,
+) -> Result<String, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let (title, body) = pull_request_text(&title, &body)?;
+        let runs = runtime.integration_runs()?;
+        let run = runs
+            .iter()
+            .find(|run| run.id == id)
+            .ok_or("Task not found")?;
+        if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
+            return Err("Wait for the agent to finish before opening a pull request.".into());
+        }
+        let path = Path::new(&run.workspace);
+        let branch = git(path, &["branch", "--show-current"])?;
+        if branch.is_empty() {
+            return Err("Check out the task branch before opening a pull request.".into());
+        }
+        let mut command = Command::new("gh");
+        command
+            .current_dir(path)
+            .args(["pr", "create", "--head", &branch, "--title", &title, "--body-file", "-"])
+            .env("GH_PROMPT_DISABLED", "1")
+            .env("GIT_TERMINAL_PROMPT", "0");
+        if let Some(base) = run.target_branch.as_deref().filter(|base| !base.is_empty()) {
+            command.args(["--base", base]);
+        }
+        if draft {
+            command.arg("--draft");
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x08000000);
+        }
+        let result = process_control::run_with_input(command, Duration::from_secs(60), body.into_bytes())?;
+        if !result.success {
+            let detail = result.stderr.trim();
+            return Err(if detail.is_empty() {
+                "GitHub CLI could not open the pull request. Check that it is installed and signed in.".into()
+            } else {
+                format!("GitHub CLI could not open the pull request: {}", detail.chars().take(2000).collect::<String>())
+            });
+        }
+        created_url(&result.stdout)
+            .ok_or_else(|| "The pull request was created, but GitHub CLI did not print its address.".into())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn pull_request_text_and_url_are_checked() {
+        assert!(pull_request_text("", "body").is_err());
+        assert!(pull_request_text("two\nlines", "").is_err());
+        assert_eq!(
+            pull_request_text("  Add search  ", " body ").unwrap(),
+            ("Add search".into(), "body".into())
+        );
+        assert_eq!(
+            created_url("Creating pull request\nhttps://github.com/o/r/pull/7\n").as_deref(),
+            Some("https://github.com/o/r/pull/7")
+        );
+        assert_eq!(created_url("warning only"), None);
+    }
+
     #[test]
     fn inspection_distinguishes_local_changes_and_missing_upstream() {
         let temp =

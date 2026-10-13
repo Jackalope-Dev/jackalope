@@ -1,36 +1,5 @@
 .mcp-tabs {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding-bottom: 0.75rem;
-  margin-bottom: 1.5rem;
-}
-
-.mcp-tab-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1.125rem;
-  min-height: 44px;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  border-radius: 9999px;
-  background: transparent;
-  color: var(--color-text-muted);
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.mcp-tab-btn:hover {
-  color: var(--color-text-primary);
-  background: var(--color-surface-hover);
-}
-
-.mcp-tab-btn.active {
-  color: var(--color-text-primary);
-  background: var(--color-surface-elevated);
-  box-shadow: var(--shadow-selection);
+  margin-bottom: 24px;
 }
 
 .mcp-grid {
@@ -42,7 +11,7 @@
 .mcp-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
@@ -94,7 +63,7 @@
   font-size: var(--text-xs);
   font-family: var(--font-mono, monospace);
   background: var(--color-surface-sunken);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   padding: 0.4rem 0.6rem;
   color: var(--color-text-muted);
   overflow: hidden;
@@ -128,7 +97,7 @@
   padding: 0.35rem 0.85rem;
   min-height: 36px;
   font-size: var(--text-sm);
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   color: var(--color-text-muted);
@@ -151,7 +120,7 @@
 .mcp-privacy-banner {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 1.5rem;
   display: flex;
   align-items: center;
@@ -164,7 +133,7 @@
   margin-top: 0.75rem;
   padding: 0.5rem;
   background: var(--color-surface-sunken);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   font-size: var(--text-xs);
   max-height: 140px;
@@ -198,7 +167,7 @@
   flex-direction: column;
   gap: 16px;
   padding: 20px;
-  border-radius: 18px;
+  border-radius: var(--radius-2xl);
   background: linear-gradient(to bottom, var(--color-surface), var(--color-surface-sunken));
   box-shadow: var(--shadow-flat);
   border: 1px solid var(--color-border-subtle);
@@ -207,25 +176,6 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-}
-.mcp-detail-tab-list button {
-  min-height: 44px;
-  padding: 8px 14px;
-  border: 0;
-  background: transparent;
-  border-radius: 10px;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-.mcp-detail-tab-list button[data-state="active"] {
-  background: var(--color-surface-elevated);
-  color: var(--color-text-primary);
-  box-shadow: var(--shadow-selection);
-}
-.mcp-detail-tab-list button:focus-visible {
-  outline: 2px solid var(--color-accent-ink);
-  outline-offset: 2px;
 }
 .mcp-market-card .mcp-card-title button {
   padding: 0;
@@ -310,11 +260,8 @@
   flex-direction: column;
 }
 .mcp-detail-tab-list {
-  display: flex;
-  gap: 4px;
-  padding: 0 24px 12px;
-  border-bottom: 1px solid var(--color-border-subtle);
   flex-shrink: 0;
+  margin: 0 24px 12px;
 }
 .mcp-detail-scroll {
   min-height: 0;
@@ -390,7 +337,7 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   padding: 16px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface-sunken);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -399,7 +346,7 @@
 .mcp-detail-notice {
   padding: 12px 16px;
   background: var(--color-surface-sunken);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 .mcp-detail-notice > * + * {
   margin-top: 10px;
@@ -484,12 +431,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
   .mcp-detail-tab-list {
-    padding-inline: 16px;
-    gap: 2px;
-  }
-  .mcp-detail-tab-list button {
-    padding-inline: 9px;
-    font-size: var(--text-xs);
+    margin-inline: 16px;
   }
   .mcp-detail-scroll {
     padding: 20px;
@@ -501,7 +443,7 @@
   place-items: center;
   flex: 0 0 80px;
   height: 80px;
-  border-radius: 20px;
+  border-radius: var(--radius-2xl);
   background: var(--color-accent-subtle);
   color: var(--color-accent-ink);
   overflow: hidden;
@@ -523,12 +465,11 @@
   min-height: 44px;
   padding: 10px 16px;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   text-decoration: none;
 }
 .mcp-server-page .mcp-detail-tab-list {
-  padding-inline: 0;
-  flex-wrap: wrap;
+  margin-inline: 0;
 }
 .mcp-server-page .mcp-detail-scroll {
   padding: 24px 0;
@@ -542,7 +483,7 @@
   gap: 24px;
   padding: 24px;
   background: var(--color-surface-sunken);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
 }
 .mcp-server-page .mcp-detail-facts dd {
   overflow-wrap: anywhere;
@@ -568,7 +509,7 @@
   margin-top: 28px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }
 .mcp-configuration-saved {
   display: flex;
@@ -613,7 +554,7 @@
 .mcp-market-heading .mcp-server-icon {
   flex-basis: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }
 
 .ui-dialog.mcp-connection-dialog {
@@ -742,7 +683,7 @@
   display: block;
   padding: 16px;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
   overflow-wrap: anywhere;
   font-size: var(--text-sm);

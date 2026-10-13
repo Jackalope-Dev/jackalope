@@ -16,14 +16,18 @@ async function _verifyPage(page) {
     (await page.locator('.landing-kicker, .hero-edition, .echo-caption').count()) === 0,
     'No redundant eyebrow labels',
   );
+  assert(
+    (await page.locator('.lp-final').getByRole('textbox', { name: 'Email address' }).count()) === 1,
+    'Signup form beside the final download link',
+  );
   const heroWaitlist = page
-    .locator('.hero-actions')
+    .locator('.lp-actions')
     .getByRole('button', { name: 'Join the waitlist' });
   await heroWaitlist.click();
   await page.getByRole('dialog', { name: 'Join the Jackalope waitlist' }).waitFor();
   await page.getByRole('textbox', { name: 'Email address', exact: true }).waitFor();
   await page.keyboard.press('Escape');
-  await page.waitForFunction(() => document.activeElement?.closest('.hero-actions'));
+  await page.waitForFunction(() => document.activeElement?.closest('.lp-actions'));
   const xLink = page.getByRole('link', { name: 'Follow on X', exact: true });
   assert(
     (await xLink.getAttribute('href')) === 'https://x.com/JackalopeDotDev',
@@ -42,7 +46,7 @@ async function _verifyPage(page) {
   ]) {
     await page.setViewportSize({ width, height });
     await page.evaluate(() => scrollTo(0, 0));
-    const logo = page.locator('.landing-hero > .echo-art');
+    const logo = page.locator('.lp-hero-echo');
     assert(
       await logo.evaluate(
         (element) =>
@@ -51,69 +55,55 @@ async function _verifyPage(page) {
       ),
       `Decorative background does not intercept controls at ${width}`,
     );
-    const capture = await page.locator('.hero-window').boundingBox();
+    const visual = await page.locator('.lp-flow').boundingBox();
     assert(
-      capture.x >= 0 && capture.x + capture.width <= width,
-      `Complete app preview at ${width}`,
+      visual.x >= 0 && visual.x + visual.width <= width,
+      `Complete hero illustration at ${width}`,
     );
-    for (const id of ['inside', 'workflow', 'features', 'atmosphere', 'questions', 'download']) {
+    assert(
+      (await page.locator('.lp-flow').getAttribute('data-step')) === '4',
+      `Reduced motion shows the finished illustration at ${width}`,
+    );
+    for (const id of ['how-it-works', 'inside', 'features', 'questions', 'download']) {
       await page.locator(`#${id}`).evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
       assert(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
         `Overflow at ${width}, ${id}`,
       );
     }
-    for (const [label, task, file] of [
-      ['Build a feature', 'Build keyboard search', 'Search.tsx'],
-      ['Find a stubborn bug', 'Investigate lost drafts', 'TaskComposer.tsx'],
-      ['Explore a new direction', 'Explore navigation'],
-    ]) {
-      await page.getByRole('tab', { name: label }).click();
-      const panel = page.getByRole('tabpanel', { name: label });
-      await panel.getByText(task, { exact: true }).waitFor();
-      if (file) await panel.getByText(file, { exact: false }).waitFor();
+    for (const label of ['Tasks', 'Review', 'Agents', 'Context', 'Schedules']) {
+      await page.getByRole('tab', { name: label, exact: true }).click();
+      await page.getByRole('tabpanel', { name: label }).locator('.product-capture').waitFor();
       assert(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-        `Use case overflow at ${width}: ${label}`,
+        `Workspace overflow at ${width}: ${label}`,
       );
     }
   }
-  await page.getByRole('tab', { name: 'Tasks & ideas' }).focus();
+  await page.getByRole('tab', { name: 'Tasks', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
-  await page.getByRole('tabpanel', { name: 'Changes & review' }).waitFor();
+  await page.getByRole('tabpanel', { name: 'Review' }).waitFor();
   await page.keyboard.press('ArrowRight');
-  await page.getByRole('tabpanel', { name: 'Agents & accounts' }).waitFor();
-  await page.getByRole('tab', { name: 'Build a feature' }).focus();
-  await page.keyboard.press('ArrowRight');
-  await page.getByRole('tabpanel', { name: 'Find a stubborn bug' }).waitFor();
-  await page.getByRole('button', { name: 'Electric Indigo', exact: true }).click();
-  await page.getByRole('button', { name: 'Dark', exact: true }).click();
+  await page.getByRole('tabpanel', { name: 'Agents' }).waitFor();
+  await page.setViewportSize({ width: 1280, height: 840 });
+  const appearance = page.locator('.landing-header .appearance-toggle');
+  await appearance.click();
   assert(
     await page.evaluate(() => document.documentElement.style.colorScheme === 'dark'),
     'Dark appearance',
   );
-  assert(
-    (await page.locator('.product-capture img').getAttribute('src')) ===
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.product-capture img')?.getAttribute('src') ===
       '/media/workspace/agents.jpg',
-    'Dark app screenshot',
   );
-  await page.getByRole('button', { name: 'Light', exact: true }).click();
-  await page.getByRole('button', { name: 'Mojave Sunset', exact: true }).click();
-  assert(
-    (await page.locator('.product-capture img').getAttribute('src')) ===
+  await appearance.click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.product-capture img')?.getAttribute('src') ===
       '/media/workspace/agents-light.jpg',
-    'Light app screenshot',
   );
-  assert(
-    await page
-      .locator('.landing-finale')
-      .evaluate(
-        (el) =>
-          getComputedStyle(el).backgroundColor ===
-          getComputedStyle(document.querySelector('.landing-footer')).backgroundColor,
-      ),
-    'Continuous footer color',
-  );
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await page.getByRole('menuitem', { name: 'Product tour' }).waitFor();
   await page.keyboard.press('Escape');
@@ -165,7 +155,7 @@ async function _verifyPage(page) {
   await page.unroute(media.source);
   assert(
     await page
-      .locator('.workbench [role="tabpanel"][data-state="active"]')
+      .locator('.lp-explorer [role="tabpanel"][data-state="active"]')
       .evaluate((el) => getComputedStyle(el).animationName === 'none'),
     'Reduced scene motion',
   );
@@ -173,36 +163,28 @@ async function _verifyPage(page) {
   await page.reload();
   await page.setViewportSize({ width: 1280, height: 840 });
   await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
-  const line = page.locator('.brand-echo-line').first();
-  const transform = await line.evaluate((el) => getComputedStyle(el).transform);
+  const flow = page.locator('.lp-flow');
+  const step = await flow.getAttribute('data-step');
   await page.waitForFunction(
-    (before) => getComputedStyle(document.querySelector('.brand-echo-line')).transform !== before,
-    transform,
+    (before) => document.querySelector('.lp-flow').dataset.step !== before,
+    step,
   );
+  await page.locator('#questions').evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
+  await page.waitForTimeout(1500);
+  const offscreen = await flow.getAttribute('data-step');
+  await page.waitForTimeout(1500);
   assert(
-    (await page.locator('.echo-art button').count()) === 0,
-    'No manual logo animation control',
+    offscreen === '4' && (await flow.getAttribute('data-step')) === '4',
+    'Hero illustration pauses offscreen',
   );
-  await page.locator('#workflow').evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
-  await page.waitForFunction(
-    () => document.querySelector('.echo-art .brand-echo').dataset.animated === 'false',
-  );
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  assert(
-    await line.evaluate((el) => getComputedStyle(el).animationName === 'none'),
-    'Reduced motion stops logo loop',
-  );
-  await page.goto(`${await page.evaluate(() => location.origin)}/#agents`);
-  await page.locator('#agents').waitFor({ state: 'visible' });
   assert(errors.length === 0, errors.join('\n'));
   return {
     viewports: 5,
-    useCases: 3,
+    workspaceScenes: 5,
     keyboard: true,
     appearance: true,
     reducedMotion: true,
     loopingArtwork: true,
-    supportDeepLink: true,
     media,
     errors,
   };

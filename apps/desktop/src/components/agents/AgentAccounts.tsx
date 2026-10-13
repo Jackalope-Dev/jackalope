@@ -429,6 +429,36 @@ export function AgentAccounts({
                   {active ? <Check size={18} /> : <Circle size={18} />}
                 </button>
               )}
+              {!project && (
+                <div className="flex items-center gap-2">
+                  <Switch
+                    label={`Allow ${agentName} account ${profile.name} app-wide`}
+                    checked={appEnabled}
+                    disabled={locked}
+                    onCheckedChange={(checked) =>
+                      void action(profile.id, async () => {
+                        const before = useAgentConfigStore.getState().disabledAccounts;
+                        const ids = before[agentId] ?? [];
+                        useAgentConfigStore.setState({
+                          disabledAccounts: {
+                            ...before,
+                            [agentId]: checked
+                              ? ids.filter((id) => id !== profile.id)
+                              : [...new Set([...ids, profile.id])],
+                          },
+                        });
+                        try {
+                          await syncAgentConfig();
+                        } catch (cause) {
+                          useAgentConfigStore.setState({ disabledAccounts: before });
+                          throw cause;
+                        }
+                      })
+                    }
+                  />
+                  <span>{appEnabled ? 'Allowed' : 'Blocked'}</span>
+                </div>
+              )}
               {project && (
                 <div className="flex items-center gap-2">
                   <Switch

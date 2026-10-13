@@ -57,29 +57,36 @@ test('adding a project clears previous setup context', () => {
   assert.equal(store.getState().projectId, null);
 });
 
-test('decision drafts survive reload but do not cross project boundaries', async () => {
-  store.getState().begin('first');
-  store.getState().setRoutingMode('jev');
-  store.getState().setRoutingFallback('agent');
-  const saved = values.get('jackalope-onboarding-v1');
-  store.getState().finish();
-  values.set('jackalope-onboarding-v1', saved);
-  await store.persist.rehydrate();
-  assert.equal(store.getState().routingFallback, 'agent');
-  store.getState().selectProject('first');
-  assert.equal(store.getState().routingFallback, 'agent');
-  store.getState().selectProject('second');
-  assert.equal(store.getState().routingMode, null);
-  assert.equal(store.getState().routingFallback, null);
+test('legacy decision drafts are dropped on reload', async () => {
   values.set(
     'jackalope-onboarding-v1',
-    JSON.stringify({ state: { routingMode: 'jev' }, version: 0 }),
+    JSON.stringify({
+      state: { status: 'active', step: 'agent', routingMode: 'jev', routingFallback: 'agent' },
+      version: 0,
+    }),
   );
   await store.persist.rehydrate();
-  assert.equal(store.getState().routingFallback, null);
+  assert.equal(store.getState().step, 'agent');
+  assert.equal('routingMode' in store.getState(), false);
+  assert.equal('routingFallback' in store.getState(), false);
 });
-test('old account and theme steps migrate to project setup', async () => {
-  for (const step of ['account', 'behavior', 'theme']) {
+test('removed setup steps resume at the first task or restart setup', async () => {
+  for (const step of ['routing', 'behavior', 'theme']) {
+    values.set(
+      'jackalope-onboarding-v1',
+      JSON.stringify({
+        state: {
+          status: 'active',
+          step,
+          pendingProject: { id: 'staged', path: 'C:/Projects/staged' },
+        },
+        version: 0,
+      }),
+    );
+    await store.persist.rehydrate();
+    assert.equal(store.getState().step, 'task');
+  }
+  for (const step of ['account', 'routing', 'behavior', 'theme']) {
     values.set(
       'jackalope-onboarding-v1',
       JSON.stringify({ state: { status: 'active', step }, version: 0 }),
@@ -115,7 +122,7 @@ test('returning to the project step keeps setup active and saved projects untouc
   projects.setState({ projects: [existingProject], activeProjectId: existingProject.id });
   store.getState().begin();
   store.getState().stageProject(pendingProject, 'A task that is not ready yet');
-  store.getState().go('theme');
+  store.getState().go('task');
   assert.deepEqual(projects.getState().projects, [existingProject]);
   assert.equal(projects.getState().activeProjectId, existingProject.id);
   store.getState().go('project');
@@ -130,12 +137,12 @@ test('provisional appearance and first task survive reload without registering a
   projects.setState({ projects: [existingProject], activeProjectId: existingProject.id });
   store.getState().begin();
   store.getState().stageProject(pendingProject, 'Keep this draft');
-  store.getState().go('theme');
+  store.getState().go('task');
   const saved = values.get('jackalope-onboarding-v1');
   store.getState().finish();
   values.set('jackalope-onboarding-v1', saved);
   await store.persist.rehydrate();
-  assert.equal(store.getState().step, 'theme');
+  assert.equal(store.getState().step, 'task');
   assert.deepEqual(store.getState().pendingProject, pendingProject);
   assert.equal(store.getState().firstTask, 'Keep this draft');
   assert.deepEqual(projects.getState().projects, [existingProject]);

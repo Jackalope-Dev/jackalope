@@ -86,14 +86,23 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
       <WorkspaceHeading
         title="Hosts"
         action={
-          <Button variant="outline" onClick={onSetup}>
-            Share this host
-          </Button>
+          <div className="workspace-actions">
+            <Button variant="outline" onClick={onSetup}>
+              Share this host
+            </Button>
+            <Button
+              variant={adding ? 'outline' : 'primary'}
+              disabled={busy || !loaded}
+              onClick={() => setAdding((value) => !value)}
+            >
+              {adding ? 'Cancel' : 'Connect a host'}
+            </Button>
+          </div>
         }
       />
       <div className="remote-workspace">
-        <div className="remote-toolbar">
-          {!!hosts.length && (
+        {!!hosts.length && (
+          <div className="remote-toolbar">
             <Select
               aria-label="Host"
               disabled={busy}
@@ -109,43 +118,40 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
                 </SelectItem>
               ))}
             </Select>
-          )}
-          <Button
-            variant="outline"
-            disabled={busy || !loaded}
-            onClick={() => setAdding((value) => !value)}
-          >
-            {adding ? 'Cancel' : 'Connect a host'}
-          </Button>
-          {host && (
-            <Button
-              variant="ghost"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                setError('');
-                try {
-                  await nativeTask('remote_host_remove', { id: host.id });
-                  setHosts(await nativeTask<Host[]>('remote_hosts'));
-                } catch (cause) {
-                  setError(String(cause));
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              Forget host
-            </Button>
-          )}
-        </div>
-        {error && (
-          <InlineNotice tone="error">
-            {error}
-            {!loaded && (
-              <Button variant="ghost" onClick={() => void load()}>
-                Retry
+            {host && (
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setError('');
+                  try {
+                    await nativeTask('remote_host_remove', { id: host.id });
+                    setHosts(await nativeTask<Host[]>('remote_hosts'));
+                  } catch (cause) {
+                    setError(String(cause));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Forget host
               </Button>
             )}
+          </div>
+        )}
+        {error && (
+          <InlineNotice
+            tone="error"
+            action={
+              !loaded && (
+                <Button variant="outline" size="sm" onClick={() => void load()}>
+                  Retry
+                </Button>
+              )
+            }
+          >
+            {error}
           </InlineNotice>
         )}
         {!loaded && !error && <p role="status">Loading hosts…</p>}

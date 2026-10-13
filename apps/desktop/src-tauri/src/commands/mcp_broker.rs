@@ -711,7 +711,7 @@ async fn list_bounded(client: &Client, config: &McpServerConfig) -> Result<Vec<T
     Err("Too many tool pages".into())
 }
 
-fn is_read_only(tool: &Tool) -> bool {
+pub(super) fn is_read_only(tool: &Tool) -> bool {
     tool.annotations.as_ref().is_some_and(|annotations| {
         annotations.read_only_hint == Some(true) && annotations.destructive_hint != Some(true)
     })

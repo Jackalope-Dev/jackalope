@@ -13,11 +13,14 @@ import {
   GitMerge,
   MailPlus,
   MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
   Play,
   Square,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { useWideWorkspace } from '../../hooks/useWideWorkspace';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import { waitForStoppedAttempt } from '../../lib/continue-task';
 import { projectConnections } from '../../lib/mcp-connection';
@@ -38,13 +41,13 @@ import { listMcpServers, type McpServerConfig, openInBrowser } from '../../lib/t
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
+import { Tooltip } from '../ui/Tooltip';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
@@ -114,14 +117,13 @@ export function TaskDetail({
   const [acting, setActing] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const workRequest = useWorkViewStore((state) => state.request);
-  const preset = useWorkbenchStore((state) => state.presets[run.projectId] ?? 'focus');
   const savedTab = useWorkViewStore.getState().reading[run.taskId];
   const [tab, setTab] = useState(
     savedTab === 'context'
       ? 'activity'
       : savedTab === 'delivery'
         ? 'changes'
-        : (savedTab ?? (preset === 'build' ? 'changes' : 'result')),
+        : (savedTab ?? 'result'),
   );
   const [detailsOpen, setDetailsOpen] = useState(savedTab === 'context');
   const [reviewSection, setReviewSection] = useState<ReviewSection>(
@@ -166,7 +168,8 @@ export function TaskDetail({
   const [connections, setConnections] = useState<McpServerConfig[] | null>(null);
   const applied = useCallback(() => setIntegrated(true), []);
   const key = `reply:${run.taskId}`;
-  const split = useWorkViewStore((state) => state.split[run.taskId] ?? preset === 'build');
+  const wide = useWideWorkspace();
+  const split = useWorkViewStore((state) => state.split[run.taskId] ?? wide);
   const alongside = split && ['changes', 'preview', 'terminal', 'activity', 'screen'].includes(tab);
   const reply = drafts[key]?.prompt ?? '';
   const active = isActive(run);
@@ -406,10 +409,11 @@ export function TaskDetail({
   if (run.detailsOmitted)
     return (
       <WorkspacePage className="task-detail" aria-busy="true">
-        <Button variant="outline" onClick={onBack}>
-          <ArrowLeft size={16} />
-          All tasks
-        </Button>
+        <Tooltip content="All tasks">
+          <Button variant="ghost" size="icon" aria-label="All tasks" onClick={onBack}>
+            <ArrowLeft size={18} aria-hidden="true" />
+          </Button>
+        </Tooltip>
         <WorkspaceHeading title={title} />
         <p role="status">Loading task…</p>
       </WorkspacePage>
@@ -417,10 +421,11 @@ export function TaskDetail({
   return (
     <WorkspacePage className="task-detail">
       <div className="task-detail-navigation">
-        <Button variant="outline" onClick={onBack}>
-          <ArrowLeft size={16} />
-          All tasks
-        </Button>
+        <Tooltip content="All tasks">
+          <Button variant="ghost" size="icon" aria-label="All tasks" onClick={onBack}>
+            <ArrowLeft size={18} aria-hidden="true" />
+          </Button>
+        </Tooltip>
         <WorkspaceHeading
           title={title}
           titleRef={heading}
@@ -640,7 +645,7 @@ export function TaskDetail({
       )}
       <Tabs.Root className="task-working-area" value={tab} onValueChange={setTab}>
         <div className="task-view-controls">
-          <Tabs.List className="result-tabs" aria-label="Task sections">
+          <Tabs.List aria-label="Task sections">
             {[
               { value: 'result', label: 'Result' },
               { value: 'changes', label: 'Review' },
@@ -656,14 +661,22 @@ export function TaskDetail({
           </Tabs.List>
           <div className="task-view-tools">
             {['changes', 'preview', 'terminal', 'activity', 'screen'].includes(tab) && (
-              <Button
-                variant="ghost"
-                className="conversation-toggle"
-                aria-pressed={split}
-                onClick={() => useWorkViewStore.getState().setSplit(run.taskId, !split)}
-              >
-                {split ? 'Hide conversation' : 'Show conversation'}
-              </Button>
+              <Tooltip content={split ? 'Hide conversation' : 'Show conversation'}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="conversation-toggle"
+                  aria-label={split ? 'Hide conversation' : 'Show conversation'}
+                  aria-pressed={split}
+                  onClick={() => useWorkViewStore.getState().setSplit(run.taskId, !split)}
+                >
+                  {split ? (
+                    <PanelLeftClose size={16} aria-hidden="true" />
+                  ) : (
+                    <PanelLeftOpen size={16} aria-hidden="true" />
+                  )}
+                </Button>
+              </Tooltip>
             )}
             <WorkContext
               key={`context:${run.taskId}`}

@@ -359,7 +359,7 @@ export const practicalPosts: BlogPost[] = [
         paragraphs: [
           'For your first few attempts, record elapsed time to an accepted result, time spent reviewing, repeated work, and meaningful defects found. Keep provider usage separate when its units or reporting coverage differ. A fast first response is only one part of the workflow; a result that takes an hour to reconcile may not save you time.',
           'Use one agent when the work is small or tightly coupled. Use several when tasks have clear boundaries and you can actually review them. If the same shared file keeps blocking progress, change the plan rather than increasing the number of sessions.',
-          'Jackalope brings supported agent tasks, account choices, worktrees, and review into one desktop workspace. It is coming soon; the manual workflow here works independently of access to Jackalope. The app tour shows the intended experience, and the compatibility page distinguishes supported execution from agents still under evaluation.',
+          'Jackalope brings supported agent tasks, account choices, worktrees, and review into one desktop workspace. It is in early access; the manual workflow here works independently of access to Jackalope. The app tour shows the intended experience, and the compatibility page distinguishes supported execution from agents still under evaluation.',
         ],
       },
     ],
@@ -487,7 +487,7 @@ export const practicalPosts: BlogPost[] = [
         paragraphs: [
           'A good review comment connects a situation to a consequence and then to the expected behavior. For example: “If results refresh while the second row is selected, the selected index may exceed the new list length. Reconcile the selection when the list changes, and cover shortening the list while the menu is open.” That is more helpful than asking the author to make the code more robust.',
           'After a fix, inspect the new patch and rerun the affected checks. Revisit any earlier finding made stale by the correction. Do not accidentally accept an old screenshot or test run as evidence for new code, and do not resolve a finding solely because the author says it is fixed.',
-          'Jackalope is designed to keep task results, changes, and recorded evidence together before integration. It is coming soon. Whatever interface you use today, the final review should answer three questions: what changed, what establishes that it works, and what still needs a decision.',
+          'Jackalope is designed to keep task results, changes, and recorded evidence together before integration. It is in early access. Whatever interface you use today, the final review should answer three questions: what changed, what establishes that it works, and what still needs a decision.',
         ],
       },
     ],
@@ -613,7 +613,7 @@ export const practicalPosts: BlogPost[] = [
         title: 'Bring the connection into the project workflow',
         paragraphs: [
           'Jackalope centralizes project connections and provides built-in task tools, with support depending on the selected agent and connection type. Its knowledgebase documents configuration and troubleshooting. A listing in the MCP marketplace is not an audit or an endorsement of a third-party server’s security, reliability, or data handling.',
-          'Jackalope is coming soon. While evaluating your current setup, keep a short record of what each connection is for, the identity and scope it uses, and the last operation you verified. That record is more useful than an impressive tool count when you need to understand why a task can read or change something.',
+          'Jackalope is in early access. While evaluating your current setup, keep a short record of what each connection is for, the identity and scope it uses, and the last operation you verified. That record is more useful than an impressive tool count when you need to understand why a task can read or change something.',
         ],
       },
     ],
@@ -753,7 +753,7 @@ export const practicalPosts: BlogPost[] = [
         paragraphs: [
           'After the trial, write a short decision: the essential requirements met, the important unknowns, and the limitations you are willing to accept. Keep the evidence beside that decision. If a feature is planned rather than available, evaluate the product without it and revisit when it ships.',
           'A terminal and editor can be a good fit for one focused session. A provider’s own app may fit an established agent workflow. A workspace for multiple agents becomes attractive when projects, accounts, parallel tasks, and review need more structure. There is no need to make every project use the same interface if their needs differ.',
-          'Jackalope is coming soon. Its app tour uses sample data and helps explain the interface; it does not replace a trial on your repository. Use the compatibility page and roadmap to understand current scope, then apply the same evaluation questions to Jackalope when you receive access.',
+          'Jackalope is in early access. Its app tour uses sample data and helps explain the interface; it does not replace a trial on your repository. Use the compatibility page and roadmap to understand current scope, then apply the same evaluation questions to Jackalope when you receive access.',
         ],
         links: [
           { label: 'Compare apps with current product references', href: '/compare/' },

@@ -60,7 +60,7 @@ test('Needs you includes review and blockers without changing their specific nex
   assert.equal(workGroup('review'), 'attention');
   assert.deepEqual(
     workGroups.map((group) => group.label),
-    ['Needs you', 'Working', 'Saved ideas', 'Finished'],
+    ['Needs you', 'Working', 'Drafts', 'Finished'],
   );
 });
 

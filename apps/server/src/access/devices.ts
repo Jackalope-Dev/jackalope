@@ -4,7 +4,7 @@ import { randomToken, tokenHash } from './crypto';
 import { memberFeedback } from './feedback';
 import { AccessError, invitations, type Member, tokenSchema } from './service';
 import { settingsRoute } from './settings';
-import { waitlistProgress } from './waitlist';
+import { openSignup, waitlistProgress } from './waitlist';
 
 const lifetime = 90 * 86400000;
 export async function connectedDevices(env: Env, memberId: string) {
@@ -16,7 +16,7 @@ export async function connectedDevices(env: Env, memberId: string) {
       .all()
   ).results;
 }
-export async function deviceMember(env: Env, hash: string, now = Date.now()) {
+async function deviceMember(env: Env, hash: string, now = Date.now()) {
   return accountDevice(env, hash, now, false);
 }
 async function accountDevice(env: Env, hash: string, now: number, includeWaiting = true) {
@@ -232,7 +232,8 @@ export async function deviceRoutes(
         .bind(device.memberId)
         .first<Member>();
       if (!member) throw new AccessError(401, 'device_sign_in_required');
-      return json(await invitations(env, member, now));
+      // With open signup, passes no longer admit anyone, so the desktop can hide them.
+      return json({ ...(await invitations(env, member, now)), openSignup: openSignup(env) });
     }
     if (request.method !== 'POST' || url.pathname !== '/v1/desktop/exchange')
       throw new AccessError(404, 'not_found');
@@ -319,7 +320,7 @@ export async function browserDeviceAction(
           .bind(hash)
           .run()
       : await env.DB.prepare(
-          `UPDATE access_device_links SET member_id=? WHERE verification_hash=? AND expires_at>? AND member_id IS NULL AND used_at IS NULL AND EXISTS(SELECT 1 FROM access_members WHERE id=? AND ${waiting ? "status='waiting' AND waitlist_verified_at IS NOT NULL" : "status='approved' AND verified_at IS NOT NULL"})`,
+          `UPDATE access_device_links SET member_id=? WHERE verification_hash=? AND expires_at>? AND member_id IS NULL AND used_at IS NULL AND EXISTS(SELECT 1 FROM access_members WHERE id=? AND ${waiting ? "status IN ('waiting','approved') AND waitlist_verified_at IS NOT NULL" : "status='approved' AND verified_at IS NOT NULL"})`,
         )
           .bind(member.id, hash, now, member.id)
           .run();

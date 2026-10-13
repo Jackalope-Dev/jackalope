@@ -1,6 +1,6 @@
+import { PROVIDER_MARKS } from '@jackalope/brand/provider-marks';
 import { Bot } from 'lucide-react';
 import { agentProvider } from '../../lib/agent-provider';
-import { PROVIDER_MARKS } from './provider-marks';
 
 /**
  * A provider's product mark, for places where people pick or identify an agent.

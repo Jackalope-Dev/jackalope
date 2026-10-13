@@ -406,7 +406,7 @@ export function CaptureTask({
                   })
                 }
               >
-                <SelectItem value="unassigned">Choose later · save an idea</SelectItem>
+                <SelectItem value="unassigned">Choose later · save a draft</SelectItem>
                 {projects.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.name}
@@ -546,7 +546,9 @@ export function CaptureTask({
       )}
       {project && !runner?.available && (
         <div className="task-notice mt-4">
-          <span>{runner?.detail || 'Connect an agent to start. You can save this idea now.'}</span>
+          <span>
+            {runner?.detail || 'Connect an agent to start. You can save this as a draft now.'}
+          </span>
           <Button
             variant="ghost"
             disabled={!desktop || discovering}
@@ -616,7 +618,7 @@ export function CaptureTask({
             {idea ? idea.title : 'What do you want to accomplish?'}
           </Dialog.Title>
           <Dialog.Description className="sr-only">
-            Configure a task or save an idea.
+            Configure a task or save a draft.
           </Dialog.Description>
           {content}
         </Dialog.Content>

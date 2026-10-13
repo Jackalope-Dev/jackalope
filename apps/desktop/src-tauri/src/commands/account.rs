@@ -89,6 +89,9 @@ struct ReferralResponse {
     #[serde(rename = "shareUrl")]
     share_url: String,
     invites: Vec<ReferralInviteResponse>,
+    /// Older services omit it; passes then still admit invitees.
+    #[serde(rename = "openSignup", default)]
+    open_signup: bool,
 }
 #[derive(Deserialize)]
 struct ReferralInviteResponse {
@@ -110,6 +113,7 @@ pub struct ReferralView {
     connected: u16,
     share_url: String,
     invites: Vec<ReferralInvite>,
+    open_signup: bool,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -266,6 +270,7 @@ fn parse_referrals(data: serde_json::Value, web: &reqwest::Url) -> Result<Referr
         connected: response.connected,
         share_url: response.share_url,
         invites,
+        open_signup: response.open_signup,
     })
 }
 async fn request(

@@ -229,6 +229,12 @@ fn ensure_project(app: &AppHandle, path: &str) -> Result<protocol::Project, Stri
     let root = super::tasks::project_directory(path)?;
     let runtime = app.state::<TaskRuntime>();
     let record = super::project_registry::ensure(&runtime, &root)?;
+    // An open window adopts a repository first used from a terminal now,
+    // rather than on its next launch. Merging a known project changes nothing.
+    {
+        use tauri::Emitter;
+        let _ = app.emit("jackalope:projects-registered", ());
+    }
     Ok(protocol::Project {
         id: record.id,
         name: record.name,
@@ -297,6 +303,9 @@ fn attempts<'a>(run_id: &str, runs: &'a [TaskRun]) -> Vec<&'a TaskRun> {
     chain
 }
 
+/// Activity entries a terminal receives, enough to show what work is doing.
+const ACTIVITY_TAIL: usize = 12;
+
 /// Projects the newest attempt in a conversation into what a terminal renders.
 fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionView {
     let run = runs
@@ -340,6 +349,12 @@ fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionVie
         workspace: run.map(|run| run.workspace.clone()),
         branch: run.map(|run| run.branch.clone()),
         result: run.map(|run| run.result.clone()).unwrap_or_default(),
+        activity: run
+            .map(|run| {
+                let skip = run.activity.len().saturating_sub(ACTIVITY_TAIL);
+                run.activity[skip..].to_vec()
+            })
+            .unwrap_or_default(),
         questions: run
             .map(|run| {
                 run.prompts
@@ -431,6 +446,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             let first = super::live_sessions::FirstMessage {
                 id: uuid::Uuid::new_v4().to_string(),
                 text,
+                origin: None,
             };
             sessions.create_with_limits(
                 session_id.clone(),
@@ -627,6 +643,17 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             let _ = app.emit("jackalope:open-changes", path);
             Ok(response)
         }
+        Request::SetAccent { project_id, accent } => {
+            use tauri::Emitter;
+            let runtime = app.state::<TaskRuntime>();
+            super::project_registry::set_accent(&runtime, &project_id, &accent)?;
+            // The app owns theme preferences; it applies this and mirrors back.
+            let _ = app.emit(
+                "jackalope:set-accent",
+                serde_json::json!({ "projectId": project_id, "accent": accent }),
+            );
+            Ok(Response::Ok)
+        }
         Request::SessionLearn { session_id } => {
             let sessions = app.state::<LiveSessions>();
             let runtime = app.state::<TaskRuntime>();
@@ -638,8 +665,140 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 message: result.message,
             })
         }
+        Request::MergePrepare {
+            session_id,
+            message,
+        } => {
+            let run = reviewable_run(app, &session_id)?;
+            let plan = super::integration::integration_prepare(
+                app.state(),
+                app.state(),
+                app.state(),
+                vec![run.id],
+                message,
+            )
+            .await?;
+            Ok(Response::Merge {
+                plan: merge_plan(plan),
+            })
+        }
+        Request::MergeApply { plan_id, cleanup } => {
+            let plan = super::integration::integration_apply(
+                app.state(),
+                app.state(),
+                app.state(),
+                plan_id,
+                Some(cleanup),
+            )
+            .await?;
+            Ok(Response::Merge {
+                plan: merge_plan(plan),
+            })
+        }
+        Request::PullRequest {
+            session_id,
+            title,
+            body,
+            draft,
+        } => {
+            let run = reviewable_run(app, &session_id)?;
+            let changes = super::commit_review::git_working_changes(
+                run.project_path.clone(),
+                run.workspace.clone(),
+            )
+            .await?;
+            if !changes.files.is_empty() {
+                super::commit_review::git_commit_changes(
+                    run.project_path.clone(),
+                    run.workspace.clone(),
+                    changes.files.into_iter().map(|file| file.path).collect(),
+                    title.trim().to_string(),
+                    String::new(),
+                    vec![run.agent.clone()],
+                )
+                .await
+                .map_err(|failure| failure.message().to_string())?;
+            }
+            super::commit_review::git_push_changes(run.project_path.clone(), run.workspace.clone())
+                .await?;
+            let url =
+                super::delivery::task_pull_request_create(run.id, title, body, draft, app.state())
+                    .await?;
+            Ok(Response::PullRequest { url })
+        }
         Request::Ping => Ok(Response::Ok),
         Request::ShowWindow => Ok(show_window(app)),
+    }
+}
+
+/// The conversation's newest attempt when it has finished and kept its own
+/// worktree, which is what merging and pull requests act on.
+fn reviewable_run(app: &AppHandle, session_id: &str) -> Result<TaskRun, String> {
+    let snapshot = app.state::<LiveSessions>().snapshot(Some(session_id))?;
+    let session = snapshot
+        .sessions
+        .iter()
+        .find(|session| session.id == session_id)
+        .ok_or("That conversation is no longer open.")?;
+    let run = snapshot
+        .runs
+        .iter()
+        .filter(|run| run.live_session_id.as_deref() == Some(session_id))
+        .max_by(|left, right| left.started_at.cmp(&right.started_at))
+        .ok_or("This conversation has no work to deliver yet.")?;
+    if protocol::working(Some(&run.status)) {
+        return Err("Wait for the agent to finish first.".into());
+    }
+    if !["review", "reviewed"].contains(&run.status.as_str()) {
+        return Err("The latest attempt did not finish, so there is nothing to deliver.".into());
+    }
+    if session.integrated_run_id.as_deref() == Some(run.id.as_str()) {
+        return Err("This work is already merged.".into());
+    }
+    if run.workspace.is_empty() || same_path(&run.workspace, &run.project_path) {
+        return Err(
+            "This conversation edited the project folder directly, so its changes are already there."
+                .into(),
+        );
+    }
+    Ok(run.clone())
+}
+
+fn same_path(left: &str, right: &str) -> bool {
+    let normal = |path: &str| {
+        let path = path.replace('\\', "/");
+        let path = path.trim_end_matches('/');
+        if cfg!(windows) {
+            path.to_lowercase()
+        } else {
+            path.to_string()
+        }
+    };
+    normal(left) == normal(right)
+}
+
+fn merge_plan(plan: super::integration::IntegrationPlan) -> protocol::MergePlan {
+    protocol::MergePlan {
+        cleanup: plan
+            .commit_policy
+            .as_ref()
+            .is_some_and(|policy| policy.cleanup_after_merge),
+        cleanup_errors: plan
+            .cleanup_results
+            .iter()
+            .filter_map(|result| {
+                result
+                    .error
+                    .as_ref()
+                    .map(|error| format!("{}: {error}", result.workspace))
+            })
+            .collect(),
+        id: plan.id,
+        status: plan.status,
+        target_branch: plan.target_branch,
+        files: plan.files,
+        conflicts: plan.conflicts,
+        commit_message: plan.commit_message,
     }
 }
 
@@ -730,5 +889,13 @@ mod tests {
         // A cycle in stored history ends rather than looping.
         let looped = [run("x", Some("y"), "1"), run("y", Some("x"), "2")];
         assert_eq!(attempts("x", &looped).len(), 2);
+    }
+
+    #[test]
+    fn work_in_the_project_folder_is_the_project_itself() {
+        assert!(same_path("/repo/app/", "/repo/app"));
+        assert!(!same_path("/repo/app/.worktrees/task", "/repo/app"));
+        #[cfg(windows)]
+        assert!(same_path(r"C:\Repo\App", "c:/repo/app"));
     }
 }

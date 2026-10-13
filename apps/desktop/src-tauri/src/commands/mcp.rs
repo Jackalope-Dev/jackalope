@@ -947,6 +947,101 @@ fn delivery_from_configs(
     Ok((result, optimized))
 }
 
+/// Resolves one enabled connection a project's tasks would receive: its own or a managed global one.
+pub(super) fn resolve_connection(
+    project_id: &str,
+    connection_id: &str,
+) -> Result<McpServerConfig, String> {
+    let _guard = CONFIG_LOCK.lock().map_err(|e| e.to_string())?;
+    let scope = format!("project:{project_id}");
+    let project = read_config(&config_path(&scope)?)?.1;
+    let global = read_config(&config_path("global")?)?.1;
+    let (value, scope) = match project["mcpServers"].get(connection_id) {
+        Some(value) => (value.clone(), scope),
+        None => (
+            global["mcpServers"]
+                .get(connection_id)
+                .filter(|value| value["jackalopeManaged"] == true)
+                .cloned()
+                .ok_or("This connection is no longer set up for the project.")?,
+            "global".to_owned(),
+        ),
+    };
+    if value["enabled"] == false {
+        return Err("This connection is turned off.".into());
+    }
+    let server = parse_server_spec(connection_id, &value, &scope);
+    validate(&server)?;
+    Ok(server)
+}
+
+fn tool_allowed(server: &McpServerConfig, name: &str) -> bool {
+    let listed = |key: &str| {
+        server
+            .extra
+            .get(key)
+            .and_then(Value::as_array)
+            .map(|list| list.iter().any(|item| item.as_str() == Some(name)))
+    };
+    listed("enabled_tools").unwrap_or(true) && !listed("disabled_tools").unwrap_or(false)
+}
+
+/// Tools a connection marks read-only, the only ones a bot wake-up may poll.
+pub(super) async fn read_only_tools(server: &McpServerConfig) -> Result<Vec<McpToolInfo>, String> {
+    let future = async {
+        let client = connect(server, None, None).await?;
+        let result = client.list_all_tools().await.map_err(|e| e.to_string());
+        client.cancel().await;
+        result
+    };
+    let tools = tokio::time::timeout(Duration::from_secs(20), future)
+        .await
+        .map_err(|_| "The connection did not list its tools within 20 seconds.".to_string())??;
+    Ok(tools
+        .into_iter()
+        .filter(|tool| super::mcp_broker::is_read_only(tool) && tool_allowed(server, &tool.name))
+        .map(|tool| McpToolInfo {
+            name: tool.name.to_string(),
+            description: tool.description.map(|value| value.to_string()),
+            input_schema: Some(json!(tool.input_schema)),
+        })
+        .collect())
+}
+
+/// Calls one read-only tool and returns its result. Tools without a read-only annotation are refused.
+pub(super) async fn read_tool_once(
+    server: &McpServerConfig,
+    tool: &str,
+    arguments: serde_json::Map<String, Value>,
+) -> Result<rmcp::model::CallToolResult, String> {
+    if !tool_allowed(server, tool) {
+        return Err("This tool is excluded by the connection's tool list.".into());
+    }
+    let future = async {
+        let client = connect(server, None, None).await?;
+        let outcome = async {
+            let tools = client.list_all_tools().await.map_err(|e| e.to_string())?;
+            let found = tools
+                .iter()
+                .find(|item| item.name == tool)
+                .ok_or("The connection no longer offers this tool.")?;
+            if !super::mcp_broker::is_read_only(found) {
+                return Err("Only tools the connection marks read-only can be watched.".into());
+            }
+            let request: rmcp::model::CallToolRequestParams =
+                serde_json::from_value(json!({"name": tool, "arguments": arguments}))
+                    .map_err(|_| "Invalid tool arguments.".to_string())?;
+            client.call_tool(request).await.map_err(|e| e.to_string())
+        }
+        .await;
+        client.cancel().await;
+        outcome
+    };
+    tokio::time::timeout(Duration::from_secs(60), future)
+        .await
+        .map_err(|_| "The connection did not answer within 60 seconds.".to_string())?
+}
+
 pub(super) fn codex_overrides(
     servers: &serde_json::Map<String, Value>,
 ) -> Result<Vec<String>, String> {

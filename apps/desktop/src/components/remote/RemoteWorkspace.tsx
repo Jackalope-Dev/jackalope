@@ -413,7 +413,7 @@ export function RemoteWorkspace({
             <p className="task-muted">Choose a task or start something new.</p>
           )}
           {!composing && selectedTask?.sessionId && !selectedSession && (
-            <p className="task-muted">This chat is closed. Start a new task to continue.</p>
+            <p className="task-muted">This conversation is closed. Start a new task to continue.</p>
           )}
           {(composing || selectedSession || (selectedTask && !selectedTask.sessionId)) && (
             <form

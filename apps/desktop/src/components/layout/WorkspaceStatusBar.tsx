@@ -1,11 +1,12 @@
-import { ListTodo, Megaphone, Monitor, SquareTerminal } from 'lucide-react';
+import { ListTodo, Megaphone, Monitor, PauseCircle, SquareTerminal } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { setWakeUpsPaused, useBotHubStore } from '../../lib/bot-hub';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { isActive } from '../../lib/task-runtime';
+import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
-import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { Companion } from '../mascot/Companion';
 import { FeedbackDialog } from '../settings/FeedbackDialog';
@@ -26,6 +27,7 @@ export function WorkspaceStatusBar({
   onInvitations?: () => void;
 }) {
   const host = useHostContextStore((state) => state.host);
+  const wakeUpsPaused = useBotHubStore((state) => state.paused);
   const [terminalError, setTerminalError] = useState('');
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const feedbackButton = useRef<HTMLButtonElement>(null);
@@ -38,9 +40,9 @@ export function WorkspaceStatusBar({
     ...new Map([...runs, ...sessionRuns].map((item) => [item.id, item])).values(),
   ].filter(isActive).length;
   const activity = () => {
-    useExecutionStore.getState().select(null);
-    useLiveSessionStore.getState().select(null);
-    useManagedTaskStore.getState().select(null);
+    selectWork();
+    // The counts cover every project, so the list they open does too.
+    useWorkViewStore.getState().setScope('all');
     useWorkViewStore.getState().openList(attention ? 'attention' : 'working');
     navigateWorkspace('kanban');
   };
@@ -51,7 +53,7 @@ export function WorkspaceStatusBar({
         {host ? `${host.wsl ? 'WSL · ' : ''}${host.name}` : 'This computer'}
       </button>
       {project && !host && <StatusBarChanges projectPath={project.path} checkout={checkout} />}
-      <button type="button" onClick={activity}>
+      <button type="button" onClick={activity} title="Work across all projects">
         <ListTodo size={15} />
         {host ? 'This computer: ' : ''}
         {active} running
@@ -75,6 +77,21 @@ export function WorkspaceStatusBar({
       {terminalError && (
         <span id="statusbar-terminal-error" role="alert" className="statusbar-error">
           {terminalError}
+        </span>
+      )}
+      {wakeUpsPaused && !host && (
+        <span className="statusbar-paused" role="status">
+          <button type="button" onClick={() => navigateWorkspace('bots')}>
+            <PauseCircle size={15} aria-hidden="true" />
+            Bot wake-ups paused
+          </button>
+          <button
+            type="button"
+            className="statusbar-resume"
+            onClick={() => void setWakeUpsPaused(false)}
+          >
+            Resume
+          </button>
         </span>
       )}
       {onInvitations && <InvitationsButton compact onClick={onInvitations} />}

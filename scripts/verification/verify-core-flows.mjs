@@ -42,6 +42,10 @@ if(mode) window.__TAURI_INTERNALS__={invoke:async(command,args={})=>{
  if(command==='task_preview_inspect')return {screenshot:{id:'capture',name:'Preview fixture',timestamp:'2026-09-11T12:03:00Z',filePath:'C:/fixture/preview.png',url:'http://127.0.0.1:61234/',width:390,height:640},snapshot:'button Save changes [ref=save]',errors:''};
  if(command==='task_screenshot')return Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2WQAAAAASUVORK5CYII='),c=>c.charCodeAt(0));
  if(command==='task_preview_inspect_cancel')return;
+ if(command==='git_working_changes')return {branch:'task/search',head:'local-head',files:[{path:'src/search.ts',status:'modified'}]};
+ if(command==='git_commit_changes')return 'abc1234';
+ if(command==='git_push_changes')return 'Pushed task/search to origin/task/search.';
+ if(command==='task_pull_request_create')return 'https://github.com/example/example/pull/2';
  if(command==='task_delivery_status')return {head:'local-head',branch:'task/search',changed:true,upstream:'origin/task/search',ahead:1,behind:0,pullRequest:args.remote?{url:'https://github.com/example/example/pull/1',state:'OPEN',headRefOid:'different-head',statusCheckRollup:[{name:'Build',conclusion:'FAILURE'}]}:null,remoteNote:'Fixture state only',checkedAt:'2026-09-11T12:00:00Z'};
  throw new Error('Unexpected fixture command: '+command);
 }};
@@ -69,6 +73,8 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 840 } });
   page.setDefaultTimeout(15000);
+  // The first-launch welcome is covered by its own checks; these flows start after it.
+  await page.addInitScript(() => localStorage.setItem('jackalope.welcome.seen', '1'));
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -82,9 +88,14 @@ try {
     }),
   );
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.getByRole('heading', { name: 'Pick up where you left off', exact: true }).waitFor();
-  const passes = page.getByRole('button', { name: '3/5 Trial passes', exact: true });
+  await page.getByRole('heading', { name: 'Work', exact: true }).waitFor();
+  const passes = page.getByRole('button', { name: 'Trial passes', exact: true });
   await passes.waitFor();
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('button[aria-label="Trial passes"]')].some((button) =>
+      button.textContent.includes('3/5'),
+    ),
+  );
   const searchBox = await page
     .getByRole('button', { name: 'Search commands', exact: true })
     .boundingBox();
@@ -92,20 +103,25 @@ try {
   assert.ok(passesBox.y >= searchBox.y + searchBox.height, 'Trial passes belong below search');
   await passes.click();
   await page.getByRole('heading', { name: 'Invitations', exact: true }).waitFor();
+  // The fixture has no native account, which clears passes; restore them to check the page.
+  await page.evaluate(() => window.coreFixture.passes(3));
   await page.getByText('of 5 Instant Access Passes available', { exact: true }).waitFor();
   await page
     .getByRole('navigation', { name: 'Workspace', exact: true })
-    .getByRole('button', { name: 'Tasks', exact: true })
+    .getByRole('button', { name: 'Work', exact: true })
     .click();
-  await page.getByRole('textbox', { name: 'Message', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Work', exact: true }).waitFor();
   for (const remaining of [0, null, 5, 3]) {
     await page.evaluate((value) => window.coreFixture.passes(value), remaining);
-    await page
-      .getByRole('button', {
-        name: remaining === null ? 'Trial passes' : `${remaining}/5 Trial passes`,
-        exact: true,
-      })
-      .waitFor();
+    await page.waitForFunction(
+      (expected) =>
+        [...document.querySelectorAll('button[aria-label="Trial passes"]')].some((button) =>
+          expected === null
+            ? !/\d/.test(button.textContent)
+            : button.textContent.includes(`${expected}/5`),
+        ),
+      remaining,
+    );
   }
   for (const count of [1, 10, 100]) {
     await page.evaluate((value) => window.coreFixture.notices(value), count);
@@ -117,41 +133,34 @@ try {
     assert.equal(badge.width, badge.height, 'Notification badge must stay circular');
   }
   await page.evaluate(() => window.coreFixture.notices(0));
+  // Work leads with existing work; New work opens the composer above it.
+  assert.equal(await page.getByRole('textbox', { name: 'Message', exact: true }).count(), 0);
+  await page.getByRole('button', { name: 'New work', exact: true }).first().click();
+  const message = page.getByRole('textbox', { name: 'Message', exact: true });
+  await message.waitFor();
   for (const width of [1280, 960, 680]) {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
     for (const appearance of ['light', 'dark']) {
       await applyTheme(page, appearance);
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await page.evaluate(() => document.fonts.ready);
-      const { composerBottom, workTop } = await page.evaluate(() => ({
-        composerBottom: document.querySelector('.live-start-composer').getBoundingClientRect()
-          .bottom,
-        workTop: document.querySelector('.daily-work').getBoundingClientRect().top,
-      }));
-      assert.ok(composerBottom <= workTop, 'Chat must come before attention work');
+      const composerBottom = await page.evaluate(
+        () => document.querySelector('.live-start-composer').getBoundingClientRect().bottom,
+      );
       assert.ok(
         composerBottom <= (width === 1280 ? 840 : 640),
-        'Chat composer must be visible on entry',
+        'The opened composer must be visible',
       );
       assert.equal(
         await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
         false,
       );
-      assert.equal(await page.getByText('Session limits', { exact: true }).count(), 0);
-      await page.screenshot({ path: `${output}/chat-${width}-${appearance}.png` });
+      assert.equal(await page.getByText('Conversation limits', { exact: true }).count(), 0);
+      await page.screenshot({ path: `${output}/composer-${width}-${appearance}.png` });
     }
   }
   await page.setViewportSize({ width: 1280, height: 840 });
-  const taskTabs = page.getByRole('navigation', { name: 'tasks views', exact: true });
-  assert.deepEqual(await taskTabs.getByRole('button').allTextContents(), [
-    'Chat',
-    'Tasks',
-    'Evidence',
-    'Recurring',
-  ]);
-  await taskTabs.getByRole('button', { name: 'Tasks', exact: true }).click();
-  await page.getByRole('heading', { name: 'Work in Atlas', exact: true }).waitFor();
-  assert.equal(await page.getByRole('button', { name: /Improve billing/ }).count(), 0);
+  assert.equal(await page.locator('.work-item').filter({ hasText: 'Improve billing' }).count(), 0);
   await page.locator('.work-item').filter({ hasText: 'Live keyboard exploration' }).waitFor();
   const rows = page.locator('.work-item');
   await rows.first().focus();
@@ -166,45 +175,21 @@ try {
         (color) => getComputedStyle(document.querySelector('.work-item')).color === color,
         foreground,
       );
-      await page.locator('.task-home').evaluate((node) => {
-        node.scrollTop = 0;
-      });
-      await page.waitForFunction((color) => {
-        const canvas = document.querySelector('.task-home');
-        const bounds = canvas.getBoundingClientRect();
-        return [...document.querySelectorAll('.work-item-title')].every((node) => {
-          const rect = node.getBoundingClientRect();
-          return (
-            rect.top >= bounds.bottom ||
-            rect.bottom <= bounds.top ||
-            getComputedStyle(node).color === color
-          );
-        });
-      }, foreground);
-      assert(
-        await rows
-          .first()
-          .evaluate(
-            (node) =>
-              node.getBoundingClientRect().bottom <=
-              document.querySelector('.task-home').getBoundingClientRect().bottom,
-          ),
-        'Attention work must be visible on entry',
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+        false,
       );
       await page.screenshot({ path: `${output}/home-${width}-${appearance}.png` });
     }
   }
+  await page.setViewportSize({ width: 1280, height: 840 });
   await page.getByRole('searchbox', { name: 'Search tasks', exact: true }).fill('Export');
   await page.getByRole('combobox', { name: 'Filter by project', exact: true }).click();
   await page.getByRole('option', { name: 'All work · every project', exact: true }).click();
   await page.getByRole('searchbox', { name: 'Search tasks', exact: true }).fill('billing');
   await page.reload();
-  await page.getByRole('heading', { name: 'Pick up where you left off', exact: true }).waitFor();
-  await page
-    .getByRole('navigation', { name: 'tasks views', exact: true })
-    .getByRole('button', { name: 'Tasks', exact: true })
-    .click();
-  await page.getByRole('heading', { name: 'All work', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Work', exact: true }).waitFor();
+  // Each project scope keeps its own search across a reload.
   assert.equal(
     await page.getByRole('searchbox', { name: 'Search tasks', exact: true }).inputValue(),
     'billing',
@@ -226,6 +211,7 @@ try {
   await page.getByRole('heading', { name: 'Orbit', exact: true }).waitFor();
   await page.screenshot({ path: `${output}/project-overview.png` });
   await page.goto(`${url}/?mode=preview`);
+  await page.locator('summary').filter({ hasText: 'Preview setup' }).click();
   await page.getByRole('button', { name: 'Detect preview command' }).click();
   assert.equal(
     await page.evaluate(() =>
@@ -256,6 +242,7 @@ try {
     .waitFor();
   await page.getByRole('button', { name: 'Use phone width' }).click();
   assert.equal(await page.getByRole('button', { name: 'Add evidence to follow-up' }).count(), 0);
+  await page.locator('summary').filter({ hasText: 'Capture a fresh page snapshot' }).click();
   await page.getByRole('button', { name: 'Capture evidence', exact: true }).click();
   await page.getByRole('combobox', { name: 'Element to discuss' }).click();
   await page.getByRole('option', { name: 'button Save changes [ref=save]', exact: true }).click();
@@ -277,6 +264,11 @@ try {
   await page
     .getByText('The PR head differs from the inspected local revision.', { exact: false })
     .waitFor();
+  await page.getByText('1 CI check failed', { exact: false }).waitFor();
+  await page.getByRole('button', { name: 'Ask the agent to fix', exact: true }).click();
+  const repair = await page.evaluate(() => window.coreFixture.handoff);
+  assert.match(repair, /- Build: FAILURE/);
+  assert.match(repair, /Do not commit, push/);
   await page.getByRole('button', { name: 'More delivery actions' }).click();
   await page.getByRole('menuitem', { name: 'Prepare a deployment' }).click();
   assert.match(await page.evaluate(() => window.coreFixture.handoff), /Do not commit, push/);
@@ -287,9 +279,32 @@ try {
     false,
   );
   await page.screenshot({ path: `${output}/delivery.png` });
+  await page.goto(`${url}/?mode=delivery`);
+  await page.getByRole('button', { name: 'Create pull request', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Create pull request' });
+  await dialog.getByText('Commits 1 changed file', { exact: false }).waitFor();
+  assert.equal(
+    await page.evaluate(() =>
+      window.coreFixture.calls.some((call) => /commit|push|pull_request/.test(call.command)),
+    ),
+    false,
+    'Opening the dialog must not publish anything',
+  );
+  await dialog.getByRole('button', { name: 'Open draft pull request', exact: true }).click();
+  await page.getByText('Pull request opened.', { exact: true }).waitFor();
+  const published = await page.evaluate(() =>
+    window.coreFixture.calls
+      .filter((call) => /commit|push|pull_request/.test(call.command))
+      .map((call) => ({ command: call.command, draft: call.draft, paths: call.paths })),
+  );
+  assert.deepEqual(published, [
+    { command: 'git_commit_changes', draft: undefined, paths: ['src/search.ts'] },
+    { command: 'git_push_changes', draft: undefined, paths: undefined },
+    { command: 'task_pull_request_create', draft: true, paths: undefined },
+  ]);
   assert.deepEqual(errors, []);
   console.log(
-    'Core flow browser fixtures passed: scoped unified work, visible attention items, keyboard navigation, project/task search, preview setup/readiness/feedback and guarded delivery drafts. No native execution.',
+    'Core flow browser fixtures passed: scoped unified work, visible attention items, keyboard navigation, project/task search, preview setup/readiness/feedback, guarded delivery drafts, CI repair drafts and confirmed pull request creation. No native execution.',
   );
 } catch (error) {
   const page = browser.contexts()[0]?.pages()[0];

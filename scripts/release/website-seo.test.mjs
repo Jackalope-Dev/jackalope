@@ -11,8 +11,8 @@ const metadata = (path) => {
 
 test('discovery availability follows each configured platform, including Store without an installer version', () => {
   for (const [env, available, unavailable] of [
-    [{}, 'Public downloads are not open yet', 'version'],
-    [{ VITE_RELEASE_VERSION: '0.1.0' }, 'Public downloads are not open yet', 'version'],
+    [{}, 'Desktop downloads are available for macOS and Linux', 'Windows'],
+    [{ VITE_RELEASE_VERSION: '0.1.0' }, 'available for macOS and Linux', 'version'],
     [
       {
         VITE_MACOS_DOWNLOAD_URL: 'https://downloads.example.test/app.dmg',
@@ -50,7 +50,7 @@ test('discovery availability follows each configured platform, including Store w
       assert.ok(!availability.includes(unavailable), `${path}: ${unavailable}`);
       assert.ok(availability.includes(`${origin}/download/`));
       assert.ok(!availability.includes('/#download'));
-      if (!available.startsWith('Public')) assert.match(availability, /requires waitlist approval/);
+      assert.match(availability, /requires waitlist approval/);
     }
   }
 });

@@ -16,7 +16,11 @@ export const escapeHtml = (value: string) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char,
   );
 
-export function accessEmail(mail: Mail, origin: string) {
+export type EmailDownload = { label: string; url: string };
+
+/** `downloads` adds direct installer links to approval emails; other kinds ignore it. */
+export function accessEmail(mail: Mail, origin: string, downloads: EmailDownload[] = []) {
+  const direct = mail.kind === 'welcome' ? downloads : [];
   const total = 'total' in mail ? mail.total : 0;
   const copy = {
     feedback_request: {
@@ -46,7 +50,7 @@ export function accessEmail(mail: Mail, origin: string) {
       subject: 'You’re in. Welcome to Jackalope',
       title: 'You’re in.',
       intro:
-        'Your early access is approved. Confirm your email, then check download availability for your computer.',
+        'Your early access is approved. Confirm your email, then download Jackalope for your computer.',
       action: 'Get Jackalope',
       detail:
         'You also have five Instant Access Passes to share. Each lets one person skip the waitlist after verifying their email.',
@@ -140,6 +144,9 @@ export function accessEmail(mail: Mail, origin: string) {
     `${copy.action}: ${link}`,
     copy.detail,
     downloadLink ? `View downloads: ${downloadLink}` : '',
+    direct.length
+      ? `Or download directly:\n${direct.map((item) => `${item.label}: ${item.url}`).join('\n')}`
+      : '',
     expiry,
     footer,
     `${EMAIL_COMPANY.legalName}${address ? ` · ${address}` : ''} · ${EMAIL_COMPANY.companySite}\nPrivacy: ${origin}/privacy/`,
@@ -159,6 +166,17 @@ export function accessEmail(mail: Mail, origin: string) {
 ${callout(copy.stamp, copy.action, link)}
 ${copy.detail ? `<p style="margin:0;font-size:15px;line-height:1.8;color:${c.muted}">${escapeHtml(copy.detail)}</p>` : ''}
 ${downloadLink ? `<p style="margin:16px 0 0;font-size:15px;line-height:1.8"><a href="${escapeHtml(downloadLink)}" style="color:${c.ink};text-decoration:underline">View downloads</a></p>` : ''}
+${
+  direct.length
+    ? `<p style="margin:22px 0 8px;font-size:13px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:${c.faint}">Or download directly</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse">${direct
+        .map(
+          (item) =>
+            `<tr><td style="padding:10px 0;border-top:1px solid ${c.borderSubtle}"><a href="${escapeHtml(item.url)}" style="color:${c.ink};font-size:15px;font-weight:600;text-decoration:none">${escapeHtml(item.label)} &nbsp;&darr;</a></td></tr>`,
+        )
+        .join('')}</table>`
+    : ''
+}
 ${expiry ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.7;color:${c.faint}">${escapeHtml(expiry)}</p>` : ''}`,
       footer: footerHtml,
     }),

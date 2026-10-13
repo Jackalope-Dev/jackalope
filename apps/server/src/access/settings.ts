@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { AccessError } from './service';
 
-export const syncedSettingsSchema = z.strictObject({
+const syncedSettingsSchema = z.strictObject({
   version: z.literal(1),
   accentHex: z.string().regex(/^#[a-fA-F0-9]{6}$/),
   isDark: z.boolean(),

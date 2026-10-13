@@ -10,7 +10,7 @@ await writeFile(
   `<!doctype html><html><body><div id="root"></div><script type="module">
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { AccessBoundary } from '/src/components/account/AccessBoundary.tsx';
+import { AccessBoundary, AccessNoticeSlot } from '/src/components/account/AccessBoundary.tsx';
 import { useOnboardingStore } from '/src/stores/onboardingStore.ts';
 import { useThemeStore } from '/src/stores/themeStore.ts';
 import '/src/index.css';
@@ -20,7 +20,12 @@ window.setFixtureTheme = (isDark) => {
   store.setAppTheme({ ...store.appTheme, appearance: 'manual', isDark });
 };
 createRoot(document.getElementById('root')).render(
-  React.createElement(AccessBoundary, null, React.createElement('h1', null, 'Workspace fixture'))
+  React.createElement(
+    AccessBoundary,
+    null,
+    React.createElement(AccessNoticeSlot),
+    React.createElement('h1', null, 'Workspace fixture'),
+  )
 );
 </script></body></html>`,
 );
@@ -92,7 +97,7 @@ try {
           window.accessFixture.account = disconnected;
           return disconnected;
         }
-        if (command === 'plugin:shell|open') window.accessFixture.opened.push(args.path);
+        if (command === 'plugin:opener|open_url') window.accessFixture.opened.push(args.url);
         if (command === 'app_community_settings')
           return { reviewed: true, telemetry: false, errors: false, configured: false };
         if (command === 'app_settings_sync')
@@ -218,7 +223,7 @@ try {
   await page.evaluate(() => {
     window.accessFixture.allowed = false;
   });
-  await page.getByRole('status').filter({ hasText: 'Connect an approved account' }).waitFor();
+  await page.getByRole('status').filter({ hasText: 'Sign in to start new work' }).waitFor();
   assert.equal(await workspace.isVisible(), true, 'Revocation must retain saved-work access');
   await page.getByRole('button', { name: 'Connect account', exact: true }).click();
   await welcome.waitFor();

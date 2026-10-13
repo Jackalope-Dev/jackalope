@@ -12,7 +12,8 @@
     "./email": "./src/email.ts",
     "./passes": "./src/PassTickets.tsx",
     "./fonts.css": "./src/fonts.css",
-    "./tokens": "./src/tokens.ts"
+    "./tokens": "./src/tokens.ts",
+    "./provider-marks": "./src/provider-marks.ts"
   },
   "peerDependencies": {
     "react": "^19.0.0"

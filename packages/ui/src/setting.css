@@ -30,6 +30,13 @@
   .settings-actions:last-child {
     border-bottom: none;
   }
+  /* Conditional actions can render nothing; drop the row and the divider above it. */
+  .settings-actions:empty {
+    display: none;
+  }
+  .settings-block:has(+ .settings-actions:empty:last-child) {
+    border-bottom: none;
+  }
   .settings-row {
     display: flex;
     flex-wrap: wrap;

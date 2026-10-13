@@ -97,13 +97,13 @@ export function OnboardingAgentAccount({
           )}
           {status?.state === 'signedOut' && (
             <p className="task-muted">
-              Sign in to this account in Settings → Agents before starting a task.
+              Sign in to this account on the Agents page before starting a task.
             </p>
           )}
         </>
       ) : (
         <p className="task-muted" role="status">
-          No enabled accounts. Enable an account in Settings → Agents.
+          No enabled accounts. Allow one on the Agents page.
         </p>
       )}
     </div>

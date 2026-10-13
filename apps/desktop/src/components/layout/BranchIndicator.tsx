@@ -1,8 +1,9 @@
-import { Popover } from '@jackalope/ui';
-import { GitBranch } from 'lucide-react';
+import { CopyButton, Popover } from '@jackalope/ui';
+import { ChevronDown, GitBranch } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { sessionWork } from '../../lib/live-session';
 import { managedTaskWork } from '../../lib/managed-task';
+import { selectWork } from '../../lib/work-selection';
 import { openChanges } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
@@ -72,9 +73,7 @@ function useSwitchTargets(checkout: string) {
       branch: project.plainFolder ? 'No Git' : project.gitBranch || 'Branch unknown',
       label: 'Project checkout',
       open: () => {
-        useExecutionStore.getState().select(null);
-        useLiveSessionStore.getState().select(null);
-        useManagedTaskStore.getState().select(null);
+        selectWork();
       },
     });
   }
@@ -119,6 +118,7 @@ export function BranchIndicator() {
         <button type="button" className="chrome-branch" title={`Branch: ${branch}`}>
           <GitBranch size={14} aria-hidden="true" />
           <span className="chrome-branch-name">{branch}</span>
+          <ChevronDown size={12} aria-hidden="true" className="chrome-branch-chevron" />
         </button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -166,6 +166,20 @@ export function BranchIndicator() {
             </section>
           )}
           <div className="flex flex-wrap gap-2">
+            {run?.branch || (!run && !managed && project.gitBranch) ? (
+              <CopyButton
+                variant="outline"
+                text={run ? run.branch : project.gitBranch}
+                label="Copy branch"
+              />
+            ) : null}
+            {(run ? run.workspace : !managed && project.path) ? (
+              <CopyButton
+                variant="outline"
+                text={run ? run.workspace : project.path}
+                label="Copy path"
+              />
+            ) : null}
             {!managed && (
               <Popover.Close asChild>
                 <Button onClick={() => openChanges(checkout)}>Review changes</Button>

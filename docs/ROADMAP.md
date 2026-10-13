@@ -23,8 +23,8 @@ representative benefit and installed-platform acceptance remain open.
   shortcuts, editor/shell choices, saved actions and optional local dictation.
   Split terminals can retain stopped output without replaying commands. Explicit
   ignored-file setup and bounded worktree size inspection support isolated work.
-- Per-project Focus, Build and Oversee modes provide a quiet conversation canvas,
-  a workspace with tools beside work, or a full-width activity and attention board.
+- One workspace layout keeps recent work in a collapsible sidebar beside the open item,
+  with list and board views of the work list.
   One prompt can go to several agents in separate isolated tasks for side-by-side
   comparison. Composers accept pasted images and dropped or picked files, and command
   search opens or attaches project files. Work rows show elapsed time, changed lines and
@@ -51,8 +51,9 @@ representative benefit and installed-platform acceptance remain open.
   connections with curated discovery and guided setup, browser tools and Ask Jackalope.
 - Shared appearance, guided setup, history recovery, archiving and optional local
   usefulness ratings. Optional local-model setup checks editing and continuation.
-- Account connection, waitlist/referral progress, platform download guidance and
-  optional settings sync, feedback and reporting.
+- Account connection with optional open signup and Turnstile-protected signup,
+  waitlist/referral progress, platform download guidance and optional settings sync,
+  feedback and reporting.
 
 These capabilities describe source behavior. Provider, platform, delivery and
 installed-app acceptance remain separate. See [current capabilities and limits](STATUS.md)
@@ -142,8 +143,9 @@ with Ubuntu 24.04/GNOME 46 the first Wayland acceptance target and X11 compatibi
 retained. Other compositors and GNOME versions remain unsupported.
 
 Saved bots keep standing instructions, an agent and model, a project and a connection
-scope; their conversations repeat the instructions in every batch and routines use
-schedules. Connected apps use the person's own Composio project through one managed
+scope; their conversations repeat the instructions in every batch. Bots wake on
+schedules, project changes and new connection data, consult each other, and bring
+decisions, questions and sources to the person as cards. Connected apps use the person's own Composio project through one managed
 on-demand connection. A Screen view shows the task browser's viewport and desktop
 grant state with revoke controls. Installed and live-account acceptance remain open.
 

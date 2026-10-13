@@ -55,11 +55,9 @@ const fixture = `
 import React from '/node_modules/.vite/deps/react.js';
 import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';
 import { RoutingPreferences } from '/src/components/settings/RoutingSetup.tsx';
-import { OnboardingFlow } from '/src/components/onboarding/OnboardingFlow.tsx';
 import '/src/index.css';
-const source=await fetch('/src/components/onboarding/OnboardingFlow.tsx').then(r=>r.text());
+const source=await fetch('/src/components/settings/RoutingSetup.tsx').then(r=>r.text());
 const module=async(name)=>import(source.split('"').find(url=>url.startsWith('/src/stores/'+name+'.ts'))||'/src/stores/'+name+'.ts');
-const {useOnboardingStore}=await module('onboardingStore');
 const {useProjectStore}=await module('projectStore');
 const {useExecutionStore}=await module('executionStore');
 const {useAgentAccountsStore}=await module('agentAccountsStore');
@@ -71,10 +69,8 @@ const project={id:'alpha',name:'Atlas',path:'C:/Fixture/atlas',gitBranch:'main',
 useProjectStore.setState({projects:[],activeProjectId:'alpha'});
 useExecutionStore.setState({runners:[{id:'codex',name:'Codex',available:true,signedIn:true,account:'fixture',detail:'Browser fixture only'}],discovering:false});
 useAgentAccountsStore.setState({load:async()=>{}});
-const onboarding=location.search.includes('onboarding');
-if(onboarding)useOnboardingStore.setState({status:'active',step:'routing',projectId:'alpha',pendingProject:project,routingMode:null,routingFallback:null});
 const projectId=new URLSearchParams(location.search).get('project')||undefined;
-ReactDOM.createRoot(document.getElementById('root')).render(onboarding?React.createElement(OnboardingFlow,{onFinish:()=>{},onSkip:()=>{}}):React.createElement('div',{style:{padding:'32px',maxWidth:'760px'}},React.createElement('h1',null,'Jackalope Decisions'),React.createElement(RoutingPreferences,{projectId})));
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement('div',{style:{padding:'32px',maxWidth:'760px'}},React.createElement('h1',null,'Jackalope Decisions'),React.createElement(RoutingPreferences,{projectId})));
 `;
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
@@ -294,7 +290,8 @@ try {
   await page.waitForFunction(() => document.querySelector('input[value=deterministic]').checked);
   assert.equal(config.connected, false);
   assert.equal(config.projects.alpha, 'deterministic');
-  await page.goto(`${url}/?onboarding`);
+  // Routing is edited in settings; check its layout across sizes, themes and motion.
+  await page.goto(url);
   await page.getByRole('heading', { name: 'Jackalope Decisions', exact: true }).waitFor();
   for (const [width, height] of [
     [1280, 840],
@@ -323,12 +320,6 @@ try {
             .evaluate((el) => getComputedStyle(el).alignItems),
           'baseline',
         );
-        await page
-          .locator('.onboarding-content')
-          .evaluate((node) => {
-            node.scrollTop = 0;
-          })
-          .catch(() => {});
         await page.screenshot({
           path: `${output}/${width}-${dark ? 'dark' : 'light'}-${mode}.png`,
         });
@@ -350,10 +341,6 @@ try {
     '2',
   );
   await local.check();
-  const continueButton = page.getByRole('button', { name: 'Continue', exact: true });
-  assert.equal(await continueButton.isEnabled(), true);
-  await continueButton.click();
-  await page.locator('#onboarding-heading[data-step=behavior]').waitFor();
   assert.equal(
     await page.evaluate(
       (secret) => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(secret),

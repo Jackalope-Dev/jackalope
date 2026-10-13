@@ -184,7 +184,7 @@ function TourFilm() {
   );
 }
 
-export function TourPage({ dark, available }: { dark: boolean; available: boolean }) {
+export function TourPage({ dark }: { dark: boolean }) {
   return (
     <main id="main" className="product-tour">
       <section className="tour-intro">
@@ -210,15 +210,9 @@ export function TourPage({ dark, available }: { dark: boolean; available: boolea
                 </a>
               </div>
               <p className="tour-availability">
-                {available ? (
-                  <a href="/download/">
-                    Explore available downloads <ArrowRight size={14} />
-                  </a>
-                ) : (
-                  <a href="/download/">
-                    Coming soon. See platform availability <ArrowRight size={14} />
-                  </a>
-                )}
+                <a href="/download/">
+                  Explore available downloads <ArrowRight size={14} />
+                </a>
               </p>
             </div>
             <div className="tour-hero-art" aria-hidden="true">
@@ -367,7 +361,7 @@ export function TourPage({ dark, available }: { dark: boolean; available: boolea
             <br />
             with Jackalope.
           </h2>
-          <p>Join the waitlist. We’ll let you know when your workspace is ready.</p>
+          <p>Sign up free. Your workspace is ready as soon as you confirm your email.</p>
         </div>
         <div>
           <Signup />

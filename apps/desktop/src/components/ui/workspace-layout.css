@@ -29,6 +29,20 @@
   min-width: 0;
   max-width: 65ch;
 }
+/* Actions stay on the title row; long descriptions wrap beside them instead. */
+.workspace-heading {
+  flex-wrap: nowrap;
+}
+.workspace-heading > div:first-child {
+  flex: 1 1 auto;
+}
+.workspace-heading > :not(:first-child) {
+  flex-shrink: 0;
+  max-width: 60%;
+}
+.workspace-heading > .workspace-actions {
+  justify-content: flex-end;
+}
 .workspace-heading h1 {
   margin: 0;
   color: var(--color-text-primary);
@@ -77,7 +91,7 @@
 .workspace-section-header {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px 24px;
   margin-bottom: var(--workspace-section-heading-gap, 16px);
@@ -96,6 +110,13 @@
 }
 .workspace-stack > .workspace-section-header {
   margin-bottom: 0;
+}
+/* With a description, actions line up with the title line instead of the whole block. */
+.workspace-section-header:has(> div:first-child > p) {
+  align-items: flex-start;
+}
+.workspace-section-header:has(> div:first-child > :is(h2, h3) + p) > :not(:first-child) {
+  margin-top: -8px;
 }
 .workspace-section + .workspace-section,
 .workspace-page-layout > :where(:not(.workspace-heading)) + .workspace-section {

@@ -5,6 +5,7 @@ import { browserDeviceAction, connectedDevices } from './devices';
 import { feedbackResponse } from './feedback';
 import { campaignSchema, preferencesSchema, savePreferences } from './insights';
 import { deliverAccessMail } from './mail';
+import type { EmailDownload } from './mail-templates';
 import { syncNewsletter } from './newsletter';
 import {
   AccessError,
@@ -20,8 +21,10 @@ import {
   sessionMember,
   tokenSchema,
 } from './service';
+import { SIGNUP_ACTION, verifyTurnstile } from './turnstile';
 import {
   acceptWaitlistToken,
+  openSignupSession,
   requestWaitlistLink,
   saveWaitlistPreferences,
   waitingMember,
@@ -71,6 +74,26 @@ export function linuxChannels(env: Env) {
 }
 function releaseDownloadUrl(channel: string, id: keyof typeof releaseDownloads) {
   return `https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/${releaseDownloads[id].platform}?channel=${channel}`;
+}
+
+/**
+ * Direct stable-channel downloads for approval emails. Installers are public on the
+ * release CDN; the desktop account gate, not the link, controls who can run tasks.
+ */
+export function stableDownloads(env: Env): EmailDownload[] {
+  const store = storeUrl(env);
+  return [
+    ...(store ? [{ label: 'Windows (Microsoft Store)', url: store }] : []),
+    ...(macChannels(env).includes('stable')
+      ? (['macos-aarch64', 'macos-x86_64'] as const).map((id) => ({
+          label: `macOS (${releaseDownloads[id].label})`,
+          url: releaseDownloadUrl('stable', id),
+        }))
+      : []),
+    ...(linuxChannels(env).includes('stable')
+      ? [{ label: 'Linux (AppImage)', url: releaseDownloadUrl('stable', 'linux-x86_64') }]
+      : []),
+  ];
 }
 
 export function storeUrl(env: Env) {
@@ -176,10 +199,17 @@ export async function accessRoutes(
           referral: tokenSchema.optional(),
           source: z.enum(['inline', 'popup']).default('inline'),
           website: z.string().max(200).default(''),
+          turnstile: z.string().max(2048).optional(),
         })
         .parse(await readJson(request));
       let surveyToken = randomToken();
       if (!body.website) {
+        await verifyTurnstile(
+          env,
+          body.turnstile,
+          request.headers.get('cf-connecting-ip'),
+          SIGNUP_ACTION,
+        );
         surveyToken = await register(
           env,
           body.email,
@@ -206,9 +236,12 @@ export async function accessRoutes(
     if (request.method === 'POST' && path === '/v1/access/waitlist/accept') {
       const body = z.strictObject({ token: tokenSchema }).parse(await readJson(request));
       const session = await acceptWaitlistToken(env, body.token);
+      const member = await openSignupSession(env, session);
       if (ctx) ctx.waitUntil(deliverAccessMail(env));
       if (ctx) ctx.waitUntil(syncNewsletter(env));
-      return json({ success: true }, 200, { 'set-cookie': waitlistCookie(session) });
+      const response = json({ success: true }, 200, { 'set-cookie': waitlistCookie(session) });
+      if (member) response.headers.append('set-cookie', sessionCookie(member));
+      return response;
     }
     if (request.method === 'POST' && path === '/v1/access/waitlist/preferences') {
       const body = z

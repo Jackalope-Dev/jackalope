@@ -116,8 +116,8 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
                       <a href={source.href}>{source.label}</a>
                     </span>
                   ))}
-                  . Jackalope is coming soon; <a href="/agents/">check agent compatibility</a> and
-                  the <a href="/roadmap/">roadmap</a>.
+                  . Jackalope is in early access; <a href="/agents/">check agent compatibility</a>{' '}
+                  and the <a href="/roadmap/">roadmap</a>.
                 </p>
               </div>
             </section>

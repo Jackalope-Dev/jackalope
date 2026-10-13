@@ -131,8 +131,7 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
           access?.allowed ? null : (
             <div className="access-notice">
               <p role="status">
-                Connect an approved account to start new work. Saved work and running tasks remain
-                available.
+                Sign in to start new work. Saved work and running tasks remain available.
               </p>
               <Button
                 variant="outline"
@@ -186,7 +185,7 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
             <header className="access-intro">
               <EchoMark animated={false} className="access-mark" />
               <h1 id="access-heading">Welcome to Jackalope.</h1>
-              <p>Connect your account to check early access.</p>
+              <p>Sign in, or create a free account, to start working with your agents.</p>
             </header>
             <Disclosure className="access-privacy">
               <DisclosureSummary>
@@ -270,7 +269,7 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
             </footer>
           </section>
         )}
-        <p className="access-caption">Jackalope{version ? ` v${version}` : ''} · Early access</p>
+        <p className="access-caption">Jackalope{version ? ` v${version}` : ''}</p>
       </main>
     </div>
   );

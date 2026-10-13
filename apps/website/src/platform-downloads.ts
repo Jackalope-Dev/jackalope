@@ -8,6 +8,39 @@ export interface PlatformDownload {
   store: boolean;
 }
 
+export interface ReleaseBuild {
+  id: string;
+  label: string;
+  channel: 'stable' | 'beta';
+  url: string;
+}
+
+const releaseCdn =
+  'https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform';
+const releasePlatforms = {
+  macos: [
+    { id: 'macos-aarch64', label: 'Apple silicon', platform: 'dmg-aarch64' },
+    { id: 'macos-x86_64', label: 'Intel', platform: 'dmg-x86_64' },
+  ],
+  linux: [{ id: 'linux-x86_64', label: 'x64 AppImage', platform: 'appimage-x86_64' }],
+} as const;
+
+/**
+ * Public release CDN builds. Anyone can download them; the desktop account gate, not
+ * the link, controls who can use the app. Signed-in members get equivalent links from
+ * the access service so first downloads are recorded.
+ */
+export function publicReleaseBuilds(os: keyof typeof releasePlatforms): ReleaseBuild[] {
+  return (['stable', 'beta'] as const).flatMap((channel) =>
+    releasePlatforms[os].map(({ id, label, platform }) => ({
+      id,
+      label,
+      channel,
+      url: `${releaseCdn}/${platform}?channel=${channel}`,
+    })),
+  );
+}
+
 export function detectDesktopPlatform({
   platform = '',
   userAgent = '',

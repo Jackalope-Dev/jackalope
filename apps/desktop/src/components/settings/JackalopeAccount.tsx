@@ -293,7 +293,7 @@ export function JackalopeAccount({
     );
   return (
     <>
-      <SettingGroup title="Your account" description="Beta access requires an approved account.">
+      <SettingGroup title="Your account" description="New work needs a signed-in account.">
         <SettingBody>{status}</SettingBody>
         <SettingActions>{actions}</SettingActions>
         {failure && <SettingBody>{failure}</SettingBody>}

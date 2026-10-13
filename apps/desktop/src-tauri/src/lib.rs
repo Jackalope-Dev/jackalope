@@ -186,6 +186,13 @@ pub fn run(launch: Launch) {
             );
             remote.launch();
             app.manage(remote);
+            let bot_hub = commands::bot_hub::BotHub::new(
+                directory.join("bots/hub.json"),
+                runtime.clone(),
+                sessions.clone(),
+            );
+            bot_hub.launch(app.handle().clone());
+            app.manage(bot_hub);
             app.manage(sessions);
             let scheduler = Scheduler::new(directory.join("schedules.json"), coordinator.clone());
             scheduler.launch();
@@ -236,6 +243,14 @@ pub fn run(launch: Launch) {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            commands::bot_hub::bot_hub_sync,
+            commands::bot_hub::bot_hub_snapshot,
+            commands::bot_hub::bot_hub_pause,
+            commands::bot_hub::bot_hub_card,
+            commands::bot_hub::bot_hub_proposal,
+            commands::bot_hub::bot_hub_wake_now,
+            commands::bot_hub::bot_hub_forget_note,
+            commands::bot_hub::bot_hub_connection_tools,
             commands::live_sessions::live_session_snapshot,
             commands::live_sessions::live_session_create,
             commands::live_sessions::live_session_send,
@@ -398,6 +413,7 @@ pub fn run(launch: Launch) {
             commands::previews::design::task_preview_design_open,
             commands::previews::design::task_preview_design_capture,
             commands::delivery::task_delivery_status,
+            commands::delivery::task_pull_request_create,
             commands::outcomes::task_outcome_review,
             task_review,
             commands::live_sessions::live_session_limits,
@@ -528,6 +544,7 @@ pub fn run(launch: Launch) {
                 app.state::<commands::remote::RemoteAccess>().shutdown();
                 commands::remote::close_tunnels();
                 app.state::<Scheduler>().shutdown();
+                app.state::<commands::bot_hub::BotHub>().shutdown();
                 app.state::<commands::notifications::Notifications>()
                     .shutdown();
                 app.state::<commands::live_sessions::LiveSessions>()
