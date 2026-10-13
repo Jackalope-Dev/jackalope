@@ -51,6 +51,46 @@ pub const TIPS: &[&str] = &[
     "Start a line with a space to keep it out of your history.",
 ];
 
+/// How long the start-up reveal takes to fill the screen.
+const BOOT: Duration = Duration::from_millis(720);
+
+/// Whether the start-up reveal is still drawing.
+pub fn booting(elapsed: Duration) -> bool {
+    elapsed < BOOT && brand::motion() && brand::colored()
+}
+
+/// Rows lit so far by the start-up reveal, counted from the bottom: whole
+/// lines arrive one after another like an old terminal filling from its
+/// prompt upward, quick at first and settling at the top.
+fn boot_rows(elapsed: Duration, height: u16) -> u16 {
+    let progress = (elapsed.as_secs_f32() / BOOT.as_secs_f32()).clamp(0.0, 1.0);
+    let eased = 1.0 - (1.0 - progress).powi(2);
+    (eased * height as f32).ceil() as u16
+}
+
+/// Blanks the rows the reveal has not reached and tints the leading row as a
+/// phosphor edge. Only colour and visibility change; the layout is final.
+fn boot_reveal(frame: &mut Frame, elapsed: Duration) {
+    let buffer = frame.buffer_mut();
+    let area = buffer.area;
+    let lit = boot_rows(elapsed, area.height);
+    let edge = area.bottom().saturating_sub(lit);
+    for row in area.top()..edge {
+        for column in area.left()..area.right() {
+            if let Some(cell) = buffer.cell_mut((column, row)) {
+                cell.reset();
+            }
+        }
+    }
+    if lit < area.height {
+        for column in area.left()..area.right() {
+            if let Some(cell) = buffer.cell_mut((column, edge)) {
+                cell.set_fg(brand::accent());
+            }
+        }
+    }
+}
+
 pub fn draw(frame: &mut Frame, app: &App) {
     let area = frame.area();
     // The full banner greets you; once a conversation is under way the small
@@ -184,6 +224,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
                 }
             }
         }
+    }
+
+    let elapsed = app.opened.elapsed();
+    if booting(elapsed) {
+        boot_reveal(frame, elapsed);
     }
 
     if let Some(picker) = &app.picker {
@@ -595,6 +640,16 @@ mod tests {
             let line = Line::from(spans);
             assert!(line.width() > 10, "tip should be substantive: {tip}");
         }
+    }
+
+    #[test]
+    fn the_start_up_reveal_fills_from_the_bottom_and_finishes() {
+        assert_eq!(boot_rows(Duration::ZERO, 40), 0);
+        let early = boot_rows(BOOT / 4, 40);
+        let late = boot_rows(BOOT * 3 / 4, 40);
+        assert!(0 < early && early < late && late < 40);
+        assert_eq!(boot_rows(BOOT, 40), 40);
+        assert!(!booting(BOOT));
     }
 
     #[test]

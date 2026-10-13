@@ -702,22 +702,38 @@ img[src="/mascot.svg"] {
   }
 }
 
-/* Sized for pointer use but kept visually light against the bubble. */
-.mascot-bubble-close {
+/* Visually small against the bubble, with a 44px hit area. Scoped like the action so
+   status bar button sizing and hover tints, unreadable on the inverted bubble, never apply. */
+.mascot-speech .mascot-bubble-close {
+  position: relative;
   display: grid;
   flex-shrink: 0;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  margin: -4px 0 -4px;
-  border-radius: var(--radius-sm);
+  width: 22px;
+  min-width: 0;
+  height: 22px;
+  min-height: 0;
+  margin: 1px -4px 0 0;
+  padding: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
   color: inherit;
-  opacity: 0.7;
+  opacity: 0.65;
+  transition:
+    background-color 120ms ease,
+    opacity 120ms ease;
 }
-.mascot-bubble-close:hover {
+.mascot-speech .mascot-bubble-close::before {
+  content: "";
+  position: absolute;
+  inset: -11px;
+}
+.mascot-speech .mascot-bubble-close:hover {
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  color: inherit;
   opacity: 1;
 }
-.mascot-bubble-close:focus-visible {
+.mascot-speech .mascot-bubble-close:focus-visible {
   outline: 2px solid var(--color-border-focus);
   opacity: 1;
 }

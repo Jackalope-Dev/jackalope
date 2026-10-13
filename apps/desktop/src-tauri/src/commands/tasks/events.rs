@@ -230,7 +230,13 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                 .as_array()
                 .filter(|v| !v.is_empty())
             {
-                activity(run, &format!("{} tool request(s) were denied by the agent's permission policy. Review the result before continuing.", denials.len()));
+                let tools: Vec<&str> = denials
+                    .iter()
+                    .filter_map(|d| d["tool_name"].as_str())
+                    .take(8)
+                    .collect();
+                activity(run, &format!("{} tool request(s) were denied by the agent's permission policy: {}. Review the result before continuing.", denials.len(), tools.join(", ")));
+                run.error.get_or_insert("Claude Code was denied a required permission. Allow the operation and continue the task, or review what was blocked.".into());
             }
         }
         _ => {}

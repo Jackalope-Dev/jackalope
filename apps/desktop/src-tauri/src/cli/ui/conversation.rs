@@ -45,7 +45,8 @@ impl App {
     /// The state of the conversation's work and the tone that carries it.
     pub(super) fn work_state(&self, view: &SessionView) -> (String, Tone) {
         if protocol::present(view.error.as_deref()).is_some() {
-            return ("needs you".into(), Tone::Danger);
+            // Amber, not red: the work is waiting on a decision, not broken.
+            return ("needs you".into(), Tone::Warning);
         }
         if !view.questions.is_empty() {
             return ("waiting on your answer".into(), Tone::Warning);

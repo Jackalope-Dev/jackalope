@@ -184,8 +184,23 @@ pub fn picker(frame: &mut Frame, picker: &Picker, area: Rect) {
         } else {
             80
         });
-    let visible = (area.height.saturating_sub(10) as usize).clamp(3, 14);
-    let rows = shown.len().clamp(1, visible) as u16;
+    // A title's first line goes on the border; later lines (a question's
+    // detail, such as the command a permission request would run) sit above
+    // the rows so nothing the user is deciding on is cut off.
+    let mut title_lines = picker.title.lines();
+    let heading = title_lines.next().unwrap_or_default().to_string();
+    let context: Vec<String> = title_lines
+        .filter(|line| !line.trim().is_empty())
+        .take(6)
+        .map(|line| brand::ellipsize(line, (width as usize).saturating_sub(6)))
+        .collect();
+    let context_rows = if context.is_empty() {
+        0
+    } else {
+        context.len() as u16 + 1
+    };
+    let visible = (area.height.saturating_sub(10 + context_rows) as usize).clamp(3, 14);
+    let rows = shown.len().clamp(1, visible) as u16 + context_rows;
     let popup = Rect {
         x: area.x + (area.width.saturating_sub(width)) / 2,
         // Borders, the filter line and a spacer around the rows.
@@ -204,7 +219,14 @@ pub fn picker(frame: &mut Frame, picker: &Picker, area: Rect) {
         inner.saturating_sub(4)
     };
     let detail_width = inner.saturating_sub(label_width + 4);
-    let mut lines: Vec<Line> = vec![Line::from(if picker.filter.is_empty() {
+    let mut lines: Vec<Line> = context
+        .iter()
+        .map(|line| Line::raw(format!("  {line}")))
+        .collect();
+    if !lines.is_empty() {
+        lines.push(Line::raw(""));
+    }
+    lines.push(Line::from(if picker.filter.is_empty() {
         vec![Span::styled("  type to filter", muted)]
     } else {
         vec![
@@ -218,7 +240,7 @@ pub fn picker(frame: &mut Frame, picker: &Picker, area: Rect) {
                 muted,
             ),
         ]
-    })];
+    }));
     lines.push(Line::raw(""));
     lines.extend(
         shown
@@ -275,7 +297,10 @@ pub fn picker(frame: &mut Frame, picker: &Picker, area: Rect) {
     };
     let mut block = frame_block(
         Span::styled(
-            format!(" {} ", picker.title),
+            format!(
+                " {} ",
+                brand::ellipsize(&heading, (width as usize).saturating_sub(6))
+            ),
             accent.add_modifier(Modifier::BOLD),
         ),
         accent,

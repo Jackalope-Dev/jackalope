@@ -35,6 +35,8 @@ USAGE
   jackalope ls                   list open conversations
   jackalope attach <id>          the same as --resume <id>
   jackalope stop <id>            stop the work a conversation is running
+  jackalope answer <id> [reply]  show the question a conversation is waiting
+                                 on, or answer it by text or option number
   jackalope diff <id> [--stat]   print a conversation's changes since it started
   jackalope merge <id>           merge a paused conversation's work into the
                                  project branch (-m <message>, --yes)
@@ -132,6 +134,7 @@ fn run() -> Result<(), String> {
         Command::List { json } => subcommands::list(cli.cold_start, json),
         Command::Status { json } => subcommands::status(json),
         Command::Stop { id } => subcommands::stop(cli.cold_start, &id),
+        Command::Answer { id, text } => subcommands::answer(cli.cold_start, &id, text),
         Command::Diff { id, stat } => subcommands::diff(cli.cold_start, &id, stat),
         Command::Merge { id, message, yes } => {
             subcommands::merge(cli.cold_start, &id, message, yes)

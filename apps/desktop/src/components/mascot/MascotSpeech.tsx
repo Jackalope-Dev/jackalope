@@ -29,7 +29,7 @@ export function MascotSpeech({
         aria-label={dismissLabel}
         onClick={onDismiss}
       >
-        <X size={14} aria-hidden="true" />
+        <X size={12} aria-hidden="true" />
       </button>
     </div>
   );
