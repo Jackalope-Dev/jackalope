@@ -1480,14 +1480,13 @@ fn old_task_records_do_not_opt_into_automatic_execution() {
 #[test]
 fn agent_launch_retries_transient_failures_but_not_a_missing_executable() {
     // A missing executable fails at once, without spending the retry budget.
-    let started = std::time::Instant::now();
     let error =
         super::runtime::spawn_agent(&mut command("jackalope-nonexistent-agent-binary"), "codex")
             .unwrap_err();
     assert!(error.contains("Could not launch codex"));
     assert!(
-        started.elapsed() < Duration::from_millis(120),
-        "a missing binary must not back off"
+        !error.contains("attempts"),
+        "a missing binary must not back off: {error}"
     );
 
     // A real command starts on the first attempt.
