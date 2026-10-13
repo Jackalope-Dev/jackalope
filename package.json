@@ -46,7 +46,8 @@
     "licenses:generate": "node scripts/licenses.mjs",
     "ui:dev": "pnpm --filter @jackalope/ui dev",
     "ui:build": "pnpm --filter @jackalope/ui build",
-    "ui:test": "node scripts/verification/verify-ui.mjs"
+    "ui:test": "node scripts/verification/verify-ui.mjs",
+    "worktrees": "node scripts/worktree-report.mjs"
   },
   "keywords": [
     "tauri",
