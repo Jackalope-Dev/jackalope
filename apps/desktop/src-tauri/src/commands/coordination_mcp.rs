@@ -110,6 +110,7 @@ struct PermissionPromptInput {
 }
 
 const ALLOW_ONCE: &str = "Allow once";
+const ALWAYS_PREFIX: &str = "Always allow ";
 const DENY: &str = "Deny";
 /// Shorter than the bridge timeout so Claude Code receives a denial, not a transport error.
 const PERMISSION_WAIT_SECS: u64 = 1800;
@@ -984,13 +985,28 @@ impl CoordinationTools {
             .service
             .authorized_run(&headers)
             .map_err(bridge_error)?;
-        let answer = if run.prompts.len() >= 100 {
+        let rules = super::permission_rules::path(&self.service.runtime.preferences_directory());
+        let standing = super::permission_rules::rule_for(&input.tool_name, &input.input);
+        let always = standing
+            .as_ref()
+            .map(|(_, label)| format!("{ALWAYS_PREFIX}{label} in {}", run.project_name));
+        let answer = if super::permission_rules::allows(
+            &rules,
+            &run.project_id,
+            &input.tool_name,
+            &input.input,
+        ) {
+            Some(ALLOW_ONCE.to_string())
+        } else if run.prompts.len() >= 100 {
             None
         } else {
+            let mut options = vec![ALLOW_ONCE.to_string()];
+            options.extend(always.clone());
+            options.push(DENY.into());
             let question = super::harness::AskUserInput {
                 question: permission_question(&input),
                 input_type: "choice".into(),
-                options: vec![ALLOW_ONCE.into(), DENY.into()],
+                options,
                 default_value: None,
             };
             let prompt = super::harness::ask_user_async(
@@ -1001,7 +1017,20 @@ impl CoordinationTools {
             )
             .await;
             self.service.runtime.record_prompt(&prompt);
-            prompt.answer
+            match (prompt.answer, &always, &standing) {
+                (Some(answer), Some(always), Some((rule, _))) if &answer == always => {
+                    if let Err(error) =
+                        super::permission_rules::remember(&rules, &run.project_id, rule)
+                    {
+                        self.service.runtime.update(&run.id, |r| {
+                            r.activity
+                                .push(format!("Could not save the permission rule: {error}"))
+                        });
+                    }
+                    Some(ALLOW_ONCE.to_string())
+                }
+                (answer, _, _) => answer,
+            }
         };
         let decision = permission_decision(input.input, answer.as_deref());
         self.service.runtime.update(&run.id, |r| {
