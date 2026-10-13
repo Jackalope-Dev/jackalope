@@ -101,6 +101,41 @@ struct UserResponseInput {
     id: String,
 }
 
+/// Claude Code's `--permission-prompt-tool` request for a tool call its policy does not allow.
+#[derive(Deserialize, schemars::JsonSchema)]
+struct PermissionPromptInput {
+    tool_name: String,
+    #[serde(default)]
+    input: serde_json::Value,
+}
+
+const ALLOW_ONCE: &str = "Allow once";
+const DENY: &str = "Deny";
+/// Shorter than the bridge timeout so Claude Code receives a denial, not a transport error.
+const PERMISSION_WAIT_SECS: u64 = 1800;
+
+fn permission_question(input: &PermissionPromptInput) -> String {
+    format!(
+        "Claude Code requests permission: {}\n{}",
+        input.tool_name.chars().take(200).collect::<String>(),
+        input
+            .input
+            .to_string()
+            .chars()
+            .take(3000)
+            .collect::<String>()
+    )
+}
+
+/// Claude Code reads the decision as JSON text; anything but an explicit allow denies.
+fn permission_decision(input: serde_json::Value, answer: Option<&str>) -> serde_json::Value {
+    if answer == Some(ALLOW_ONCE) {
+        serde_json::json!({"behavior":"allow","updatedInput":input})
+    } else {
+        serde_json::json!({"behavior":"deny","message":"The user denied this action in Jackalope or did not answer. Do not retry it or work around it; report what is blocked."})
+    }
+}
+
 #[derive(Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct HarnessDiscoveryInput {
@@ -925,6 +960,60 @@ impl CoordinationTools {
     }
 
     #[tool(
+        description = "Jackalope's approval handler for Claude Code tool permissions. Called by the Claude Code CLI, not by agents.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn permission_prompt(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<PermissionPromptInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let headers = request_headers(&context)?;
+        let run = self
+            .service
+            .authorized_run(&headers)
+            .map_err(bridge_error)?;
+        let answer = if run.prompts.len() >= 100 {
+            None
+        } else {
+            let question = super::harness::AskUserInput {
+                question: permission_question(&input),
+                input_type: "choice".into(),
+                options: vec![ALLOW_ONCE.into(), DENY.into()],
+                default_value: None,
+            };
+            let prompt = super::harness::ask_user_async(
+                &run.id,
+                question,
+                std::time::Duration::from_secs(PERMISSION_WAIT_SECS),
+                |prompt| self.service.runtime.record_prompt(prompt),
+            )
+            .await;
+            self.service.runtime.record_prompt(&prompt);
+            prompt.answer
+        };
+        let decision = permission_decision(input.input, answer.as_deref());
+        self.service.runtime.update(&run.id, |r| {
+            r.activity.push(format!(
+                "Claude Code permission {}",
+                if decision["behavior"] == "allow" {
+                    "allowed"
+                } else {
+                    "denied"
+                }
+            ))
+        });
+        Ok(CallToolResult::success(vec![
+            rmcp::model::ContentBlock::text(decision.to_string()),
+        ]))
+    }
+
+    #[tool(
         description = "Read the user's saved answer to a question from this attempt. Poll this after ask_user returns pending. An unanswered question is not approval.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
@@ -1243,6 +1332,26 @@ mod tests {
             assert!(!schema.to_string().contains("\"rows\""));
             assert!(schema.to_string().contains("jsonPointers"));
         }
+    }
+
+    #[test]
+    fn permission_prompt_allows_only_an_explicit_allow() {
+        let input = serde_json::json!({"command":"pnpm add x"});
+        assert_eq!(
+            permission_decision(input.clone(), Some(ALLOW_ONCE)),
+            serde_json::json!({"behavior":"allow","updatedInput":input})
+        );
+        for answer in [Some(DENY), Some("yes"), None] {
+            assert_eq!(
+                permission_decision(input.clone(), answer)["behavior"],
+                "deny"
+            );
+        }
+        let question = permission_question(&PermissionPromptInput {
+            tool_name: "Bash".into(),
+            input,
+        });
+        assert!(question.contains("Bash") && question.contains("pnpm add x"));
     }
 
     #[test]
