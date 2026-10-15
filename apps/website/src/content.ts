@@ -182,9 +182,9 @@ export const pages: SitePage[] = [
   },
   {
     path: '/download/',
-    title: 'Download Jackalope for Windows, macOS & Linux',
+    title: 'Download the Jackalope app for Windows, macOS & Linux',
     description:
-      'Find Jackalope desktop downloads and platform availability. Sign up free and confirm your email to start.',
+      'Download Jackalope, the desktop app from Jackalope Digital for running Codex, Claude Code and Gemini CLI in parallel Git worktrees. Free signup.',
   },
   {
     path: '/benchmarks/',
