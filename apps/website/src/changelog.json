@@ -1,5 +1,28 @@
 [
   {
+    "id": "free-to-sign-up-no-waitlist",
+    "date": "2026-10-26",
+    "status": "Released",
+    "title": "Free to sign up, no waitlist",
+    "description": "Anyone can create a free Jackalope account and download the app right away.",
+    "items": [
+      "Sign up at jackalope.dev, confirm your email and you land on the download page, already signed in.",
+      "With no coding agent installed, setup opens the list of supported agents and their install commands."
+    ]
+  },
+  {
+    "id": "claude-code-asks-before-it-acts",
+    "date": "2026-10-26",
+    "status": "Released",
+    "title": "Claude Code asks before it acts",
+    "description": "When Claude Code needs a command or tool its settings do not already allow, Jackalope shows you the request and waits for your answer.",
+    "items": [
+      "The request shows the exact command or tool, so you can see what you are approving. Before, those requests were refused without asking you.",
+      "Always allow, per project: approve a tool, or a command such as pnpm add, for one project so Claude Code stops asking. Commands that chain, pipe or redirect always ask.",
+      "jackalope answer <id> shows the question a conversation is waiting on and answers it by option number or text, so scripts can reply too."
+    ]
+  },
+  {
     "id": "one-name-for-every-kind-of-work",
     "date": "2026-10-12",
     "status": "In development",
