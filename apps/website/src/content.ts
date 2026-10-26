@@ -19,7 +19,7 @@ export const tour = {
   captions: '/media/launch-v4.vtt',
   published: '2026-09-09T18:00:00Z',
   transcript:
-    'Your next idea. Already in motion. Choose a theme, set up a project and its agents, and open your workspace. Describe an outcome and dispatch a task. Watch a sample browser booking flow, then inspect its check results and screenshot evidence in Jackalope. Bring Codex, Claude Code, Grok, and OpenCode together, with separate work and personal accounts. Explore directories and file dependencies in the interactive codebase map. More room to build. Get early access at jackalope.dev. This recorded frontend walkthrough uses fictional Atlas data and an original instrumental track. Task execution, account identities, and check results are sample states; browser interactions are scripted. No native agent task or Windows app-control session is launched.',
+    'Your next idea. Already in motion. Choose a theme, set up a project and its agents, and open your workspace. Describe an outcome and dispatch a task. Watch a sample browser booking flow, then inspect its check results and screenshot evidence in Jackalope. Bring Codex, Claude Code, Grok, and OpenCode together, with separate work and personal accounts. Explore directories and file dependencies in the interactive codebase map. More room to build. Sign up free at jackalope.dev. This recorded frontend walkthrough uses fictional Atlas data and an original instrumental track. Task execution, account identities, and check results are sample states; browser interactions are scripted. No native agent task or Windows app-control session is launched.',
 };
 
 export const posts: BlogPost[] = [
@@ -182,9 +182,9 @@ export const pages: SitePage[] = [
   },
   {
     path: '/download/',
-    title: 'Download Jackalope for Windows, macOS & Linux',
+    title: 'Download the Jackalope app for Windows, macOS & Linux',
     description:
-      'Find Jackalope desktop downloads and platform availability. Sign up free and confirm your email to start.',
+      'Download Jackalope, the desktop app from Jackalope Digital for running Codex, Claude Code and Gemini CLI in parallel Git worktrees. Free signup.',
   },
   {
     path: '/benchmarks/',
@@ -229,14 +229,14 @@ export const pages: SitePage[] = [
   {
     path: '/waitlist/',
     noindex: true,
-    title: 'Your account | Jackalope',
+    title: 'Confirm your email | Jackalope',
     description: 'Confirm your email and manage your Jackalope account.',
   },
   {
     path: '/access/',
     noindex: true,
-    title: 'Your early access | Jackalope',
-    description: 'Your private Jackalope downloads and invitations.',
+    title: 'Your account | Jackalope',
+    description: 'Sign in to your Jackalope account and get your download.',
   },
   {
     path: '/feedback/',

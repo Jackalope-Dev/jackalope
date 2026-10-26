@@ -190,7 +190,7 @@ export function WaitlistPreferences({ token }: { token: string }) {
           <p>
             {state === 'done'
               ? 'Your preferences will help us prioritize platforms, agents, and workflows.'
-              : 'Check your email to verify your place and unlock your referral link.'}
+              : 'Check your email and confirm it to finish creating your account.'}
           </p>
           <a href="/tour/" className="button button-primary">
             Explore the app <ArrowRight size={16} />
@@ -202,7 +202,7 @@ export function WaitlistPreferences({ token }: { token: string }) {
             onClick={async () => {
               try {
                 await navigator.clipboard.writeText(shareUrl);
-                setMessage('Waitlist link copied.');
+                setMessage('Link copied.');
               } catch {
                 setMessage('Could not copy. You can share jackalope.dev directly.');
               }
@@ -210,18 +210,15 @@ export function WaitlistPreferences({ token }: { token: string }) {
           >
             <Copy size={16} /> Copy public website link
           </Button>
-          <a className="button button-secondary" href="/waitlist/">
-            See my waitlist place <ArrowRight size={16} />
-          </a>
           <p className="signup-consent">
-            Use your personal link from your waitlist page to earn referral priority. Once accepted,
-            you get five Instant Access Passes to bring people straight in.
+            Once you confirm your email, download Jackalope and sign in to the app with the same
+            address.
           </p>
         </>
       ) : (
         <form onSubmit={submit}>
           <h3 id={`${id}-title`}>Make Jackalope fit your work.</h3>
-          <p>Optional · Pick all that apply. Your place is already saved.</p>
+          <p>Optional · Pick all that apply. Your signup is already saved.</p>
           {groups.map((group) => (
             <fieldset key={group.name} disabled={state === 'saving'}>
               <legend>{group.title}</legend>

@@ -251,8 +251,7 @@ export function JournalPage({ path }: { path: string }) {
           </p>
           {post.related && (
             <p>
-              <a href="/#newsletter">Join the early-access waitlist</a> to try Jackalope when access
-              is ready.
+              <a href="/#newsletter">Sign up free</a> to try Jackalope on your own projects.
             </p>
           )}
         </div>

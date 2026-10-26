@@ -18,8 +18,10 @@ interface Place {
   shareUrl: string;
   preferences: Preferences | null;
 }
-const shareMessage =
-  'Join me on the Jackalope waitlist. A cross-platform workspace for coding agents, with room for your projects, changes, and review.';
+const shareMessage = (approved: boolean) =>
+  approved
+    ? 'Try Jackalope with me. A free, cross-platform workspace for coding agents, with room for your projects, changes, and review.'
+    : 'Join me on the Jackalope waitlist. A cross-platform workspace for coding agents, with room for your projects, changes, and review.';
 
 export function WaitlistPage() {
   const [place, setPlace] = useState<Place | null>(null);
@@ -106,6 +108,16 @@ export function WaitlistPage() {
     await act(async () => {
       await accessRequest('waitlist/accept', { token });
       setToken('');
+      // With open signup, confirming also signs the person in, so send them straight to
+      // their download rather than a waitlist page with nothing to wait for.
+      const signedIn = await accessRequest('me').then(
+        () => true,
+        () => false,
+      );
+      if (signedIn) {
+        window.location.assign('/download/');
+        return;
+      }
       setPlace(await accessRequest<Place>('waitlist/me'));
       setNotice('Email verified. Your place is ready.');
     });
@@ -123,18 +135,20 @@ export function WaitlistPage() {
   }
   async function share() {
     if (!place) return;
+    const approved = place.status === 'approved';
+    const message = shareMessage(approved);
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Join the Jackalope waitlist',
-          text: shareMessage,
+          title: approved ? 'Try Jackalope' : 'Join the Jackalope waitlist',
+          text: message,
           url: place.shareUrl,
         });
       } catch (e) {
         if (!(e instanceof DOMException && e.name === 'AbortError'))
           setError('Sharing didn’t open. Copy your link below.');
       }
-    } else await copyText(`${shareMessage}\n\n${place.shareUrl}`, 'share');
+    } else await copyText(`${message}\n\n${place.shareUrl}`, 'share');
   }
   return (
     <main id="main" className="access-page page-width waitlist-page">
@@ -212,13 +226,10 @@ export function WaitlistPage() {
           {place.status === 'approved' ? (
             <Panel variant="plain" className="waitlist-approved access-card">
               <Check size={32} />
-              <h2>You’re in. Bring five people.</h2>
-              <p>
-                Your wait is over. Open your member space for your Instant Access Passes, setup
-                steps, and available downloads.
-              </p>
-              <a className="button button-primary" href="/access/#invitations">
-                Open my passes
+              <h2>You’re in.</h2>
+              <p>Download Jackalope, then sign in to the app with this email address.</p>
+              <a className="button button-primary" href="/download/">
+                Download Jackalope
                 <ArrowRight size={18} />
               </a>
             </Panel>
@@ -270,13 +281,15 @@ export function WaitlistPage() {
               </h2>
               <p>
                 {place.status === 'approved'
-                  ? 'Keep sharing the waitlist with as many people as you like. Your referral total keeps growing.'
+                  ? 'Know someone who juggles coding agents? Share your link with as many people as you like.'
                   : 'Invite as many people to the waitlist as you like. Every new signup that verifies their email through your link earns you one day of priority.'}
               </p>
             </div>
             <div>
               <label htmlFor="waitlist-share">
-                Share your link with others to move up the waitlist
+                {place.status === 'approved'
+                  ? 'Your share link'
+                  : 'Share your link with others to move up the waitlist'}
               </label>
               <Input
                 id="waitlist-share"
@@ -293,7 +306,11 @@ export function WaitlistPage() {
                   disabled={busy}
                 >
                   {copied === 'share' ? <Check size={18} /> : <Share2 size={18} />}
-                  {copied === 'share' ? 'Copied' : 'Share the waitlist'}
+                  {copied === 'share'
+                    ? 'Copied'
+                    : place.status === 'approved'
+                      ? 'Share Jackalope'
+                      : 'Share the waitlist'}
                 </Button>
                 <Button
                   variant="secondary"
@@ -312,20 +329,18 @@ export function WaitlistPage() {
             answers={place.preferences}
             onSaved={(preferences) => setPlace({ ...place, preferences })}
           />
-          <aside className="waitlist-next">
-            <BrandMark />
-            <div>
-              <h2>
-                {place.status === 'approved'
-                  ? 'Five passes. A head start for your people.'
-                  : 'On the other side: five passes.'}
-              </h2>
-              <p>
-                Accepted members get five Instant Access Passes. Each lets one person skip the line
-                after email verification.
-              </p>
-            </div>
-          </aside>
+          {place.status !== 'approved' && (
+            <aside className="waitlist-next">
+              <BrandMark />
+              <div>
+                <h2>On the other side: five passes.</h2>
+                <p>
+                  Accepted members get five Instant Access Passes. Each lets one person skip the
+                  line after email verification.
+                </p>
+              </div>
+            </aside>
+          )}
         </>
       ) : (
         <Panel variant="plain" className="access-card access-entry">
@@ -367,8 +382,8 @@ export function WaitlistPage() {
             <p>Waitlist status will be available when sign-in opens.</p>
           )}
           <p>
-            New here? <a href="/#newsletter">Join the waitlist</a>. Already accepted?{' '}
-            <a href="/access/">Open your member space</a>.
+            New here? <a href="/#newsletter">Sign up free</a>. Already have an account?{' '}
+            <a href="/access/">Sign in</a>.
           </p>
         </Panel>
       )}

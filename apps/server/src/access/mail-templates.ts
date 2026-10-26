@@ -18,8 +18,17 @@ export const escapeHtml = (value: string) =>
 
 export type EmailDownload = { label: string; url: string };
 
-/** `downloads` adds direct installer links to approval emails; other kinds ignore it. */
-export function accessEmail(mail: Mail, origin: string, downloads: EmailDownload[] = []) {
+/**
+ * `downloads` adds direct installer links to approval emails; other kinds ignore it.
+ * `open` words signup and referral emails for open signup, where confirming an email
+ * creates a ready account and nobody waits in line.
+ */
+export function accessEmail(
+  mail: Mail,
+  origin: string,
+  downloads: EmailDownload[] = [],
+  open = false,
+) {
   const direct = mail.kind === 'welcome' ? downloads : [];
   const total = 'total' in mail ? mail.total : 0;
   const copy = {
@@ -31,29 +40,43 @@ export function accessEmail(mail: Mail, origin: string, downloads: EmailDownload
       detail: 'A sentence or two is plenty.',
       stamp: 'Feedback / Early access',
     },
-    waitlist: {
-      subject: 'You’re on the Jackalope waitlist',
-      title: 'You’re on the list.',
-      intro:
-        'Confirm your email to see your place on the waitlist and get your referral link.' +
-        (mail.kind === 'waitlist' && mail.newsletter
-          ? ' This also confirms your product-note subscription. If you didn’t request it, don’t use this link.'
-          : ''),
-      action: 'See my place',
-      detail:
-        'Each new person who verifies their email through your link earns you one day of waitlist priority. Share it with as many people as you like.',
-      // No stamp: the intro already says what the link does, so the button
-      // stands alone and centred instead of inside a labelled panel.
-      stamp: '',
-    },
+    waitlist: open
+      ? {
+          subject: 'Confirm your email for Jackalope',
+          title: 'Almost there.',
+          intro:
+            'Confirm your email to finish creating your free Jackalope account. Then download the app and sign in with this address.' +
+            (mail.kind === 'waitlist' && mail.newsletter
+              ? ' This also confirms your product-note subscription. If you didn’t request it, don’t use this link.'
+              : ''),
+          action: 'Confirm my email',
+          detail: '',
+          stamp: '',
+        }
+      : {
+          subject: 'You’re on the Jackalope waitlist',
+          title: 'You’re on the list.',
+          intro:
+            'Confirm your email to see your place on the waitlist and get your referral link.' +
+            (mail.kind === 'waitlist' && mail.newsletter
+              ? ' This also confirms your product-note subscription. If you didn’t request it, don’t use this link.'
+              : ''),
+          action: 'See my place',
+          detail:
+            'Each new person who verifies their email through your link earns you one day of waitlist priority. Share it with as many people as you like.',
+          // No stamp: the intro already says what the link does, so the button
+          // stands alone and centred instead of inside a labelled panel.
+          stamp: '',
+        },
     welcome: {
       subject: 'You’re in. Welcome to Jackalope',
       title: 'You’re in.',
       intro:
         'Your early access is approved. Confirm your email, then download Jackalope for your computer.',
       action: 'Get Jackalope',
-      detail:
-        'You also have five Instant Access Passes to share. Each lets one person skip the waitlist after verifying their email.',
+      detail: open
+        ? ''
+        : 'You also have five Instant Access Passes to share. Each lets one person skip the waitlist after verifying their email.',
       stamp: 'Early access / Welcome',
     },
     invite: {
@@ -79,9 +102,10 @@ export function accessEmail(mail: Mail, origin: string, downloads: EmailDownload
       title: 'Thanks for sharing Jackalope.',
       intro: `${total} ${total === 1 ? 'person has' : 'people have'} joined through your link and verified their email.`,
       action: 'See my progress',
-      detail:
-        'Each verified referral earns one day of waitlist priority. Sharing is unlimited and doesn’t use your Instant Access Passes.',
-      stamp: 'Waitlist / Referrals',
+      detail: open
+        ? 'Keep sharing your link with anyone who might like Jackalope.'
+        : 'Each verified referral earns one day of waitlist priority. Sharing is unlimited and doesn’t use your Instant Access Passes.',
+      stamp: open ? 'Your account / Referrals' : 'Waitlist / Referrals',
     },
     passes_ready: {
       subject: 'Your Jackalope passes are ready',
@@ -124,7 +148,7 @@ export function accessEmail(mail: Mail, origin: string, downloads: EmailDownload
     mail.kind === 'invite' || mail.kind === 'welcome'
       ? 'This link expires in 7 days. Keep it private. You can request a new one on the website.'
       : mail.kind === 'waitlist' && mail.token
-        ? 'This link works once. Keep it private. If it expires, request another from your waitlist page.'
+        ? `This link works once. Keep it private. If it expires, request another from ${open ? 'the sign-in page' : 'your waitlist page'}.`
         : mail.kind === 'login'
           ? 'This link works once and expires in 30 minutes. Keep it private.'
           : '';

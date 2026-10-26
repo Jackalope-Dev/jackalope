@@ -753,7 +753,7 @@ export const practicalPosts: BlogPost[] = [
         paragraphs: [
           'After the trial, write a short decision: the essential requirements met, the important unknowns, and the limitations you are willing to accept. Keep the evidence beside that decision. If a feature is planned rather than available, evaluate the product without it and revisit when it ships.',
           'A terminal and editor can be a good fit for one focused session. A provider’s own app may fit an established agent workflow. A workspace for multiple agents becomes attractive when projects, accounts, parallel tasks, and review need more structure. There is no need to make every project use the same interface if their needs differ.',
-          'Jackalope is in early access. Its app tour uses sample data and helps explain the interface; it does not replace a trial on your repository. Use the compatibility page and roadmap to understand current scope, then apply the same evaluation questions to Jackalope when you receive access.',
+          'Jackalope is in early access. Its app tour uses sample data and helps explain the interface; it does not replace a trial on your repository. Use the compatibility page and roadmap to understand current scope, then apply the same evaluation questions to Jackalope.',
         ],
         links: [
           { label: 'Compare apps with current product references', href: '/compare/' },

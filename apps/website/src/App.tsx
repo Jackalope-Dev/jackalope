@@ -188,7 +188,7 @@ export function App({ path = '/' }: { path?: string }) {
                   </Menu.Item>
                   {[
                     ['Download Jackalope', '/download/'],
-                    ['Your account', '/waitlist/'],
+                    ['Your account', '/access/'],
                     ['Member access', '/access/'],
                     ['Compare workflows', '/compare/'],
                     ['Product tour', '/tour/'],

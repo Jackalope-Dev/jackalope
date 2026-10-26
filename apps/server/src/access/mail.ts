@@ -4,6 +4,7 @@ import { queueGrowthMail } from './growth-mail';
 import { type AccessMail, accessEmail, type Mail } from './mail-templates';
 import { providerJson } from './provider';
 import { stableDownloads } from './routes';
+import { openSignup } from './waitlist';
 
 export { type AccessMail, accessEmail, type WaitlistMail } from './mail-templates';
 
@@ -77,7 +78,12 @@ export async function deliverAccessMail(env: Env, request = fetch, now = Date.no
             .bind(now + 7 * 86400000, id)
             .run();
         }
-        const content = accessEmail(mail, env.ACCESS_WEB_ORIGIN, stableDownloads(env));
+        const content = accessEmail(
+          mail,
+          env.ACCESS_WEB_ORIGIN,
+          stableDownloads(env),
+          openSignup(env),
+        );
         stage = 'request';
         const response = await request('https://api.sequenzy.com/api/v1/transactional/send', {
           method: 'POST',

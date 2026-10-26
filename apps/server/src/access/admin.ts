@@ -15,7 +15,7 @@ import type { Mail } from './mail-templates';
 import { markAudienceStale } from './newsletter';
 import { installerKey, linuxChannels, macChannels, stableDownloads, storeUrl } from './routes';
 import { AccessError, approve, requestLink } from './service';
-import { waitlistRankSql } from './waitlist';
+import { openSignup, waitlistRankSql } from './waitlist';
 
 function mailConfigured(env: Env) {
   return !!(env.ACCESS_SECRET?.length >= 32 && env.SEQUENZY_API_KEY && env.ACCESS_EMAIL_FROM);
@@ -94,14 +94,17 @@ export async function accessAdmin(
                 kind: kind === 'invite' ? 'invite' : kind === 'login' ? 'login' : 'welcome',
                 token: 'preview-only',
               };
-    return new Response(accessEmail(mail, env.ACCESS_WEB_ORIGIN, stableDownloads(env)).body, {
-      headers: {
-        ...headers,
-        'content-type': 'text/html; charset=utf-8',
-        'content-security-policy':
-          "default-src 'none'; style-src 'unsafe-inline'; img-src https://jackalope.dev; base-uri 'none'; frame-ancestors 'none'",
+    return new Response(
+      accessEmail(mail, env.ACCESS_WEB_ORIGIN, stableDownloads(env), openSignup(env)).body,
+      {
+        headers: {
+          ...headers,
+          'content-type': 'text/html; charset=utf-8',
+          'content-security-policy':
+            "default-src 'none'; style-src 'unsafe-inline'; img-src https://jackalope.dev; base-uri 'none'; frame-ancestors 'none'",
+        },
       },
-    });
+    );
   }
   if (request.method === 'GET' && url.pathname === '/admin/access/broadcast-preview') {
     const draft = broadcastSchema.safeParse({

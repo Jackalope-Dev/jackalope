@@ -15,7 +15,7 @@
   "dependencies": {
     "@jackalope/brand": "workspace:*",
     "jose": "^6.2.12",
-    "zod": "4.6.5",
+    "zod": "4.6.6",
     "@jackalope/ui": "workspace:*",
     "@lopebase/adapter": "^0.2.0",
     "react": "^19.0.0",
@@ -26,7 +26,7 @@
     "@cloudflare/vitest-plugin": "1.2.6",
     "@types/node": "^26.5.1",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.0",
+    "vitest": "^4.1.12",
     "wrangler": "4.139.0",
     "esbuild": "0.28.2",
     "@types/react": "^19.0.10",

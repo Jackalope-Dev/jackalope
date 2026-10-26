@@ -19,6 +19,8 @@ interface Invitation {
 }
 interface Membership {
   email: string;
+  /** Anyone can join, so Instant Access Passes no longer admit anyone. */
+  openSignup?: boolean;
   limit: number;
   remaining: number;
   accepted: number;
@@ -203,7 +205,7 @@ export function AccessPage() {
   return (
     <main id="main" className={`access-page page-width${member ? ' access-page-member' : ''}`}>
       <header className="access-heading">
-        <h1>{member ? 'Your access' : invite ? 'You’re invited' : 'Early access'}</h1>
+        <h1>{member ? 'Your account' : invite ? 'You’re invited' : 'Sign in'}</h1>
         {member && <p>Download Jackalope and share your Instant Access Passes.</p>}
       </header>
       {error && (
@@ -247,7 +249,7 @@ export function AccessPage() {
           </div>
           <nav className="member-navigation" aria-label="Your account">
             <a href="#setup">Get started</a>
-            <a href="#invitations">Instant Access Passes</a>
+            {!member.openSignup && <a href="#invitations">Instant Access Passes</a>}
             <a href="#desktops">Connected desktops</a>
           </nav>
           <Panel variant="plain" id="setup" className="access-card access-download">
@@ -266,7 +268,7 @@ export function AccessPage() {
                   <ArrowDownToLine size={22} />
                   <div>
                     <strong>No download available yet</strong>
-                    <p>Your access is approved. We’ll email you when your download is ready.</p>
+                    <p>Your account is ready. We’ll email you when your download is ready.</p>
                     <a className="text-link" href="/download/">
                       See platform availability <ArrowRight size={16} />
                     </a>
@@ -302,214 +304,216 @@ export function AccessPage() {
               </li>
             </ol>
           </Panel>
-          <Panel
-            variant="plain"
-            id="invitations"
-            className="access-card access-invitations"
-            aria-labelledby="invite-heading"
-          >
-            <div className="access-invite-intro">
-              <div>
-                <h2 id="invite-heading" tabIndex={-1}>
-                  Bring your people.
-                </h2>
-                <p>
-                  Your {member.limit} Instant Access Passes let people skip the waitlist after email
-                  verification. Once accepted, they get five passes of their own.
-                </p>
-              </div>
-              <div className="access-places">
-                <strong>
-                  {member.remaining}
-                  <span>/{member.limit}</span>
-                </strong>
-                <small>passes available</small>
-                {!!member.accepted && (
-                  <span>
-                    {member.accepted} accepted · {member.downloaded} downloaded · {member.connected}{' '}
-                    connected
-                  </span>
-                )}
-              </div>
-            </div>
-            <AccessPasses
-              member={member}
-              onSent={(updated) =>
-                setMember((current) => (current ? { ...current, ...updated } : current))
-              }
-            />
-            <p className="access-fine">
-              Your shared pass link draws from this allowance. Email passes reserve a place for
-              seven days. <a href="/waitlist/">Your unlimited waitlist link</a> stays separate and
-              never spends a pass.
-            </p>
-            <div className="access-invite-options">
-              <div>
-                <h3>
-                  <MailIcon size={20} /> Send a pass by email
-                </h3>
-                <p>Reserve a place for seven days. If it isn’t accepted, you can use it again.</p>
-                <form onSubmit={sendInvites}>
-                  <label htmlFor="invite-emails">Email addresses</label>
-                  <Textarea
-                    id="invite-emails"
-                    name="emails"
-                    rows={3}
-                    required
-                    maxLength={1300}
-                    placeholder={'friend@example.com\nanother@example.com'}
-                    disabled={busy || member.remaining === 0}
-                    aria-describedby="invite-emails-help"
-                  />
-                  <small id="invite-emails-help">
-                    Up to five addresses, separated by commas or new lines.
-                  </small>
-                  <Button
-                    variant="primary"
-                    className="button button-primary button-download"
-                    disabled={busy || member.remaining === 0}
-                    type="submit"
-                  >
-                    Send passes <ArrowRight size={17} />
-                  </Button>
-                </form>
-              </div>
-              <div>
-                <h3>
-                  <Copy size={18} /> Share a pass link
-                </h3>
-                <p>
-                  Places are claimed when recipients verify their email. This link works while you
-                  have passes available.
-                </p>
-                <label htmlFor="share-link">Your pass link</label>
-                <Input
-                  id="share-link"
-                  readOnly
-                  value={member.shareUrl}
-                  onFocus={(event) => event.currentTarget.select()}
-                />
-                <div className="access-copy-actions">
-                  <CopyButton
-                    variant="primary"
-                    className="button button-primary"
-                    text={member.shareUrl}
-                    label="Copy pass link"
-                    disabled={busy || member.remaining === 0}
-                  />
-                  <CopyButton
-                    variant="secondary"
-                    className="button button-secondary"
-                    text={`${invitationMessage}\n\n${member.shareUrl}`}
-                    label="Copy message"
-                    disabled={busy || member.remaining === 0}
-                  />
+          {!member.openSignup && (
+            <Panel
+              variant="plain"
+              id="invitations"
+              className="access-card access-invitations"
+              aria-labelledby="invite-heading"
+            >
+              <div className="access-invite-intro">
+                <div>
+                  <h2 id="invite-heading" tabIndex={-1}>
+                    Bring your people.
+                  </h2>
+                  <p>
+                    Your {member.limit} Instant Access Passes let people skip the waitlist after
+                    email verification. Once accepted, they get five passes of their own.
+                  </p>
                 </div>
-                <div className="access-share-actions">
-                  {typeof navigator.share === 'function' && (
+                <div className="access-places">
+                  <strong>
+                    {member.remaining}
+                    <span>/{member.limit}</span>
+                  </strong>
+                  <small>passes available</small>
+                  {!!member.accepted && (
+                    <span>
+                      {member.accepted} accepted · {member.downloaded} downloaded ·{' '}
+                      {member.connected} connected
+                    </span>
+                  )}
+                </div>
+              </div>
+              <AccessPasses
+                member={member}
+                onSent={(updated) =>
+                  setMember((current) => (current ? { ...current, ...updated } : current))
+                }
+              />
+              <p className="access-fine">
+                Your shared pass link draws from this allowance. Email passes reserve a place for
+                seven days. <a href="/waitlist/">Your unlimited waitlist link</a> stays separate and
+                never spends a pass.
+              </p>
+              <div className="access-invite-options">
+                <div>
+                  <h3>
+                    <MailIcon size={20} /> Send a pass by email
+                  </h3>
+                  <p>Reserve a place for seven days. If it isn’t accepted, you can use it again.</p>
+                  <form onSubmit={sendInvites}>
+                    <label htmlFor="invite-emails">Email addresses</label>
+                    <Textarea
+                      id="invite-emails"
+                      name="emails"
+                      rows={3}
+                      required
+                      maxLength={1300}
+                      placeholder={'friend@example.com\nanother@example.com'}
+                      disabled={busy || member.remaining === 0}
+                      aria-describedby="invite-emails-help"
+                    />
+                    <small id="invite-emails-help">
+                      Up to five addresses, separated by commas or new lines.
+                    </small>
+                    <Button
+                      variant="primary"
+                      className="button button-primary button-download"
+                      disabled={busy || member.remaining === 0}
+                      type="submit"
+                    >
+                      Send passes <ArrowRight size={17} />
+                    </Button>
+                  </form>
+                </div>
+                <div>
+                  <h3>
+                    <Copy size={18} /> Share a pass link
+                  </h3>
+                  <p>
+                    Places are claimed when recipients verify their email. This link works while you
+                    have passes available.
+                  </p>
+                  <label htmlFor="share-link">Your pass link</label>
+                  <Input
+                    id="share-link"
+                    readOnly
+                    value={member.shareUrl}
+                    onFocus={(event) => event.currentTarget.select()}
+                  />
+                  <div className="access-copy-actions">
+                    <CopyButton
+                      variant="primary"
+                      className="button button-primary"
+                      text={member.shareUrl}
+                      label="Copy pass link"
+                      disabled={busy || member.remaining === 0}
+                    />
+                    <CopyButton
+                      variant="secondary"
+                      className="button button-secondary"
+                      text={`${invitationMessage}\n\n${member.shareUrl}`}
+                      label="Copy message"
+                      disabled={busy || member.remaining === 0}
+                    />
+                  </div>
+                  <div className="access-share-actions">
+                    {typeof navigator.share === 'function' && (
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        disabled={busy || member.remaining === 0}
+                        onClick={() => void share('native')}
+                      >
+                        <Share2 size={15} /> Share
+                      </Button>
+                    )}
+                    <a
+                      className="ui-button"
+                      data-variant="ghost"
+                      data-size="md"
+                      aria-disabled={member.remaining === 0}
+                      tabIndex={member.remaining ? undefined : -1}
+                      onClick={(event) => {
+                        if (!member.remaining) event.preventDefault();
+                      }}
+                      href={`mailto:?subject=${encodeURIComponent('Try Jackalope early access')}&body=${encodeURIComponent(`${invitationMessage}\n\n${member.shareUrl}`)}`}
+                    >
+                      Email
+                    </a>
                     <Button
                       variant="ghost"
                       type="button"
-                      disabled={busy || member.remaining === 0}
-                      onClick={() => void share('native')}
+                      disabled={member.remaining === 0}
+                      onClick={() => void share('x')}
                     >
-                      <Share2 size={15} /> Share
+                      X (Twitter)
                     </Button>
-                  )}
-                  <a
-                    className="ui-button"
-                    data-variant="ghost"
-                    data-size="md"
-                    aria-disabled={member.remaining === 0}
-                    tabIndex={member.remaining ? undefined : -1}
-                    onClick={(event) => {
-                      if (!member.remaining) event.preventDefault();
-                    }}
-                    href={`mailto:?subject=${encodeURIComponent('Try Jackalope early access')}&body=${encodeURIComponent(`${invitationMessage}\n\n${member.shareUrl}`)}`}
-                  >
-                    Email
-                  </a>
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    disabled={member.remaining === 0}
-                    onClick={() => void share('x')}
-                  >
-                    X (Twitter)
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    disabled={member.remaining === 0}
-                    onClick={() => void share('linkedin')}
-                  >
-                    LinkedIn
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    disabled={member.remaining === 0}
-                    onClick={() => void share('bluesky')}
-                  >
-                    Bluesky
-                  </Button>
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      disabled={member.remaining === 0}
+                      onClick={() => void share('linkedin')}
+                    >
+                      LinkedIn
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      disabled={member.remaining === 0}
+                      onClick={() => void share('bluesky')}
+                    >
+                      Bluesky
+                    </Button>
+                  </div>
+                  <small>
+                    You’ll see who accepts, requests a download, and connects a desktop, not their
+                    projects or task activity.
+                  </small>
                 </div>
-                <small>
-                  You’ll see who accepts, requests a download, and connects a desktop, not their
-                  projects or task activity.
-                </small>
               </div>
-            </div>
-            {member.invites.length > 0 && (
-              <div className="access-invite-list">
-                <h3>Your people</h3>
-                <ul>
-                  {member.invites.map((item) => (
-                    <li key={item.id}>
-                      <div>
-                        <strong>{item.email}</strong>
-                        <small>
-                          {item.connected_at
-                            ? 'Connected Jackalope'
-                            : item.downloaded_at
-                              ? 'Opened the download'
-                              : item.status === 'accepted'
-                                ? 'Pass claimed'
-                                : `Reserved until ${new Date(item.expires_at).toLocaleDateString()}`}
-                        </small>
-                      </div>
-                      {item.status === 'accepted' ? (
-                        <span
-                          className={`access-accepted${item.connected_at ? ' is-connected' : ''}`}
-                        >
-                          <Check size={16} /> {item.connected_at ? 'Connected' : 'Accepted'}
-                        </span>
-                      ) : (
-                        <div className="access-invite-actions">
-                          <Button
-                            variant="ghost"
-                            type="button"
-                            disabled={busy}
-                            onClick={() => change(item.id, 'resend')}
-                          >
-                            Resend
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            type="button"
-                            disabled={busy}
-                            onClick={() => change(item.id, 'revoke')}
-                          >
-                            Withdraw
-                          </Button>
+              {member.invites.length > 0 && (
+                <div className="access-invite-list">
+                  <h3>Your people</h3>
+                  <ul>
+                    {member.invites.map((item) => (
+                      <li key={item.id}>
+                        <div>
+                          <strong>{item.email}</strong>
+                          <small>
+                            {item.connected_at
+                              ? 'Connected Jackalope'
+                              : item.downloaded_at
+                                ? 'Opened the download'
+                                : item.status === 'accepted'
+                                  ? 'Pass claimed'
+                                  : `Reserved until ${new Date(item.expires_at).toLocaleDateString()}`}
+                          </small>
                         </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </Panel>
+                        {item.status === 'accepted' ? (
+                          <span
+                            className={`access-accepted${item.connected_at ? ' is-connected' : ''}`}
+                          >
+                            <Check size={16} /> {item.connected_at ? 'Connected' : 'Accepted'}
+                          </span>
+                        ) : (
+                          <div className="access-invite-actions">
+                            <Button
+                              variant="ghost"
+                              type="button"
+                              disabled={busy}
+                              onClick={() => change(item.id, 'resend')}
+                            >
+                              Resend
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              type="button"
+                              disabled={busy}
+                              onClick={() => change(item.id, 'revoke')}
+                            >
+                              Withdraw
+                            </Button>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </Panel>
+          )}
           <div id="desktops">
             <ConnectedDesktops />
           </div>
@@ -519,7 +523,7 @@ export function AccessPage() {
           {token ? (
             <>
               <h2>Confirm sign-in</h2>
-              <p>Verify your email to access downloads and passes. Keep this link private.</p>
+              <p>Verify your email to sign in and get your download. Keep this link private.</p>
               <p className="access-fine">
                 By continuing, you confirm you’re 18 or older and agree to the{' '}
                 <a href="/terms/">Terms</a>. See our <a href="/privacy/">Privacy Policy</a>.
@@ -554,8 +558,8 @@ export function AccessPage() {
             <>
               <h2>Check your email</h2>
               <p>
-                If this address has access or a valid invitation, you’ll receive a sign-in link.
-                Check your inbox and spam folder.
+                If this address has a Jackalope account, you’ll receive a sign-in link. Check your
+                inbox and spam folder.
               </p>
               <Button
                 variant="ghost"
@@ -594,12 +598,12 @@ export function AccessPage() {
               <p>
                 {invite
                   ? 'Enter your email. Follow the link we send to claim your pass while a place is available.'
-                  : 'Enter your approved or invited email address to receive a sign-in link.'}
+                  : 'Enter the email address you signed up with to receive a sign-in link.'}
               </p>
               {invite && available === false && (
                 <p className="access-alert">
                   All passes on this link are claimed or reserved right now. You can still sign in
-                  if you already have access, or <a href="/#newsletter">join the waitlist</a>.
+                  if you already have an account, or <a href="/#newsletter">sign up free</a>.
                 </p>
               )}
               <form onSubmit={signIn}>

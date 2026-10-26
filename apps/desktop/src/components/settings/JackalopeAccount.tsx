@@ -57,6 +57,7 @@ export function JackalopeAccount({
   onStatus?: (status: AccountStatus) => void;
 }) {
   const [account, setAccount] = useState<AccountStatus | null>(null);
+  const referrals = useReferralStore((state) => state.referrals);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
@@ -153,8 +154,8 @@ export function JackalopeAccount({
           <p className="break-all font-medium">{account.email}</p>
           <p role="status" className="settings-row-description">
             {account.state === 'connected'
-              ? 'Early access approved'
-              : 'Access could not be checked. Previously verified beta access lasts up to 72 hours offline, or until the connection expires. Retry when online.'}
+              ? 'Signed in'
+              : 'Access could not be checked. Previously verified access lasts up to 72 hours offline, or until the connection expires. Retry when online.'}
           </p>
         </div>
       )}
@@ -242,7 +243,11 @@ export function JackalopeAccount({
       )}
       {connected && (
         <>
-          {onInvitations && <Button onClick={onInvitations}>View Instant Access Passes</Button>}
+          {onInvitations && referrals && (
+            <Button onClick={onInvitations}>
+              {referrals.openSignup ? 'Invite friends' : 'View Instant Access Passes'}
+            </Button>
+          )}
           <Button
             variant="outline"
             disabled={busy}

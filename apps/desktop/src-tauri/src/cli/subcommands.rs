@@ -128,6 +128,48 @@ pub fn stop(preference: Option<ColdStart>, prefix: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Shows the question a conversation is waiting on, or answers it. A number
+/// picks that option, so `jackalope answer ab 1` approves without retyping it.
+pub fn answer(
+    preference: Option<ColdStart>,
+    prefix: &str,
+    text: Option<String>,
+) -> Result<(), String> {
+    let mut connection = host::ensure(preference)?;
+    let id = resolve(&connection.sessions()?, prefix)?;
+    let view = connection.session(&id)?;
+    let question = view
+        .questions
+        .first()
+        .cloned()
+        .ok_or_else(|| format!("Nothing is waiting on you in {}.", view.title))?;
+    let Some(text) = text else {
+        println!("{}", question.question);
+        for (index, option) in question.options.iter().enumerate() {
+            println!("  {}. {option}", index + 1);
+        }
+        println!(
+            "Reply with 'jackalope answer {} <number or text>'.",
+            short(&id)
+        );
+        return Ok(());
+    };
+    let reply = text
+        .trim()
+        .parse::<usize>()
+        .ok()
+        .and_then(|number| question.options.get(number.checked_sub(1)?))
+        .cloned()
+        .unwrap_or(text);
+    connection.call(&Request::Answer {
+        run_id: question.run_id,
+        prompt_id: question.id,
+        text: reply.clone(),
+    })?;
+    println!("Answered: {reply}");
+    Ok(())
+}
+
 /// Prints what a conversation changed: its worktree against the commit where it
 /// left the project's branch, uncommitted edits included, or the uncommitted
 /// edits of a conversation that works in the project folder itself.

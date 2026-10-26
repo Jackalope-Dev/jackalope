@@ -497,6 +497,24 @@ it('routes acceptance emails through download confirmation while preserving acco
   expect(passes.body).toContain('/access/#invitations');
 });
 
+it('words signup and referral emails without a waitlist when signup is open', () => {
+  const signup = { kind: 'waitlist', to: 'reader@example.com', token: 'a'.repeat(64) } as const;
+  const waiting = accessEmail(signup, bindings.ACCESS_WEB_ORIGIN);
+  expect(waiting.subject).toContain('waitlist');
+  const open = accessEmail(signup, bindings.ACCESS_WEB_ORIGIN, [], true);
+  expect(open.subject).toBe('Confirm your email for Jackalope');
+  expect(open.body).toContain(`/waitlist/#token=${signup.token}`);
+  const referral = accessEmail(
+    { kind: 'referral', to: 'reader@example.com', total: 2 },
+    bindings.ACCESS_WEB_ORIGIN,
+    [],
+    true,
+  );
+  for (const content of [open, referral])
+    expect(content.text.toLowerCase()).not.toContain('waitlist priority');
+  expect(open.text.toLowerCase()).not.toContain('waitlist page');
+});
+
 it('queues branded transactional mail once with encrypted tokens and retries provider failures', async () => {
   const person = await member('person@example.com');
   await approve(bindings, person.id);

@@ -1,6 +1,6 @@
 [package]
 name = "jackalope-desktop"
-version = "0.1.21"
+version = "0.1.24"
 description = "Jackalope - Ultra-performant desktop shell and harness for agentic workflows"
 authors = ["Jackalope Contributors"]
 edition = "2021"
@@ -33,7 +33,9 @@ pkg-config = "0.3"
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
-tauri-plugin-updater = "2"
+# No `zip` feature: it only unpacks Tauri v1 bundles (.msi.zip, .AppImage.tar.gz),
+# we ship v2 artifacts, and it pulls zip 4.x (RUSTSEC-2026-0367/0368/0369).
+tauri-plugin-updater = { version = "2", default-features = false, features = ["rustls-tls", "system-proxy"] }
 tauri-plugin-autostart = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

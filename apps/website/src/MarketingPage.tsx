@@ -177,8 +177,8 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
                   <p>
                     Explore <a href="/agents/">supported agents</a>, learn about{' '}
                     <a href="/git-worktrees-for-ai-agents/">Git worktrees</a>, or read the{' '}
-                    <a href="/guides/review-ai-generated-code/">code review guide</a>. Join the
-                    waitlist to hear when early access is ready.
+                    <a href="/guides/review-ai-generated-code/">code review guide</a>. When you’re
+                    ready, sign up free and download the app.
                   </p>
                   <div className="acquisition-actions">
                     <WaitlistButton />
