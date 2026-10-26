@@ -215,7 +215,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Current agent compatibility',
         paragraphs: [
-          'These are implemented capabilities. Jackalope is in early access; validate your installed CLI version, sign-in, and required tool flow when you receive access.',
+          'These are implemented capabilities. Jackalope is in early access; validate your installed CLI version, sign-in, and required tool flow on your machine.',
         ],
         table: {
           columns: ['Agent', 'Project tools', 'Account behavior'],
@@ -383,7 +383,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Can Gemini choose agents or answer Ask Jackalope?',
         paragraphs: [
           'Gemini CLI currently runs as a worker. It does not supply the tool-free interface used for routing coordination or Ask Jackalope. Use an eligible coordinator or local decision rules, and assign Gemini to the supported work you want it to perform.',
-          'Jackalope is prerelease. CLI discovery and automated fixtures do not prove that your installed account, permissions, and operating system have passed a real task. Check platform availability on Download and test a focused change when you receive access.',
+          'Jackalope is prerelease. CLI discovery and automated fixtures do not prove that your installed account, permissions, and operating system have passed a real task. Check platform availability on Download, then test a focused change.',
         ],
         links: [{ label: 'Agent compatibility', href: '/agents/' }],
       },

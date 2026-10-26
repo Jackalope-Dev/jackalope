@@ -227,7 +227,7 @@ export const growthPages: MarketingPage[] = [
         title: 'Review the combination, not just each reply.',
         paragraphs: [
           'Two isolated tasks can still make incompatible assumptions. Jackalope prepares a combined patch for review and rechecks the source and target before integration. The final decision stays explicit.',
-          'The interface tour uses sample project data. Try this same workflow on a disposable repository when you receive early access.',
+          'The interface tour uses sample project data. Then try the same workflow on a disposable repository.',
         ],
       },
       {
@@ -353,7 +353,7 @@ export const growthPost = {
     {
       title: 'Your setup helps set the direction.',
       paragraphs: [
-        'Joining starts with an email address. Then, if you want, tell us the operating systems and agents you use and which workflows need the most help. Select more than one, or skip the questions entirely. Your waitlist place does not depend on your answers.',
+        'Joining starts with an email address. Then, if you want, tell us the operating systems and agents you use and which workflows need the most help. Select more than one, or skip the questions entirely. Your account does not depend on your answers.',
         'We use those answers to guide product planning. Choosing an agent or workflow is an expression of interest, not a promise that it is supported.',
       ],
     },

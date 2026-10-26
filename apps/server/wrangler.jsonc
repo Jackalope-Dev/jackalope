@@ -184,7 +184,7 @@
         "FEEDBACK_EMAIL_FROM": "",
         "FEEDBACK_EMAIL_TO": "contact@jackalope.dev",
         "EARLY_ACCESS_ENABLED": "false",
-        "OPEN_SIGNUP": "false",
+        "OPEN_SIGNUP": "true",
         "ACCESS_WEB_ORIGIN": "https://jackalope.dev",
         "ACCESS_EMAIL_FROM": "",
         "ACCESS_EMAIL_REPLY_TO": "contact@jackalope.dev",

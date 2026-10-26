@@ -112,10 +112,11 @@ export function CompanionSources() {
         ]
       : [],
   );
-  const openSignup = useReferralStore((state) => !!state.referrals?.openSignup);
+  // Passes only matter once the service confirms signup is still invitation-based.
+  const passes = useReferralStore((state) => !!state.referrals && !state.referrals.openSignup);
   useCompanionNotices(
     'referrals',
-    referralAccount && !openSignup
+    referralAccount && passes
       ? [
           {
             id: `referrals:${referralAccount}`,

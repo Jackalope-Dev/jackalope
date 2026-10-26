@@ -321,10 +321,10 @@ export function TourPage({ dark }: { dark: boolean }) {
             </p>
           </Disclosure>
           <Disclosure>
-            <DisclosureSummary>What happens after I join the waitlist?</DisclosureSummary>
+            <DisclosureSummary>What happens after I sign up?</DisclosureSummary>
             <p>
-              Verify your email to confirm your place. We’ll email you when access is ready. Joining
-              is free, and a waitlist place does not yet grant desktop access.
+              Confirm your email, download Jackalope, and sign in to the app with the same address.
+              Signing up is free.
             </p>
           </Disclosure>
         </div>

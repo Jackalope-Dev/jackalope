@@ -34,7 +34,7 @@ export function InvitationsButton({
       document.removeEventListener('visibilitychange', refresh);
     };
   }, [load, visible]);
-  if (!visible || referrals?.openSignup) return null;
+  if (!visible || !referrals || referrals.openSignup) return null;
   if (compact)
     return (
       <button

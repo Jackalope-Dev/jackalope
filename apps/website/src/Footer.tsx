@@ -45,7 +45,7 @@ const groups: Array<{ title: string; links: Array<[string, string, ReactNode?]> 
   {
     title: 'Connect',
     links: [
-      ['Your waitlist place', '/waitlist/'],
+      ['Your account', '/access/'],
       ['Your access & passes', '/access/'],
       ['Questions', '/#questions'],
       ['Join our Discord', DISCORD_URL, <DiscordIcon key="discord" />],

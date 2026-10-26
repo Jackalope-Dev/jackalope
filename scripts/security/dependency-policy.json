@@ -35,6 +35,42 @@
       "version": "0.9.0",
       "advisory": "RUSTSEC-2025-0098",
       "reason": "Transitive Tauri URL-pattern Unicode tables; track upstream replacement."
+    },
+    {
+      "package": "zbus_names",
+      "version": "3.0.0",
+      "advisory": "RUSTSEC-2026-0371",
+      "reason": "Merged into zbus 6; locked via secret-service 4 -> zbus 4 and not built. Track upstream zbus 6 adoption."
+    },
+    {
+      "package": "zbus_names",
+      "version": "4.3.4",
+      "advisory": "RUSTSEC-2026-0371",
+      "reason": "Merged into zbus 6; zbus 5 is still required by notify-rust and tauri-plugin-opener. Track upstream zbus 6 adoption."
+    },
+    {
+      "package": "zvariant",
+      "version": "4.2.0",
+      "advisory": "RUSTSEC-2026-0370",
+      "reason": "Merged into zbus 6; locked via secret-service 4 -> zbus 4 and not built. Track upstream zbus 6 adoption."
+    },
+    {
+      "package": "zvariant",
+      "version": "5.15.0",
+      "advisory": "RUSTSEC-2026-0370",
+      "reason": "Merged into zbus 6; zbus 5 is still required by notify-rust and tauri-plugin-opener. Track upstream zbus 6 adoption."
+    },
+    {
+      "package": "zvariant_derive",
+      "version": "4.2.0",
+      "advisory": "RUSTSEC-2026-0372",
+      "reason": "Merged into zbus 6; locked via secret-service 4 -> zbus 4 and not built. Track upstream zbus 6 adoption."
+    },
+    {
+      "package": "zvariant_derive",
+      "version": "5.15.0",
+      "advisory": "RUSTSEC-2026-0372",
+      "reason": "Merged into zbus 6; zbus 5 is still required by notify-rust and tauri-plugin-opener. Track upstream zbus 6 adoption."
     }
   ]
 }

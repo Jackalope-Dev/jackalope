@@ -24,6 +24,7 @@ import {
 import { SIGNUP_ACTION, verifyTurnstile } from './turnstile';
 import {
   acceptWaitlistToken,
+  openSignup,
   openSignupSession,
   requestWaitlistLink,
   saveWaitlistPreferences,
@@ -156,7 +157,7 @@ export async function accessRoutes(
     const url = new URL(request.url);
     if (url.search) throw new AccessError(400, 'query_not_allowed');
     if (request.method === 'GET' && url.pathname === '/v1/access/status')
-      return json({ enabled: env.EARLY_ACCESS_ENABLED === 'true' });
+      return json({ enabled: env.EARLY_ACCESS_ENABLED === 'true', openSignup: openSignup(env) });
     if (
       env.EARLY_ACCESS_ENABLED !== 'true' ||
       !env.ACCESS_SECRET ||
@@ -330,6 +331,7 @@ export async function accessRoutes(
       return json({
         email: member.email,
         ...(await invitations(env, member)),
+        openSignup: openSignup(env),
         macos: builds(macChannels(env), macDownloads),
         linux: builds(linuxChannels(env), linuxDownloads),
         download: store
