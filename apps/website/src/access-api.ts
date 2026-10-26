@@ -39,7 +39,7 @@ export function accessMessage(error: unknown) {
     if (error.code === 'verification_failed')
       return 'We couldn’t confirm this request came from a person. Complete the check and try again.';
     if (error.code === 'invitation_full')
-      return 'This invitation has no places available. Request another invitation or join the waitlist.';
+      return 'This invitation has no places available. Request another invitation or sign up free.';
     if (error.code === 'link_expired')
       return 'This link has expired or has already been used. Request a fresh link below.';
     if (error.code === 'invitation_not_resendable')

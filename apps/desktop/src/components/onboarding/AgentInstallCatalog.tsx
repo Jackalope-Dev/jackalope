@@ -13,17 +13,24 @@ export function CommandCopy({ command }: { command: string }) {
   );
 }
 
-/** Supported agents that are not installed yet, with docs and install commands. */
+/**
+ * Supported agents that are not installed yet, with docs and install commands.
+ * `first` means nothing is installed, so the catalog starts open as the next step.
+ */
 export function AgentInstallCatalog({
   agents,
+  first = false,
 }: {
   agents: readonly (typeof builtinAgents)[number][];
+  first?: boolean;
 }) {
   if (!agents.length) return null;
   return (
-    <Disclosure className="onboarding-install-catalog">
+    <Disclosure className="onboarding-install-catalog" open={first}>
       <DisclosureSummary>
-        Install other supported agents ({agents.length} available)
+        {first
+          ? 'Install a supported agent'
+          : `Install other supported agents (${agents.length} available)`}
       </DisclosureSummary>
       <div className="onboarding-catalog-grid">
         {agents.map((agent) => (

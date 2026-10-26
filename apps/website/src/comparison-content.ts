@@ -426,7 +426,7 @@ const comparisons: Comparison[] = [
       {
         question: 'Should I switch every project at once?',
         answer:
-          'Start with one small project when you receive early access. Compare follow-up effort, review clarity, and account behavior before deciding whether to move more work.',
+          'Start with one small project. Compare follow-up effort, review clarity, and account behavior before deciding whether to move more work.',
       },
     ],
   },
@@ -629,7 +629,7 @@ const comparisons: Comparison[] = [
         title: 'Choose by the work around the agent',
         paragraphs: [
           'Our assessment: evaluate Emdash when a broad agent catalog, issue intake, or remote development is central to your workflow. Evaluate Jackalope when your priority is carrying context and evidence through a local task lifecycle, with dependent work and combined review.',
-          'Use the same small UI change in both trials. Capture a browser check, request a follow-up, and review the final patch. Jackalope is in early access; join the waitlist to try it once approved. Model access remains with your provider, and public Jackalope pricing has not been announced.',
+          'Use the same small UI change in both trials. Capture a browser check, request a follow-up, and review the final patch. Jackalope is in early access, and signing up is free. Model access remains with your provider, and public Jackalope pricing has not been announced.',
         ],
       },
     ],
@@ -863,7 +863,7 @@ const comparisons: Comparison[] = [
       {
         question: 'Can I evaluate Jackalope for a solo workflow?',
         answer:
-          'Yes, through early access when invited. Start with a familiar local project and compare task history, context, and review against your existing process.',
+          'Yes. Sign up free, then start with a familiar local project and compare task history, context, and review against your existing process.',
       },
     ],
   },

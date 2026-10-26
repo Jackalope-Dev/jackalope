@@ -450,7 +450,7 @@ export function OnboardingFlow({
                         <p className="task-muted" role="status">
                           {execution.discovering
                             ? 'Looking for installed agents…'
-                            : 'No agents found yet. Connect an API key below, or install and sign in to an agent and re-scan.'}
+                            : 'No agents found yet. Install one below and sign in to it, then re-scan. You can also connect an API key.'}
                         </p>
                       )}
                     </fieldset>
@@ -458,7 +458,10 @@ export function OnboardingFlow({
                       <ProviderConnections setup />
                     )}
                     {localAi}
-                    <AgentInstallCatalog agents={installableAgents} />
+                    <AgentInstallCatalog
+                      agents={installableAgents}
+                      first={!detectedAgents.length && !execution.discovering}
+                    />
                   </>
                 );
               })()}

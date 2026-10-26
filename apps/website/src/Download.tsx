@@ -179,9 +179,9 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
         <section className="download-confirmation" aria-labelledby="download-confirm-title">
           <div>
             <h2 id="download-confirm-title" tabIndex={-1} ref={confirmation}>
-              Confirm your early access.
+              Confirm your email.
             </h2>
-            <p>Verify your email to sign in or claim your friend’s pass.</p>
+            <p>Verify your email to finish signing in.</p>
             <p className="download-terms">
               By continuing, you confirm you’re 18 or older and agree to the{' '}
               <a href="/terms/">Terms</a>. See our <a href="/privacy/">Privacy Policy</a>.
@@ -267,13 +267,12 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
                 : 'Sign up with your email, confirm it, then sign in to the app with the same address.'}
             </p>
             {email && !token ? (
-              <a className="text-link" href="/access/#invitations">
-                Your account & friend passes <ArrowRight size={15} />
+              <a className="text-link" href="/access/">
+                Your account <ArrowRight size={15} />
               </a>
             ) : (
               <p className="download-pass-note">
-                Have a friend pass? Open your invite link or{' '}
-                <a href="/access/">sign in with your invited email</a>.
+                Already have an account? <a href="/access/">Sign in</a>.
               </p>
             )}
           </div>

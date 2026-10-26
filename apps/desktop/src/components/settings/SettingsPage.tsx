@@ -166,8 +166,8 @@ export function SettingsPage({
       {
         System: 'device computer operating system architecture git',
         'Jackalope account':
-          'connect sign in email membership early access invitations disconnect device',
-        Invitations: 'invite referral share link email accepted connected early access',
+          'connect sign in email membership account invitations disconnect device',
+        Invitations: 'invite referral share link email accepted connected',
         Diagnostics: 'activity log routing events errors codebase',
         General:
           'window close exit system tray background quit minimize launch login startup guided setup onboarding notifications system quiet test',
