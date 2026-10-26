@@ -32,6 +32,17 @@ const run = (cmd, args, options = {}) => {
     throw new Error(`${cmd} failed during release preparation`);
   }
 };
+/** Gatekeeper checks look up the notarization ticket at Apple, which drops CI connections. */
+const runWithRetry = async (cmd, args) => {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return run(cmd, args);
+    } catch (error) {
+      if (attempt === 4) throw error;
+      await new Promise((done) => setTimeout(done, attempt * 20_000));
+    }
+  }
+};
 const capture = (cmd, args) => run(cmd, args, { stdio: 'pipe', encoding: 'utf8' }).trim();
 const source = capture('git', ['rev-parse', 'HEAD']);
 const dirty = () => Boolean(capture('git', ['status', '--porcelain', '--untracked-files=normal']));
@@ -186,8 +197,8 @@ try {
         !info.stderr.includes(`Authority=${process.env.APPLE_SIGNING_IDENTITY}`)
       )
         throw new Error('Signed app does not match the expected Apple publisher');
-      run('spctl', ['--assess', '--type', 'execute', '--verbose=2', app]);
-      run('xcrun', ['stapler', 'validate', app]);
+      await runWithRetry('spctl', ['--assess', '--type', 'execute', '--verbose=2', app]);
+      await runWithRetry('xcrun', ['stapler', 'validate', app]);
     }
   }
   for (const asset of cloudAssets(target, v, mode)) {
