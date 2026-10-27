@@ -56,6 +56,14 @@ fn models() -> Vec<LocalModel> {
             description:
                 "A coding specialist for high-memory machines. GPU memory matters for speed.",
         },
+        LocalModel {
+            id: "flint:40b",
+            name: "Recursive Flint · 40B",
+            download_bytes: 23_000_000_000,
+            recommended_memory_gb: 48,
+            description:
+                "A fast coding-agent specialist for high-memory machines. Needs a recent Ollama.",
+        },
     ]
 }
 
@@ -198,7 +206,7 @@ pub async fn local_ai_inspect() -> Result<Value, String> {
     Ok(
         json!({"hardware":hardware,"models":models(),"installedModels":installed,"ollamaOnline":found.is_ok(),
         "opencodeInstalled":tasks::executable("opencode").is_ok(),"canPrepareRunner":super::managed_runtime::supported(),"canInstall":cfg!(windows) && winget().is_ok(),
-        "runtimeDiskBytes":4_000_000_000u64,"catalogCheckedAt":"2026-09-10","endpoint":ENDPOINT}),
+        "runtimeDiskBytes":4_000_000_000u64,"catalogCheckedAt":"2026-10-27","endpoint":ENDPOINT}),
     )
 }
 
@@ -247,7 +255,14 @@ pub async fn local_ai_install(
 struct DownloadProgress(BTreeMap<String, (u64, u64)>);
 impl DownloadProgress {
     fn consume(&mut self, value: &Value) -> Result<Progress, String> {
-        if value.get("error").is_some() {
+        if let Some(error) = value.get("error") {
+            // Newer library models carry a minimum Ollama version and fail before any layer downloads.
+            if error
+                .as_str()
+                .is_some_and(|e| e.contains("requires ollama version"))
+            {
+                return Err("This model needs a newer Ollama. Update Ollama, then retry.".into());
+            }
             return Err("Ollama could not download the model. Check its connection and free disk space, then retry.".into());
         }
         if let (Some(digest), Some(total)) = (value["digest"].as_str(), value["total"].as_u64()) {

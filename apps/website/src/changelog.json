@@ -1,5 +1,16 @@
 [
   {
+    "id": "recursive-flint-for-local-agents",
+    "date": "2026-10-27",
+    "status": "In development",
+    "title": "Recursive Flint for local agents",
+    "description": "Local agent setup now offers Recursive Flint, a fast open coding model for computers with 48 GB of memory or more.",
+    "items": [
+      "Pick Recursive Flint · 40B in Agents → Try a local agent. It downloads through Ollama like the other local models and must pass the same local check before you connect it.",
+      "If your Ollama is too old for a model, setup now says to update Ollama instead of pointing at your connection or disk space."
+    ]
+  },
+  {
     "id": "free-to-sign-up-no-waitlist",
     "date": "2026-10-26",
     "status": "Released",
