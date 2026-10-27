@@ -36,11 +36,13 @@ Open **Agents → Try a local agent**, or use the same entry during onboarding.
 | Qwen 3.5 4B | 3.4 GB | 16 GB |
 | Qwen 3.5 9B | 6.6 GB | 24 GB |
 | Qwen3 Coder 30B | 19 GB | 48 GB |
+| Recursive Flint 40B | 23 GB | 48 GB |
 
 Memory figures are conservative starting points, **not measured acceptance
 thresholds or speed guarantees**. Context, GPU memory and other apps affect
 whether a model fits. Ollama's Windows documentation also requires at least
-4 GB for its runtime, separate from weights. The private OpenCode runner uses the version and integrity pins described in
+4 GB for its runtime, separate from weights. Recursive Flint needs Ollama 0.40.8 or
+newer; an older Ollama stops its download and asks for an update. The private OpenCode runner uses the version and integrity pins described in
 [agent support](AGENT-SUPPORT.md#private-opencode-runner).
 
 Model requests use `127.0.0.1:11434`. Native download requests bypass proxies and
@@ -78,6 +80,7 @@ Sources: [Ollama and OpenCode](https://docs.ollama.com/integrations/opencode),
 [Windows requirements](https://docs.ollama.com/windows),
 [Qwen 3.5 tags](https://ollama.com/library/qwen3.5),
 [Qwen3 Coder](https://ollama.com/library/qwen3-coder),
+[Recursive Flint](https://ollama.com/library/flint),
 [OpenCode configuration](https://opencode.ai/docs/config/).
 
 ## Context retrieval and routing
