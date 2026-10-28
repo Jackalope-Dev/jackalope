@@ -1,0 +1,439 @@
+/*
+ * Terminal demo. Always dark like a terminal, tinted by the brand accent the way the CLI
+ * paints its shell, ground and elevated surfaces (brand.rs).
+ */
+.td {
+  --td-shell: color-mix(in srgb, black 93%, var(--color-accent));
+  --td-ground: color-mix(in srgb, black 88%, var(--color-accent));
+  --td-elevated: color-mix(in srgb, black 80%, var(--color-accent));
+  --td-hairline: color-mix(in srgb, white 14%, var(--td-ground));
+  --td-text: color-mix(in srgb, white 90%, var(--color-accent));
+  --td-muted: color-mix(in srgb, white 52%, var(--td-ground));
+  --td-accent: color-mix(in srgb, white 30%, var(--color-accent));
+  --td-secondary: color-mix(in srgb, white 30%, var(--color-accent-secondary, var(--color-accent)));
+  --td-warning: #f5b544;
+  --td-success: #4ade80;
+  --td-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  display: grid;
+  gap: 16px;
+  max-width: 960px;
+  margin: 48px auto 0;
+}
+.td-window {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 540px;
+  overflow: hidden;
+  border-radius: var(--radius-2xl, 16px);
+  background: var(--td-shell);
+  box-shadow: 0 48px 96px -48px color-mix(in srgb, black 70%, transparent);
+  font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--td-text);
+}
+.td :where(p) {
+  margin: 0;
+  color: inherit;
+  line-height: 20px;
+  white-space: pre-wrap;
+}
+.td :where(code) {
+  font-family: inherit;
+  color: var(--td-accent);
+}
+.td :where(b, strong) {
+  font-weight: 700;
+  color: var(--td-text);
+}
+.td-muted {
+  color: var(--td-muted);
+}
+.td-accent {
+  color: var(--td-accent);
+}
+.td-warning {
+  color: var(--td-warning);
+}
+.td-success {
+  color: var(--td-success);
+}
+[data-tone="accent"] {
+  --td-tone: var(--td-accent);
+  color: var(--td-accent);
+}
+[data-tone="warning"] {
+  --td-tone: var(--td-warning);
+  color: var(--td-warning);
+}
+[data-tone="success"] {
+  --td-tone: var(--td-success);
+  color: var(--td-success);
+}
+[data-tone="muted"] {
+  color: var(--td-muted);
+}
+.td-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Header: wordmark, tabs, then agent, project and branch three spaces apart. */
+.td-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-width: 0;
+  height: 36px;
+  padding: 0 16px;
+  white-space: pre;
+}
+.td-brand {
+  font-weight: 700;
+  color: var(--td-accent);
+}
+.td-tabs {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+.td-tab {
+  max-width: 220px;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: var(--td-muted);
+  text-overflow: ellipsis;
+  white-space: pre;
+  cursor: pointer;
+  transition: color 200ms var(--td-ease);
+}
+.td-tab:hover {
+  color: var(--td-text);
+}
+.td-tab[aria-current="true"] {
+  font-weight: 700;
+  color: var(--td-text);
+  background: var(--td-elevated);
+}
+.td-tab:focus-visible {
+  outline: 2px solid var(--td-accent);
+  outline-offset: 1px;
+}
+.td-header-right {
+  display: flex;
+  gap: 24px;
+  margin-left: auto;
+}
+
+/* Content card: a hairline frame; a band of accent travels its top edge while work runs. */
+.td-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  margin: 0 8px;
+  overflow: hidden;
+  border: 1px solid var(--td-hairline);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--td-ground);
+}
+.td-card::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 25%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--td-accent), transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+.td-card[data-working]::before {
+  opacity: 1;
+  animation: td-band 1.8s linear infinite;
+}
+.td-transcript {
+  display: grid;
+  align-content: end;
+  gap: 16px;
+  padding: 16px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--td-hairline) transparent;
+}
+.td-transcript > * {
+  animation: td-in 300ms var(--td-ease) both;
+}
+.td-block {
+  display: grid;
+}
+.td .td-user {
+  padding: 0 8px;
+  box-shadow: inset 2px 0 0 var(--td-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+.td .td-note {
+  color: var(--td-muted);
+}
+
+/* Welcome: the block wordmark, tagline, agent chips and open conversations, centred. */
+.td-welcome {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding-block: 24px;
+  text-align: center;
+}
+.td-wordmark {
+  margin: 0 0 8px;
+  font: inherit;
+  line-height: 1;
+  background: linear-gradient(90deg, var(--td-accent), var(--td-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.td-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.td-chip {
+  padding: 0 4px;
+  background: color-mix(in srgb, var(--td-tone, var(--td-accent)) 20%, var(--td-ground));
+  color: var(--td-text);
+}
+.td-chips .td-chip {
+  margin: 0;
+}
+
+/* Question card above the input. */
+.td-question-card {
+  padding: 0 16px 12px;
+}
+
+/* Input: rounded border in the mode's colour, with the mode named on its top edge. */
+.td-input-wrap {
+  position: relative;
+  padding: 0 16px 16px;
+}
+.td-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--td-accent);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--td-elevated);
+  cursor: text;
+}
+.td-input[data-mode="shell"] {
+  border-color: var(--td-warning);
+}
+.td-input-title {
+  position: absolute;
+  top: -11px;
+  right: 16px;
+  background: var(--td-elevated);
+  color: var(--td-muted);
+  white-space: pre;
+}
+.td-prompt {
+  font-weight: 700;
+  color: var(--td-accent);
+}
+.td-input[data-mode="shell"] .td-prompt {
+  color: var(--td-warning);
+}
+.td-input input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  color: var(--td-text);
+  caret-color: var(--td-accent);
+}
+.td-input input::placeholder {
+  color: var(--td-muted);
+}
+.td-input:focus-within {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+
+/* Menus float just above the input in a frame titled with their keys. */
+.td-menu {
+  position: absolute;
+  z-index: 1;
+  left: 16px;
+  bottom: calc(100% - 8px);
+  width: min(608px, calc(100% - 32px));
+  padding: 4px 0 12px;
+  border: 1px solid var(--td-muted);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--td-ground);
+  box-shadow: 0 16px 32px -16px black;
+  animation: td-in 200ms var(--td-ease) both;
+}
+.td-menu ul {
+  display: grid;
+  max-height: 160px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.td-menu li {
+  display: flex;
+  gap: 16px;
+  padding: 0 8px;
+  white-space: pre;
+}
+.td-menu-name {
+  min-width: 96px;
+}
+.td-menu-about {
+  overflow: hidden;
+  color: var(--td-muted);
+  text-overflow: ellipsis;
+}
+.td-menu li[aria-current="true"] {
+  font-weight: 700;
+  background: color-mix(in srgb, var(--color-accent) 28%, var(--td-ground));
+}
+.td-menu li[aria-current="true"] .td-menu-about {
+  color: var(--td-text);
+}
+.td-menu-title {
+  position: absolute;
+  bottom: -11px;
+  left: 16px;
+  background: var(--td-ground);
+  color: var(--td-muted);
+  white-space: pre;
+}
+
+/* Status line: state dot and label, details, then key hints on the right. */
+.td-status {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 36px;
+  padding: 0 16px;
+  white-space: pre;
+}
+.td-details {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.td-shimmer {
+  background:
+    linear-gradient(
+      90deg,
+      var(--td-accent) 40%,
+      color-mix(in srgb, white 70%, var(--td-accent)) 50%,
+      var(--td-accent) 60%
+    )
+    0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: td-shimmer 1.6s linear infinite;
+}
+.td-hints {
+  margin-left: auto;
+  padding-left: 24px;
+  color: var(--td-muted);
+}
+
+/* Suggestions under the window */
+.td-try {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-text-secondary);
+}
+.td-try button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full, 999px);
+  background: var(--color-surface);
+  font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  transition:
+    border-color 300ms var(--td-ease),
+    scale 300ms var(--td-ease);
+}
+.td-try button:hover {
+  border-color: var(--color-text-muted);
+}
+.td-try button:active {
+  scale: 0.98;
+}
+
+@keyframes td-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@keyframes td-band {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+@keyframes td-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .td-window {
+    height: 500px;
+    font-size: 11px;
+  }
+  .td-header-right,
+  .td-hints {
+    display: none;
+  }
+  .td-wordmark {
+    font-size: 7px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .td-transcript > *,
+  .td-menu,
+  .td-card[data-working]::before,
+  .td-shimmer {
+    animation: none;
+  }
+}

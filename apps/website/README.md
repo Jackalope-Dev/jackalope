@@ -25,6 +25,10 @@ dated milestones in `src/changelog.json`. Update the shared source when content
 changes; route metadata, structured data, sitemap, RSS and LLM-readable discovery
 files are generated from it.
 
+The landing page's terminal demo (`src/TerminalDemo.tsx`) imitates the `jackalope`
+terminal UI with scripted replies. It copies the terminal's layout, glyphs, copy and
+command names, so update it when the terminal's visible behavior changes.
+
 Keep article publication dates stable when editing. Use a field note's `updated`
 date for a substantive revision, and keep comparison `published` dates separate
 from `reviewed` source dates. Visible bylines, article metadata and sitemap dates
@@ -74,15 +78,17 @@ Open Graph image. After changing it or `media/tasks-light.png`, regenerate it wi
 ## Verification
 
 Against the website preview, the browser callback checks responsive layout,
-keyboard controls, dialog focus, appearance, playback/failure and reduced motion:
+keyboard controls, dialog focus, appearance, the scroll story, the terminal demo and
+reduced motion:
 
 ~~~powershell
 npx --yes --package @playwright/cli playwright-cli -s=website-check open http://localhost:5180
 npx --yes --package @playwright/cli playwright-cli -s=website-check run-code --filename apps/website/scripts/verify-page.js
 ~~~
 
-`verify-page.js` expects the default waitlist configuration and intentionally aborts
-the active tour request for its media recovery check. `verify-launch.js` exercises
+`verify-page.js` expects the default waitlist configuration. `verify-contrast.js` measures
+text contrast across palettes and appearances against a preview on port 5182.
+`verify-launch.js` exercises
 routes, discovery output and mocked signup validation, rate limits, retry and focus.
 Those signup requests are intercepted; fixtures do not prove email delivery.
 Run callbacks from the checkout being verified.

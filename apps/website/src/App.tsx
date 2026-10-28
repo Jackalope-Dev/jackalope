@@ -1,13 +1,11 @@
 import { applyThemeTokens, type ThemePalette } from '@jackalope/brand/theme';
-import { Button, GitHubIcon, IconButton, DropdownMenu as Menu } from '@jackalope/ui';
-import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowDownToLine, ArrowRight, Menu as MenuIcon, Moon, Sun, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { GitHubIcon, IconButton, DropdownMenu as Menu } from '@jackalope/ui';
+import { ArrowDownToLine, ArrowRight, Menu as MenuIcon, Moon, Sun } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { AccessPage } from './Access';
 import { BenchmarksPage } from './Benchmarks';
 import { BrandMark } from './BrandMark';
 import { GITHUB_URL } from './community';
-import { tour } from './content';
 import { DownloadPage } from './Download';
 import { desktopDownloads, downloadsAvailable } from './download-config';
 import { FeedbackPage } from './Feedback';
@@ -23,7 +21,6 @@ import { waitlistReferral } from './referral';
 import { Newsletter, Signup, WaitlistButton } from './Signup';
 import { TourPage } from './TourPage';
 import { DEFAULT_WEBSITE_THEME, readWebsiteTheme, saveWebsiteTheme } from './theme';
-import { setInitialVideoVolume } from './video-volume';
 import { WaitlistPage } from './Waitlist';
 import './knowledge.css';
 
@@ -104,9 +101,6 @@ export function App({ path = '/' }: { path?: string }) {
     setTheme(next);
   };
   const setDark = (isDark: boolean) => updateTheme({ ...theme, isDark });
-  const [videoOpen, setVideoOpen] = useState(false);
-  const [videoError, setVideoError] = useState(false);
-  const videoTrigger = useRef<HTMLElement | null>(null);
   useEffect(() => {
     setTheme(readWebsiteTheme());
   }, []);
@@ -214,18 +208,7 @@ export function App({ path = '/' }: { path?: string }) {
       </header>
 
       {home ? (
-        <LandingPage
-          waitlistAction={<WaitlistButton />}
-          signup={<Signup />}
-          platforms={platforms}
-          dark={dark}
-          onPlay={() => {
-            videoTrigger.current = document.activeElement as HTMLElement;
-            setVideoError(false);
-            setVideoOpen(true);
-          }}
-          faqs={faqs}
-        />
+        <LandingPage signup={<Signup />} platforms={platforms} faqs={faqs} />
       ) : path === '/tour/' ? (
         <TourPage dark={dark} />
       ) : path === '/download/' ? (
@@ -263,69 +246,6 @@ export function App({ path = '/' }: { path?: string }) {
       ].includes(path) && <Newsletter />}
 
       <Footer home={home} path={path} />
-
-      <Dialog.Root open={videoOpen} onOpenChange={setVideoOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="dialog-overlay" />
-          <Dialog.Content
-            className="video-dialog"
-            onCloseAutoFocus={(event) => {
-              event.preventDefault();
-              videoTrigger.current?.focus({ preventScroll: true });
-            }}
-          >
-            <div className="video-heading">
-              <div>
-                <Dialog.Title>Jackalope walkthrough</Dialog.Title>
-                <Dialog.Description className="sr-only">
-                  Explore the Jackalope workspace.
-                </Dialog.Description>
-              </div>
-              <Dialog.Close asChild>
-                <IconButton className="icon-button" label="Close walkthrough">
-                  <X size={22} />
-                </IconButton>
-              </Dialog.Close>
-            </div>
-            {videoError ? (
-              <div className="video-error">
-                <p>The walkthrough couldn’t load. You can still explore the app screenshots.</p>
-                <Button
-                  variant="primary"
-                  type="button"
-                  className="button button-primary"
-                  onClick={() => {
-                    setVideoOpen(false);
-                    document.getElementById('inside')?.scrollIntoView();
-                  }}
-                >
-                  Explore the workspace
-                  <ArrowRight size={16} />
-                </Button>
-              </div>
-            ) : (
-              <video
-                onLoadedMetadata={setInitialVideoVolume}
-                controls
-                playsInline
-                preload="metadata"
-                poster={tour.poster}
-                aria-label="Jackalope launch film"
-                onError={() => setVideoError(true)}
-              >
-                <source src={tour.video} type="video/mp4" onError={() => setVideoError(true)} />
-                <track
-                  kind="captions"
-                  src={tour.captions}
-                  srcLang="en"
-                  label="English descriptions"
-                />
-              </video>
-            )}
-            <p className="video-transcript">{tour.transcript}</p>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
     </>
   );
 }
