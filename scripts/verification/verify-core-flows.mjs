@@ -185,7 +185,7 @@ try {
   await page.setViewportSize({ width: 1280, height: 840 });
   await page.getByRole('searchbox', { name: 'Search tasks', exact: true }).fill('Export');
   await page.getByRole('combobox', { name: 'Filter by project', exact: true }).click();
-  await page.getByRole('option', { name: 'All work · every project', exact: true }).click();
+  await page.getByRole('option', { name: 'All projects', exact: true }).click();
   await page.getByRole('searchbox', { name: 'Search tasks', exact: true }).fill('billing');
   await page.reload();
   await page.getByRole('heading', { name: 'Work', exact: true }).waitFor();
@@ -196,7 +196,7 @@ try {
   );
   await page.locator('.work-item').filter({ hasText: 'Improve billing' }).waitFor();
   await page.getByRole('combobox', { name: 'Filter by project', exact: true }).click();
-  await page.getByRole('option', { name: 'Atlas · project work', exact: true }).click();
+  await page.getByRole('option', { name: 'Atlas', exact: true }).click();
   assert.equal(
     await page.getByRole('searchbox', { name: 'Search tasks', exact: true }).inputValue(),
     'Export',

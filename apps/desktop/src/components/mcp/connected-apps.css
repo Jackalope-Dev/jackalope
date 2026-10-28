@@ -54,24 +54,6 @@
   border-radius: 2px;
 }
 
-.connected-apps-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.connected-apps-summary p {
-  margin: 0;
-  color: var(--color-text-secondary);
-}
-
-.connected-apps-summary code {
-  font-family: var(--font-mono);
-}
-
-.connected-apps-summary-actions,
 .connected-apps-toolbar,
 .connected-app-actions {
   display: flex;
@@ -80,12 +62,9 @@
   gap: 8px;
 }
 
-.connected-apps-toolbar {
-  justify-content: space-between;
-}
-
 .connected-apps-search {
   flex: 1;
+  margin-inline-start: auto;
   min-width: 14rem;
   max-width: 24rem;
 }

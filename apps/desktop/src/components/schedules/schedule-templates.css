@@ -2,17 +2,11 @@
   margin-block: 24px 16px;
 }
 
-.template-library-heading,
 .template-library-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px 24px;
-}
-
-.template-library-heading > span {
-  flex-shrink: 0;
-  padding-top: 4px;
 }
 
 .template-library-filters {
@@ -162,7 +156,6 @@
 }
 
 @media (max-width: 700px) {
-  .template-library-heading,
   .template-library-row {
     flex-wrap: wrap;
   }
@@ -176,4 +169,27 @@
   .schedule-fields {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.schedule-row-summary {
+  display: flex;
+  flex-basis: 100%;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.schedule-row-summary > div {
+  flex: 1;
+}
+
+.schedule-row-summary p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-row .ui-disclosure {
+  flex-basis: 100%;
+  min-width: 0;
 }

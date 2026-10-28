@@ -1,6 +1,7 @@
 import type { TaskRun } from './task-runtime.ts';
 
-export function taskDecision(run: TaskRun, integrated = false, verifyCommand?: string) {
+/** The task's headline state and next action. Checks surface inside review, not here. */
+export function taskDecision(run: TaskRun, integrated = false) {
   const active = ['starting', 'running', 'stopping'].includes(run.status);
   const state = (
     label: string,
@@ -25,11 +26,6 @@ export function taskDecision(run: TaskRun, integrated = false, verifyCommand?: s
     return state('Changes integrated locally', 'View delivery', 'delivery', 'success');
   if (run.status === 'interrupted')
     return state('Work interrupted', 'Inspect interrupted work', 'activity', 'warning');
-  if (
-    run.verificationError ||
-    (run.verification && (!run.verification.result.success || !run.verification.tree))
-  )
-    return state('Checks need attention', 'Inspect failed check', 'changes', 'warning');
   if (!['review', 'reviewed'].includes(run.status))
     return state(
       run.status === 'stopped' ? 'Work stopped' : 'Work needs attention',
@@ -37,8 +33,6 @@ export function taskDecision(run: TaskRun, integrated = false, verifyCommand?: s
       'activity',
       'warning',
     );
-  if (!run.verification && (run.verifyCommand || verifyCommand))
-    return state('Checks not run', 'Run checks', 'verify', 'warning');
   const isolated =
     !!run.workspace &&
     run.workspace.replaceAll('\\', '/').toLowerCase() !==

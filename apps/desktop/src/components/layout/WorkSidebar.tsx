@@ -102,7 +102,7 @@ export function WorkSidebar({ onOpen }: { onOpen: () => void }) {
                   <AgentStack agents={presence.agents} state={presence.state} size="xs" />
                   <span>
                     <strong>{item.title}</strong>
-                    <small>{item.statusLabel ?? presence.action}</small>
+                    {group !== 'finished' && <small>{item.statusLabel ?? presence.action}</small>}
                   </span>
                   <WorkSignals
                     item={item}

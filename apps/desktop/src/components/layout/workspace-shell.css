@@ -85,7 +85,7 @@
 .work-sidebar-item {
   display: flex;
   gap: 8px;
-  align-items: flex-start;
+  align-items: center;
   text-align: left;
   width: 100%;
   padding: 10px 12px;
@@ -307,13 +307,8 @@
   align-self: center;
 }
 /* Bot replies the person has not opened; counts are reserved for things waiting on them. */
-.workspace-shell .workspace-nav-unread {
-  flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  margin-left: auto;
-  border-radius: 50%;
-  background: var(--color-accent);
+.workspace-shell .workspace-nav-item[data-unread] > span {
+  font-weight: 700;
 }
 .workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-item {
   justify-content: center;
@@ -341,11 +336,6 @@
   right: 0;
   min-width: 16px;
   padding: 0 4px;
-}
-.workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-unread {
-  position: absolute;
-  top: 4px;
-  right: 4px;
 }
 .workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-item > span {
   display: none;
@@ -472,11 +462,6 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-  }
-}
-@media (max-width: 820px) {
-  .workspace-statusbar .statusbar-invitations {
-    display: none;
   }
 }
 /* Paused bot wake-ups: a state with its own one-click recovery. */

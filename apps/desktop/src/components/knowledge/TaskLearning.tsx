@@ -1,3 +1,5 @@
+import { DropdownMenu as Menu } from '@jackalope/ui';
+import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import type { KnowledgeEntry } from '../../lib/knowledge';
 import type { TaskRun } from '../../lib/task-runtime';
@@ -55,66 +57,78 @@ export function TaskLearning({ run, allowSave = false }: { run: TaskRun; allowSa
       )}
       {(run.status === 'reviewed' || allowSave) && (
         <>
-          <h2 className="text-base font-medium">Save project knowledge</h2>
-
-          <div className="flex flex-wrap gap-2">
-            {hasEarlierAttempt && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  const entry = newKnowledge(
-                    { id: run.projectId, path: run.projectPath },
-                    'memory',
-                    run.id,
-                  );
-                  entry.title = 'Lesson from this correction';
-                  if (new TextEncoder().encode(run.prompt).length <= 800)
-                    entry.content = run.prompt;
-                  setEditing(entry);
-                }}
-              >
-                Turn this correction into a lesson
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button variant="outline">
+                Save to project <ChevronDown size={16} aria-hidden="true" />
               </Button>
-            )}
-            <Button
-              variant="outline"
-              onClick={() =>
-                setEditing(
-                  newKnowledge({ id: run.projectId, path: run.projectPath }, 'memory', run.id),
-                )
-              }
-            >
-              Save lesson
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                const entry = newKnowledge(
-                  { id: run.projectId, path: run.projectPath },
-                  'workflow',
-                  run.id,
-                );
-                entry.title = taskTitle(run.prompt).slice(0, 100);
-                entry.process = {
-                  inputs: Object.keys(run.contract?.inputs ?? {}),
-                  steps: (run.contract?.requirements ?? [])
-                    .filter((r) => r.checkpoint)
-                    .map((r) => r.title),
-                  outcomes: (run.contract?.requirements ?? [])
-                    .filter((r) => !r.checkpoint)
-                    .map((r) => r.title),
-                };
-                const procedure =
-                  run.contextReceipt?.entries.find((e) => e.kind === 'workflow')?.content ||
-                  run.prompt;
-                const seed = `${procedure}\n\nVerification\n${run.verifyCommand || 'Describe how to verify the result.'}`;
-                if (new TextEncoder().encode(seed).length <= 6000) entry.content = seed;
-                setEditing(entry);
-              }}
-            >
-              Use this process again
-            </Button>
-          </div>
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content
+                className="workspace-menu"
+                align="start"
+                sideOffset={8}
+                collisionPadding={12}
+              >
+                {hasEarlierAttempt && (
+                  <Menu.Item
+                    className="workspace-menu-item"
+                    onSelect={() => {
+                      const entry = newKnowledge(
+                        { id: run.projectId, path: run.projectPath },
+                        'memory',
+                        run.id,
+                      );
+                      entry.title = 'Lesson from this correction';
+                      if (new TextEncoder().encode(run.prompt).length <= 800)
+                        entry.content = run.prompt;
+                      setEditing(entry);
+                    }}
+                  >
+                    Turn this correction into a lesson
+                  </Menu.Item>
+                )}
+                <Menu.Item
+                  className="workspace-menu-item"
+                  onSelect={() =>
+                    setEditing(
+                      newKnowledge({ id: run.projectId, path: run.projectPath }, 'memory', run.id),
+                    )
+                  }
+                >
+                  Save a lesson
+                </Menu.Item>
+                <Menu.Item
+                  className="workspace-menu-item"
+                  onSelect={() => {
+                    const entry = newKnowledge(
+                      { id: run.projectId, path: run.projectPath },
+                      'workflow',
+                      run.id,
+                    );
+                    entry.title = taskTitle(run.prompt).slice(0, 100);
+                    entry.process = {
+                      inputs: Object.keys(run.contract?.inputs ?? {}),
+                      steps: (run.contract?.requirements ?? [])
+                        .filter((r) => r.checkpoint)
+                        .map((r) => r.title),
+                      outcomes: (run.contract?.requirements ?? [])
+                        .filter((r) => !r.checkpoint)
+                        .map((r) => r.title),
+                    };
+                    const procedure =
+                      run.contextReceipt?.entries.find((e) => e.kind === 'workflow')?.content ||
+                      run.prompt;
+                    const seed = `${procedure}\n\nVerification\n${run.verifyCommand || 'Describe how to verify the result.'}`;
+                    if (new TextEncoder().encode(seed).length <= 6000) entry.content = seed;
+                    setEditing(entry);
+                  }}
+                >
+                  Save as a reusable workflow
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu.Root>
           {saved && (
             <p role="status" className="task-muted">
               {saved} Manage it in Project → Context.

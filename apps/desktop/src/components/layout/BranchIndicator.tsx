@@ -51,6 +51,11 @@ export function useFocusedWork() {
 }
 
 const MAX_SWITCH_TARGETS = 8;
+
+/** Older task branches end in a generated id; its first eight characters still tell them apart. */
+function branchLabel(branch: string) {
+  return branch.replace(/(^|\/)([0-9a-f]{8})(?:-[0-9a-f]{1,4}){2,4}[0-9a-f-]*$/i, '$1$2');
+}
 const samePath = (a: string, b: string) => a.replace(/[\\/]+$/, '') === b.replace(/[\\/]+$/, '');
 
 /**
@@ -117,7 +122,7 @@ export function BranchIndicator() {
       <Popover.Trigger asChild>
         <button type="button" className="chrome-branch" title={`Branch: ${branch}`}>
           <GitBranch size={14} aria-hidden="true" />
-          <span className="chrome-branch-name">{branch}</span>
+          <span className="chrome-branch-name">{branchLabel(branch)}</span>
           <ChevronDown size={12} aria-hidden="true" className="chrome-branch-chevron" />
         </button>
       </Popover.Trigger>
@@ -156,7 +161,7 @@ export function BranchIndicator() {
                         }}
                       >
                         <GitBranch size={14} aria-hidden="true" />
-                        <span className="branch-switch-name">{target.branch}</span>
+                        <span className="branch-switch-name">{branchLabel(target.branch)}</span>
                         <span className="branch-switch-label">{target.label}</span>
                       </button>
                     </Popover.Close>

@@ -41,10 +41,6 @@ export function McpRecommendedDetails({
       />
       <div className="mcp-detail-content mcp-recommended-detail">
         <p className="mcp-detail-description">{server.description}</p>
-        <div className="mcp-market-labels">
-          <span>Selected by Jackalope</span>
-          <span>{setup.remote ? 'Remote server' : 'Local process'}</span>
-        </div>
         <section>
           <h3>What you need</h3>
           <p>{recommendation.setup}</p>
@@ -73,9 +69,6 @@ export function McpRecommendedDetails({
           <SourceLink url={server.url}>Publisher source</SourceLink>
           <SourceLink url={server.detailUrl}>View on AllMCPs</SourceLink>
         </div>
-        <p className="task-muted">
-          Available tools and access depend on your account and service permissions.
-        </p>
         <div>
           <Button onClick={onConfigure}>
             {scopes.length ? 'Manage connection' : 'Configure server'}

@@ -1,14 +1,5 @@
-import { FormField, Input, RefreshIcon, SegmentedControl } from '@jackalope/ui';
-import {
-  ArrowLeft,
-  Cpu,
-  KeyRound,
-  ShieldCheck,
-  Sparkles,
-  Star,
-  Terminal,
-  Trash2,
-} from 'lucide-react';
+import { FormField, Input, DropdownMenu as Menu, SegmentedControl } from '@jackalope/ui';
+import { ArrowLeft, MoreHorizontal, Star } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
@@ -47,6 +38,11 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
   );
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const markChanged = () => {
+    setSaved(false);
+    setDirty(true);
+  };
   const [modelsRevision, setModelsRevision] = useState(0);
   const refreshModels = useCallback(() => setModelsRevision((value) => value + 1), []);
   const [busy, setBusy] = useState(false);
@@ -96,12 +92,19 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
       await syncAgentConfig();
       await discover();
       setSaved(true);
+      setDirty(false);
       refreshModels();
     } catch (e) {
       setError(String(e));
     } finally {
       setBusy(false);
     }
+  };
+
+  const makeDefault = () => {
+    if (!selected) return;
+    config.setDefaultMetaAgent(selected.id, project?.id);
+    markChanged();
   };
 
   const options = selected
@@ -115,12 +118,11 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
   const update = (patch: Partial<typeof options>) => {
     if (!selected) return;
     config.setRunnerOptions(selected.id, { ...options, ...patch });
-    setSaved(false);
+    markChanged();
   };
 
   return (
     <div className="agent-manager workspace-stack">
-      {/* Navigation and Quick Switcher */}
       <div className="agent-manager-toolbar">
         <Button
           variant="ghost"
@@ -168,11 +170,12 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
                       >
                         <ProviderMark provider={agent.id} size={18} />
                         <span className="agent-switcher-name">{agent.name}</span>
-                        {appOnly && <span className="agent-switcher-note">App only</span>}
-                        {isAgentDef && <Star size={12} aria-hidden="true" />}
-                        {!isAgentOn && (
-                          <span className="agent-switcher-off-dot" title="Disabled for tasks" />
+                        {appOnly ? (
+                          <span className="agent-switcher-note">App only</span>
+                        ) : (
+                          !isAgentOn && <span className="agent-switcher-note">Off</span>
                         )}
+                        {isAgentDef && <Star size={12} aria-hidden="true" />}
                       </Button>
                     );
                   })}
@@ -209,48 +212,14 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
           <div className="agent-hero-title-row">
             <h1 className="agent-hero-title">{selected?.name ?? 'Agent'}</h1>
           </div>
-
-          <div className="agent-hero-badges">
-            {isDefault && (
-              <span className="agent-hero-badge agent-hero-badge-default">
-                <Star size={12} fill="currentColor" />
-                Default agent
-              </span>
-            )}
-            <span
-              className={`agent-hero-badge ${
-                selectedRunner?.available
-                  ? selectedRunner.signedIn
-                    ? 'agent-hero-badge-ready'
-                    : 'agent-hero-badge-installed'
-                  : 'agent-hero-badge-unavailable'
-              }`}
-            >
-              <span className="agent-hero-badge-dot" />
-              {selectedRunner?.available
-                ? selectedRunner.signedIn
-                  ? 'Ready · Connected'
-                  : 'Installed · CLI detected'
-                : selectedRunner?.detail || 'Not installed'}
-            </span>
-          </div>
-
-          <p className="agent-hero-description">
-            {selected?.description ||
-              (selected?.id === 'claude'
-                ? 'Anthropic Claude Code assistant with deep reasoning and multi-file code editing.'
-                : selected?.id === 'codex'
-                  ? 'OpenAI Codex CLI runner for automated task execution and fast refactoring.'
-                  : selected?.id === 'antigravity'
-                    ? 'Google Antigravity agent CLI for deep planning, subagents, and self-verifying workflows.'
-                    : selected?.id === 'grok'
-                      ? 'xAI Grok CLI assistant with command-line reasoning capabilities.'
-                      : selected?.id === 'opencode'
-                        ? 'Open-source agent runner supporting both local models and hosted inference providers.'
-                        : selected?.id === 'kimi'
-                          ? 'Moonshot AI Kimi Code agent assistant.'
-                          : 'Configured agent runner for automated project tasks.')}
-          </p>
+          {!selectedRunner?.available ? (
+            <p className="agent-hero-status">{selectedRunner?.detail || 'Not installed'}</p>
+          ) : (
+            !selectedRunner.signedIn && <p className="agent-hero-status">Not signed in</p>
+          )}
+          {selected?.description && (
+            <p className="agent-hero-description">{selected.description}</p>
+          )}
         </div>
 
         <div className="agent-hero-actions">
@@ -261,7 +230,7 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
               onCheckedChange={(value) => {
                 if (selected) {
                   config.toggleAgent(selected.id, value, project?.id);
-                  setSaved(false);
+                  markChanged();
                 }
               }}
               label={`Enable ${selected?.name}${project ? ` for ${project.name}` : ' app-wide'}`}
@@ -272,55 +241,79 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
           </div>
 
           <div className="agent-hero-buttons">
-            <Button
-              type="button"
-              variant={isDefault ? 'secondary' : 'outline'}
-              size="sm"
-              disabled={
-                isDefault ||
-                !selectedEnabled ||
-                !selectedRunner?.available ||
-                (!project && !orchestrates)
-              }
-              title={isDefault ? undefined : defaultBlockedReason}
-              onClick={() => {
-                if (!selected) return;
-                config.setDefaultMetaAgent(selected.id, project?.id);
-                setSaved(false);
-              }}
-            >
-              <Star size={14} fill={isDefault ? 'currentColor' : 'none'} />
-              {isDefault ? 'Default agent' : 'Make default'}
-            </Button>
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void save()}
-              disabled={!desktop || busy || discovering}
-              loading={busy || discovering}
-              loadingLabel="Checking…"
-            >
-              <RefreshIcon size={16} />
-              Save &amp; check agents
-            </Button>
-
-            {'isCustom' in selected && (
+            {dirty ? (
               <Button
                 type="button"
-                variant="ghost"
                 size="sm"
-                className="text-destructive"
-                aria-label={`Remove ${selected.name}`}
-                onClick={() => {
-                  config.removeCustomAgent(selected.id);
-                  setSaved(false);
-                }}
+                onClick={() => void save()}
+                disabled={!desktop || busy || discovering}
+                loading={busy || discovering}
+                loadingLabel="Saving…"
               >
-                <Trash2 size={14} />
+                Save changes
               </Button>
+            ) : (
+              !isDefault && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!!defaultBlockedReason}
+                  title={defaultBlockedReason}
+                  onClick={makeDefault}
+                >
+                  <Star size={14} />
+                  Make default
+                </Button>
+              )
             )}
+
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-label={`${selected?.name ?? 'Agent'} options`}
+                >
+                  <MoreHorizontal size={16} aria-hidden="true" />
+                </Button>
+              </Menu.Trigger>
+              <Menu.Portal>
+                <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
+                  {dirty && !isDefault && (
+                    <Menu.Item
+                      className="workspace-menu-item"
+                      disabled={!!defaultBlockedReason}
+                      onSelect={makeDefault}
+                    >
+                      Make default
+                    </Menu.Item>
+                  )}
+                  <Menu.Item
+                    className="workspace-menu-item"
+                    disabled={!desktop || busy || discovering}
+                    onSelect={() => void save()}
+                  >
+                    Check agents again
+                  </Menu.Item>
+                  {'isCustom' in selected && (
+                    <>
+                      <Menu.Separator className="menu-separator" />
+                      <Menu.Item
+                        className="workspace-menu-item"
+                        onSelect={() => {
+                          config.removeCustomAgent(selected.id);
+                          markChanged();
+                        }}
+                      >
+                        Remove {selected.name}
+                      </Menu.Item>
+                    </>
+                  )}
+                </Menu.Content>
+              </Menu.Portal>
+            </Menu.Root>
           </div>
         </div>
       </div>
@@ -337,20 +330,9 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
         </InlineNotice>
       )}
 
-      {/* Special Contextual Wizards */}
       {selected?.id === 'opencode' && (
         <div className="agent-settings-card">
-          <div className="agent-settings-card-header">
-            <div className="agent-settings-card-icon">
-              <Sparkles size={18} />
-            </div>
-            <div>
-              <h2 className="agent-settings-card-title">Local AI &amp; Inference Setup</h2>
-              <p className="agent-settings-card-description">
-                Connect OpenCode with local models running in Ollama or LM Studio.
-              </p>
-            </div>
-          </div>
+          <h2 className="agent-settings-card-header agent-settings-card-title">Local models</h2>
           <div className="agent-settings-card-body">
             <LocalAiSetup onConnected={refreshModels} />
           </div>
@@ -359,38 +341,16 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
 
       {selected?.id === 'antigravity' && !selectedRunner?.available && (
         <div className="agent-settings-card">
-          <div className="agent-settings-card-header">
-            <div className="agent-settings-card-icon">
-              <Terminal size={18} />
-            </div>
-            <div>
-              <h2 className="agent-settings-card-title">CLI Installation Guide</h2>
-              <p className="agent-settings-card-description">
-                Install the Google Antigravity CLI to connect this agent.
-              </p>
-            </div>
-          </div>
+          <h2 className="agent-settings-card-header agent-settings-card-title">Install</h2>
           <div className="agent-settings-card-body">
             <AgentInstallGuide desktopInstalled={selectedRunner?.desktopInstalled} />
           </div>
         </div>
       )}
 
-      {/* Structured Settings Cards */}
       <div className="agent-settings-sections">
-        {/* Card 1: Accounts & Credentials */}
         <section className="agent-settings-card" aria-label="Agent accounts">
-          <div className="agent-settings-card-header">
-            <div className="agent-settings-card-icon">
-              <KeyRound size={18} />
-            </div>
-            <div>
-              <h2 className="agent-settings-card-title">Accounts &amp; Authentication</h2>
-              <p className="agent-settings-card-description">
-                Manage connected accounts, API keys, and subscriptions for {selected?.name}.
-              </p>
-            </div>
-          </div>
+          <h2 className="agent-settings-card-header agent-settings-card-title">Accounts</h2>
           <div className="agent-settings-card-body agent-config-fields">
             {selected && (
               <AgentAccounts
@@ -404,25 +364,14 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
           </div>
         </section>
 
-        {/* Card 2: Models & Runtime Options */}
         <section className="agent-settings-card" aria-label="Models and executable">
-          <div className="agent-settings-card-header">
-            <div className="agent-settings-card-icon">
-              <Cpu size={18} />
-            </div>
-            <div>
-              <h2 className="agent-settings-card-title">Models &amp; Executable</h2>
-              <p className="agent-settings-card-description">
-                Select default models, restrict model choices, or customize the command path.
-              </p>
-            </div>
-          </div>
+          <h2 className="agent-settings-card-header agent-settings-card-title">Models</h2>
           <div className="agent-settings-card-body agent-config-fields">
             {selected && (
               <>
                 <FormField
                   label="Executable command override"
-                  description="Specify a custom command name or absolute path if the agent executable is not in your default system PATH."
+                  description="Leave blank to find it on PATH."
                 >
                   <Input
                     className="task-input"
@@ -454,20 +403,8 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
           </div>
         </section>
 
-        {/* Card 3: Capabilities & Integration */}
         <section className="agent-settings-card" aria-label="Agent support">
-          <div className="agent-settings-card-header">
-            <div className="agent-settings-card-icon">
-              <ShieldCheck size={18} />
-            </div>
-            <div>
-              <h2 className="agent-settings-card-title">Capabilities &amp; Integration</h2>
-              <p className="agent-settings-card-description">
-                Tool protocols, context passing, and background workflows supported by{' '}
-                {selected?.name}.
-              </p>
-            </div>
-          </div>
+          <h2 className="agent-settings-card-header agent-settings-card-title">Capabilities</h2>
           <div className="agent-settings-card-body">
             {selected && (
               <AgentSupport

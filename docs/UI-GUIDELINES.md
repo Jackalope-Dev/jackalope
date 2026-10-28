@@ -71,7 +71,8 @@ width, with separate Changes, Checks and Merge views. Put approval and optional
 review actions in a toolbar above the diff; never in a competing side panel.
 File review markers are optional tracking, not acceptance or merge gates. Task, planned-task
 and conversation review reuse `ResultReview`; file navigation and diffs reuse `ChangedFiles`.
-Keep check failures visible in navigation, preserve review inputs when switching views,
+Keep check failures visible in review navigation rather than in a task's headline status
+or primary action. Preserve review inputs when switching views,
 and load optional tools on first use. Keep one follow-up composer per task. Worker links resolve to their parent task instead of a second result screen.
 Use `WorkspaceTabs` for keyboard-navigable task and review panels with the same
 appearance as workspace navigation. Keep the task agent beside its heading.

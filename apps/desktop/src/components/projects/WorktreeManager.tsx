@@ -1,4 +1,10 @@
-import { Badge, type BadgeProps, IconButton, RefreshIcon } from '@jackalope/ui';
+import {
+  Badge,
+  type BadgeProps,
+  IconButton,
+  DropdownMenu as Menu,
+  RefreshIcon,
+} from '@jackalope/ui';
 import {
   Archive,
   Copy,
@@ -7,8 +13,8 @@ import {
   GitBranch,
   GitCommitHorizontal,
   GitMerge,
-  HardDrive,
   Lock,
+  MoreHorizontal,
   Plus,
   Trash2,
 } from 'lucide-react';
@@ -346,9 +352,6 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
             </p>
           )}
           <div className="worktree-meta">
-            <span className="font-mono">
-              {wt.head ? wt.head.slice(0, 7) : 'No resolved commit'}
-            </span>
             {wt.is_locked && !wt.cleanup?.missing && (
               <span>
                 <Lock size={14} aria-hidden="true" />
@@ -448,27 +451,31 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
             <GitCommitHorizontal size={18} aria-hidden="true" />
             Changes
           </Button>
-          <IconButton
-            variant="ghost"
-            label={
-              measuring === wt.path
-                ? 'Measuring…'
-                : `${sizes[wt.path] ? 'Refresh' : 'Check'} disk size of ${wt.branch || wt.path}`
-            }
-            title={sizes[wt.path] ? 'Refresh disk size' : 'Check disk size'}
-            disabled={!!measuring || !desktop || !!wt.cleanup?.missing}
-            onClick={() => void measure(wt.path)}
-          >
-            <HardDrive size={18} />
-          </IconButton>
-          <IconButton
-            variant="ghost"
-            label={`Copy path for ${wt.branch || wt.path}`}
-            title="Copy path"
-            onClick={() => void copy(wt.path)}
-          >
-            <Copy size={18} />
-          </IconButton>
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <IconButton variant="ghost" label={`${wt.branch || wt.path} options`}>
+                <MoreHorizontal size={18} />
+              </IconButton>
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
+                <Menu.Item
+                  className="workspace-menu-item"
+                  disabled={!!measuring || !desktop || !!wt.cleanup?.missing}
+                  onSelect={() => void measure(wt.path)}
+                >
+                  {measuring === wt.path
+                    ? 'Measuring…'
+                    : sizes[wt.path]
+                      ? 'Refresh disk size'
+                      : 'Check disk size'}
+                </Menu.Item>
+                <Menu.Item className="workspace-menu-item" onSelect={() => void copy(wt.path)}>
+                  Copy path
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu.Root>
         </div>
       </article>
     );
@@ -615,10 +622,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
           {active.length > 0 && (
             <section className="worktree-group" aria-labelledby="worktrees-active">
               <header className="worktree-group-heading">
-                <div>
-                  <h2 id="worktrees-active">In progress</h2>
-                  <p className="task-muted">Branches not merged yet, or with work still open.</p>
-                </div>
+                <h2 id="worktrees-active">In progress</h2>
                 {missing.length > 0 && (
                   <Button
                     size="sm"

@@ -117,18 +117,21 @@ export function ResultReview({
               {portalActions(
                 <div className="task-review-actions">
                   <div ref={setFeedbackSlot} className="review-feedback-slot" />
-                  {review && <ReviewActions run={run} review={review} />}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Refresh changes"
-                    title="Refresh changes"
-                    disabled={loading}
-                    aria-busy={loading || undefined}
-                    onClick={() => void load()}
-                  >
-                    <RefreshCw size={16} aria-hidden="true" />
-                  </Button>
+                  {review ? (
+                    <ReviewActions run={run} review={review} onRefresh={() => void load()} />
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Refresh changes"
+                      title="Refresh changes"
+                      disabled={loading}
+                      aria-busy={loading || undefined}
+                      onClick={() => void load()}
+                    >
+                      <RefreshCw size={16} aria-hidden="true" />
+                    </Button>
+                  )}
                   {canApprove && run.status === 'review' && !unfinishedWorkflow && (
                     <ApproveWork
                       run={run}

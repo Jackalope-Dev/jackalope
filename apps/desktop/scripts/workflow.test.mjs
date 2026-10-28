@@ -49,9 +49,9 @@ test('Needs you includes review and blockers without changing their specific nex
   );
   assert.deepEqual(
     needsYou.map((item) => item.statusLabel),
-    ['Checks need attention', 'Ready for your review'],
+    ['Ready for your review', 'Ready for your review'],
   );
-  assert.equal(workPresence(needsYou[0]).action, 'Inspect failed check');
+  assert.equal(workPresence(needsYou[0]).action, 'Review result');
   assert.equal(workPresence(needsYou[1]).action, 'Review result');
   assert.deepEqual(
     items.filter((item) => matchesWorkFilter(item, 'review')),
@@ -64,18 +64,16 @@ test('Needs you includes review and blockers without changing their specific nex
   );
 });
 
-test('failed or missing checks take priority over review and integration actions', () => {
+test('checks stay inside review instead of replacing the review and merge action', () => {
   const finished = { ...run, workspace: '/repo/task', projectPath: '/repo', status: 'reviewed' };
-  assert.equal(taskDecision({ ...finished, verificationError: 'Check failed' }).section, 'changes');
   assert.equal(
-    taskDecision({ ...finished, verification: { result: { success: false }, tree: 'tree' } }).tone,
-    'warning',
+    taskDecision({ ...finished, verificationError: 'Check failed' }).section,
+    'integrate',
   );
   assert.equal(
-    taskDecision({ ...finished, verification: { result: { success: true }, tree: null } }).tone,
-    'warning',
+    taskDecision({ ...finished, verification: { result: { success: false }, tree: 'tree' } }).label,
+    'Ready to merge',
   );
-  assert.equal(taskDecision(finished, false, 'pnpm test').section, 'verify');
   assert.equal(taskDecision(finished).section, 'integrate');
   assert.equal(taskDecision(finished).action, 'Merge into your project');
   assert.equal(taskDecision({ ...finished, targetBranch: 'main' }).action, 'Merge into main');

@@ -14,17 +14,15 @@ export function TaskProgress({
   pending,
   action,
   onActivity,
-  verifyCommand,
 }: {
   run: TaskRun;
   integrated: boolean;
   pending: number;
   action?: ReactNode;
   onActivity: () => void;
-  verifyCommand?: string;
 }) {
   const active = isActive(run);
-  const decision = taskDecision(run, integrated, verifyCommand);
+  const decision = taskDecision(run, integrated);
   const agents = taskAgents(run);
   const presence = pending ? 'waiting' : active ? 'working' : 'idle';
   return (

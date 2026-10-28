@@ -451,11 +451,10 @@ export function Shell({
         Skip to workspace
       </a>
       <ResizeHandles />
-      <TitleBar onSettings={() => navigate('preferences')} />
+      <TitleBar themePicker />
       <AccessNoticeSlot />
       <header className="workspace-chrome">
         <div className="flex items-center gap-4 min-w-0">
-          <img src="/mascot.svg" alt="Jackalope" className="size-8 shrink-0" />
           <Menu.Root>
             <Menu.Trigger asChild>
               <button
@@ -530,18 +529,6 @@ export function Shell({
             </button>
           </Tooltip>
           {!isTauriEnvironment() && showThemePicker && <ArcColorPicker />}
-          {!isTauriEnvironment() && (
-            <Tooltip content={`Settings (${displayShortcut(shortcuts.settings)})`}>
-              <button
-                type="button"
-                onClick={() => navigate('preferences')}
-                className="quiet-icon"
-                aria-label="Settings and preferences"
-              >
-                <Settings2 className="size-4" />
-              </button>
-            </Tooltip>
-          )}
         </div>
       </header>
       <div className="workspace-body">
@@ -585,32 +572,31 @@ export function Shell({
                 }
                 title={item.label}
                 className="workspace-nav-item"
+                data-unread={(item.id === 'bots' && !botsWaiting && botsUnread > 0) || undefined}
               >
                 <item.icon className="size-3.5" />
                 <span>{item.label}</span>
-                {item.id === 'bots' &&
-                  (botsWaiting > 0 ? (
-                    <small className="workspace-nav-count" aria-hidden="true">
-                      {botsWaiting}
-                    </small>
-                  ) : (
-                    botsUnread > 0 && <small className="workspace-nav-unread" aria-hidden="true" />
-                  ))}
+                {item.id === 'bots' && botsWaiting > 0 && (
+                  <small className="workspace-nav-count" aria-hidden="true">
+                    {botsWaiting}
+                  </small>
+                )}
               </button>
             ))}
           </nav>
           {!navCollapsed && <WorkSidebar onOpen={() => setActiveTab('kanban')} />}
-          <button
-            type="button"
-            className="workspace-nav-item workspace-settings"
-            aria-label="Settings"
-            aria-current={activeTab === 'preferences' ? 'page' : undefined}
-            title="Settings"
-            onClick={() => navigate('preferences')}
-          >
-            <Settings2 size={18} />
-            <span>Settings</span>
-          </button>
+          <Tooltip side="right" content={`Settings (${displayShortcut(shortcuts.settings)})`}>
+            <button
+              type="button"
+              className="workspace-nav-item workspace-settings"
+              aria-label="Settings"
+              aria-current={activeTab === 'preferences' ? 'page' : undefined}
+              onClick={() => navigate('preferences')}
+            >
+              <Settings2 size={18} />
+              <span>Settings</span>
+            </button>
+          </Tooltip>
         </aside>
         <main
           ref={canvas}

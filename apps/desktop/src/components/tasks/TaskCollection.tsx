@@ -1,5 +1,4 @@
 import {
-  Badge,
   Checkbox,
   Disclosure,
   DisclosureSummary,
@@ -10,11 +9,11 @@ import {
 import {
   Archive,
   ArchiveRestore,
-  Check,
   ChevronRight,
   Columns3,
   Lightbulb,
   List,
+  ListChecks,
   ListTodo,
   MoreHorizontal,
   Radio,
@@ -22,7 +21,6 @@ import {
 import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
-  ideaStageLabels,
   matchesWorkFilter,
   type WorkItem,
   workGroup,
@@ -30,15 +28,12 @@ import {
   workPresence,
   workShape,
 } from '../../lib/task-collection';
-import type { Runner } from '../../lib/task-runtime';
-import { useProjectStore } from '../../stores/projectStore';
 import { type ChangeStats, useChangeStats } from '../../stores/workSignalsStore';
 import { AgentStack } from '../agents/AgentAvatar';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
-import { RunStatus } from './RunStatus';
 import { isUnread, useOpenSignalKey, useWorkSignals, WorkSignals } from './WorkSignals';
 import './task-collection.css';
 
@@ -50,28 +45,25 @@ export interface TaskCollectionView {
 
 export function TaskCollection({
   items,
-  runners,
   onOpen,
   view,
   onViewChange,
   scope,
-  history,
   emptyState,
   archived = false,
+  onArchivedChange,
   onArchive,
-  onBusyChange,
 }: {
   items: WorkItem[];
-  runners: Runner[];
   onOpen: (item: WorkItem) => void;
   view: TaskCollectionView;
   onViewChange: (view: TaskCollectionView) => void;
   scope?: ReactNode;
-  history?: ReactNode;
   emptyState?: ReactNode;
   archived?: boolean;
+  /** Switches between current and archived work from the organize menu. */
+  onArchivedChange?: (archived: boolean) => void;
   onArchive?: (items: WorkItem[], archived: boolean) => Promise<void>;
-  onBusyChange?: (busy: boolean) => void;
 }) {
   const [selecting, setSelecting] = useState(false);
   const [selection, setSelection] = useState<string[]>([]);
@@ -85,7 +77,6 @@ export function TaskCollection({
   useEffect(() => {
     if (focusReturn) actionFocus.current?.focus();
   }, [focusReturn]);
-  const projects = useProjectStore((state) => state.projects);
   const { layout, query } = view;
   const filter = workGroup(view.filter);
   const setFilter = (filter: string) => onViewChange({ ...view, filter });
@@ -105,20 +96,13 @@ export function TaskCollection({
   const eligible = filtered.filter((item) => archived || !item.archiveBlocked);
   const selected = eligible.filter((item) => selection.includes(item.id));
   const finished = eligible.filter((item) => item.stage === 'finished');
-  const happening = useMemo(
-    () =>
-      archived
-        ? []
-        : items
-            .map((item) => ({ item, presence: workPresence(item) }))
-            .filter(({ presence }) => presence.state !== 'idle'),
-    [archived, items],
-  );
+  const canArchiveFinished = !!onArchive && !archived && finished.length > 0;
+  const hasOrganizeItems =
+    (!!onArchive && !selecting) || canArchiveFinished || (!!onArchivedChange && !archived);
   const changeArchive = async (targets: WorkItem[], archive: boolean) => {
     if (!onArchive || pending.current || !targets.length) return;
     pending.current = true;
     setBusy(true);
-    onBusyChange?.(true);
     setError('');
     setNotice('');
     setUndo([]);
@@ -134,7 +118,6 @@ export function TaskCollection({
     } finally {
       pending.current = false;
       setBusy(false);
-      onBusyChange?.(false);
       setFocusReturn((value) => value + 1);
     }
   };
@@ -160,8 +143,6 @@ export function TaskCollection({
       )}
       <WorkCard
         item={item}
-        runners={runners}
-        projects={projects}
         onOpen={onOpen}
         disabled={busy}
         unread={isUnread(item, signals, openKey)}
@@ -191,7 +172,6 @@ export function TaskCollection({
   return (
     <div className="task-collection">
       <div className="work-toolbar">
-        {history}
         {scope}
         <SearchField
           aria-label="Search tasks"
@@ -234,95 +214,102 @@ export function TaskCollection({
             },
           ]}
         />
-        {onArchive && (
+        {(onArchive || onArchivedChange) && (
           <Menu.Root>
             <Menu.Trigger asChild>
-              <Button ref={actionFocus} variant="ghost" aria-label="Organize work" disabled={busy}>
+              <Button
+                ref={actionFocus}
+                variant="ghost"
+                aria-label="Organize work"
+                disabled={busy || !hasOrganizeItems}
+              >
                 <MoreHorizontal size={18} />
               </Button>
             </Menu.Trigger>
             <Menu.Portal>
               <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
-                <Menu.Item
-                  className="workspace-menu-item"
-                  onSelect={() => {
-                    setSelecting(!selecting);
-                    setSelection([]);
-                  }}
-                >
-                  {selecting ? 'Done selecting' : 'Select tasks'}
-                </Menu.Item>
-                {!archived && finished.length > 0 && (
+                {onArchive && !selecting && (
+                  <Menu.Item
+                    className="workspace-menu-item"
+                    onSelect={() => {
+                      setSelecting(true);
+                      setSelection([]);
+                    }}
+                  >
+                    <ListChecks size={16} />
+                    Select tasks
+                  </Menu.Item>
+                )}
+                {canArchiveFinished && (
                   <Menu.Item
                     className="workspace-menu-item"
                     onSelect={() => void changeArchive(finished, true)}
                   >
+                    <Archive size={16} />
                     Archive finished ({finished.length})
                   </Menu.Item>
+                )}
+                {onArchivedChange && !archived && (
+                  <>
+                    {onArchive && (!selecting || canArchiveFinished) && (
+                      <Menu.Separator className="menu-separator" />
+                    )}
+                    <Menu.Item
+                      className="workspace-menu-item"
+                      onSelect={() => onArchivedChange(true)}
+                    >
+                      <ArchiveRestore size={16} />
+                      Show archived work
+                    </Menu.Item>
+                  </>
                 )}
               </Menu.Content>
             </Menu.Portal>
           </Menu.Root>
         )}
       </div>
-      {onArchive && (selecting || archived) && (
-        <>
-          <div className="work-toolbar work-cleanup">
-            <Button
-              variant="outline"
-              disabled={busy}
-              aria-pressed={selecting}
-              onClick={() => {
-                setSelecting(!selecting);
-                setSelection([]);
-              }}
-            >
-              {selecting ? 'Done selecting' : 'Select tasks'}
-            </Button>
-            {selecting ? (
-              <>
-                <label className="work-select-all">
-                  <Checkbox
-                    aria-label="Select all matching tasks"
-                    disabled={busy || !eligible.length}
-                    checked={!!eligible.length && selected.length === eligible.length}
-                    indeterminate={selected.length > 0 && selected.length < eligible.length}
-                    onChange={(event) =>
-                      setSelection(event.target.checked ? eligible.map((item) => item.id) : [])
-                    }
-                  />
-                  Select all matching
-                </label>
-                <Button
-                  variant="outline"
-                  disabled={!selected.length || busy}
-                  loading={busy}
-                  loadingLabel={archived ? 'Restoring…' : 'Archiving…'}
-                  onClick={() => void changeArchive(selected, !archived)}
-                >
-                  {archived ? 'Restore' : 'Archive'} selected ({selected.length})
-                </Button>
-              </>
-            ) : !archived && finished.length > 0 ? (
-              <Button
-                variant="outline"
-                disabled={busy}
-                loading={busy}
-                loadingLabel="Archiving…"
-                onClick={() => void changeArchive(finished, true)}
-              >
-                <Archive size={16} /> Archive finished ({finished.length})
-              </Button>
-            ) : null}
-          </div>
-          {(archived || selecting) && (
-            <p className="task-muted work-archive-help">
-              {archived
-                ? 'Restore a task to bring it back to your current tasks.'
-                : 'Archived tasks can be restored. Results and workspaces are kept.'}
-            </p>
-          )}
-        </>
+      {archived && onArchivedChange && (
+        <div className="work-filter-summary">
+          <p>Archived work</p>
+          <Button variant="ghost" disabled={busy} onClick={() => onArchivedChange(false)}>
+            Show current work
+          </Button>
+        </div>
+      )}
+      {onArchive && selecting && (
+        <div className="work-toolbar work-cleanup">
+          <label className="work-select-all">
+            <Checkbox
+              aria-label="Select all matching tasks"
+              disabled={busy || !eligible.length}
+              checked={!!eligible.length && selected.length === eligible.length}
+              indeterminate={selected.length > 0 && selected.length < eligible.length}
+              onChange={(event) =>
+                setSelection(event.target.checked ? eligible.map((item) => item.id) : [])
+              }
+            />
+            Select all matching
+          </label>
+          <Button
+            variant="outline"
+            disabled={!selected.length || busy}
+            loading={busy}
+            loadingLabel={archived ? 'Restoring…' : 'Archiving…'}
+            onClick={() => void changeArchive(selected, !archived)}
+          >
+            {archived ? 'Restore' : 'Archive'} selected ({selected.length})
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() => {
+              setSelecting(false);
+              setSelection([]);
+            }}
+          >
+            Done
+          </Button>
+        </div>
       )}
       {error && <InlineNotice tone="error">Some tasks could not be updated. {error}</InlineNotice>}
       {notice && (
@@ -347,35 +334,6 @@ export function TaskCollection({
             Clear filters
           </Button>
         </div>
-      )}
-      {happening.length > 0 && (
-        <section className="work-now" aria-label="Work in progress">
-          {happening.slice(0, 4).map(({ item, presence }) => (
-            <button
-              key={item.id}
-              type="button"
-              className="work-now-item"
-              disabled={busy}
-              onClick={() => onOpen(item)}
-            >
-              {presence.agents.length ? (
-                <AgentStack agents={presence.agents} state={presence.state} />
-              ) : (
-                <span className="work-avatar-fallback" aria-hidden="true">
-                  {item.session ? <Radio size={16} /> : <Lightbulb size={16} />}
-                </span>
-              )}
-              <span className="work-now-copy">
-                <strong>{item.title}</strong>
-                <span>
-                  {presence.state === 'waiting'
-                    ? presence.action
-                    : item.run?.progress?.label || presence.action}
-                </span>
-              </span>
-            </button>
-          ))}
-        </section>
       )}
       {!items.length && emptyState ? (
         emptyState
@@ -478,11 +436,14 @@ const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: 'short',
   timeStyle: 'medium',
 });
+/** The row's single next-step line: why it needs you, otherwise what opening it does. */
+function workRowAction(item: WorkItem, action: string) {
+  if (!item.run && !item.session && !item.managed && item.idea?.runId) return 'History unavailable';
+  return item.stage === 'attention' && item.statusLabel ? item.statusLabel : action;
+}
 const WorkCard = memo(
   function WorkCard({
     item,
-    runners,
-    projects,
     onOpen,
     disabled,
     unread,
@@ -491,25 +452,11 @@ const WorkCard = memo(
     unread: boolean;
     stats?: ChangeStats;
     item: WorkItem;
-    runners: Runner[];
-    projects: ReturnType<typeof useProjectStore.getState>['projects'];
     onOpen: (item: WorkItem) => void;
     disabled: boolean;
   }) {
     const presence = workPresence(item);
-    const agent = presence.agents[0];
     const date = new Date(item.date);
-    const status = item.statusLabel ? (
-      <Badge
-        appearance="plain"
-        className="task-status"
-        variant={item.stage === 'attention' ? 'warning' : 'default'}
-      >
-        {item.statusLabel}
-      </Badge>
-    ) : item.run ? (
-      <RunStatus status={item.run.status} progress={item.run.progress} />
-    ) : null;
     return (
       <button
         id={`work-item-${item.id}`}
@@ -518,6 +465,7 @@ const WorkCard = memo(
         disabled={disabled}
         className="work-item"
         data-unread={unread || undefined}
+        title={item.title}
         onClick={() => onOpen(item)}
       >
         {presence.agents.length ? (
@@ -530,68 +478,24 @@ const WorkCard = memo(
         <span className="work-item-content">
           <span className="work-item-title">{item.title}</span>
           <span className="work-item-meta">
-            <span>
-              {workShape(item)} ·{' '}
-              {item.session?.request.projectName ??
-                item.run?.projectName ??
-                projects.find((p) => p.id === item.idea?.projectId)?.name ??
-                'No project yet'}
-              {agent && agent !== 'Unassigned'
-                ? ` · ${runners.find((r) => r.id === agent)?.name ?? agent}`
-                : ''}
-              {presence.agents.length > 1 ? ` +${presence.agents.length - 1}` : ''}
+            <span className="work-item-meta-text">
+              {workShape(item)}
+              {!Number.isNaN(date.getTime()) && (
+                <>
+                  {' · '}
+                  <time dateTime={item.date} title={dateTimeFormatter.format(date)}>
+                    {dateFormatter.format(date)}
+                  </time>
+                </>
+              )}
             </span>
-            {Number.isNaN(date.getTime()) ? (
-              ' · Date unavailable'
-            ) : (
-              <>
-                {' · '}
-                <time dateTime={item.date} title={dateTimeFormatter.format(date)}>
-                  {dateFormatter.format(date)}
-                </time>
-              </>
-            )}
             <WorkSignals item={item} unread={unread} stats={stats} />
           </span>
         </span>
-        {item.session || item.managed ? (
-          <span className="work-item-status">
-            {status}
-            <span className="work-item-action">
-              {presence.action}
-              <ChevronRight size={14} aria-hidden="true" />
-            </span>
-          </span>
-        ) : item.run ? (
-          <span className="work-item-status">
-            {item.stage === 'finished' && item.run.status !== 'reviewed' ? (
-              <Badge appearance="plain" className="task-status">
-                <Check size={16} />
-                Integrated
-              </Badge>
-            ) : (
-              status
-            )}
-            <span className="work-item-action">
-              {presence.action}
-              <ChevronRight size={14} aria-hidden="true" />
-            </span>
-            {item.run.persistenceError && <span className="work-item-meta">Not saved</span>}
-          </span>
-        ) : (
-          <span className="work-item-status">
-            <Badge appearance="plain" className="work-idea-status">
-              {item.idea?.status === 'done' ? <Check size={15} /> : <Lightbulb size={15} />}
-              {item.idea?.runId
-                ? 'History unavailable'
-                : ideaStageLabels[item.idea?.status ?? 'backlog']}
-            </Badge>
-            <span className="work-item-action">
-              {presence.action}
-              <ChevronRight size={14} aria-hidden="true" />
-            </span>
-          </span>
-        )}
+        <span className="work-item-action">
+          {workRowAction(item, presence.action)}
+          <ChevronRight size={14} aria-hidden="true" />
+        </span>
       </button>
     );
   },
@@ -600,8 +504,6 @@ const WorkCard = memo(
     before.disabled === after.disabled &&
     before.unread === after.unread &&
     before.stats === after.stats &&
-    before.runners === after.runners &&
-    before.projects === after.projects &&
     before.item.id === after.item.id &&
     before.item.title === after.item.title &&
     before.item.stage === after.item.stage &&
@@ -609,5 +511,6 @@ const WorkCard = memo(
     before.item.date === after.item.date &&
     before.item.run === after.item.run &&
     before.item.session === after.item.session &&
+    before.item.managed === after.item.managed &&
     before.item.idea === after.item.idea,
 );

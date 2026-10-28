@@ -1,5 +1,5 @@
 import { FormField, IconButton, Panel, Select, SelectItem, Textarea } from '@jackalope/ui';
-import { Activity, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Activity, RefreshCw } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useWideWorkspace } from '../../hooks/useWideWorkspace';
@@ -21,7 +21,6 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
-import { Tooltip } from '../ui/Tooltip';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
@@ -45,7 +44,7 @@ import { WorkSourceLink } from './WorkSourceLink';
 
 const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
 
-export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: () => void }) {
+export function ManagedTaskView({ task }: { task: ManagedTask }) {
   const {
     queue,
     refresh,
@@ -256,29 +255,11 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
   return (
     <WorkspacePage ref={pageRef} className="managed-task workspace-stack">
       <div className="managed-task-heading">
-        <Tooltip content="All tasks">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="All tasks"
-            onClick={() => {
-              select(null);
-              onBack();
-            }}
-          >
-            <ArrowLeft size={18} aria-hidden="true" />
-          </Button>
-        </Tooltip>
         <ManagedTaskAgent provider={lead?.agent ?? task.request.agent} run={lead} />
         <WorkspaceHeading
           titleRef={titleRef}
           title={task.title}
-          description={
-            <span role="status">
-              {work.status} · {task.request.projectName} ·{' '}
-              {getAgentMetadata(lead?.agent ?? task.request.agent)?.name ?? task.request.agent}
-            </span>
-          }
+          description={<span role="status">{work.status}</span>}
           action={
             <div className="managed-task-actions">
               {task.delivery &&

@@ -1,4 +1,4 @@
-import { DiscordIcon, FormField, Input, SearchField, SegmentedControl } from '@jackalope/ui';
+import { FormField, Input, SearchField, SegmentedControl } from '@jackalope/ui';
 import {
   Cloud,
   Cpu,
@@ -20,9 +20,8 @@ import {
 } from 'lucide-react';
 
 import { useEffect, useRef, useState } from 'react';
-import { DISCORD_URL } from '../../lib/community';
 import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -274,11 +273,7 @@ export function SettingsPage({
             ))}
           </Select>
         )}
-        <p className="task-muted">
-          {scope === 'app'
-            ? 'Defaults for Jackalope and projects without overrides.'
-            : 'Overrides for this project. App-wide restrictions still apply.'}
-        </p>
+        {scope === 'project' && <p className="task-muted">App-wide restrictions still apply.</p>}
       </div>
       <div className="settings-body">
         <nav className="settings-sidebar" aria-label="Settings categories">
@@ -312,14 +307,6 @@ export function SettingsPage({
               </div>
             );
           })}
-          <button
-            type="button"
-            className="settings-nav-item settings-community-link"
-            onClick={() => void openExternalUrl(DISCORD_URL)}
-          >
-            <DiscordIcon />
-            Join the Discord
-          </button>
         </nav>
         <div className="settings-content" ref={content}>
           {!visible.length && <p>No settings match “{query}”.</p>}
@@ -329,20 +316,11 @@ export function SettingsPage({
               className="settings-section"
               ref={c === category ? selectedSection : undefined}
             >
-              <WorkspaceSectionHeading
-                title={c === 'Project' ? 'Project settings' : c}
-                description={
-                  c === 'Project' && project ? `${project.name} · ${project.path}` : undefined
-                }
-              />
+              <WorkspaceSectionHeading title={c === 'Project' ? 'Project settings' : c} />
               {c === 'Jackalope account' && (
                 <JackalopeAccount onInvitations={() => setCategory('Invitations')} />
               )}
-              {c === 'Connected work' && (
-                <>
-                  <IssueConnections />
-                </>
-              )}
+              {c === 'Connected work' && <IssueConnections />}
               {c === 'Cloudflare' && (
                 <>
                   <ArtifactsConnection />
@@ -392,7 +370,7 @@ export function SettingsPage({
                   <SettingGroup>
                     <Setting
                       title="Use MCP marketplace"
-                      description="Allow searches and server details from allmcps.com. Disabling cancels marketplace requests; configured MCP servers remain available."
+                      description="Allow searches and server details from allmcps.com."
                     >
                       <Switch
                         label="Use MCP marketplace"
@@ -403,8 +381,8 @@ export function SettingsPage({
                     <SettingBody>
                       <p className="settings-row-description">
                         Publisher avatars load from GitHub. Marketplace searches go to AllMCPs,
-                        which publicly logs requests, with User-Agent Jackalope/0.1.0. Your
-                        connected agents and MCP servers use their own services.
+                        which publicly logs requests. Your connected agents and MCP servers use
+                        their own services.
                       </p>
                     </SettingBody>
                   </SettingGroup>

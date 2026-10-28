@@ -370,8 +370,9 @@ impl TaskRuntime {
             {
                 return Err("The .worktrees directory resolves outside this project.".into());
             }
-            let path = parent.join(format!("jackalope-{id}"));
-            let branch = format!("jackalope/{id}");
+            let name = workspace_name(id, &req.prompt);
+            let path = parent.join(&name);
+            let branch = format!("jackalope/{name}");
             let exclude_path = git(
                 &root,
                 &[
@@ -386,7 +387,7 @@ impl TaskRuntime {
                 .append(true)
                 .open(exclude_path)
                 .map_err(|e| e.to_string())?;
-            writeln!(exclude, "\n/.worktrees/jackalope-{id}/").map_err(|e| e.to_string())?;
+            writeln!(exclude, "\n/.worktrees/{name}/").map_err(|e| e.to_string())?;
             git(
                 &root,
                 &[
@@ -1924,6 +1925,49 @@ impl TaskRuntime {
     }
 }
 
+/// Names a task's branch and worktree folder after what it was asked to do, so
+/// people can tell them apart in Git and on disk. The id prefix keeps two tasks
+/// with the same request from colliding.
+pub(super) fn workspace_name(id: &str, prompt: &str) -> String {
+    const SKIP: &[&str] = &[
+        "a", "an", "and", "are", "as", "at", "be", "by", "can", "could", "do", "for", "from",
+        "here", "i", "in", "into", "is", "it", "its", "let", "lets", "me", "my", "of", "on", "or",
+        "our", "please", "should", "so", "that", "the", "this", "to", "we", "with", "would", "you",
+    ];
+    let line = prompt
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or("");
+    let line = line.strip_prefix("Live session:").unwrap_or(line);
+    let mut slug = String::new();
+    for word in line
+        .split(|ch: char| !ch.is_ascii_alphanumeric())
+        .map(str::to_ascii_lowercase)
+        .filter(|word| !word.is_empty() && !SKIP.contains(&word.as_str()))
+        .take(5)
+    {
+        if !slug.is_empty() && slug.len() + word.len() >= 40 {
+            break;
+        }
+        if !slug.is_empty() {
+            slug.push('-');
+        }
+        slug.extend(word.chars().take(40));
+    }
+    let short: String = id
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .take(6)
+        .collect::<String>()
+        .to_ascii_lowercase();
+    match (slug.is_empty(), short.is_empty()) {
+        (true, _) => format!("task-{short}"),
+        (false, true) => slug,
+        (false, false) => format!("{slug}-{short}"),
+    }
+}
+
 /// Whether an isolated attempt left uncommitted or committed changes. Unknown counts as changed.
 fn attempt_changed(run: &TaskRun) -> bool {
     if run.base_head.is_empty() || run.workspace.is_empty() {
@@ -1953,6 +1997,22 @@ fn attempt_changed(run: &TaskRun) -> bool {
 #[cfg(test)]
 mod attempt_change_tests {
     use super::*;
+
+    #[test]
+    fn workspaces_are_named_after_the_request() {
+        assert_eq!(
+            workspace_name(
+                "909b032e-1efc-4942-842f-8cd636",
+                "Live session: Create or update AGENTS.md at the repository root so coding agents can work"
+            ),
+            "create-update-agents-md-repository-909b03"
+        );
+        assert_eq!(
+            workspace_name("task-1", "\n  Fix the login bug\nDetails"),
+            "fix-login-bug-task1"
+        );
+        assert_eq!(workspace_name("abc", "?!"), "task-abc");
+    }
 
     #[test]
     fn only_attempts_with_changes_need_automatic_checks() {
