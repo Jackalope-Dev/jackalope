@@ -1,4 +1,11 @@
-import { ConfirmDialog, DropdownMenu as Menu, SearchField, Switch, Textarea } from '@jackalope/ui';
+import {
+  ConfirmDialog,
+  DropdownMenu as Menu,
+  SearchField,
+  SegmentedNav,
+  Switch,
+  Textarea,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   AlarmClock,
@@ -6,7 +13,6 @@ import {
   Bot as BotIcon,
   MessageSquare,
   MoreHorizontal,
-  Pin,
   Plus,
   Sparkles,
 } from 'lucide-react';
@@ -53,9 +59,11 @@ import { LiveSessionView } from '../sessions/LiveSessionView';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { InlineNotice } from '../ui/InlineNotice';
+import { OptionsMenu } from '../ui/OptionsMenu';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
+import { WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import { BotAvatar } from './BotAvatar';
 import { BotCardView } from './BotCardView';
 import { BotEditor } from './BotEditor';
@@ -208,10 +216,16 @@ export function BotsWorkspace() {
         title="Bots"
         action={
           <div className="bots-heading-actions">
-            {bots.length > 0 && <HubMenu paused={hub.paused} />}
+            {bots.length > 0 && (
+              <HubMenu
+                paused={hub.paused}
+                disabled={!projects.length}
+                onTemplate={() => setPickingTemplate(true)}
+              />
+            )}
             <Button onClick={() => startNew()} disabled={!projects.length}>
               <Plus size={16} aria-hidden="true" />
-              Create a new bot
+              New bot
             </Button>
           </div>
         }
@@ -273,20 +287,15 @@ export function BotsWorkspace() {
                   >
                     <BotAvatar appearance={bot.appearance} agent={bot.agent} state={activity} />
                     <span className="bots-roster-copy">
-                      <strong>
-                        {bot.name}
-                        {bot.pinned && <Pin size={12} aria-label="Pinned" />}
-                      </strong>
+                      <strong>{bot.name}</strong>
                       <small title={latest?.title ?? bot.role}>
                         {latest?.title ?? (bot.role || 'No conversations yet')}
                       </small>
                     </span>
-                    {waiting > 0 ? (
+                    {waiting > 0 && (
                       <small className="bots-roster-count" aria-hidden="true">
                         {waiting}
                       </small>
-                    ) : (
-                      unread > 0 && <span className="bots-roster-unread" aria-hidden="true" />
                     )}
                   </button>
                   <BotMenu
@@ -297,15 +306,6 @@ export function BotsWorkspace() {
                 </div>
               );
             })}
-            <button
-              type="button"
-              className="bots-roster-template"
-              disabled={!projects.length}
-              onClick={() => setPickingTemplate(true)}
-            >
-              <Plus size={14} aria-hidden="true" />
-              Create from template
-            </button>
           </nav>
           {open ? (
             <div className="bots-conversation">
@@ -313,7 +313,6 @@ export function BotsWorkspace() {
                 key={open.id}
                 session={open}
                 runs={sessionRuns}
-                initialDetailsOpen={false}
                 onBack={() => useBotStore.getState().openConversation(null)}
                 onOpenSession={openSession}
                 simple
@@ -353,7 +352,7 @@ export function BotsWorkspace() {
       {pickingTemplate && (
         <Dialog.Root open onOpenChange={(value) => !value && setPickingTemplate(false)}>
           <DialogContent className="bots-template-dialog">
-            <DialogHeader title="Create from template" />
+            <DialogHeader title="New bot from template" />
             <DialogCloseButton />
             <BotTemplates
               disabled={!projects.length}
@@ -434,7 +433,16 @@ function BotTemplates({
   );
 }
 
-function HubMenu({ paused }: { paused: boolean }) {
+/** Page options. Resuming lives on the paused notice, so the menu only offers pausing. */
+function HubMenu({
+  paused,
+  disabled,
+  onTemplate,
+}: {
+  paused: boolean;
+  disabled: boolean;
+  onTemplate: () => void;
+}) {
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
@@ -444,12 +452,20 @@ function HubMenu({ paused }: { paused: boolean }) {
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
-          <Menu.Item
-            className="workspace-menu-item"
-            onSelect={() => void setWakeUpsPaused(!paused)}
-          >
-            {paused ? 'Resume all wake-ups' : 'Pause all wake-ups'}
+          <Menu.Item className="workspace-menu-item" disabled={disabled} onSelect={onTemplate}>
+            New bot from template…
           </Menu.Item>
+          {!paused && (
+            <>
+              <Menu.Separator className="menu-separator" />
+              <Menu.Item
+                className="workspace-menu-item"
+                onSelect={() => void setWakeUpsPaused(true)}
+              >
+                Pause all wake-ups
+              </Menu.Item>
+            </>
+          )}
         </Menu.Content>
       </Menu.Portal>
     </Menu.Root>
@@ -498,6 +514,8 @@ function BotMenu({
     </Menu.Root>
   );
 }
+
+type ProfileView = 'conversations' | 'wakes' | 'memory' | 'activity';
 
 /** Rows listed before Show all; longer conversation lists also get search. */
 const LIST_LIMIT = 12;
@@ -556,6 +574,9 @@ function BotProfile({
   const [error, setError] = useState('');
   const [fresh, setFresh] = useState(false);
   const [allEvents, setAllEvents] = useState(false);
+  const [chosenView, setView] = useState<ProfileView>('conversations');
+  const view = chosenView === 'activity' && !events.length ? 'conversations' : chosenView;
+  const routines = project && bot.routineIds.length > 0;
   const latestOpen = continuableConversation(conversations);
   const continuing = fresh ? undefined : latestOpen;
   const pending = useRef<{
@@ -726,30 +747,42 @@ function BotProfile({
           </div>
         </section>
       )}
-      <ConversationList
-        conversations={conversations}
-        runs={runs}
-        isUnread={isUnread}
-        onOpen={onOpen}
-      />
-      <BotMemory bot={bot} notes={notes} onOpen={onOpen} />
-      <BotWakeList
-        bot={bot}
-        project={project}
-        states={wakeStates}
-        onEdit={onEdit}
-        onOpen={onOpen}
-      />
-      {events.length > 0 && (
-        <section className="workspace-section workspace-stack">
-          <WorkspaceSectionHeading
-            title="Activity"
-            description={
-              bot.collaborate
-                ? 'Wake-ups, messages with other bots and cards.'
-                : 'Wake-ups and cards. Messaging other bots is off.'
-            }
-          />
+      <WorkspaceToolbar>
+        <SegmentedNav
+          label={`${bot.name} views`}
+          value={view}
+          onChange={setView}
+          items={[
+            { id: 'conversations', label: 'Conversations', count: conversations.length },
+            { id: 'wakes', label: 'Wake-ups', count: bot.wakes.length },
+            { id: 'memory', label: 'Memory', count: notes.length },
+            ...(events.length ? [{ id: 'activity' as const, label: 'Activity' }] : []),
+          ]}
+        />
+        {view === 'wakes' && (
+          <Button variant="outline" onClick={onEdit}>
+            <AlarmClock size={16} aria-hidden="true" />
+            {bot.wakes.length ? 'Edit wake-ups' : 'Add wake-up'}
+          </Button>
+        )}
+      </WorkspaceToolbar>
+      {view === 'conversations' && (
+        <ConversationList
+          conversations={conversations}
+          runs={runs}
+          isUnread={isUnread}
+          onOpen={onOpen}
+        />
+      )}
+      {view === 'memory' && <BotMemory bot={bot} notes={notes} onOpen={onOpen} />}
+      {view === 'wakes' && (
+        <div className="workspace-sections">
+          <BotWakeList bot={bot} project={project} states={wakeStates} onOpen={onOpen} />
+          {routines && <BotRoutines bot={bot} />}
+        </div>
+      )}
+      {view === 'activity' && (
+        <section className="workspace-stack" aria-label="Activity">
           <ul className="bots-list bots-activity">
             {events
               .slice(allEvents ? 0 : -LIST_LIMIT)
@@ -771,7 +804,6 @@ function BotProfile({
           )}
         </section>
       )}
-      {project && bot.routineIds.length > 0 && <BotRoutines bot={bot} />}
     </section>
   );
 }
@@ -799,8 +831,7 @@ function ConversationList({
     : conversations;
   const shown = all || search ? matching : matching.slice(0, LIST_LIMIT);
   return (
-    <section className="workspace-section workspace-stack">
-      <WorkspaceSectionHeading title="Conversations" />
+    <section className="workspace-stack" aria-label="Conversations">
       {conversations.length > LIST_LIMIT && (
         <SearchField
           aria-label="Search conversations"
@@ -875,11 +906,7 @@ function BotMemory({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
   return (
-    <section className="workspace-section workspace-stack">
-      <WorkspaceSectionHeading
-        title="Memory"
-        description={`What ${bot.name} brings to new conversations, with how its latest ones ended.`}
-      />
+    <section className="workspace-stack" aria-label="Memory">
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {notes.length ? (
         <ul className="bots-list">
@@ -887,21 +914,25 @@ function BotMemory({
             <li key={note.id} className="bots-routine">
               <span>
                 <span className="bots-note">{note.text}</span>
-                <small>{new Date(note.updatedAt).toLocaleString()}</small>
+                <small>
+                  {busy === note.id ? 'Removing…' : new Date(note.updatedAt).toLocaleString()}
+                </small>
               </span>
-              <span className="bot-wake-actions">
+              <OptionsMenu
+                label={`Note options: ${note.text.slice(0, 60)}`}
+                disabled={busy !== null}
+              >
                 {note.sessionId && (
-                  <Button variant="ghost" onClick={() => onOpen(note.sessionId ?? '')}>
-                    Source
-                  </Button>
+                  <Menu.Item
+                    className="workspace-menu-item"
+                    onSelect={() => onOpen(note.sessionId ?? '')}
+                  >
+                    Open source conversation
+                  </Menu.Item>
                 )}
-                <Button
-                  variant="ghost"
-                  aria-label={`Remove note: ${note.text.slice(0, 60)}`}
-                  loading={busy === note.id}
-                  loadingLabel="Removing…"
-                  disabled={busy !== null}
-                  onClick={async () => {
+                <Menu.Item
+                  className="workspace-menu-item"
+                  onSelect={async () => {
                     setBusy(note.id);
                     setError('');
                     try {
@@ -913,9 +944,9 @@ function BotMemory({
                     }
                   }}
                 >
-                  Remove
-                </Button>
-              </span>
+                  Remove note
+                </Menu.Item>
+              </OptionsMenu>
             </li>
           ))}
         </ul>
@@ -943,12 +974,7 @@ function ProposalCard({
     <article className="bot-card" data-kind="proposal">
       <header className="bot-card-header">
         <Sparkles size={16} aria-hidden="true" />
-        <span>
-          <small>Suggested bot</small>
-          <strong>
-            {proposal.name} · {proposal.role}
-          </strong>
-        </span>
+        <strong>Suggested bot: {proposal.name}</strong>
       </header>
       <p className="bot-card-body">{proposal.reason}</p>
       {proposal.wake && (
@@ -966,27 +992,28 @@ function ProposalCard({
       )}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       <footer className="bot-card-footer">
-        <Button variant="ghost" onClick={onOpen}>
-          Open conversation
-        </Button>
-        <Button
-          variant="ghost"
-          loading={busy}
-          loadingLabel="Dismissing…"
-          onClick={async () => {
-            setBusy(true);
-            try {
-              await resolveProposal(proposal.id, 'dismiss');
-            } catch (cause) {
-              setError(String(cause));
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Dismiss
-        </Button>
-        <Button onClick={onReview}>
+        <OptionsMenu label={`${proposal.name} suggestion options`} disabled={busy}>
+          <Menu.Item className="workspace-menu-item" onSelect={onOpen}>
+            Open conversation
+          </Menu.Item>
+          <Menu.Item
+            className="workspace-menu-item"
+            onSelect={async () => {
+              setBusy(true);
+              setError('');
+              try {
+                await resolveProposal(proposal.id, 'dismiss');
+              } catch (cause) {
+                setError(String(cause));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Dismiss
+          </Menu.Item>
+        </OptionsMenu>
+        <Button onClick={onReview} disabled={busy}>
           <BotIcon size={16} aria-hidden="true" />
           Review and create
         </Button>
@@ -1035,13 +1062,11 @@ function BotWakeList({
   bot,
   project,
   states,
-  onEdit,
   onOpen,
 }: {
   bot: Bot;
   project?: Project;
   states: WakeState[];
-  onEdit: () => void;
   onOpen: (id: string) => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
@@ -1056,34 +1081,27 @@ function BotWakeList({
     }
   };
   return (
-    <section className="workspace-section workspace-stack">
-      <WorkspaceSectionHeading
-        title="Wake-ups"
-        description="Wake-ups start or continue conversations on their own."
-        action={
-          <Button variant="outline" onClick={onEdit}>
-            <AlarmClock size={16} aria-hidden="true" />
-            {bot.wakes.length ? 'Edit wake-ups' : 'Add wake-up'}
-          </Button>
-        }
-      />
+    <section className="workspace-stack" aria-label="Wake-ups">
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {bot.wakes.length ? (
         <ul className="bots-list">
           {bot.wakes.map((wake) => {
             const state = states.find((item) => item.wakeId === wake.id);
-            const status = !wake.enabled
-              ? 'Off'
-              : [
-                  state?.lastOutcome,
-                  wake.trigger.kind === 'schedule' && state?.nextCheckAt
-                    ? `Next ${new Date(state.nextCheckAt).toLocaleString()}`
-                    : state?.lastCheckedAt
-                      ? `Checked ${new Date(state.lastCheckedAt).toLocaleTimeString()}`
-                      : 'Starting',
-                ]
-                  .filter(Boolean)
-                  .join(' · ');
+            const status =
+              busy === wake.id
+                ? 'Waking…'
+                : !wake.enabled
+                  ? 'Off'
+                  : [
+                      state?.lastOutcome,
+                      wake.trigger.kind === 'schedule' && state?.nextCheckAt
+                        ? `Next ${new Date(state.nextCheckAt).toLocaleString()}`
+                        : state?.lastCheckedAt
+                          ? `Checked ${new Date(state.lastCheckedAt).toLocaleTimeString()}`
+                          : 'Starting',
+                    ]
+                      .filter(Boolean)
+                      .join(' · ');
             return (
               <li key={wake.id} className="bots-routine">
                 <span>
@@ -1092,31 +1110,34 @@ function BotWakeList({
                   <small>{status}</small>
                 </span>
                 <span className="bot-wake-actions">
-                  {state?.lastSessionId && (
-                    <Button variant="ghost" onClick={() => onOpen(state.lastSessionId ?? '')}>
-                      Latest
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    disabled={!project || !isTauriEnvironment() || busy !== null}
-                    loading={busy === wake.id}
-                    loadingLabel="Waking…"
-                    onClick={async () => {
-                      setBusy(wake.id);
-                      setError('');
-                      try {
-                        onOpen(await wakeNow(bot.id, wake.id));
-                        await useLiveSessionStore.getState().refresh(null);
-                      } catch (cause) {
-                        setError(String(cause));
-                      } finally {
-                        setBusy(null);
-                      }
-                    }}
-                  >
-                    Run now
-                  </Button>
+                  <OptionsMenu label={`${wake.name} options`} disabled={busy !== null}>
+                    <Menu.Item
+                      className="workspace-menu-item"
+                      disabled={!project || !isTauriEnvironment()}
+                      onSelect={async () => {
+                        setBusy(wake.id);
+                        setError('');
+                        try {
+                          onOpen(await wakeNow(bot.id, wake.id));
+                          await useLiveSessionStore.getState().refresh(null);
+                        } catch (cause) {
+                          setError(String(cause));
+                        } finally {
+                          setBusy(null);
+                        }
+                      }}
+                    >
+                      Run now
+                    </Menu.Item>
+                    {state?.lastSessionId && (
+                      <Menu.Item
+                        className="workspace-menu-item"
+                        onSelect={() => onOpen(state.lastSessionId ?? '')}
+                      >
+                        Open latest conversation
+                      </Menu.Item>
+                    )}
+                  </OptionsMenu>
                   <Switch
                     aria-label={`Turn on ${wake.name}`}
                     checked={wake.enabled}
@@ -1165,7 +1186,7 @@ function BotRoutines({ bot }: { bot: Bot }) {
     <section className="workspace-section workspace-stack">
       <WorkspaceSectionHeading
         title="Routines"
-        description="Earlier scheduled tasks. Manage timing and history in Schedules."
+        description="Manage timing and history in Schedules."
       />
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       <ul className="bots-list">

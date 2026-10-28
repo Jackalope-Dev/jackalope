@@ -12,7 +12,6 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useShallow } from 'zustand/react/shallow';
 import {
   collectWorkspaceWork,
-  matchesWorkFilter,
   selectedManagedTask,
   type WorkItem,
 } from '../../lib/task-collection';
@@ -77,7 +76,6 @@ export function TaskWorkspace({
     () => [...new Map([...runs, ...sessionRuns].map((run) => [run.id, run])).values()],
     [runs, sessionRuns],
   );
-  const runners = useExecutionStore((state) => state.runners);
   const selectedId = useExecutionStore((state) => state.selectedId);
   const select = useExecutionStore((state) => state.select);
   const loading = useExecutionStore((state) => state.loading);
@@ -102,7 +100,6 @@ export function TaskWorkspace({
   );
   const projectFilter = scope === 'all' ? 'all' : (activeProjectId ?? 'unassigned');
   const [archived, setArchived] = useState(false);
-  const [cleanupBusy, setCleanupBusy] = useState(false);
   const [parallel, setParallel] = useState(false);
   const [composerExpanded, setComposerExpanded] = useState(false);
   const hasWork = !!(
@@ -212,9 +209,6 @@ export function TaskWorkspace({
     }
     if (failures.length) throw new Error(failures.join('\n'));
   };
-  const needsYou = archived
-    ? 0
-    : items.filter((item) => matchesWorkFilter(item, 'attention')).length;
   const managedTask = selectedManagedTask(
     managed.queue,
     allRuns,
@@ -237,18 +231,13 @@ export function TaskWorkspace({
   if (managedTask)
     return (
       <Suspense fallback={<LoadingState label="Loading task…" />}>
-        <ManagedTaskView key={managedTask.id} task={managedTask} onBack={() => selectWork()} />
+        <ManagedTaskView key={managedTask.id} task={managedTask} />
       </Suspense>
     );
   if (owningSession)
     return (
       <Suspense fallback={<LoadingState label="Loading conversation…" />}>
-        <LiveSessionView
-          key={owningSession.id}
-          session={owningSession}
-          runs={sessionRuns}
-          onBack={() => selectWork()}
-        />
+        <LiveSessionView key={owningSession.id} session={owningSession} runs={sessionRuns} />
       </Suspense>
     );
   if (selected)
@@ -272,12 +261,7 @@ export function TaskWorkspace({
   if (selectedSession)
     return (
       <Suspense fallback={<LoadingState label="Loading conversation…" />}>
-        <LiveSessionView
-          key={selectedSession.id}
-          session={selectedSession}
-          runs={sessionRuns}
-          onBack={() => selectWork()}
-        />
+        <LiveSessionView key={selectedSession.id} session={selectedSession} runs={sessionRuns} />
       </Suspense>
     );
   if (parallel && project)
@@ -291,40 +275,9 @@ export function TaskWorkspace({
     <WorkspacePage className="task-home">
       <WorkspaceHeading
         title="Work"
-        description={
-          hasWork ? undefined : (
-            <span>
-              Describe what to build, fix, or explore, or{' '}
-              <button
-                type="button"
-                className="task-inline-link"
-                onClick={() => navigateWorkspace('repo-todos')}
-              >
-                find tasks in Repo TODOs &rarr;
-              </button>
-            </span>
-          )
-        }
         action={
           <div className="task-home-actions">
-            {!!needsYou && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setView({
-                    ...view,
-                    filter: 'attention',
-                  });
-                  document
-                    .querySelector('.task-collection')
-                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }}
-              >
-                Needs you · {needsYou}
-              </Button>
-            )}
-            {hasWork && (
+            {hasWork && !(composerVisible && composerExpanded) && (
               <Button
                 onClick={() => {
                   setComposerExpanded(true);
@@ -395,28 +348,15 @@ export function TaskWorkspace({
             key={String(archived)}
             archived={archived}
             onArchive={archiveItems}
-            onBusyChange={setCleanupBusy}
-            history={
-              <Select
-                aria-label="Task history"
-                disabled={cleanupBusy}
-                value={archived ? 'archive' : 'current'}
-                onValueChange={(value) => setArchived(value === 'archive')}
-              >
-                <SelectItem value="current">Current work</SelectItem>
-                <SelectItem value="archive">Archived work</SelectItem>
-              </Select>
-            }
+            onArchivedChange={setArchived}
             scope={
               <Select
                 aria-label="Filter by project"
                 value={scope}
                 onValueChange={(value) => setScope(value as 'all' | 'project')}
               >
-                <SelectItem value="all">All work · every project</SelectItem>
-                <SelectItem value="project">
-                  {project?.name ?? 'No project yet'} · project work
-                </SelectItem>
+                <SelectItem value="all">All projects</SelectItem>
+                <SelectItem value="project">{project?.name ?? 'No project yet'}</SelectItem>
               </Select>
             }
             emptyState={
@@ -435,26 +375,22 @@ export function TaskWorkspace({
                     : 'Start new work, or browse repository TODOs to find tasks.'
                 }
                 action={
-                  <div className="workspace-actions">
-                    {projectFilter !== 'all' && projects.length > 1 && (
-                      <Button variant="outline" onClick={() => setScope('all')}>
-                        Show all projects
-                      </Button>
-                    )}
-                    {!archived && (
-                      <Button variant="outline" onClick={() => navigateWorkspace('repo-todos')}>
-                        <ListTodo size={16} />
-                        Browse Repo TODOs
-                      </Button>
-                    )}
-                  </div>
+                  projectFilter !== 'all' && projects.length > 1 ? (
+                    <Button variant="outline" onClick={() => setScope('all')}>
+                      Show all projects
+                    </Button>
+                  ) : archived ? undefined : (
+                    <Button variant="outline" onClick={() => navigateWorkspace('repo-todos')}>
+                      <ListTodo size={16} />
+                      Browse Repo TODOs
+                    </Button>
+                  )
                 }
               />
             }
             view={view}
             onViewChange={setView}
             items={items}
-            runners={runners}
             onOpen={openItem}
           />
         </Suspense>

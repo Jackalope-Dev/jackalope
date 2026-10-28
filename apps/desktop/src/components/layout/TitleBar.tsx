@@ -1,7 +1,6 @@
-import { LifeBuoy, Minus, RotateCw, Settings2, Square, X } from 'lucide-react';
+import { LifeBuoy, Minus, RotateCw, Square, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { isMacPlatform } from '../../lib/platform-shortcuts';
-import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
@@ -25,10 +24,9 @@ const isMac = isMacPlatform();
  * false` (tauri.conf.json) and get fully custom controls on the right.
  * A no-op outside Tauri (browser dev preview keeps its normal chrome).
  */
-export function TitleBar({ onSettings }: { onSettings?: () => void }) {
+export function TitleBar({ themePicker = false }: { themePicker?: boolean }) {
   const [isMaximized, setIsMaximized] = useState(false);
   const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
-  const shortcuts = useSettingsStore((state) => state.shortcuts);
   const beta = useUpdateStore((state) => state.release?.channel === 'beta');
   const updateReady = useUpdateStore(
     (state) =>
@@ -90,21 +88,7 @@ export function TitleBar({ onSettings }: { onSettings?: () => void }) {
             </button>
           </Tooltip>
         )}
-        {onSettings && showThemePicker && <ArcColorPicker variant="titlebar" />}
-        {onSettings && (
-          <Tooltip content={`Settings (${displayShortcut(resolveShortcuts(shortcuts).settings)})`}>
-            <button
-              type="button"
-              className="app-titlebar-button"
-              aria-label="Settings and preferences"
-              onMouseDown={(event) => event.stopPropagation()}
-              onDoubleClick={(event) => event.stopPropagation()}
-              onClick={onSettings}
-            >
-              <Settings2 size={16} />
-            </button>
-          </Tooltip>
-        )}
+        {themePicker && showThemePicker && <ArcColorPicker variant="titlebar" />}
         <Tooltip content="Help Center">
           <button
             type="button"

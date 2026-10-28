@@ -7,13 +7,15 @@ isolated parallel work, coordination and review before integration.
 
 ### Live sessions
 
-Task review and preview open beside the conversation on windows at least 1280 pixels
-wide and take the full width on narrower ones. Individual
-conversation toggles remain available and are saved per task.
-
-The task toolbar shows the branch and changes since a previous visit. Task context
-opens the workspace and saved checks. Terminal opens a shell view in that exact
-workspace; Workspace tools opens its installed editor or a separate task window.
+Task review and preview open beside the task on windows at least 1280 pixels wide and
+take the full width on narrower ones; the toggle is saved per task. Conversations
+instead switch the whole view between Conversation, Review, Preview, Terminal and
+Screen tabs. Their options menu holds Task context (workspace, branch and saved
+checks), Topics and a Workspace submenu for editors, separate task windows and copying
+the path or branch. The task toolbar shows the branch and changes since a
+previous visit, with the same Task context and Workspace tools. Terminal opens a shell
+view in that exact workspace. New task branches and worktree folders are named after the
+request with a short id suffix, such as `jackalope/fix-login-bug-909b03`.
 The task terminal is a separate shell, not a resumed provider conversation. Stop it
 before agent work, checks, previews or integration. Its bounded output survives closing
 and reopening a view while the app runs. Controls reject commands addressed to an
@@ -196,8 +198,8 @@ dialog reopen in feature planning after any unfinished regular plan is imported;
 their saved run, steps and storage remain intact.
 
 1. Open the native desktop app and choose a Git project with a committed local target branch.
-2. In Tasks, choose **Plan parallel work**. Add focused tasks, or **Import a plan**
-   from JSON. Review titles, instructions, assigned agents, owned paths and dependencies.
+2. In Work's options menu, choose **Plan feature work**. Add focused tasks, or **Import a
+   plan** from JSON, from that page's options menu. Review titles, instructions, assigned agents, owned paths and dependencies.
 3. Choose the concurrency limit and **Run ready tasks**. The limit counts currently
    active application attempts across projects. Explicit single-task launches remain
    available separately. Pausing dispatch leaves current attempts running; each has Stop.

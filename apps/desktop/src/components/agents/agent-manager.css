@@ -99,14 +99,6 @@
   }
 }
 
-.agent-switcher-off-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--color-text-muted);
-  opacity: 0.6;
-}
-
 /* Hero Profile Card - Front & Center */
 .agent-hero-card {
   display: flex;
@@ -196,55 +188,10 @@
   margin: 0;
 }
 
-.agent-hero-badges {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.agent-hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  font-size: var(--text-xs, 0.75rem);
-  font-weight: 500;
-}
-
-/* Status tones come from theme tokens so the badges keep contrast in dark themes. */
-.agent-hero-badge-default {
-  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
-  color: var(--color-warning);
-  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
-}
-
-.agent-hero-badge-ready {
-  background: color-mix(in srgb, var(--color-success) 12%, transparent);
-  color: var(--color-success);
-  border: 1px solid color-mix(in srgb, var(--color-success) 30%, transparent);
-}
-
-.agent-hero-badge-installed {
-  background: var(--color-accent-subtle);
-  color: var(--color-accent-ink);
-  border: 1px solid color-mix(in srgb, var(--color-accent-ink) 30%, transparent);
-}
-
-.agent-hero-badge-unavailable {
-  background: var(--color-surface-sunken);
+.agent-hero-status {
+  margin: 0 0 12px;
+  font-size: var(--text-sm, 0.875rem);
   color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
-}
-
-.agent-hero-badge-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
 }
 
 .agent-hero-description {
@@ -309,28 +256,10 @@
   border-bottom: 1px solid var(--color-border-subtle, var(--color-border));
 }
 
-.agent-settings-card-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  background: var(--color-surface-sunken);
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
-}
-
 .agent-settings-card-title {
   font-size: var(--text-base, 1rem);
   font-weight: 600;
   color: var(--color-text-primary);
-  margin: 0 0 2px;
-}
-
-.agent-settings-card-description {
-  font-size: var(--text-xs, 0.75rem);
-  color: var(--color-text-muted);
   margin: 0;
 }
 

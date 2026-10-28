@@ -117,7 +117,7 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
           ].join(', ')}
         >
           <Gauge size={15} aria-hidden="true" />
-          <span className="statusbar-usage-label">{label}</span>
+          {!summaries.length && <span className="statusbar-usage-label">{label}</span>}
           {summaries.slice(0, 2).map((summary) => (
             <span
               key={summary.record.agent}

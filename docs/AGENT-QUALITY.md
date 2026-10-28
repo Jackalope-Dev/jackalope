@@ -650,6 +650,70 @@ user setting or proof of a faster workflow.
 | `JACKALOPE_INITIAL_TOOLS=small` | Attempts discovery for up to three seconds before launch. Supplies a complete catalog only when it has at most four tools and 6 KB of metadata; other catalogs retain on-demand discovery. Initialization time and broker searches remain in the measurements. |
 | `JACKALOPE_CONTEXT_READ=on` | Exposes bounded source ranges and ranked symbol locations. Previously read block hashes can omit unchanged text; callers must retain that text in context. Explicitly requested blocks are not reranked away. |
 | `JACKALOPE_JEV_ASSISTANCE=shadow` | Records configured relevance/review assessments without changing selected context or suppressing monitors. Source candidate ranking is shadow-only. Existing Jev settings and credentials are required. |
+| `JACKALOPE_CLAUDE_SESSION=oneshot` | Starts a Claude Code process per message and continues with `--resume`. `persistent` (default) runs Claude Code over the stream-json control protocol and keeps one warm process per live conversation; see [Claude Code sessions and hooks](#claude-code-sessions-and-hooks). |
+| `JACKALOPE_CLAUDE_ISOLATION=on` | Adds `--strict-mcp-config --setting-sources project,local` to Claude Code tasks, so personal settings, plugins, hooks and global MCP servers do not load. A project's **Use my Claude Code setup** choice overrides this default either way. |
+| `JACKALOPE_CLAUDE_PARTIALS=off` | Disables the default `--include-partial-messages`. Streamed text is held in memory for the terminal view and records `firstTokenMs`; saved results and activity are unchanged. |
+| `JACKALOPE_CLAUDE_FALLBACK=off` | Drops the default `--fallback-model`, which an explicitly selected Claude model gets: Opus falls back to Sonnet, Sonnet to Opus, Haiku to Sonnet. An unpinned model gets no fallback. Turn it off for model comparisons. |
+| `JACKALOPE_CLAUDE_PROMPT_CACHE=shared` | Adds `--exclude-dynamic-system-prompt-sections`, moving per-workspace sections out of Claude Code's system prompt so different worktrees can share its cache. |
+| `JACKALOPE_CLAUDE_EDIT_CHECK=off` | Turns off the default edit check: with a persistent session, the project's **Check after each edit** command (`editCheck`) runs after Edit, Write, MultiEdit and NotebookEdit and a failure returns to Claude as context. |
+| `JACKALOPE_CLAUDE_STOP_CHECK=off` | Turns off the default stop check: with a persistent session and automatic checks on, the saved check runs when Claude stops and a failure asks it to keep fixing, for at most three rounds. |
+| `JACKALOPE_CLAUDE_CONTEXT_HOOK=off` | Turns off the default context hook, which with a persistent session delivers selected project context through `UserPromptSubmit` instead of the first message and records lesson delivery only when the hook fires. |
+| `JACKALOPE_CLAUDE_PERMISSION_HOOK=off` | Turns off the default permission hook, which with a persistent session answers `PreToolUse` for Bash, PowerShell, WebFetch and WebSearch with the auto-approval risk check. Routine requests are allowed directly; risky ones use the existing permission prompt, or are denied with the reason when the task has no bridge. Deny rules in Claude Code settings still apply. |
+| `JACKALOPE_CLAUDE_TOOL_TIMING=off` | Turns off the default tool timing, which with a persistent session records each reported tool duration under `efficiency.timings["tool:<name>"]` (at most 40 tool names, then `tool:other`). |
+
+### Claude Code sessions and hooks
+
+A persistent Claude Code session starts with `--input-format stream-json` and sends
+an `initialize` control request that registers only the enabled hook callbacks. Each
+message in a live conversation is written to the same process. After a clean turn the
+process is parked, keyed by Claude's session ID and a fingerprint of its program,
+arguments, explicit environment, working directory and hook set. A follow-up reuses
+it only when that fingerprint and the workspace match; otherwise, and after ten idle
+minutes, a failed or stopped turn, a quota stop, an account change or app exit, the
+process is stopped and the follow-up resumes the saved session with `--resume`. At
+most four processes stay warm. During a turn the process is registered under the
+running attempt, so stopping the attempt kills it. A warm process keeps the bridge
+token it started with; while a later attempt runs a turn, that token is resolved to the
+later attempt's grant, and between turns it maps back to the finished first attempt,
+which the bridge no longer authorizes. Claude reports cumulative cost per process, so
+a reused turn records the difference from the previous turn.
+
+Hook callbacks answer in the same session. A stop-hook check uses the saved-check
+path, so a passing snapshot is reused by the final check; after the third failing
+round the attempt finishes and the final check reports the result. Hooks registered
+when the process started remain registered for later turns, which answer with no
+decision when a check does not apply. Edit checks run the project's `editCheck`
+command (`{file}` becomes the quoted workspace path; paths needing more escaping skip
+the check) for up to 60 seconds; set it as **Check after each edit** in the
+project's checks settings.
+
+Claude Code 2.1.312 accepts these registrations with `--include-partial-messages`,
+`--strict-mcp-config`, `--setting-sources project,local` and `--fallback-model`, sends
+`hook_callback` requests with the registered `callback_id` and the hook input, and
+acts on the replies: a `PreToolUse` allow runs the tool, `additionalContext` reaches
+the model, and a `Stop` block continues the turn with `stop_hook_active` set on the
+next stop. A deny rule in Claude Code settings still refuses a tool the hook allows.
+`total_cost_usd` in `result` is cumulative for the process while `usage` covers the
+turn.
+
+Trial records include `efficiency.claudeTransport` (one-shot runs leave it empty,
+otherwise `started`, `resumed` or `reused`), `firstTokenMs`, `stopCheckRounds`,
+`editChecks`, `editCheckFailures` and `firstCheckPassed`. Quality summaries add
+first-token and follow-up first-token latency, per-turn time, cache read/write tokens,
+attempt counts, first-pass check rate and stop-check rounds. Compare session settings
+on the continuation suite, which has follow-up turns, with the same installed Claude
+Code version and model in both variants. Against the persistent default, measure the
+one-shot transport:
+
+~~~sh
+node scripts/evaluation/continuation-cases.mjs C:\trials\continuation.json
+pnpm evaluate:quality -- --execute --agent=claude --model=sonnet --suite=C:\trials\continuation.json --before=C:\trials\current.exe --after=C:\trials\current.exe --before-claude-session=oneshot --order-seed=claude-session --repeat=3 --seconds=600 --tokens=400000
+~~~
+
+Compare one control at a time, for example `--before-claude-stop-check=off`, so
+both arms share the persistent transport, and turn off `claude-fallback` when
+comparing models. Fixture tests use a protocol stand-in and do not establish
+installed Claude Code behavior.
 
 `node scripts/evaluation/assistance.mjs receipts.json labels.json report.json`
 compares retained decision receipts with independent labels containing `recordId`,

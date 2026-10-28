@@ -262,6 +262,8 @@ export interface RunRequest {
   autoVerify?: boolean;
   prompt: string;
   isolated: boolean;
+  /** Overrides `isolated` for a new Git task; absent keeps the `isolated` choice. */
+  workspaceMode?: 'worktree' | 'branch' | 'current' | 'ask';
   previousRunId?: string;
   taskId?: string;
 }

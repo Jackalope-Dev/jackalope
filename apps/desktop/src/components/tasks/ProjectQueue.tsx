@@ -1,4 +1,10 @@
-import { Badge, Disclosure, DisclosureSummary, SegmentedNav } from '@jackalope/ui';
+import {
+  Badge,
+  Disclosure,
+  DisclosureSummary,
+  DropdownMenu as Menu,
+  SegmentedNav,
+} from '@jackalope/ui';
 import {
   ArrowLeft,
   ArrowRight,
@@ -9,6 +15,7 @@ import {
   Layers3,
   ListPlus,
   LoaderCircle,
+  MoreHorizontal,
   Pause,
   Play,
 } from 'lucide-react';
@@ -179,17 +186,28 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
             {tab === 'review' ? 'Review & merge' : 'Feature work'}
           </h1>
         </div>
-        <div className="flex flex-col items-end gap-3">
+        <div className="task-home-actions">
           <Button disabled={!desktop} onClick={() => setPlanningFeature(true)}>
             Plan a feature
           </Button>
-          <Button variant="outline" disabled={!desktop} onClick={() => setAdding(true)}>
-            <ListPlus size={16} />
-            Add work
-          </Button>
-          <Button variant="ghost" disabled={!desktop} onClick={() => setImporting(true)}>
-            Import a plan
-          </Button>
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button variant="outline" aria-label="More feature work actions" disabled={!desktop}>
+                <MoreHorizontal size={18} />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
+                <Menu.Item className="workspace-menu-item" onSelect={() => setAdding(true)}>
+                  <ListPlus size={16} />
+                  Add work
+                </Menu.Item>
+                <Menu.Item className="workspace-menu-item" onSelect={() => setImporting(true)}>
+                  Import a plan
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu.Root>
         </div>
       </div>
       {planningFeature && (
@@ -302,11 +320,6 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
               {enabled ? 'Pause dispatch' : 'Run ready tasks'}
             </Button>
           </div>
-          <p className="task-muted text-xs">
-            {enabled
-              ? 'Dispatch is on. Ready tasks start automatically as dependencies merge.'
-              : 'Dispatch is paused. Start ready tasks when your plan is set.'}
-          </p>
 
           <fieldset className="queue-flow">
             <legend className="sr-only">Filter by progress</legend>
@@ -368,19 +381,19 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                     <div className="queue-item-body">
                       <div className="queue-item-title">
                         <h3>{item.title}</h3>
-                        <Badge appearance="plain" className="task-status">
-                          {phase === 'merged'
-                            ? 'Integrated'
-                            : item.error
+                        {phase !== 'merged' && (
+                          <Badge appearance="plain" className="task-status">
+                            {item.error
                               ? 'Needs attention'
                               : run
                                 ? statusLabel[run.status]
                                 : 'Queued'}
-                        </Badge>
+                          </Badge>
+                        )}
                       </div>
-                      <p className="task-muted text-xs">
-                        {item.agent} · {item.scopes.join(', ')}
-                      </p>
+                      {item.scopes.length > 0 && (
+                        <p className="task-muted text-xs">{item.scopes.join(', ')}</p>
+                      )}
                       {phase === 'queued' && <p className="queue-wait">{reason(item)}</p>}
                       {item.error && <InlineNotice tone="error">{item.error}</InlineNotice>}
                       <Disclosure className="mt-2">
@@ -388,22 +401,11 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                         <p className="queue-brief">{item.prompt}</p>
                       </Disclosure>
                       <div className="queue-item-actions">
-                        {run ? (
+                        {run && (
                           <Button variant="outline" size="sm" onClick={() => select(run.id)}>
                             {isActive(run) ? 'Follow work' : 'Read result'}
                             <ArrowRight size={13} />
                           </Button>
-                        ) : (
-                          !item.runId && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={busy}
-                              onClick={() => void act('queue_cancel', { id: item.id })}
-                            >
-                              Remove from plan
-                            </Button>
-                          )
                         )}
                         {phase === 'attention' && (
                           <Button
@@ -415,25 +417,47 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                             Retry in a new worktree
                           </Button>
                         )}
-                        {item.runId && (!run || !isActive(run)) && phase !== 'merged' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={busy}
-                            onClick={() => void act('queue_release', { id: item.id, retry: false })}
-                          >
-                            Abandon & release scope
-                          </Button>
-                        )}
-                        {run && isActive(run) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={busy}
-                            onClick={() => void act('task_stop', { id: run.id })}
-                          >
-                            Stop agent
-                          </Button>
+                        {phase !== 'merged' && (
+                          <Menu.Root>
+                            <Menu.Trigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                aria-label={`More actions for ${item.title}`}
+                                disabled={busy}
+                              >
+                                <MoreHorizontal size={16} />
+                              </Button>
+                            </Menu.Trigger>
+                            <Menu.Portal>
+                              <Menu.Content className="workspace-menu" align="start" sideOffset={8}>
+                                {run && isActive(run) ? (
+                                  <Menu.Item
+                                    className="workspace-menu-item"
+                                    onSelect={() => void act('task_stop', { id: run.id })}
+                                  >
+                                    Stop agent
+                                  </Menu.Item>
+                                ) : item.runId ? (
+                                  <Menu.Item
+                                    className="workspace-menu-item"
+                                    onSelect={() =>
+                                      void act('queue_release', { id: item.id, retry: false })
+                                    }
+                                  >
+                                    Abandon & release scope
+                                  </Menu.Item>
+                                ) : (
+                                  <Menu.Item
+                                    className="workspace-menu-item"
+                                    onSelect={() => void act('queue_cancel', { id: item.id })}
+                                  >
+                                    Remove from plan
+                                  </Menu.Item>
+                                )}
+                              </Menu.Content>
+                            </Menu.Portal>
+                          </Menu.Root>
                         )}
                       </div>
                     </div>
@@ -441,12 +465,6 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                 );
               })
           )}
-          <p className="task-muted text-sm my-4">
-            {project.plainFolder
-              ? 'Tasks run directly in this folder.'
-              : `Tasks start from committed ${project.preferences?.baseBranch || project.gitBranch}.`}{' '}
-            Pausing or restarting stops new dispatches.
-          </p>
           <CoordinationAutomation
             project={project}
             queue={queue}
@@ -486,7 +504,6 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                       <p>Completed: {m.report.completed.join('; ') || 'None reported'}</p>
                       <p>Remaining: {m.report.remaining.join('; ') || 'None reported'}</p>
                       <p>Artifacts: {m.report.artifacts.join(', ') || 'None reported'}</p>
-                      <p>Agent report · Snapshot {m.sourceTree?.slice(0, 12) ?? 'unavailable'}</p>
                     </div>
                   )}
                   <small>

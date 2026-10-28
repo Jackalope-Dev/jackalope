@@ -9,6 +9,7 @@ use std::{
 use tauri::State;
 
 pub mod automatic;
+pub mod learning;
 pub use automatic::LearningSource;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -180,6 +181,7 @@ impl KnowledgeStore {
         }
         let _lock = self.lock.lock().map_err(|e| e.to_string())?;
         let mut entries = self.read()?;
+        let mut history = vec![];
         if let Some(index) = entries.iter().position(|e| e.id == entry.id) {
             let old = &entries[index];
             if old.project_id != entry.project_id
@@ -194,18 +196,41 @@ impl KnowledgeStore {
             }
             entry.automatic = old.automatic.clone();
             entry.dismissed = false;
+            let edited = old.content != entry.content
+                || old.keywords != entry.keywords
+                || old.title != entry.title;
+            let was_managed = old.automatic.as_ref().is_some_and(|source| source.managed);
             if let Some(source) = &mut entry.automatic {
-                if old.content != entry.content
-                    || old.keywords != entry.keywords
-                    || old.title != entry.title
-                {
+                if edited {
                     source.managed = false;
                 }
+                // Turning an archived learned lesson back on restores it.
+                if let Some(state) = source.lifecycle.as_mut() {
+                    if entry.enabled && state.archived() {
+                        state.status = learning::PROBATION.into();
+                        state.archived_reason = None;
+                        state.opportunities = 0;
+                        state.idle = 0;
+                    }
+                }
             }
+            let restored =
+                learning::lifecycle(old).is_some_and(|state| state.archived()) && entry.enabled;
             entry.source_run_id = old.source_run_id.clone();
             entry.revision += 1;
             entry.updated_at = Utc::now().to_rfc3339();
             entries[index] = entry.clone();
+            if edited && was_managed {
+                history.push((
+                    "edited",
+                    "Edited by you; Jackalope will no longer change it.",
+                ));
+            } else if edited {
+                history.push(("edited", "Edited by you."));
+            }
+            if restored {
+                history.push(("restored", "Restored by you."));
+            }
         } else {
             entry.automatic = None;
             entry.dismissed = false;
@@ -226,6 +251,9 @@ impl KnowledgeStore {
             entries.push(entry.clone());
         }
         self.write(&entries)?;
+        for (action, reason) in history {
+            self.record_edit(&entry, action, reason);
+        }
         Ok(entry)
     }
 
@@ -250,6 +278,19 @@ impl KnowledgeStore {
             return Err("This entry changed. Reload before removing it.".into());
         }
         if entries[index].automatic.is_some() {
+            self.record_edit(
+                &entries[index],
+                "deleted",
+                "Removed by you; it will not be learned again.",
+            );
+            if let Some(state) = entries[index]
+                .automatic
+                .as_mut()
+                .and_then(|source| source.lifecycle.as_mut())
+            {
+                state.statement.clear();
+                state.recent_runs.clear();
+            }
             entries[index].dismissed = true;
             entries[index].enabled = false;
             entries[index].revision += 1;

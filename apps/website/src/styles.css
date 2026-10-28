@@ -512,8 +512,7 @@ h1 span {
   backdrop-filter: blur(8px);
   animation: panel-in var(--motion-fast) ease-out;
 }
-.release-dialog,
-.video-dialog {
+.release-dialog {
   position: fixed;
   z-index: 50;
   top: 50%;
@@ -551,43 +550,6 @@ h1 span {
 }
 .release-dialog .button {
   margin-top: 26px;
-}
-.video-dialog {
-  width: min(1100px, calc(100% - 48px));
-  padding: 22px;
-}
-.video-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 3px 0 18px;
-}
-.video-heading h2 {
-  font-size: 23px;
-  letter-spacing: -0.8px;
-}
-.video-heading p,
-.video-transcript {
-  font-size: 11px;
-  color: var(--color-text-secondary);
-  margin-top: 8px;
-}
-.video-dialog video {
-  display: block;
-  width: 100%;
-  max-height: 64dvh;
-  background: var(--color-surface-sunken);
-  border-radius: 10px;
-}
-.video-transcript {
-  margin-top: 16px;
-}
-.video-error {
-  padding: 32px;
-}
-.video-error .button {
-  margin-top: 18px;
 }
 @keyframes panel-in {
   from {
@@ -692,12 +654,6 @@ h1 span {
   }
   .faq-list summary {
     min-height: 66px;
-  }
-  .video-heading h2 {
-    font-size: 20px;
-  }
-  .video-dialog {
-    padding: 15px;
   }
 }
 @media (max-width: 420px) {

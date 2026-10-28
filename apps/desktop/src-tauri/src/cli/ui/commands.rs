@@ -5,7 +5,7 @@ use super::pickers::PickerKind;
 use super::App;
 use crate::connection::short;
 use crate::history;
-use crate::protocol::{Request, Response};
+use crate::protocol::{AgentStatus, Request, Response};
 
 pub const COMMANDS: &[(&str, &str)] = &[
     (
@@ -27,6 +27,10 @@ pub const COMMANDS: &[(&str, &str)] = &[
     (
         "learn",
         "save learnings from this session to project context",
+    ),
+    (
+        "learnings",
+        "see, archive or restore what this project has learned",
     ),
     ("files", "show or hide the files this work changed (Ctrl+O)"),
     (
@@ -188,6 +192,11 @@ impl App {
             self.answer(text);
             return;
         }
+        let (agents, text) = self.take_agent_mentions(&text);
+        if !agents.is_empty() {
+            self.start_with_agents(agents, text);
+            return;
+        }
         match self.session.clone() {
             Some(id) => {
                 let busy = self.working();
@@ -211,6 +220,48 @@ impl App {
                     self.show(Some(session_id));
                 }
             }
+        }
+    }
+
+    /// The agents a message names with `@id`, and the message without them.
+    /// Unknown names are left in the text, where they read as files.
+    fn take_agent_mentions(&self, text: &str) -> (Vec<String>, String) {
+        match &self.overview {
+            Some(Ok(overview)) => split_agent_mentions(text, &overview.agents),
+            _ => (Vec::new(), text.to_string()),
+        }
+    }
+
+    /// Starts the message with each named agent, one conversation apiece, and
+    /// shows the first; the rest wait in the tabs.
+    fn start_with_agents(&mut self, agents: Vec<String>, text: String) {
+        if text.is_empty() {
+            self.flash("Add a message after the agent", Tone::Warning);
+            return;
+        }
+        let mut started = Vec::new();
+        for agent in &agents {
+            let model = (self.next_agent.as_ref() == Some(agent))
+                .then(|| self.next_model.clone())
+                .flatten();
+            if let Some(Response::Started { session_id }) = self.request(Request::StartSession {
+                project_path: self.project.path.clone(),
+                text: text.clone(),
+                agent: Some(agent.clone()),
+                model,
+            }) {
+                started.push(session_id);
+            }
+        }
+        let Some(first) = started.first().cloned() else {
+            return;
+        };
+        self.show(Some(first));
+        if started.len() > 1 {
+            self.flash(
+                format!("Started with {} agents · Alt+1–9 switches", started.len()),
+                Tone::Success,
+            );
         }
     }
 
@@ -351,6 +402,7 @@ impl App {
                 None => self.note("Nothing is waiting on an answer."),
             },
             "learn" => self.learn(),
+            "learnings" | "lessons" => self.open_picker(PickerKind::Learnings),
             "review" | "diff" | "changes" => {
                 if self
                     .request(Request::ShowChanges {
@@ -474,6 +526,29 @@ impl App {
     }
 }
 
+/// The usable agents `text` names with `@id`, in order and once each, and
+/// the text without those names.
+fn split_agent_mentions(text: &str, agents: &[AgentStatus]) -> (Vec<String>, String) {
+    let mut named = Vec::new();
+    let mut kept = Vec::new();
+    for word in text.split(' ') {
+        let agent = word.strip_prefix('@').and_then(|name| {
+            agents
+                .iter()
+                .find(|agent| super::pickers::usable(agent) && agent.id.eq_ignore_ascii_case(name))
+        });
+        match agent {
+            Some(agent) => {
+                if !named.contains(&agent.id) {
+                    named.push(agent.id.clone());
+                }
+            }
+            None => kept.push(word),
+        }
+    }
+    (named, kept.join(" ").trim().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -488,7 +563,8 @@ mod tests {
     #[test]
     fn slash_menu_filters_bare_commands_only() {
         assert_eq!(names("/se"), ["sessions", "settings"]);
-        assert_eq!(names("/le"), ["learn"]);
+        assert_eq!(names("/le"), ["learn", "learnings"]);
+        assert_eq!(names("/learni"), ["learnings"]);
         assert_eq!(names("/").len(), COMMANDS.len());
         assert!(names("/stop now").is_empty(), "arguments close the menu");
         assert!(names("hello").is_empty());
@@ -543,5 +619,35 @@ mod tests {
         assert_eq!(closest_command("stpo"), Some("stop"));
         assert_eq!(closest_command("hist"), Some("history"));
         assert_eq!(closest_command("deploy"), None);
+    }
+
+    #[test]
+    fn agent_mentions_pick_usable_agents_and_leave_files_in_the_text() {
+        let agent = |id: &str, state: &str| AgentStatus {
+            id: id.into(),
+            name: id.into(),
+            state: state.into(),
+            account: String::new(),
+            detail: String::new(),
+            models: Vec::new(),
+            default_model: String::new(),
+        };
+        let agents = [
+            agent("codex", "ready"),
+            agent("claude", "installed"),
+            agent("gemini", "missing"),
+        ];
+        assert_eq!(
+            split_agent_mentions("@Codex @claude fix @src/app.ts @codex", &agents),
+            (
+                vec!["codex".to_string(), "claude".to_string()],
+                "fix @src/app.ts".to_string()
+            )
+        );
+        // An agent that is not set up reads as an ordinary mention.
+        assert_eq!(
+            split_agent_mentions("@gemini look", &agents),
+            (Vec::new(), "@gemini look".to_string())
+        );
     }
 }

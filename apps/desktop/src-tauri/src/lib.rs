@@ -177,6 +177,7 @@ pub fn run(launch: Launch) {
                 coordinator.clone(),
             );
             sessions.launch(app.handle().clone());
+            commands::knowledge::learning::watcher::launch(runtime.clone(), sessions.clone());
             let remote = commands::remote::RemoteAccess::new(
                 preferences.join("remote-access.bin"),
                 runtime.clone(),
@@ -292,6 +293,8 @@ pub fn run(launch: Launch) {
             commands::knowledge::knowledge_list,
             commands::knowledge::knowledge_save,
             commands::knowledge::knowledge_remove,
+            commands::knowledge::learning::knowledge_history,
+            commands::knowledge::learning::knowledge_set_archived,
             commands::knowledge::knowledge_preview,
             commands::knowledge::knowledge_search,
             commands::codebase::codebase_scan,

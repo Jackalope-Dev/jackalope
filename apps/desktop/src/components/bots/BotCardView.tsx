@@ -1,4 +1,4 @@
-import { Textarea } from '@jackalope/ui';
+import { DropdownMenu as Menu, Textarea } from '@jackalope/ui';
 import {
   CircleHelp,
   ExternalLink,
@@ -11,36 +11,31 @@ import {
 import { useState } from 'react';
 import { answerCard, type BotCard, dismissCard } from '../../lib/bot-hub';
 import { openExternalUrl } from '../../lib/tauri-bridge';
-import { useBotStore } from '../../stores/botStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
-import { BotAvatar } from './BotAvatar';
+import { OptionsMenu } from '../ui/OptionsMenu';
 import './bot-card.css';
 
-const KINDS = {
-  decision: { label: 'Decision', icon: ListChecks },
-  input: { label: 'Needs input', icon: CircleHelp },
-  action: { label: 'Suggested next step', icon: Lightbulb },
-  sources: { label: 'Sources', icon: FileText },
-  update: { label: 'Update', icon: Newspaper },
+const KIND_ICONS = {
+  decision: ListChecks,
+  input: CircleHelp,
+  action: Lightbulb,
+  sources: FileText,
+  update: Newspaper,
 } as const;
 
 /** A card a bot presented: its context, sources and the choices that answer it. */
 export function BotCardView({
   card,
-  showBot = false,
   onOpenConversation,
 }: {
   card: BotCard;
-  /** Lists outside the conversation name the bot that asked. */
-  showBot?: boolean;
   onOpenConversation?: (sessionId: string) => void;
 }) {
-  const bot = useBotStore((state) => state.bots.find((item) => item.id === card.botId));
   const [text, setText] = useState('');
   const [busy, setBusy] = useState<number | 'text' | 'dismiss' | null>(null);
   const [error, setError] = useState('');
-  const kind = KINDS[card.kind] ?? KINDS.update;
+  const KindIcon = KIND_ICONS[card.kind] ?? KIND_ICONS.update;
   const open = card.status === 'open';
   const act = async (key: number | 'text' | 'dismiss', action: () => Promise<void>) => {
     setBusy(key);
@@ -57,18 +52,8 @@ export function BotCardView({
   return (
     <article className="bot-card" data-kind={card.kind} data-status={card.status}>
       <header className="bot-card-header">
-        {showBot ? (
-          <BotAvatar appearance={bot?.appearance} agent={bot?.agent} />
-        ) : (
-          <kind.icon size={16} aria-hidden="true" />
-        )}
-        <span>
-          <small>
-            {kind.label}
-            {showBot && ` · ${card.botName}`}
-          </small>
-          <strong>{card.title}</strong>
-        </span>
+        <KindIcon size={16} aria-hidden="true" />
+        <strong>{card.title}</strong>
       </header>
       {card.body && <p className="bot-card-body">{card.body}</p>}
       {card.sources.length > 0 && (
@@ -147,21 +132,35 @@ export function BotCardView({
           </span>
         )}
         {card.status === 'dismissed' && <span>Dismissed</span>}
-        {onOpenConversation && (
-          <Button variant="ghost" onClick={() => onOpenConversation(card.sessionId)}>
-            Open conversation
-          </Button>
-        )}
-        {open && (
-          <Button
-            variant="ghost"
-            disabled={busy !== null}
-            loading={busy === 'dismiss'}
-            loadingLabel="Dismissing…"
-            onClick={() => void act('dismiss', () => dismissCard(card.id))}
-          >
-            Dismiss
-          </Button>
+        {onOpenConversation ? (
+          <OptionsMenu label={`${card.title} options`} disabled={busy !== null}>
+            <Menu.Item
+              className="workspace-menu-item"
+              onSelect={() => onOpenConversation(card.sessionId)}
+            >
+              Open conversation
+            </Menu.Item>
+            {open && (
+              <Menu.Item
+                className="workspace-menu-item"
+                onSelect={() => void act('dismiss', () => dismissCard(card.id))}
+              >
+                Dismiss
+              </Menu.Item>
+            )}
+          </OptionsMenu>
+        ) : (
+          open && (
+            <Button
+              variant="ghost"
+              disabled={busy !== null}
+              loading={busy === 'dismiss'}
+              loadingLabel="Dismissing…"
+              onClick={() => void act('dismiss', () => dismissCard(card.id))}
+            >
+              Dismiss
+            </Button>
+          )
         )}
       </footer>
     </article>

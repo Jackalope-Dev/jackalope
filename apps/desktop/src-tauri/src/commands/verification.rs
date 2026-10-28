@@ -89,10 +89,14 @@ fn shell(command: &str, workspace: &str) -> Result<Command, String> {
     if command.trim().is_empty() || command.len() > 4000 || command.contains('\0') {
         return Err("Set a verification command of 1–4,000 characters in Project Settings.".into());
     }
+    // `/S /C "<command>"` hands cmd.exe the line verbatim. Passing it as an
+    // ordinary argument would escape its quotes as `\"`, which cmd.exe keeps.
     #[cfg(windows)]
     let mut cmd = {
+        use std::os::windows::process::CommandExt;
         let mut cmd = Command::new("cmd.exe");
-        cmd.args(["/D", "/S", "/C", command]);
+        cmd.args(["/D", "/S", "/C"])
+            .raw_arg(format!("\"{command}\""));
         cmd
     };
     #[cfg(not(windows))]
@@ -243,6 +247,9 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
         runtime.update_checked(&run.id, |r| {
             r.verification = Some(verification.clone());
             *r.efficiency.native_verification_calls.get_or_insert(0) += 1;
+            r.efficiency
+                .first_check_passed
+                .get_or_insert(verification.result.success);
         })?;
         Ok(verification)
     })();
@@ -308,53 +315,75 @@ pub async fn agent_verify(
     run: TaskRun,
     input: super::harness::ComputerVerifyInput,
 ) -> Result<serde_json::Value, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let guard = super::integration::execution_guard()?;
-        let runs = runtime.integration_runs()?;
-        let run = runs
-            .iter()
-            .find(|current| current.id == run.id)
-            .ok_or("Task not found")?;
-        let command = agent_command(run.verify_command.as_deref(), &input)?;
-        if !runtime.is_running(&run.id) {
-            return Err("This attempt is no longer active.".into());
-        }
-        let _lease = leases::reserve(&run.workspace)?;
-        if let Some(check) = reusable_check(&runtime, run, command)? {
-            let mut response = output::response(check);
-            runtime.update_checked(&run.id, |r| {
-                r.efficiency.verification_reuses =
-                    Some(r.efficiency.verification_reuses.unwrap_or(0) + 1)
-            })?;
-            response["reused"] = true.into();
-            return Ok(response);
-        }
-        drop(guard);
-        let result = execute(&runtime, run, command)?;
-        let mut response = output::response(&result);
-        response["reused"] = false.into();
-        runtime.update_checked(&run.id, |current| {
-            current.efficiency.verification(
-                &result.result.stdout,
-                &response,
-                result.result.success,
-            );
+    tauri::async_runtime::spawn_blocking(move || agent_verify_blocking(&runtime, &run, &input))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Runs the attempt's saved check for an in-session caller such as a stop hook. An unchanged
+/// passing snapshot is reused, and the result is saved where the final check reuses it.
+pub(in crate::commands) fn saved_check(
+    runtime: &TaskRuntime,
+    run_id: &str,
+) -> Result<Verification, String> {
+    let run = runtime.run_snapshot(run_id).ok_or("Task not found")?;
+    let input = super::harness::ComputerVerifyInput {
+        command: String::new(),
+        args: Vec::new(),
+    };
+    agent_verify_blocking(runtime, &run, &input)?;
+    runtime
+        .run_snapshot(run_id)
+        .and_then(|run| run.verification)
+        .ok_or_else(|| "The saved check did not record a result.".into())
+}
+
+fn agent_verify_blocking(
+    runtime: &TaskRuntime,
+    run: &TaskRun,
+    input: &super::harness::ComputerVerifyInput,
+) -> Result<serde_json::Value, String> {
+    let guard = super::integration::execution_guard()?;
+    let runs = runtime.integration_runs()?;
+    let run = runs
+        .iter()
+        .find(|current| current.id == run.id)
+        .ok_or("Task not found")?;
+    let command = agent_command(run.verify_command.as_deref(), &input)?;
+    if !runtime.is_running(&run.id) {
+        return Err("This attempt is no longer active.".into());
+    }
+    let _lease = leases::reserve(&run.workspace)?;
+    if let Some(check) = reusable_check(&runtime, run, command)? {
+        let mut response = output::response(check);
+        runtime.update_checked(&run.id, |r| {
+            r.efficiency.verification_reuses =
+                Some(r.efficiency.verification_reuses.unwrap_or(0) + 1)
         })?;
-        #[cfg(test)]
-        if let Some(spec) = std::env::var_os("JACKALOPE_QUALITY_SPEC") {
-            use std::io::Write;
-            let path = std::path::PathBuf::from(spec).with_extension("verification.jsonl");
-            let mut capture = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(path)
-                .map_err(|e| e.to_string())?;
-            writeln!(capture, "{}", response).map_err(|e| e.to_string())?;
-        }
-        Ok(response)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+        response["reused"] = true.into();
+        return Ok(response);
+    }
+    drop(guard);
+    let result = execute(&runtime, run, command)?;
+    let mut response = output::response(&result);
+    response["reused"] = false.into();
+    runtime.update_checked(&run.id, |current| {
+        current
+            .efficiency
+            .verification(&result.result.stdout, &response, result.result.success);
+    })?;
+    #[cfg(test)]
+    if let Some(spec) = std::env::var_os("JACKALOPE_QUALITY_SPEC") {
+        use std::io::Write;
+        let path = std::path::PathBuf::from(spec).with_extension("verification.jsonl");
+        let mut capture = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .map_err(|e| e.to_string())?;
+        writeln!(capture, "{}", response).map_err(|e| e.to_string())?;
+    }
+    Ok(response)
 }
 
 fn agent_command<'a>(
@@ -380,6 +409,17 @@ fn agent_command<'a>(
 mod agent_command_tests {
     use super::*;
     use serde_json::json;
+
+    #[cfg(windows)]
+    #[test]
+    fn saved_checks_keep_their_double_quotes_on_windows() {
+        let workspace = std::env::temp_dir();
+        let output = shell(r#"echo "a b""#, workspace.to_str().unwrap())
+            .unwrap()
+            .output()
+            .unwrap();
+        assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), r#""a b""#);
+    }
 
     #[test]
     fn saved_checks_accept_empty_or_matching_requests_without_expanding_authority() {

@@ -3,6 +3,7 @@
 //! full-width row for the highlight, ellipses instead of hard cuts, and the
 //! position in the bottom border when the list scrolls.
 
+use super::super::Mention;
 use crate::brand;
 use crate::ui::pickers::{Picker, PickerKind};
 use ratatui::layout::Rect;
@@ -27,6 +28,7 @@ pub(super) fn frame_block(
         .borders(Borders::ALL)
         .border_type(brand::border())
         .border_style(border)
+        .style(brand::painted_style(brand::Surface::Elevated))
         .title(title);
     if let Some((index, total)) = position {
         block = block.title_bottom(
@@ -53,12 +55,13 @@ pub(super) fn row(spans: Vec<Span<'static>>, width: usize, chosen: bool) -> Line
     }
 }
 
-/// Files for an `@` mention, in the same place as the command menu.
-pub fn mention_menu(frame: &mut Frame, paths: &[String], selected: usize, input: Rect) {
+/// Agents and files for an `@` mention, in the same place as the command
+/// menu.
+pub fn mention_menu(frame: &mut Frame, mentions: &[Mention], selected: usize, input: Rect) {
     let accent = Style::default().fg(brand::accent());
     let muted = Style::default().fg(brand::muted());
-    let rows = paths.len().min(8);
-    let selected = selected.min(paths.len() - 1);
+    let rows = mentions.len().min(8);
+    let selected = selected.min(mentions.len() - 1);
     let first = window_start(selected, rows);
     let area = Rect {
         x: input.x,
@@ -67,39 +70,56 @@ pub fn mention_menu(frame: &mut Frame, paths: &[String], selected: usize, input:
         height: rows as u16 + 2,
     };
     let inner = area.width.saturating_sub(2) as usize;
-    let lines: Vec<Line> = paths
+    let lines: Vec<Line> = mentions
         .iter()
         .enumerate()
         .skip(first)
         .take(rows)
-        .map(|(index, path)| {
-            let (directory, name) = path
-                .rsplit_once('/')
-                .map_or(("", path.as_str()), |(directory, name)| (directory, name));
+        .map(|(index, mention)| {
             let chosen = index == selected;
-            let name = format!(" {name}");
-            let room = inner.saturating_sub(name.chars().count() + 2);
-            let directory = if directory.is_empty() || room < 4 {
-                String::new()
-            } else {
-                format!("  {}", brand::ellipsize(&format!("{directory}/"), room))
+            let strong = |style: Style| {
+                if chosen {
+                    style.add_modifier(Modifier::BOLD)
+                } else {
+                    style
+                }
             };
-            let name_style = if chosen {
-                accent.add_modifier(Modifier::BOLD)
-            } else {
-                accent
-            };
-            row(
-                vec![
-                    Span::styled(name, name_style),
-                    Span::styled(directory, muted),
-                ],
-                inner,
-                chosen,
-            )
+            match mention {
+                Mention::Agent { name, .. } => row(
+                    vec![
+                        Span::styled(
+                            format!(" {} {name}", if brand::unicode() { "●" } else { "*" }),
+                            strong(Style::default().fg(brand::success())),
+                        ),
+                        Span::styled("  agent · starts the message with it", muted),
+                    ],
+                    inner,
+                    chosen,
+                ),
+                Mention::File(path) => {
+                    let (directory, name) = path
+                        .rsplit_once('/')
+                        .map_or(("", path.as_str()), |(directory, name)| (directory, name));
+                    let name = format!(" {name}");
+                    let room = inner.saturating_sub(name.chars().count() + 2);
+                    let directory = if directory.is_empty() || room < 4 {
+                        String::new()
+                    } else {
+                        format!("  {}", brand::ellipsize(&format!("{directory}/"), room))
+                    };
+                    row(
+                        vec![
+                            Span::styled(name, strong(accent)),
+                            Span::styled(directory, muted),
+                        ],
+                        inner,
+                        chosen,
+                    )
+                }
+            }
         })
         .collect();
-    let position = (paths.len() > rows).then_some((selected, paths.len()));
+    let position = (mentions.len() > rows).then_some((selected, mentions.len()));
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(lines).block(frame_block(

@@ -98,7 +98,7 @@ pub fn visible(app: &App, width: u16, height: u16) -> (Vec<Line<'static>>, usize
         (lines, offset, bottom)
     };
     let Some(view) = &app.view else {
-        return place(&Measured::new(welcome(app), width));
+        return place(&Measured::new(welcome(app, width, height as u16), width));
     };
     let mut cache = app.transcript.borrow_mut();
     let accent = brand::accent();
@@ -110,13 +110,13 @@ pub fn visible(app: &App, width: u16, height: u16) -> (Vec<Line<'static>>, usize
             version: app.view_version,
             accent,
             width,
-            measured: Measured::new(conversation(view), width),
+            measured: Measured::new(conversation(view, width), width),
         });
     }
     place(&cache.as_ref().expect("filled above").measured)
 }
 
-fn conversation(view: &SessionView) -> Vec<Line<'static>> {
+fn conversation(view: &SessionView, width: u16) -> Vec<Line<'static>> {
     let accent = Style::default().fg(brand::accent());
     let muted = Style::default().fg(brand::muted());
     let mut lines = Vec::new();
@@ -125,11 +125,8 @@ fn conversation(view: &SessionView) -> Vec<Line<'static>> {
         if message.role == "agent" {
             // Who is speaking, so replies stand apart from your messages.
             let mut label = vec![
-                Span::styled(format!("{} ", brand::mark_glyph(brand::Mark::Full)), accent),
-                Span::styled(
-                    view.agent.clone().unwrap_or_else(|| "agent".into()),
-                    accent.add_modifier(Modifier::BOLD),
-                ),
+                Span::styled(if brand::unicode() { "● " } else { "* " }, accent),
+                Span::styled(view.agent.clone().unwrap_or_else(|| "agent".into()), muted),
             ];
             if let Some(attempt) = message.attempt {
                 label.push(Span::styled(format!(" · attempt {attempt}"), muted));
@@ -138,32 +135,57 @@ fn conversation(view: &SessionView) -> Vec<Line<'static>> {
             lines.extend(markdown(&message.text));
             continue;
         }
-        let marker = if message.sent { "› " } else { "… " };
-        for (index, text) in message.text.lines().enumerate() {
-            let lead = if index == 0 { marker } else { "  " };
-            lines.push(Line::from(vec![
-                Span::styled(lead, accent.add_modifier(Modifier::BOLD)),
-                Span::styled(
-                    text.to_string(),
-                    Style::default().add_modifier(Modifier::BOLD),
-                ),
-            ]));
+        // Your messages sit in a tinted block with the accent down its left
+        // edge; queued ones stay quiet until they are sent.
+        let (color, text_style) = if message.sent {
+            (brand::accent(), Style::default().fg(brand::text()))
+        } else {
+            (brand::muted(), muted)
+        };
+        let mut body: Vec<Vec<Span<'static>>> = message
+            .text
+            .lines()
+            .map(|text| vec![Span::styled(text.to_string(), text_style)])
+            .collect();
+        if !message.sent {
+            body.push(vec![Span::styled(
+                "queued",
+                muted.add_modifier(Modifier::ITALIC),
+            )]);
         }
+        lines.extend(callout(body, color, width));
     }
-    if view.messages.iter().all(|message| message.role != "agent") && !view.result.trim().is_empty()
+    if view.messages.iter().all(|message| message.role != "agent")
+        && view.partial.is_empty()
+        && !view.result.trim().is_empty()
     {
         // A host that predates agent messages still sends the latest output.
         lines.push(Line::raw(""));
         lines.extend(markdown(&view.result));
     }
     if protocol::working(view.status.as_deref()) {
+        if !view.partial.trim().is_empty() {
+            // The reply as it is written, ending in a cursor.
+            lines.push(Line::raw(""));
+            lines.push(Line::from(vec![
+                Span::styled(if brand::unicode() { "● " } else { "* " }, accent),
+                Span::styled(view.agent.clone().unwrap_or_else(|| "agent".into()), muted),
+            ]));
+            let mut reply = markdown(&view.partial);
+            let cursor = Span::styled(if brand::unicode() { "▍" } else { "_" }, accent);
+            match reply.last_mut() {
+                Some(line) => line.spans.push(cursor),
+                None => reply.push(Line::from(cursor)),
+            }
+            lines.extend(reply);
+        }
         lines.extend(activity(&view.activity));
     }
     let warning = Style::default().fg(brand::warning());
     for question in &view.questions {
         lines.push(Line::raw(""));
         lines.push(Line::from(vec![
-            Span::styled("? ", warning.add_modifier(Modifier::BOLD)),
+            Span::styled(if brand::unicode() { "◆ " } else { "? " }, warning),
             Span::styled(
                 question.question.clone(),
                 Style::default().add_modifier(Modifier::BOLD),
@@ -184,19 +206,72 @@ fn conversation(view: &SessionView) -> Vec<Line<'static>> {
             muted,
         ));
     }
-    if let Some(error) = protocol::present(view.error.as_deref()) {
-        let danger = Style::default().fg(brand::danger());
-        lines.push(Line::raw(""));
-        lines.push(Line::from(vec![
-            Span::styled("✕ ", danger.add_modifier(Modifier::BOLD)),
-            Span::styled(error.to_string(), danger),
-        ]));
-        lines.push(Line::styled(
-            "  /retry to run it again, or reply with what to change",
-            muted,
-        ));
+    lines
+}
+
+/// Rows of spans as a block: a bar of `color` down the left edge and its
+/// tint behind every row, wrapped and padded to `width` so the tint is even.
+pub(super) fn callout(
+    rows: Vec<Vec<Span<'static>>>,
+    color: Color,
+    width: u16,
+) -> Vec<Line<'static>> {
+    let bar = Span::styled(
+        if brand::unicode() { "▎ " } else { "| " },
+        Style::default().fg(color),
+    );
+    let fill = brand::callout_style(color);
+    let room = usize::from(width).saturating_sub(3).max(8);
+    let mut lines = Vec::new();
+    for spans in rows {
+        for row in wrap(spans, room) {
+            let used: usize = row.iter().map(Span::width).sum();
+            let mut line = vec![bar.clone()];
+            line.extend(row);
+            line.push(Span::raw(" ".repeat(room.saturating_sub(used) + 1)));
+            lines.push(Line::from(line).patch_style(fill));
+        }
     }
     lines
+}
+
+/// Spans broken into rows of at most `room` columns at spaces, or mid-word
+/// when a word alone is too long.
+fn wrap(spans: Vec<Span<'static>>, room: usize) -> Vec<Vec<Span<'static>>> {
+    let mut rows = vec![Vec::new()];
+    let mut used = 0;
+    for span in spans {
+        let style = span.style;
+        for word in span.content.split_inclusive(' ') {
+            let mut word = word.to_string();
+            loop {
+                let columns = unicode_width::UnicodeWidthStr::width(word.trim_end());
+                if used > 0 && used + columns > room {
+                    rows.push(Vec::new());
+                    used = 0;
+                }
+                if columns <= room {
+                    used += unicode_width::UnicodeWidthStr::width(word.as_str());
+                    rows.last_mut()
+                        .expect("one row")
+                        .push(Span::styled(word, style));
+                    break;
+                }
+                let split = word
+                    .char_indices()
+                    .nth(room)
+                    .map_or(word.len(), |(index, _)| index);
+                let rest = word.split_off(split);
+                rows.last_mut()
+                    .expect("one row")
+                    .push(Span::styled(word, style));
+                rows.push(Vec::new());
+                used = 0;
+                word = rest;
+            }
+        }
+    }
+    rows
 }
 
 /// The newest steps of running work, one line each, so a long run shows what
@@ -392,8 +467,9 @@ mod tests {
             result: String::new(),
             activity: Vec::new(),
             questions: Vec::new(),
+            partial: String::new(),
         };
-        let shown: Vec<String> = conversation(&view).iter().map(text).collect();
+        let shown: Vec<String> = conversation(&view, 80).iter().map(text).collect();
         let first = shown
             .iter()
             .position(|line| line.ends_with("agent · attempt 1"))
@@ -404,5 +480,25 @@ mod tests {
             .unwrap();
         assert!(first < second);
         assert_eq!(shown[second + 1], "second try");
+    }
+
+    #[test]
+    fn callouts_wrap_at_words_and_fill_every_row_to_one_width() {
+        let lines = callout(
+            vec![vec![Span::raw(
+                "a fairly long sentence that has to wrap across several rows here",
+            )]],
+            brand::accent(),
+            24,
+        );
+        assert!(lines.len() > 1);
+        let widths: Vec<usize> = lines.iter().map(Line::width).collect();
+        assert!(widths.iter().all(|width| *width == widths[0]), "{widths:?}");
+        // A word longer than a row is split rather than overflowing.
+        let long = wrap(vec![Span::raw("x".repeat(50))], 20);
+        assert_eq!(long.len(), 3);
+        assert!(long
+            .iter()
+            .all(|row| row.iter().map(Span::width).sum::<usize>() <= 20));
     }
 }

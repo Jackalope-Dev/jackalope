@@ -3,11 +3,11 @@ import {
   ConfirmDialog,
   FormField,
   Input,
-  RefreshIcon,
+  DropdownMenu as Menu,
   SearchField,
   SegmentedControl,
 } from '@jackalope/ui';
-import { ExternalLink, KeyRound } from 'lucide-react';
+import { ExternalLink, KeyRound, MoreHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type AppState,
@@ -65,10 +65,7 @@ export function ConnectedApps() {
   }, [load]);
   return (
     <WorkspacePage className="connected-apps">
-      <WorkspaceHeading
-        title="Connected apps"
-        description="Sign in to apps once; every agent can use them as tools."
-      />
+      <WorkspaceHeading title="Connected apps" />
       {!isTauriEnvironment() && (
         <InlineNotice>Connected apps are available in the desktop app.</InlineNotice>
       )}
@@ -184,6 +181,7 @@ function AppCatalog({ status, onRemoved }: { status: ComposioStatus; onRemoved: 
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState('');
   const [waiting, setWaiting] = useState<string | null>(null);
+  const [removingKey, setRemovingKey] = useState(false);
   const polls = useRef(0);
 
   const readAccounts = useCallback(async () => {
@@ -282,33 +280,18 @@ function AppCatalog({ status, onRemoved }: { status: ComposioStatus; onRemoved: 
 
   return (
     <>
-      <div className="connected-apps-summary">
-        <p>
-          <strong>{connectedCount}</strong> {connectedCount === 1 ? 'app' : 'apps'} connected ·
-          Composio project key ending in <code>{status.keyHint}</code>
-        </p>
-        <div className="connected-apps-summary-actions">
-          <Button
-            variant="ghost"
-            aria-label="Refresh apps"
-            disabled={loading}
-            onClick={() => void refresh(true)}
-          >
-            <RefreshIcon />
-          </Button>
-          <ConfirmDialog
-            trigger={<Button variant="outline">Remove key</Button>}
-            title="Remove the Composio key?"
-            description="Agents lose access to connected apps. Apps stay connected in your Composio project; disconnect them first if you also want to revoke their sign-ins."
-            label="Remove key"
-            busyLabel="Removing…"
-            onConfirm={async () => {
-              await removeComposioKey();
-              onRemoved();
-            }}
-          />
-        </div>
-      </div>
+      <ConfirmDialog
+        open={removingKey}
+        onOpenChange={setRemovingKey}
+        title="Remove the Composio key?"
+        description="Agents lose access to connected apps. Apps stay connected in your Composio project; disconnect them first if you also want to revoke their sign-ins."
+        label="Remove key"
+        busyLabel="Removing…"
+        onConfirm={async () => {
+          await removeComposioKey();
+          onRemoved();
+        }}
+      />
       {waitingApp && (
         <InlineNotice
           action={
@@ -329,7 +312,7 @@ function AppCatalog({ status, onRemoved }: { status: ComposioStatus; onRemoved: 
           onChange={setView}
           items={[
             { id: 'all', label: 'All apps' },
-            { id: 'connected', label: `Connected (${connectedCount})` },
+            { id: 'connected', label: 'Connected', count: connectedCount },
           ]}
         />
         <SearchField
@@ -339,6 +322,28 @@ function AppCatalog({ status, onRemoved }: { status: ComposioStatus; onRemoved: 
           onValueChange={setQuery}
           containerClassName="connected-apps-search"
         />
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button variant="outline" aria-label="Connected apps options">
+              <MoreHorizontal size={16} aria-hidden="true" />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
+              <Menu.Item
+                className="workspace-menu-item"
+                disabled={loading}
+                onSelect={() => void refresh(true)}
+              >
+                Refresh apps
+              </Menu.Item>
+              <Menu.Separator className="menu-separator" />
+              <Menu.Item className="workspace-menu-item" onSelect={() => setRemovingKey(true)}>
+                Remove key ending in {status.keyHint}…
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Portal>
+        </Menu.Root>
       </div>
       {catalog === null ? (
         loading && <LoadingState label="Loading apps…" />

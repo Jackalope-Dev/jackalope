@@ -46,7 +46,18 @@ export function aggregateAttempts(report) {
     ),
     helperCostUsd: helpers.length ? sum(helperUsages.map((usage) => usage.estimatedCostUsd)) : 0,
   };
-  if (runs.length < 2) return { ...accounting, efficiency: report?.run?.efficiency ?? null };
+  const turns = runs.map((run) => ({
+    claudeTransport: run.efficiency?.claudeTransport ?? null,
+    firstTokenMs: run.efficiency?.firstTokenMs ?? null,
+    firstActivityMs: run.efficiency?.firstActivityMs ?? null,
+    elapsedMs:
+      run.startedAt && run.endedAt ? Date.parse(run.endedAt) - Date.parse(run.startedAt) : null,
+  }));
+  if (runs.length < 2)
+    return {
+      ...accounting,
+      efficiency: report?.run?.efficiency ? { ...report.run.efficiency, turns } : null,
+    };
   const tools = {};
   for (const run of runs)
     for (const [name, count] of Object.entries(run.efficiency?.toolCalls ?? {}))
@@ -55,6 +66,11 @@ export function aggregateAttempts(report) {
     ...accounting,
     efficiency: {
       firstActivityMs: runs[0].efficiency?.firstActivityMs ?? null,
+      firstTokenMs: runs[0].efficiency?.firstTokenMs ?? null,
+      firstCheckPassed:
+        runs.find((run) => typeof run.efficiency?.firstCheckPassed === 'boolean')?.efficiency
+          .firstCheckPassed ?? null,
+      turns,
       toolCalls: runs.every((run) => run.efficiency?.toolCalls) ? tools : null,
       ...Object.fromEntries(
         [
@@ -67,6 +83,9 @@ export function aggregateAttempts(report) {
           'contextBlocksUnchanged',
           'jevQuestionCalls',
           'jevQuestions',
+          'stopCheckRounds',
+          'editChecks',
+          'editCheckFailures',
         ].map((key) => [key, sum(runs.map((run) => run.efficiency?.[key]))]),
       ),
     },

@@ -1,5 +1,55 @@
 [
   {
+    "id": "faster-steadier-claude-code-tasks",
+    "date": "2026-10-28",
+    "status": "In development",
+    "title": "Faster, steadier Claude Code tasks",
+    "description": "Claude Code now keeps one warm session per conversation and checks its own work as it goes.",
+    "items": [
+      "Follow-up messages reuse the running Claude Code session, so replies start sooner and reuse the prompt cache.",
+      "Replies stream into the terminal as they are written.",
+      "Claude Code fixes problems from a project's quick check after each edit, and keeps working when the verification command fails before it finishes.",
+      "Project lessons reach Claude Code with every message, and a pinned model falls back to another when it is overloaded."
+    ]
+  },
+  {
+    "id": "a-redesigned-terminal",
+    "date": "2026-10-28",
+    "status": "In development",
+    "title": "A redesigned terminal",
+    "description": "The jackalope terminal now looks and works like the app, with tabs for every open conversation.",
+    "items": [
+      "A rounded content card on the app's own surface colours, with the project's accent, contrast checked against them.",
+      "Tabs for open conversations show which need you, which are working and which are idle; Alt+1–9 or a click switches.",
+      "@ names agents as well as files: @codex starts a message with Codex, and naming two starts one conversation each.",
+      "Leading /, ! and @ switch the input into command, shell or mention mode, and a Needs you banner says what a blocked conversation is waiting on."
+    ]
+  },
+  {
+    "id": "jackalope-learns-from-your-work",
+    "date": "2026-10-28",
+    "status": "In development",
+    "title": "Jackalope learns from your work.",
+    "description": "Every agent now benefits from lessons Jackalope saves in the background from what you tell it and from checks that pass.",
+    "items": [
+      "Lessons are saved while long tasks run and when work finishes, and /learn still saves on request.",
+      "New lessons stay on probation until tasks use them; unused ones are archived and can be restored.",
+      "Each lesson keeps a history of why it was learned or changed, in Project context and the terminal's /learnings.",
+      "Turn Learn automatically off for any project in its settings."
+    ]
+  },
+  {
+    "id": "auto-approved-agent-requests-and-project-workspace-modes",
+    "date": "2026-10-28",
+    "status": "In development",
+    "title": "Auto-approved agent requests and project workspace modes",
+    "description": "Agents keep working without stopping for routine permission requests, and each project chooses where its tasks run.",
+    "items": [
+      "Routine tool use from Claude Code, Kimi Code and OpenCode is approved automatically and listed in the task's activity; deletes, force pushes, deploys, credentials, elevated commands and changes outside the workspace still ask. Turn it off per project in Project settings.",
+      "Projects can run tasks in an isolated worktree, on a new branch in the project checkout, directly on the current branch, or ask each time a task starts."
+    ]
+  },
+  {
     "id": "recursive-flint-for-local-agents",
     "date": "2026-10-27",
     "status": "In development",

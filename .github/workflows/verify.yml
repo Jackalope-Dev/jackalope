@@ -100,6 +100,10 @@ jobs:
             verify-${{ matrix.os }}-${{ runner.arch }}-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-
             verify-${{ matrix.os }}-${{ runner.arch }}-rust-1.98.1-
       - run: pnpm verify --native-only
+      # A runner's first Chrome launch can spend over 30 s building caches, past the product's startup bound.
+      - name: Warm the installed browser
+        if: runner.os == 'Linux'
+        run: timeout 120 google-chrome --headless=new --no-first-run --user-data-dir="$(mktemp -d)" --dump-dom about:blank > /dev/null || true
       - name: Exercise bundled browser
         run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features real_agent_browser_ -- --ignored --test-threads=1
       - name: Exercise isolated Linux credential storage

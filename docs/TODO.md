@@ -207,7 +207,17 @@ release dates.
   confirmation. Freeze independent family sampling and statistical power assumptions;
   use the study planner to reject infeasible confirmation sizes.
 - [ ] Extend Grok/Antigravity permission protocols and scoped MCP delivery without
-  weakening process ownership, usage accounting or saved-session compatibility.
+  weakening process ownership, usage accounting or saved-session compatibility, so
+  their requests pass the same auto-approval risk check.
+- [ ] Accept auto-approval and in-place workspace modes in the installed app with
+  Claude Code, Kimi Code and OpenCode, including Windows shells, the ask-each-time
+  prompt in the terminal command and pull requests from new-branch tasks.
+- [ ] Run matched Claude Code session and hook trials on the continuation suite against
+  the defaults (persistent session, hooks, fallback) and the off variants, and before
+  changing isolation or shared prompt caching. Confirm in installed tasks that stop,
+  app exit, idle cleanup, account switches and bridge authorization behave as the
+  fixture tests assume, and that a failing check after the third stop round is not run
+  twice.
 - [ ] Add isolated Antigravity subscription accounts only when its CLI supports
   a verified credential-store override.
 - [ ] Validate reconnect and failover with explicit process ownership and recovery in installed profiles.
@@ -241,6 +251,13 @@ release dates.
 
 - [ ] Verify automatic lessons across tasks, queues, schedules and restart,
   including evidence, edits, removal and frozen task context. Measure outcomes.
+- [ ] Run background learning in the installed app across agents and conversations:
+  cadence and end-of-work reflection, probation, archiving, restore and history.
+  Calibrate the cadence, probation and archive thresholds against real use, and
+  measure whether learned lessons reduce repeated corrections before claiming it.
+- [ ] Add an opt-in account sync layer for learned lessons over settings sync: match
+  by learned id and project ID, merge by revision, append history records by id, and
+  leave evidence excerpts and local use counts on the device.
 - [ ] Extend codebase semantic coverage, project knowledge and scheduled continuation.
 - [ ] Verify Usage & quota drilldowns against installed history, including dated
   project-attributed Ask Jackalope turns, archived helper conversations and

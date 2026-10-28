@@ -48,6 +48,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 840 } });
+const organize = async (name) => {
+  await page.getByRole('button', { name: 'Organize work', exact: true }).click();
+  await page.getByRole('menuitem', { name, exact: true }).click();
+};
 try {
   await page.routeWebSocket(/.*/, (socket) => socket.close());
   const errors = [];
@@ -57,7 +61,7 @@ try {
     route.fulfill({ contentType: 'application/javascript', body: fixture }),
   );
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.getByRole('button', { name: 'Select tasks', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Organize work', exact: true }).waitFor();
   assert.equal(
     await page.getByRole('button', { name: 'Archive Live indexing', exact: true }).isDisabled(),
     true,
@@ -68,9 +72,11 @@ try {
   );
   await page.getByRole('combobox', { name: 'Filter by project' }).click();
   await page.getByRole('option', { name: 'Atlas', exact: true }).click();
-  await page.getByRole('button', { name: 'Archive finished (1)', exact: true }).click();
+  await organize('Archive finished (1)');
   await page.getByText('1 task archived.', { exact: true }).waitFor();
-  await page.waitForFunction(() => document.activeElement?.textContent === 'Select tasks');
+  await page.waitForFunction(
+    () => document.activeElement?.getAttribute('aria-label') === 'Organize work',
+  );
   assert.deepEqual(
     await page.evaluate(() =>
       window.cleanupFixture.calls.filter((c) => c.command === 'task_set_archived').map((c) => c.id),
@@ -79,7 +85,9 @@ try {
   );
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await page.getByText('1 task restored.', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Select tasks', exact: true }).focus();
+  await page.getByRole('button', { name: 'Organize work', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('menuitem', { name: 'Select tasks', exact: true }).waitFor();
   await page.keyboard.press('Enter');
   await page.getByRole('checkbox', { name: 'Select Polish search', exact: true }).waitFor();
   await page.getByRole('checkbox', { name: 'Select all matching tasks', exact: true }).check();
@@ -106,10 +114,7 @@ try {
     window.cleanupFixture.hold = true;
   });
   await page.getByRole('button', { name: 'Archive selected (1)', exact: true }).click();
-  assert.equal(
-    await page.getByRole('button', { name: 'Archived', exact: true }).isDisabled(),
-    true,
-  );
+  assert.equal(await page.getByRole('button', { name: 'Done', exact: true }).isDisabled(), true);
   await page.waitForFunction(() => !!window.cleanupFixture.release);
   await page.evaluate(() => {
     window.cleanupFixture.hold = false;
@@ -117,10 +122,10 @@ try {
   });
   await page.getByText('1 task archived.', { exact: true }).waitFor();
   await page.getByRole('searchbox', { name: 'Search tasks' }).fill('');
-  await page.getByRole('button', { name: 'Archived', exact: true }).click();
+  await organize('Show archived work');
   await page.getByRole('button', { name: 'Restore Retry indexing', exact: true }).click();
   await page.getByText('1 task restored.', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Current tasks', exact: true }).click();
+  await page.getByRole('button', { name: 'Show current work', exact: true }).click();
   await page.evaluate(() => {
     window.cleanupFixture.failIdeaSave = true;
   });
@@ -134,7 +139,9 @@ try {
     window.cleanupFixture.failIdeaSave = false;
   });
   await page.getByRole('button', { name: 'Archive Explore shortcuts', exact: true }).click();
-  await page.waitForFunction(() => document.activeElement?.textContent === 'Select tasks');
+  await page.waitForFunction(
+    () => document.activeElement?.getAttribute('aria-label') === 'Organize work',
+  );
   assert.ok(
     await page.evaluate(
       () => JSON.parse(localStorage.getItem('jackalope-tasks')).state.tasks[0].archivedAt,
@@ -147,7 +154,7 @@ try {
     ),
     null,
   );
-  await page.getByRole('button', { name: 'Select tasks', exact: true }).click();
+  await organize('Select tasks');
   await page.getByRole('checkbox', { name: 'Select all matching tasks', exact: true }).check();
   await page.evaluate(() => {
     window.cleanupFixture.fail = 'failed';
@@ -165,12 +172,12 @@ try {
   await page.evaluate(() => {
     window.cleanupFixture.fail = null;
   });
-  await page.getByRole('button', { name: 'Archived', exact: true }).click();
-  await page.getByRole('button', { name: 'Select tasks', exact: true }).click();
+  await organize('Show archived work');
+  await organize('Select tasks');
   await page.getByRole('checkbox', { name: 'Select all matching tasks', exact: true }).check();
   await page.getByRole('button', { name: 'Restore selected (3)', exact: true }).click();
   await page.getByText('3 tasks restored.', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Current tasks', exact: true }).click();
+  await page.getByRole('button', { name: 'Show current work', exact: true }).click();
   for (const [width, height] of [
     [1280, 840],
     [960, 640],
@@ -181,7 +188,7 @@ try {
       await page.emulateMedia({ reducedMotion: 'reduce' });
       for (const layout of ['List', 'Board']) {
         await page.getByRole('button', { name: layout, exact: true }).click();
-        await page.getByRole('button', { name: 'Select tasks', exact: true }).click();
+        await organize('Select tasks');
         assert.equal(
           await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
           false,
@@ -190,7 +197,7 @@ try {
           path: `${output}/${theme}-${width}-${layout.toLowerCase()}.png`,
           fullPage: true,
         });
-        await page.getByRole('button', { name: 'Done selecting', exact: true }).click();
+        await page.getByRole('button', { name: 'Done', exact: true }).click();
       }
     }
   }

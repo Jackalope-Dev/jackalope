@@ -1,20 +1,25 @@
 import { DropdownMenu as Menu } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { MoreHorizontal, SlidersHorizontal } from 'lucide-react';
+import { ChevronRight, MoreHorizontal, SlidersHorizontal } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 
+type MenuAction = { id: string; label: string; onSelect: () => void; disabled?: boolean };
+
 export function ChatOptions({
   items,
   actions = [],
+  submenus = [],
   onClose,
   triggerVariant = 'icon',
   triggerLabel = 'Options',
 }: {
   items: { id: string; label: string; content: (close: () => void) => ReactNode }[];
   /** Immediate commands listed above the items that open a panel. */
-  actions?: { id: string; label: string; onSelect: () => void; disabled?: boolean }[];
+  actions?: MenuAction[];
+  /** Grouped commands listed after the actions, each behind its own submenu. */
+  submenus?: { id: string; label: string; groups: MenuAction[][] }[];
   onClose?: () => void;
   triggerVariant?: 'icon' | 'button';
   triggerLabel?: string;
@@ -63,7 +68,39 @@ export function ChatOptions({
                 {entry.label}
               </Menu.Item>
             ))}
-            {!!actions.length && !!items.length && <Menu.Separator className="menu-separator" />}
+            {!!actions.length && !!(submenus.length || items.length) && (
+              <Menu.Separator className="menu-separator" />
+            )}
+            {submenus.map((submenu) => (
+              <Menu.Sub key={submenu.id}>
+                <Menu.SubTrigger className="workspace-menu-item workspace-menu-sub">
+                  {submenu.label}
+                  <ChevronRight size={14} aria-hidden="true" />
+                </Menu.SubTrigger>
+                <Menu.Portal>
+                  <Menu.SubContent className="workspace-menu">
+                    {submenu.groups.map((group, index) => [
+                      index > 0 && (
+                        <Menu.Separator
+                          key={`separator-${group[0]?.id}`}
+                          className="menu-separator"
+                        />
+                      ),
+                      ...group.map((entry) => (
+                        <Menu.Item
+                          key={entry.id}
+                          className="workspace-menu-item"
+                          disabled={entry.disabled}
+                          onSelect={entry.onSelect}
+                        >
+                          {entry.label}
+                        </Menu.Item>
+                      )),
+                    ])}
+                  </Menu.SubContent>
+                </Menu.Portal>
+              </Menu.Sub>
+            ))}
             {items.map((entry) => (
               <Menu.Item
                 key={entry.id}

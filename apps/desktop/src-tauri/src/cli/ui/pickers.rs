@@ -1,5 +1,5 @@
 //! Pickers: filterable lists over conversations, projects, agents, settings,
-//! history and an agent's question.
+//! history, learned lessons and an agent's question.
 
 use super::feed::Tone;
 use super::App;
@@ -7,7 +7,7 @@ use crate::brand;
 use crate::connection::short;
 use crate::files;
 use crate::host::{self, ColdStart};
-use crate::protocol::{self, AgentStatus, Project, Request, Response, SessionSummary};
+use crate::protocol::{self, AgentStatus, Learning, Project, Request, Response, SessionSummary};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// What choosing a picker row does.
@@ -19,7 +19,16 @@ pub enum Action {
     Agent(String),
     ColdStart,
     Attribution,
+    AutoApprove,
+    WorkspaceMode,
+    LearnAutomatically,
     OpenApp,
+    /// Offer what can be done with a learned lesson.
+    Learning(Learning),
+    /// Show a learned lesson and its recent history in the feed.
+    ShowLearning(String),
+    /// Archive (`true`) or restore a learned lesson.
+    ArchiveLearning(String, bool),
     /// Route the next new conversation to this agent; `None` lets Jackalope choose.
     NextAgent(Option<String>),
     /// Use this model for the next new conversation; `None` uses the default.
@@ -48,6 +57,8 @@ pub enum PickerKind {
     NextModel,
     Question,
     History,
+    Learnings,
+    LearningActions,
 }
 
 pub struct Picker {
@@ -105,6 +116,15 @@ fn cold_start_label(choice: Option<ColdStart>) -> &'static str {
     }
 }
 
+fn workspace_mode_label(mode: Option<&str>) -> &'static str {
+    match mode {
+        Some("branch") => "new branch in the checkout",
+        Some("current") => "current branch, directly",
+        Some("ask") => "ask each time",
+        _ => "isolated worktree",
+    }
+}
+
 fn attribution_label(attribution: Option<&str>) -> &'static str {
     match attribution {
         Some("user") => "You",
@@ -131,6 +151,21 @@ pub fn agent_state_label(agent: &AgentStatus) -> String {
         "disabled" => "disabled".into(),
         _ => "not installed".into(),
     }
+}
+
+/// A learned lesson's status and use count, as a picker shows it.
+pub fn learning_detail(learning: &Learning) -> String {
+    let status = match learning.status.as_str() {
+        "probation" => "new",
+        "archived" => "archived",
+        _ => "active",
+    };
+    let uses = match learning.uses {
+        1 => "used once".to_string(),
+        uses => format!("used {uses} times"),
+    };
+    let edited = if learning.managed { "" } else { " · edited" };
+    format!("{status} · {uses}{edited}")
 }
 
 /// Agents that can take work or need only a sign-in.
@@ -182,7 +217,14 @@ impl App {
 
     fn choose(&mut self, action: Action) {
         // Settings rows change in place; everything else closes the list.
-        if !matches!(action, Action::ColdStart | Action::Attribution) {
+        if !matches!(
+            action,
+            Action::ColdStart
+                | Action::Attribution
+                | Action::AutoApprove
+                | Action::WorkspaceMode
+                | Action::LearnAutomatically
+        ) {
             self.picker = None;
         }
         match action {
@@ -211,6 +253,29 @@ impl App {
                     Some(ColdStart::Open) => host::remember_choice(ColdStart::Background),
                     Some(ColdStart::Background) => host::forget_choice(),
                 }
+                self.open_picker(PickerKind::Settings);
+            }
+            Action::AutoApprove => {
+                let next = !self.project.auto_approve.unwrap_or(true);
+                self.save_project_settings(Some(next), None, None);
+                self.open_picker(PickerKind::Settings);
+            }
+            Action::LearnAutomatically => {
+                let next = !self.project.learn_automatically.unwrap_or(true);
+                self.save_project_settings(None, None, Some(next));
+                self.open_picker(PickerKind::Settings);
+            }
+            Action::Learning(learning) => self.open_learning_actions(learning),
+            Action::ShowLearning(id) => self.show_learning(&id),
+            Action::ArchiveLearning(id, archived) => self.archive_learning(&id, archived),
+            Action::WorkspaceMode => {
+                let next = match self.project.workspace_mode.as_deref() {
+                    None | Some("worktree") => "branch",
+                    Some("branch") => "current",
+                    Some("current") => "ask",
+                    _ => "worktree",
+                };
+                self.save_project_settings(None, Some(next.into()), None);
                 self.open_picker(PickerKind::Settings);
             }
             Action::Attribution => {
@@ -321,6 +386,126 @@ impl App {
         items
     }
 
+    /// Saves this project's approval, workspace or learning setting in the
+    /// host, which the app and every terminal then share.
+    fn save_project_settings(
+        &mut self,
+        auto_approve: Option<bool>,
+        workspace_mode: Option<String>,
+        learn_automatically: Option<bool>,
+    ) {
+        if let Some(Response::Project { project }) = self.request(Request::SetProjectSettings {
+            project_id: self.project.id.clone(),
+            auto_approve,
+            workspace_mode,
+            learn_automatically,
+            learning_cadence: None,
+        }) {
+            self.project.auto_approve = project.auto_approve;
+            self.project.workspace_mode = project.workspace_mode;
+            self.project.learn_automatically = project.learn_automatically;
+            self.project.learning_cadence = project.learning_cadence;
+        }
+    }
+
+    fn learning_items(&mut self) -> Vec<Item> {
+        let learnings = match self.request(Request::Learnings {
+            project_id: self.project.id.clone(),
+        }) {
+            Some(Response::Learnings { learnings }) => learnings,
+            _ => Vec::new(),
+        };
+        learnings
+            .into_iter()
+            .map(|learning| Item {
+                label: learning.title.clone(),
+                detail: learning_detail(&learning),
+                action: Action::Learning(learning),
+            })
+            .collect()
+    }
+
+    fn open_learning_actions(&mut self, learning: Learning) {
+        let archived = learning.status == "archived";
+        let items = vec![
+            Item {
+                label: "Show lesson and history".into(),
+                detail: learning_detail(&learning),
+                action: Action::ShowLearning(learning.id.clone()),
+            },
+            Item {
+                label: if archived { "Restore" } else { "Archive" }.into(),
+                detail: if archived {
+                    "supply it to matching tasks again".into()
+                } else {
+                    "stop supplying it; restore any time".into()
+                },
+                action: Action::ArchiveLearning(learning.id.clone(), !archived),
+            },
+            Item {
+                label: "Edit or delete in the app".into(),
+                detail: "Project, then Context".into(),
+                action: Action::OpenApp,
+            },
+        ];
+        self.picker = Some(Picker {
+            kind: PickerKind::LearningActions,
+            title: learning.title,
+            items,
+            filter: String::new(),
+            selected: 0,
+        });
+    }
+
+    fn show_learning(&mut self, id: &str) {
+        if let Some(Response::Learning { learning, history }) = self.request(Request::Learning {
+            project_id: self.project.id.clone(),
+            entry_id: id.into(),
+        }) {
+            self.note_learning(&learning, &history);
+        }
+    }
+
+    fn archive_learning(&mut self, id: &str, archived: bool) {
+        if let Some(Response::Learning { learning, .. }) =
+            self.request(Request::SetLearningArchived {
+                project_id: self.project.id.clone(),
+                entry_id: id.into(),
+                archived,
+            })
+        {
+            let done = if archived { "Archived" } else { "Restored" };
+            self.flash(format!("{done} {}", learning.title), Tone::Success);
+        }
+    }
+
+    fn note_learning(&mut self, learning: &Learning, history: &[protocol::LearningEvent]) {
+        self.note_tone(
+            format!("{} · {}", learning.title, learning_detail(learning)),
+            Tone::Success,
+        );
+        for line in learning.content.lines() {
+            self.note(format!("  {line}"));
+        }
+        let recent = &history[history.len().saturating_sub(5)..];
+        if !recent.is_empty() {
+            self.note_tone("  History", Tone::Muted);
+        }
+        for event in recent {
+            let day = event.at.get(..10).unwrap_or(&event.at);
+            self.note_tone(
+                format!("  {day} {} · {}", event.action, event.reason),
+                Tone::Muted,
+            );
+            if let Some(evidence) = event.evidence.first() {
+                self.note_tone(
+                    format!("    {}", brand::ellipsize(evidence, 100)),
+                    Tone::Muted,
+                );
+            }
+        }
+    }
+
     fn settings_items(&mut self) -> Vec<Item> {
         if self.attribution.is_none() {
             if let Some(Response::CommitPolicy { attribution, .. }) =
@@ -342,6 +527,32 @@ impl App {
                 label: "When Jackalope isn't running".into(),
                 detail: cold_start_label(host::remembered_choice()).into(),
                 action: Action::ColdStart,
+            },
+            Item {
+                label: format!("Auto-approve agent requests in {}", self.project.name),
+                detail: if self.project.auto_approve.unwrap_or(true) {
+                    "on · asks only for risky actions".into()
+                } else {
+                    "off · asks for every request".into()
+                },
+                action: Action::AutoApprove,
+            },
+            Item {
+                label: format!("Where tasks work in {}", self.project.name),
+                detail: workspace_mode_label(self.project.workspace_mode.as_deref()).into(),
+                action: Action::WorkspaceMode,
+            },
+            Item {
+                label: format!("Learn automatically in {}", self.project.name),
+                detail: if self.project.learn_automatically.unwrap_or(true) {
+                    format!(
+                        "on · reflects every {} tool calls and when work ends",
+                        self.project.learning_cadence.unwrap_or(50)
+                    )
+                } else {
+                    "off · /learn still saves lessons on request".into()
+                },
+                action: Action::LearnAutomatically,
             },
             Item {
                 label: format!("Commit author in {}", self.project.name),
@@ -503,6 +714,12 @@ impl App {
                 ("Projects".to_string(), items)
             }
             PickerKind::Agents => ("Agents".to_string(), self.agent_items()),
+            PickerKind::Learnings => (
+                format!("Learned in {}", self.project.name),
+                self.learning_items(),
+            ),
+            // Built by `open_learning_actions`, which knows the lesson.
+            PickerKind::LearningActions => return,
             PickerKind::Settings => ("Settings".to_string(), self.settings_items()),
             PickerKind::NextAgent => (
                 "Agent for the next conversation".to_string(),

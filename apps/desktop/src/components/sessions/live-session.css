@@ -26,7 +26,7 @@
   background: var(--color-surface);
   flex: none;
 }
-.live-header:has(~ .live-statusbar, ~ .work-toolbar) {
+.live-header:has(~ .live-statusbar, ~ .live-tabbar) {
   border-bottom: 0;
 }
 .live-title {
@@ -74,9 +74,17 @@
   background: var(--color-surface);
   flex: none;
 }
-/* The header, status and task bars read as one block with a single divider beneath it. */
-.live-statusbar:has(~ .work-toolbar) {
+/* The header, status and view bars read as one block with a single divider beneath it. */
+.live-statusbar:has(~ .live-tabbar) {
   border-bottom: 0;
+}
+.live-tabbar {
+  display: flex;
+  padding: 0 20px 12px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  flex: none;
 }
 .live-status-actions {
   display: flex;
@@ -89,37 +97,26 @@
 .live-status {
   display: flex;
   align-items: center;
-  gap: 8px;
   min-height: 44px;
-  cursor: pointer;
   font-size: var(--text-xs);
-  text-align: left;
 }
 /* The status sits beside the project name, so the header stays one row. */
 .live-title > .live-status {
   min-height: 28px;
-  padding: 0 4px;
-  margin: -4px 0;
-  border-radius: var(--radius-xs);
   color: var(--color-text-secondary);
 }
-.live-title > .live-status:hover:not(:disabled) {
-  background: var(--color-surface-hover);
-}
-.live-title > .live-status:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: -2px;
-}
+/* One view fills the canvas at a time: the conversation or a review, preview, terminal or screen. */
 .live-columns {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
 }
-.live-columns[data-expanded="true"] {
-  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 1fr);
+.live-conversation[hidden] {
+  display: none;
 }
 .live-conversation {
+  flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -127,7 +124,8 @@
 }
 .live-transcript {
   overflow: auto;
-  padding: 24px;
+  /* Wide conversations keep a readable, centered column. */
+  padding: 24px max(24px, (100% - 56rem) / 2);
   flex: 1;
   min-height: 0;
   scroll-behavior: auto;
@@ -165,7 +163,6 @@
     transition: none;
   }
 }
-.live-workspace p,
 .work-context-path {
   user-select: text;
 }
@@ -269,7 +266,7 @@
 }
 .live-composer {
   padding: 12px;
-  margin: 12px 20px 20px;
+  margin: 12px max(20px, (100% - 56rem) / 2) 20px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
   background: var(--color-surface-elevated);
@@ -305,46 +302,14 @@
   white-space: nowrap;
 }
 .live-work {
+  flex: 1;
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: 16px;
-  border-left: 1px solid var(--color-border-subtle);
-  background: var(--color-surface);
-}
-.live-work-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 14px;
+  padding: 20px;
 }
 .live-tabs > .ui-segment {
-  padding-inline: 10px;
-}
-.live-work-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-.live-work-row > div {
-  min-width: 0;
-}
-.live-work-row p {
-  font-size: var(--text-sm);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-}
-.live-work-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 20px;
+  padding-inline: 12px;
 }
 .live-message[data-canceled="true"] > p {
   text-decoration: line-through;
@@ -355,17 +320,6 @@
   max-height: 20%;
   overflow: auto;
   flex: 0 1 auto;
-}
-.live-workspace {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  margin-top: 20px;
-  overflow-wrap: anywhere;
-}
-.live-workspace summary {
-  cursor: pointer;
-  min-height: 44px;
-  padding: 12px 0;
 }
 .live-start {
   width: 100%;
@@ -454,20 +408,6 @@
   gap: 10px;
   margin-left: auto;
 }
-@container session-canvas (max-width: 800px) {
-  .live-columns[data-expanded="true"] {
-    display: flex;
-    flex-direction: column;
-  }
-  .live-conversation {
-    flex: 1;
-  }
-  .live-work {
-    border-left: 0;
-    border-top: 1px solid var(--color-border-subtle);
-    max-height: 45%;
-  }
-}
 .live-session-detached .live-header {
   padding: 16px 10px 10px 14px;
   gap: 8px;
@@ -512,38 +452,17 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.live-session-detached .live-columns {
-  display: flex;
-  flex-direction: column;
-}
-.live-session-detached .live-conversation {
-  flex: 1;
+.live-session-detached .live-tabbar {
+  padding: 0 8px 8px;
 }
 .live-session-detached .live-work {
-  border-left: 0;
-  border-top: 1px solid var(--color-border-subtle);
-  max-height: 45%;
-  flex: 0 1 auto;
+  padding: 14px;
 }
 .live-session-detached .live-transcript {
   padding: 20px;
 }
 .live-session-detached .live-composer {
   margin: 8px 14px 14px;
-}
-@media (max-width: 850px) {
-  .live-columns[data-expanded="true"] {
-    display: flex;
-    flex-direction: column;
-  }
-  .live-conversation {
-    flex: 1;
-  }
-  .live-work {
-    border-left: 0;
-    border-top: 1px solid var(--color-border-subtle);
-    max-height: 45%;
-  }
 }
 @media (max-width: 400px) {
   .live-session-detached .live-header .live-mascot {
@@ -585,22 +504,6 @@
   .live-session .brand-agent-character {
     animation: none;
   }
-}
-.live-columns[data-result-view="true"] {
-  display: flex;
-  flex-direction: column;
-}
-.live-columns[data-result-view="true"] > .live-work {
-  order: 0;
-  flex: 1;
-  border-left: 0;
-}
-.live-columns[data-result-view="true"] > .live-conversation {
-  order: 1;
-  flex: none;
-}
-.live-columns[data-result-view="true"] .live-transcript {
-  display: none;
 }
 .live-header-native-mac {
   padding-left: 80px;

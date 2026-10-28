@@ -115,7 +115,7 @@ const DENY: &str = "Deny";
 /// Shorter than the bridge timeout so Claude Code receives a denial, not a transport error.
 const PERMISSION_WAIT_SECS: u64 = 1800;
 
-fn permission_question(input: &PermissionPromptInput) -> String {
+fn permission_question(input: &PermissionPromptInput, escalation: Option<&str>) -> String {
     // Show what would run the way a person reads it: a shell command or file
     // path as written, anything else as its JSON input.
     let detail = ["command", "file_path", "url", "pattern"]
@@ -127,8 +127,11 @@ fn permission_question(input: &PermissionPromptInput) -> String {
         .as_str()
         .map(|text| format!("\n{}", text.chars().take(300).collect::<String>()))
         .unwrap_or_default();
+    let escalated = escalation
+        .map(|reason| format!("\nJackalope is asking because {reason}."))
+        .unwrap_or_default();
     format!(
-        "Allow Claude Code to use {}?\n{}{reason}",
+        "Allow Claude Code to use {}?\n{}{reason}{escalated}",
         input.tool_name.chars().take(200).collect::<String>(),
         detail.chars().take(3000).collect::<String>()
     )
@@ -990,6 +993,9 @@ impl CoordinationTools {
         let always = standing
             .as_ref()
             .map(|(_, label)| format!("{ALWAYS_PREFIX}{label} in {}", run.project_name));
+        let mut asked = false;
+        let mut automatic = false;
+        let mut escalation = None;
         let answer = if super::permission_rules::allows(
             &rules,
             &run.project_id,
@@ -997,6 +1003,21 @@ impl CoordinationTools {
             &input.input,
         ) {
             Some(ALLOW_ONCE.to_string())
+        } else if let super::permission_risk::Decision::Ask(reason) = super::permission_risk::decide(
+            &self.service.runtime,
+            &run.id,
+            &super::permission_risk::label(&input.tool_name, &input.input),
+            |workspace| super::permission_risk::assess(&input.tool_name, &input.input, workspace),
+        ) {
+            escalation = reason;
+            asked = true;
+            None
+        } else {
+            automatic = true;
+            Some(ALLOW_ONCE.to_string())
+        };
+        let answer = if !asked {
+            answer
         } else if run.prompts.len() >= 100 {
             None
         } else {
@@ -1004,7 +1025,7 @@ impl CoordinationTools {
             options.extend(always.clone());
             options.push(DENY.into());
             let question = super::harness::AskUserInput {
-                question: permission_question(&input),
+                question: permission_question(&input, escalation.as_deref()),
                 input_type: "choice".into(),
                 options,
                 default_value: None,
@@ -1033,16 +1054,19 @@ impl CoordinationTools {
             }
         };
         let decision = permission_decision(input.input, answer.as_deref());
-        self.service.runtime.update(&run.id, |r| {
-            r.activity.push(format!(
-                "Claude Code permission {}",
-                if decision["behavior"] == "allow" {
-                    "allowed"
-                } else {
-                    "denied"
-                }
-            ))
-        });
+        // Automatic approvals already recorded their own activity line.
+        if !automatic {
+            self.service.runtime.update(&run.id, |r| {
+                r.activity.push(format!(
+                    "Claude Code permission {}",
+                    if decision["behavior"] == "allow" {
+                        "allowed"
+                    } else {
+                        "denied"
+                    }
+                ))
+            });
+        }
         Ok(CallToolResult::success(vec![
             rmcp::model::ContentBlock::text(decision.to_string()),
         ]))
@@ -1382,11 +1406,16 @@ mod tests {
                 "deny"
             );
         }
-        let question = permission_question(&PermissionPromptInput {
+        let request = PermissionPromptInput {
             tool_name: "Bash".into(),
             input,
-        });
+        };
+        let question = permission_question(&request, None);
         assert!(question.contains("Bash") && question.contains("pnpm add x"));
+        assert!(
+            permission_question(&request, Some("it pushes commits to a remote"))
+                .ends_with("Jackalope is asking because it pushes commits to a remote.")
+        );
     }
 
     #[test]

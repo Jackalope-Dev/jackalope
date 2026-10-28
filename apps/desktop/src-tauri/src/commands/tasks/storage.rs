@@ -50,6 +50,7 @@ impl TaskRuntime {
             directory,
             writer,
             warm_helpers: Default::default(),
+            claude_sessions: Default::default(),
             _owner: owner,
         };
         let paths: Vec<_> = std::fs::read_dir(&runtime.directory)

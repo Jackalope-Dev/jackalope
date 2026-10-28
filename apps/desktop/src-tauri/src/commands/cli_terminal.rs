@@ -87,6 +87,10 @@ pub async fn cli_terminal_start(key: String, directory: String) -> Result<String
     let mut command = CommandBuilder::new(command_path()?);
     // The command reports its conversation under this key; see `popout`.
     command.env("JACKALOPE_TERMINAL", &key);
+    // The window's xterm.js draws 24-bit colour and Unicode but, like many
+    // embedded terminals, says neither.
+    command.env("COLORTERM", "truecolor");
+    command.env("TERM_PROGRAM", "jackalope");
     let id = terminal_id(&key);
     let started = id.clone();
     tauri::async_runtime::spawn_blocking(move || {

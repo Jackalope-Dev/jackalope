@@ -1,7 +1,8 @@
-import { SearchField } from '@jackalope/ui';
-import { BookOpen, Lightbulb, Workflow } from 'lucide-react';
+import { Badge, SearchField } from '@jackalope/ui';
+import { BookOpen, Lightbulb, Sparkles, Workflow } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { type KnowledgeEntry, openKnowledgeTask, useKnowledge } from '../../lib/knowledge';
+import { learnedStatus, learningSummary, statusLabel } from '../../lib/learning';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -13,6 +14,7 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { KnowledgeEditor, newKnowledge } from './KnowledgeEditor';
+import { LearnedHistory } from './LearnedHistory';
 
 export function KnowledgeLibrary({ project }: { project: Project }) {
   const { entries, error, loading, refresh } = useKnowledge(project.id, project.path);
@@ -31,6 +33,25 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
   const desktop = isTauriEnvironment();
   const runs = useExecutionStore((s) => s.runs);
   const importer = useRef<HTMLInputElement>(null);
+  // Archived learned lessons follow everything that is still available.
+  const ordered = [...entries].sort(
+    (a, b) =>
+      Number(learnedStatus(a.automatic?.lifecycle) === 'archived') -
+      Number(learnedStatus(b.automatic?.lifecycle) === 'archived'),
+  );
+  const setArchived = async (entry: KnowledgeEntry, archived: boolean) => {
+    setActionError('');
+    try {
+      await nativeTask('knowledge_set_archived', {
+        id: entry.id,
+        revision: entry.revision,
+        archived,
+      });
+      await refresh();
+    } catch (cause) {
+      setActionError(String(cause));
+    }
+  };
   return (
     <>
       <section className="workspace-section workspace-stack" aria-label="Saved project knowledge">
@@ -102,126 +123,162 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
           </div>
         )}
         <div className="context-knowledge-grid">
-          {entries.map((entry) => (
-            <article key={entry.id} className="context-knowledge-card">
-              <div className="context-knowledge-type">
-                {entry.kind === 'memory' ? (
-                  <Lightbulb size={18} aria-hidden="true" />
-                ) : (
-                  <Workflow size={18} aria-hidden="true" />
-                )}
-                {entry.automatic
-                  ? 'Automatically learned'
-                  : entry.kind === 'memory'
-                    ? 'Lesson'
-                    : 'Workflow'}
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-medium">{entry.title}</h3>
-                  <p className="task-muted">
-                    {entry.enabled ? 'Available' : 'Paused'} · Revision {entry.revision}
-                    {runs.some((run) =>
-                      run.contextReceipt?.entries.some((e) => e.id === entry.id),
-                    ) && (
-                      <>
-                        {' '}
-                        · Used in{' '}
-                        {
-                          new Set(
-                            runs
-                              .filter((run) =>
-                                run.contextReceipt?.entries.some((e) => e.id === entry.id),
-                              )
-                              .map((run) => run.taskId),
-                          ).size
-                        }{' '}
-                        tasks
-                      </>
-                    )}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="ghost" onClick={() => setEditing(entry)}>
-                    Edit
-                  </Button>
-                  <ConfirmAction
-                    title="Remove saved knowledge?"
-                    description="Future tasks will stop using it. Existing task context and source history are kept."
-                    onConfirm={async () => {
-                      try {
-                        await nativeTask('knowledge_remove', {
-                          id: entry.id,
-                          revision: entry.revision,
-                        });
-                        await refresh();
-                      } catch (e) {
-                        setActionError(String(e));
+          {ordered.map((entry) => {
+            const lifecycle = entry.automatic?.lifecycle;
+            const status = learnedStatus(lifecycle);
+            return (
+              <article key={entry.id} className="context-knowledge-card">
+                <div className="context-knowledge-type">
+                  {status ? (
+                    <Sparkles size={18} aria-hidden="true" />
+                  ) : entry.kind === 'memory' ? (
+                    <Lightbulb size={18} aria-hidden="true" />
+                  ) : (
+                    <Workflow size={18} aria-hidden="true" />
+                  )}
+                  {status
+                    ? 'Learned'
+                    : entry.automatic
+                      ? 'Automatically learned'
+                      : entry.kind === 'memory'
+                        ? 'Lesson'
+                        : 'Workflow'}
+                  {status && (
+                    <Badge
+                      variant={
+                        status === 'active'
+                          ? 'success'
+                          : status === 'probation'
+                            ? 'accent'
+                            : 'outline'
                       }
-                    }}
-                    trigger={<Button variant="ghost">Remove</Button>}
-                  />
+                    >
+                      {statusLabel(status)}
+                    </Badge>
+                  )}
                 </div>
-              </div>
-              <div className="mt-2">
-                <div className="context-knowledge-content">
-                  <p
-                    className={`whitespace-pre-wrap break-words ${expanded[entry.id] ? '' : 'context-knowledge-preview'}`}
-                  >
-                    {entry.content}
-                  </p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-medium">{entry.title}</h3>
+                    <p className="task-muted">
+                      {lifecycle
+                        ? learningSummary(lifecycle)
+                        : entry.enabled
+                          ? 'Available'
+                          : 'Paused'}{' '}
+                      · Revision {entry.revision}
+                      {!lifecycle &&
+                        runs.some((run) =>
+                          run.contextReceipt?.entries.some((e) => e.id === entry.id),
+                        ) && (
+                          <>
+                            {' '}
+                            · Used in{' '}
+                            {
+                              new Set(
+                                runs
+                                  .filter((run) =>
+                                    run.contextReceipt?.entries.some((e) => e.id === entry.id),
+                                  )
+                                  .map((run) => run.taskId),
+                              ).size
+                            }{' '}
+                            tasks
+                          </>
+                        )}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" onClick={() => setEditing(entry)}>
+                      Edit
+                    </Button>
+                    {status && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => void setArchived(entry, status !== 'archived')}
+                      >
+                        {status === 'archived' ? 'Restore' : 'Archive'}
+                      </Button>
+                    )}
+                    <ConfirmAction
+                      title="Remove saved knowledge?"
+                      description="Future tasks will stop using it. Existing task context and source history are kept."
+                      onConfirm={async () => {
+                        try {
+                          await nativeTask('knowledge_remove', {
+                            id: entry.id,
+                            revision: entry.revision,
+                          });
+                          await refresh();
+                        } catch (e) {
+                          setActionError(String(e));
+                        }
+                      }}
+                      trigger={<Button variant="ghost">Remove</Button>}
+                    />
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <div className="context-knowledge-content">
+                    <p
+                      className={`whitespace-pre-wrap break-words ${expanded[entry.id] ? '' : 'context-knowledge-preview'}`}
+                    >
+                      {entry.content}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      aria-expanded={!!expanded[entry.id]}
+                      onClick={() =>
+                        setExpanded((current) => ({ ...current, [entry.id]: !current[entry.id] }))
+                      }
+                    >
+                      {expanded[entry.id] ? 'Show less' : 'Read full content'}
+                    </Button>
+                  </div>
+                  {entry.keywords.length > 0 && (
+                    <p className="task-muted mt-2">Matches: {entry.keywords.join(', ')}</p>
+                  )}
+                </div>
+                {entry.automatic && (
+                  <div className="task-muted break-words">
+                    <p>
+                      {entry.automatic.managed ? 'Updated from local evidence' : 'Edited by you'} ·{' '}
+                      {entry.automatic.kind}
+                    </p>
+                    {entry.automatic.evidence.map((evidence) => (
+                      <p key={evidence}>{evidence}</p>
+                    ))}
+                  </div>
+                )}
+                {status && <LearnedHistory projectId={project.id} entryId={entry.id} />}
+                {entry.sourceRunId && (
                   <Button
                     variant="ghost"
-                    aria-expanded={!!expanded[entry.id]}
-                    onClick={() =>
-                      setExpanded((current) => ({ ...current, [entry.id]: !current[entry.id] }))
-                    }
+                    onClick={() => {
+                      if (entry.sourceRunId) openSource(entry.sourceRunId);
+                    }}
                   >
-                    {expanded[entry.id] ? 'Show less' : 'Read full content'}
+                    Open source task
                   </Button>
-                </div>
-                {entry.keywords.length > 0 && (
-                  <p className="task-muted mt-2">Matches: {entry.keywords.join(', ')}</p>
                 )}
-              </div>
-              {entry.automatic && (
-                <div className="task-muted break-words">
-                  <p>
-                    {entry.automatic.managed ? 'Updated from local evidence' : 'Edited by you'} ·{' '}
-                    {entry.automatic.kind}
-                  </p>
-                  {entry.automatic.evidence.map((evidence) => (
-                    <p key={evidence}>{evidence}</p>
-                  ))}
-                </div>
-              )}
-              {entry.sourceRunId && (
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    if (entry.sourceRunId) openSource(entry.sourceRunId);
-                  }}
-                >
-                  Open source task
-                </Button>
-              )}
-              {entry.kind === 'workflow' && (
-                <Button
-                  variant="ghost"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(entry.content);
-                      setActionError('');
-                    } catch (cause) {
-                      setActionError(`Could not copy workflow: ${String(cause)}`);
-                    }
-                  }}
-                >
-                  Copy Markdown
-                </Button>
-              )}
-            </article>
-          ))}
+                {entry.kind === 'workflow' && (
+                  <Button
+                    variant="ghost"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(entry.content);
+                        setActionError('');
+                      } catch (cause) {
+                        setActionError(`Could not copy workflow: ${String(cause)}`);
+                      }
+                    }}
+                  >
+                    Copy Markdown
+                  </Button>
+                )}
+              </article>
+            );
+          })}
         </div>
       </section>
       <section className="workspace-section workspace-stack" aria-label="Search past decisions">

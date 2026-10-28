@@ -1,7 +1,8 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Disclosure, DisclosureSummary, DropdownMenu as Menu, Switch } from '@jackalope/ui';
 import { Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { describeWake } from '../../lib/bot-hub';
 import { type ScheduleTemplate, scheduleTemplateDraft } from '../../lib/schedule-templates';
 import { type ScheduleDefinition as Definition, savedPlanDraft } from '../../lib/schedules';
 import { nativeTask, type RunRequest } from '../../lib/task-runtime';
@@ -20,6 +21,7 @@ import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
+import { OptionsMenu } from '../ui/OptionsMenu';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
@@ -44,6 +46,17 @@ interface SavedSchedule {
 interface Ledger {
   schedules: SavedSchedule[];
   error: string | null;
+}
+
+/** Plain-language timing, falling back to the expression for custom schedules. */
+function describeTiming(definition: Definition) {
+  return describeWake({
+    id: definition.id,
+    name: definition.name,
+    prompt: '',
+    enabled: definition.enabled,
+    trigger: { kind: 'schedule', expression: definition.expression, timezone: definition.timezone },
+  });
 }
 export function ScheduleManager(props: {
   onOpenProject: () => void;
@@ -72,6 +85,7 @@ export function ScheduleManager(props: {
   const [template, setTemplate] = useState<ScheduleTemplate | null>(null);
   const [templateContext, setTemplateContext] = useState('');
   const [changePreview, setChangePreview] = useState<{ title: string; text: string } | null>(null);
+  const [deleting, setDeleting] = useState<Definition | null>(null);
   const [webhook, setWebhook] = useState<{
     id: string;
     name: string;
@@ -258,7 +272,7 @@ export function ScheduleManager(props: {
     <WorkspacePage className="">
       <WorkspaceHeading
         title="Schedules"
-        description="Recurring tasks run on a schedule while Jackalope is open, including in the tray. To have a bot check in on its own, give it a wake-up instead."
+        description="Recurring tasks run while Jackalope is open, including in the tray."
         action={
           <Button
             ref={newSchedule}
@@ -280,16 +294,48 @@ export function ScheduleManager(props: {
         {visible.map(
           ({ definition: d, nextAt, history, localChecks, quietChecks, webhook: hook }) => (
             <article className="schedule-row" key={d.id}>
-              <div className="flex-1 min-w-0">
-                <h2 className="text-base font-medium">{d.name}</h2>
+              <div className="schedule-row-summary">
+                <div className="min-w-0">
+                  <h2 className="text-base font-medium">{d.name}</h2>
+                  <p className="task-muted">
+                    {d.enabled
+                      ? `${describeTiming(d)} · Next ${new Date(nextAt).toLocaleString()}`
+                      : 'Paused'}
+                  </p>
+                </div>
+                <Switch
+                  aria-label={`Run ${d.name} on schedule`}
+                  checked={d.enabled}
+                  disabled={busy}
+                  onCheckedChange={(enabled) =>
+                    void act(() => nativeTask('schedule_set_enabled', { id: d.id, enabled }))
+                  }
+                />
+                <OptionsMenu label={`${d.name} options`} disabled={busy}>
+                  <Menu.Item className="workspace-menu-item" onSelect={() => open(d)}>
+                    Edit…
+                  </Menu.Item>
+                  <Menu.Item
+                    className="workspace-menu-item"
+                    disabled={!desktop}
+                    onSelect={() => setWebhook({ id: d.id, name: d.name, active: Boolean(hook) })}
+                  >
+                    Webhook…
+                  </Menu.Item>
+                  <Menu.Separator className="menu-separator" />
+                  <Menu.Item className="workspace-menu-item" onSelect={() => setDeleting(d)}>
+                    Delete…
+                  </Menu.Item>
+                </OptionsMenu>
+              </div>
+              <Disclosure>
+                <DisclosureSummary className="min-h-11 py-3">
+                  Details and run history ({history.length})
+                </DisclosureSummary>
                 <p className="task-muted">
                   {d.request.projectName} ·{' '}
                   {d.monitor?.action === 'notify' ? 'Local monitor' : d.request.agent} ·{' '}
-                  {d.timezone}
-                </p>
-                <p className="task-muted">
-                  {d.enabled ? `Next: ${new Date(nextAt).toLocaleString()}` : 'Paused'} ·{' '}
-                  {d.expression}
+                  {d.timezone} · {d.expression}
                 </p>
                 {d.monitor && (
                   <div className="task-muted mt-2">
@@ -304,113 +350,75 @@ export function ScheduleManager(props: {
                     </p>
                   </div>
                 )}
-                <Disclosure className="mt-3">
-                  <DisclosureSummary className="min-h-11 py-3">
-                    Instructions and run history ({history.length})
-                  </DisclosureSummary>
-                  <p className="whitespace-pre-wrap my-3">{d.request.prompt}</p>
-                  {[...history].reverse().map((event) => {
-                    const run = runs.find((r) => r.id === event.runId);
-                    return (
-                      <div key={event.dueAt} className="flex flex-wrap items-center gap-3 py-2">
-                        <span>
-                          {new Date(event.dueAt).toLocaleString()} · {run?.status ?? event.outcome}
-                        </span>
-                        {event.change && (
-                          <Button
-                            variant="ghost"
-                            disabled={busy}
-                            onClick={() =>
-                              void act(async () => {
-                                const text = await nativeTask<string>('schedule_inspect_change', {
-                                  id: d.id,
-                                  dueAt: event.dueAt,
-                                });
-                                setChangePreview({
-                                  title: `${d.name} · ${new Date(event.dueAt).toLocaleString()}`,
-                                  text,
-                                });
-                              })
-                            }
-                          >
-                            Inspect change
-                          </Button>
-                        )}
-                        {run && (
-                          <Button
-                            variant="ghost"
-                            onClick={() => {
-                              selectProject(run.projectId);
-                              props.onPlanning();
-                              useExecutionStore.getState().select(run.id);
-                            }}
-                          >
-                            View run
-                          </Button>
-                        )}
-                        {run && ['starting', 'running'].includes(run.status) && (
-                          <Button
-                            variant="ghost"
-                            disabled={busy}
-                            onClick={() => void act(() => nativeTask('task_stop', { id: run.id }))}
-                          >
-                            Stop run
-                          </Button>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {!history.length && <p className="task-muted">No occurrences yet.</p>}
-                </Disclosure>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" disabled={busy} onClick={() => open(d)}>
-                  Edit
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={busy || !desktop}
-                  onClick={() =>
-                    setWebhook({
-                      id: d.id,
-                      name: d.name,
-                      active: Boolean(hook),
-                    })
-                  }
-                >
-                  Webhook
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() =>
-                    void act(() =>
-                      nativeTask('schedule_set_enabled', { id: d.id, enabled: !d.enabled }),
-                    )
-                  }
-                >
-                  {d.enabled ? 'Pause' : 'Enable'}
-                </Button>
-                <ConfirmAction
-                  title="Delete schedule?"
-                  description="Future occurrences stop. Existing tasks and worktrees are kept."
-                  onConfirm={() => act(() => nativeTask('schedule_remove', { id: d.id }))}
-                  trigger={
-                    <Button variant="ghost" disabled={busy}>
-                      Delete
-                    </Button>
-                  }
-                />
-              </div>
+                <p className="whitespace-pre-wrap my-3">{d.request.prompt}</p>
+                {[...history].reverse().map((event) => {
+                  const run = runs.find((r) => r.id === event.runId);
+                  return (
+                    <div key={event.dueAt} className="flex flex-wrap items-center gap-3 py-2">
+                      <span>
+                        {new Date(event.dueAt).toLocaleString()} · {run?.status ?? event.outcome}
+                      </span>
+                      {event.change && (
+                        <Button
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() =>
+                            void act(async () => {
+                              const text = await nativeTask<string>('schedule_inspect_change', {
+                                id: d.id,
+                                dueAt: event.dueAt,
+                              });
+                              setChangePreview({
+                                title: `${d.name} · ${new Date(event.dueAt).toLocaleString()}`,
+                                text,
+                              });
+                            })
+                          }
+                        >
+                          Inspect change
+                        </Button>
+                      )}
+                      {run && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            selectProject(run.projectId);
+                            props.onPlanning();
+                            useExecutionStore.getState().select(run.id);
+                          }}
+                        >
+                          View run
+                        </Button>
+                      )}
+                      {run && ['starting', 'running'].includes(run.status) && (
+                        <Button
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() => void act(() => nativeTask('task_stop', { id: run.id }))}
+                        >
+                          Stop run
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+                {!history.length && <p className="task-muted">No occurrences yet.</p>}
+              </Disclosure>
             </article>
           ),
         )}
       </div>
-      {visible.length > 0 && (
-        <p className="task-muted mt-5">
-          Pausing keeps active runs. Overlapping or interrupted runs are skipped; failed starts are
-          not retried.
-        </p>
+      {deleting && (
+        <ConfirmAction
+          open
+          onOpenChange={(value) => !value && setDeleting(null)}
+          title={`Delete ${deleting.name}?`}
+          description="Future occurrences stop. Existing tasks and worktrees are kept."
+          onConfirm={async () => {
+            await act(() => nativeTask('schedule_remove', { id: deleting.id }));
+            setDeleting(null);
+          }}
+        />
       )}
       <ScheduleTemplateLibrary onChoose={chooseTemplate} disabled={!desktop || busy} />
       {legacy.length > 0 && (

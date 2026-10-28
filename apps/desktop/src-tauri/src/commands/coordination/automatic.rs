@@ -390,9 +390,10 @@ impl Coordinator {
             .and_then(|h| h.to_str().ok())
             .and_then(|h| h.strip_prefix("Bearer "))
             .ok_or("Coordination is unavailable for this attempt")?;
+        let token = crate::commands::tasks::bridge_token(token);
         let (_, run_id) = inner
             .grants
-            .get(token)
+            .get(&token)
             .ok_or("Coordination is unavailable for this attempt")?;
         let run = self
             .runtime

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useExecutionStore } from '../stores/executionStore';
 import { useProjectStore } from '../stores/projectStore';
+import type { Lifecycle } from './learning';
 import { createReadCache } from './read-cache';
 import { nativeTask } from './task-runtime';
 import { isTauriEnvironment } from './tauri-bridge';
@@ -12,9 +13,18 @@ interface ProcessTemplate {
 }
 export interface KnowledgeEntry {
   automatic?: {
-    kind: 'preference' | 'adjustment' | 'review' | 'repository' | 'verification';
+    kind:
+      | 'preference'
+      | 'adjustment'
+      | 'review'
+      | 'repository'
+      | 'verification'
+      | 'correction'
+      | 'clarification';
     evidence: string[];
     managed: boolean;
+    /** Present on lessons the learning loop wrote. */
+    lifecycle?: Lifecycle | null;
     resolution?: {
       runId: string;
       requirementId: string;

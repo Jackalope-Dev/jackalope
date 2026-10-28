@@ -227,6 +227,11 @@ fn main() {
     let policy_path = runtime.policy_path();
     std::fs::create_dir_all(policy_path.parent().unwrap()).unwrap();
     std::fs::write(policy_path, serde_json::to_vec(&policy).unwrap()).unwrap();
+    // The Claude fixture answers one prompt and exits, as a one-shot launch expects.
+    crate::commands::tasks::claude_session::set_test_settings(
+        "routing-fixture",
+        Default::default(),
+    );
     let id = uuid::Uuid::new_v4().to_string();
     let request: RunRequest = serde_json::from_value(serde_json::json!({"id":id,"projectId":"routing-fixture","projectName":"Routing fixture","projectPath":repo,"agent":"auto","prompt":"Complete the fixture while preserving progress.","isolated":true,"connectionIds":[]})).unwrap();
     runtime.start(request.clone()).unwrap();

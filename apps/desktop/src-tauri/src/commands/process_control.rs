@@ -148,10 +148,19 @@ impl ProcessTree {
         use std::os::unix::process::CommandExt;
         // This separate process observes EOF even if Jackalope is killed without running Drop.
         // CLOEXEC on the parent's pipe prevents agent grandchildren from keeping it alive.
+        // A macOS group kill can miss a child its parent is still forking, so the guardian
+        // repeats it until no member can be signaled; zombies refuse signals there, which
+        // ends the loop. Linux signals a forking parent and its child together, but would
+        // keep signaling an unreaped zombie leader, so it kills once.
+        let script = if cfg!(target_os = "macos") {
+            "IFS= read -r ignored; while kill -9 \"-$1\"; do :; done"
+        } else {
+            "IFS= read -r ignored; kill -9 \"-$1\""
+        };
         let guardian = Command::new("/bin/sh")
             .args([
                 "-c",
-                "IFS= read -r ignored; kill -9 \"-$1\"",
+                script,
                 "jackalope-process-guardian",
                 &group.to_string(),
             ])

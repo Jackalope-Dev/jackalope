@@ -1,6 +1,32 @@
 use super::*;
 use crate::commands::work_terminal;
 
+/// Polls terminal `id` and answers each new cursor-position request once.
+/// ConPTY asks once on start; unrequested replies reach the shell as typed input.
+fn poll_answering_cursor_requests(
+    id: &str,
+    generation: &str,
+    answered: &mut usize,
+) -> serde_json::Value {
+    let view = serde_json::to_value(
+        work_terminal::task_terminal_status(id.into(), 0, String::new())
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    let requests = view["output"]
+        .as_str()
+        .unwrap()
+        .matches("\u{1b}[6n")
+        .count();
+    while *answered < requests {
+        let _ =
+            work_terminal::task_terminal_write(id.into(), generation.into(), "\u{1b}[1;1R".into());
+        *answered += 1;
+    }
+    view
+}
+
 #[test]
 fn task_terminal_reconnects_and_reserves_its_workspace_until_stopped() {
     let root = std::env::temp_dir().join(format!("jackalope-terminal-{}", uuid::Uuid::new_v4()));
@@ -70,27 +96,34 @@ fn task_terminal_reconnects_and_reserves_its_workspace_until_stopped() {
         .unwrap();
     let saved_output = runtime.integration_directory().join("terminal-output");
     let started = std::time::Instant::now();
+    let mut exit_sent = started;
+    let mut answered = 0;
     loop {
-        let split = serde_json::to_value(
-            work_terminal::task_terminal_status(split_id.clone(), 0, String::new())
-                .unwrap()
-                .unwrap(),
-        )
-        .unwrap();
-        if split["output"].as_str().unwrap().contains("\u{1b}[6n") {
-            let _ = work_terminal::task_terminal_write(
-                split_id.clone(),
-                split_generation.clone(),
-                "\u{1b}[1;1R".into(),
-            );
-        }
+        let split = poll_answering_cursor_requests(&split_id, &split_generation, &mut answered);
         if split["running"] == false && saved_output.read_dir().unwrap().next().is_some() {
             break;
         }
-        assert!(
-            started.elapsed().as_secs() < 15,
-            "Exited shell output was not saved"
-        );
+        // A shell that is still starting (PowerShell under ConPTY) can drop typed-ahead input.
+        if split["running"] == true && exit_sent.elapsed().as_secs() >= 3 {
+            let _ = work_terminal::task_terminal_write(
+                split_id.clone(),
+                split_generation.clone(),
+                "exit\r".into(),
+            );
+            exit_sent = std::time::Instant::now();
+        }
+        if started.elapsed().as_secs() >= 30 {
+            let output = split["output"].as_str().unwrap();
+            let tail = output
+                .char_indices()
+                .rev()
+                .nth(2000)
+                .map_or(output, |(at, _)| &output[at..]);
+            panic!(
+                "Exited shell output was not saved (running: {}, output tail: {tail:?})",
+                split["running"]
+            );
+        }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
     drop(split_cleanup);
@@ -110,16 +143,9 @@ fn task_terminal_reconnects_and_reserves_its_workspace_until_stopped() {
     )
     .unwrap();
     let started = std::time::Instant::now();
+    let mut answered = 0;
     loop {
-        let current = status();
-        let output = current["output"].as_str().unwrap();
-        if output.contains("\u{1b}[6n") {
-            let _ = work_terminal::task_terminal_write(
-                run.task_id.clone(),
-                generation.clone(),
-                "\u{1b}[1;1R".into(),
-            );
-        }
+        poll_answering_cursor_requests(&run.task_id, &generation, &mut answered);
         if workspace.join("terminal-receipt.txt").exists() {
             break;
         }

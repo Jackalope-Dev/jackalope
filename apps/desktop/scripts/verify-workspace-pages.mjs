@@ -488,9 +488,10 @@ try {
   );
 
   await page.setViewportSize({ width: 1280, height: 840 });
-  await page.getByRole('button', { name: 'Trial passes', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'More', exact: true }).waitFor();
   await navigate('mcps');
-  await page.getByRole('button', { name: 'Custom connection', exact: true }).click();
+  await page.getByRole('button', { name: 'Connection options', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Custom connection', exact: true }).click();
   const connectionDialog = page.getByRole('dialog');
   await connectionDialog.getByLabel('Name', { exact: true }).fill('Fixture tool');
   await connectionDialog.getByRole('button', { name: 'Remote URL', exact: true }).click();
@@ -849,8 +850,8 @@ try {
     };
   });
   await navigate('worktrees');
-  await page.getByRole('button', { name: 'Copy path for feature/search' }).waitFor();
-  assert.equal(await page.getByRole('button', { name: 'Copy path for master' }).count(), 0);
+  await page.getByRole('button', { name: 'feature/search options' }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'master options' }).count(), 0);
   await page.getByText('Checking merge and cleanup status…', { exact: true }).waitFor();
   assert.equal(await page.getByText('Loading worktrees…', { exact: true }).count(), 0);
   for (const width of [1280, 960]) {
@@ -859,7 +860,7 @@ try {
   }
   await page.evaluate(() => window.failWorktreeInspection());
   await page.getByRole('alert').filter({ hasText: 'Cleanup check unavailable' }).waitFor();
-  assert.equal(await page.getByRole('button', { name: 'Copy path for feature/search' }).count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'feature/search options' }).count(), 1);
   assert.equal(await page.getByRole('button', { name: 'Refresh worktrees' }).isEnabled(), true);
   assert.deepEqual(errors, []);
   console.log(

@@ -224,12 +224,25 @@ pub fn merge(
             view.title
         );
     }
-    let plan = match connection.call(&Request::MergePrepare {
+    let prepared = connection.call(&Request::MergePrepare {
         session_id: id.clone(),
         message,
-    })? {
-        Response::Merge { plan } => plan,
-        _ => return Err(unexpected()),
+    });
+    let plan = match prepared {
+        Ok(Response::Merge { plan }) => plan,
+        other => {
+            // Nothing was prepared, so the pause this command added is undone.
+            if !view.paused {
+                let _ = connection.call(&Request::SessionAction {
+                    session_id: id.clone(),
+                    action: "resume".into(),
+                });
+            }
+            return Err(match other {
+                Err(error) => error,
+                _ => unexpected(),
+            });
+        }
     };
     if !plan.conflicts.is_empty() {
         return Err(format!(
@@ -514,6 +527,8 @@ mod tests {
             pending: 0,
             error: Some("null".into()),
             updated_at: String::new(),
+            status: None,
+            asking: false,
         };
         assert_eq!(state(&session), "open");
         session.pending = 2;

@@ -7,9 +7,6 @@ import {
   ChevronUp,
   ExternalLink,
   Minus,
-  Monitor,
-  PanelLeftClose,
-  PanelLeftOpen,
   PanelRightClose,
   Pause,
   Pin,
@@ -19,7 +16,6 @@ import {
 } from 'lucide-react';
 import { type CSSProperties, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
-import { useWideWorkspace } from '../../hooks/useWideWorkspace';
 import { BOT_BATCH_ALLOWANCE, batchLimitReached } from '../../lib/bot-conversations';
 import { type BotCard, useBotHubStore } from '../../lib/bot-hub';
 import {
@@ -49,9 +45,10 @@ import { ResultReview } from '../tasks/ResultReview';
 import { deliveryHandoff, TaskDelivery } from '../tasks/TaskDelivery';
 import { TaskLiveActivity } from '../tasks/TaskLiveActivity';
 import { TaskPreview } from '../tasks/TaskPreview';
-import { WorkContext } from '../tasks/WorkContext';
+import { useWorkSeen, WorkContextDetails } from '../tasks/WorkContext';
 import { WorkFeedbackInbox } from '../tasks/WorkFeedbackInbox';
 import { WorkSourceLink } from '../tasks/WorkSourceLink';
+import { useWorkspaceActions } from '../tasks/WorkTools';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Tooltip } from '../ui/Tooltip';
@@ -72,15 +69,14 @@ export function LiveSessionView({
   runs,
   detached = false,
   onBack,
-  initialDetailsOpen,
   simple = false,
   onOpenSession,
 }: {
   session: LiveSession;
   runs: TaskRun[];
   detached?: boolean;
+  /** A bot conversation returns to its bot list; work returns through the sidebar. */
   onBack?: () => void;
-  initialDetailsOpen?: boolean;
   /** A plain conversation for bot chats: no workspace, terminal or session tools; review appears in the transcript. */
   simple?: boolean;
   /** Opens another conversation, such as the one a bot message came from. */
@@ -91,10 +87,6 @@ export function LiveSessionView({
   const batchById = useMemo(
     () => new Map(session.batches.map((batch) => [batch.runId, batch])),
     [session.batches],
-  );
-  const messageById = useMemo(
-    () => new Map(session.messages.map((message) => [message.id, message])),
-    [session.messages],
   );
   const hubCards = useBotHubStore((state) => state.cards);
   const cardsByRun = useMemo(() => {
@@ -122,20 +114,16 @@ export function LiveSessionView({
     localStorage.setItem(key, existing ? `${existing}\n\n${text}` : text);
     selectWork();
   };
-  const [expanded, setExpanded] = useState(initialDetailsOpen ?? !detached);
-  useEffect(() => {
-    if (initialDetailsOpen === undefined) setExpanded(!detached);
-  }, [detached, initialDetailsOpen]);
-  const wide = useWideWorkspace();
-  const split = useWorkViewStore((state) => state.split[`session:${session.id}`] ?? wide);
+  const [topicsOpen, setTopicsOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  // Each view takes the whole canvas; the conversation is one of them, not a sidebar.
   const [tab, setTab] = useState(() => {
     const saved = useWorkViewStore.getState().reading[`session:${session.id}`];
     return saved === 'delivery'
       ? 'changes'
-      : ['work', 'changes', 'preview', 'terminal', 'screen'].includes(saved)
+      : ['changes', 'preview', 'terminal', 'screen'].includes(saved)
         ? saved
-        : 'work';
+        : 'conversation';
   });
   useEffect(() => {
     useWorkViewStore.getState().remember(`session:${session.id}`, tab);
@@ -154,9 +142,8 @@ export function LiveSessionView({
         ? section
         : ['changes', 'review', 'integrate', 'verify', 'delivery'].includes(section)
           ? 'changes'
-          : 'work',
+          : 'conversation',
     );
-    setExpanded(section !== 'result' && section !== 'conversation');
   }, [workRequest, session.id, session.batches]);
   const [addition, setAddition] = useState<{
     text: string;
@@ -196,6 +183,9 @@ export function LiveSessionView({
   const mascotRef = useRef<HTMLSpanElement>(null);
   const mascotGaze = useAgentGaze(mascotRef);
   const refresh = () => useLiveSessionStore.getState().refresh(session.id);
+  const tooled = !detached && !simple;
+  useWorkSeen(tooled ? latest : undefined);
+  const workspace = useWorkspaceActions(tooled ? latest : undefined);
   const act = async (action: () => Promise<unknown>) => {
     setBusy(true);
     setError('');
@@ -220,6 +210,10 @@ export function LiveSessionView({
     return () => observer.disconnect();
   }, [collapsed]);
   useEffect(() => {
+    const node = transcript.current;
+    if (tab === 'conversation' && node && follow.current) node.scrollTop = node.scrollHeight;
+  }, [tab]);
+  useEffect(() => {
     const attempt = `${latest?.id}:${latest?.status}:${session.paused}`;
     if (reviewAttempt.current !== attempt) {
       reviewAttempt.current = attempt;
@@ -234,7 +228,6 @@ export function LiveSessionView({
   const changeStats = useChangeStats(simple ? [latest] : []);
   const latestChanges = latest ? changeStats[latest.id]?.value : undefined;
   const showReview = () => {
-    setExpanded(true);
     setTab('changes');
     if (!latest || active || integrated) return;
     void act(async () => {
@@ -270,25 +263,9 @@ export function LiveSessionView({
       await sessionCommand('action', { id: session.id, action: 'pause' });
       await nativeTask('task_stop', { id: active.id });
     });
+  const retryable = !active && !!session.batches.at(-1)?.error;
   const tools = (
     <>
-      {!detached && !simple && (
-        <Tooltip content="Agent’s screen">
-          <button
-            type="button"
-            className="app-titlebar-button"
-            aria-label="Agent’s screen"
-            aria-pressed={expanded && tab === 'screen'}
-            onClick={() => {
-              const open = !(expanded && tab === 'screen');
-              setExpanded(open);
-              if (open) setTab('screen');
-            }}
-          >
-            <Monitor size={16} aria-hidden="true" />
-          </button>
-        </Tooltip>
-      )}
       {(!detached || (!integrated && !simple)) && (
         <ChatOptions
           actions={
@@ -301,9 +278,47 @@ export function LiveSessionView({
                   ...(active
                     ? [{ id: 'stop', label: 'Stop work', onSelect: stopWork, disabled: busy }]
                     : []),
+                  ...(!active && !session.closed && !simple
+                    ? [
+                        {
+                          id: 'finish',
+                          label: 'Finish conversation',
+                          disabled: busy,
+                          onSelect: () =>
+                            void act(() =>
+                              sessionCommand('action', { id: session.id, action: 'finish' }),
+                            ),
+                        },
+                      ]
+                    : []),
+                  ...(simple
+                    ? []
+                    : [
+                        {
+                          id: 'topics',
+                          label: session.topics?.length
+                            ? `Topics · ${session.topics.length}`
+                            : 'Topics',
+                          onSelect: () => setTopicsOpen(true),
+                        },
+                      ]),
                 ]
           }
+          submenus={
+            workspace.groups.length
+              ? [{ id: 'workspace', label: 'Workspace', groups: workspace.groups }]
+              : []
+          }
           items={[
+            ...(tooled && latest
+              ? [
+                  {
+                    id: 'context',
+                    label: 'Task context',
+                    content: () => <WorkContextDetails run={latest} />,
+                  },
+                ]
+              : []),
             {
               id: 'limits',
               label: 'Conversation limits',
@@ -318,7 +333,7 @@ export function LiveSessionView({
                 />
               ),
             },
-          ].filter(() => !integrated && !simple)}
+          ].filter((item) => item.id === 'context' || (!integrated && !simple))}
         />
       )}
       {detached && (
@@ -380,34 +395,20 @@ export function LiveSessionView({
       )}
     </>
   );
-  const statusControl = (
-    <button
-      type="button"
-      className="live-status"
-      aria-expanded={simple ? undefined : expanded}
-      aria-controls={simple ? undefined : 'live-session-work'}
-      disabled={simple && !expanded}
-      onClick={() => setExpanded(!expanded)}
-    >
-      <span aria-live="polite">
-        {status === 'Queued'
-          ? `${pending} queued`
-          : latest && !active && status === 'Ready to review'
-            ? taskDecision(latest).label
-            : status}
-        {pending && status !== 'Queued' ? ` · ${pending} queued` : ''}
-      </span>
-      {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-    </button>
+  const statusText = (
+    <span aria-live="polite">
+      {status === 'Queued'
+        ? `${pending} queued`
+        : latest && !active && status === 'Ready to review'
+          ? taskDecision(latest).label
+          : status}
+      {pending && status !== 'Queued' ? ` · ${pending} queued` : ''}
+    </span>
   );
   const headerActions = (
     <>
-      {!simple && (
-        <Button
-          variant={latest && !active && !integrated ? undefined : 'outline'}
-          disabled={!latest || !!active || busy}
-          onClick={showReview}
-        >
+      {!simple && latest && !active && !integrated && tab !== 'changes' && (
+        <Button disabled={busy} onClick={showReview}>
           Review changes
         </Button>
       )}
@@ -423,8 +424,8 @@ export function LiveSessionView({
         className={`live-header${detached && /Mac/.test(navigator.platform) ? ' live-header-native-mac' : ''}`}
         data-tauri-drag-region={detached || undefined}
       >
-        {!detached && onBack && (
-          <Button variant="ghost" size="icon" aria-label="Back to work" onClick={onBack}>
+        {simple && !detached && onBack && (
+          <Button variant="ghost" size="icon" aria-label="Back to bots" onClick={onBack}>
             <ArrowLeft size={18} />
           </Button>
         )}
@@ -441,7 +442,7 @@ export function LiveSessionView({
             {session.persona ? `${session.persona.name} · ` : ''}
             {session.request.projectName}
           </span>
-          {!detached && statusControl}
+          {!detached && <span className="live-status">{statusText}</span>}
         </div>
         <div className="app-titlebar-controls">
           {!detached && headerActions}
@@ -451,7 +452,7 @@ export function LiveSessionView({
       <SessionRecovery />
       {detached && (
         <div className="live-statusbar">
-          {statusControl}
+          <span className="live-status">{statusText}</span>
           <div className="live-status-actions">
             <Button
               variant="outline"
@@ -516,25 +517,37 @@ export function LiveSessionView({
           </InlineNotice>
         </div>
       ) : (
-        (error || session.error) && (
+        (error || workspace.error || session.error || retryable) && (
           <div className="live-notice">
-            <InlineNotice tone="error">{error || session.error}</InlineNotice>
+            <InlineNotice
+              tone="error"
+              action={
+                retryable && (
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() =>
+                      void act(() => sessionCommand('action', { id: session.id, action: 'retry' }))
+                    }
+                  >
+                    Retry launch
+                  </Button>
+                )
+              }
+            >
+              {error || workspace.error || session.error || session.batches.at(-1)?.error}
+            </InlineNotice>
           </div>
         )
       )}
       {!simple && <WorkSourceLink prompts={session.messages.map((message) => message.text)} />}
-      {latest && !detached && !simple && (
-        <WorkContext
-          key={`context:${session.id}`}
-          run={latest}
-          onTerminal={() => {
-            setExpanded(true);
-            setTab('terminal');
-          }}
-          hideTerminal={expanded}
-        >
-          <SessionTopics key={`topics:${session.id}`} session={session} />
-        </WorkContext>
+      {tooled && (
+        <SessionTopics
+          key={`topics:${session.id}`}
+          session={session}
+          open={topicsOpen}
+          onOpenChange={setTopicsOpen}
+        />
       )}
       {latest && !detached && !session.closed && !simple && (
         <WorkFeedbackInbox
@@ -543,17 +556,36 @@ export function LiveSessionView({
           onFeedback={append}
         />
       )}
-      {!latest && !detached && !simple && (
-        <div className="work-toolbar">
-          <SessionTopics key={`topics:${session.id}`} session={session} />
+      {(!simple || tab !== 'conversation') && (
+        <div className="live-tabbar">
+          <SegmentedControl
+            className="live-tabs"
+            label="Conversation views"
+            value={tab}
+            onChange={(value) => {
+              if (value === 'changes') showReview();
+              else {
+                setTab(value);
+                if (value === 'preview' && !integrated)
+                  void act(() => sessionCommand('action', { id: session.id, action: 'pause' }));
+              }
+            }}
+            items={[
+              { id: 'conversation', label: 'Conversation' },
+              { id: 'changes', label: 'Review' },
+              ...(simple
+                ? []
+                : [
+                    { id: 'preview', label: 'Preview' },
+                    { id: 'terminal', label: 'Terminal' },
+                    { id: 'screen', label: 'Screen' },
+                  ]),
+            ]}
+          />
         </div>
       )}
-      <div
-        className="live-columns"
-        data-expanded={expanded}
-        data-result-view={(expanded && tab !== 'work' && !split) || undefined}
-      >
-        <div className="live-conversation">
+      <div className="live-columns">
+        <div className="live-conversation" hidden={tab !== 'conversation'}>
           {!collapsed && (
             <div
               className="live-transcript"
@@ -599,7 +631,7 @@ export function LiveSessionView({
                               ? 'Working'
                               : sessionRunNeedsAttention(run)
                                 ? 'Needs attention'
-                                : 'Handled'
+                                : ''
                             : batch?.error
                               ? 'Needs attention'
                               : 'Queued'}
@@ -701,6 +733,22 @@ export function LiveSessionView({
                   <TaskLiveActivity run={active} />
                 </div>
               )}
+              {integrated && latest && !detached && (
+                <div className="live-review-cta">
+                  <span>These changes are merged.</span>
+                  <Button
+                    onClick={() => {
+                      try {
+                        nextChat(deliveryHandoff(latest, true, 'the next change'));
+                      } catch (cause) {
+                        setError(String(cause));
+                      }
+                    }}
+                  >
+                    Continue in a new chat
+                  </Button>
+                </div>
+              )}
               {questions.map((prompt) => (
                 <AgentQuestion
                   key={prompt.id}
@@ -724,125 +772,8 @@ export function LiveSessionView({
             addition={addition}
           />
         </div>
-        {expanded && (
-          <aside className="live-work" id="live-session-work">
-            <div className="live-work-bar">
-              <SegmentedControl
-                className="live-tabs"
-                label="Conversation details"
-                value={tab}
-                onChange={(value) => {
-                  if (value === 'changes') showReview();
-                  else {
-                    setTab(value);
-                    if (value === 'preview' && !integrated)
-                      void act(() => sessionCommand('action', { id: session.id, action: 'pause' }));
-                  }
-                }}
-                items={[
-                  { id: 'work', label: 'Activity' },
-                  { id: 'changes', label: 'Review' },
-                  { id: 'preview', label: 'Preview' },
-                  { id: 'terminal', label: 'Terminal' },
-                  { id: 'screen', label: 'Screen' },
-                ]}
-              />
-              {tab !== 'work' && (
-                <Tooltip content={split ? 'Hide conversation' : 'Show conversation'}>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={split ? 'Hide conversation' : 'Show conversation'}
-                    aria-pressed={split}
-                    onClick={() =>
-                      useWorkViewStore.getState().setSplit(`session:${session.id}`, !split)
-                    }
-                  >
-                    {split ? (
-                      <PanelLeftClose size={16} aria-hidden="true" />
-                    ) : (
-                      <PanelLeftOpen size={16} aria-hidden="true" />
-                    )}
-                  </Button>
-                </Tooltip>
-              )}
-            </div>
-            {tab === 'work' && (
-              <>
-                <div className="live-work-list">
-                  {session.batches.map((batch, index) => {
-                    const run = runById.get(batch.runId);
-                    const message = messageById.get(batch.messageIds[0]);
-                    return (
-                      <div className="live-work-row" key={batch.runId}>
-                        <span className="live-mascot">
-                          <AgentCharacter
-                            provider={character(run?.agent ?? session.request.agent)}
-                            state={run && isActive(run) ? 'working' : 'idle'}
-                          />
-                        </span>
-                        <div>
-                          <p>{message?.text.split('\n')[0] || `Batch ${index + 1}`}</p>
-                          <span className="live-muted">
-                            {run?.finishing
-                              ? 'Checking'
-                              : run && isActive(run)
-                                ? 'Working'
-                                : batch.error
-                                  ? 'Needs attention'
-                                  : run?.status === 'review'
-                                    ? 'Ready to review'
-                                    : (run?.status ?? 'Queued')}{' '}
-                            · {batch.messageIds.length}{' '}
-                            {batch.messageIds.length === 1 ? 'message' : 'messages'}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="live-work-actions">
-                  {!active && session.batches.at(-1)?.error && (
-                    <Button
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() =>
-                        void act(() =>
-                          sessionCommand('action', { id: session.id, action: 'retry' }),
-                        )
-                      }
-                    >
-                      Retry launch
-                    </Button>
-                  )}
-                  {!active && !session.closed && (
-                    <Button
-                      variant="ghost"
-                      onClick={() =>
-                        void act(() =>
-                          sessionCommand('action', { id: session.id, action: 'finish' }),
-                        )
-                      }
-                    >
-                      Finish session
-                    </Button>
-                  )}
-                </div>
-                {integrated && latest && !detached && (
-                  <Button
-                    onClick={() => {
-                      try {
-                        nextChat(deliveryHandoff(latest, true, 'the next change'));
-                      } catch (cause) {
-                        setError(String(cause));
-                      }
-                    }}
-                  >
-                    Continue in a new chat
-                  </Button>
-                )}
-              </>
-            )}
+        {tab !== 'conversation' && (
+          <section className="live-work" aria-label="Conversation view">
             {tab === 'screen' &&
               (screenRun ? (
                 <AgentScreen run={screenRun} />
@@ -933,20 +864,7 @@ export function LiveSessionView({
                     : 'Run a change to start a preview.'}
                 </p>
               ))}
-            {latest?.workspace && tab === 'work' && (
-              <details className="live-workspace">
-                <summary>Workspace</summary>
-                <p>{latest.workspace}</p>
-                <CopyButton text={latest.workspace} label="Copy path" />
-                {latest.branch && (
-                  <>
-                    <p>{latest.branch}</p>
-                    <CopyButton text={latest.branch} label="Copy branch" />
-                  </>
-                )}
-              </details>
-            )}
-          </aside>
+          </section>
         )}
       </div>
     </section>
