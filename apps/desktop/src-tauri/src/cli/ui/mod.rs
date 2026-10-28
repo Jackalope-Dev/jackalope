@@ -62,6 +62,24 @@ enum Event {
     Tick,
 }
 
+/// What clicking part of the interface does.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Click {
+    /// Runs a slash command, as if typed.
+    Command(&'static str),
+    /// Starts the input with this text, opening its menu.
+    Type(&'static str),
+    /// Shows the open conversation at this position in the tabs.
+    Tab(usize),
+}
+
+/// Something an `@` can name: an agent to hand the message to, or a file.
+#[derive(Clone, PartialEq, Debug)]
+enum Mention {
+    Agent { id: String, name: String },
+    File(String),
+}
+
 #[derive(Clone)]
 struct Overview {
     agents: Vec<AgentStatus>,
@@ -163,10 +181,10 @@ struct App {
     /// Furthest the transcript can scroll, measured while drawing.
     max_scroll: Cell<usize>,
     transcript: RefCell<Option<render::transcript::Cache>>,
+    /// Where the last frame drew something clickable.
+    hits: RefCell<Vec<(Rect, Click)>>,
     /// Animation frame for the working indicator.
     tick: usize,
-    /// When the screen first drew, for the start-up reveal.
-    opened: Instant,
     /// Currently displayed rotating tip.
     tip_index: usize,
     last_tip_change: Instant,
@@ -241,8 +259,8 @@ pub fn run(
         scroll_top: None,
         max_scroll: Cell::new(0),
         transcript: RefCell::new(None),
+        hits: RefCell::new(Vec::new()),
         tick: 0,
-        opened: Instant::now(),
         tip_index: 0,
         last_tip_change: Instant::now(),
         quit: false,

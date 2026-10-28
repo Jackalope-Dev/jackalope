@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { nativeTask } from '../lib/task-runtime.ts';
 import { createWorktree, isTauriEnvironment, type WorktreeEntry } from '../lib/tauri-bridge.ts';
+import { WORKSPACE_MODES, type WorkspaceMode } from '../lib/workspace-mode.ts';
 import { readWorktrees } from '../lib/worktree-reads.ts';
 
 export interface ProjectPreferences {
@@ -34,7 +35,26 @@ export interface ProjectPreferences {
   prepareCommand?: string;
   setupFiles?: string[];
   autoVerify?: boolean;
+  /** Superseded by `workspaceMode`; `false` still means current-branch work. */
   isolatedByDefault?: boolean;
+  /** Undefined means an isolated worktree, or `isolatedByDefault` when that is set. */
+  workspaceMode?: WorkspaceMode;
+  /**
+   * Approve routine agent requests without asking and escalate only high-risk
+   * ones. Undefined means on.
+   */
+  autoApprove?: boolean;
+  /** Reflect on work in the background and tidy learned lessons. Undefined means on. */
+  learnAutomatically?: boolean;
+  /** Reported tool calls between background reflections. Undefined means 50. */
+  learningCadence?: number;
+  /**
+   * Load the person's own Claude Code settings, plugins, hooks and MCP servers in Claude
+   * Code tasks. `false` limits them to project settings and Jackalope's connections.
+   */
+  personalClaudeSetup?: boolean;
+  /** Fast command Claude Code runs after each file edit; `{file}` is the edited path. */
+  editCheck?: string;
 }
 
 /**
@@ -282,6 +302,12 @@ interface ProjectRecord {
   path: string;
   /** The accent the project shows in, so the terminal can match it. */
   accent?: string;
+  autoApprove?: boolean;
+  workspaceMode?: WorkspaceMode;
+  learnAutomatically?: boolean;
+  learningCadence?: number;
+  personalClaudeSetup?: boolean;
+  editCheck?: string;
 }
 
 /**
@@ -302,6 +328,12 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
     name,
     path,
     accent: preferences?.theme?.accentHex ?? appAccent,
+    autoApprove: preferences?.autoApprove,
+    workspaceMode: preferences?.workspaceMode,
+    learnAutomatically: preferences?.learnAutomatically,
+    learningCadence: preferences?.learningCadence,
+    personalClaudeSetup: preferences?.personalClaudeSetup,
+    editCheck: preferences?.editCheck,
   }));
 }
 
@@ -326,6 +358,44 @@ export async function mergeProjectRegistry() {
       }));
     if (added.length) {
       useProjectStore.setState((current) => ({ projects: [...current.projects, ...added] }));
+    }
+    // A terminal can change these settings while the app is closed or headless.
+    for (const record of records) {
+      const project = useProjectStore
+        .getState()
+        .projects.find((item) => projectPathKey(item.path) === projectPathKey(record.path));
+      if (!project) continue;
+      const changes: Partial<ProjectPreferences> = {};
+      if (
+        record.autoApprove !== undefined &&
+        record.autoApprove !== project.preferences?.autoApprove
+      )
+        changes.autoApprove = record.autoApprove;
+      if (
+        record.workspaceMode &&
+        WORKSPACE_MODES.includes(record.workspaceMode) &&
+        record.workspaceMode !== project.preferences?.workspaceMode
+      )
+        changes.workspaceMode = record.workspaceMode;
+      if (
+        record.learnAutomatically !== undefined &&
+        record.learnAutomatically !== project.preferences?.learnAutomatically
+      )
+        changes.learnAutomatically = record.learnAutomatically;
+      if (
+        record.learningCadence !== undefined &&
+        record.learningCadence !== project.preferences?.learningCadence
+      )
+        changes.learningCadence = record.learningCadence;
+      if (
+        record.personalClaudeSetup !== undefined &&
+        record.personalClaudeSetup !== project.preferences?.personalClaudeSetup
+      )
+        changes.personalClaudeSetup = record.personalClaudeSetup;
+      if (record.editCheck !== undefined && record.editCheck !== project.preferences?.editCheck)
+        changes.editCheck = record.editCheck;
+      if (Object.keys(changes).length)
+        useProjectStore.getState().updateProjectPreferences(project.id, changes);
     }
     mirrorProjects(useProjectStore.getState().projects);
   } catch {

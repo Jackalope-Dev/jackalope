@@ -174,6 +174,16 @@ impl App {
             .collect()
     }
 
+    /// Shows the open conversation at `index` in the tabs (Alt+1 to Alt+9).
+    pub(super) fn jump_session(&mut self, index: usize) {
+        let order = self.session_order();
+        match order.get(index) {
+            Some(id) if Some(id) != self.session.as_ref() => self.show(Some(id.clone())),
+            Some(_) => {}
+            None => self.flash(format!("No conversation {}", index + 1), Tone::Muted),
+        }
+    }
+
     /// Moves to the next (`1`) or previous (`-1`) open conversation, across
     /// projects, in the order `/sessions` lists them.
     pub(super) fn step_session(&mut self, direction: isize) {

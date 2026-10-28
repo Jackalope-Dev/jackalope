@@ -1,4 +1,5 @@
 pub(super) mod antigravity;
+mod claude_session;
 mod delegation;
 mod efficiency;
 pub(super) mod effort;
@@ -28,6 +29,7 @@ pub(super) mod timing;
 mod tool_activity;
 mod warm_opencode;
 
+pub(in crate::commands) use claude_session::bridge_token;
 pub(super) use events::consume_adapter_event;
 use events::*;
 pub use models::*;
@@ -71,12 +73,45 @@ pub struct TaskRuntime {
     // Drop joins the writer before releasing the profile lock below.
     writer: journal::Writer,
     warm_helpers: Arc<warm_opencode::Pool>,
+    claude_sessions: Arc<claude_session::Pool>,
     _owner: Arc<super::file_lock::FileLock>,
+}
+
+/// A run's progress as background learning sees it.
+pub struct RunActivity {
+    pub id: String,
+    pub project_id: String,
+    /// Tool calls the agent reported so far, across every tool.
+    pub tool_calls: u64,
+    /// The agent stopped and nothing more will be added to this attempt.
+    pub finished: bool,
 }
 
 impl TaskRuntime {
     pub(super) fn invalidate_account_helpers(&self, directory: &Path) {
         self.warm_helpers.invalidate_account(directory);
+        self.claude_sessions.invalidate_account(directory);
+    }
+
+    /// Every loaded run's tool-call total and whether it finished, without
+    /// cloning run records.
+    pub(in crate::commands) fn learning_activity(&self) -> Vec<RunActivity> {
+        let Ok(inner) = self.inner.lock() else {
+            return vec![];
+        };
+        inner
+            .runs
+            .values()
+            .filter(|run| !run.details_omitted)
+            .map(|run| RunActivity {
+                id: run.id.clone(),
+                project_id: run.project_id.clone(),
+                tool_calls: run.efficiency.tool_calls.values().sum(),
+                finished: !run.finishing
+                    && !["starting", "running", "stopping", "routing", "queued"]
+                        .contains(&run.status.as_str()),
+            })
+            .collect()
     }
 }
 

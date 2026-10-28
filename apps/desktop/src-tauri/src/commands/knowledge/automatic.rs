@@ -11,6 +11,9 @@ pub struct LearningSource {
     pub managed: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resolution: Option<ReviewResolution>,
+    /// Present only on lessons the learning loop authored; see `learning`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lifecycle: Option<super::learning::Lifecycle>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -101,6 +104,7 @@ fn candidate(
             evidence: vec![evidence],
             managed: true,
             resolution: None,
+            lifecycle: None,
         }),
         source_run_id: run.map(|r| r.id.clone()),
         source_head: run.map(|r| r.base_head.clone()).filter(|s| !s.is_empty()),
@@ -132,7 +136,7 @@ fn reusable(text: &str) -> bool {
         .any(|s| lower.contains(s))
 }
 
-fn objective(prompt: &str) -> &str {
+pub(super) fn objective(prompt: &str) -> &str {
     prompt
         .strip_prefix("### 🎯 Objective\n")
         .map(|text| text.split("\n\n### ").next().unwrap_or(text))

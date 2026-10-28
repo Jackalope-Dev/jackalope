@@ -1,12 +1,15 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useShallow } from 'zustand/react/shallow';
+import { LEARNING_CADENCES, learningSettings } from '../../lib/learning';
 import { VETTED_SKILLS } from '../../lib/skills/catalog';
+import { type WorkspaceMode, workspaceModeFor } from '../../lib/workspace-mode';
 import { useProjectStore } from '../../stores/projectStore';
 import { openProjectSettings } from '../layout/navigation';
 import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { FormField } from '../ui/FormField';
 import { Input } from '../ui/input';
+import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { Textarea } from '../ui/Textarea';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
@@ -15,6 +18,29 @@ import { ArtifactsProjectSettings } from './ArtifactsProjectSettings';
 import { ProjectGitSettings } from './ProjectGitSettings';
 import { RemoveProjectAction } from './RemoveProjectAction';
 import '../settings/settings.css';
+
+const WORKSPACE_MODES: Record<WorkspaceMode, { label: string; description: string }> = {
+  worktree: {
+    label: 'Isolated worktree',
+    description:
+      'Each task works in its own worktree and branch. Review and merge when it finishes.',
+  },
+  branch: {
+    label: 'New branch here',
+    description:
+      'Each task switches this checkout to a new branch for review or a pull request. Requires a clean checkout; one task at a time.',
+  },
+  current: {
+    label: 'Current branch',
+    description:
+      'Tasks edit this checkout on the target branch, alongside your own changes. One task at a time; there is no merge step.',
+  },
+  ask: {
+    label: 'Ask each time',
+    description: 'Each task asks where to work when it starts.',
+  },
+};
+
 export function ProjectPreferences({
   embedded = false,
   projectId,
@@ -125,6 +151,64 @@ export function ProjectPreferences({
                 }
               />
             </Setting>
+            <Setting
+              title="Auto-approve agent requests"
+              description="Approve routine tool use without asking; each approval is listed in the task's activity. Deleting files, force pushes, deploys, credentials, elevated commands and changes outside the workspace still ask. Codex, Gemini CLI, Grok and Antigravity follow their own CLI rules."
+            >
+              <Switch
+                label="Auto-approve agent requests"
+                checked={project.preferences?.autoApprove !== false}
+                onCheckedChange={(autoApprove) =>
+                  updateProjectPreferences(project.id, { autoApprove })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Use my Claude Code setup"
+              description="Claude Code tasks load your own Claude Code settings, plugins, hooks and MCP servers. Turn off to use only this project's settings and the connections chosen here."
+            >
+              <Switch
+                label="Use my Claude Code setup"
+                checked={project.preferences?.personalClaudeSetup !== false}
+                onCheckedChange={(personalClaudeSetup) =>
+                  updateProjectPreferences(project.id, { personalClaudeSetup })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Learn automatically"
+              description="Save lessons from what you tell agents and from checks that pass, while work runs and when it finishes. New lessons stay on probation until tasks use them; unused ones are archived. Review them under Context."
+            >
+              <Switch
+                label="Learn automatically"
+                checked={learningSettings(project).automatic}
+                onCheckedChange={(learnAutomatically) =>
+                  updateProjectPreferences(project.id, { learnAutomatically })
+                }
+              />
+            </Setting>
+            {learningSettings(project).automatic && (
+              <Setting
+                title="Learn during long tasks"
+                description="How often a running task is reviewed for new lessons."
+                descriptionId="project-learning-cadence-description"
+              >
+                <Select
+                  aria-label="Learn during long tasks"
+                  aria-describedby="project-learning-cadence-description"
+                  value={String(learningSettings(project).cadence)}
+                  onValueChange={(value) =>
+                    updateProjectPreferences(project.id, { learningCadence: Number(value) })
+                  }
+                >
+                  {LEARNING_CADENCES.map((cadence) => (
+                    <SelectItem key={cadence} value={String(cadence)}>
+                      Every {cadence} tool calls
+                    </SelectItem>
+                  ))}
+                </Select>
+              </Setting>
+            )}
             <Disclosure className="project-guidelines">
               <DisclosureSummary>Always include guidelines</DisclosureSummary>
               {VETTED_SKILLS.map((skill) => (
@@ -153,6 +237,30 @@ export function ProjectPreferences({
             />
           )}
           <SettingGroup title="Workspace">
+            {!project.plainFolder && (
+              <Setting
+                title="Where tasks work"
+                description={WORKSPACE_MODES[workspaceModeFor(project)].description}
+                descriptionId="project-workspace-mode-description"
+              >
+                <Select
+                  aria-label="Where tasks work"
+                  aria-describedby="project-workspace-mode-description"
+                  value={workspaceModeFor(project)}
+                  onValueChange={(value) =>
+                    updateProjectPreferences(project.id, {
+                      workspaceMode: value as WorkspaceMode,
+                    })
+                  }
+                >
+                  {(Object.keys(WORKSPACE_MODES) as WorkspaceMode[]).map((mode) => (
+                    <SelectItem key={mode} value={mode}>
+                      {WORKSPACE_MODES[mode].label}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </Setting>
+            )}
             <Setting
               title="Target branch"
               description="Starting branch for new tasks and their review."
@@ -221,6 +329,25 @@ export function ProjectPreferences({
                 onChange={(e) =>
                   updateProjectPreferences(project.id, {
                     verifyCommand: e.target.value,
+                  })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Check after each edit"
+              description="A fast check Claude Code runs after it edits a file, so it fixes problems straight away. {file} is the edited file. One-minute limit."
+              controlId="edit-check"
+              descriptionId="edit-check-description"
+            >
+              <Input
+                id="edit-check"
+                aria-describedby="edit-check-description"
+                className="project-setting-input"
+                value={project.preferences?.editCheck ?? ''}
+                placeholder="pnpm exec biome check {file}"
+                onChange={(e) =>
+                  updateProjectPreferences(project.id, {
+                    editCheck: e.target.value,
                   })
                 }
               />

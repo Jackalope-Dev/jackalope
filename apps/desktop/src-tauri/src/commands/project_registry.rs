@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use tauri::State;
 
-use super::tasks::TaskRuntime;
+use super::tasks::{TaskRuntime, WorkspaceMode};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -26,6 +26,73 @@ pub struct ProjectRecord {
     /// same colour as the app. Absent for a repository the app has not opened.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accent: Option<String>,
+    /// Whether routine agent requests are approved without asking, escalating
+    /// only high-risk ones. Absent means on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_approve: Option<bool>,
+    /// Where new work runs: `worktree`, `branch`, `current` or `ask`. Kept as
+    /// text so a value from a newer app cannot make the ledger unreadable;
+    /// absent or unknown means an isolated worktree.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_mode: Option<String>,
+    /// Whether Jackalope reflects on work in the background and keeps learned
+    /// lessons tidy. Absent means on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub learn_automatically: Option<bool>,
+    /// Reported tool calls between background reflections of a running task.
+    /// Absent or out of range means the default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub learning_cadence: Option<u32>,
+    /// Whether Claude Code tasks load the person's own Claude Code settings, plugins,
+    /// hooks and MCP servers. `false` limits them to the project's settings and the
+    /// connections Jackalope supplies. Absent follows the evaluation default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub personal_claude_setup: Option<bool>,
+    /// A fast command Claude Code sessions run after each file edit, with `{file}`
+    /// replaced by the edited path. Used only by the edit-check evaluation hook.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edit_check: Option<String>,
+}
+
+/// Accepted `learning_cadence` values.
+pub const LEARNING_CADENCES: std::ops::RangeInclusive<u32> = 10..=1000;
+
+/// A project's agent-approval and workspace settings, with their defaults.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProjectSettings {
+    pub auto_approve: bool,
+    pub workspace_mode: WorkspaceMode,
+    pub learn_automatically: bool,
+    pub learning_cadence: u32,
+}
+
+impl Default for ProjectSettings {
+    fn default() -> Self {
+        Self {
+            auto_approve: true,
+            workspace_mode: WorkspaceMode::Worktree,
+            learn_automatically: true,
+            learning_cadence: super::knowledge::learning::DEFAULT_CADENCE,
+        }
+    }
+}
+
+impl ProjectRecord {
+    pub fn settings(&self) -> ProjectSettings {
+        ProjectSettings {
+            auto_approve: self.auto_approve.unwrap_or(true),
+            workspace_mode: self
+                .workspace_mode
+                .as_deref()
+                .and_then(WorkspaceMode::parse)
+                .unwrap_or_default(),
+            learn_automatically: self.learn_automatically.unwrap_or(true),
+            learning_cadence: self
+                .learning_cadence
+                .filter(|cadence| LEARNING_CADENCES.contains(cadence))
+                .unwrap_or(super::knowledge::learning::DEFAULT_CADENCE),
+        }
+    }
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -126,6 +193,86 @@ pub fn set_accent(runtime: &TaskRuntime, project_id: &str, accent: &str) -> Resu
     write_ledger(&file, &ledger)
 }
 
+/// The settings for a project, or the defaults for one the app has not saved.
+pub fn settings(runtime: &TaskRuntime, project_id: &str) -> ProjectSettings {
+    list(runtime)
+        .into_iter()
+        .find(|project| project.id == project_id)
+        .map(|project| project.settings())
+        .unwrap_or_default()
+}
+
+pub fn auto_approve(runtime: &TaskRuntime, project_id: &str) -> bool {
+    settings(runtime, project_id).auto_approve
+}
+
+fn record(runtime: &TaskRuntime, project_id: &str) -> Option<ProjectRecord> {
+    list(runtime)
+        .into_iter()
+        .find(|project| project.id == project_id)
+}
+
+pub fn personal_claude_setup(runtime: &TaskRuntime, project_id: &str) -> Option<bool> {
+    record(runtime, project_id).and_then(|project| project.personal_claude_setup)
+}
+
+pub fn edit_check(runtime: &TaskRuntime, project_id: &str) -> Option<String> {
+    record(runtime, project_id)
+        .and_then(|project| project.edit_check)
+        .map(|command| command.trim().to_string())
+        .filter(|command| !command.is_empty() && command.len() <= 4000)
+}
+
+/// Learning changes a terminal can make; `None` keeps the saved value.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct LearningSettings {
+    pub automatic: Option<bool>,
+    pub cadence: Option<u32>,
+}
+
+/// Records a terminal's change to a project's settings. The app adopts the
+/// saved values when it next merges the registry.
+pub fn set_settings(
+    runtime: &TaskRuntime,
+    project_id: &str,
+    auto_approve: Option<bool>,
+    workspace_mode: Option<WorkspaceMode>,
+    learning: LearningSettings,
+) -> Result<ProjectRecord, String> {
+    if let Some(cadence) = learning.cadence {
+        if !LEARNING_CADENCES.contains(&cadence) {
+            return Err(format!(
+                "Choose a learning cadence from {} to {} tool calls.",
+                LEARNING_CADENCES.start(),
+                LEARNING_CADENCES.end()
+            ));
+        }
+    }
+    let _guard = lock().lock();
+    let file = path(runtime);
+    let mut ledger = read_ledger(&file);
+    let record = ledger
+        .projects
+        .iter_mut()
+        .find(|project| project.id == project_id)
+        .ok_or("That project is not registered.")?;
+    if let Some(auto_approve) = auto_approve {
+        record.auto_approve = Some(auto_approve);
+    }
+    if let Some(mode) = workspace_mode {
+        record.workspace_mode = Some(mode.as_str().into());
+    }
+    if let Some(automatic) = learning.automatic {
+        record.learn_automatically = Some(automatic);
+    }
+    if let Some(cadence) = learning.cadence {
+        record.learning_cadence = Some(cadence);
+    }
+    let updated = record.clone();
+    write_ledger(&file, &ledger)?;
+    Ok(updated)
+}
+
 /// Returns the record for a repository, creating one when it is not known yet.
 /// Used when work starts from a terminal in a repository the app has never
 /// opened; the UI merges the new entry on its next load.
@@ -149,6 +296,12 @@ pub fn ensure(runtime: &TaskRuntime, project_path: &str) -> Result<ProjectRecord
         name,
         path: project_path.to_string(),
         accent: None,
+        auto_approve: None,
+        workspace_mode: None,
+        learn_automatically: None,
+        learning_cadence: None,
+        personal_claude_setup: None,
+        edit_check: None,
     };
     ledger.projects.push(record.clone());
     write_ledger(&file, &ledger)?;
@@ -184,12 +337,24 @@ mod tests {
                     name: "Work".into(),
                     path: "/work".into(),
                     accent: Some("#00aa88".into()),
+                    auto_approve: None,
+                    workspace_mode: None,
+                    learn_automatically: None,
+                    learning_cadence: None,
+                    personal_claude_setup: None,
+                    edit_check: None,
                 },
                 ProjectRecord {
                     id: "personal".into(),
                     name: "Personal".into(),
                     path: "/personal".into(),
                     accent: Some("#aa00ff".into()),
+                    auto_approve: Some(false),
+                    workspace_mode: Some("current".into()),
+                    learn_automatically: Some(false),
+                    learning_cadence: Some(5),
+                    personal_claude_setup: None,
+                    edit_check: None,
                 },
             ],
         };
@@ -204,6 +369,25 @@ mod tests {
         let legacy: ProjectRecord =
             serde_json::from_str(r#"{"id":"old","name":"Old","path":"/old"}"#).unwrap();
         assert_eq!(legacy.accent, None);
+        assert_eq!(legacy.settings(), ProjectSettings::default());
+        assert!(legacy.settings().learn_automatically);
+        assert_eq!(legacy.settings().learning_cadence, 50);
+        let future: ProjectRecord = serde_json::from_str(
+            r#"{"id":"new","name":"New","path":"/new","workspaceMode":"cloud","autoApprove":false}"#,
+        )
+        .unwrap();
+        assert_eq!(future.settings().workspace_mode, WorkspaceMode::Worktree);
+        assert!(!future.settings().auto_approve);
+        assert_eq!(
+            ledger.projects[1].settings().workspace_mode,
+            WorkspaceMode::Current
+        );
+        assert!(!ledger.projects[1].settings().learn_automatically);
+        assert_eq!(
+            ledger.projects[1].settings().learning_cadence,
+            50,
+            "an out-of-range cadence reads as the default"
+        );
     }
 
     #[test]
@@ -219,6 +403,12 @@ mod tests {
             name: "repo".into(),
             path: directory.to_string_lossy().into_owned(),
             accent: None,
+            auto_approve: None,
+            workspace_mode: None,
+            learn_automatically: None,
+            learning_cadence: None,
+            personal_claude_setup: None,
+            edit_check: None,
         });
         write_ledger(&file, &ledger).unwrap();
 

@@ -12,6 +12,7 @@ import { isQuestionOnly } from '../../lib/question-intent';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
 import type { RunRequest } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { workspaceRequest } from '../../lib/workspace-mode';
 import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -214,7 +215,7 @@ export function SessionStart({
         codexSpeed,
         agentProfileId: lead ? agentAccountFor(project, lead.adapter) : undefined,
         prompt: value,
-        isolated: true,
+        ...workspaceRequest(project),
         targetBranch: project.preferences?.baseBranch || project.gitBranch,
         verifyCommand: project.preferences?.verifyCommand,
         // A question needs no installed dependencies; the agent can prepare if it must.

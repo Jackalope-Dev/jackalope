@@ -268,6 +268,23 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
     });
     std::fs::create_dir_all(runtime.policy_path().parent().unwrap()).unwrap();
     std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
+    std::fs::create_dir_all(runtime.preferences_directory()).unwrap();
+    crate::commands::project_registry::save(
+        &runtime,
+        vec![crate::commands::project_registry::ProjectRecord {
+            id: "fixture".into(),
+            name: "Fixture".into(),
+            path: root.into(),
+            accent: None,
+            auto_approve: None,
+            workspace_mode: None,
+            learn_automatically: None,
+            learning_cadence: None,
+            personal_claude_setup: None,
+            edit_check: None,
+        }],
+    )
+    .unwrap();
     let mut request:RunRequest=serde_json::from_value(json!({"id":"opencode-fixture-first","projectId":"fixture","projectName":"Fixture","projectPath":root,"agent":"opencode-fixture","isolated":false,"prompt":"Fixture task","autoVerify":false,"model":"fixture/worker","effort":"quick"})).unwrap();
     for attempt in 0..8 {
         request.prompt = match attempt {
@@ -328,6 +345,22 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
             "{:?}",
             completed.error
         );
+        if attempt == 0 {
+            // Auto-approval is on by default; the rest of the fixture covers asking.
+            assert!(completed.prompts.is_empty());
+            assert!(completed
+                .activity
+                .iter()
+                .any(|line| line == "Auto-approved OpenCode bash: fixture action"));
+            crate::commands::project_registry::set_settings(
+                &runtime,
+                "fixture",
+                Some(false),
+                None,
+                Default::default(),
+            )
+            .unwrap();
+        }
         assert_eq!(completed.session_id.as_deref(), Some("ses_fixture"));
         if attempt == 0 {
             assert_eq!(

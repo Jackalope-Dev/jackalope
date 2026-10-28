@@ -315,6 +315,7 @@ impl Coordinator {
                 account_binding: None,
                 prompt: item.prompt,
                 isolated: true,
+                workspace_mode: None,
                 previous_run_id: None,
                 connection_ids: None,
                 coordination: Some(CoordinationContext {
@@ -691,10 +692,11 @@ impl Coordinator {
             .and_then(|h| h.to_str().ok())
             .and_then(|h| h.strip_prefix("Bearer "))
             .ok_or(StatusCode::UNAUTHORIZED)?;
+        let token = crate::commands::tasks::bridge_token(token);
         let inner = self.inner.lock().unwrap();
         let (id, run_id) = inner
             .grants
-            .get(token)
+            .get(&token)
             .cloned()
             .ok_or(StatusCode::UNAUTHORIZED)?;
         let item = inner
@@ -771,10 +773,11 @@ impl Coordinator {
             .and_then(|h| h.to_str().ok())
             .and_then(|h| h.strip_prefix("Bearer "))
             .ok_or(StatusCode::UNAUTHORIZED)?;
+        let token = crate::commands::tasks::bridge_token(token);
         let inner = self.inner.lock().unwrap();
         let (_id, run_id) = inner
             .grants
-            .get(token)
+            .get(&token)
             .cloned()
             .ok_or(StatusCode::UNAUTHORIZED)?;
         drop(inner);

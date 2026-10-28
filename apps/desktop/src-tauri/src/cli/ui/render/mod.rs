@@ -1,5 +1,6 @@
 //! Drawing a frame: header, transcript, status line, input, tips and popups.
 
+mod chrome;
 mod markdown;
 mod menus;
 mod panel;
@@ -7,16 +8,15 @@ pub mod transcript;
 
 use super::commands::slash_matches;
 use super::editor::Layout as InputLayout;
-use super::feed::Tone;
-use super::pickers::{agent_glyph, agent_state_label, usable};
+use super::pickers::{agent_glyph, usable};
 use super::App;
-use crate::brand;
+use crate::brand::{self, Surface};
 use crate::protocol::{self, SessionSummary};
 use markdown::inline;
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Modifier, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
+use ratatui::widgets::{Block, Borders, Padding, Paragraph, Wrap};
 use ratatui::Frame;
 use std::time::Duration;
 
@@ -51,81 +51,87 @@ pub const TIPS: &[&str] = &[
     "Start a line with a space to keep it out of your history.",
 ];
 
-/// How long the start-up reveal takes to fill the screen.
-const BOOT: Duration = Duration::from_millis(720);
-
-/// Whether the start-up reveal is still drawing.
-pub fn booting(elapsed: Duration) -> bool {
-    elapsed < BOOT && brand::motion() && brand::colored()
-}
-
-/// Rows lit so far by the start-up reveal, counted from the bottom: whole
-/// lines arrive one after another like an old terminal filling from its
-/// prompt upward, quick at first and settling at the top.
-fn boot_rows(elapsed: Duration, height: u16) -> u16 {
-    let progress = (elapsed.as_secs_f32() / BOOT.as_secs_f32()).clamp(0.0, 1.0);
-    let eased = 1.0 - (1.0 - progress).powi(2);
-    (eased * height as f32).ceil() as u16
-}
-
-/// Blanks the rows the reveal has not reached and tints the leading row as a
-/// phosphor edge. Only colour and visibility change; the layout is final.
-fn boot_reveal(frame: &mut Frame, elapsed: Duration) {
-    let buffer = frame.buffer_mut();
-    let area = buffer.area;
-    let lit = boot_rows(elapsed, area.height);
-    let edge = area.bottom().saturating_sub(lit);
-    for row in area.top()..edge {
-        for column in area.left()..area.right() {
-            if let Some(cell) = buffer.cell_mut((column, row)) {
-                cell.reset();
-            }
-        }
-    }
-    if lit < area.height {
-        for column in area.left()..area.right() {
-            if let Some(cell) = buffer.cell_mut((column, edge)) {
-                cell.set_fg(brand::accent());
-            }
-        }
-    }
-}
-
 pub fn draw(frame: &mut Frame, app: &App) {
-    let area = frame.area();
-    // The full banner greets you; once a conversation is under way the small
-    // mark keeps its place beside live context, and a short terminal keeps
-    // one line so the conversation has room.
-    let header: Vec<Line> = if app.view.is_none() && area.height >= 28 {
-        brand::banner()
-    } else if area.height >= 22 {
-        // The rule below carries the motion; the mark stays still.
+    let full = frame.area();
+    app.hits.borrow_mut().clear();
+    // With room, the interface follows the desktop app: a darker shell holds
+    // a header line, one rounded content card and a status line. Smaller
+    // terminals keep a compact header and status line on a plain ground.
+    let framed = full.width >= 60 && full.height >= 16;
+    frame.render_widget(
+        Block::default().style(brand::painted_style(if framed {
+            Surface::Shell
+        } else {
+            Surface::Ground
+        })),
+        full,
+    );
+    let area = if framed {
+        let [top, middle, bottom] = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Min(1),
+            Constraint::Length(1),
+        ])
+        .areas(full);
+        chrome::header(frame, app, top);
+        chrome::status(frame, app, bottom);
+        let card = Rect {
+            x: middle.x + 1,
+            width: middle.width.saturating_sub(2),
+            ..middle
+        };
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(brand::border())
+            .border_style(Style::default().fg(brand::hairline()))
+            .style(brand::painted_style(Surface::Ground))
+            .padding(Padding::horizontal(1));
+        let inner = block.inner(card);
+        frame.render_widget(block, card);
+        chrome::band(frame, app, card);
+        inner
+    } else {
+        full
+    };
+
+    let header: Vec<Line> = if framed {
+        Vec::new()
+    } else if area.height >= 22 && app.view.is_some() {
         brand::header(header_info(app), false, app.tick)
     } else {
         vec![brand::compact()]
     };
-    let show_tip = area.height >= 18;
+    let show_tip = !framed && area.height >= 18;
     let tip_height = if show_tip { 1 } else { 0 };
+    let status_height = if framed { 0 } else { 1 };
+    let header_height = if framed { 0 } else { header.len() as u16 + 1 };
 
     // The draft grows with what is typed, up to a third of the screen, then
     // scrolls to keep the cursor in view.
-    let input_width = area.width.saturating_sub(2).max(2);
+    let input_width = area.width.saturating_sub(INPUT_LEFT + INPUT_RIGHT).max(2);
     app.input_width.set(input_width);
-    let layout = InputLayout::new(app.editor.text(), input_width);
+    // A leading `/`, `!` or `@` becomes the input's mode: the prompt shows it
+    // and the text hides it, so deleting it returns to a plain message.
+    let draft = app.editor.text();
+    let hidden = usize::from(draft.starts_with(['/', '!', '@']));
+    let layout = InputLayout::new(&draft[hidden..], input_width);
     let most_rows = (area.height / 3).max(3) as usize;
     let visible_rows = layout.rows.len().clamp(1, most_rows);
     let input_rows = visible_rows as u16 + 2;
 
-    let card = if app.picker.is_none() && area.height >= 16 {
+    let mut card = if app.picker.is_none() && area.height >= 16 {
         panel::question_card(app, area.width)
     } else {
         Vec::new()
     };
+    if card.is_empty() {
+        card = needs_you(app, area.width);
+    }
 
     let [header_area, body, status_area, card_area, input_area, tip_area] = Layout::vertical([
-        Constraint::Length(header.len() as u16 + 1),
+        Constraint::Length(header_height),
         Constraint::Min(3),
-        Constraint::Length(1),
+        Constraint::Length(status_height),
         Constraint::Length(card.len() as u16),
         Constraint::Length(input_rows),
         Constraint::Length(tip_height),
@@ -134,13 +140,15 @@ pub fn draw(frame: &mut Frame, app: &App) {
     let (body, panel_area) = panel::split(app, body);
     app.body_area.set(body);
 
-    let mut header_lines = header;
-    header_lines.push(if app.working() {
-        brand::divider_active(header_area.width, app.tick)
-    } else {
-        brand::divider(header_area.width)
-    });
-    frame.render_widget(Paragraph::new(header_lines), header_area);
+    if !framed {
+        let mut header_lines = header;
+        header_lines.push(if app.working() {
+            brand::divider_active(header_area.width, app.tick)
+        } else {
+            brand::divider(header_area.width)
+        });
+        frame.render_widget(Paragraph::new(header_lines), header_area);
+    }
 
     let (lines, offset, bottom) = transcript::visible(app, body.width, body.height);
     app.max_scroll.set(bottom);
@@ -154,44 +162,65 @@ pub fn draw(frame: &mut Frame, app: &App) {
     if let Some(panel_area) = panel_area {
         panel::changes(frame, app, panel_area);
     }
-    frame.render_widget(Paragraph::new(status(app)), status_area);
+    if !framed {
+        frame.render_widget(Paragraph::new(status(app)), status_area);
+    }
     frame.render_widget(Paragraph::new(card), card_area);
 
-    // The border says what Enter will do: a shell command, a slash command,
-    // or a message for the agent.
+    // The bar and prompt say what Enter will do: a shell command, a slash
+    // command, or a message for the agent.
     let text = app.editor.text();
-    let (mode_color, mode_title) = if text.starts_with('!') {
+    let mentioning = !app.mention_matches().is_empty();
+    let (mode_color, prompt, mode_hint) = if text.starts_with('!') {
         (
             brand::warning(),
-            " shell · runs here, not sent to an agent ",
+            "!",
+            "shell · runs here, not sent to an agent",
         )
     } else if text.starts_with('/') {
-        (brand::accent(), " command ")
+        (brand::accent(), "/", "command")
+    } else if text.starts_with('@') || mentioning {
+        (brand::success(), "@", "mention an agent or file")
     } else if app.working() && !text.is_empty() {
-        (brand::accent(), " queues after the current work ")
+        (brand::accent(), "❯", "queues after the current work")
     } else {
-        (brand::accent(), "")
+        (brand::accent(), "❯", "")
     };
     let mut block = Block::default()
         .borders(Borders::ALL)
         .border_type(brand::border())
-        .border_style(Style::default().fg(mode_color));
-    if !mode_title.is_empty() {
-        block = block.title(Span::styled(mode_title, Style::default().fg(mode_color)));
+        .border_style(Style::default().fg(mode_color))
+        .style(brand::painted_style(Surface::Elevated))
+        .padding(Padding::left(INPUT_LEFT));
+    if !mode_hint.is_empty() {
+        block = block.title(
+            Line::styled(
+                format!(" {mode_hint} "),
+                Style::default().fg(brand::muted()),
+            )
+            .right_aligned(),
+        );
     }
     let inner = block.inner(input_area);
-    let (cursor_row, cursor_column) = layout.positions[app.editor.cursor().min(app.editor.len())];
+    let cursor = app.editor.cursor().saturating_sub(hidden);
+    let (cursor_row, cursor_column) = layout.positions[cursor.min(layout.positions.len() - 1)];
     let first_row = cursor_row.saturating_sub(visible_rows - 1);
-    let shown = if text.is_empty() {
+    let shown = if text.len() <= hidden {
         Text::styled(
-            if app.question().is_some() {
-                "Type your answer · / commands · ! shell"
+            if hidden == 1 {
+                match prompt {
+                    "/" => "Type a command · Backspace to leave",
+                    "!" => "Type a shell command · Backspace to leave",
+                    _ => "Name an agent or file · Backspace to leave",
+                }
+            } else if app.question().is_some() {
+                "Type your answer"
             } else if app.working() {
-                "Queue a follow-up · / commands · ! shell"
+                "Queue a follow-up"
             } else if app.session.is_some() {
-                "Reply · / commands · ! shell"
+                "Reply"
             } else {
-                "What should we work on?  / commands · ! shell"
+                "What should we work on?"
             },
             Style::default().fg(brand::muted()),
         )
@@ -207,6 +236,16 @@ pub fn draw(frame: &mut Frame, app: &App) {
         )
     };
     frame.render_widget(Paragraph::new(shown).block(block), input_area);
+    frame.buffer_mut().set_string(
+        input_area.x + 2,
+        inner.y,
+        if prompt == "❯" && !brand::unicode() {
+            ">"
+        } else {
+            prompt
+        },
+        Style::default().fg(mode_color).add_modifier(Modifier::BOLD),
+    );
 
     if show_tip {
         draw_tip(frame, app, tip_area);
@@ -224,11 +263,6 @@ pub fn draw(frame: &mut Frame, app: &App) {
                 }
             }
         }
-    }
-
-    let elapsed = app.opened.elapsed();
-    if booting(elapsed) {
-        boot_reveal(frame, elapsed);
     }
 
     if let Some(picker) = &app.picker {
@@ -249,6 +283,43 @@ pub fn draw(frame: &mut Frame, app: &App) {
         inner.y + ((cursor_row - first_row) as u16).min(inner.height.saturating_sub(1)),
     ));
 }
+
+/// What the open conversation is waiting on, pinned above the input in
+/// amber so it reads at a glance: the reason, and how to carry on.
+fn needs_you(app: &App, width: u16) -> Vec<Line<'static>> {
+    let Some(error) = app
+        .view
+        .as_ref()
+        .and_then(|view| protocol::present(view.error.as_deref()))
+    else {
+        return Vec::new();
+    };
+    let warning = brand::warning();
+    let mut lines = transcript::callout(
+        vec![
+            vec![
+                Span::styled(
+                    "Needs you  ",
+                    Style::default().fg(warning).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(error.to_string(), Style::default().fg(brand::text())),
+            ],
+            vec![Span::styled(
+                "/retry to run it again, or reply with what to change",
+                Style::default().fg(brand::muted()),
+            )],
+        ],
+        warning,
+        width,
+    );
+    lines.push(Line::raw(""));
+    lines
+}
+
+/// Columns inside the input's border kept for the prompt and a gap, and the
+/// border columns themselves.
+const INPUT_LEFT: u16 = 3;
+const INPUT_RIGHT: u16 = 2;
 
 fn draw_tip(frame: &mut Frame, app: &App, area: Rect) {
     if area.height == 0 || area.width < 10 {
@@ -274,69 +345,41 @@ pub fn duration(elapsed: Duration) -> String {
     }
 }
 
-fn status(app: &App) -> Line<'static> {
+/// The work's state as a short label and its colour, with the details that
+/// follow it: elapsed time, the step, queued messages, changed files, running
+/// commands and any confirmation.
+pub(super) fn status_parts(app: &App) -> (String, Color, Vec<Span<'static>>) {
     let muted = Style::default().fg(brand::muted());
     let accent = Style::default().fg(brand::accent());
-    let mut parts: Vec<Span> = vec![Span::raw(" ")];
+    let mut parts: Vec<Span> = Vec::new();
     if app.offline.is_some() {
-        let warning = Style::default().fg(brand::warning());
-        parts.push(Span::styled(
-            format!(
-                "{} lost contact with Jackalope · retrying",
-                brand::mark_glyph(brand::Mark::Attention)
-            ),
-            warning.add_modifier(Modifier::BOLD),
-        ));
-        return Line::from(parts);
+        return (
+            "Reconnecting".into(),
+            brand::warning(),
+            vec![Span::styled(
+                "  lost contact with Jackalope, retrying",
+                muted,
+            )],
+        );
     }
-    match &app.view {
+    let (label, color) = match &app.view {
         None => {
-            parts.push(Span::styled(app.project.name.clone(), muted));
-            if let Some(branch) = &app.branch {
-                parts.push(Span::styled(format!(" · {branch}"), muted));
-            }
-            parts.push(Span::styled(" · new conversation", muted));
             if let Some(agent) = &app.next_agent {
-                parts.push(Span::styled(
-                    format!(" · {}", app.agent_name(agent)),
-                    accent,
-                ));
+                parts.push(Span::styled("  next with ", muted));
+                parts.push(Span::styled(app.agent_name(agent), accent));
             }
+            ("Ready".to_string(), brand::success())
         }
         Some(view) => {
             let (state, tone) = app.work_state(view);
-            if app.working() {
-                parts.push(Span::styled(
-                    format!("{} ", brand::spinner(app.tick)),
-                    accent,
-                ));
-                parts.extend(brand::shimmer(&state, app.tick, accent));
-            } else {
-                let glyph = brand::mark_glyph(match tone {
-                    Tone::Danger | Tone::Warning => brand::Mark::Attention,
-                    _ => brand::Mark::Full,
-                });
-                let style = Style::default().fg(tone.color());
-                parts.push(Span::styled(format!("{glyph} "), style));
-                parts.push(Span::styled(state, style));
-            }
             if let Some(elapsed) = app.elapsed() {
-                parts.push(Span::styled(format!(" {}", duration(elapsed)), muted));
+                parts.push(Span::styled(format!("  {}", duration(elapsed)), muted));
             }
             if let Some(quiet) = app.quiet() {
                 parts.push(Span::styled(
-                    format!(" · no new output for {}", duration(quiet)),
+                    format!("  no new output for {}", duration(quiet)),
                     Style::default().fg(brand::warning()),
                 ));
-            }
-            if let Some(agent) = &view.agent {
-                parts.push(Span::styled(" · ", muted));
-                let model = view
-                    .model
-                    .as_deref()
-                    .map(|model| format!(" {model}"))
-                    .unwrap_or_default();
-                parts.push(Span::raw(format!("{agent}{model}")));
             }
             if let Some(detail) = view
                 .step_detail
@@ -344,49 +387,79 @@ fn status(app: &App) -> Line<'static> {
                 .filter(|detail| !detail.is_empty() && app.working())
             {
                 let short: String = detail.chars().take(60).collect();
-                parts.push(Span::styled(format!(" · {short}"), muted));
+                parts.push(Span::styled(format!("  {short}"), muted));
             }
             let queued = view.messages.iter().filter(|message| !message.sent).count();
             if queued > 0 {
-                parts.push(Span::styled(format!(" · {queued} queued"), accent));
+                parts.push(Span::styled(format!("  {queued} queued"), accent));
             }
             if let Some(attempt) = view.attempt.filter(|attempt| *attempt > 1) {
-                parts.push(Span::styled(format!(" · attempt {attempt}"), muted));
+                parts.push(Span::styled(format!("  attempt {attempt}"), muted));
             }
             let files = app.changes.len();
             if files > 0 && !app.panel_shown() {
                 parts.push(Span::styled(
                     format!(
-                        " · {files} {} changed (Ctrl+O)",
+                        "  {files} {} changed",
                         if files == 1 { "file" } else { "files" }
                     ),
                     muted,
                 ));
             }
+            let mut label = state;
+            if let Some(first) = label.get_mut(..1) {
+                first.make_ascii_uppercase();
+            }
+            let color = if app.working() {
+                brand::accent()
+            } else {
+                tone.color()
+            };
+            (label, color)
         }
-    }
+    };
     let running = app.shells_running();
     if running > 0 {
         parts.push(Span::styled(
             format!(
-                " · {running} {} running",
+                "  {running} {} running",
                 if running == 1 { "command" } else { "commands" }
             ),
             accent,
         ));
     }
     if app.scroll_top.is_some() {
-        parts.push(Span::styled(" · scrolled back, Esc to return", muted));
+        parts.push(Span::styled("  scrolled back, Esc to return", muted));
     }
     if let Some((text, tone, _)) = &app.flash {
-        parts.push(Span::styled("  ", muted));
         parts.push(Span::styled(
-            text.clone(),
+            format!("  {text}"),
             Style::default()
                 .fg(tone.color())
                 .add_modifier(Modifier::BOLD),
         ));
     }
+    (label, color, parts)
+}
+
+/// The status as one line, for terminals too small for the bars.
+fn status(app: &App) -> Line<'static> {
+    let (label, color, details) = status_parts(app);
+    let style = Style::default().fg(color);
+    let mut parts = vec![Span::raw(" ")];
+    if app.working() {
+        parts.push(Span::styled(
+            format!("{} ", brand::spinner(app.tick)),
+            style,
+        ));
+        parts.extend(brand::shimmer(&label, app.tick, style));
+    } else {
+        parts.push(Span::styled(
+            format!("{} {label}", brand::mark_glyph(brand::Mark::Full)),
+            style,
+        ));
+    }
+    parts.extend(details);
     Line::from(parts)
 }
 
@@ -500,85 +573,54 @@ fn header_info(app: &App) -> Vec<Line<'static>> {
     lines
 }
 
-/// The start screen: where you are, what is running, and who can do the work.
-fn welcome(app: &App) -> Vec<Line<'static>> {
-    let accent = Style::default().fg(brand::accent());
+/// The start screen, centred in `height` rows: the wordmark, then who can
+/// take the work as chips. Where you are already sits on the frame, and key
+/// hints beneath it.
+fn welcome(app: &App, width: u16, height: u16) -> Vec<Line<'static>> {
     let muted = Style::default().fg(brand::muted());
-    let bold = Style::default().add_modifier(Modifier::BOLD);
-    let label = |text: &str| Span::styled(format!("  {text:<10}"), muted);
-    let mut lines = vec![Line::raw("")];
-
-    let mut project = vec![
-        label("Project"),
-        Span::styled(app.project.name.clone(), bold),
-    ];
-    if let Some(branch) = &app.branch {
-        project.push(Span::styled(format!("  {branch}"), accent));
+    let mut group: Vec<Line<'static>> = Vec::new();
+    if usize::from(width) >= brand::WORDMARK_WIDTH + 4 && height >= 12 {
+        group.extend(brand::wordmark().into_iter().map(Line::centered));
+    } else if usize::from(width) >= brand::SMALL_WORDMARK_WIDTH + 2 && height >= 9 {
+        group.extend(brand::small_wordmark().into_iter().map(Line::centered));
+    } else {
+        group.push(
+            Line::styled(
+                "jackalope",
+                Style::default()
+                    .fg(brand::accent())
+                    .add_modifier(Modifier::BOLD),
+            )
+            .centered(),
+        );
     }
-    lines.push(Line::from(project));
-    lines.push(Line::from(vec![
-        label(""),
-        Span::styled(app.project.path.clone(), muted),
-    ]));
-    lines.push(Line::from(vec![
-        label("Jackalope"),
-        Span::raw(if app.handshake.windowed {
-            "running with the app open"
-        } else {
-            "running in the background"
-        }),
-        Span::styled("  /open to show the app", muted),
-    ]));
+    group.push(Line::styled("your coding agents, orchestrated", muted).centered());
+    group.push(Line::raw(""));
 
     match &app.overview {
-        None => lines.push(Line::from(vec![
-            label("Agents"),
-            Span::styled("checking sign-in…", muted),
-        ])),
-        Some(Err(error)) => lines.push(Line::from(vec![
-            label("Agents"),
-            Span::styled(error.clone(), muted),
-        ])),
+        None => group.push(Line::styled("checking agents…", muted).centered()),
+        Some(Err(error)) => group.push(Line::styled(error.clone(), muted).centered()),
         Some(Ok(overview)) => {
-            let ready: Vec<_> = overview
-                .agents
-                .iter()
-                .filter(|agent| usable(agent))
-                .collect();
-            if ready.is_empty() {
-                lines.push(Line::from(vec![
-                    label("Agents"),
-                    Span::raw("none installed yet · /agents to set one up"),
-                ]));
-            }
-            for (index, agent) in ready.iter().enumerate() {
-                let glyph_style = if agent.state == "sign-in" {
-                    muted
-                } else {
-                    accent
-                };
-                let mut spans = vec![
-                    label(if index == 0 { "Agents" } else { "" }),
-                    Span::styled(format!("{} ", agent_glyph(&agent.state)), glyph_style),
-                    Span::raw(format!("{:<14}", agent.name)),
-                    Span::styled(agent_state_label(agent), muted),
-                ];
-                if agent.id == overview.default_agent {
-                    spans.push(Span::styled("  default", accent));
+            let mut chips = Vec::new();
+            let dot = if brand::unicode() { "●" } else { "*" };
+            for agent in overview.agents.iter().filter(|agent| usable(agent)) {
+                let ready = agent.state == "ready";
+                if !chips.is_empty() {
+                    chips.push(Span::raw(" "));
                 }
-                lines.push(Line::from(spans));
+                let color = if agent.id == overview.default_agent {
+                    brand::accent()
+                } else if ready {
+                    brand::success()
+                } else {
+                    brand::muted()
+                };
+                chips.push(brand::chip(&format!("{dot} {}", agent.name), color));
             }
-            let missing: Vec<_> = overview
-                .agents
-                .iter()
-                .filter(|agent| !usable(agent))
-                .map(|agent| agent.name.clone())
-                .collect();
-            if !missing.is_empty() {
-                lines.push(Line::from(vec![
-                    label(""),
-                    Span::styled(format!("Not set up: {}", missing.join(", ")), muted),
-                ]));
+            if chips.is_empty() {
+                group.push(Line::styled("No agents set up yet  ·  /agents", muted).centered());
+            } else {
+                group.push(Line::from(chips).centered());
             }
         }
     }
@@ -589,41 +631,25 @@ fn welcome(app: &App) -> Vec<Line<'static>> {
             .iter()
             .filter(|session| protocol::present(session.error.as_deref()).is_some())
             .count();
-        let mut spans = vec![
-            label("Open"),
-            Span::raw(format!(
-                "{} {} here",
-                here.len(),
-                if here.len() == 1 {
-                    "conversation"
-                } else {
-                    "conversations"
-                }
-            )),
-        ];
+        let mut spans = vec![Span::styled(format!("{} open here", here.len()), muted)];
         if waiting > 0 {
-            spans.push(Span::styled(format!(" · {waiting} need you"), accent));
+            spans.push(Span::raw("  "));
+            spans.push(brand::chip(
+                &format!("{waiting} need you"),
+                brand::warning(),
+            ));
         }
-        spans.push(Span::styled("  /sessions to switch", muted));
-        lines.push(Line::from(spans));
+        spans.push(Span::styled("  /sessions", muted));
+        group.push(Line::raw(""));
+        group.push(Line::from(spans).centered());
     }
 
-    lines.push(Line::raw(""));
-    lines.push(Line::styled(
-        "  Describe what you want done and Jackalope picks the agent.",
-        muted,
-    ));
-    lines.push(Line::from(vec![
-        Span::styled("  ", muted),
-        Span::styled("/", accent),
-        Span::styled(" commands   ", muted),
-        Span::styled("/projects", accent),
-        Span::styled(" switch repo   ", muted),
-        Span::styled("/settings", accent),
-        Span::styled(" preferences   ", muted),
-        Span::styled("Ctrl+C", accent),
-        Span::styled(" leave", muted),
-    ]));
+    // Centred, with the space below filled so the bottom-anchored view keeps
+    // it in the middle.
+    let spare = (height as usize).saturating_sub(group.len());
+    let mut lines = vec![Line::raw(""); spare / 2];
+    lines.extend(group);
+    lines.extend(std::iter::repeat_n(Line::raw(""), spare - spare / 2));
     lines
 }
 
@@ -640,16 +666,6 @@ mod tests {
             let line = Line::from(spans);
             assert!(line.width() > 10, "tip should be substantive: {tip}");
         }
-    }
-
-    #[test]
-    fn the_start_up_reveal_fills_from_the_bottom_and_finishes() {
-        assert_eq!(boot_rows(Duration::ZERO, 40), 0);
-        let early = boot_rows(BOOT / 4, 40);
-        let late = boot_rows(BOOT * 3 / 4, 40);
-        assert!(0 < early && early < late && late < 40);
-        assert_eq!(boot_rows(BOOT, 40), 40);
-        assert!(!booting(BOOT));
     }
 
     #[test]

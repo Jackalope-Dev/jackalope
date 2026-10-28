@@ -52,9 +52,42 @@ enum Background {
     Unknown,
 }
 
+/// The ground colours are drawn on: the painted surface when the interface
+/// paints its own, otherwise whatever the terminal reports.
+fn background() -> Background {
+    match painted() {
+        Some(true) => Background::Dark,
+        Some(false) => Background::Light,
+        None => terminal_background(),
+    }
+}
+
+/// Whether the interface paints its own surfaces, and if so whether dark.
+///
+/// With true colour it wears the app's surface tones (see `themeTokens` in
+/// `packages/brand/src/tokens.ts`) so it reads as Jackalope rather than as the
+/// terminal's theme. `JACKALOPE_THEME` takes `dark`, `light` or `terminal`
+/// (keep the terminal's own background); otherwise a light terminal gets the
+/// light surfaces and everything else the dark ones.
+fn painted() -> Option<bool> {
+    if !colored() || !truecolor() {
+        return None;
+    }
+    match std::env::var("JACKALOPE_THEME")
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "terminal" => None,
+        "light" => Some(false),
+        "dark" => Some(true),
+        _ => Some(terminal_background() != Background::Light),
+    }
+}
+
 /// The terminal's background, when it says. Many terminals export
 /// `COLORFGBG` as `foreground;background` in ANSI indexes; 0–6 and 8 are dark.
-fn background() -> Background {
+fn terminal_background() -> Background {
     let Ok(value) = std::env::var("COLORFGBG") else {
         return Background::Unknown;
     };
@@ -209,20 +242,19 @@ fn indexed(color: (u8, u8, u8)) -> Color {
     )
 }
 
-/// How many echo lines sit above the wordmark.
-const ECHOES: usize = 4;
-
-/// Rows in the mark. The wordmark and its echoes sit beside the lower rows.
-const MARK_ROWS: usize = 8;
-
-/// The row (from the top of the mark) the solid wordmark sits on.
-const WORDMARK_ROW: usize = 5;
-
-/// True colour lets the echo ramp read as one gradient. Without it the ramp
-/// would band into a few indexed colours and look like an accident, so the
-/// banner falls back to a single accent line.
+/// Whether 24-bit colour reaches the screen.
+///
+/// Windows consoles have drawn 24-bit colour since Windows 10, and several
+/// terminals that do (Windows Terminal among them) never set `COLORTERM`.
 pub fn truecolor() -> bool {
     std::env::var("COLORTERM").is_ok_and(|value| value == "truecolor" || value == "24bit")
+        || cfg!(windows)
+        || std::env::var_os("WT_SESSION").is_some()
+        || std::env::var_os("WEZTERM_PANE").is_some()
+        || std::env::var_os("KITTY_WINDOW_ID").is_some()
+        || std::env::var("TERM_PROGRAM").is_ok_and(|program| {
+            ["iTerm.app", "WezTerm", "vscode", "ghostty", "jackalope"].contains(&program.as_str())
+        })
 }
 
 pub fn colored() -> bool {
@@ -245,8 +277,10 @@ pub fn unicode() -> bool {
         .or_else(|_| std::env::var("LC_CTYPE"))
         .or_else(|_| std::env::var("LANG"))
         .is_ok_and(|value| value.to_ascii_lowercase().contains("utf"));
-    // Windows rarely sets a locale variable, but these hosts render Unicode.
-    let modern_host = std::env::var_os("WT_SESSION").is_some()
+    // Windows rarely sets a locale variable, but its consoles and these hosts
+    // render Unicode.
+    let modern_host = cfg!(windows)
+        || std::env::var_os("WT_SESSION").is_some()
         || std::env::var_os("TERM_PROGRAM").is_some()
         || std::env::var_os("WEZTERM_PANE").is_some()
         || std::env::var_os("ALACRITTY_WINDOW_ID").is_some();
@@ -370,29 +404,96 @@ pub fn muted() -> Color {
     if !colored() {
         return Color::Reset;
     }
+    if let Some(dark) = painted() {
+        return rgb(tinted(if dark { 0.66 } else { 0.40 }, 0.03));
+    }
     tone((0x8b, 0x90, 0x99), Color::DarkGray)
 }
 
+/// The app's surface layers, which the terminal paints when it can.
+#[derive(Clone, Copy)]
+pub enum Surface {
+    /// Around the content card, a step darker (`--color-navigation`).
+    Shell,
+    /// The content card (`--color-surface`).
+    Ground,
+    /// Popups and the input (`--color-surface-elevated`).
+    Elevated,
+}
+
+/// `themeTokens` tints neutral surfaces with the accent's hue at the default
+/// atmosphere (12 × 0.45 per cent saturation).
+const SURFACE_SATURATION: f64 = 0.054;
+
+fn tinted(lightness: f64, saturation: f64) -> (u8, u8, u8) {
+    let (hue, _, _) = to_hsl(current_accent());
+    from_hsl(hue, saturation, lightness)
+}
+
+fn rgb((r, g, b): (u8, u8, u8)) -> Color {
+    Color::Rgb(r, g, b)
+}
+
+fn surface_rgb(level: Surface) -> Option<(u8, u8, u8)> {
+    let dark = painted()?;
+    let lightness = match (level, dark) {
+        (Surface::Shell, true) => 0.065,
+        (Surface::Shell, false) => 0.935,
+        (Surface::Ground, true) => 0.105,
+        (Surface::Ground, false) => 0.99,
+        (Surface::Elevated, true) => 0.14,
+        (Surface::Elevated, false) => 1.0,
+    };
+    Some(tinted(lightness, SURFACE_SATURATION))
+}
+
+/// A surface tone, or Reset where the terminal's own background shows.
+pub fn surface(level: Surface) -> Color {
+    surface_rgb(level).map_or(Color::Reset, rgb)
+}
+
+/// Hairline borders (`--color-border-subtle`), or the muted grey unpainted.
+pub fn hairline() -> Color {
+    match painted() {
+        Some(dark) => rgb(tinted(if dark { 0.21 } else { 0.86 }, SURFACE_SATURATION)),
+        None => muted(),
+    }
+}
+
+/// Body text (`--color-text-primary`), or the terminal's own foreground.
+pub fn text() -> Color {
+    match painted() {
+        Some(dark) => rgb(tinted(if dark { 0.94 } else { 0.14 }, 0.04)),
+        None => Color::Reset,
+    }
+}
+
+/// The base style of a painted area at `level`.
+pub fn painted_style(level: Surface) -> Style {
+    Style::default().bg(surface(level)).fg(text())
+}
+
 /// Behind the highlighted row of a menu or picker: the accent faded most of the
-/// way into the terminal's ground. Terminals without true colour reverse the
-/// row instead.
+/// way into the popup's ground. Terminals without true colour reverse the row
+/// instead.
 pub fn selection() -> Style {
     if !colored() || !truecolor() {
         return Style::default().add_modifier(Modifier::REVERSED);
     }
-    let (r, g, b) = current_accent();
-    let ground = if background() == Background::Light {
-        255.0
+    let accent = current_accent();
+    let light = background() == Background::Light;
+    let ground = surface_rgb(Surface::Elevated).unwrap_or(if light {
+        (255, 255, 255)
     } else {
-        30.0
-    };
-    let weight = if background() == Background::Light {
-        0.16
-    } else {
-        0.28
-    };
-    let blend = |channel: u8| (ground + (channel as f32 - ground) * weight).round() as u8;
-    Style::default().bg(Color::Rgb(blend(r), blend(g), blend(b)))
+        (30, 30, 30)
+    });
+    Style::default().bg(rgb(blend(ground, accent, if light { 0.16 } else { 0.28 })))
+}
+
+/// `from` moved `amount` (0–1) of the way toward `to`.
+fn blend(from: (u8, u8, u8), to: (u8, u8, u8), amount: f32) -> (u8, u8, u8) {
+    let step = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * amount).round() as u8;
+    (step(from.0, to.0), step(from.1, to.1), step(from.2, to.2))
 }
 
 /// Rounded corners where box-drawing arcs are available.
@@ -457,97 +558,201 @@ pub fn danger() -> Color {
     tone((0xe5, 0x48, 0x4d), Color::Red)
 }
 
-/// How much of the accent echo `step` carries. The last step is the solid
-/// wordmark; earlier ones recede toward the background.
-fn echo_weight(step: usize) -> f32 {
-    (step + 1) as f32 / (ECHOES + 1) as f32
+/// The accent's neighbour: the same colour turned 40° round the wheel, so a
+/// gradient between them stays in one family the way the app's palette does.
+fn secondary() -> (u8, u8, u8) {
+    let (hue, saturation, lightness) = to_hsl(current_accent());
+    readable(
+        from_hsl((hue + 40.0).rem_euclid(360.0), saturation, lightness),
+        background(),
+    )
 }
 
-/// Blends the accent toward the background for echo `step` of `ECHOES`.
-fn echo_color(step: usize) -> Color {
-    if !colored() {
-        return Color::Reset;
+/// The accent gradient at `position` (0 at the start, 1 at the end), or the
+/// plain accent where true colour is unavailable.
+pub fn gradient(position: f32) -> Color {
+    if !colored() || !truecolor() {
+        return accent();
     }
-    if !truecolor() {
-        return Color::DarkGray;
-    }
-    let weight = echo_weight(step);
-    let (r, g, b) = current_accent();
-    // Echoes recede toward the ground: black on dark terminals, white on light.
-    let ground = if background() == Background::Light {
-        255.0
-    } else {
-        0.0
-    };
-    let blend = |channel: u8| (ground + (channel as f32 - ground) * weight).round() as u8;
-    Color::Rgb(blend(r), blend(g), blend(b))
+    rgb(blend(
+        current_accent(),
+        secondary(),
+        position.clamp(0.0, 1.0),
+    ))
 }
 
-/// The jackalope head from `packages/brand` (`characterPaths`: ears, antler and
-/// head, as `EchoMark` draws it), rasterized onto a 2×4 dot grid per cell so it
-/// keeps the logo's silhouette rather than approximating it with line art.
-fn mark() -> [&'static str; MARK_ROWS] {
-    if unicode() {
-        [
-            "⢀⣤⣀  ⣼⣿⡄  ⢠⡄⢀   ",
-            "⠘⣿⣿⣷⡀⣿⣿⡇  ⣼⡿⠟⠁  ",
-            " ⠘⣿⣿⣿⣿⣿⡇ ⣼⡟⣀⡀   ",
-            "  ⠈⠻⣿⣿⣿⣧⣼⡿⠛⠛⠁   ",
-            "    ⣿⣿⣿⣿⣿⣿⣆     ",
-            "    ⠸⣿⣿⣿⣿⣿⣿⣿⣶⡄  ",
-            "   ⢀⣠⣿⣿⣿⣿⡿⠿⠿⠋   ",
-            "    ⠙⠿⢿⣿⡇       ",
-        ]
-    } else {
-        [
-            ".o.  ##.  ...   ",
-            ".###.##o  ##o.  ",
-            " .#####o ##..   ",
-            "  .o######oo.   ",
-            "    ######o     ",
-            "    o########.  ",
-            "   .o#######o   ",
-            "    o###o       ",
-        ]
+/// The frame's colour at `position` along it: the gradient softened into the
+/// ground so it holds things together without competing with them.
+pub fn frame_at(position: f32) -> Color {
+    match (surface_rgb(Surface::Ground), gradient(position)) {
+        (Some(ground), Color::Rgb(r, g, b)) => rgb(blend(ground, (r, g, b), 0.6)),
+        (_, color) => color,
     }
 }
 
-/// The full banner: the mark beside a wordmark that echoes upward, with the
-/// version underneath.
-pub fn banner() -> Vec<Line<'static>> {
-    let mark = mark();
-    let first_echo = WORDMARK_ROW - ECHOES;
-    let mark_style = Style::default().fg(accent());
-    let mut lines = Vec::with_capacity(MARK_ROWS);
-    for (row, glyphs) in mark.iter().enumerate() {
-        let mut spans = vec![
-            Span::raw(" "),
-            Span::styled(*glyphs, mark_style),
-            Span::raw("  "),
-        ];
-        if (first_echo..=WORDMARK_ROW).contains(&row) {
-            let step = row - first_echo;
-            let color = echo_color(step);
-            // The wordmark shifts one column per echo, the way the desktop mark
-            // offsets each repeat.
-            spans.push(Span::raw(" ".repeat(ECHOES - step)));
-            spans.push(Span::styled(
-                "jackalope",
-                if step == ECHOES {
-                    Style::default().fg(color).add_modifier(Modifier::BOLD)
-                } else {
-                    Style::default().fg(color)
-                },
-            ));
-        } else if row == WORDMARK_ROW + 1 {
-            spans.push(Span::styled(
-                format!("v{}", env!("CARGO_PKG_VERSION")),
-                Style::default().fg(muted()),
-            ));
+/// `text` as a chip: padded, on a tint of `color`. Without true colour the
+/// tint is dropped and the text keeps `color`.
+pub fn chip(text: &str, color: Color) -> Span<'static> {
+    let label = format!(" {text} ");
+    match (surface_rgb(Surface::Ground), color) {
+        (Some(ground), Color::Rgb(r, g, b)) => Span::styled(
+            label,
+            Style::default()
+                .bg(rgb(blend(ground, (r, g, b), 0.2)))
+                .fg(text_on_tint()),
+        ),
+        _ => Span::styled(label, Style::default().fg(color)),
+    }
+}
+
+fn text_on_tint() -> Color {
+    match text() {
+        Color::Reset => accent(),
+        color => color,
+    }
+}
+
+/// A block of `color`: its tint behind the text and a bar of it down the left
+/// edge, for your messages, questions and errors.
+pub fn callout_style(color: Color) -> Style {
+    match (surface_rgb(Surface::Ground), color) {
+        (Some(ground), Color::Rgb(r, g, b)) => {
+            Style::default().bg(rgb(blend(ground, (r, g, b), 0.07)))
         }
-        lines.push(Line::from(spans));
+        _ => Style::default(),
     }
-    lines
+}
+
+/// Six-pixel capitals for the wordmark, two pixels to a cell row.
+const LETTERS: [(char, &[&str]); 8] = [
+    (
+        'J',
+        &["  ####", "    ##", "    ##", "    ##", "##  ##", " #### "],
+    ),
+    (
+        'A',
+        &[" #### ", "##  ##", "##  ##", "######", "##  ##", "##  ##"],
+    ),
+    (
+        'C',
+        &[" #####", "##    ", "##    ", "##    ", "##    ", " #####"],
+    ),
+    (
+        'K',
+        &["##  ##", "## ## ", "####  ", "####  ", "## ## ", "##  ##"],
+    ),
+    (
+        'L',
+        &["##    ", "##    ", "##    ", "##    ", "##    ", "######"],
+    ),
+    (
+        'O',
+        &[" #### ", "##  ##", "##  ##", "##  ##", "##  ##", " #### "],
+    ),
+    (
+        'P',
+        &["##### ", "##  ##", "##  ##", "##### ", "##    ", "##    "],
+    ),
+    (
+        'E',
+        &["######", "##    ", "##### ", "##    ", "##    ", "######"],
+    ),
+];
+
+/// Four-pixel capitals with single strokes, for narrow windows.
+const SMALL_LETTERS: [(char, &[&str]); 8] = [
+    ('J', &[" ###", "   #", "#  #", " ## "]),
+    ('A', &[" ## ", "#  #", "####", "#  #"]),
+    ('C', &[" ###", "#   ", "#   ", " ###"]),
+    ('K', &["#  #", "# # ", "### ", "#  #"]),
+    ('L', &["#   ", "#   ", "#   ", "####"]),
+    ('O', &[" ## ", "#  #", "#  #", " ## "]),
+    ('P', &["### ", "#  #", "### ", "#   "]),
+    ('E', &["####", "#   ", "### ", "####"]),
+];
+
+/// Columns the wordmark needs.
+pub const WORDMARK_WIDTH: usize = 9 * 7 - 1;
+
+/// Columns the narrow wordmark needs.
+pub const SMALL_WORDMARK_WIDTH: usize = 9 * 5 - 1;
+
+/// "JACKALOPE" in block capitals three rows tall, swept by the accent
+/// gradient. Half blocks give each row two pixels, so the letters keep round
+/// shoulders without box-drawing.
+pub fn wordmark() -> Vec<Line<'static>> {
+    block_letters(&LETTERS)
+}
+
+/// The wordmark two rows tall, for windows narrower than `WORDMARK_WIDTH`.
+pub fn small_wordmark() -> Vec<Line<'static>> {
+    block_letters(&SMALL_LETTERS)
+}
+
+fn block_letters(letters: &[(char, &[&str]); 8]) -> Vec<Line<'static>> {
+    let glyphs: Vec<&[&str]> = "JACKALOPE"
+        .chars()
+        .filter_map(|letter| {
+            letters
+                .iter()
+                .find(|(key, _)| *key == letter)
+                .map(|(_, rows)| *rows)
+        })
+        .collect();
+    let height = glyphs[0].len();
+    let width = glyphs[0][0].len();
+    let total = glyphs.len() * (width + 1) - 1;
+    let on = |glyph: &[&str], row: usize, column: usize| {
+        glyph
+            .get(row)
+            .is_some_and(|line| line.as_bytes()[column] == b'#')
+    };
+    (0..height.div_ceil(2))
+        .map(|cell| {
+            let mut spans = Vec::new();
+            for (index, glyph) in glyphs.iter().enumerate() {
+                if index > 0 {
+                    spans.push(Span::raw(" "));
+                }
+                for column in 0..width {
+                    let symbol =
+                        match (on(glyph, cell * 2, column), on(glyph, cell * 2 + 1, column)) {
+                            (true, true) => "█",
+                            (true, false) => "▀",
+                            (false, true) => "▄",
+                            (false, false) => " ",
+                        };
+                    let position = (index * (width + 1) + column) as f32 / total as f32;
+                    spans.push(Span::styled(
+                        symbol,
+                        Style::default().fg(gradient(position)),
+                    ));
+                }
+            }
+            Line::from(spans)
+        })
+        .collect()
+}
+
+/// The colour of column `column` of a `width`-wide frame edge while work
+/// runs: a soft band of accent travelling along it. `None` when still.
+pub fn frame_band(column: usize, width: usize, tick: usize) -> Option<Color> {
+    if !motion() || !colored() {
+        return None;
+    }
+    const HALF: isize = 12;
+    let span = width + 2 * HALF as usize;
+    let center = (tick * span / 48) % span;
+    let distance = (center as isize - HALF - column as isize).abs();
+    if distance >= HALF {
+        return None;
+    }
+    let weight = 1.0 - (distance as f32 / HALF as f32).powi(2);
+    Some(mix(
+        frame_at(column as f32 / width.max(1) as f32),
+        lifted(0.3),
+        weight,
+    ))
 }
 
 /// Rows in the small mark shown above a conversation.
@@ -672,40 +877,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_banner_ends_on_the_solid_wordmark() {
-        let lines = banner();
-        assert_eq!(lines.len(), MARK_ROWS);
-        let text = |line: &Line| -> String {
-            line.spans
-                .iter()
-                .map(|span| span.content.as_ref())
-                .collect()
-        };
-        // The echoes and the solid wordmark form one run of lines.
-        let wordmarks: Vec<usize> = (0..lines.len())
-            .filter(|&row| text(&lines[row]).contains("jackalope"))
-            .collect();
-        assert_eq!(
-            wordmarks,
-            (WORDMARK_ROW - ECHOES..=WORDMARK_ROW).collect::<Vec<_>>()
-        );
-        assert!(lines[WORDMARK_ROW]
-            .spans
-            .last()
-            .unwrap()
-            .style
-            .add_modifier
-            .contains(Modifier::BOLD));
-    }
-
-    #[test]
-    fn every_mark_row_has_the_same_width() {
-        for row in mark() {
-            assert_eq!(row.chars().count(), 16, "{row:?}");
-        }
-    }
-
-    #[test]
     fn project_accents_use_matching_indexed_colours_and_reject_invalid_hex() {
         assert_eq!(indexed((0, 175, 135)), Color::Indexed(36));
         assert_eq!(indexed((175, 95, 215)), Color::Indexed(134));
@@ -744,6 +915,23 @@ mod tests {
     }
 
     #[test]
+    fn the_wordmark_spells_jackalope_at_its_declared_width() {
+        let lines = wordmark();
+        assert_eq!(lines.len(), 3);
+        for line in &lines {
+            assert_eq!(line.width(), WORDMARK_WIDTH);
+        }
+        for (_, rows) in LETTERS {
+            assert!(rows.iter().all(|row| row.len() == 6), "{rows:?}");
+        }
+        let small = small_wordmark();
+        assert_eq!(small.len(), 2);
+        for line in &small {
+            assert_eq!(line.width(), SMALL_WORDMARK_WIDTH);
+        }
+    }
+
+    #[test]
     fn small_mark_rows_share_a_width_and_the_glint_passes_every_column() {
         for row in small_mark() {
             assert_eq!(row.chars().count(), 8, "{row:?}");
@@ -758,17 +946,6 @@ mod tests {
             (0..200).any(|tick| glint(4, 8, tick) == 0.0),
             "the glint rests"
         );
-    }
-
-    #[test]
-    fn echoes_ramp_toward_the_accent() {
-        // Guards the gradient direction: a reversed ramp would leave the
-        // brightest line at the top and the wordmark invisible.
-        let first = echo_color(0);
-        let last = echo_color(ECHOES);
-        if let (Color::Rgb(r1, _, _), Color::Rgb(r2, _, _)) = (first, last) {
-            assert!(r1 < r2, "echo should brighten toward the wordmark");
-        }
     }
 
     #[test]

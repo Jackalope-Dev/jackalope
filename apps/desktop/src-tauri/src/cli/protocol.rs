@@ -100,9 +100,42 @@ pub enum Request {
     ShowChanges { path: String },
     /// Set a project's theme accent (`#rrggbb`) in the app and every terminal.
     SetAccent { project_id: String, accent: String },
+    /// Change a project's agent-approval or workspace setting in the app and
+    /// every terminal. Omitted fields keep their current values. Answers with
+    /// `Response::Project` carrying the saved settings.
+    SetProjectSettings {
+        project_id: String,
+        /// Approve routine agent requests without asking.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        auto_approve: Option<bool>,
+        /// `worktree`, `branch`, `current` or `ask`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        workspace_mode: Option<String>,
+        /// Reflect on work in the background and keep learned lessons tidy.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        learn_automatically: Option<bool>,
+        /// Reported tool calls between background reflections (10–1000).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        learning_cadence: Option<u32>,
+    },
     /// Extract learnings from a conversation's history (up to the previous /learn,
     /// if present) and save them to project context.
     SessionLearn { session_id: String },
+    /// A project's learned lessons, archived ones included. Answers with
+    /// `Response::Learnings`.
+    Learnings { project_id: String },
+    /// One learned lesson and its recent history. Answers with
+    /// `Response::Learning`.
+    Learning {
+        project_id: String,
+        entry_id: String,
+    },
+    /// Archive or restore a learned lesson. Answers with `Response::Learning`.
+    SetLearningArchived {
+        project_id: String,
+        entry_id: String,
+        archived: bool,
+    },
     /// Account quota windows, as the app's status bar shows them.
     Usage,
     /// Prepares a merge of a paused conversation's latest attempt into the
@@ -135,6 +168,56 @@ pub struct Project {
     /// The project's theme accent as `#rrggbb`, when the app has one for it.
     #[serde(default)]
     pub accent: Option<String>,
+    /// Whether routine agent requests are approved without asking. Absent from
+    /// older hosts; treat absent as on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_approve: Option<bool>,
+    /// Where new tasks work: `worktree`, `branch`, `current` or `ask`. Absent
+    /// from older hosts; treat absent as `worktree`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_mode: Option<String>,
+    /// Whether background learning is on. Absent from older hosts; treat
+    /// absent as on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub learn_automatically: Option<bool>,
+    /// Reported tool calls between background reflections. Absent from older
+    /// hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub learning_cadence: Option<u32>,
+}
+
+/// A lesson Jackalope learned for a project.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Learning {
+    pub id: String,
+    pub title: String,
+    pub content: String,
+    /// `probation`, `active` or `archived`.
+    pub status: String,
+    /// `preference`, `correction`, `clarification`, `verification` and so on.
+    pub kind: String,
+    /// Distinct tasks the lesson was supplied to.
+    pub uses: u64,
+    /// Whether Jackalope may still change it; false once someone edited it.
+    pub managed: bool,
+    pub updated_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archived_reason: Option<String>,
+}
+
+/// One change in a learned lesson's history.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LearningEvent {
+    pub at: String,
+    /// `born`, `merged`, `patched`, `retired`, `promoted`, `archived`,
+    /// `restored`, `edited` or `deleted`.
+    pub action: String,
+    pub reason: String,
+    /// Redacted excerpts of what prompted the change.
+    #[serde(default)]
+    pub evidence: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -148,6 +231,13 @@ pub struct SessionSummary {
     pub pending: usize,
     pub error: Option<String>,
     pub updated_at: String,
+    /// The latest run's status, so a list can show which conversations are
+    /// working. Absent from older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// Whether an agent is waiting on an answer. Absent from older hosts.
+    #[serde(default)]
+    pub asking: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -204,6 +294,10 @@ pub struct SessionView {
     #[serde(default)]
     pub activity: Vec<String>,
     pub questions: Vec<Question>,
+    /// Text the agent is writing right now, before its message completes.
+    /// Empty when nothing is streaming or the host is older.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub partial: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -289,6 +383,13 @@ pub enum Response {
     },
     Usage {
         accounts: Vec<UsageAccount>,
+    },
+    Learnings {
+        learnings: Vec<Learning>,
+    },
+    Learning {
+        learning: Learning,
+        history: Vec<LearningEvent>,
     },
     Merge {
         plan: MergePlan,

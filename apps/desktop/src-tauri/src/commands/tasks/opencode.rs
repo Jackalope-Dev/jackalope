@@ -510,6 +510,37 @@ impl Api<'_> {
                 return Err("OpenCode's permission request is too large to review safely. The action was not approved.".into());
             }
             let scopes = Denials::scopes(request)?;
+            let permission = request["permission"].as_str().unwrap_or_default();
+            let patterns: Vec<String> = scopes.iter().map(|(_, pattern)| pattern.clone()).collect();
+            let label = format!("OpenCode {permission}: {}", patterns.join(", "));
+            let decision = if scopes.iter().any(|scope| denials.scopes.contains(scope)) {
+                crate::commands::permission_risk::Decision::Ask(None)
+            } else {
+                crate::commands::permission_risk::decide(runtime, run_id, &label, |workspace| {
+                    crate::commands::permission_risk::assess_opencode(
+                        permission,
+                        &patterns,
+                        &request["metadata"],
+                        workspace,
+                    )
+                })
+            };
+            let escalation = match decision {
+                crate::commands::permission_risk::Decision::Approve => {
+                    self.json(
+                        Method::POST,
+                        &format!("/permission/{id}/reply"),
+                        Some(json!({"reply":"once"})),
+                    )
+                    .await?;
+                    return Ok(());
+                }
+                crate::commands::permission_risk::Decision::Ask(reason) => reason,
+            };
+            let text = match escalation {
+                Some(reason) => format!("{text}\nJackalope is asking because {reason}."),
+                None => text,
+            };
             if scopes.iter().any(|scope| denials.scopes.contains(scope)) {
                 self.json(
                     Method::POST,

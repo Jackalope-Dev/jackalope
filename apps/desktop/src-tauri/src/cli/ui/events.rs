@@ -42,9 +42,21 @@ pub fn event_loop(
         let _ = (enhanced, std::mem::take(&mut app.suspend));
         if redraw {
             app.signal();
+            // Synchronized output makes the terminal paint the frame at once
+            // instead of showing cells as they stream in; terminals without
+            // it ignore the sequence.
+            let _ = crossterm::queue!(
+                std::io::stdout(),
+                crossterm::terminal::BeginSynchronizedUpdate
+            );
             let drawn = terminal
                 .draw(|frame| render::draw(frame, app))
-                .map_err(|error| error.to_string())?;
+                .map_err(|error| error.to_string());
+            let _ = crossterm::execute!(
+                std::io::stdout(),
+                crossterm::terminal::EndSynchronizedUpdate
+            );
+            let drawn = drawn?;
             // Only a selection copies from the screen.
             app.screen = app.selection.map(|_| drawn.buffer.clone());
         }

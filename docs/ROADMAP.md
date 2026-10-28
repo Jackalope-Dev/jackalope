@@ -99,6 +99,9 @@ delivery comparisons retain waits, failures and missing review evidence. Validat
 complete task delivery and quality on representative repositories before claiming gains.
 
 Project review lessons require resolved feedback and matching successful checks.
+Background learning keeps learned lessons on probation, archives unused ones and
+records their history; its thresholds and any effect on corrections need real-use
+calibration. Opt-in account sync of learned lessons is a possible later extension.
 Chronological history comparisons and bounded offline prompt optimization have
 separate validation and held-out gates. Representative first-pass acceptance and
 actual correction counts still need measurement before making outcome claims.

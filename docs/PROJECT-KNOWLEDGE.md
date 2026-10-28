@@ -23,10 +23,9 @@ Open **Project → Context → Add lesson**, or choose **Save lesson** on a revi
 task. Write one concise fact or decision and the words or phrases that should
 match future task instructions. Task-derived entries retain a link to the source
 attempt. Manual entries stay under your control. Jackalope also derives bounded local lessons
-from saved user feedback and repository evidence; it does not rewrite repository
-instructions or make background model calls. In terminal conversations, `/learn`
-extracts stated preferences, corrections and verified check commands from recent session
-history into project knowledge.
+from saved user feedback and repository evidence, and keeps
+[learned lessons](#learned-lessons) from conversations and finished work. It does not
+rewrite repository instructions or make background model calls.
 
 The composer previews matching lessons under **Saved project context**. Skip an
 individual lesson or disable matching for that task. The native launcher applies
@@ -87,6 +86,58 @@ folders. It does not follow directory symlinks. Manifest reads are capped at
 records. Older observations remain historical; these bounds are not a complete
 semantic analysis of every repository or every user action.
 
+## Learned lessons
+
+With **Learn automatically** on (the default, per project in Project settings or
+the terminal's `/settings`), Jackalope reflects on work in the background: each time
+a running task reports another 50 tool calls (25, 50, 100 or 200 in Project
+settings) and when a task or conversation turn ends. `/learn` runs the same
+reflection on demand over a conversation since its previous `/learn`, whether or not
+the setting is on. Reflection is local and deterministic; it adds no model calls and
+never blocks, slows or fails the task. Failures are logged and skipped.
+
+Reflection reads only what the person wrote (a task's objective, or the messages sent
+in that conversation turn), their typed answers to agent questions, and check
+commands that passed. It never reads agent output or messages from bots and
+wake-ups. From these it proposes:
+
+- **Add**: a new preference (**Always**, **Never**, **Prefer**, **Use**, **Avoid**,
+  **Make sure** and similar), correction (**instead of**, **Correction:**),
+  clarification or verified check command.
+- **Merge**: the same lesson seen again; the new source is recorded as evidence.
+- **Patch**: a newer instruction about the same subject with the opposite intent
+  (for example **Never** after **Always**) rewrites the older lesson instead of
+  adding a rival.
+- **Retire**: **No longer…**, **Stop using…** or **…anymore** archives the matching
+  lesson.
+
+A single promotion gate applies proposals. It refuses statements that look like they
+contain a credential, token, key, private key or email address (rather than saving
+them redacted), lessons outside 15–500 characters or without a matching phrase,
+duplicates of existing content, and additions that contradict a hand-written lesson.
+It adds at most five lessons per reflection. Merge, patch, retire and automatic
+archiving only ever change lessons Jackalope learned and nobody has edited; manual
+lessons, edited lessons, older automatic lessons and `AGENTS.md` are never changed.
+Editing a learned lesson makes it yours. Removing one keeps a suppression record so
+it is not learned again.
+
+New lessons are on probation (shown as **New**) until they are supplied to two
+distinct tasks, then become **Active**. Each new task that selects saved context is an
+opportunity for every available learned lesson in the project. A lesson never supplied
+in 30 opportunities, or not supplied in the last 100, is archived. A project keeps at
+most 40 available learned lessons; adding another archives the least used first.
+Archiving never deletes: **Restore** in Project → Context or `/learnings` returns a
+lesson to probation with fresh counts, and turning an archived lesson back on in its
+editor does the same. With automatic learning off, deliveries are still counted but
+nothing is archived for lack of use. Use counts record that a lesson was supplied,
+not that it caused a better result.
+
+Every change is appended to a per-project history: learned, seen again, updated,
+retired, now active, archived, restored, edited or removed, with the reason and a
+redacted excerpt of the source (emails, tokens, keys, credential URLs and the home
+folder are replaced). Open **History** on a learned lesson in Project → Context, or
+choose it in `/learnings`.
+
 ## Workflows
 
 Choose **Save workflow** on a reviewed task to start an editable draft from its
@@ -143,6 +194,16 @@ folder, with optimistic revisions for edits and deletion. Corrupt files are
 preserved and surfaced; mutations never silently replace unreadable knowledge.
 The store allows 100 entries per project and 500 per profile. Task journals own
 the context receipts; summary polling omits their content bodies.
+
+`commands/knowledge/learning.rs` owns reflection, the promotion gate and the lessons'
+lifecycle. Learned lessons keep their status and use counts under the entry's
+`automatic.lifecycle`; entries saved before it existed load unchanged. Learned ids
+derive from the project ID and the lesson, not the folder, so the same lesson has the
+same id on every device. History is append-only JSON Lines in
+`task-runs-v1/knowledge/ledger/`, one file per project; past 1 MB the file is moved
+aside, replacing the previous one, so two files are kept. Evidence excerpts live only
+there, apart from the entry. Everything stays in the local profile; there is no
+account or cross-machine sharing of lessons.
 
 `commands/monitors.rs` owns bounded, read-only Git observations and diffs.
 `commands/schedules.rs` owns timing, persisted observations/notices and guarded

@@ -440,6 +440,7 @@ mod tests {
             result: String::new(),
             activity: Vec::new(),
             questions: Vec::new(),
+            partial: String::new(),
         }
     }
 

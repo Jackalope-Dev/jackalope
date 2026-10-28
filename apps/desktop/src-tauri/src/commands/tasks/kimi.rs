@@ -496,13 +496,37 @@ pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) ->
     if options.is_empty() {
         return json!({"outcome":"cancelled"});
     }
+    let tool_call = &params["toolCall"];
+    let allow_once = params["options"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|option| option["kind"] == "allow_once")
+        .and_then(|option| option["optionId"].as_str());
+    let mut escalation = None;
+    if let Some(allow_once) = allow_once {
+        let label = format!(
+            "{}: {}",
+            tool_call["title"].as_str().unwrap_or("Tool"),
+            crate::commands::permission_risk::label("", &tool_call["rawInput"])
+                .trim_start_matches(": ")
+        );
+        match crate::commands::permission_risk::decide(runtime, run_id, &label, |workspace| {
+            crate::commands::permission_risk::assess_acp(tool_call, workspace)
+        }) {
+            crate::commands::permission_risk::Decision::Approve => {
+                return json!({"outcome":"selected","optionId":allow_once});
+            }
+            crate::commands::permission_risk::Decision::Ask(reason) => escalation = reason,
+        }
+    }
     let labels: Vec<String> = options
         .iter()
         .enumerate()
         .map(|(index, (_, name))| format!("{}. {name}", index + 1))
         .collect();
     let question = format!(
-        "Kimi requests permission: {}\n{}",
+        "Kimi requests permission: {}\n{}{}",
         params["toolCall"]["title"]
             .as_str()
             .unwrap_or("Tool action")
@@ -513,7 +537,10 @@ pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) ->
             .to_string()
             .chars()
             .take(3000)
-            .collect::<String>()
+            .collect::<String>(),
+        escalation
+            .map(|reason| format!("\nJackalope is asking because {reason}."))
+            .unwrap_or_default()
     );
     wait_for_answer(runtime, run_id, question, labels.clone(), "choice")
         .and_then(|answer| labels.iter().position(|label| label == &answer))
@@ -904,6 +931,7 @@ setInterval(()=>{},1000);
             model: None,
             prompt: "Fixture task".into(),
             isolated: false,
+            workspace_mode: None,
             previous_run_id: None,
             coordination: None,
             connection_ids: None,

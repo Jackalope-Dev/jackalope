@@ -153,6 +153,10 @@ fn read_only(request: &Request) -> bool {
             | Request::ShowWindow
             | Request::ShowChanges { .. }
             | Request::SetAccent { .. }
+            | Request::SetProjectSettings { .. }
+            | Request::Learnings { .. }
+            | Request::Learning { .. }
+            | Request::SetLearningArchived { .. }
             | Request::Attached { .. }
     )
 }
@@ -189,6 +193,8 @@ mod tests {
             pending: 0,
             error: None,
             updated_at: String::new(),
+            status: None,
+            asking: false,
         }
     }
 

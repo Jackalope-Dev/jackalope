@@ -64,10 +64,13 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   the question, and a home directory or drive root is refused. A second app
   launch raises the running host. Inside conversations, `!` runs shell commands with
   streamed output, follow-ups queue behind running work, `/bg` starts parallel
-  conversations, a live header shows other open work and agent readiness, the input
-  wraps and grows, and dragging copies text. `/learn` extracts session learnings into
-  project knowledge, `/model` and `/usage` choose a model and show account quota,
-  `/init` writes `AGENTS.md`, `--resume` picks or rejoins a conversation, and a rotating tips footer highlights commands and shortcuts.
+  conversations, open conversations appear as tabs with their state (Alt+1–9 or a click
+  switches), a pinned banner says what a blocked conversation needs, `@` names agents as
+  well as files, a leading `/`, `!` or `@` sets the input's mode, the input wraps and
+  grows, and dragging copies text. With 24-bit colour it paints the app's surfaces in a
+  rounded card with clickable header and status lines. `/learn` sends session learnings through
+  the learning gate, `/learnings` lists, shows, archives and restores learned lessons, `/model` and `/usage` choose a model and show account quota,
+  `/init` writes `AGENTS.md`, and `--resume` picks or rejoins a conversation.
   The status bar, command search and Cmd/Ctrl+J open it in an app window that can
   hand the conversation to the system terminal. Release builds link the command onto
   PATH; agent questions can be answered in the terminal. The transcript shows every
@@ -188,6 +191,14 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Live provider calibration and native cross-platform acceptance remain open.
 - Isolated Git worktrees, task checkpoints, verification, snapshot-bound outcome
   acceptance, combined patch review and guarded integration with recoverable cleanup.
+  Each project chooses where new tasks, composer drafts and conversations work: an
+  isolated worktree (the default), a new `jackalope/<id>` branch in the project
+  checkout, the checkout's current branch, or a choice asked when each task starts.
+  In-place modes hold the checkout for one task at a time, never carry, stash or
+  discard the person's changes (a new branch requires a clean checkout), create no
+  automatic checkpoint commits and have no merge step; a new branch stays for review
+  or a pull request. Parallel subtasks, comparisons, schedules and coordinated work
+  keep isolated worktrees.
   Agents can report
   all requirement assessments in one call; review shows their justifications and
   evidence separately from human acceptance.
@@ -221,6 +232,15 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Chat supports per-request lesson opt-outs. Automatic review lessons require a later
   accepted revision and a successful check of the accepted tree; unresolved notes
   remain visible without entering task context.
+- Per-project background learning, on by default: local reflection every 50 reported
+  tool calls (configurable) and when work ends proposes adding, merging, patching or
+  retiring learned lessons. One promotion gate refuses credential-like or personal
+  data, duplicates, conflicts with hand-written lessons and oversized lessons, and
+  changes only unedited lessons it wrote. Lessons start on probation, become active
+  after two deliveries, are archived when unused or over the 40-lesson project cap,
+  and can be restored; an append-only history records every change with redacted
+  evidence. Project → Context and the terminal show status, use and history. Lessons
+  are profile-local; any effect on task outcomes is unmeasured.
 - MCP connections with a curated marketplace, publisher setup presets, token entry,
   agent sign-in guidance and save-and-check results. Full AllMCPs search and custom
   connections remain available; live publisher/account acceptance remains open.
@@ -310,11 +330,26 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   An external Harbor adapter runs prepared Git repositories through the same native
   task path with separate upstream grading and optional request metering. Its initial
   payload targets Linux x86_64/OpenCode; broader provider and benchmark acceptance remain open.
+  Projects auto-approve agent requests by default: Claude Code, Kimi Code/ACP and
+  OpenCode permission requests pass a native risk check that approves routine tool
+  use and asks only for recursive or out-of-workspace deletes, Git pushes and history
+  or working-tree loss, piped or encoded code, elevated or system changes, credential
+  files, publishing and deploys, process kills and writes outside the workspace.
+  Each automatic approval and escalation is recorded in the task's activity. Saved
+  always-allow rules still apply. Codex keeps its workspace-write sandbox; Gemini
+  CLI, Grok and Antigravity follow their own CLI approval policies.
   OpenCode tasks use an authenticated owned server for recoverable permission prompts,
   structured questions, exact-session continuation and child-session usage. Scope,
   native-output and provider-effort ablations retain matched permission policies and
   independent accounting; cross-platform installed acceptance and representative
   improvement claims remain open.
+  Claude Code streams partial text into the terminal view, and a project can skip the
+  person's own Claude Code settings, plugins, hooks and MCP servers. By default each
+  live conversation keeps a warm Claude Code process with SDK hooks for edit checks,
+  stop-time saved checks, context delivery, permission decisions and tool timing, and a
+  pinned model gets a fallback model. The hook protocol, replies, deny-rule precedence
+  and cost accounting were checked against installed Claude Code 2.1.312; full task
+  acceptance and any speed or quality benefit remain unmeasured.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.
   Project setup has three steps: project, agents and an optional first task. Theme editors open directly; existing saved app/project choices remain compatible.
 - Review views save optional local usefulness ratings and reported review minutes with

@@ -143,6 +143,7 @@ impl TaskRuntime {
 
     pub fn stop_all(&self) {
         self.warm_helpers.clear();
+        self.claude_sessions.clear();
         let ids: Vec<_> = self
             .inner
             .lock()
@@ -229,6 +230,9 @@ impl TaskRuntime {
                 if request.agent == "auto" {
                     runtime.timed(&id, "routing", || runtime.route(&mut request))?;
                 }
+                if !super::claude_session::context_by_hook(&runtime, &request) {
+                    crate::commands::knowledge::learning::observe_delivery(&runtime, &request);
+                }
                 Ok(request)
             })
         };
@@ -302,7 +306,7 @@ impl TaskRuntime {
         }
     }
 
-    fn prepare_workspace(
+    pub(super) fn prepare_workspace(
         &self,
         id: &str,
         req: &RunRequest,
@@ -312,6 +316,18 @@ impl TaskRuntime {
             return self.prepare_plain_folder(id, req, previous, &folder);
         }
         let root = git(&req.project_path, &["rev-parse", "--show-toplevel"])?;
+        let mode = if previous.is_some() || req.isolated {
+            WorkspaceMode::Worktree
+        } else {
+            match req.workspace_mode {
+                Some(WorkspaceMode::Ask) => match self.ask_workspace_mode(id)? {
+                    Some(mode) => mode,
+                    None => return Ok(()),
+                },
+                Some(WorkspaceMode::Branch) => WorkspaceMode::Branch,
+                _ => WorkspaceMode::Current,
+            }
+        };
         let base_ref = format!(
             "refs/heads/{}",
             req.target_branch
@@ -330,11 +346,37 @@ impl TaskRuntime {
                 ],
             )?
         };
-        if previous.is_none()
-            && !req.isolated
-            && git(&root, &["symbolic-ref", "--quiet", "HEAD"])? != base_ref
-        {
-            return Err("The checkout is on a different branch. Switch to the target branch or enable an isolated worktree.".into());
+        if previous.is_none() && mode != WorkspaceMode::Worktree {
+            self.claim_checkout(id, &root)?;
+        }
+        if previous.is_none() && mode == WorkspaceMode::Current {
+            let head = git(&root, &["symbolic-ref", "--quiet", "HEAD"])?;
+            // A retry may continue on the branch its failed attempt was using.
+            let retried_branch = req
+                .retry_of
+                .as_deref()
+                .and_then(|retried| self.run_snapshot(retried))
+                .filter(|old| {
+                    Path::new(&old.workspace) == Path::new(&root) && !old.branch.is_empty()
+                })
+                .map(|old| format!("refs/heads/{}", old.branch));
+            if head != base_ref && Some(&head) != retried_branch.as_ref() {
+                return Err("The checkout is on a different branch. Switch to the target branch or enable an isolated worktree.".into());
+            }
+        }
+        if let Some(old) = &previous {
+            // In-place work continues only on the branch it started on.
+            if Path::new(&old.workspace) == Path::new(&root) && !old.branch.is_empty() {
+                let current = git(&root, &["branch", "--show-current"])?;
+                if current != old.branch {
+                    return Err(format!(
+                        "The project checkout is now on {}; this task worked on {}. Switch back to {} to continue it.",
+                        if current.is_empty() { "a detached commit" } else { &current },
+                        old.branch,
+                        old.branch
+                    ));
+                }
+            }
         }
         self.update(id, |run| {
             run.progress = Some(StepProgress::new("workspace", "Preparing the workspace", 1))
@@ -360,7 +402,7 @@ impl TaskRuntime {
                 )
             });
             (workspace, branch, base_head)
-        } else if req.isolated {
+        } else if mode == WorkspaceMode::Worktree {
             let parent = PathBuf::from(&root).join(".worktrees");
             std::fs::create_dir_all(&parent).map_err(|e| e.to_string())?;
             let canonical_root = std::fs::canonicalize(&root).map_err(|e| e.to_string())?;
@@ -400,12 +442,29 @@ impl TaskRuntime {
                 ],
             )?;
             (path.to_string_lossy().into_owned(), branch, base)
+        } else if mode == WorkspaceMode::Branch {
+            let changes = git(&root, &["status", "--porcelain", "--untracked-files=no"])?;
+            if !changes.trim().is_empty() {
+                return Err("The project checkout has uncommitted changes. Commit or move them before starting work on a new branch; Jackalope will not carry them over or discard them.".into());
+            }
+            let branch = format!("jackalope/{}", workspace_name(id, &req.prompt));
+            git(&root, &["checkout", "-b", &branch, &base])?;
+            self.update(id, |run| {
+                activity(
+                    run,
+                    &format!("Working on new branch {branch} in the project checkout."),
+                )
+            });
+            (root.clone(), branch, base)
         } else {
-            (
-                root.clone(),
-                git(&root, &["branch", "--show-current"])?,
-                base,
-            )
+            let branch = git(&root, &["branch", "--show-current"])?;
+            self.update(id, |run| {
+                activity(
+                    run,
+                    &format!("Working directly in the project checkout on {branch}."),
+                )
+            });
+            (root.clone(), branch, base)
         };
         self.update_checked(id, |r| {
             r.workspace = workspace.clone();
@@ -442,6 +501,87 @@ impl TaskRuntime {
             }
         }
         Ok(())
+    }
+
+    /// Reserves the project checkout for this attempt. Only one attempt works in
+    /// a checkout at a time; the check and the reservation happen under one lock
+    /// so two in-place starts cannot both pass it.
+    fn claim_checkout(&self, id: &str, root: &str) -> Result<(), String> {
+        let canonical = |path: &str| dunce::canonicalize(path).ok();
+        let target = canonical(root);
+        let mut inner = self.inner.lock().unwrap();
+        if inner.runs.values().any(|other| {
+            other.id != id
+                && !other.workspace.is_empty()
+                && ["starting", "running", "stopping"].contains(&other.status.as_str())
+                && (Path::new(&other.workspace) == Path::new(root)
+                    || target.is_some() && canonical(&other.workspace) == target)
+        }) {
+            return Err("Another task is working in this project checkout. Wait for it to finish or use an isolated worktree.".into());
+        }
+        let run = inner.runs.get_mut(id).ok_or("Attempt not found")?;
+        run.workspace = root.to_string();
+        Ok(())
+    }
+
+    /// Asks where an `ask` project's task should work. `None` means the attempt
+    /// was stopped while waiting.
+    fn ask_workspace_mode(&self, id: &str) -> Result<Option<WorkspaceMode>, String> {
+        const CHOICES: [(&str, WorkspaceMode); 3] = [
+            ("Isolated worktree", WorkspaceMode::Worktree),
+            ("New branch in the project checkout", WorkspaceMode::Branch),
+            (
+                "Current branch in the project checkout",
+                WorkspaceMode::Current,
+            ),
+        ];
+        let prompt = crate::commands::harness::PendingUserPrompt {
+            id: uuid::Uuid::new_v4().to_string(),
+            run_id: id.into(),
+            question: "Where should this task work? An isolated worktree leaves your checkout untouched; the other choices edit the project checkout directly.".into(),
+            input_type: "choice".into(),
+            options: CHOICES.iter().map(|(label, _)| label.to_string()).collect(),
+            default_value: Some(CHOICES[0].0.into()),
+            status: "pending".into(),
+            answer: None,
+            created_at: Utc::now().to_rfc3339(),
+            answered_at: None,
+        };
+        self.record_prompt(&prompt);
+        self.update(id, |run| {
+            run.progress = Some(StepProgress::new(
+                "workspace",
+                "Waiting for a workspace choice",
+                1,
+            ))
+        });
+        let started = std::time::Instant::now();
+        loop {
+            if !self.is_running(id) {
+                return Ok(None);
+            }
+            let answer = self
+                .inner
+                .lock()
+                .unwrap()
+                .runs
+                .get(id)
+                .and_then(|run| run.prompts.iter().find(|saved| saved.id == prompt.id))
+                .and_then(|saved| saved.answer.clone());
+            if let Some(answer) = answer {
+                return CHOICES
+                    .iter()
+                    .find(|(label, _)| *label == answer)
+                    .map(|(_, mode)| Some(*mode))
+                    .ok_or_else(|| "Choose one of the offered workspaces.".into());
+            }
+            if started.elapsed() > std::time::Duration::from_secs(1800) {
+                return Err(
+                    "No workspace was chosen within 30 minutes. Start the task again.".into(),
+                );
+            }
+            std::thread::sleep(std::time::Duration::from_millis(250));
+        }
     }
 
     /// A directory that is not a Git repository. The agent edits it directly;
@@ -566,7 +706,10 @@ impl TaskRuntime {
         if !EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
             return Err(unimplemented_adapter(&adapter));
         }
-        let _runner_lease = crate::commands::managed_runtime::acquire(&executable)?;
+        let runner_lease = crate::commands::managed_runtime::acquire(&executable)?;
+        let claude =
+            (adapter == "claude").then(|| super::claude_session::settings(self, &req.project_id));
+        let persistent = claude.is_some_and(|settings| settings.persistent);
         let mut cmd = command(executable);
         let mut opencode_connection = None;
         if let Some(binding) = &req.account_binding {
@@ -603,18 +746,18 @@ impl TaskRuntime {
             }
             cmd.args(["--json", "-"]);
         } else if adapter == "claude" {
-            cmd.args([
-                "--print",
-                "--verbose",
-                "--output-format",
-                "stream-json",
-                "--permission-mode",
-                "acceptEdits",
-            ]);
+            cmd.args(["--print", "--verbose", "--output-format", "stream-json"]);
+            if persistent {
+                cmd.args(["--input-format", "stream-json"]);
+            }
+            cmd.args(["--permission-mode", "acceptEdits"]);
             if let Some(ref old) = previous {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
                 crate::commands::verification::ensure_idle(&old.workspace)?;
-                cmd.args(["--resume", old.session_id.as_deref().unwrap()]);
+                // A persistent session adds --resume only when no warm process continues it.
+                if !persistent {
+                    cmd.args(["--resume", old.session_id.as_deref().unwrap()]);
+                }
             }
         } else if adapter == "kimi" {
             cmd.arg("acp");
@@ -700,6 +843,9 @@ impl TaskRuntime {
                 cmd.args(["--model", model]);
             }
             self.update_checked(id, |run| run.model = Some(model.clone()))?;
+        }
+        if let Some(settings) = &claude {
+            super::claude_session::configure(&mut cmd, settings, selected_model.as_deref());
         }
         let (mut project_mcp, discovered_mcp) = crate::commands::mcp::project_delivery(
             &req.project_id,
@@ -833,7 +979,9 @@ impl TaskRuntime {
                     input.push_str(&map);
                 }
             }
-            input.push_str(&req.context_receipt.text());
+            if !claude.is_some_and(|settings| settings.hooks.context) {
+                input.push_str(&req.context_receipt.text());
+            }
 
             if let Some(change) = &req.monitor_change {
                 input.push_str(&format!("\nA local monitor detected committed content changes on branch {}, path {}. Previous content object: {}. Observed content object: {}. These are Git content object IDs, not necessarily commits. The branch may have advanced since this observation; verify the current workspace.\n", change.branch, if change.path.is_empty() { "(whole project)" } else { &change.path }, change.before, change.after));
@@ -971,6 +1119,30 @@ impl TaskRuntime {
         if std::env::var_os("JACKALOPE_QUALITY_SPEC").is_some() {
             std::fs::write(self.directory.join(format!("{id}.input")), &input)
                 .map_err(|e| e.to_string())?;
+        }
+        if persistent {
+            let outcome = self.run_claude_session(super::claude_session::Launch {
+                id,
+                request: req,
+                cmd,
+                input,
+                workspace: workspace.clone(),
+                previous_session: previous.and_then(|old| old.session_id),
+                settings: claude.unwrap_or_default(),
+                final_check,
+                context_by_hook: claude.is_some_and(|settings| settings.hooks.context),
+                runner_lease,
+            })?;
+            let Some(outcome) = outcome else {
+                return Ok(());
+            };
+            return self.complete_attempt(
+                id,
+                req,
+                outcome.success,
+                outcome.exit_code,
+                outcome.quota_stopped,
+            );
         }
         cmd.current_dir(&workspace)
             .stdin(Stdio::piped())
@@ -1120,10 +1292,17 @@ impl TaskRuntime {
             }
             let mut gemini_stream = gemini::Stream::new(resumed_session.clone());
             let mut stream = antigravity::Stream::new(resumed_session);
+            let mut partials = super::claude_session::Partials::new(launched);
             if let Err(error) = crate::commands::process_control::bounded_lines(
                 BufReader::new(stdout),
                 1_000_000,
                 |line, truncated| {
+                    if output_adapter == "claude"
+                        && !truncated
+                        && partials.consume(&runtime, &event_id, &line)
+                    {
+                        return;
+                    }
                     let _ = runtime.update_output(&event_id, |r| {
                     if !truncated && super::efficiency::useful_event(&line, &output_adapter) {
                         r.efficiency.first_activity(launched.elapsed());
@@ -1142,6 +1321,9 @@ impl TaskRuntime {
                 let _ = runtime.update_output(&event_id, |r| {
                     r.error = Some(format!("Agent output could not be read: {error}"))
                 });
+            }
+            if output_adapter == "claude" {
+                partials.complete(&runtime, &event_id);
             }
             if output_adapter == "antigravity" {
                 runtime.update(&event_id, |run| stream.finish(run));
@@ -1244,6 +1426,18 @@ impl TaskRuntime {
             let _ = std::fs::remove_file(self.directory.join(format!("{id}.prompt")));
         }
         self.inner.lock().unwrap().processes.remove(id);
+        self.complete_attempt(id, req, success, exit.code(), quota_stopped)
+    }
+
+    /// Checks, checkpoints and records the outcome of an agent turn that has ended.
+    fn complete_attempt(
+        &self,
+        id: &str,
+        req: &RunRequest,
+        success: bool,
+        exit_code: Option<i32>,
+        quota_stopped: bool,
+    ) -> Result<(), String> {
         let run = self
             .integration_runs()?
             .into_iter()
@@ -1314,14 +1508,14 @@ impl TaskRuntime {
         }
         let canceled = self.inner.lock().unwrap().canceled.remove(id);
         self.update(id, |r| {
-            r.finishing = false; r.exit_code = exit.code(); r.ended_at = Some(Utc::now().to_rfc3339());
+            r.finishing = false; r.exit_code = exit_code; r.ended_at = Some(Utc::now().to_rfc3339());
             r.status = if canceled || r.status == "stopping" { "stopped" } else if r.routing.is_some() && r.quota_failure.is_some() { r.ended_at = None; "starting" } else if success && r.error.is_none() && !r.result.is_empty() { "review" } else { "failed" }.into();
             if r.status == "failed" {
                 if r.error.as_deref().is_none_or(|e| e.trim().is_empty() || e == "null") {
                     if let Some(failure) = &r.quota_failure {
                         r.error = Some(failure.message.clone());
                     } else {
-                        r.error = Some(format!("Agent exited with {}. Inspect activity for details; no successful result was reported.", exit.code().map_or("no exit code".into(), |c| c.to_string())));
+                        r.error = Some(format!("Agent exited with {}. Inspect activity for details; no successful result was reported.", exit_code.map_or("no exit code".into(), |c| c.to_string())));
                     }
                 }
             }
@@ -1546,6 +1740,7 @@ impl TaskRuntime {
             account_binding: None,
             prompt: run.prompt.clone(),
             isolated: Path::new(&run.workspace) != Path::new(&run.project_path),
+            workspace_mode: None,
             previous_run_id: None,
             retry_of: Some(run.id.clone()),
             connection_ids: run.connection_ids.clone(),
@@ -1588,6 +1783,12 @@ impl TaskRuntime {
             || request.prompt.len() > 100_000
         {
             return Err("Provide a task between 1 and 100,000 bytes.".into());
+        }
+        if request.previous_run_id.is_some() {
+            request.workspace_mode = None;
+        }
+        if let Some(mode) = request.workspace_mode {
+            request.isolated = mode == WorkspaceMode::Worktree;
         }
         if !request.isolated && request.previous_run_id.is_none() {
             crate::commands::previews::ensure_idle(&request.project_path)?;
@@ -1752,6 +1953,7 @@ impl TaskRuntime {
             if let Some(folder) = plain_folder(&request.project_path)? {
                 request.project_path = folder;
                 request.isolated = false;
+                request.workspace_mode = None;
                 request.target_branch = None;
             } else if let Some(old) = &previous {
                 request.target_branch =
@@ -1874,6 +2076,7 @@ impl TaskRuntime {
                 ended_at: None,
                 session_id: None,
                 result: String::new(),
+                streaming: String::new(),
                 details_omitted: false,
                 activity: vec![],
                 diagnostics: vec![],
@@ -1969,7 +2172,7 @@ pub(super) fn workspace_name(id: &str, prompt: &str) -> String {
 }
 
 /// Whether an isolated attempt left uncommitted or committed changes. Unknown counts as changed.
-fn attempt_changed(run: &TaskRun) -> bool {
+pub(super) fn attempt_changed(run: &TaskRun) -> bool {
     if run.base_head.is_empty() || run.workspace.is_empty() {
         return true;
     }

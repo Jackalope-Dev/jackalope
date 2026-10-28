@@ -16,6 +16,7 @@ import { effortPrompt } from '../../lib/task-effort';
 import type { RunRequest } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
 import { isTauriEnvironment, listMcpServers, type McpServerConfig } from '../../lib/tauri-bridge';
+import { workspaceModeFor, workspaceRequest } from '../../lib/workspace-mode';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
@@ -101,8 +102,7 @@ export function CaptureTask({
         drafts[key]?.isolated ??
         (idea
           ? initial.isolated
-          : (projects.find((p) => p.id === activeProjectId)?.preferences?.isolatedByDefault ??
-            true)),
+          : workspaceModeFor(projects.find((p) => p.id === activeProjectId)) === 'worktree'),
       projectId,
       agent:
         drafts[key]?.agent ??
@@ -332,7 +332,7 @@ export function CaptureTask({
         prompt: finalPrompt,
         effort: current.effort ?? 'balanced',
         codexSpeed: current.codexSpeed,
-        isolated: current.isolated,
+        ...workspaceRequest(project, current.isolated),
         connectionIds: current.connectionIds,
         contextSelection: current.contextSelection,
       };

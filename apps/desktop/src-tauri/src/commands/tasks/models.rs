@@ -108,6 +108,10 @@ pub struct TaskRun {
     pub ended_at: Option<String>,
     pub session_id: Option<String>,
     pub result: String,
+    /// Text the model is still writing, from partial messages. Kept in memory only and
+    /// cleared when the message completes into activity or `result`.
+    #[serde(skip)]
+    pub streaming: String,
     #[serde(default)]
     pub details_omitted: bool,
     pub activity: Vec<String>,
@@ -171,6 +175,12 @@ pub struct RunRequest {
     pub account_binding: Option<crate::commands::agent_profiles::AccountBinding>,
     pub prompt: String,
     pub isolated: bool,
+    /// Where a new Git task runs. When present it overrides `isolated`: only
+    /// `worktree` isolates, `branch` and `current` edit the project checkout,
+    /// and `ask` asks the person when the task starts. Absent keeps the
+    /// `isolated` choice, so callers that need worktrees are unaffected.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_mode: Option<WorkspaceMode>,
     pub previous_run_id: Option<String>,
     /// The failed attempt this run replaces. Unlike `previous_run_id` it resumes no agent
     /// session: it is a fresh attempt that may reuse the earlier attempt's prepared workspace.
@@ -180,6 +190,42 @@ pub struct RunRequest {
     pub connection_ids: Option<Vec<String>>,
     #[serde(skip)]
     pub coordination: Option<CoordinationContext>,
+}
+
+/// Where new work in a Git project runs.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WorkspaceMode {
+    /// A separate worktree on a new `jackalope/<name>` branch named after the request.
+    #[default]
+    Worktree,
+    /// A new `jackalope/<name>` branch checked out in the project checkout.
+    Branch,
+    /// The project checkout on its current branch.
+    Current,
+    /// Ask the person when the task starts.
+    Ask,
+}
+
+impl WorkspaceMode {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "worktree" => Some(Self::Worktree),
+            "branch" => Some(Self::Branch),
+            "current" => Some(Self::Current),
+            "ask" => Some(Self::Ask),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Worktree => "worktree",
+            Self::Branch => "branch",
+            Self::Current => "current",
+            Self::Ask => "ask",
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -284,6 +330,7 @@ impl TaskRun {
             ended_at: self.ended_at.clone(),
             session_id: self.session_id.clone(),
             result: Default::default(),
+            streaming: String::new(),
             details_omitted: true,
             activity: if ["starting", "running", "stopping"].contains(&self.status.as_str()) {
                 self.activity
