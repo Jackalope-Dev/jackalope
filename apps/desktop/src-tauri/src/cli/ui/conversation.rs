@@ -81,7 +81,9 @@ impl App {
             return;
         };
         let (_, tone) = self.work_state(view);
-        let signal = if self.working() {
+        let signal = if self.pending_deviation().is_some() {
+            Signal::NeedsYou
+        } else if self.working() {
             Signal::Working
         } else if matches!(tone, Tone::Danger | Tone::Warning) {
             Signal::NeedsYou
@@ -110,7 +112,10 @@ impl App {
 
     /// The question an agent is waiting on, if any. Answers go to the oldest.
     pub(super) fn question(&self) -> Option<&Question> {
-        self.view.as_ref()?.questions.first()
+        self.view
+            .as_ref()
+            .and_then(|view| view.questions.first())
+            .or_else(|| self.plan_question())
     }
 
     /// Opens a question with options as a picker, once, so answering is one

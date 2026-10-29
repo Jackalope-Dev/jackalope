@@ -1,6 +1,6 @@
 [package]
 name = "jackalope-desktop"
-version = "0.1.26"
+version = "0.1.27"
 description = "Jackalope - Ultra-performant desktop shell and harness for agentic workflows"
 authors = ["Jackalope Contributors"]
 edition = "2021"
@@ -111,3 +111,7 @@ block2 = "0.6"
 keyring = { version = "=3.6.3", features = ["sync-secret-service", "crypto-rust"] }
 notify-rust = { version = "=4.18.0", default-features = false, features = ["z-with-tokio"] }
 zbus = { version = "5", default-features = false, features = ["tokio"] }
+# Already in the graph through zbus and tray-icon; the XDG portal desktop
+# backend awaits D-Bus signals and crops portal screenshots with them.
+futures-util = { version = "0.3", default-features = false }
+png = "0.18"

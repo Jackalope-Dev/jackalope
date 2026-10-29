@@ -32,16 +32,14 @@ accepted against the latest files. These gates control launches, not an agent's 
 to ignore its instructions within a step. Existing account and execution permissions apply.
 After reviewing a result, use Use this process again to save an editable workflow.
 
-## Plan a feature with one assistant
+## Write the plan myself
 
-Open Plan a feature from the project menu or Feature work. Ask the selected assistant
-for an isolated planning task, or add tasks manually. Review and edit instructions,
-scopes, expected outcomes and dependencies before saving. Drafts retain the planning
-task link across dialog closure and restart. Saving uses a stable feature identifier,
-so retrying the same save does not duplicate work. Imports pause project dispatch;
-explicitly start the plan after review. Dependencies wait for integration into the
-shared target. Progress counts integrated tasks and calls out failures; completing a
-plan still requires checking the combined feature. Plans contain up to 12 tasks.
+Choose **Write the plan myself** in the composer or on Feature work to write tasks
+directly: a title, instructions, files or folders, the earlier tasks each starts after,
+and the outcomes each must meet. Drafts are kept on this device across dialog closure and
+restart. **Review the plan** saves it as a plan-mode draft (up to 8 tasks; outcomes
+become acceptance criteria) and opens it on the Plans page for approval, hand-off,
+review and tracking like a plan drafted with an agent. See [plan mode](PLAN-MODE.md).
 
 ## Return to a project
 

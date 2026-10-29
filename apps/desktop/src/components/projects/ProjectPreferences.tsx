@@ -1,6 +1,8 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useShallow } from 'zustand/react/shallow';
 import { LEARNING_CADENCES, learningSettings } from '../../lib/learning';
+import { syncsLessons } from '../../lib/lesson-sync';
+import { REVIEW_PAGE_LIMIT, reviewCapturesOn } from '../../lib/review-captures';
 import { VETTED_SKILLS } from '../../lib/skills/catalog';
 import { type WorkspaceMode, workspaceModeFor } from '../../lib/workspace-mode';
 import { useProjectStore } from '../../stores/projectStore';
@@ -15,7 +17,10 @@ import { Textarea } from '../ui/Textarea';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { ArtifactsProjectSettings } from './ArtifactsProjectSettings';
+import { BrowserProfileSettings } from './BrowserProfileSettings';
+import { DesktopProjectSettings } from './DesktopProjectSettings';
 import { ProjectGitSettings } from './ProjectGitSettings';
+import { ProjectPlanningSettings } from './ProjectPlanningSettings';
 import { RemoveProjectAction } from './RemoveProjectAction';
 import '../settings/settings.css';
 
@@ -209,6 +214,42 @@ export function ProjectPreferences({
                 </Select>
               </Setting>
             )}
+            <Setting
+              title="Reflect with an agent"
+              description="When work ends, also ask this project's default agent to suggest lessons from what you wrote. Uses that agent account's quota; each reflection is short and capped. Suggestions pass the same checks as other lessons."
+            >
+              <Switch
+                label="Reflect with an agent"
+                checked={project.preferences?.agentReflection === true}
+                onCheckedChange={(agentReflection) =>
+                  updateProjectPreferences(project.id, { agentReflection })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Sync learned lessons"
+              description="Include this project's learned lessons when lesson sync is on under Settings → Privacy. Turn off to keep them on this computer."
+            >
+              <Switch
+                label="Sync learned lessons"
+                checked={syncsLessons(project)}
+                onCheckedChange={(syncLessons) =>
+                  updateProjectPreferences(project.id, { syncLessons })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Write lessons to AGENTS.md"
+              description="Keep active learned lessons in a marked section of this project's AGENTS.md and in a Claude Code skill, so agents outside Jackalope see them. Nothing is committed for you; turning this off removes them."
+            >
+              <Switch
+                label="Write lessons to AGENTS.md"
+                checked={project.preferences?.exportLessons === true}
+                onCheckedChange={(exportLessons) =>
+                  updateProjectPreferences(project.id, { exportLessons })
+                }
+              />
+            </Setting>
             <Disclosure className="project-guidelines">
               <DisclosureSummary>Always include guidelines</DisclosureSummary>
               {VETTED_SKILLS.map((skill) => (
@@ -228,7 +269,13 @@ export function ProjectPreferences({
               ))}
             </Disclosure>
           </SettingGroup>
+          <ProjectPlanningSettings key={`planning-${project.id}`} projectId={project.id} />
           <ProjectGitSettings key={project.path} projectPath={project.path} />
+          <DesktopProjectSettings key={`desktop-${project.id}`} projectId={project.id} />
+          <BrowserProfileSettings
+            key={`browser-${project.id}`}
+            owner={{ kind: 'project', id: project.id, name: project.name }}
+          />
           {!project.plainFolder && (
             <ArtifactsProjectSettings
               key={`artifacts-${project.path}`}
@@ -368,8 +415,8 @@ export function ProjectPreferences({
               title="Preview command"
               description={
                 <>
-                  Runs only when you choose Start preview. Use {'{port}'} for an available local
-                  port.
+                  Runs when you choose Start preview, and briefly for review screenshots. Use{' '}
+                  {'{port}'} for an available local port.
                 </>
               }
               controlId="project-preview-command"
@@ -387,6 +434,65 @@ export function ProjectPreferences({
                 }
               />
             </Setting>
+            <Setting
+              title="Capture review screenshots"
+              description={
+                project.preferences?.previewCommand?.trim()
+                  ? 'When work with changes finishes, open the preview in a private, temporary browser and save before and after screenshots for review. Adds up to a few minutes to finishing.'
+                  : 'Save a preview command to capture before and after screenshots when work finishes.'
+              }
+            >
+              <Switch
+                label="Capture review screenshots"
+                checked={reviewCapturesOn(project.preferences)}
+                disabled={!project.preferences?.previewCommand?.trim()}
+                onCheckedChange={(reviewCaptures) =>
+                  updateProjectPreferences(project.id, { reviewCaptures })
+                }
+              />
+            </Setting>
+            {reviewCapturesOn(project.preferences) && (
+              <>
+                <Setting
+                  title="Screenshot sizes"
+                  description="Narrow adds a phone-width capture of each page."
+                  descriptionId="project-review-viewports-description"
+                >
+                  <Select
+                    aria-label="Screenshot sizes"
+                    aria-describedby="project-review-viewports-description"
+                    value={
+                      project.preferences?.reviewViewports?.includes('narrow') ? 'both' : 'desktop'
+                    }
+                    onValueChange={(value) =>
+                      updateProjectPreferences(project.id, {
+                        reviewViewports: value === 'both' ? ['desktop', 'narrow'] : ['desktop'],
+                      })
+                    }
+                  >
+                    <SelectItem value="desktop">Desktop</SelectItem>
+                    <SelectItem value="both">Desktop and narrow</SelectItem>
+                  </Select>
+                </Setting>
+                <SettingBody>
+                  <FormField
+                    label="Pages to capture"
+                    description={`One path per line, such as /settings. Pages named in browser checks and pages the agent opened are added, up to ${REVIEW_PAGE_LIMIT} in all. Empty captures /.`}
+                  >
+                    <Textarea
+                      rows={3}
+                      placeholder="/"
+                      value={(project.preferences?.reviewPages ?? []).join('\n')}
+                      onChange={(event) =>
+                        updateProjectPreferences(project.id, {
+                          reviewPages: event.target.value.split('\n'),
+                        })
+                      }
+                    />
+                  </FormField>
+                </SettingBody>
+              </>
+            )}
           </SettingGroup>
           <SettingGroup tone="danger">
             <Setting

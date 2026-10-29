@@ -117,6 +117,26 @@ pub enum Request {
         /// Reported tool calls between background reflections (10–1000).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         learning_cadence: Option<u32>,
+        /// Include this project's learned lessons in account lesson sync.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sync_lessons: Option<bool>,
+        /// Also reflect with the default agent, spending its account's quota.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        agent_reflection: Option<bool>,
+        /// Mirror active learned lessons into AGENTS.md and a Claude Code skill.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        export_lessons: Option<bool>,
+        /// Most questions a planning interview may ask (0–12).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        question_cap: Option<u32>,
+        /// Plan with this agent instead of the task's; empty plans with the
+        /// task's agent.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        planner_agent: Option<String>,
+        /// Capture before/after review screenshots from the preview command
+        /// when work with changes finishes. Older hosts ignore it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        review_captures: Option<bool>,
     },
     /// Extract learnings from a conversation's history (up to the previous /learn,
     /// if present) and save them to project context.
@@ -148,6 +168,34 @@ pub enum Request {
     },
     /// Applies a prepared merge; `cleanup` removes the merged worktree after.
     MergeApply { plan_id: String, cleanup: bool },
+    /// Starts plan mode: a read-only interview that ends in a plan to approve.
+    /// Answers with `Response::Plan`.
+    PlanStart {
+        project_path: String,
+        goal: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        agent: Option<String>,
+    },
+    /// A project's plans, newest first. Answers with `Response::Plans`.
+    Plans { project_path: String },
+    /// One plan, reading any finished planning turn first. Answers with
+    /// `Response::Plan`.
+    PlanDetail { plan_id: String },
+    /// Acts on a plan: `keep` and `replan` take comments in `text`; `approve`
+    /// takes the shape (`single`, `subtasks` or `swarm`) in `text` with the
+    /// exact `revision` and `hash` shown; `save` takes Markdown in `text` and
+    /// the `revision` it was edited from; `export` takes an optional path;
+    /// `accept`, `redo` and `replan-deviation` take a deviation ID in `text`.
+    PlanAction {
+        plan_id: String,
+        action: String,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        revision: Option<u32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        hash: Option<String>,
+    },
     /// Commits a conversation's remaining changes with the project's commit
     /// settings, pushes its branch and opens a pull request through the
     /// person's GitHub CLI, as the app's Create pull request does.
@@ -157,6 +205,59 @@ pub enum Request {
         body: String,
         draft: bool,
     },
+    /// A project's persistent agent browser. An empty `action` reads its
+    /// status; `open` opens it in a window to sign in (at `url` when given),
+    /// creating it on first use; `done` closes that window. Answers with
+    /// `Response::BrowserProfile`.
+    BrowserProfile {
+        project_id: String,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        action: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        url: Option<String>,
+    },
+    /// The conversation's computer: its bot's, or the one its task was given.
+    /// An empty `action` reads its status; `start` and `stop` change it.
+    /// Answers with `Response::Computer`.
+    Computer {
+        session_id: String,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        action: String,
+    },
+}
+
+/// A bot or task computer as a terminal shows it.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComputerView {
+    pub name: String,
+    /// local-docker, remote-machine or jackalope-hosted.
+    pub provider: String,
+    /// not-created, stopped, running, starting or unavailable.
+    pub state: String,
+    pub phase: Option<String>,
+    pub error: Option<String>,
+    /// Idle time and when it stops, or that it is in use. Absent from older apps.
+    #[serde(default)]
+    pub usage: Option<String>,
+    /// Stopped by the idle stop.
+    #[serde(default)]
+    pub stopped_idle: bool,
+}
+
+/// A persistent agent browser profile as a terminal shows it.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserProfileView {
+    pub name: String,
+    /// Domains holding cookies when the profile last closed.
+    pub sites: Vec<String>,
+    pub size_bytes: u64,
+    pub last_used_at: Option<String>,
+    /// What holds the profile now, if anything.
+    pub in_use: Option<String>,
+    /// Whether its sign-in window is open.
+    pub window_open: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -184,6 +285,41 @@ pub struct Project {
     /// hosts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub learning_cadence: Option<u32>,
+    /// Whether learned lessons are included in account lesson sync. Absent
+    /// from older hosts; treat absent as included.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sync_lessons: Option<bool>,
+    /// Whether the default agent also reflects on finished work. Absent from
+    /// older hosts; treat absent as off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_reflection: Option<bool>,
+    /// Whether active lessons are mirrored into AGENTS.md and a Claude Code
+    /// skill. Absent from older hosts; treat absent as off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub export_lessons: Option<bool>,
+    /// The project's saved check, as the app mirrors it. Absent when none is
+    /// saved or from older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verify_command: Option<String>,
+    /// Whether finished work runs the saved check automatically. Absent from
+    /// older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_verify: Option<bool>,
+    /// Most questions a planning interview asks. Absent from older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub question_cap: Option<u32>,
+    /// The agent plans use instead of the task's. Absent when plans use the
+    /// task's agent or from older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub planner_agent: Option<String>,
+    /// The project's preview command. Absent when none is saved or from older
+    /// hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview_command: Option<String>,
+    /// Whether finished work gets review screenshots when a preview command is
+    /// saved. Absent from older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_captures: Option<bool>,
 }
 
 /// A lesson Jackalope learned for a project.
@@ -204,6 +340,14 @@ pub struct Learning {
     pub updated_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub archived_reason: Option<String>,
+    /// Times the person restated it after it was supplied. Absent from older
+    /// hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub misses: Option<u64>,
+    /// Why it needs a look: agents keep missing it, or it names something the
+    /// project no longer has. Absent from older hosts and when nothing is wrong.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attention: Option<String>,
 }
 
 /// One change in a learned lesson's history.
@@ -212,7 +356,8 @@ pub struct Learning {
 pub struct LearningEvent {
     pub at: String,
     /// `born`, `merged`, `patched`, `retired`, `promoted`, `archived`,
-    /// `restored`, `edited` or `deleted`.
+    /// `restored`, `edited`, `deleted`, `curated`, `missed`, `contradicted`
+    /// or `stale`.
     pub action: String,
     pub reason: String,
     /// Redacted excerpts of what prompted the change.
@@ -255,13 +400,110 @@ pub struct Message {
     pub attempt: Option<u32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Question {
     pub id: String,
     pub run_id: String,
     pub question: String,
     pub options: Vec<String>,
+    /// A short label above the question. Absent from older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub header: Option<String>,
+    /// The option the agent recommends.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recommended: Option<String>,
+    /// Several options may be chosen; the answer is a JSON array.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub multi_select: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rationale: Option<String>,
+}
+
+/// A plan as a terminal shows it.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanView {
+    pub id: String,
+    pub title: String,
+    /// `planning`, `draft`, `approved`, `running` or `done`.
+    pub status: String,
+    pub planning: bool,
+    pub error: Option<String>,
+    pub revision: Option<u32>,
+    pub hash: Option<String>,
+    pub markdown: Option<String>,
+    /// The shape approval defaults to and the planner's reason for it.
+    pub shape: String,
+    pub shape_reason: String,
+    pub workers: u32,
+    pub swarm_connected: bool,
+    pub assumptions: Vec<String>,
+    pub tasks: Vec<PlanTask>,
+    pub criteria: Vec<PlanCriterion>,
+    pub questions: Vec<Question>,
+    pub deviations: Vec<PlanDeviation>,
+    /// Sections changed from the previous revision.
+    pub changed: Vec<String>,
+    /// A one-line summary of running work, when it runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub progress: Option<String>,
+    /// How approval would verify the work: `project`, `criteria` or `review`
+    /// (no automatic check). Absent from older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verification: Option<String>,
+    /// The check approval would use, when there is one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanTask {
+    pub key: String,
+    pub title: String,
+    pub depends_on: Vec<String>,
+    pub parallel: bool,
+    pub covers: Vec<String>,
+    /// Progress once running: `waiting`, `running`, `checked`,
+    /// `needs-attention`, `merged`; or `done` when a re-plan kept it.
+    pub state: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanCriterion {
+    pub id: String,
+    pub verify: String,
+    pub text: String,
+    /// `unassessed`, `agent-claimed`, `check-passed`, `check-failed` or
+    /// `human-accepted`.
+    pub state: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanDeviation {
+    pub id: String,
+    pub kind: String,
+    pub summary: String,
+    pub status: String,
+    /// The amendment the agent proposed. Absent from older hosts.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub amendment: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanSummary {
+    pub id: String,
+    pub title: String,
+    pub status: String,
+    pub revision: Option<u32>,
+    pub updated_at: String,
+    /// A deviation waits on the person. Absent from older hosts.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub needs_you: bool,
 }
 
 /// What the terminal needs to render a conversation: the exchange, the work
@@ -298,6 +540,10 @@ pub struct SessionView {
     /// Empty when nothing is streaming or the host is older.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub partial: String,
+    /// Review screenshots of the latest attempt, viewable in the app. Absent
+    /// when there are none or the host is older.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_screenshots: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -394,8 +640,27 @@ pub enum Response {
     Merge {
         plan: MergePlan,
     },
+    Plans {
+        plans: Vec<PlanSummary>,
+    },
+    Plan {
+        // Boxed: carries the plan document.
+        plan: Box<PlanView>,
+    },
+    /// Where `export` wrote the plan, relative to the project.
+    Exported {
+        path: String,
+    },
     PullRequest {
         url: String,
+    },
+    /// Absent `profile` means the project has no browser profile yet.
+    BrowserProfile {
+        profile: Option<BrowserProfileView>,
+    },
+    /// Absent `computer` means the conversation has no computer.
+    Computer {
+        computer: Option<ComputerView>,
     },
 }
 
@@ -641,4 +906,98 @@ pub fn attach() -> Option<(Handshake, Client)> {
     let handshake = read_handshake()?;
     let mut client = Client::connect(&handshake.endpoint).ok()?;
     matches!(client.send(&Request::Ping), Ok(Response::Ok)).then_some((handshake, client))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lesson_settings_stay_optional_for_older_hosts_and_terminals() {
+        let older: Project = serde_json::from_value(serde_json::json!({
+            "id": "p", "name": "n", "path": "/r", "accent": null,
+            "autoApprove": true, "learnAutomatically": true, "learningCadence": 50,
+        }))
+        .unwrap();
+        assert_eq!(
+            (
+                older.sync_lessons,
+                older.agent_reflection,
+                older.export_lessons
+            ),
+            (None, None, None)
+        );
+        let request = serde_json::to_string(&Request::SetProjectSettings {
+            project_id: "p".into(),
+            auto_approve: None,
+            workspace_mode: None,
+            learn_automatically: None,
+            learning_cadence: None,
+            sync_lessons: Some(false),
+            agent_reflection: None,
+            export_lessons: None,
+            question_cap: None,
+            planner_agent: None,
+            review_captures: None,
+        })
+        .unwrap();
+        assert!(request.contains("\"sync_lessons\":false"), "{request}");
+        assert!(!request.contains("agent_reflection") && !request.contains("export_lessons"));
+        assert!(!request.contains("question_cap") && !request.contains("planner_agent"));
+        assert!(!request.contains("review_captures"));
+        assert_eq!(older.review_captures, None);
+        let parsed: Request = serde_json::from_str(
+            r#"{"request":"set-project-settings","project_id":"p","auto_approve":true}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            parsed,
+            Request::SetProjectSettings {
+                sync_lessons: None,
+                export_lessons: None,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn computer_requests_are_additive() {
+        let status = serde_json::to_string(&Request::Computer {
+            session_id: "s".into(),
+            action: String::new(),
+        })
+        .unwrap();
+        assert_eq!(status, r#"{"request":"computer","session_id":"s"}"#);
+        let start: Request =
+            serde_json::from_str(r#"{"request":"computer","session_id":"s","action":"start"}"#)
+                .unwrap();
+        assert!(matches!(start, Request::Computer { action, .. } if action == "start"));
+        let none: Response =
+            serde_json::from_str(r#"{"response":"computer","computer":null}"#).unwrap();
+        assert!(matches!(none, Response::Computer { computer: None }));
+    }
+
+    #[test]
+    fn browser_profile_requests_are_additive() {
+        let status = serde_json::to_string(&Request::BrowserProfile {
+            project_id: "p".into(),
+            action: String::new(),
+            url: None,
+        })
+        .unwrap();
+        assert_eq!(status, r#"{"request":"browser-profile","project_id":"p"}"#);
+        let open: Request = serde_json::from_str(
+            r#"{"request":"browser-profile","project_id":"p","action":"open","url":"https://example.com"}"#,
+        )
+        .unwrap();
+        assert!(
+            matches!(open, Request::BrowserProfile { action, url: Some(_), .. } if action == "open")
+        );
+        let response: Response =
+            serde_json::from_str(r#"{"response":"browser-profile","profile":null}"#).unwrap();
+        assert!(matches!(
+            response,
+            Response::BrowserProfile { profile: None }
+        ));
+    }
 }

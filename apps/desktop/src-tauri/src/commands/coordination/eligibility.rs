@@ -182,9 +182,7 @@ pub(super) fn ready_items(
                                                 || run.persistence_error.is_some()
                                                 || run.dependency_invalidated
                                                 || run.verification_error.is_some()
-                                                || run.verification.as_ref().is_none_or(|check| {
-                                                    !check.result.success || check.tree.is_none()
-                                                }))
+                                                || !crate::commands::integration::dependencies::checked_or_unchecked(run))
                                     })
                                 })
                         })
@@ -236,11 +234,11 @@ pub(super) fn ready_items(
                         || (item.staged_dependencies
                             && runs.iter().any(|run| {
                                 &run.id == id
-                                    && ["review", "reviewed"].contains(&run.status.as_str())
-                                    && run
-                                        .verification
-                                        .as_ref()
-                                        .is_some_and(|v| v.result.success && v.tree.is_some())
+                                && ["review", "reviewed"].contains(&run.status.as_str())
+                                && run.error.is_none()
+                                && crate::commands::integration::dependencies::checked_or_unchecked(
+                                    run,
+                                )
                             }))
                 })
         }) {

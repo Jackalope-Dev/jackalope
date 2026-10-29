@@ -201,6 +201,7 @@ fn the_gate_redacts_rejects_secrets_and_never_touches_hand_written_knowledge() {
             content: "Always deploy staging from the release branch.".into(),
             keywords: vec!["deploy".into()],
             enabled: true,
+            stale: None,
             source_run_id: None,
             source_head: None,
             revision: 0,
@@ -455,12 +456,125 @@ fn lifecycle_promotes_used_lessons_and_archives_unused_ones() {
     .archived());
 }
 
+/// Distinct nouns, three per lesson, so generated lessons share no
+/// meaningful words.
+const WORDS: [&str; 75] = [
+    "parser",
+    "router",
+    "billing",
+    "upload",
+    "search",
+    "cache",
+    "ledger",
+    "invoice",
+    "webhook",
+    "schema",
+    "migration",
+    "fixture",
+    "locale",
+    "tooltip",
+    "sidebar",
+    "keyboard",
+    "printer",
+    "modal",
+    "cursor",
+    "gradient",
+    "thread",
+    "socket",
+    "queue",
+    "worker",
+    "cron",
+    "bucket",
+    "pebble",
+    "harbor",
+    "meadow",
+    "lantern",
+    "footer",
+    "banner",
+    "avatar",
+    "badge",
+    "chart",
+    "legend",
+    "axis",
+    "toolbar",
+    "dialog",
+    "drawer",
+    "toast",
+    "spinner",
+    "skeleton",
+    "carousel",
+    "slider",
+    "stepper",
+    "wizard",
+    "accordion",
+    "breadcrumb",
+    "pagination",
+    "calendar",
+    "picker",
+    "uploader",
+    "dropzone",
+    "editor",
+    "terminal",
+    "console",
+    "inspector",
+    "profiler",
+    "tracer",
+    "logger",
+    "metric",
+    "alert",
+    "pager",
+    "rota",
+    "runbook",
+    "playbook",
+    "incident",
+    "postmortem",
+    "canary",
+    "rollout",
+    "flag",
+    "experiment",
+    "cohort",
+    "funnel",
+];
+
+fn distinct_lesson(index: usize) -> String {
+    let [a, b, c] = [0, 1, 2].map(|offset| WORDS[(index * 3 + offset) % WORDS.len()]);
+    format!("Always review {a} {b} {c} changes.")
+}
+
+#[test]
+fn near_duplicates_strengthen_the_saved_lesson_instead_of_adding() {
+    let (_root, store, path) = fixture();
+    let first = learn(
+        &store,
+        &path,
+        &[said(
+            "Always run the billing webhook tests before merging.",
+            "Task a",
+        )],
+    );
+    assert_eq!(first.applied.len(), 1, "{first:?}");
+    let second = learn(
+        &store,
+        &path,
+        &[said(
+            "Always run billing webhook tests before merging please.",
+            "Task b",
+        )],
+    );
+    assert_eq!(
+        learned(&store, &path)
+            .into_iter()
+            .filter(|e| live(e))
+            .count(),
+        1,
+        "{second:?}"
+    );
+}
+
 #[test]
 fn capacity_archives_the_least_used_lesson_first() {
     let (_root, store, path) = fixture();
-    let topics: Vec<String> = (0..PROJECT_CAPACITY)
-        .map(|index| format!("Always document module{index:02} invariants carefully."))
-        .collect();
+    let topics: Vec<String> = (0..PROJECT_CAPACITY).map(distinct_lesson).collect();
     for chunk in topics.chunks(ADDS_PER_REFLECTION) {
         let observations: Vec<_> = chunk.iter().map(|text| said(text, "Task a")).collect();
         let report = learn(&store, &path, &observations);
@@ -470,7 +584,7 @@ fn capacity_archives_the_least_used_lesson_first() {
     // Every lesson but the first gets a delivery.
     let first = learned(&store, &path)
         .into_iter()
-        .find(|e| e.content.contains("module00"))
+        .find(|e| e.content.contains(WORDS[0]))
         .unwrap()
         .id;
     let others: Vec<String> = ids.into_iter().filter(|id| *id != first).collect();
@@ -481,7 +595,7 @@ fn capacity_archives_the_least_used_lesson_first() {
         &store,
         &path,
         &[said(
-            "Always document overflow invariants carefully please.",
+            "Always quarantine flaky snapshot fixtures overnight.",
             "Task b",
         )],
     );
@@ -499,12 +613,7 @@ fn capacity_archives_the_least_used_lesson_first() {
 fn one_reflection_adds_a_bounded_number_of_lessons() {
     let (_root, store, path) = fixture();
     let observations: Vec<_> = (0..ADDS_PER_REFLECTION + 3)
-        .map(|index| {
-            said(
-                &format!("Always check service{index} health endpoints first."),
-                "Task a",
-            )
-        })
+        .map(|index| said(&distinct_lesson(index), "Task a"))
         .collect();
     let report = learn(&store, &path, &observations);
     assert_eq!(report.applied.len(), ADDS_PER_REFLECTION);
@@ -655,3 +764,433 @@ fn observations_come_from_the_persons_words_answers_and_passing_checks() {
 }
 
 use std::io::Write;
+
+#[test]
+fn metrics_count_statuses_deliveries_and_recorded_changes() {
+    let (_root, store, path) = fixture();
+    learn(
+        &store,
+        &path,
+        &[
+            said(
+                "Always keep migrations reversible in this repository.",
+                "Task a",
+            ),
+            said("Prefer table-driven tests for parsers.", "Task a"),
+        ],
+    );
+    let entries = learned(&store, &path);
+    let used = entries[0].id.clone();
+    for run in ["run-1", "run-2"] {
+        store
+            .record_delivery("p", &path, run, std::slice::from_ref(&used), true)
+            .unwrap();
+    }
+    let other = learned(&store, &path)
+        .into_iter()
+        .find(|entry| entry.id != used)
+        .unwrap();
+    let archived = store.set_archived(&other.id, other.revision, true).unwrap();
+    store
+        .set_archived(&other.id, archived.revision, false)
+        .unwrap();
+    let metrics = store.metrics("p", &path).unwrap();
+    assert_eq!(
+        (metrics.probation, metrics.active, metrics.archived),
+        (1, 1, 0)
+    );
+    assert_eq!(metrics.deliveries, 2);
+    assert_eq!(
+        (
+            metrics.learned,
+            metrics.promoted,
+            metrics.archived_events,
+            metrics.restored
+        ),
+        (2, 1, 1, 1)
+    );
+    assert!(metrics.since.is_some());
+}
+
+#[test]
+fn pulled_active_lessons_are_not_archived_for_lack_of_local_use() {
+    let (_root, store, path) = fixture();
+    learn(
+        &store,
+        &path,
+        &[said(
+            "Always keep migrations reversible in this repository.",
+            "Task a",
+        )],
+    );
+    let mut entry = learned(&store, &path).remove(0);
+    entry
+        .automatic
+        .as_mut()
+        .unwrap()
+        .lifecycle
+        .as_mut()
+        .unwrap()
+        .status = ACTIVE.into();
+    {
+        let _lock = store.lock.lock().unwrap();
+        store.write(&[entry.clone()]).unwrap();
+    }
+    for run in 0..PROBATION_OPPORTUNITIES + 5 {
+        store
+            .record_delivery("p", &path, &format!("run-{run}"), &[], true)
+            .unwrap();
+    }
+    assert!(!lifecycle(&learned(&store, &path).remove(0))
+        .unwrap()
+        .archived());
+}
+
+fn find(store: &KnowledgeStore, path: &str, needle: &str) -> KnowledgeEntry {
+    learned(store, path)
+        .into_iter()
+        .find(|entry| entry.content.contains(needle))
+        .unwrap()
+}
+
+fn answered(text: &str) -> Observation {
+    Observation {
+        kind: ObservationKind::Answer {
+            question: "Anything else?".into(),
+        },
+        text: text.into(),
+        reference: "Task a".into(),
+        run_id: None,
+    }
+}
+
+/// Judges what the person said in `run_id` against the lessons supplied.
+fn judge(
+    store: &KnowledgeStore,
+    path: &str,
+    run_id: &str,
+    delivered: &[KnowledgeEntry],
+    observations: &[Observation],
+) -> Vec<Outcome> {
+    let found = outcomes(observations, delivered, true, &THRESHOLDS);
+    store
+        .record_outcomes("p", path, run_id, &found, &THRESHOLDS)
+        .unwrap();
+    found
+}
+
+#[test]
+fn restating_a_supplied_lesson_counts_as_a_miss_once_per_run() {
+    let (_root, store, path) = fixture();
+    learn(
+        &store,
+        &path,
+        &[said(
+            "Always run pnpm verify before committing changes.",
+            "Task a",
+        )],
+    );
+    let lesson = find(&store, &path, "pnpm verify");
+    let correction = said(
+        "You forgot to run pnpm verify before committing changes.",
+        "Task a",
+    );
+    // The request that selected the lesson is not a correction; a typed
+    // answer always comes after delivery.
+    assert!(outcomes(
+        std::slice::from_ref(&correction),
+        std::slice::from_ref(&lesson),
+        false,
+        &THRESHOLDS
+    )
+    .is_empty());
+    assert_eq!(
+        outcomes(
+            &[answered(
+                "Please run pnpm verify before committing changes."
+            )],
+            std::slice::from_ref(&lesson),
+            false,
+            &THRESHOLDS
+        )
+        .len(),
+        1
+    );
+    // Unrelated words and check commands are never misses.
+    assert!(outcomes(
+        &[
+            said("Rename the sidebar toggle.", "Task a"),
+            Observation {
+                kind: ObservationKind::Check,
+                text: "pnpm verify".into(),
+                reference: "Task a".into(),
+                run_id: None,
+            }
+        ],
+        std::slice::from_ref(&lesson),
+        true,
+        &THRESHOLDS
+    )
+    .is_empty());
+
+    store
+        .record_delivery("p", &path, "run-1", std::slice::from_ref(&lesson.id), true)
+        .unwrap();
+    let found = judge(
+        &store,
+        &path,
+        "run-2",
+        std::slice::from_ref(&lesson),
+        std::slice::from_ref(&correction),
+    );
+    assert!(matches!(
+        &found[..],
+        [Outcome {
+            contradicted: false,
+            ..
+        }]
+    ));
+    // Reflecting on the same run again does not count it twice.
+    judge(
+        &store,
+        &path,
+        "run-2",
+        std::slice::from_ref(&lesson),
+        std::slice::from_ref(&correction),
+    );
+    let state = lifecycle(&find(&store, &path, "pnpm verify"))
+        .cloned()
+        .unwrap();
+    assert_eq!((state.misses, state.missed_often), (1, false));
+    assert!(state.on_probation());
+    let history = store.history("p", &lesson.id, 10);
+    assert_eq!(history.last().unwrap().action, "missed");
+    assert!(history.last().unwrap().evidence[0].contains("You forgot"));
+
+    // A second miss within the window on a lesson still on probation archives it.
+    judge(
+        &store,
+        &path,
+        "run-3",
+        std::slice::from_ref(&lesson),
+        std::slice::from_ref(&correction),
+    );
+    let entry = find(&store, &path, "pnpm verify");
+    let state = lifecycle(&entry).unwrap();
+    assert_eq!(state.misses, 2);
+    assert!(state.missed_often);
+    assert_eq!(
+        (state.archived(), state.archived_reason.as_deref()),
+        (true, Some(IGNORED))
+    );
+    assert!(!entry.enabled);
+    assert!(attention(&entry).is_none(), "the archive reason says why");
+    let actions: Vec<_> = store
+        .history("p", &lesson.id, 10)
+        .into_iter()
+        .map(|record| record.action)
+        .collect();
+    assert_eq!(actions, ["born", "missed", "missed", "archived"]);
+    let metrics = store.metrics("p", &path).unwrap();
+    assert_eq!((metrics.missed, metrics.contradicted), (2, 0));
+
+    // Restoring starts the count again.
+    let restored = store
+        .set_archived(&entry.id, entry.revision, false)
+        .unwrap();
+    let state = lifecycle(&restored).unwrap();
+    assert!(state.corrections.is_empty() && !state.missed_often);
+}
+
+#[test]
+fn an_active_lesson_agents_keep_missing_is_flagged_and_supplied_first() {
+    let (_root, store, path) = fixture();
+    learn(
+        &store,
+        &path,
+        &[
+            said(
+                "Always keep migrations reversible in this repository.",
+                "Task a",
+            ),
+            said("Prefer table-driven tests for parsers.", "Task a"),
+        ],
+    );
+    let migrations = find(&store, &path, "migrations");
+    let parsers = find(&store, &path, "parsers");
+    // Miss the lesson that sorts last by id, so the flag decides the order.
+    let (missed, other, line) = if migrations.id > parsers.id {
+        (
+            migrations,
+            parsers,
+            "Again: keep migrations reversible in this repository, please.",
+        )
+    } else {
+        (
+            parsers,
+            migrations,
+            "Again, use table-driven tests for parsers.",
+        )
+    };
+    for run in ["run-1", "run-2"] {
+        store
+            .record_delivery(
+                "p",
+                &path,
+                run,
+                &[missed.id.clone(), other.id.clone()],
+                true,
+            )
+            .unwrap();
+    }
+    let order = |store: &KnowledgeStore| -> Vec<String> {
+        store
+            .select("p", &path, "repository parsers", &Default::default())
+            .unwrap()
+            .entries
+            .into_iter()
+            .map(|entry| entry.id)
+            .collect()
+    };
+    assert_eq!(order(&store), [other.id.clone(), missed.id.clone()]);
+    for run in ["run-3", "run-4"] {
+        judge(
+            &store,
+            &path,
+            run,
+            std::slice::from_ref(&missed),
+            &[said(line, "Task a")],
+        );
+    }
+    let entry = find(&store, &path, &missed.content);
+    let state = lifecycle(&entry).unwrap();
+    assert_eq!(state.status, ACTIVE, "an active lesson is kept");
+    assert!(state.missed_often && entry.enabled);
+    assert_eq!(
+        attention(&entry).as_deref(),
+        Some("agents keep missing this")
+    );
+    assert_eq!(order(&store), [missed.id.clone(), other.id.clone()]);
+
+    // The flag clears once the misses fall out of the delivery window.
+    for run in 0..THRESHOLDS.miss_window {
+        let flagged = lifecycle(&find(&store, &path, &missed.content))
+            .unwrap()
+            .missed_often;
+        assert!(flagged, "still flagged before delivery {run}");
+        store
+            .record_delivery(
+                "p",
+                &path,
+                &format!("later-{run}"),
+                std::slice::from_ref(&missed.id),
+                true,
+            )
+            .unwrap();
+    }
+    assert!(
+        !lifecycle(&find(&store, &path, &missed.content))
+            .unwrap()
+            .missed_often
+    );
+}
+
+#[test]
+fn a_contradiction_patches_the_lesson_that_was_supplied() {
+    let (_root, store, path) = fixture();
+    learn(
+        &store,
+        &path,
+        &[
+            said(
+                "Always run pnpm verify before committing changes.",
+                "Task a",
+            ),
+            said(
+                "Always run pnpm verify before pushing release branches.",
+                "Task a",
+            ),
+        ],
+    );
+    let committing = find(&store, &path, "committing");
+    let pushing = find(&store, &path, "pushing");
+    let line = said(
+        "Never run pnpm verify before committing or pushing release changes.",
+        "Task b",
+    );
+    let existing = store.list("p", &path).unwrap();
+    // Without a delivery the closest lesson is the target...
+    assert!(matches!(
+        &reflect(std::slice::from_ref(&line), &existing)[..],
+        [Proposal::Patch { target, .. }] if *target == committing.id
+    ));
+    // ...but the lesson the agent was given is the one corrected.
+    let proposals = reflect_delivered(
+        std::slice::from_ref(&line),
+        &existing,
+        std::slice::from_ref(&pushing.id),
+    );
+    assert!(matches!(
+        &proposals[..],
+        [Proposal::Patch { target, .. }] if *target == pushing.id
+    ));
+    let found = judge(
+        &store,
+        &path,
+        "run-1",
+        std::slice::from_ref(&pushing),
+        std::slice::from_ref(&line),
+    );
+    assert_eq!(found.len(), 1);
+    assert!(found[0].contradicted);
+    assert_eq!(found[0].entry_id, pushing.id);
+    store.promote("p", &path, proposals, "reflection").unwrap();
+    let patched = learned(&store, &path)
+        .into_iter()
+        .find(|entry| entry.id == pushing.id)
+        .unwrap();
+    assert!(patched.content.contains("Never run pnpm verify"));
+    assert_eq!(
+        lifecycle(&patched).unwrap().misses,
+        0,
+        "a contradiction is not a miss"
+    );
+    let actions: Vec<_> = store
+        .history("p", &pushing.id, 10)
+        .into_iter()
+        .map(|record| record.action)
+        .collect();
+    assert_eq!(actions, ["born", "contradicted", "patched"]);
+    let untouched = learned(&store, &path)
+        .into_iter()
+        .find(|entry| entry.id == committing.id)
+        .unwrap();
+    assert_eq!(untouched.revision, committing.revision);
+    // Reflecting on the run again, against the statement it was given, adds nothing.
+    judge(
+        &store,
+        &path,
+        "run-1",
+        std::slice::from_ref(&pushing),
+        std::slice::from_ref(&line),
+    );
+    assert_eq!(store.metrics("p", &path).unwrap().contradicted, 1);
+}
+
+#[test]
+fn saved_lifecycles_from_before_outcomes_load_with_empty_counts() {
+    let old = r#"{"id":"00000000-0000-4000-8000-000000000002","projectId":"p","projectPath":"/p","kind":"memory","title":"Lesson","content":"Use pnpm.","keywords":["pnpm"],"enabled":true,"sourceRunId":null,"revision":3,"updatedAt":"2026-01-01T00:00:00Z","automatic":{"kind":"preference","evidence":["Task a"],"managed":true,"lifecycle":{"status":"active","statement":"Always use pnpm for installs here.","origin":"reflection","bornAt":"2026-01-01T00:00:00Z","deliveries":4,"opportunities":9,"idle":2,"recentRuns":["r1"]}}}"#;
+    let entry: KnowledgeEntry = serde_json::from_str(old).unwrap();
+    assert!(entry.stale.is_none());
+    let state = lifecycle(&entry).unwrap();
+    assert_eq!(state.misses, 0);
+    assert!(state.corrections.is_empty() && !state.missed_often);
+    assert!(attention(&entry).is_none());
+    // Unset fields stay out of the saved form, so older apps read it as before.
+    let saved = serde_json::to_value(&entry).unwrap();
+    assert!(saved.get("stale").is_none());
+    let lifecycle = &saved["automatic"]["lifecycle"];
+    for field in ["misses", "corrections", "missedOften"] {
+        assert!(lifecycle.get(field).is_none(), "{field}");
+    }
+}

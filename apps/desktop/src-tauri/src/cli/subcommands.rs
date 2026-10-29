@@ -196,6 +196,13 @@ pub fn diff(preference: Option<ColdStart>, prefix: &str, stat: bool) -> Result<(
             untracked.join(", ")
         );
     }
+    match view.review_screenshots {
+        Some(1) => eprintln!("1 review screenshot is in the Jackalope app, under Review."),
+        Some(count) => {
+            eprintln!("{count} review screenshots are in the Jackalope app, under Review.")
+        }
+        None => {}
+    }
     Ok(())
 }
 
@@ -349,7 +356,7 @@ pub fn pull_request(
 
 /// `--yes`, or a yes typed at a terminal. A script without `--yes` is refused
 /// rather than left waiting for an answer nobody will type.
-fn approved(yes: bool, question: &str) -> Result<bool, String> {
+pub fn approved(yes: bool, question: &str) -> Result<bool, String> {
     use std::io::{BufRead, IsTerminal, Write};
     if yes {
         return Ok(true);

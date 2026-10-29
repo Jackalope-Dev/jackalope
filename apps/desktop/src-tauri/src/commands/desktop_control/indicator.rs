@@ -21,9 +21,19 @@ pub fn desktop_control_theme(accent: String) -> Result<(), String> {
 }
 
 pub(super) struct Indicator {
-    child: Child,
-    tree: super::super::process_control::ProcessTree,
-    directory: PathBuf,
+    kind: Kind,
+}
+
+enum Kind {
+    /// A native indicator process that writes its state to a private file.
+    Process {
+        child: Child,
+        tree: super::super::process_control::ProcessTree,
+        directory: PathBuf,
+    },
+    /// The portal session; the compositor shows its own sharing indicator.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    Portal(Arc<super::portal::Shared>),
 }
 
 pub(super) struct State {
@@ -66,9 +76,18 @@ pub(super) fn parse_state(text: &str, now: i64) -> Result<State, String> {
     })
 }
 
+/// The window the indicator follows. Desktop grants have none, which the
+/// helpers receive as handle 0.
+fn indicator_window(grant: &super::grant::Grant) -> Value {
+    grant.window.as_ref().map_or_else(
+        || json!({"handle":"0","pid":0,"started":"0","title":"","class":""}),
+        |window| json!(window),
+    )
+}
+
 impl Indicator {
     #[cfg(windows)]
-    pub fn start(window: &Window) -> Result<Self, String> {
+    pub fn start(grant: &super::grant::Grant) -> Result<Self, String> {
         let directory =
             std::env::temp_dir().join(format!("jackalope-window-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&directory).map_err(|e| e.to_string())?;
@@ -83,12 +102,14 @@ impl Indicator {
             include_bytes!("../../../icons/32x32.png"),
         )
         .map_err(|e| e.to_string())?;
-        let script=format!("$ErrorActionPreference='Stop'\nAdd-Type -ReferencedAssemblies System.Drawing,System.Windows.Forms -TypeDefinition @'\n{}\n'@\n$r=$env:JACKALOPE_DESKTOP_REQUEST | ConvertFrom-Json\n[JackalopeWindowIndicator]::Run([long]$r.window.handle,[int]$r.window.pid,[string]$r.window.started,[string]$r.file,[string]$r.theme,[string]$r.logo)",include_str!("indicator.cs"));
+        let script=format!("$ErrorActionPreference='Stop'\nAdd-Type -ReferencedAssemblies System.Drawing,System.Windows.Forms -TypeDefinition @'\n{}\n'@\n$r=$env:JACKALOPE_DESKTOP_REQUEST | ConvertFrom-Json\n[JackalopeWindowIndicator]::Run([long]$r.window.handle,[int]$r.window.pid,[string]$r.window.started,[string]$r.file,[string]$r.theme,[string]$r.logo,[string]$r.scope,[string]$r.app,[string]$r.label)",include_str!("indicator.cs"));
         let errors =
             std::fs::File::create(directory.join("error.log")).map_err(|e| e.to_string())?;
         let mut command = super::native_command(
             &script,
-            json!({"window":window,"file":directory.join("state"),"theme":directory.join("theme"),"logo":directory.join("logo.png")}),
+            Some(
+                json!({"window":indicator_window(grant),"scope":grant.scope.as_str(),"app":grant.app,"label":grant.label,"file":directory.join("state"),"theme":directory.join("theme"),"logo":directory.join("logo.png")}),
+            ),
         )?;
         command
             .stdin(Stdio::null())
@@ -104,20 +125,17 @@ impl Indicator {
             }
         };
         let mut result = Self {
-            child,
-            tree,
-            directory,
+            kind: Kind::Process {
+                child,
+                tree,
+                directory: directory.clone(),
+            },
         };
         for _ in 0..100 {
-            if result
-                .child
-                .try_wait()
-                .map_err(|e| e.to_string())?
-                .is_some()
-            {
+            if result.exited()? {
                 return Err(format!(
                     "Desktop indicator could not start: {}",
-                    std::fs::read_to_string(result.directory.join("error.log"))
+                    std::fs::read_to_string(directory.join("error.log"))
                         .unwrap_or_default()
                         .chars()
                         .take(1200)
@@ -133,7 +151,7 @@ impl Indicator {
     }
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]
-    pub fn start(window: &Window) -> Result<Self, String> {
+    pub fn start(grant: &super::grant::Grant) -> Result<Self, String> {
         use std::os::unix::fs::DirBuilderExt;
         let directory =
             std::env::temp_dir().join(format!("jackalope-window-{}", uuid::Uuid::new_v4()));
@@ -141,7 +159,7 @@ impl Indicator {
             .mode(0o700)
             .create(&directory)
             .map_err(|e| e.to_string())?;
-        let result = Self::start_unix(window, directory.clone());
+        let result = Self::start_unix(grant, directory.clone());
         if result.is_err() {
             let _ = std::fs::remove_dir_all(directory);
         }
@@ -149,7 +167,7 @@ impl Indicator {
     }
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]
-    fn start_unix(window: &Window, directory: PathBuf) -> Result<Self, String> {
+    fn start_unix(grant: &super::grant::Grant, directory: PathBuf) -> Result<Self, String> {
         let accent = ACCENT
             .get_or_init(|| Mutex::new("#6366f1".into()))
             .lock()
@@ -158,8 +176,11 @@ impl Indicator {
         std::fs::write(directory.join("theme"), accent).map_err(|e| e.to_string())?;
         let errors =
             std::fs::File::create(directory.join("error.log")).map_err(|e| e.to_string())?;
-        let mut command = super::platform::command(json!({"action":"indicator", "window":window,
-            "file":directory.join("state"),"theme":directory.join("theme")}))?;
+        let mut command = super::platform::command(
+            json!({"action":"indicator", "window":indicator_window(grant),
+            "scope":grant.scope.as_str(),"app":grant.app,"label":grant.label,
+            "file":directory.join("state"),"theme":directory.join("theme")}),
+        )?;
         command
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -174,20 +195,17 @@ impl Indicator {
             }
         };
         let mut result = Self {
-            child,
-            tree,
-            directory,
+            kind: Kind::Process {
+                child,
+                tree,
+                directory: directory.clone(),
+            },
         };
         for _ in 0..100 {
-            if result
-                .child
-                .try_wait()
-                .map_err(|e| e.to_string())?
-                .is_some()
-            {
+            if result.exited()? {
                 return Err(format!(
                     "Desktop indicator could not start: {}",
-                    std::fs::read_to_string(result.directory.join("error.log"))
+                    std::fs::read_to_string(directory.join("error.log"))
                         .unwrap_or_default()
                         .chars()
                         .take(1200)
@@ -203,27 +221,103 @@ impl Indicator {
     }
 
     #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
-    pub fn start(_: &Window) -> Result<Self, String> {
+    pub fn start(_: &super::grant::Grant) -> Result<Self, String> {
         Err("A guarded native desktop backend is unavailable on this desktop.".into())
     }
 
-    pub fn state(&mut self) -> Result<State, String> {
-        if self.child.try_wait().map_err(|e| e.to_string())?.is_some() {
-            return Err(
-                "Desktop control canceled or indicator closed. Request access again.".into(),
-            );
+    #[cfg(target_os = "linux")]
+    pub fn portal(shared: Arc<super::portal::Shared>) -> Self {
+        Self {
+            kind: Kind::Portal(shared),
         }
-        read_state(&self.directory.join("state"))
+    }
+
+    /// Whether the compositor's portal, not a Jackalope bar, shows control.
+    pub fn is_portal(&self) -> bool {
+        matches!(self.kind, Kind::Portal(_))
+    }
+
+    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
+    fn exited(&mut self) -> Result<bool, String> {
+        match &mut self.kind {
+            Kind::Process { child, .. } => {
+                Ok(child.try_wait().map_err(|e| e.to_string())?.is_some())
+            }
+            Kind::Portal(_) => Ok(false),
+        }
+    }
+
+    pub fn state(&mut self) -> Result<State, String> {
+        match &mut self.kind {
+            Kind::Process {
+                child, directory, ..
+            } => {
+                if child.try_wait().map_err(|e| e.to_string())?.is_some() {
+                    return Err(
+                        "Desktop control canceled or indicator closed. Request access again."
+                            .into(),
+                    );
+                }
+                read_state(&directory.join("state"))
+            }
+            Kind::Portal(shared) => {
+                let (status, epoch, reason) = shared.current();
+                Ok(State {
+                    status,
+                    epoch,
+                    reason,
+                })
+            }
+        }
+    }
+
+    /// The indicator process, whose windows agents may never target.
+    pub fn pid(&self) -> Option<u32> {
+        match &self.kind {
+            Kind::Process { child, .. } => Some(child.id()),
+            Kind::Portal(_) => None,
+        }
     }
 
     pub fn guard(&self, epoch: u64) -> Value {
-        json!({"file":self.directory.join("state"),"epoch":epoch})
+        match &self.kind {
+            Kind::Process { directory, .. } => {
+                json!({"file":directory.join("state"),"epoch":epoch})
+            }
+            Kind::Portal(_) => json!({"epoch": epoch}),
+        }
     }
 
     pub fn watch(&self, session: &Arc<Session>, runtime: TaskRuntime, id: String) {
         let weak = Arc::downgrade(session);
-        let state_file = self.directory.join("state");
-        let theme_file = self.directory.join("theme");
+        let directory = match &self.kind {
+            Kind::Process { directory, .. } => directory,
+            Kind::Portal(shared) => {
+                let shared = shared.clone();
+                std::thread::spawn(move || loop {
+                    std::thread::sleep(Duration::from_millis(100));
+                    let Some(session) = weak.upgrade() else {
+                        break;
+                    };
+                    if session.canceled.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    let (status, _, reason) = shared.current();
+                    if status == "canceled" {
+                        close(&id);
+                        let _ = runtime.update_checked(&id, |run| {
+                            run.activity.push(format!(
+                                "Desktop access ended: {reason} A new grant is required."
+                            ))
+                        });
+                        break;
+                    }
+                });
+                return;
+            }
+        };
+        let state_file = directory.join("state");
+        let theme_file = directory.join("theme");
         std::thread::spawn(move || {
             let mut prior_color = String::new();
             loop {
@@ -239,7 +333,7 @@ impl Indicator {
                     .is_some_and(|state| state.status != "canceled");
                 if !active {
                     close(&id);
-                    let _ = runtime.update_checked(&id, |run|run.activity.push("Desktop access ended: Escape was pressed or the window indicator closed. A new window grant is required.".into()));
+                    let _ = runtime.update_checked(&id, |run|run.activity.push("Desktop access ended: Escape was pressed or the indicator closed. A new grant is required.".into()));
                     break;
                 }
                 let color = ACCENT.get().unwrap().lock().unwrap().clone();
@@ -255,9 +349,18 @@ impl Indicator {
 
 impl Drop for Indicator {
     fn drop(&mut self) {
-        self.tree.terminate();
-        let _ = self.child.wait();
-        let _ = std::fs::remove_dir_all(&self.directory);
+        match &mut self.kind {
+            Kind::Process {
+                child,
+                tree,
+                directory,
+            } => {
+                tree.terminate();
+                let _ = child.wait();
+                let _ = std::fs::remove_dir_all(&*directory);
+            }
+            Kind::Portal(shared) => shared.cancel("Desktop access was released."),
+        }
     }
 }
 

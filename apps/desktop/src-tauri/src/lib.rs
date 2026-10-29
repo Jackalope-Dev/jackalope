@@ -136,6 +136,7 @@ pub fn run(launch: Launch) {
         .setup(move |app| {
             commands::browser::set_resource_directory(app.path().resource_dir()?);
             commands::desktop_control::platform::set_resource_directory(app.path().resource_dir()?);
+            commands::computers::set_resource_directory(app.path().resource_dir()?);
             let directory = profile
                 .clone()
                 .unwrap_or(app.path().app_data_dir()?)
@@ -148,6 +149,8 @@ pub fn run(launch: Launch) {
             commands::managed_runtime::initialize(directory.join("agent-runtimes"));
             let runtime = TaskRuntime::new(directory.clone())?;
             runtime.observe_changes(app.handle().clone());
+            commands::computers::install_browser_routing(runtime.clone());
+            commands::computers::launch_idle_stop(runtime.clone());
             let helper = commands::helper::Helper::new(directory.clone(), runtime.clone());
             helper.launch();
             app.manage(helper);
@@ -273,6 +276,7 @@ pub fn run(launch: Launch) {
             commands::execution_access::app_execution_access,
             commands::account::app_account_status,
             commands::account::settings_sync::app_settings_sync,
+            commands::account::lesson_sync::app_lesson_sync,
             commands::account::app_account_connect,
             commands::account::app_account_open_browser,
             commands::account::app_account_referrals,
@@ -294,6 +298,7 @@ pub fn run(launch: Launch) {
             commands::knowledge::knowledge_save,
             commands::knowledge::knowledge_remove,
             commands::knowledge::learning::knowledge_history,
+            commands::knowledge::learning::knowledge_learning_metrics,
             commands::knowledge::learning::knowledge_set_archived,
             commands::knowledge::knowledge_preview,
             commands::knowledge::knowledge_search,
@@ -333,6 +338,30 @@ pub fn run(launch: Launch) {
             commands::desktop_control::platform::desktop_control_request_permissions,
             commands::desktop_control::platform::desktop_control_open_settings,
             commands::desktop_control::platform::desktop_control_restart,
+            commands::desktop_control::desktop_control_remember,
+            commands::desktop_control::desktop_control_permissions,
+            commands::desktop_control::desktop_control_forget,
+            commands::browser_profiles::browser_profile_status,
+            commands::computers::computer_docker_status,
+            commands::computers::computer_list,
+            commands::computers::computer_status,
+            commands::computers::computer_configure,
+            commands::computers::computer_start,
+            commands::computers::computer_stop,
+            commands::computers::computer_delete,
+            commands::computers::computer_viewer,
+            commands::computers::computer_viewer_lease,
+            commands::computers::computer_idle_timeout,
+            commands::computers::computer_preferences,
+            commands::computers::computer_set_preferences,
+            commands::computers::computer_machines,
+            commands::computers::computer_machine_add,
+            commands::computers::computer_machine_test,
+            commands::computers::computer_machine_remove,
+            commands::browser_profiles::browser_profile_open,
+            commands::browser_profiles::browser_profile_close,
+            commands::browser_profiles::browser_profile_clear_site,
+            commands::browser_profiles::browser_profile_delete,
             commands::local_ai::local_ai_inspect,
             commands::local_ai::local_ai_install,
             commands::local_ai::local_ai_pull,
@@ -509,6 +538,21 @@ pub fn run(launch: Launch) {
             commands::coordination::managed::task_plan_start,
             commands::coordination::managed::task_plan_action,
             commands::coordination::managed::task_plan_review_time,
+            commands::planning::plan_list,
+            commands::planning::plan_get,
+            commands::planning::plan_start,
+            commands::planning::plan_keep_planning,
+            commands::planning::plan_save,
+            commands::planning::plan_approve,
+            commands::planning::plan_replan,
+            commands::planning::plan_resolve_deviation,
+            commands::planning::plan_export,
+            commands::planning::plan_diff,
+            commands::planning::plan_revision,
+            commands::planning::plan_archive,
+            commands::planning::plan_settings_get,
+            commands::planning::plan_settings_set,
+            commands::planning::plan_create,
             agent_profile_rename,
             agent_profile_delete,
             agent_profile_set_active,
@@ -557,6 +601,7 @@ pub fn run(launch: Launch) {
                 commands::work_terminal::close_all();
                 app.state::<Coordinator>().shutdown();
                 app.state::<TaskRuntime>().stop_all();
+                commands::computers::shutdown(&app.state::<TaskRuntime>().computers_root());
                 app.state::<AppState>().kill_all_pty_sessions();
                 app.state::<SignInService>().stop_all();
             }

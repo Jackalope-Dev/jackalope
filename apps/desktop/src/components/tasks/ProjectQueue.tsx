@@ -188,7 +188,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
         </div>
         <div className="task-home-actions">
           <Button disabled={!desktop} onClick={() => setPlanningFeature(true)}>
-            Plan a feature
+            Write the plan myself
           </Button>
           <Menu.Root>
             <Menu.Trigger asChild>
@@ -211,11 +211,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
         </div>
       </div>
       {planningFeature && (
-        <FeaturePlanner
-          project={project}
-          onClose={() => setPlanningFeature(false)}
-          onAdded={load}
-        />
+        <FeaturePlanner project={project} onClose={() => setPlanningFeature(false)} />
       )}
       {[...new Set(items.filter((i) => i.feature).map((i) => i.featureId ?? i.feature))].map(
         (featureId) => {

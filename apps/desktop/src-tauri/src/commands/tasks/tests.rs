@@ -65,6 +65,10 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         prompts: vec![],
         validation_steps: vec![],
         screenshots: vec![],
+        desktop_actions: vec![],
+        visited_pages: vec![],
+        review_captures: None,
+        review_capturing: false,
     }
 }
 
@@ -439,6 +443,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
                     .into(),
                 keywords: vec![],
                 enabled: true,
+                stale: None,
                 source_run_id: None,
                 source_head: None,
                 revision: 0,
@@ -756,6 +761,7 @@ fn saved_user_answers_are_scoped_idempotent_and_not_overwritten_by_a_timeout() {
         answer: None,
         created_at: Utc::now().to_rfc3339(),
         answered_at: None,
+        presentation: Default::default(),
     };
     runtime.record_prompt(&prompt);
     assert!(runtime

@@ -1,8 +1,19 @@
-import type { FeatureStep } from './feature-plan';
+import type { ContextSelection } from './knowledge';
 import type { QueueView } from './queue';
 import type { RunRequest, TaskRun } from './task-runtime';
 import { isActive, nativeTask } from './task-runtime.ts';
 import type { TaskAssessment } from './task-strategy';
+
+/** One assignment of a managed task's proposed plan, as its preview shows it. */
+export interface FeatureStep {
+  key: string;
+  title: string;
+  prompt: string;
+  agent: string;
+  scopes: string[];
+  dependsOn: string[];
+  contextSelection?: ContextSelection;
+}
 
 export interface ManagedTask {
   delivery?: {
@@ -32,6 +43,8 @@ export interface ManagedTask {
   started: boolean;
   error: string | null;
   autoStart?: boolean;
+  /** Set when an approved plan started this task; it has no planner attempt. */
+  plan?: { planId: string; revision: number } | null;
 }
 
 export const managedTaskCommand = <T>(
@@ -44,7 +57,7 @@ export const previewTaskPlan = (id: string) => managedTaskCommand<FeatureStep[]>
 export function managedTaskWork(task: ManagedTask, queue: QueueView, runs: TaskRun[]) {
   const items = queue.items.filter((item) => item.featureId === task.id);
   const roots = new Set([
-    task.plannerRunId,
+    ...(task.plan ? [] : [task.plannerRunId]),
     ...(task.runIds ?? []),
     ...items.flatMap((item) => (item.runId ? [item.runId] : [])),
   ]);

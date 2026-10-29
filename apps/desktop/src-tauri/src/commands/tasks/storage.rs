@@ -152,6 +152,9 @@ impl TaskRuntime {
                             .push(quarantine(&path, reason));
                     }
                     Ok(mut run) => {
+                        if crate::commands::previews::review::recover(&mut run) {
+                            let _ = runtime.save(&run);
+                        }
                         if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
                             run.status = if cfg!(windows) && run.process_contained {
                                 "stopped"

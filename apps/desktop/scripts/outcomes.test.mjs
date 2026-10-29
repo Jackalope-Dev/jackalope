@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFeaturePlan } from '../src/lib/feature-plan.ts';
 import { recoveryHandoff, returnToProject } from '../src/lib/project-return.ts';
 import {
   correctionPrompt,
@@ -43,44 +42,6 @@ test('acceptance is unknown until a current file snapshot has been inspected', (
   assert.equal(requirementState(requirement, 'tree'), 'Accepted by you');
   assert.equal(requirementState(requirement, 'changed'), 'Evidence needs refreshing');
   assert.match(correctionPrompt([requirement]), /Reset works.*\n.*Verified reset/);
-});
-
-test('feature plan validation preserves outcomes and rejects cycles, missing dependencies and escaping scopes', () => {
-  const first = {
-    key: 'api',
-    title: 'API',
-    prompt: 'Implement the API',
-    scopes: ['src/api'],
-    dependsOn: [],
-    outcomes: ['Invalid input rejected'],
-  };
-  const second = {
-    key: 'ui',
-    title: 'UI',
-    prompt: 'Use the API',
-    scopes: ['src/ui'],
-    dependsOn: ['api'],
-    outcomes: ['Errors shown'],
-  };
-  const parsed = readFeaturePlan(
-    `\`\`\`json\n${JSON.stringify([first, second])}\n\`\`\``,
-    'claude',
-  );
-  assert.equal(parsed[1].agent, 'claude');
-  assert.deepEqual(parsed[0].contextSelection.outcomes, ['Invalid input rejected']);
-  assert.deepEqual(readFeaturePlan(JSON.stringify(parsed), 'codex')[1].contextSelection.outcomes, [
-    'Errors shown',
-  ]);
-  assert.throws(
-    () => readFeaturePlan(JSON.stringify([{ ...first, dependsOn: ['ui'] }, second]), 'claude'),
-    /cycle/,
-  );
-  assert.throws(() => readFeaturePlan(JSON.stringify([second]), 'claude'), /Missing dependency/);
-  assert.throws(
-    () => readFeaturePlan(JSON.stringify([{ ...first, scopes: ['../secrets'] }]), 'claude'),
-    /scopes/,
-  );
-  assert.throws(() => readFeaturePlan(JSON.stringify([first, first]), 'claude'), /unique/);
 });
 
 test('return view selects latest attempts, prioritizes blockers and retains reviewed unintegrated work', () => {

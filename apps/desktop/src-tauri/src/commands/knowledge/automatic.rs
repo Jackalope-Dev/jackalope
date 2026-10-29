@@ -106,6 +106,7 @@ fn candidate(
             resolution: None,
             lifecycle: None,
         }),
+        stale: None,
         source_run_id: run.map(|r| r.id.clone()),
         source_head: run.map(|r| r.base_head.clone()).filter(|s| !s.is_empty()),
         revision: 1,

@@ -47,6 +47,30 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("history", "search what you have typed before"),
     ("kill", "stop running ! commands"),
     ("clear", "start fresh (Ctrl+L clears notes instead)"),
+    (
+        "plan",
+        "plan with me first: explore, ask, then draft a plan",
+    ),
+    ("plans", "pick one of this project's plans to open"),
+    ("revise", "keep planning: send comments for a revised plan"),
+    (
+        "approve",
+        "approve the plan and run it: single, subtasks or swarm",
+    ),
+    ("replan", "revise a running plan from what is done"),
+    ("export", "save the plan into the repository, uncommitted"),
+    (
+        "deviation",
+        "decide on a plan deviation: accept, redo or replan",
+    ),
+    (
+        "browser",
+        "show the project browser; /browser open [url] to sign in",
+    ),
+    (
+        "computer",
+        "show this conversation's computer; /computer start or stop",
+    ),
     ("open", "show Jackalope's app window"),
     ("help", "show these commands"),
     ("quit", "leave (work keeps running)"),
@@ -311,6 +335,7 @@ impl App {
             "Ctrl+A/E line start/end · Ctrl+W, Alt+Backspace delete word",
             "Ctrl+U/K delete to line start/end · Ctrl+Y paste deleted text",
             "Ctrl+L clear notes · Ctrl+Z suspend · Ctrl+C clear, stop commands, leave",
+            "Ctrl+G edit the open plan in $EDITOR",
             "Start a line with a space to keep it out of history",
         ] {
             self.note(format!("  {keys}"));
@@ -410,7 +435,22 @@ impl App {
                     })
                     .is_some()
                 {
-                    self.flash("Opened Changes in Jackalope", Tone::Muted);
+                    let shots = self
+                        .view
+                        .as_ref()
+                        .and_then(|view| view.review_screenshots)
+                        .unwrap_or(0);
+                    match shots {
+                        0 => self.flash("Opened Changes in Jackalope", Tone::Muted),
+                        1 => self.flash(
+                            "Opened Changes in Jackalope · 1 review screenshot there",
+                            Tone::Muted,
+                        ),
+                        n => self.flash(
+                            format!("Opened Changes in Jackalope · {n} review screenshots there"),
+                            Tone::Muted,
+                        ),
+                    }
                 }
             }
             "retry" => self.session_action("retry", "Retrying", Tone::Muted),
@@ -433,12 +473,95 @@ impl App {
                 }
             }
             "open" => self.open_app(),
+            "browser" => self.browser(argument),
+            "computer" => self.computer(argument),
+            name if super::plan::COMMANDS.contains(&name) => {
+                self.plan_command(name, argument);
+            }
             other => match closest_command(other) {
                 Some(name) => self.note(format!("Unknown command /{other}. Did you mean /{name}?")),
                 None => self.note(format!("Unknown command /{other}. Type / to see the list.")),
             },
         }
         self.refresh();
+    }
+
+    fn browser(&mut self, argument: &str) {
+        let (action, url) = argument
+            .split_once(char::is_whitespace)
+            .map(|(action, url)| (action, url.trim()))
+            .unwrap_or((argument, ""));
+        let action = match action {
+            "" | "status" => "",
+            "open" | "signin" | "sign-in" => "open",
+            "done" | "close" => "done",
+            other => {
+                self.note(format!(
+                    "/browser {other} is not a choice. Use /browser, /browser open [url] or /browser done."
+                ));
+                return;
+            }
+        };
+        let request = Request::BrowserProfile {
+            project_id: self.project.id.clone(),
+            action: action.into(),
+            url: (!url.is_empty()).then(|| url.to_string()),
+        };
+        let Some(Response::BrowserProfile { profile }) = self.request(request) else {
+            return;
+        };
+        let Some(profile) = profile else {
+            self.note("This project has no browser profile yet. /browser open creates it and opens a window to sign in.");
+            return;
+        };
+        for line in browser_lines(&profile) {
+            self.note(line);
+        }
+        match action {
+            "open" => self.flash(
+                "Sign in in the browser window, then close it or type /browser done",
+                Tone::Success,
+            ),
+            "done" => self.flash("Closed the project browser", Tone::Muted),
+            _ => {}
+        }
+    }
+
+    fn computer(&mut self, argument: &str) {
+        let action = match argument.trim() {
+            "" | "status" => "",
+            "start" => "start",
+            "stop" => "stop",
+            other => {
+                self.note(format!(
+                    "/computer {other} is not a choice. Use /computer, /computer start or /computer stop."
+                ));
+                return;
+            }
+        };
+        let Some(session_id) = self.session.clone() else {
+            self.note(
+                "Open a conversation first. A bot's computer is set up in its settings in the app.",
+            );
+            return;
+        };
+        let request = Request::Computer {
+            session_id,
+            action: action.into(),
+        };
+        let Some(Response::Computer { computer }) = self.request(request) else {
+            return;
+        };
+        let Some(computer) = computer else {
+            self.note("This conversation has no computer. Give its bot one in the app, or the agent can ask for one with computer_request.");
+            return;
+        };
+        self.note(computer_line(&computer));
+        match action {
+            "start" => self.flash(format!("Starting {}", computer.name), Tone::Success),
+            "stop" => self.flash(format!("Stopped {}", computer.name), Tone::Muted),
+            _ => {}
+        }
     }
 
     fn usage(&mut self) {
@@ -526,6 +649,54 @@ impl App {
     }
 }
 
+/// What `/computer` shows about a conversation's computer.
+fn computer_line(computer: &crate::protocol::ComputerView) -> String {
+    let provider = match computer.provider.as_str() {
+        "local-docker" => "local sandbox",
+        "remote-machine" => "cloud machine",
+        other => other,
+    };
+    let mut line = format!(
+        "{} · {provider} · {}",
+        computer.name,
+        computer.state.replace('-', " ")
+    );
+    if computer.stopped_idle {
+        line.push_str(" (idle)");
+    } else if let Some(usage) = &computer.usage {
+        line.push_str(&format!(" · {usage}"));
+    }
+    if let Some(detail) = computer.phase.as_ref().or(computer.error.as_ref()) {
+        line.push_str(&format!(" · {detail}"));
+    }
+    line
+}
+
+/// What `/browser` shows about a project's persistent browser profile.
+fn browser_lines(profile: &crate::protocol::BrowserProfileView) -> Vec<String> {
+    let megabytes = profile.size_bytes as f64 / 1_048_576.0;
+    let state = match (&profile.in_use, profile.window_open) {
+        (_, true) => "open for signing in".to_string(),
+        (Some(holder), false) => format!("in use by {holder}"),
+        (None, false) => "idle".to_string(),
+    };
+    let mut lines = vec![format!(
+        "{} · {state} · {megabytes:.1} MB · last used {}",
+        profile.name,
+        profile
+            .last_used_at
+            .as_deref()
+            .and_then(|at| at.get(..10))
+            .unwrap_or("never")
+    )];
+    lines.push(if profile.sites.is_empty() {
+        "  No saved sign-ins yet.".to_string()
+    } else {
+        format!("  Sites with saved data: {}", profile.sites.join(", "))
+    });
+    lines
+}
+
 /// The usable agents `text` names with `@id`, in order and once each, and
 /// the text without those names.
 fn split_agent_mentions(text: &str, agents: &[AgentStatus]) -> (Vec<String>, String) {
@@ -574,7 +745,8 @@ mod tests {
     fn command_lines_split_their_argument() {
         assert!(COMMANDS.iter().any(|(name, _)| *name == "bg"));
         assert!(names("/bg fix it").is_empty());
-        assert_eq!(names("/co"), ["copy"]);
+        assert_eq!(names("/co"), ["copy", "computer"]);
+        assert_eq!(names("/cop"), ["copy"]);
     }
 
     #[test]
@@ -649,5 +821,58 @@ mod tests {
             split_agent_mentions("@gemini look", &agents),
             (Vec::new(), "@gemini look".to_string())
         );
+    }
+
+    #[test]
+    fn computer_status_names_provider_state_and_detail() {
+        let mut computer = crate::protocol::ComputerView {
+            name: "Scout computer".into(),
+            provider: "local-docker".into(),
+            state: "not-created".into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            computer_line(&computer),
+            "Scout computer · local sandbox · not created"
+        );
+        computer.error = Some("Docker is not installed.".into());
+        assert!(computer_line(&computer).ends_with("· Docker is not installed."));
+        computer.error = None;
+        computer.state = "running".into();
+        computer.usage = Some("idle 3 min · stops in 7 min".into());
+        assert_eq!(
+            computer_line(&computer),
+            "Scout computer · local sandbox · running · idle 3 min · stops in 7 min"
+        );
+        computer.state = "stopped".into();
+        computer.stopped_idle = true;
+        assert_eq!(
+            computer_line(&computer),
+            "Scout computer · local sandbox · stopped (idle)"
+        );
+        assert!(COMMANDS.iter().any(|(name, _)| *name == "computer"));
+    }
+
+    #[test]
+    fn browser_status_lists_state_size_and_sites() {
+        let mut profile = crate::protocol::BrowserProfileView {
+            name: "Project browser".into(),
+            size_bytes: 3 * 1_048_576,
+            ..Default::default()
+        };
+        let lines = browser_lines(&profile);
+        assert_eq!(
+            lines[0],
+            "Project browser · idle · 3.0 MB · last used never"
+        );
+        assert!(lines[1].contains("No saved sign-ins"));
+        profile.window_open = true;
+        profile.in_use = Some("the sign-in window".into());
+        profile.last_used_at = Some("2026-10-28T10:00:00Z".into());
+        profile.sites = vec!["example.com".into(), "github.com".into()];
+        let lines = browser_lines(&profile);
+        assert!(lines[0].contains("open for signing in") && lines[0].ends_with("2026-10-28"));
+        assert_eq!(lines[1], "  Sites with saved data: example.com, github.com");
+        assert!(COMMANDS.iter().any(|(name, _)| *name == "browser"));
     }
 }

@@ -2,7 +2,7 @@
 //! against the project's learned lessons. Local and deterministic; it makes no
 //! model calls. The promotion gate validates everything proposed here.
 
-use super::{lifecycle, owned, Lesson, Proposal};
+use super::{lifecycle, owned, Lesson, Proposal, Thresholds};
 use crate::commands::knowledge::{words, KnowledgeEntry};
 use std::collections::HashSet;
 
@@ -90,7 +90,7 @@ pub(super) fn negative(text: &str) -> bool {
     .any(|word| text.contains(word))
 }
 
-fn similarity(a: &str, b: &str) -> f64 {
+pub(super) fn similarity(a: &str, b: &str) -> f64 {
     let a: HashSet<_> = phrases(a).into_iter().collect();
     let b: HashSet<_> = phrases(b).into_iter().collect();
     if a.is_empty() || b.is_empty() {
@@ -215,9 +215,91 @@ fn lessons(observation: &Observation) -> Vec<(Lesson, bool)> {
     }
 }
 
+/// What the person said about a lesson that was supplied to the run.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Outcome {
+    pub entry_id: String,
+    /// The person said otherwise; false means they restated it (a miss).
+    pub contradicted: bool,
+    pub reference: String,
+    /// The line that matched, redacted before it is recorded.
+    pub excerpt: String,
+}
+
+/// Lines of what the person wrote, outside fenced code.
+fn said_lines(text: &str) -> impl Iterator<Item = &str> {
+    let mut in_code = false;
+    text.lines().take(200).filter_map(move |line| {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") {
+            in_code = !in_code;
+            return None;
+        }
+        let line = trimmed.trim_start_matches(['-', '*', ' ', '•']).trim();
+        (!in_code && !line.is_empty()).then_some(line)
+    })
+}
+
+/// Compares what the person said after lessons were supplied with the
+/// statements those lessons carried when supplied. `delivered` holds the
+/// learned lessons in the run's context receipt. Statements count only when
+/// `later` (a follow-up or later conversation turn, not the request that
+/// selected the lessons); typed answers always come after delivery. At most
+/// one outcome per lesson: the closest line.
+pub fn outcomes(
+    observations: &[Observation],
+    delivered: &[KnowledgeEntry],
+    later: bool,
+    thresholds: &Thresholds,
+) -> Vec<Outcome> {
+    let mut found = vec![];
+    for entry in delivered {
+        let Some(state) = lifecycle(entry) else {
+            continue;
+        };
+        let kind = entry.automatic.as_ref().map(|source| source.kind.as_str());
+        if state.statement.is_empty() || kind == Some("verification") {
+            continue;
+        }
+        let best = observations
+            .iter()
+            .filter(|observation| match observation.kind {
+                ObservationKind::Statement => later,
+                ObservationKind::Answer { .. } => true,
+                ObservationKind::Check => false,
+            })
+            .flat_map(|observation| {
+                said_lines(&observation.text).map(move |line| (observation, line))
+            })
+            .map(|(observation, line)| (similarity(&state.statement, line), observation, line))
+            .filter(|(score, _, _)| *score >= thresholds.miss_similarity)
+            .max_by(|a, b| a.0.total_cmp(&b.0));
+        if let Some((_, observation, line)) = best {
+            found.push(Outcome {
+                entry_id: entry.id.clone(),
+                contradicted: negative(&state.statement) != negative(line),
+                reference: observation.reference.clone(),
+                excerpt: line.to_string(),
+            });
+        }
+    }
+    found
+}
+
 /// Proposals for the observations, judged against the project's entries.
 /// Only lessons the loop owns are named as merge, patch or retire targets.
 pub fn reflect(observations: &[Observation], existing: &[KnowledgeEntry]) -> Vec<Proposal> {
+    reflect_delivered(observations, existing, &[])
+}
+
+/// As `reflect`, but a lesson supplied to the run (`delivered` ids) is the
+/// preferred patch, merge or retire target whenever it matches closely
+/// enough, so a correction lands on the lesson the agent was given.
+pub fn reflect_delivered(
+    observations: &[Observation],
+    existing: &[KnowledgeEntry],
+    delivered: &[String],
+) -> Vec<Proposal> {
     let candidates: Vec<(&KnowledgeEntry, &str)> = existing
         .iter()
         .filter(|entry| owned(entry))
@@ -245,7 +327,12 @@ pub fn reflect(observations: &[Observation], existing: &[KnowledgeEntry]) -> Vec
                     (similarity(statement, &lesson.statement), *entry, *statement)
                 })
                 .filter(|(score, _, _)| *score > 0.0)
-                .max_by(|a, b| a.0.total_cmp(&b.0));
+                .max_by(|a, b| {
+                    let supplied = |(score, entry, _): &(f64, &KnowledgeEntry, &str)| {
+                        *score >= 0.5 && delivered.contains(&entry.id)
+                    };
+                    supplied(a).cmp(&supplied(b)).then(a.0.total_cmp(&b.0))
+                });
             if retirement {
                 if let Some((score, entry, _)) = best {
                     if score >= 0.5 {

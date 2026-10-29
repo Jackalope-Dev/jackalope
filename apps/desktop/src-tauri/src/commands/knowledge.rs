@@ -28,6 +28,11 @@ pub struct KnowledgeEntry {
     pub automatic: Option<automatic::LearningSource>,
     #[serde(default)]
     pub dismissed: bool,
+    /// Something the lesson names that the project no longer has, from the
+    /// stale-lesson check. A local note: setting it never changes the
+    /// revision, and editing the lesson clears it until the next check.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stale: Option<String>,
     pub id: String,
     pub project_id: String,
     pub project_path: String,
@@ -93,6 +98,9 @@ pub struct KnowledgeStore {
     path: PathBuf,
     lock: Arc<Mutex<()>>,
     refreshes: Arc<Mutex<std::collections::HashMap<String, std::time::Instant>>>,
+    /// Bumped on every successful write, so background passes can skip
+    /// unchanged knowledge.
+    changes: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl KnowledgeStore {
@@ -101,7 +109,13 @@ impl KnowledgeStore {
             path,
             lock: Arc::new(Mutex::new(())),
             refreshes: Arc::new(Mutex::new(Default::default())),
+            changes: Default::default(),
         }
+    }
+
+    /// Changes written since this process started.
+    pub fn changes(&self) -> u64 {
+        self.changes.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     fn read(&self) -> Result<Vec<KnowledgeEntry>, String> {
@@ -199,6 +213,7 @@ impl KnowledgeStore {
             let edited = old.content != entry.content
                 || old.keywords != entry.keywords
                 || old.title != entry.title;
+            entry.stale = if edited { None } else { old.stale.clone() };
             let was_managed = old.automatic.as_ref().is_some_and(|source| source.managed);
             if let Some(source) = &mut entry.automatic {
                 if edited {
@@ -207,10 +222,9 @@ impl KnowledgeStore {
                 // Turning an archived learned lesson back on restores it.
                 if let Some(state) = source.lifecycle.as_mut() {
                     if entry.enabled && state.archived() {
+                        learning::reset_for_restore(state);
                         state.status = learning::PROBATION.into();
-                        state.archived_reason = None;
-                        state.opportunities = 0;
-                        state.idle = 0;
+                        entry.stale = None;
                     }
                 }
             }
@@ -234,6 +248,7 @@ impl KnowledgeStore {
         } else {
             entry.automatic = None;
             entry.dismissed = false;
+            entry.stale = None;
             if entry.revision != 0 {
                 return Err("This entry was deleted. Reload before saving.".into());
             }
@@ -264,7 +279,10 @@ impl KnowledgeStore {
         if bytes.len() > 4_000_000 {
             return Err("Saved knowledge exceeds the storage limit. Remove unused entries before adding more.".into());
         }
-        history::write_atomic(&self.path, &bytes)
+        history::write_atomic(&self.path, &bytes)?;
+        self.changes
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Ok(())
     }
 
     fn remove(&self, id: &str, revision: u64) -> Result<(), String> {
@@ -401,7 +419,15 @@ fn select(
                     }
             })
             .collect();
-        matches.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.id.cmp(&b.1.id)));
+        // Among equal matches, a lesson agents keep missing is supplied first.
+        let missed = |entry: &KnowledgeEntry| {
+            learning::lifecycle(entry).is_some_and(|state| state.missed_often)
+        };
+        matches.sort_by(|a, b| {
+            b.0.cmp(&a.0)
+                .then(missed(&b.1).cmp(&missed(&a.1)))
+                .then(a.1.id.cmp(&b.1.id))
+        });
         let mut seen = HashSet::new();
         receipt.entries.extend(
             matches

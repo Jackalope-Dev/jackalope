@@ -566,6 +566,7 @@ fn wait_for_answer(
         answer: None,
         created_at: Utc::now().to_rfc3339(),
         answered_at: None,
+        presentation: Default::default(),
     };
     runtime.record_prompt(&prompt);
     let started = std::time::Instant::now();

@@ -181,10 +181,11 @@ fn tab_state(app: &App, session: &protocol::SessionSummary) -> (&'static str, Co
     let needs_you = session.asking
         || protocol::present(session.error.as_deref()).is_some()
         || (current
-            && app
+            && (app
                 .view
                 .as_ref()
-                .is_some_and(|view| !view.questions.is_empty()));
+                .is_some_and(|view| !view.questions.is_empty())
+                || app.pending_deviation().is_some()));
     let working = if current {
         app.working()
     } else {

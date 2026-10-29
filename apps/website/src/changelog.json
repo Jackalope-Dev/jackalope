@@ -1,5 +1,97 @@
 [
   {
+    "id": "desktop-control-on-kde-plasma-and-other-wayland-desktops",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Desktop control on KDE Plasma and other Wayland desktops",
+    "description": "Agents can now control one app or the whole desktop on Wayland desktops that offer the standard remote desktop portal, after you approve your desktop's own prompt.",
+    "items": [
+      "Works on KDE Plasma and on GNOME without Jackalope's extension, using accessibility actions, keyboard and pointer input and monitor screenshots.",
+      "Your desktop can remember the approval, and stopping the share from its indicator ends access at once."
+    ]
+  },
+  {
+    "id": "bots-get-their-own-computer",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Bots get their own computer",
+    "description": "A bot can now work on its own Linux desktop with a browser, running in Docker on your machine or on a cloud machine you run, instead of on your computer.",
+    "items": [
+      "Choose None, Local sandbox or Cloud machine in a bot's settings, then start, stop, watch or take over its computer.",
+      "Desktop and browser tools act on the bot's computer without desktop access questions; each website still asks first.",
+      "Agents in ordinary tasks can ask for a sandbox computer, and you decide whether to share the project read-only.",
+      "Pair your own cloud machine in Settings → Computers; Jackalope-hosted computers are coming soon.",
+      "Local sandboxes start when an agent or viewer needs them and stop after 10 minutes idle by default, or when Jackalope quits unless you keep them running."
+    ]
+  },
+  {
+    "id": "agent-browsers-that-stay-signed-in",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Agent browsers that stay signed in",
+    "description": "Give agents and bots their own browser profile, sign in once, and keep your everyday browser untouched.",
+    "items": [
+      "Each project gets a Project browser and each bot can have its own; sign-ins last between tasks.",
+      "Agents ask before using each site and pause for you to sign in yourself in a visible window; passwords never reach the agent.",
+      "Manage profiles in Project settings, the bot editor or the terminal's /browser: see sites, clear one site or delete the profile.",
+      "Review screenshots now capture after the result is ready, so they never hold up finished work."
+    ]
+  },
+  {
+    "id": "before-and-after-screenshots-in-review",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Before and after screenshots in Review",
+    "description": "Finished work now arrives with screenshots of the pages it changed, so you can check the end state without running anything.",
+    "items": [
+      "When work with changes finishes, Jackalope runs the project preview in a private, temporary browser and captures up to six pages, including the pages named in browser checks and the ones the agent visited.",
+      "Review compares each page before and after with a slider or side by side, at desktop and optional narrow sizes, with a link to the live preview.",
+      "Turn it off or choose pages and sizes in Project settings; the terminal's settings and review commands show it too."
+    ]
+  },
+  {
+    "id": "agents-can-use-your-apps-and-signed-in-browser",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Agents can use your apps and signed-in browser",
+    "description": "Desktop control is much faster, acts on what it sees by name, and lets you grant one window, one app or your whole desktop.",
+    "items": [
+      "Grant one window, every window of one app, or the full desktop. Full desktop is asked for every task; window and app grants can be remembered per project and removed in project settings.",
+      "Agents can work in your own browser with your sign-ins. Each new website asks once, and you can always or never allow it for the project.",
+      "Agents act on buttons, fields and lists by name through accessibility, so they usually leave your mouse and focus alone, and fall back to mouse and keyboard when an app needs it.",
+      "A resident helper answers each action in milliseconds on Windows instead of starting a new process every time.",
+      "The Screen view lists each action with a small capture afterwards, and Escape, Stop or Revoke still ends control at once."
+    ]
+  },
+  {
+    "id": "plan-with-me-before-code-changes",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Plan with me before code changes",
+    "description": "Plan mode reads your code first, asks only what it cannot find, and drafts one plan for you to approve before any work starts.",
+    "items": [
+      "Choose Plan with me in the composer or after an assessment, /plan in the terminal or jackalope plan. The planner works read-only and asks at most five questions by default, recommended answer first; you can tell it to use its recommendations for the rest.",
+      "Prefer to write it yourself? Write the plan myself turns your tasks and outcomes into the same plan, with the same approval, review and tracking.",
+      "Each plan lists its assumptions, tasks with their files and dependencies, and acceptance criteria with how each is checked. Review revisions side by side, edit the plan directly, ask for changes, or save it into the repository without committing.",
+      "Approve an exact revision to run it as one agent, planned subtasks or a swarm. Each worker starts from the plan in a fresh context, and an independent review checks the result against every criterion and repairs serious gaps. Projects without a saved check can still run plans, checked by the plan's own test commands or by review alone.",
+      "Departures from the plan pause dependent work and notify you until you accept the amendment, ask for a redo or re-plan; re-planning keeps finished tasks."
+    ]
+  },
+  {
+    "id": "lessons-that-travel-and-tidy-themselves",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Lessons that travel and tidy themselves",
+    "description": "Learned lessons can now follow you between desktops, stay free of duplicates and reach agents outside Jackalope.",
+    "items": [
+      "Include learned lessons in settings sync to use them on every desktop signed in to your account. It is off by default, each project can opt out, and evidence, use counts and folder paths stay on your computer.",
+      "Jackalope folds near-duplicate learned lessons into one; restoring a folded lesson keeps it separate.",
+      "Optionally let your default agent reflect on finished work too, on its own account quota with strict limits; its suggestions pass the same checks.",
+      "Optionally mirror active lessons into a marked section of AGENTS.md and a Claude Code skill, removed again when you turn it off.",
+      "Learning activity in Project → Context shows how lessons are learned, used, archived and restored."
+    ]
+  },
+  {
     "id": "faster-steadier-claude-code-tasks",
     "date": "2026-10-28",
     "status": "In development",

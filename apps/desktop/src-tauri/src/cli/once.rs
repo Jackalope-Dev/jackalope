@@ -441,6 +441,7 @@ mod tests {
             activity: Vec::new(),
             questions: Vec::new(),
             partial: String::new(),
+            review_screenshots: None,
         }
     }
 
@@ -509,6 +510,7 @@ mod tests {
             run_id: "r".into(),
             question: "Which branch?".into(),
             options: Vec::new(),
+            ..Default::default()
         });
         assert_eq!(
             outcome(&asked),

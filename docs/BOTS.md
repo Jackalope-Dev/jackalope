@@ -26,7 +26,9 @@ draw their agent's character in the text colour; the retired crescent maps to Mo
 Templates in `lib/bot-templates.ts` prefill the editor with a role, instructions, an
 appearance and, where useful, a scheduled wake-up that starts turned off. They never
 grant access, enable connections or start work. Creating a bot walks through five short
-steps; editing shows the same sections on one page.
+steps; editing shows the same sections on one page, followed by the bot's browser profile
+and its optional [computer](BOT-COMPUTERS.md), both kept natively by bot ID rather than in
+the renderer's bot record.
 
 ## Native hub
 

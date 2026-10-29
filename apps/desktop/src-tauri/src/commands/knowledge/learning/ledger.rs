@@ -1,6 +1,6 @@
 //! Append-only history of learned lessons: one JSON line per change, one file
 //! per project. Records are never rewritten. Evidence excerpts are redacted
-//! and kept only here, apart from the entry, so a later sync can omit them.
+//! and kept only here, apart from the entry, so lesson sync omits them.
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -19,13 +19,15 @@ pub struct LedgerRecord {
     pub project_id: String,
     pub at: String,
     /// `born`, `merged`, `patched`, `retired`, `promoted`, `archived`,
-    /// `restored`, `edited` or `deleted`.
+    /// `restored`, `edited`, `deleted`, `curated` (folded by the curator),
+    /// `missed` (restated after it was supplied), `contradicted` or `stale`
+    /// (names something the project no longer has).
     pub action: String,
     pub reason: String,
     /// The entry revision after the change.
     #[serde(default)]
     pub revision: u64,
-    /// `reflection`, `session`, `lifecycle` or `user`.
+    /// `reflection`, `session`, `agent`, `curator`, `lifecycle` or `user`.
     #[serde(default)]
     pub origin: String,
     /// The entry title when the change was made.
@@ -78,25 +80,33 @@ pub(super) fn append(directory: &Path, records: &[LedgerRecord]) -> Result<(), S
     Ok(())
 }
 
-/// The newest `limit` records for an entry, oldest first. Unreadable lines,
-/// such as one cut short by a crash, are skipped.
-pub(super) fn read(
-    directory: &Path,
-    project_id: &str,
-    entry_id: &str,
-    limit: usize,
-) -> Vec<LedgerRecord> {
+/// Every retained record for a project, oldest first. Unreadable lines, such
+/// as one cut short by a crash, are skipped.
+pub(super) fn read_project(directory: &Path, project_id: &str) -> Vec<LedgerRecord> {
     let path = file(directory, project_id);
-    let mut found: Vec<LedgerRecord> = [rotated(&path), path]
+    [rotated(&path), path]
         .iter()
         .filter_map(|path| crate::commands::history::read_bounded(path, 2 * ROTATE_BYTES).ok())
         .flat_map(|bytes| {
             String::from_utf8_lossy(&bytes)
                 .lines()
                 .filter_map(|line| serde_json::from_str::<LedgerRecord>(line).ok())
-                .filter(|record| record.entry_id == entry_id && record.project_id == project_id)
+                .filter(|record| record.project_id == project_id)
                 .collect::<Vec<_>>()
         })
+        .collect()
+}
+
+/// The newest `limit` records for an entry, oldest first.
+pub(super) fn read(
+    directory: &Path,
+    project_id: &str,
+    entry_id: &str,
+    limit: usize,
+) -> Vec<LedgerRecord> {
+    let mut found: Vec<LedgerRecord> = read_project(directory, project_id)
+        .into_iter()
+        .filter(|record| record.entry_id == entry_id)
         .collect();
     let skip = found.len().saturating_sub(limit);
     found.drain(..skip);

@@ -956,18 +956,20 @@ export const knowledgeGuides: KnowledgeGuide[] = [
   {
     slug: 'windows-desktop-control',
     category: 'desktop-control',
-    title: 'Let an agent work in a Windows app',
+    title: 'Let an agent work in your apps',
     shortTitle: 'Windows desktop control',
     description:
-      'Select a window for a task, understand its control status, and pause or cancel when you need your computer.',
+      'Grant a window, an app or your desktop for a task, understand its control status, and pause or cancel when you need your computer.',
     readingTime: '2 min read',
     sections: [
       {
         id: 'window-grants',
-        question: 'How do window grants work?',
+        question: 'How do window, app and desktop grants work?',
         paragraphs: [
-          'On Windows, explicitly select an application window for the current task attempt. Jackalope’s desktop tools check that grant before accessibility reads, captures, and native input.',
-          'These grants control Jackalope’s desktop tools, not the agent’s other local capabilities. Desktop control operates the live user session and does not create an OS sandbox. This guide covers Windows. macOS, Linux X11 and GNOME 46 Wayland backends require platform acceptance before release; GNOME Wayland also requires the Jackalope Window Control extension. Other Wayland and headless Linux sessions are unsupported.',
+          'When an agent asks, you choose what it may use for the current task: one window, every window of one app, or your whole desktop. Jackalope’s own windows are always off limits. Jackalope’s desktop tools check that grant before accessibility reads, captures, and native input.',
+          'For a window or app you can choose Always allow for the project, so later tasks that name that app start without asking. Full desktop access is asked for every task. Remove remembered apps and websites in Project settings under Desktop control.',
+          'To use your signed-in web accounts, grant your browser as an app. The first time the agent reaches a website, Jackalope asks whether to allow it for this task, always, or never.',
+          'These grants control Jackalope’s desktop tools, not the agent’s other local capabilities. Desktop control operates the live user session and does not create an OS sandbox. This guide covers Windows. macOS, Linux X11, GNOME 46 Wayland and Wayland desktop portal backends require platform acceptance before release; GNOME Wayland uses the Jackalope Window Control extension when it is enabled. Other Wayland desktops, such as KDE Plasma, offer app and full-desktop grants when they provide the remote desktop portal: approve your desktop’s prompt to begin, and stop sharing from its indicator to end access. Your own input does not pause control there. Headless Linux sessions and Wayland desktops without that portal are unsupported.',
         ],
       },
       {
@@ -1004,10 +1006,11 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'first-window-task',
         question: 'How do I start and check a window task?',
         paragraphs: [
-          'Begin with an inspection task, such as reading the labels in a sample app. Browser pages usually fit the built-in browser tools; native desktop control is for an explicitly selected Windows application window.',
+          'Begin with an inspection task, such as reading the labels in a sample app. Public pages usually fit the built-in browser tools; desktop control is for your own apps and your signed-in browser.',
         ],
         steps: [
-          'Open the application in your Windows session and select its window for the current task attempt. State the intended action and anything that requires your review.',
+          'Open the application in your Windows session and choose its window or app when the agent asks. State the intended action and anything that requires your review.',
+          'Follow along in the task’s Screen view, which lists each action, how it was sent and a small capture afterwards.',
           'Keep the target visible and watch the control status. If you need the computer, pause or cancel through the status bar.',
           'After an interruption, review the current window before resuming. The agent needs a fresh snapshot because the UI may have changed.',
           'Read the task result and inspect the application itself. A completed input action is not proof that an external service accepted or saved it.',

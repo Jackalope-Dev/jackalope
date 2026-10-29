@@ -1,23 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { multiAgentPlanningPrompt } from '../src/lib/feature-plan.ts';
 import { planningDraft } from '../src/lib/planning.ts';
 import { savedPlanDraft } from '../src/lib/schedules.ts';
 import { VETTED_SKILLS } from '../src/lib/skills/catalog.ts';
 import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
-
-test('repository planning keeps the complete objective and only available agent choices', () => {
-  const goal = 'Build a feature\nKeep every constraint';
-  const prompt = multiAgentPlanningPrompt(goal, [
-    { id: 'fixture', available: true },
-    { id: 'missing', available: false },
-  ]);
-  assert.ok(prompt.includes(goal));
-  assert.ok(prompt.includes('actual repository paths'));
-  assert.ok(prompt.includes('independent work in parallel'));
-  assert.ok(prompt.includes('fixture'));
-  assert.ok(!prompt.includes('missing'));
-});
 
 test('prepared ideas restore editable guidelines without nesting prompts or losing custom instructions', () => {
   const skill = VETTED_SKILLS[0];

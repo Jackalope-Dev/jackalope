@@ -19,6 +19,7 @@ mod events;
 mod feed;
 mod keys;
 mod pickers;
+mod plan;
 mod refresh;
 mod render;
 mod selection;
@@ -188,6 +189,10 @@ struct App {
     /// Currently displayed rotating tip.
     tip_index: usize,
     last_tip_change: Instant,
+    /// The plan open in this terminal, from `/plan` or `/plans`.
+    plan: Option<plan::PlanPane>,
+    /// Ctrl+G asked to edit the plan in an external editor.
+    plan_edit: bool,
     quit: bool,
 }
 
@@ -263,6 +268,8 @@ pub fn run(
         tick: 0,
         tip_index: 0,
         last_tip_change: Instant::now(),
+        plan: None,
+        plan_edit: false,
         quit: false,
     };
     // The first read happens here rather than on the refresher, so the

@@ -15,6 +15,15 @@ pub(super) mod output;
 mod test_report;
 pub use leases::{ensure_all_idle, ensure_idle};
 
+/// Holds a workspace like a running check does, so checks, previews and
+/// integration wait while Jackalope runs its own process there.
+pub(in crate::commands) struct WorkspaceLease(#[allow(dead_code)] leases::Lease);
+
+/// Call under the execution guard, as for a check.
+pub(in crate::commands) fn reserve_workspace(workspace: &str) -> Result<WorkspaceLease, String> {
+    leases::reserve(workspace).map(WorkspaceLease)
+}
+
 /// Ceiling on a single check or setup command. Commands are cut off for going quiet
 /// (see the stall budgets) long before this; it only bounds a command that keeps
 /// printing forever.

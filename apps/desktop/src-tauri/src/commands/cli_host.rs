@@ -235,11 +235,15 @@ fn ensure_project(app: &AppHandle, path: &str) -> Result<protocol::Project, Stri
         use tauri::Emitter;
         let _ = app.emit("jackalope:projects-registered", ());
     }
-    Ok(project_summary(record))
+    Ok(project_summary(&runtime, record))
 }
 
-fn project_summary(record: super::project_registry::ProjectRecord) -> protocol::Project {
+fn project_summary(
+    runtime: &TaskRuntime,
+    record: super::project_registry::ProjectRecord,
+) -> protocol::Project {
     let settings = record.settings();
+    let planning = super::planning::session::store_for(runtime).settings(&record.id);
     protocol::Project {
         id: record.id,
         name: record.name,
@@ -249,6 +253,19 @@ fn project_summary(record: super::project_registry::ProjectRecord) -> protocol::
         workspace_mode: Some(settings.workspace_mode.as_str().into()),
         learn_automatically: Some(settings.learn_automatically),
         learning_cadence: Some(settings.learning_cadence),
+        sync_lessons: Some(settings.sync_lessons),
+        agent_reflection: Some(settings.agent_reflection),
+        export_lessons: Some(settings.export_lessons),
+        verify_command: record
+            .verify_command
+            .filter(|command| !command.trim().is_empty()),
+        auto_verify: record.auto_verify,
+        question_cap: Some(planning.question_cap as u32),
+        planner_agent: planning.planner_agent.filter(|agent| !agent.is_empty()),
+        preview_command: record
+            .preview_command
+            .filter(|command| !command.trim().is_empty()),
+        review_captures: Some(record.review_captures.unwrap_or(true)),
     }
 }
 
@@ -274,6 +291,8 @@ fn learning_summary(entry: &super::knowledge::KnowledgeEntry) -> Option<protocol
         managed: source.managed,
         updated_at: entry.updated_at.clone(),
         archived_reason: state.archived_reason.clone(),
+        misses: (state.misses > 0).then_some(state.misses),
+        attention: super::knowledge::learning::attention(entry),
     })
 }
 
@@ -440,17 +459,16 @@ fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionVie
             .filter(|run| run.result.is_empty() && protocol::working(Some(&run.status)))
             .map(|run| run.streaming.clone())
             .unwrap_or_default(),
+        review_screenshots: run
+            .and_then(|run| run.review_captures.as_ref())
+            .map(|captures| captures.image_count() as u32)
+            .filter(|count| *count > 0),
         questions: run
             .map(|run| {
                 run.prompts
                     .iter()
                     .filter(|prompt| prompt.status == "pending")
-                    .map(|prompt| protocol::Question {
-                        id: prompt.id.clone(),
-                        run_id: prompt.run_id.clone(),
-                        question: prompt.question.clone(),
-                        options: prompt.options.clone(),
-                    })
+                    .map(super::planning::cli::question)
                     .collect()
             })
             .unwrap_or_default(),
@@ -464,7 +482,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             Ok(Response::Projects {
                 projects: super::project_registry::list(&runtime)
                     .into_iter()
-                    .map(project_summary)
+                    .map(|record| project_summary(&runtime, record))
                     .collect(),
             })
         }
@@ -745,6 +763,12 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             workspace_mode,
             learn_automatically,
             learning_cadence,
+            sync_lessons,
+            agent_reflection,
+            export_lessons,
+            question_cap,
+            planner_agent,
+            review_captures,
         } => {
             use tauri::Emitter;
             let mode = workspace_mode
@@ -763,12 +787,37 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 super::project_registry::LearningSettings {
                     automatic: learn_automatically,
                     cadence: learning_cadence,
+                    sync: sync_lessons,
+                    agent: agent_reflection,
+                    export: export_lessons,
                 },
             )?;
+            if question_cap.is_some() || planner_agent.is_some() {
+                let store = super::planning::session::store_for(&runtime);
+                let mut planning = store.settings(&project_id);
+                if let Some(cap) = question_cap {
+                    planning.question_cap = cap as usize;
+                }
+                if let Some(agent) = planner_agent {
+                    let agent = agent.trim().to_string();
+                    if agent.is_empty() || planning.planner_agent.as_deref() != Some(&agent) {
+                        // A planning model belongs to the planning agent.
+                        planning.planner_model = None;
+                    }
+                    planning.planner_agent = Some(agent).filter(|agent| !agent.is_empty());
+                }
+                store.save_settings(&project_id, planning)?;
+            }
+            let record = match review_captures {
+                Some(enabled) => {
+                    super::project_registry::set_review_captures(&runtime, &project_id, enabled)?
+                }
+                None => record,
+            };
             // The app adopts registry settings when it merges the registry.
             let _ = app.emit("jackalope:projects-registered", ());
             Ok(Response::Project {
-                project: project_summary(record),
+                project: project_summary(&runtime, record),
             })
         }
         Request::SessionLearn { session_id } => {
@@ -883,6 +932,167 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 super::delivery::task_pull_request_create(run.id, title, body, draft, app.state())
                     .await?;
             Ok(Response::PullRequest { url })
+        }
+        Request::BrowserProfile {
+            project_id,
+            action,
+            url,
+        } => {
+            use super::browser_profiles as profiles;
+            let runtime = app.state::<TaskRuntime>();
+            let root = runtime.browser_profiles_root();
+            super::project_registry::record(&runtime, &project_id)
+                .ok_or("That project is not registered.")?;
+            let profile = tauri::async_runtime::spawn_blocking(move || {
+                let found = profiles::find(&root, "project", &project_id);
+                let profile = match action.as_str() {
+                    "" => found,
+                    "open" => {
+                        let profile =
+                            profiles::ensure(&root, "project", &project_id, "Project browser")?;
+                        profiles::open_window(&root, &profile, url.as_deref())?;
+                        profiles::find(&root, "project", &project_id)
+                    }
+                    "done" => {
+                        if let Some(profile) = &found {
+                            profiles::close_window(&root, &profile.id)?;
+                        }
+                        profiles::find(&root, "project", &project_id)
+                    }
+                    _ => return Err("Use open or done.".to_string()),
+                };
+                Ok::<_, String>(profile.map(|profile| {
+                    let status = profiles::status(&root, profile);
+                    protocol::BrowserProfileView {
+                        name: status.profile.name,
+                        sites: status.profile.signed_in_sites,
+                        size_bytes: status.size_bytes,
+                        last_used_at: status.profile.last_used_at,
+                        in_use: status.in_use,
+                        window_open: status.window_open,
+                    }
+                }))
+            })
+            .await
+            .map_err(|e| e.to_string())??;
+            Ok(Response::BrowserProfile { profile })
+        }
+        Request::Computer { session_id, action } => {
+            use super::computers;
+            let runtime = app.state::<TaskRuntime>().inner().clone();
+            let root = runtime.computers_root();
+            let sessions = app.state::<LiveSessions>();
+            let computer = match sessions.persona(&session_id) {
+                Some(persona) => computers::find(&root, "bot", &persona.bot_id),
+                None => runtime
+                    .integration_runs()?
+                    .into_iter()
+                    .filter(|run| run.live_session_id.as_deref() == Some(session_id.as_str()))
+                    .max_by(|left, right| left.started_at.cmp(&right.started_at))
+                    .and_then(|run| computers::find(&root, "task", &run.task_id)),
+            };
+            let Some(computer) = computer else {
+                return Ok(Response::Computer { computer: None });
+            };
+            let status = tauri::async_runtime::spawn_blocking(move || {
+                computers::usage::refresh_run_leases(&runtime);
+                match action.as_str() {
+                    "" => {}
+                    "start" => computers::start_background(root.clone(), computer.clone())?,
+                    "stop" => computers::stop(&root, &computer)?,
+                    _ => return Err("Use start or stop.".to_string()),
+                }
+                Ok::<_, String>(computers::status(&root, computer))
+            })
+            .await
+            .map_err(|e| e.to_string())??;
+            Ok(Response::Computer {
+                computer: Some(protocol::ComputerView {
+                    name: status.computer.name,
+                    provider: status.computer.provider,
+                    state: status.state,
+                    phase: status.phase,
+                    error: status.error,
+                    usage: status.usage,
+                    stopped_idle: status.stopped_idle,
+                }),
+            })
+        }
+        Request::PlanStart {
+            project_path,
+            goal,
+            agent,
+        } => {
+            let project = ensure_project(app, &project_path)?;
+            let runtime = app.state::<TaskRuntime>();
+            let policy = runtime.policy()?;
+            let default_agent = policy
+                .projects
+                .get(&project.id)
+                .and_then(|project| project.preferred_runner.clone())
+                .filter(|agent| !agent.is_empty())
+                .unwrap_or_else(|| policy.default_meta_agent.clone());
+            let template: super::tasks::RunRequest = serde_json::from_value(serde_json::json!({
+                "id": format!("plan-{}", uuid::Uuid::new_v4().simple()),
+                "projectId": project.id,
+                "projectName": project.name,
+                "projectPath": project.path,
+                "agent": agent.filter(|agent| !agent.is_empty()).unwrap_or(default_agent),
+                "model": null,
+                "prompt": "",
+                "isolated": true,
+                "previousRunId": null,
+            }))
+            .map_err(|error| error.to_string())?;
+            let coordinator = app
+                .state::<super::coordination::Coordinator>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                super::planning::cli::start(&coordinator, template, goal)
+            })
+            .await
+            .map_err(|error| error.to_string())?
+        }
+        Request::Plans { project_path } => {
+            let project = ensure_project(app, &project_path)?;
+            let coordinator = app
+                .state::<super::coordination::Coordinator>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                super::planning::cli::list(&coordinator, &project.id)
+            })
+            .await
+            .map_err(|error| error.to_string())?
+        }
+        Request::PlanDetail { plan_id } => {
+            let coordinator = app
+                .state::<super::coordination::Coordinator>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                super::planning::cli::get(&coordinator, &plan_id)
+            })
+            .await
+            .map_err(|error| error.to_string())?
+        }
+        Request::PlanAction {
+            plan_id,
+            action,
+            text,
+            revision,
+            hash,
+        } => {
+            let coordinator = app
+                .state::<super::coordination::Coordinator>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                super::planning::cli::action(&coordinator, &plan_id, &action, text, revision, hash)
+            })
+            .await
+            .map_err(|error| error.to_string())?
         }
         Request::Ping => Ok(Response::Ok),
         Request::ShowWindow => Ok(show_window(app)),

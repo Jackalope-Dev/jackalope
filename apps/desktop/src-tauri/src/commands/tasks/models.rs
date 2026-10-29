@@ -131,6 +131,18 @@ pub struct TaskRun {
     pub validation_steps: Vec<crate::commands::harness::ValidationStep>,
     #[serde(default)]
     pub screenshots: Vec<crate::commands::harness::ScreenshotArtifact>,
+    /// Desktop-control actions for the Screen view, newest last and bounded.
+    #[serde(default)]
+    pub desktop_actions: Vec<crate::commands::desktop_control::DesktopActionRecord>,
+    /// Local preview paths the agent opened in its task browser, newest last.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub visited_pages: Vec<String>,
+    /// Before/after screenshots Jackalope captured for review.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_captures: Option<crate::commands::previews::review::ReviewCaptures>,
+    /// Review screenshots are being captured after the attempt finished.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub review_capturing: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -353,6 +365,11 @@ impl TaskRun {
             prompts: self.prompts.clone(),
             validation_steps: self.validation_steps.clone(),
             screenshots: self.screenshots.clone(),
+            desktop_actions: self.desktop_actions[self.desktop_actions.len().saturating_sub(12)..]
+                .to_vec(),
+            visited_pages: self.visited_pages.clone(),
+            review_captures: self.review_captures.clone(),
+            review_capturing: self.review_capturing,
         }
     }
 }

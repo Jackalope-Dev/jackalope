@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { latestBetaRequest, requestBeta, withdrawBeta } from './beta';
 import { randomToken, tokenHash } from './crypto';
 import { memberFeedback } from './feedback';
+import { lessonsRoute } from './lessons';
 import { AccessError, invitations, type Member, tokenSchema } from './service';
 import { settingsRoute } from './settings';
 import { openSignup, waitlistProgress } from './waitlist';
@@ -194,6 +195,28 @@ export async function deviceRoutes(
           .run();
       }
       return json(result);
+    }
+    if (url.pathname === '/v1/desktop/lessons' || url.pathname.startsWith('/v1/desktop/lessons/')) {
+      const member = await deviceMember(env, hash, now);
+      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      const action =
+        url.pathname === '/v1/desktop/lessons' && request.method === 'DELETE'
+          ? 'delete'
+          : url.pathname === '/v1/desktop/lessons/pull' && request.method === 'POST'
+            ? 'pull'
+            : url.pathname === '/v1/desktop/lessons/push' && request.method === 'POST'
+              ? 'push'
+              : undefined;
+      if (!action) throw new AccessError(404, 'not_found');
+      return json(
+        await lessonsRoute(
+          env,
+          member.memberId,
+          member.id,
+          action,
+          action === 'delete' ? undefined : await readJson(request),
+        ),
+      );
     }
     if (request.method === 'POST' && url.pathname === '/v1/desktop/feedback') {
       const member = await deviceMember(env, hash, now);

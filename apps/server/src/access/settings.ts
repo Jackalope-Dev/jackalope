@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { deleteLessonStatements } from './lessons';
 import { AccessError } from './service';
 
 const syncedSettingsSchema = z.strictObject({
@@ -25,6 +26,7 @@ export async function settingsRoute(
       env.DB.prepare('UPDATE access_members SET settings_sync_deleted=1 WHERE id=?').bind(memberId),
       env.DB.prepare('UPDATE access_devices SET settings_sync=0 WHERE member_id=?').bind(memberId),
       env.DB.prepare('DELETE FROM access_settings WHERE member_id=?').bind(memberId),
+      ...deleteLessonStatements(env, memberId),
     ]);
     return { revision: 0, settings: null };
   }

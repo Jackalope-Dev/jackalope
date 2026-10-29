@@ -53,6 +53,38 @@ release dates.
   Include parent-task links, unified Needs you counts, shared file browsing, preview
   setup explanations and evidence attachment, and blocked-result review. Include optional
   file markers, outcome approval, and real agent-review requests from the review toolbar.
+- [ ] Accept automatic review screenshots in installed apps on Windows, macOS and Linux
+  with real Vite, Next.js and static preview commands: after-only and before/after
+  captures, slow or failing previews hitting the time limits, stop during capture,
+  browser-tagged plan criteria, the slider and side-by-side views at 960 by 640 in
+  light and dark themes, keyboard use of the slider, and the TUI `/settings` toggle.
+  Confirm no browser window appears and no preview process or profile is left behind.
+- [ ] Accept [bot computers](BOT-COMPUTERS.md) in installed apps: Docker Desktop with the
+  WSL 2 backend on Windows, Docker Desktop and Colima on Apple Silicon (arm64 image) and
+  Intel macOS, and Docker Engine on Linux, including missing, stopped and
+  Windows-containers Docker; the first image build and its progress, start, stop,
+  restart persistence of the home volume, changed resources recreating the container,
+  networking off, a task's read-only project share and delete. Check Watch and Take over
+  in the embedded viewer, `desktop_control` snapshots, refs, typing and chords on the
+  computer, browser tools attached to its Chromium with all four site answers and the
+  sign-in pause, `computer_request` answers, `computer_exec` limits, `/computer`, and that
+  no container, volume or `docker exec` process is left behind after delete. Check the
+  idle stop at 5 minutes with no run or viewer, that an active run and an open viewer
+  hold the computer, that an agent call and Watch start a stopped computer, the
+  countdown in each status view, and that quitting stops sandboxes without delaying
+  exit (and leaves them running with the setting on, adopted at the next launch).
+- [ ] Pair a cloud machine on at least one real provider behind HTTPS (Caddy or similar):
+  wrong secret, unreachable machine, Test connection, desktop control and commands
+  through the agent, the external viewer page and removal. Decide whether browser tools
+  should reach cloud machines through an authenticated DevTools proxy.
+- [ ] Add AT-SPI accessibility actions and stable refs to the in-sandbox agent.
+- [ ] Accept persistent agent browser profiles in installed apps on Windows, macOS and
+  Linux with Chrome, Edge and Chromium: open the Project browser and a bot browser to
+  sign in, confirm sign-ins survive closing the window, an app restart and a later
+  task; site questions (all four answers) and saved decisions; the agent-triggered
+  sign-in pause and resume; a second task refused while the profile is busy; Clear site
+  data, Delete profile and `/browser`; and that no Chromium process or lease remains
+  after stop, completion, quitting during a session or a crash.
 - [ ] Accept the `jackalope` command in installed macOS, Windows and Linux packages,
   including a folder that is not a Git repository (direct edits, no patch or merge)
   and `--init` (initial commit, starter ignore, refusal of a home directory or drive root):
@@ -100,6 +132,15 @@ release dates.
   setup/check reuse and dependency scheduling. Include failures, independent review,
   corrections and defects; validate requested tiers in installed provider versions.
 
+- [ ] Accept [plan mode](PLAN-MODE.md) with installed providers: Codex and Claude Code
+  interviews that stay read-only and respect the question cap, approval to merge for
+  single, subtasks and swarm shapes, a plan review that finds and repairs a seeded gap,
+  a declared deviation pausing dependent work, and a re-plan that keeps finished tasks.
+  Measure whether interviews reduce repairs and corrections against the same requests
+  without plan mode. Verify the app plan page, written plans, the Planning settings group
+  and terminal panel with keyboard, light and dark themes, reduced motion and narrow
+  windows. Accept a review-only plan (no check) and a criteria-checked plan through
+  merge, and the deviation notification, banner and picker.
 - [ ] Measure automatic subtasks on representative requests: planning overhead versus
   single-lead time, how often plans return one assignment, validation failures, and
   combined-result quality. Tune the local-rules size threshold from those results.
@@ -192,6 +233,14 @@ release dates.
 - [ ] Validate hourly schedules, timezones, missed runs and restart recovery in installed builds.
 - [ ] Complete packaged desktop-control checks, including multiple monitors,
   interruption, indicator failure and permission renewal.
+- [ ] Accept desktop-control grant levels in installed builds on Windows and macOS:
+  app and full-desktop grants, remembered project grants and their removal, the
+  frame/glow on each monitor, switch_window/open_app, clipboard logging, site
+  questions in Chrome, Edge, Firefox, Zen and Safari, page-only snapshots, and
+  accessibility actions against real apps (focus and pointer left untouched).
+- [ ] Run `native_desktop_window_trial` on an interactive Windows test desktop and
+  compare action latency with the per-action baseline before claiming speedups for
+  installed builds.
 - [ ] Validate Gemini CLI task execution with installed profiles: login and account switching,
   headless flags and stream events for the installed version, exact-session resume, reported
   usage, cancellation, the attempt limit, quota and permission failures. Unit tests do not
@@ -252,12 +301,21 @@ release dates.
 - [ ] Verify automatic lessons across tasks, queues, schedules and restart,
   including evidence, edits, removal and frozen task context. Measure outcomes.
 - [ ] Run background learning in the installed app across agents and conversations:
-  cadence and end-of-work reflection, probation, archiving, restore and history.
-  Calibrate the cadence, probation and archive thresholds against real use, and
-  measure whether learned lessons reduce repeated corrections before claiming it.
-- [ ] Add an opt-in account sync layer for learned lessons over settings sync: match
-  by learned id and project ID, merge by revision, append history records by id, and
-  leave evidence excerpts and local use counts on the device.
+  cadence and end-of-work reflection, probation, archiving, restore, curator folds,
+  missed and contradicted lessons, stale-lesson checks and history. Use Learning
+  activity to calibrate the cadence, probation, archive, miss and curator thresholds
+  against real use, check how often misses and stale references are false positives,
+  and measure whether learned lessons reduce repeated corrections before claiming it.
+- [ ] Accept learned-lesson sync with two installed desktops on one account and a
+  second account: first enable, offline edits on both sides, tombstones, per-project
+  exclusion, Delete synced lessons and the reset on the other desktop, account
+  switching, and a project without commits. Apply `0019_lesson_sync.sql` before the
+  Worker. Confirm evidence, use counts and paths never reach the service.
+- [ ] Run agent reflection with each supported default agent and account: quota and
+  time limits, failures that stay out of tasks, and whether its suggestions survive
+  probation more often than local reflection.
+- [ ] Check lesson export in real repositories: Claude Code loading the skill, other
+  agents reading the `AGENTS.md` section, CRLF files, worktrees and removal.
 - [ ] Extend codebase semantic coverage, project knowledge and scheduled continuation.
 - [ ] Verify Usage & quota drilldowns against installed history, including dated
   project-attributed Ask Jackalope turns, archived helper conversations and
@@ -360,13 +418,22 @@ release dates.
   discovery, process/PTY/browser behavior and trial packaging. Keep WSL/Xvfb fixtures separate from installed desktop acceptance.
 - [ ] Run macOS helper compilation/guard CI and native desktop-control acceptance
   on macOS and real X11 desktops. Check ScreenCaptureKit and older-system capture
-  paths, physical interruption, permission readiness and held mouse buttons.
+  paths, physical interruption, permission readiness and held mouse buttons. On
+  macOS also accept the resident helper and its one-process fallback, AX element
+  refs, AXPress/AXValue actions, monitor capture with the indicator excluded, the
+  in-control frame and clipboard access.
 - [ ] Validate macOS/Linux notification clicks, permission denial, tray-host loss
   and macOS Dock reopening in installed builds.
 - [ ] Accept the GNOME 46 Wayland extension on Ubuntu 24.04 devices: installation,
   physical interruption, IME engines, scaling, multiple monitors and extension
-  lifecycle. Retain X11 coverage; other compositors and GNOME versions need their
-  own guarded integration before exposing native input.
+  lifecycle. Retain X11 coverage.
+- [ ] Accept the XDG portal desktop-control backend on installed KDE Plasma 6, GNOME
+  without the extension and a wlroots desktop (Sway with xdg-desktop-portal-wlr must
+  report unavailable): the approval dialog, restore-token reuse, sharing-indicator
+  stop, AT-SPI snapshots and actions in GTK, Qt and Chromium apps, keysym typing,
+  monitor crop and scaling with fractional scaling and multiple monitors, and the
+  Jackalope-window guard for coordinate input. Add a CI fixture that drives a real
+  portal session.
 - [ ] Validate signed installation, older-to-newer updates, real execution and
   saved-data recovery on each intended platform before enabling its download.
 - [ ] Check approved, pending, revoked and offline-expired accounts in development

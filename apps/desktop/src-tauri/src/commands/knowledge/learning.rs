@@ -7,29 +7,112 @@
 use super::*;
 use sha2::{Digest, Sha256};
 
+mod agent;
+mod curate;
+mod export;
 pub mod ledger;
 mod redact;
 mod reflect;
+mod stale;
+pub mod sync;
 pub mod watcher;
 
+pub use agent::{agent_reflection, AgentBudget};
+pub use curate::FOLDED;
+pub use export::export_project;
 pub use ledger::LedgerRecord;
 pub use redact::redact;
-pub use reflect::{reflect, Observation, ObservationKind};
+pub use reflect::{outcomes, reflect, reflect_delivered, Observation, ObservationKind, Outcome};
 
-/// Distinct deliveries that end a lesson's probation.
-pub const PROBATION_DELIVERIES: u64 = 2;
-/// Eligible tasks after which a lesson that was never delivered is archived.
-pub const PROBATION_OPPORTUNITIES: u64 = 30;
-/// Eligible tasks since its last delivery after which a lesson is archived.
-pub const IDLE_OPPORTUNITIES: u64 = 100;
-/// Available learned lessons per project; the least used is archived first.
-pub const PROJECT_CAPACITY: usize = 40;
-/// Reported tool calls between background reflections of a running task.
+/// Every tunable of the learning loop. Change values here only; the names
+/// below are aliases for use in messages. See docs/PROJECT-KNOWLEDGE.md.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Thresholds {
+    /// Distinct deliveries that end a lesson's probation.
+    pub probation_deliveries: u64,
+    /// Eligible tasks after which a lesson on probation that was never
+    /// delivered is archived.
+    pub probation_opportunities: u64,
+    /// Eligible tasks since its last delivery after which a lesson is archived.
+    pub idle_opportunities: u64,
+    /// Available learned lessons per project; the least used is archived first.
+    pub project_capacity: usize,
+    /// New lessons one reflection may add, so a noisy run cannot flood a project.
+    pub adds_per_reflection: usize,
+    /// Near-duplicates one curator pass may fold.
+    pub folds_per_curation: usize,
+    /// Lesson changes in a project that make a curator pass due.
+    pub curate_after_changes: u64,
+    /// Seconds after which an active project is curated again regardless.
+    pub curate_every_seconds: u64,
+    /// Word overlap (0–1) at which the curator treats two lessons as one.
+    pub fold_similarity: f64,
+    /// Word overlap (0–1) at which a new lesson counts as one already saved:
+    /// it strengthens a lesson Jackalope wrote, or is skipped beside one the
+    /// person wrote.
+    pub duplicate_similarity: f64,
+    /// Most-used active lessons mirrored into AGENTS.md and the Claude Code
+    /// skill, which agents read on every run.
+    pub export_limit: usize,
+    /// Agent reflections per rolling hour and day across all projects.
+    pub agent_reflections_per_hour: usize,
+    pub agent_reflections_per_day: usize,
+    /// Seconds an agent reflection may take before it is stopped.
+    pub agent_timeout_seconds: u64,
+    /// Bytes of the person's redacted words one agent reflection reads.
+    pub agent_window_bytes: usize,
+    /// Word overlap (0–1) at which something the person says after a lesson
+    /// was supplied restates it (a miss) or, with the opposite intent,
+    /// contradicts it.
+    pub miss_similarity: f64,
+    /// Misses within `miss_window` deliveries that mark a lesson as one
+    /// agents keep missing.
+    pub misses_to_flag: usize,
+    /// Most recent deliveries the misses are counted over.
+    pub miss_window: u64,
+    /// Lessons one stale-lesson check inspects per project.
+    pub stale_lessons_per_check: usize,
+    /// Paths, scripts and targets one lesson may name for the check.
+    pub stale_references_per_lesson: usize,
+}
+
+pub const THRESHOLDS: Thresholds = Thresholds {
+    probation_deliveries: 2,
+    probation_opportunities: 30,
+    idle_opportunities: 100,
+    project_capacity: 20,
+    adds_per_reflection: 3,
+    folds_per_curation: 5,
+    curate_after_changes: 10,
+    curate_every_seconds: 24 * 60 * 60,
+    fold_similarity: 0.7,
+    duplicate_similarity: 0.7,
+    export_limit: 12,
+    agent_reflections_per_hour: 4,
+    agent_reflections_per_day: 20,
+    agent_timeout_seconds: 45,
+    agent_window_bytes: 6000,
+    miss_similarity: 0.5,
+    misses_to_flag: 2,
+    miss_window: 10,
+    stale_lessons_per_check: 100,
+    stale_references_per_lesson: 8,
+};
+
+pub const PROBATION_DELIVERIES: u64 = THRESHOLDS.probation_deliveries;
+pub const PROBATION_OPPORTUNITIES: u64 = THRESHOLDS.probation_opportunities;
+pub const IDLE_OPPORTUNITIES: u64 = THRESHOLDS.idle_opportunities;
+pub const PROJECT_CAPACITY: usize = THRESHOLDS.project_capacity;
+const ADDS_PER_REFLECTION: usize = THRESHOLDS.adds_per_reflection;
+/// Reported tool calls between background reflections of a running task; a
+/// per-project setting.
 pub const DEFAULT_CADENCE: u32 = 50;
-/// New lessons one reflection may add, so a noisy run cannot flood a project.
-const ADDS_PER_REFLECTION: usize = 5;
 const EVIDENCE_REFERENCES: usize = 10;
 const RECENT_RUNS: usize = 8;
+/// `archived_reason` of a lesson on probation that agents kept missing.
+pub const IGNORED: &str = "ignored";
+/// `archived_reason` of a lesson that names something the project no longer has.
+pub const STALE: &str = "stale";
 
 pub const PROBATION: &str = "probation";
 pub const ACTIVE: &str = "active";
@@ -48,7 +131,7 @@ pub struct Lifecycle {
     /// repeats or contradicts it.
     #[serde(default)]
     pub statement: String,
-    /// `reflection` (background) or `session` (`/learn`).
+    /// `reflection` (background), `session` (`/learn`) or `agent`.
     #[serde(default)]
     pub origin: String,
     #[serde(default)]
@@ -69,6 +152,39 @@ pub struct Lifecycle {
     pub recent_runs: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub archived_reason: Option<String>,
+    /// Restored after the curator folded it into another lesson, so the
+    /// curator leaves it apart from then on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub distinct: bool,
+    /// Times the person restated this lesson after it was supplied, as if the
+    /// agent had not followed it.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub misses: u64,
+    /// Runs already judged against this lesson, newest last, so reflecting
+    /// on a run again never counts it twice.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub corrections: Vec<Correction>,
+    /// Agents keep missing it: ranked first among equally matching lessons
+    /// until the misses fall out of the delivery window.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub missed_often: bool,
+}
+
+/// One run in which the person corrected the agent on a supplied lesson.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Correction {
+    pub run_id: String,
+    /// The lesson's delivery count when it happened.
+    #[serde(default)]
+    pub delivery: u64,
+    /// The person said otherwise rather than restating it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub contradicted: bool,
+}
+
+fn is_zero(value: &u64) -> bool {
+    *value == 0
 }
 
 impl Lifecycle {
@@ -78,6 +194,31 @@ impl Lifecycle {
     pub fn on_probation(&self) -> bool {
         self.status == PROBATION
     }
+    /// Misses within the last `miss_window` deliveries.
+    pub fn recent_misses(&self, thresholds: &Thresholds) -> usize {
+        self.corrections
+            .iter()
+            .filter(|item| {
+                !item.contradicted
+                    && self.deliveries.saturating_sub(item.delivery) < thresholds.miss_window
+            })
+            .count()
+    }
+}
+
+/// Fresh counts for a restored lesson, shared by Restore and the editor.
+pub(super) fn reset_for_restore(state: &mut Lifecycle) {
+    state.distinct |= state.archived_reason.as_deref() == Some(curate::FOLDED);
+    state.status = if state.deliveries >= PROBATION_DELIVERIES {
+        ACTIVE.into()
+    } else {
+        PROBATION.into()
+    };
+    state.archived_reason = None;
+    state.opportunities = 0;
+    state.idle = 0;
+    state.corrections.clear();
+    state.missed_often = false;
 }
 
 /// A lesson reflection wants to exist. Evidence is a reference (task or
@@ -128,13 +269,27 @@ pub struct Promotion {
     pub known: Vec<String>,
 }
 
-/// Machine-independent: a project's learned lesson has the same id on every
-/// device, so a later sync layer can match entries without paths.
+/// Independent of the folder. Project ids belong to one installation, so
+/// lesson sync matches projects by repository and keeps these ids as they are.
 pub fn learned_id(project_id: &str, key: &str) -> String {
     let hash = Sha256::digest(format!("learned-v1\0{project_id}\0{key}"));
     let mut bytes = [0u8; 16];
     bytes.copy_from_slice(&hash[..16]);
     uuid::Uuid::from_bytes(bytes).to_string()
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Lets curator tests seed near-duplicates, as sync can deliver them.
+    pub(super) static SKIP_DUPLICATE_CHECK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+fn duplicate_check() -> bool {
+    #[cfg(test)]
+    if SKIP_DUPLICATE_CHECK.with(std::cell::Cell::get) {
+        return false;
+    }
+    true
 }
 
 pub(super) fn lifecycle(entry: &KnowledgeEntry) -> Option<&Lifecycle> {
@@ -143,6 +298,16 @@ pub(super) fn lifecycle(entry: &KnowledgeEntry) -> Option<&Lifecycle> {
 
 fn lifecycle_mut(entry: &mut KnowledgeEntry) -> Option<&mut Lifecycle> {
     entry.automatic.as_mut()?.lifecycle.as_mut()
+}
+
+/// A short note on why a lesson needs a look, for the terminal's `/learnings`.
+pub fn attention(entry: &KnowledgeEntry) -> Option<String> {
+    if let Some(thing) = &entry.stale {
+        return Some(format!("names {thing}, which no longer exists"));
+    }
+    lifecycle(entry)
+        .filter(|state| state.missed_often && !state.archived())
+        .map(|_| "agents keep missing this".into())
 }
 
 /// Whether the loop may change this entry: Jackalope wrote it and nobody has
@@ -205,15 +370,9 @@ fn archive(entry: &mut KnowledgeEntry, reason: &str) {
 
 fn restore(entry: &mut KnowledgeEntry) {
     if let Some(state) = lifecycle_mut(entry) {
-        state.status = if state.deliveries >= PROBATION_DELIVERIES {
-            ACTIVE.into()
-        } else {
-            PROBATION.into()
-        };
-        state.archived_reason = None;
-        state.opportunities = 0;
-        state.idle = 0;
+        reset_for_restore(state);
     }
+    entry.stale = None;
     entry.enabled = true;
     touch(entry);
 }
@@ -347,6 +506,40 @@ fn apply(
                     lesson.title, covered.title
                 ));
             }
+            // A lesson that says nearly the same thing as one already saved
+            // strengthens that one instead of adding another to choose from.
+            if let Some(similar) = entries.iter().filter(|_| duplicate_check()).find(|entry| {
+                in_project(entry, project_id, path)
+                    && !entry.dismissed
+                    && entry.enabled
+                    && entry.kind == KnowledgeKind::Memory
+                    && lifecycle(entry).is_none_or(|state| state.status != ARCHIVED)
+                    && {
+                        let existing = lifecycle(entry)
+                            .map(|state| state.statement.as_str())
+                            .filter(|statement| !statement.is_empty())
+                            .unwrap_or(&entry.content);
+                        reflect::negative(existing) == reflect::negative(&lesson.statement)
+                            && reflect::similarity(existing, &lesson.statement)
+                                >= THRESHOLDS.duplicate_similarity
+                    }
+            }) {
+                if owned(similar) {
+                    let target = similar.id.clone();
+                    return apply(
+                        entries,
+                        project_id,
+                        path,
+                        Proposal::Merge { target, lesson },
+                        origin,
+                        adds,
+                    );
+                }
+                return Err(format!(
+                    "Skipped \"{}\": too similar to \"{}\".",
+                    lesson.title, similar.title
+                ));
+            }
             if let Some(conflict) = entries.iter().find(|entry| {
                 in_project(entry, project_id, path)
                     && !entry.dismissed
@@ -443,6 +636,7 @@ fn apply(
                         ..Default::default()
                     }),
                 }),
+                stale: None,
                 source_run_id: lesson.run_id.clone(),
                 source_head: None,
                 revision: 1,
@@ -645,6 +839,11 @@ impl KnowledgeStore {
                 state.deliveries += 1;
                 state.idle = 0;
                 state.last_delivered_at = Some(now.clone());
+                if state.missed_often
+                    && state.recent_misses(&THRESHOLDS) < THRESHOLDS.misses_to_flag
+                {
+                    state.missed_often = false;
+                }
             }
             state.recent_runs.push(run_id.into());
             if state.recent_runs.len() > RECENT_RUNS {
@@ -657,7 +856,7 @@ impl KnowledgeStore {
             }
             let expired = automatic
                 && managed
-                && if state.deliveries == 0 {
+                && if state.deliveries == 0 && state.on_probation() {
                     state.opportunities >= PROBATION_OPPORTUNITIES
                 } else {
                     state.idle >= IDLE_OPPORTUNITIES
@@ -672,7 +871,8 @@ impl KnowledgeStore {
                 ));
             }
             if expired {
-                let never = lifecycle(entry).is_some_and(|state| state.deliveries == 0);
+                let never = lifecycle(entry)
+                    .is_some_and(|state| state.deliveries == 0 && state.on_probation());
                 archive(entry, "unused");
                 records.push(record(
                     entry,
@@ -691,6 +891,97 @@ impl KnowledgeStore {
             self.append_ledger(&records);
         }
         Ok(())
+    }
+
+    /// Records what the person said about lessons supplied to a run: a
+    /// restatement counts as a miss, and enough recent misses flag the lesson;
+    /// a lesson Jackalope wrote that is still on probation is then archived. A
+    /// contradiction is only recorded here; reflection patches or retires the
+    /// lesson. Each run is judged once per lesson. Returns the records written.
+    pub fn record_outcomes(
+        &self,
+        project_id: &str,
+        project_path: &str,
+        run_id: &str,
+        found: &[Outcome],
+        thresholds: &Thresholds,
+    ) -> Result<u64, String> {
+        if found.is_empty() {
+            return Ok(0);
+        }
+        let path = canonical(project_path)?;
+        let _lock = self.lock.lock().map_err(|e| e.to_string())?;
+        let mut entries = self.read()?;
+        let mut records = vec![];
+        let mut changed = false;
+        for outcome in found {
+            let Some(entry) = entries.iter_mut().find(|entry| {
+                entry.id == outcome.entry_id && in_project(entry, project_id, &path) && live(entry)
+            }) else {
+                continue;
+            };
+            let managed = owned(entry);
+            let state = lifecycle_mut(entry).unwrap();
+            if state.corrections.iter().any(|item| item.run_id == run_id) {
+                continue;
+            }
+            state.corrections.push(Correction {
+                run_id: run_id.into(),
+                delivery: state.deliveries,
+                contradicted: outcome.contradicted,
+            });
+            if state.corrections.len() > RECENT_RUNS {
+                state.corrections.remove(0);
+            }
+            changed = true;
+            let excerpt: String = redact(&outcome.excerpt).chars().take(240).collect();
+            if outcome.contradicted {
+                records.push(with_evidence(
+                    record(
+                        entry,
+                        "contradicted",
+                        "Supplied to this task, then the person said otherwise.".into(),
+                        "reflection",
+                    ),
+                    &outcome.reference,
+                    &excerpt,
+                ));
+                continue;
+            }
+            state.misses += 1;
+            let recent = state.recent_misses(thresholds);
+            let flagged = recent >= thresholds.misses_to_flag;
+            let newly = flagged && !state.missed_often;
+            state.missed_often |= flagged;
+            let ignored = flagged && managed && state.on_probation();
+            let reason = if newly && !ignored {
+                "Restated after it was supplied to this task. Agents keep missing this, so it is supplied first among equally matching lessons."
+            } else {
+                "Restated after it was supplied to this task, as if the agent had not followed it."
+            };
+            records.push(with_evidence(
+                record(entry, "missed", reason.into(), "reflection"),
+                &outcome.reference,
+                &excerpt,
+            ));
+            if ignored {
+                archive(entry, IGNORED);
+                records.push(record(
+                    entry,
+                    "archived",
+                    format!(
+                        "Ignored by agents: missed {recent} times within its last {} deliveries while new.",
+                        thresholds.miss_window
+                    ),
+                    "lifecycle",
+                ));
+            }
+        }
+        if changed {
+            self.write(&entries)?;
+            self.append_ledger(&records);
+        }
+        Ok(records.len() as u64)
     }
 
     /// Archives or restores a learned lesson for a person. Edited lessons can
@@ -765,6 +1056,86 @@ pub fn observe_delivery(runtime: &TaskRuntime, request: &super::super::tasks::Ru
     ) {
         eprintln!("Learned lesson usage was not recorded: {error}");
     }
+}
+
+/// Local counts that help calibrate the thresholds: current lessons by status
+/// and their deliveries, and changes recorded in the retained history.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LearningMetrics {
+    pub probation: usize,
+    pub active: usize,
+    pub archived: usize,
+    /// Deliveries of current learned lessons on this device.
+    pub deliveries: u64,
+    pub learned: usize,
+    pub promoted: usize,
+    pub archived_events: usize,
+    pub restored: usize,
+    pub folded: usize,
+    pub retired: usize,
+    /// Times a supplied lesson was restated (missed) or contradicted.
+    pub missed: usize,
+    pub contradicted: usize,
+    /// Lessons found to name something the project no longer has.
+    pub stale: usize,
+    /// Lessons an agent reflection suggested.
+    pub by_agent: usize,
+    /// The oldest retained history record, which bounds the counts above.
+    pub since: Option<String>,
+}
+
+impl KnowledgeStore {
+    pub fn metrics(&self, project_id: &str, project_path: &str) -> Result<LearningMetrics, String> {
+        let mut metrics = LearningMetrics::default();
+        for entry in self.list(project_id, project_path)? {
+            let Some(state) = lifecycle(&entry) else {
+                continue;
+            };
+            metrics.deliveries += state.deliveries;
+            if state.archived() {
+                metrics.archived += 1;
+            } else if state.on_probation() {
+                metrics.probation += 1;
+            } else {
+                metrics.active += 1;
+            }
+        }
+        for record in ledger::read_project(&self.ledger_directory(), project_id) {
+            if metrics
+                .since
+                .as_ref()
+                .is_none_or(|since| record.at < *since)
+            {
+                metrics.since = Some(record.at.clone());
+            }
+            match record.action.as_str() {
+                "born" => {
+                    metrics.learned += 1;
+                    metrics.by_agent += usize::from(record.origin == "agent");
+                }
+                "promoted" => metrics.promoted += 1,
+                "archived" => metrics.archived_events += 1,
+                "restored" => metrics.restored += 1,
+                "curated" => metrics.folded += 1,
+                "retired" => metrics.retired += 1,
+                "missed" => metrics.missed += 1,
+                "contradicted" => metrics.contradicted += 1,
+                "stale" => metrics.stale += 1,
+                _ => {}
+            }
+        }
+        Ok(metrics)
+    }
+}
+
+#[tauri::command]
+pub fn knowledge_learning_metrics(
+    project_id: String,
+    project_path: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<LearningMetrics, String> {
+    state.knowledge.metrics(&project_id, &project_path)
 }
 
 #[tauri::command]

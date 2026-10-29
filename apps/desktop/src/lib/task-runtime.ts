@@ -175,6 +175,23 @@ export interface TaskRun {
   prompts?: PendingUserPrompt[];
   validationSteps?: ValidationStep[];
   screenshots?: ScreenshotArtifact[];
+  /** Desktop-control actions, newest last; summaries keep only the latest few. */
+  desktopActions?: DesktopActionRecord[];
+  /** Before/after screenshots Jackalope captured from the preview for review. */
+  reviewCaptures?: import('./review-captures.ts').ReviewCaptures | null;
+  /** Review screenshots are still being captured after the result was recorded. */
+  reviewCapturing?: boolean;
+}
+/** @public Named in the return types of usage-entries.ts and usage-insights.ts exports. */
+export interface DesktopActionRecord {
+  at: string;
+  action: string;
+  summary: string;
+  /** accessibility, pointer or keyboard for input actions. */
+  method?: string | null;
+  focusChanged?: boolean;
+  site?: string | null;
+  capture?: ScreenshotArtifact | null;
 }
 export interface StepProgress {
   /** Stable key: `workspace`, `dependencies`, `routing`, `agent` or `verification`. */
@@ -218,6 +235,12 @@ export interface PendingUserPrompt {
   answer?: string | null;
   createdAt: string;
   answeredAt?: string | null;
+  /** Optional card structure; absent on older questions. */
+  header?: string;
+  recommended?: string;
+  multiSelect?: boolean;
+  allowOther?: boolean;
+  rationale?: string;
 }
 export interface ValidationStep {
   id: string;

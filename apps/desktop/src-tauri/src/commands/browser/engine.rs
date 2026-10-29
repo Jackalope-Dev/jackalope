@@ -1,6 +1,5 @@
 use super::{check_canceled, Slot};
-#[cfg(unix)]
-mod chromium;
+pub(super) mod chromium;
 use crate::commands::process_control::ProcessTree;
 use serde_json::{json, Value};
 use std::{
@@ -48,7 +47,6 @@ pub struct Engine {
     child: Child,
     tree: Arc<ProcessTree>,
     canceled: Arc<std::sync::atomic::AtomicBool>,
-    #[cfg(unix)]
     browser: Option<chromium::BrowserProcess>,
 }
 
@@ -56,17 +54,39 @@ impl Engine {
     pub fn start(slot: Arc<Slot>) -> Result<Self, String> {
         check_canceled(&slot.canceled)?;
         slot.trees.lock().map_err(|e| e.to_string())?.clear();
+        let guard = slot.profile.lock().map_err(|e| e.to_string())?.clone();
+        if let Some(endpoint) = guard.as_ref().and_then(|guard| guard.remote_devtools()) {
+            let directory = create_session_directory()?;
+            let result = Self::spawn(
+                slot,
+                directory.clone(),
+                PathBuf::new(),
+                None,
+                Some(endpoint),
+            );
+            if result.is_err() {
+                remove_session_directory(&directory);
+            }
+            return result;
+        }
+        let profile = guard.map(|guard| guard.directory().to_path_buf());
         let browser = crate::commands::harness::find_browser_executable()
             .ok_or("Install Chrome, Edge or Chromium, or set JACKALOPE_BROWSER_EXECUTABLE to its executable, then restart Jackalope.")?;
         let directory = create_session_directory()?;
-        let result = Self::spawn(slot, directory.clone(), browser);
+        let result = Self::spawn(slot, directory.clone(), browser, profile, None);
         if result.is_err() {
             remove_session_directory(&directory);
         }
         result
     }
 
-    fn spawn(slot: Arc<Slot>, directory: PathBuf, browser: PathBuf) -> Result<Self, String> {
+    fn spawn(
+        slot: Arc<Slot>,
+        directory: PathBuf,
+        browser: PathBuf,
+        profile: Option<PathBuf>,
+        remote: Option<String>,
+    ) -> Result<Self, String> {
         let mut command = Command::new(executable()?);
         command
             .env_clear()
@@ -138,7 +158,6 @@ impl Engine {
             child,
             tree,
             canceled: slot.canceled.clone(),
-            #[cfg(unix)]
             browser: None,
         };
         let start = Instant::now();
@@ -161,17 +180,34 @@ impl Engine {
             std::thread::sleep(Duration::from_millis(25));
         }
         engine.call(json!({"action":"stream_disable"}))?;
-        #[cfg(windows)]
-        engine.call(
-            json!({"action":"launch", "headless":!slot.headed, "executablePath":browser,
-            "webmcp":false, "hideScrollbars":false}),
-        )?;
-        #[cfg(unix)]
-        {
-            let owned = chromium::BrowserProcess::start(&browser, &engine.directory, &slot)?;
+        if let Some(endpoint) = remote {
+            engine.call(json!({"action":"launch", "cdpUrl":endpoint, "webmcp":false}))?;
+        } else if let Some(profile) = &profile {
+            // Persistent profiles always run in a Chromium Jackalope owns, so the
+            // profile can be closed gracefully and its cookie domains read.
+            let owned = chromium::BrowserProcess::start_persistent(
+                &browser,
+                &engine.directory,
+                profile,
+                &slot,
+                None,
+            )?;
             let endpoint = owned.endpoint.clone();
             engine.browser = Some(owned);
             engine.call(json!({"action":"launch", "cdpUrl":endpoint, "webmcp":false}))?;
+        } else {
+            #[cfg(windows)]
+            engine.call(
+                json!({"action":"launch", "headless":!slot.headed, "executablePath":browser,
+                "webmcp":false, "hideScrollbars":false}),
+            )?;
+            #[cfg(unix)]
+            {
+                let owned = chromium::BrowserProcess::start(&browser, &engine.directory, &slot)?;
+                let endpoint = owned.endpoint.clone();
+                engine.browser = Some(owned);
+                engine.call(json!({"action":"launch", "cdpUrl":endpoint, "webmcp":false}))?;
+            }
         }
         engine.call(json!({"action":"viewport", "width":1280, "height":800}))?;
         Ok(engine)
@@ -180,6 +216,13 @@ impl Engine {
     #[cfg(all(test, unix))]
     pub(super) fn browser_pid(&self) -> u32 {
         self.browser.as_ref().unwrap().pid()
+    }
+
+    /// The loopback DevTools endpoint of a browser Jackalope launched itself.
+    pub fn devtools(&self) -> Option<&str> {
+        self.browser
+            .as_ref()
+            .map(|browser| browser.endpoint.as_str())
     }
 
     #[cfg(windows)]
@@ -286,14 +329,13 @@ impl Engine {
 
     fn terminate(&self) {
         self.tree.terminate();
-        #[cfg(unix)]
         if let Some(browser) = &self.browser {
             browser.terminate();
         }
     }
 }
 
-fn create_session_directory() -> Result<PathBuf, String> {
+pub(super) fn create_session_directory() -> Result<PathBuf, String> {
     #[cfg(unix)]
     let root = PathBuf::from("/tmp");
     #[cfg(windows)]
@@ -329,16 +371,16 @@ mod platform_tests {
 
 impl Drop for Engine {
     fn drop(&mut self) {
+        // A persistent browser closes gracefully first so its sign-ins reach disk.
+        drop(self.browser.take());
         self.terminate();
         let _ = self.child.kill();
         let _ = self.child.wait();
-        #[cfg(unix)]
-        drop(self.browser.take());
         remove_session_directory(&self.directory);
     }
 }
 
-fn remove_session_directory(directory: &std::path::Path) {
+pub(super) fn remove_session_directory(directory: &std::path::Path) {
     let deadline = Instant::now() + Duration::from_secs(3);
     loop {
         if !directory.exists() || std::fs::remove_dir_all(directory).is_ok() {

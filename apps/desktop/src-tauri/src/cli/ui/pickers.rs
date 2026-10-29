@@ -22,7 +22,20 @@ pub enum Action {
     AutoApprove,
     WorkspaceMode,
     LearnAutomatically,
+    SyncLessons,
+    AgentReflection,
+    ExportLessons,
+    /// Turn review screenshots from the preview command on or off.
+    ReviewCaptures,
+    /// Step the most questions a planning interview may ask.
+    QuestionCap,
+    /// Step the agent plans use.
+    PlannerAgent,
     OpenApp,
+    /// Open a plan in the plan panel.
+    OpenPlan(String),
+    /// Decide a deviation: `accept`, `redo` or `replan`.
+    ResolveDeviation(&'static str),
     /// Offer what can be done with a learned lesson.
     Learning(Learning),
     /// Show a learned lesson and its recent history in the feed.
@@ -59,6 +72,8 @@ pub enum PickerKind {
     History,
     Learnings,
     LearningActions,
+    Plans,
+    Deviation,
 }
 
 pub struct Picker {
@@ -165,7 +180,12 @@ pub fn learning_detail(learning: &Learning) -> String {
         uses => format!("used {uses} times"),
     };
     let edited = if learning.managed { "" } else { " · edited" };
-    format!("{status} · {uses}{edited}")
+    let attention = learning
+        .attention
+        .as_deref()
+        .map(|note| format!(" · {note}"))
+        .unwrap_or_default();
+    format!("{status} · {uses}{edited}{attention}")
 }
 
 /// Agents that can take work or need only a sign-in.
@@ -224,6 +244,12 @@ impl App {
                 | Action::AutoApprove
                 | Action::WorkspaceMode
                 | Action::LearnAutomatically
+                | Action::SyncLessons
+                | Action::AgentReflection
+                | Action::ExportLessons
+                | Action::ReviewCaptures
+                | Action::QuestionCap
+                | Action::PlannerAgent
         ) {
             self.picker = None;
         }
@@ -257,14 +283,95 @@ impl App {
             }
             Action::AutoApprove => {
                 let next = !self.project.auto_approve.unwrap_or(true);
-                self.save_project_settings(Some(next), None, None);
+                self.save_project_settings(ProjectChange {
+                    auto_approve: Some(next),
+                    ..Default::default()
+                });
                 self.open_picker(PickerKind::Settings);
             }
             Action::LearnAutomatically => {
                 let next = !self.project.learn_automatically.unwrap_or(true);
-                self.save_project_settings(None, None, Some(next));
+                self.save_project_settings(ProjectChange {
+                    learn_automatically: Some(next),
+                    ..Default::default()
+                });
                 self.open_picker(PickerKind::Settings);
             }
+            Action::SyncLessons => {
+                let next = !self.project.sync_lessons.unwrap_or(true);
+                self.save_project_settings(ProjectChange {
+                    sync_lessons: Some(next),
+                    ..Default::default()
+                });
+                self.open_picker(PickerKind::Settings);
+            }
+            Action::AgentReflection => {
+                let next = !self.project.agent_reflection.unwrap_or(false);
+                self.save_project_settings(ProjectChange {
+                    agent_reflection: Some(next),
+                    ..Default::default()
+                });
+                self.open_picker(PickerKind::Settings);
+            }
+            Action::ExportLessons => {
+                let next = !self.project.export_lessons.unwrap_or(false);
+                self.save_project_settings(ProjectChange {
+                    export_lessons: Some(next),
+                    ..Default::default()
+                });
+                self.open_picker(PickerKind::Settings);
+            }
+            Action::ReviewCaptures => {
+                let next = !self.project.review_captures.unwrap_or(true);
+                self.save_project_settings(ProjectChange {
+                    review_captures: Some(next),
+                    ..Default::default()
+                });
+                self.open_picker(PickerKind::Settings);
+            }
+            Action::QuestionCap => {
+                let current = self.project.question_cap.unwrap_or(5);
+                let next = QUESTION_CAPS
+                    .iter()
+                    .copied()
+                    .find(|cap| *cap > current)
+                    .unwrap_or(QUESTION_CAPS[0]);
+                self.save_project_settings(ProjectChange {
+                    question_cap: Some(next),
+                    ..Default::default()
+                });
+                self.open_picker(PickerKind::Settings);
+            }
+            Action::PlannerAgent => {
+                let agents: Vec<String> = self
+                    .overview
+                    .as_ref()
+                    .and_then(|overview| overview.as_ref().ok())
+                    .map(|overview| {
+                        overview
+                            .agents
+                            .iter()
+                            .filter(|agent| matches!(agent.state.as_str(), "ready" | "installed"))
+                            .map(|agent| agent.id.clone())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                // The task's agent, then each ready agent in turn.
+                let next = match &self.project.planner_agent {
+                    None => agents.first().cloned(),
+                    Some(current) => agents
+                        .iter()
+                        .position(|agent| agent == current)
+                        .and_then(|index| agents.get(index + 1).cloned()),
+                };
+                self.save_project_settings(ProjectChange {
+                    planner_agent: Some(next.unwrap_or_default()),
+                    ..Default::default()
+                });
+                self.open_picker(PickerKind::Settings);
+            }
+            Action::OpenPlan(id) => self.open_plan(id),
+            Action::ResolveDeviation(action) => self.resolve_deviation(action),
             Action::Learning(learning) => self.open_learning_actions(learning),
             Action::ShowLearning(id) => self.show_learning(&id),
             Action::ArchiveLearning(id, archived) => self.archive_learning(&id, archived),
@@ -275,7 +382,10 @@ impl App {
                     Some("current") => "ask",
                     _ => "worktree",
                 };
-                self.save_project_settings(None, Some(next.into()), None);
+                self.save_project_settings(ProjectChange {
+                    workspace_mode: Some(next.into()),
+                    ..Default::default()
+                });
                 self.open_picker(PickerKind::Settings);
             }
             Action::Attribution => {
@@ -388,23 +498,31 @@ impl App {
 
     /// Saves this project's approval, workspace or learning setting in the
     /// host, which the app and every terminal then share.
-    fn save_project_settings(
-        &mut self,
-        auto_approve: Option<bool>,
-        workspace_mode: Option<String>,
-        learn_automatically: Option<bool>,
-    ) {
+    fn save_project_settings(&mut self, change: ProjectChange) {
         if let Some(Response::Project { project }) = self.request(Request::SetProjectSettings {
             project_id: self.project.id.clone(),
-            auto_approve,
-            workspace_mode,
-            learn_automatically,
+            auto_approve: change.auto_approve,
+            workspace_mode: change.workspace_mode,
+            learn_automatically: change.learn_automatically,
             learning_cadence: None,
+            sync_lessons: change.sync_lessons,
+            agent_reflection: change.agent_reflection,
+            export_lessons: change.export_lessons,
+            question_cap: change.question_cap,
+            planner_agent: change.planner_agent,
+            review_captures: change.review_captures,
         }) {
             self.project.auto_approve = project.auto_approve;
             self.project.workspace_mode = project.workspace_mode;
             self.project.learn_automatically = project.learn_automatically;
             self.project.learning_cadence = project.learning_cadence;
+            self.project.sync_lessons = project.sync_lessons;
+            self.project.agent_reflection = project.agent_reflection;
+            self.project.export_lessons = project.export_lessons;
+            self.project.question_cap = project.question_cap;
+            self.project.planner_agent = project.planner_agent;
+            self.project.review_captures = project.review_captures;
+            self.project.preview_command = project.preview_command;
         }
     }
 
@@ -553,6 +671,59 @@ impl App {
                     "off · /learn still saves lessons on request".into()
                 },
                 action: Action::LearnAutomatically,
+            },
+            Item {
+                label: format!("Reflect with an agent in {}", self.project.name),
+                detail: if self.project.agent_reflection.unwrap_or(false) {
+                    "on · uses your default agent's quota when work ends".into()
+                } else {
+                    "off · reflection makes no model calls".into()
+                },
+                action: Action::AgentReflection,
+            },
+            Item {
+                label: format!("Sync learned lessons from {}", self.project.name),
+                detail: if self.project.sync_lessons.unwrap_or(true) {
+                    "included · when lesson sync is on in the app".into()
+                } else {
+                    "excluded · lessons stay on this computer".into()
+                },
+                action: Action::SyncLessons,
+            },
+            Item {
+                label: format!("Write lessons to AGENTS.md in {}", self.project.name),
+                detail: if self.project.export_lessons.unwrap_or(false) {
+                    "on · managed AGENTS.md section and Claude Code skill".into()
+                } else {
+                    "off · lessons stay in Jackalope".into()
+                },
+                action: Action::ExportLessons,
+            },
+            Item {
+                label: format!("Review screenshots in {}", self.project.name),
+                detail: review_captures_label(
+                    self.project.review_captures,
+                    self.project.preview_command.is_some(),
+                )
+                .into(),
+                action: Action::ReviewCaptures,
+            },
+            Item {
+                label: format!("Planning questions in {}", self.project.name),
+                detail: match self.project.question_cap.unwrap_or(5) {
+                    0 => "none · the planner records its assumptions".into(),
+                    1 => "at most 1 per plan".into(),
+                    cap => format!("at most {cap} per plan"),
+                },
+                action: Action::QuestionCap,
+            },
+            Item {
+                label: format!("Planning agent in {}", self.project.name),
+                detail: match &self.project.planner_agent {
+                    Some(agent) => format!("{} · plans with this agent", self.agent_name(agent)),
+                    None => "the task's agent".into(),
+                },
+                action: Action::PlannerAgent,
             },
             Item {
                 label: format!("Commit author in {}", self.project.name),
@@ -743,13 +914,28 @@ impl App {
                     .collect();
                 ("History · type to search".to_string(), items)
             }
+            PickerKind::Plans => ("Plans · Enter to open".to_string(), self.plan_items()),
+            PickerKind::Deviation => {
+                let summary = self
+                    .pending_deviation()
+                    .map(|deviation| deviation.summary.clone())
+                    .unwrap_or_else(|| "No deviation is waiting on you".into());
+                (format!("Plan paused · {summary}"), deviation_items())
+            }
             PickerKind::Question => {
                 let question = self.question().cloned();
+                let recommended = question
+                    .as_ref()
+                    .and_then(|question| question.recommended.clone());
                 let mut items: Vec<Item> = question
                     .iter()
                     .flat_map(|question| question.options.clone())
                     .map(|option| Item {
-                        label: option.clone(),
+                        label: if recommended.as_ref() == Some(&option) {
+                            format!("{option} (recommended)")
+                        } else {
+                            option.clone()
+                        },
                         detail: String::new(),
                         action: Action::Answer(option),
                     })
@@ -767,6 +953,15 @@ impl App {
                 )
             }
         };
+        // A fresh question starts on the recommended option.
+        let selected = if kind == PickerKind::Question && !rebuilding {
+            items
+                .iter()
+                .position(|item| item.label.ends_with(" (recommended)"))
+                .unwrap_or(0)
+        } else {
+            selected
+        };
         let mut picker = Picker {
             kind,
             title,
@@ -777,11 +972,75 @@ impl App {
         picker.selected = selected.min(picker.shown().len().saturating_sub(1));
         self.picker = Some(picker);
     }
+
+    fn plan_items(&mut self) -> Vec<Item> {
+        let plans = match self.request(Request::Plans {
+            project_path: self.project.path.clone(),
+        }) {
+            Some(Response::Plans { plans }) => plans,
+            _ => Vec::new(),
+        };
+        plans.iter().map(plan_item).collect()
+    }
+}
+
+/// Steps for the planning question limit.
+const QUESTION_CAPS: [u32; 6] = [0, 3, 5, 8, 10, 12];
+
+/// A plan as a `/plans` row: its title, then status, revision and when it
+/// last changed.
+pub fn plan_item(plan: &protocol::PlanSummary) -> Item {
+    let status = if plan.needs_you {
+        "needs you".to_string()
+    } else {
+        plan.status.clone()
+    };
+    let updated = plan
+        .updated_at
+        .get(..16)
+        .unwrap_or(&plan.updated_at)
+        .replace('T', " ");
+    Item {
+        label: plan.title.clone(),
+        detail: format!(
+            "{status} · r{} · {updated} · {}",
+            plan.revision.unwrap_or_default(),
+            short(&plan.id)
+        ),
+        action: Action::OpenPlan(plan.id.clone()),
+    }
+}
+
+fn deviation_items() -> Vec<Item> {
+    vec![
+        Item {
+            label: "Accept and amend the plan".into(),
+            detail: "adds it to the plan as a new revision; work resumes".into(),
+            action: Action::ResolveDeviation("accept"),
+        },
+        Item {
+            label: "Redo".into(),
+            detail: "the agent returns to the plan as written".into(),
+            action: Action::ResolveDeviation("redo"),
+        },
+        Item {
+            label: "Re-plan".into(),
+            detail: "the planner revises what is left; you approve again".into(),
+            action: Action::ResolveDeviation("replan"),
+        },
+    ]
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn review_screenshot_setting_explains_the_preview_requirement() {
+        assert!(review_captures_label(None, true).starts_with("on"));
+        assert!(review_captures_label(None, false).contains("preview command"));
+        assert!(review_captures_label(Some(false), true).starts_with("off"));
+    }
 
     #[test]
     fn typing_in_a_picker_narrows_and_ranks_its_rows() {
@@ -811,5 +1070,62 @@ mod tests {
         assert_eq!(picker.chosen().unwrap().label, "Update docs");
         picker.step(true);
         assert_eq!(picker.selected, 1, "stops at the last match");
+    }
+
+    #[test]
+    fn plan_rows_show_status_revision_and_when_they_changed() {
+        let row = plan_item(&protocol::PlanSummary {
+            id: "0123456789abcdef".into(),
+            title: "Add CSV export".into(),
+            status: "running".into(),
+            revision: Some(3),
+            updated_at: "2026-10-28T09:15:42Z".into(),
+            needs_you: true,
+        });
+        assert_eq!(row.label, "Add CSV export");
+        assert!(
+            row.detail.starts_with("needs you · r3 · 2026-10-28 09:15"),
+            "{}",
+            row.detail
+        );
+        assert!(matches!(row.action, Action::OpenPlan(ref id) if id == "0123456789abcdef"));
+    }
+
+    #[test]
+    fn learning_rows_name_why_a_lesson_needs_a_look() {
+        let mut learning: Learning = serde_json::from_str(
+            r#"{"id":"a","title":"Checks","content":"Run the checks.","status":"active","kind":"preference","uses":3,"managed":true,"updatedAt":""}"#,
+        )
+        .unwrap();
+        assert!(learning.attention.is_none() && learning.misses.is_none());
+        assert_eq!(learning_detail(&learning), "active · used 3 times");
+        learning.attention = Some("agents keep missing this".into());
+        assert_eq!(
+            learning_detail(&learning),
+            "active · used 3 times · agents keep missing this"
+        );
+    }
+}
+
+/// One settings change for the current project; `None` keeps a value.
+#[derive(Default)]
+struct ProjectChange {
+    auto_approve: Option<bool>,
+    workspace_mode: Option<String>,
+    learn_automatically: Option<bool>,
+    sync_lessons: Option<bool>,
+    agent_reflection: Option<bool>,
+    export_lessons: Option<bool>,
+    question_cap: Option<u32>,
+    /// Empty plans with the task's agent.
+    planner_agent: Option<String>,
+    review_captures: Option<bool>,
+}
+
+fn review_captures_label(enabled: Option<bool>, preview: bool) -> &'static str {
+    match (enabled.unwrap_or(true), preview) {
+        (false, _) => "off · no screenshots after work finishes",
+        (true, true) => "on · before/after shots from the preview, shown in the app",
+        (true, false) => "on · save a preview command in the app to start",
     }
 }

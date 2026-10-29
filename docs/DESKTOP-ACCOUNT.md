@@ -6,7 +6,8 @@ account for new native tasks and terminals, with a bounded 72-hour offline lease
 Saved work and running tasks remain accessible. There is no development bypass.
 See [STORE-RELEASE.md](STORE-RELEASE.md) for enforcement and distribution.
 Account connection does not sync projects, enable remote execution or change
-Microsoft Store audience membership.
+Microsoft Store audience membership. Optional settings sync, and opt-in sync of
+learned lessons on top of it, are described in [settings sync](SETTINGS-SYNC.md).
 Connection and optional settings sync are enabled on Windows, macOS and Linux;
 macOS/Linux no longer report unavailable solely because of the platform. Their
 installed connection, expiry and revocation flows still require acceptance.

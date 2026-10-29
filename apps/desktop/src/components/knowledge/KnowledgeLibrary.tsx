@@ -2,7 +2,7 @@ import { Badge, SearchField } from '@jackalope/ui';
 import { BookOpen, Lightbulb, Sparkles, Workflow } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { type KnowledgeEntry, openKnowledgeTask, useKnowledge } from '../../lib/knowledge';
-import { learnedStatus, learningSummary, statusLabel } from '../../lib/learning';
+import { learnedStatus, learningSummary, lessonAttention, statusLabel } from '../../lib/learning';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -15,6 +15,7 @@ import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { KnowledgeEditor, newKnowledge } from './KnowledgeEditor';
 import { LearnedHistory } from './LearnedHistory';
+import { LearningMetrics } from './LearningMetrics';
 
 export function KnowledgeLibrary({ project }: { project: Project }) {
   const { entries, error, loading, refresh } = useKnowledge(project.id, project.path);
@@ -126,6 +127,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
           {ordered.map((entry) => {
             const lifecycle = entry.automatic?.lifecycle;
             const status = learnedStatus(lifecycle);
+            const attention = lessonAttention(entry);
             return (
               <article key={entry.id} className="context-knowledge-card">
                 <div className="context-knowledge-type">
@@ -156,7 +158,11 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                       {statusLabel(status)}
                     </Badge>
                   )}
+                  {attention && (
+                    <Badge variant="warning">{entry.stale ? 'Out of date' : 'Often missed'}</Badge>
+                  )}
                 </div>
+                {attention && <InlineNotice tone="warning">{attention}</InlineNotice>}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="font-medium">{entry.title}</h3>
@@ -280,6 +286,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
             );
           })}
         </div>
+        {desktop && <LearningMetrics projectId={project.id} projectPath={project.path} />}
       </section>
       <section className="workspace-section workspace-stack" aria-label="Search past decisions">
         <WorkspaceSectionHeading title="Find a decision in past tasks" />

@@ -34,6 +34,8 @@ representative benefit and installed-platform acceptance remain open.
   and representative comparisons remain in progress.
 
 - Projects, saved tasks, chat sessions and reviewed plans with isolated Git worktrees.
+  Plan mode interviews read-only, then runs an approved plan as one agent, planned
+  subtasks or a swarm with an independent review against it.
   Follow-ups, previews, recorded checks and guarded integration keep work reviewable.
   Saved line comments, visual element selection, a conversation beside review and
   GitHub/Linear/Jira issue intake keep corrections and source work together.
@@ -99,9 +101,11 @@ delivery comparisons retain waits, failures and missing review evidence. Validat
 complete task delivery and quality on representative repositories before claiming gains.
 
 Project review lessons require resolved feedback and matching successful checks.
-Background learning keeps learned lessons on probation, archives unused ones and
-records their history; its thresholds and any effect on corrections need real-use
-calibration. Opt-in account sync of learned lessons is a possible later extension.
+Background learning keeps learned lessons on probation, archives unused ones, folds
+near-duplicates and records their history; its thresholds and any effect on
+corrections need real-use calibration. Opt-in account sync of learned lessons,
+optional agent reflection and export to `AGENTS.md` and a Claude Code skill are
+implemented and need installed acceptance.
 Chronological history comparisons and bounded offline prompt optimization have
 separate validation and held-out gates. Representative first-pass acceptance and
 actual correction counts still need measurement before making outcome claims.
@@ -137,20 +141,29 @@ in every build, optional settings sync, feedback and delivery need their own acc
 Cross-platform discovery, browser, process cleanup, credential storage and notification
 hardening are implemented for native testing, including notification activation,
 account/settings sync, Unix process guardians and tray/Dock recovery. macOS and X11
-window-control helpers and a GNOME 46 Wayland extension are implemented for validation.
+window-control helpers, a GNOME 46 Wayland extension and an XDG desktop portal
+backend for other Wayland desktops are implemented for validation.
 Installed acceptance remains in progress. Cross-platform signing and branch-based
 release automation use Windows Store and Mac/Linux Cloud candidates. In-app Store
 update checks and installation are implemented for validation; live signing, publication and
 installed upgrades remain acceptance work,
 with Ubuntu 24.04/GNOME 46 the first Wayland acceptance target and X11 compatibility
-retained. Other compositors and GNOME versions remain unsupported.
+retained. KDE Plasma and other GNOME versions use the portal backend, which still
+needs installed acceptance; desktops without the RemoteDesktop portal remain unsupported.
 
 Saved bots keep standing instructions, an agent and model, a project and a connection
 scope; their conversations repeat the instructions in every batch. Bots wake on
 schedules, project changes and new connection data, consult each other, and bring
 decisions, questions and sources to the person as cards. Connected apps use the person's own Composio project through one managed
 on-demand connection. A Screen view shows the task browser's viewport and desktop
-grant state with revoke controls. Installed and live-account acceptance remain open.
+grant state with revoke controls. Persistent agent browser profiles, one per project and
+optionally per bot, keep sign-ins between tasks with per-site permission and a
+person-only sign-in window. Bots can also have their own computer, a Linux sandbox in
+Docker or a paired cloud machine the person runs, where desktop and browser tools act
+instead of on the person's desktop; tasks get one only with the person's approval.
+Local sandboxes start when needed and stop when idle or when Jackalope quits.
+Jackalope-hosted computers are planned, not available. Installed and live-account
+acceptance remain open.
 
 Cloudflare Artifacts is available as a beta bring-your-own-account option for new and
 existing projects, with pushes and expiring review snapshots. Live account and installed

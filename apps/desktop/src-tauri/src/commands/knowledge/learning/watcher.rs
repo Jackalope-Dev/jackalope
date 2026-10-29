@@ -1,13 +1,18 @@
 //! Background reflection. A low-priority thread notices when a task has made
 //! another `learning_cadence` tool calls or has finished, then reflects on what
-//! the person said and what passed. It never blocks or fails the task: errors
-//! are logged and the run is not retried.
+//! the person said and what passed. The same thread runs the curator and the
+//! optional agent reflection and keeps exported lessons current. It never
+//! blocks or fails the task: errors are logged and the run is not retried.
 
-use super::{reflect, Observation, ObservationKind};
+use super::{
+    agent_reflection, export_project, outcomes, reflect_delivered, AgentBudget, Observation,
+    ObservationKind, Thresholds, THRESHOLDS,
+};
+use crate::commands::knowledge::KnowledgeKind;
 use crate::commands::live_sessions::LiveSessions;
 use crate::commands::tasks::{TaskRun, TaskRuntime};
 use std::collections::HashMap;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const POLL: Duration = Duration::from_secs(15);
 /// Reflections per poll, so a burst of finished work is spread out.
@@ -17,6 +22,65 @@ const PER_POLL: usize = 4;
 struct Progress {
     reflected_calls: u64,
     done: bool,
+}
+
+/// Which projects the curator should visit: each one once after learning
+/// starts in it, then after enough lesson changes or a day.
+#[derive(Default)]
+struct Curation {
+    projects: HashMap<String, Pending>,
+}
+
+struct Pending {
+    path: String,
+    changes: u64,
+    last: Option<Instant>,
+}
+
+impl Curation {
+    fn note(&mut self, project_id: &str, path: &str, changes: u64) {
+        let pending = self
+            .projects
+            .entry(project_id.to_string())
+            .or_insert_with(|| Pending {
+                path: path.to_string(),
+                changes: 0,
+                last: None,
+            });
+        pending.path = path.to_string();
+        pending.changes += changes;
+    }
+
+    /// The next project due for a pass, marked as visited.
+    fn due(&mut self, now: Instant, thresholds: &Thresholds) -> Option<(String, String)> {
+        let every = Duration::from_secs(thresholds.curate_every_seconds);
+        let (id, pending) = self.projects.iter_mut().find(|(_, pending)| {
+            pending.last.is_none_or(|last| {
+                pending.changes >= thresholds.curate_after_changes
+                    || now.duration_since(last) >= every
+            })
+        })?;
+        pending.last = Some(now);
+        pending.changes = 0;
+        Some((id.clone(), pending.path.clone()))
+    }
+}
+
+/// Mirrors lessons for projects that export them and removes the managed
+/// content from projects that no longer do.
+fn export_all(runtime: &TaskRuntime) {
+    for project in crate::commands::project_registry::list(runtime) {
+        let enabled = project.settings().export_lessons;
+        if let Err(error) = export_project(&runtime.knowledge, &project.id, &project.path, enabled)
+        {
+            if enabled || !error.starts_with("Project folder unavailable") {
+                eprintln!(
+                    "Learned lessons were not exported for {}: {error}",
+                    project.name
+                );
+            }
+        }
+    }
 }
 
 /// Which runs are due. The first pass only records where every run stands, so
@@ -62,7 +126,10 @@ pub fn launch(runtime: TaskRuntime, sessions: LiveSessions) {
             let mut progress = HashMap::new();
             let mut first = true;
             let mut seen_revision = None;
-            let mut queue: Vec<String> = vec![];
+            let mut queue: Vec<(String, bool)> = vec![];
+            let mut curation = Curation::default();
+            let mut budget = AgentBudget::default();
+            let mut exported = None;
             loop {
                 std::thread::sleep(POLL);
                 let revision = runtime.revision();
@@ -78,20 +145,49 @@ pub fn launch(runtime: TaskRuntime, sessions: LiveSessions) {
                     };
                     let activity = runtime.learning_activity();
                     for id in due(&mut progress, &activity, first, &mut settings) {
-                        if !queue.contains(&id) {
-                            queue.push(id);
+                        let finished = activity.iter().any(|run| run.id == id && run.finished);
+                        match queue.iter_mut().find(|(queued, _)| *queued == id) {
+                            Some(queued) => queued.1 |= finished,
+                            None => queue.push((id, finished)),
                         }
                     }
                     first = false;
                 }
-                let batch: Vec<String> = queue.drain(..queue.len().min(PER_POLL)).collect();
-                for id in batch {
+                let batch: Vec<(String, bool)> = queue.drain(..queue.len().min(PER_POLL)).collect();
+                for (id, finished) in batch {
                     let Some(run) = runtime.run_snapshot(&id) else {
                         continue;
                     };
-                    if let Err(error) = reflect_run(&runtime, &sessions, &run) {
-                        eprintln!("Background learning skipped a task: {error}");
+                    match reflect_run(&runtime, &sessions, &run, finished, &mut budget) {
+                        Ok(changes) => curation.note(&run.project_id, &run.project_path, changes),
+                        Err(error) => eprintln!("Background learning skipped a task: {error}"),
                     }
+                }
+                if let Some((project_id, path)) = curation.due(Instant::now(), &THRESHOLDS) {
+                    let settings =
+                        crate::commands::project_registry::settings(&runtime, &project_id);
+                    if settings.learn_automatically {
+                        if let Err(error) =
+                            runtime.knowledge.curate(&project_id, &path, &THRESHOLDS)
+                        {
+                            eprintln!("The lesson curator skipped a project: {error}");
+                        }
+                        if let Err(error) =
+                            runtime
+                                .knowledge
+                                .check_stale(&project_id, &path, &THRESHOLDS)
+                        {
+                            eprintln!("The stale-lesson check skipped a project: {error}");
+                        }
+                    }
+                }
+                let marker = (
+                    runtime.knowledge.changes(),
+                    crate::commands::project_registry::revision(),
+                );
+                if exported != Some(marker) {
+                    exported = Some(marker);
+                    export_all(&runtime);
                 }
             }
         });
@@ -152,13 +248,36 @@ pub(in crate::commands) fn observations(
     found
 }
 
+/// Learned lessons in the run's context receipt, as they were supplied.
+/// Continuations carry the receipt of the run they continue.
+pub(super) fn delivered(run: &TaskRun) -> Vec<crate::commands::knowledge::KnowledgeEntry> {
+    run.context_receipt
+        .entries
+        .iter()
+        .filter(|entry| entry.kind == KnowledgeKind::Memory && super::lifecycle(entry).is_some())
+        .cloned()
+        .collect()
+}
+
+/// Whether the person's statements in this run came after its lessons were
+/// supplied: a follow-up or later conversation turn, not a retry or the
+/// request that selected them.
+pub(super) fn later(run: &TaskRun) -> bool {
+    run.task_id != run.id && run.retry_of.is_none()
+}
+
+/// Reflects on one run and returns how many lesson changes it applied. When
+/// the run has finished and the project allows it, the default agent reflects
+/// too, within the shared budget.
 fn reflect_run(
     runtime: &TaskRuntime,
     sessions: &LiveSessions,
     run: &TaskRun,
-) -> Result<(), String> {
+    finished: bool,
+    budget: &mut AgentBudget,
+) -> Result<u64, String> {
     if run.details_omitted || run.project_path.is_empty() {
-        return Ok(());
+        return Ok(0);
     }
     let turn = run
         .live_session_id
@@ -166,17 +285,52 @@ fn reflect_run(
         .map(|session| sessions.turn_messages(session, &run.id));
     let observations = observations(run, turn);
     if observations.is_empty() {
-        return Ok(());
+        return Ok(0);
     }
     let existing = runtime.knowledge.list(&run.project_id, &run.project_path)?;
-    let proposals = reflect(&observations, &existing);
-    if proposals.is_empty() {
-        return Ok(());
+    let delivered = delivered(run);
+    let mut changes = runtime.knowledge.record_outcomes(
+        &run.project_id,
+        &run.project_path,
+        &run.id,
+        &outcomes(&observations, &delivered, later(run), &THRESHOLDS),
+        &THRESHOLDS,
+    )?;
+    let ids: Vec<String> = delivered.into_iter().map(|entry| entry.id).collect();
+    let proposals = reflect_delivered(&observations, &existing, &ids);
+    if !proposals.is_empty() {
+        changes += runtime
+            .knowledge
+            .promote(&run.project_id, &run.project_path, proposals, "reflection")?
+            .applied
+            .len() as u64;
     }
-    runtime
-        .knowledge
-        .promote(&run.project_id, &run.project_path, proposals, "reflection")?;
-    Ok(())
+    let agent =
+        crate::commands::project_registry::settings(runtime, &run.project_id).agent_reflection;
+    let said = observations
+        .iter()
+        .any(|observation| !matches!(observation.kind, ObservationKind::Check));
+    if finished && agent && said && budget.allow(Instant::now(), &THRESHOLDS) {
+        let existing = runtime.knowledge.list(&run.project_id, &run.project_path)?;
+        match agent_reflection(
+            runtime,
+            &run.project_id,
+            &observations,
+            &existing,
+            &THRESHOLDS,
+        ) {
+            Ok(proposals) if !proposals.is_empty() => {
+                changes += runtime
+                    .knowledge
+                    .promote(&run.project_id, &run.project_path, proposals, "agent")?
+                    .applied
+                    .len() as u64;
+            }
+            Ok(_) => {}
+            Err(error) => eprintln!("Agent reflection skipped a task: {error}"),
+        }
+    }
+    Ok(changes)
 }
 
 #[cfg(test)]

@@ -468,6 +468,7 @@ mod tests {
             activity: Vec::new(),
             questions: Vec::new(),
             partial: String::new(),
+            review_screenshots: None,
         };
         let shown: Vec<String> = conversation(&view, 80).iter().map(text).collect();
         let first = shown

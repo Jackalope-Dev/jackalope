@@ -3296,7 +3296,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "jackalope-desktop"
-version = "0.1.26"
+version = "0.1.27"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -3308,6 +3308,7 @@ dependencies = [
  "crossterm",
  "dunce",
  "flate2",
+ "futures-util",
  "gix",
  "ignore",
  "keyring",
@@ -3320,6 +3321,7 @@ dependencies = [
  "oxc_resolver",
  "petgraph",
  "pkg-config",
+ "png 0.18.1",
  "portable-pty",
  "ratatui",
  "reqwest",

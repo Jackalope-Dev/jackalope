@@ -192,10 +192,10 @@ another continuation. A failed save preserves the draft.
 Tasks continuing with one lead ask that agent to delegate useful independent work through
 available provider subagent tools. This stays
 within the provider session and does not create native queue entries; see
-[agent quality](AGENT-QUALITY.md) for limits. Explicit feature plans remain available
-for reviewing a queue before dispatch. Unfinished drafts from the former split
-dialog reopen in feature planning after any unfinished regular plan is imported;
-their saved run, steps and storage remain intact.
+[agent quality](AGENT-QUALITY.md) for limits. Written plans (**Write the plan myself**)
+go through [plan mode](PLAN-MODE.md) approval before dispatch. Unfinished drafts from
+the former feature and split planning dialogs open in that form with their goal, agent
+and steps; their saved storage is left intact until the plan is saved.
 
 1. Open the native desktop app and choose a Git project with a committed local target branch.
 2. In Work's options menu, choose **Plan feature work**. Add focused tasks, or **Import a

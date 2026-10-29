@@ -82,9 +82,11 @@ export function AgentQuestion({
         </span>
       </div>
       {agentDetail && <p className="agent-question-identity">{agentDetail}</p>}
+      {prompt.header && <p className="agent-question-header">{prompt.header}</p>}
       <h3 id={`${id}-question`} className="agent-question-title">
         {prompt.question}
       </h3>
+      {prompt.rationale && !answered && <p className="task-experience-muted">{prompt.rationale}</p>}
       {answered ? (
         <p ref={answerRef} tabIndex={-1} className="agent-question-answer" role="status">
           <Check size={18} aria-hidden="true" />
@@ -133,9 +135,12 @@ export function AgentQuestion({
                     }}
                   />
                   <span>{option}</span>
+                  {option === prompt.recommended && (
+                    <span className="agent-question-recommended">Recommended</span>
+                  )}
                 </label>
               ))}
-              {!multiple && (
+              {!multiple && prompt.allowOther !== false && (
                 <label className="agent-question-option" data-selected={custom || undefined}>
                   <input
                     type="radio"

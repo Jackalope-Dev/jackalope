@@ -12,6 +12,11 @@ const escapeHtml = (value: string) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] ||
       character,
   );
+/** The share image; bump the version when the image changes so link previews refetch it. */
+const SOCIAL_IMAGE = '/social-preview.png?v=2';
+const SOCIAL_IMAGE_ALT =
+  'Jackalope: Run your agents side by side. Codex, Claude Code, Gemini CLI and more, each in its own Git worktree.';
+
 export const routes = pages.map((page) => page.path);
 const indexablePages = pages.filter((page) => !page.noindex);
 
@@ -90,7 +95,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
             dateModified: comparison.reviewed,
             author: { '@id': `${origin}/#organization` },
             publisher: { '@id': `${origin}/#organization` },
-            image: `${origin}/social-preview.png`,
+            image: `${origin}${SOCIAL_IMAGE}`,
             mainEntityOfPage: url,
             citation: comparison.sources.map((source) => source.href),
             about: [
@@ -108,14 +113,14 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
               dateModified: post.updated ?? post.date,
               author: { '@type': 'Organization', name: company.name, url: company.url },
               publisher: { '@id': `${origin}/#organization` },
-              image: `${origin}/social-preview.png`,
+              image: `${origin}${SOCIAL_IMAGE}`,
               mainEntityOfPage: url,
             }
           : isArticle
             ? {
                 author: { '@type': 'Organization', name: company.name, url: company.url },
                 publisher: { '@id': `${origin}/#organization` },
-                image: `${origin}/social-preview.png`,
+                image: `${origin}${SOCIAL_IMAGE}`,
                 mainEntityOfPage: url,
               }
             : {}),
@@ -129,7 +134,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
       url: origin,
       applicationCategory: 'DeveloperApplication',
       description,
-      image: `${origin}/social-preview.png`,
+      image: `${origin}${SOCIAL_IMAGE}`,
       featureList: [
         'Parallel coding-agent tasks',
         'Isolated Git worktrees',
@@ -222,16 +227,16 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
     `<meta property="og:title" content="${escapeHtml(title)}" />`,
     `<meta property="og:description" content="${escapeHtml(description)}" />`,
     `<meta property="og:url" content="${escapeHtml(url)}" />`,
-    `<meta property="og:image" content="${origin}/social-preview.png" />`,
+    `<meta property="og:image" content="${origin}${SOCIAL_IMAGE}" />`,
     `<meta property="og:image:width" content="1200" />`,
     `<meta property="og:image:height" content="630" />`,
-    `<meta property="og:image:alt" content="Jackalope: Many agents. One workspace. Run coding agents in parallel, keep project context, and review changes." />`,
+    `<meta property="og:image:alt" content="${SOCIAL_IMAGE_ALT}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:site" content="@JackalopeDotDev" />`,
-    `<meta name="twitter:image:alt" content="Jackalope: A desktop workspace for parallel coding agents and code review." />`,
+    `<meta name="twitter:image:alt" content="${SOCIAL_IMAGE_ALT}" />`,
     `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
     `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
-    `<meta name="twitter:image" content="${origin}/social-preview.png" />`,
+    `<meta name="twitter:image" content="${origin}${SOCIAL_IMAGE}" />`,
     ...(post
       ? [
           `<meta property="article:published_time" content="${post.date}T12:00:00Z" />`,

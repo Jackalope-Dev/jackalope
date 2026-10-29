@@ -116,6 +116,10 @@ pub struct PlanRequest {
     pub setup_files: Vec<String>,
     #[serde(default)]
     pub(super) auto_verify: bool,
+    /// An approved plan without any check: staged dependencies continue from
+    /// cleanly finished snapshots and the plan review gates integration.
+    #[serde(default)]
+    pub(super) review_only: bool,
     pub(super) items: Vec<PlanEntry>,
 }
 

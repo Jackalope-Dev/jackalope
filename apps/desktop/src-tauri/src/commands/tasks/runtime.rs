@@ -177,6 +177,7 @@ impl TaskRuntime {
         self.mcp_broker.close(id);
         crate::commands::browser::close(id);
         crate::commands::desktop_control::close(id);
+        crate::commands::computers::release_run(id);
         if let Some(process) = process {
             let mut child = process.lock().unwrap();
             if child.try_wait().map_err(|e| e.to_string())?.is_none() {
@@ -546,6 +547,7 @@ impl TaskRuntime {
             answer: None,
             created_at: Utc::now().to_rfc3339(),
             answered_at: None,
+            presentation: Default::default(),
         };
         self.record_prompt(&prompt);
         self.update(id, |run| {
@@ -731,13 +733,19 @@ impl TaskRuntime {
             crate::commands::agent_profiles::validate_binding(&self.profiles_root(), binding)?;
             crate::commands::agent_profiles::apply_binding(&mut cmd, binding)?;
         }
+        // Plan sessions explore without editing where the CLI can enforce it.
+        let read_only = crate::commands::planning::read_only(id);
         if adapter == "codex" {
             cmd.args([
                 "exec",
                 "-c",
                 "approval_policy=\"never\"",
                 "-c",
-                "sandbox_mode=\"workspace-write\"",
+                if read_only {
+                    "sandbox_mode=\"read-only\""
+                } else {
+                    "sandbox_mode=\"workspace-write\""
+                },
             ]);
             if let Some(ref old) = previous {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
@@ -750,7 +758,16 @@ impl TaskRuntime {
             if persistent {
                 cmd.args(["--input-format", "stream-json"]);
             }
-            cmd.args(["--permission-mode", "acceptEdits"]);
+            if read_only {
+                cmd.args([
+                    "--permission-mode",
+                    "default",
+                    "--disallowedTools",
+                    "Edit,Write,MultiEdit,NotebookEdit",
+                ]);
+            } else {
+                cmd.args(["--permission-mode", "acceptEdits"]);
+            }
             if let Some(ref old) = previous {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
                 crate::commands::verification::ensure_idle(&old.workspace)?;
@@ -1059,7 +1076,7 @@ impl TaskRuntime {
                     "--permission-prompt-tool",
                     "mcp__jackalope__permission_prompt",
                     "--allowedTools",
-                    "mcp__jackalope__ask_jev,mcp__jackalope__read_context,mcp__jackalope__discover_harness_tools,mcp__jackalope__search_tools,mcp__jackalope__read_tool,mcp__jackalope__read_tool_result,mcp__jackalope__project,mcp__jackalope__peers,mcp__jackalope__peer_read,mcp__jackalope__peer_adopt,mcp__jackalope__propose_subtask,mcp__jackalope__agreement,mcp__jackalope__message,mcp__jackalope__inbox,mcp__jackalope__acknowledge_message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__browser_configure,mcp__jackalope__browser_inspect,mcp__jackalope__browser_tabs,mcp__jackalope__desktop_control,mcp__jackalope__ask_user,mcp__jackalope__user_response,mcp__jackalope__record_validation_step,mcp__jackalope__computer_verify,mcp__jackalope__verification_output",
+                    "mcp__jackalope__ask_jev,mcp__jackalope__read_context,mcp__jackalope__discover_harness_tools,mcp__jackalope__search_tools,mcp__jackalope__read_tool,mcp__jackalope__read_tool_result,mcp__jackalope__project,mcp__jackalope__peers,mcp__jackalope__peer_read,mcp__jackalope__peer_adopt,mcp__jackalope__propose_subtask,mcp__jackalope__plan_deviation,mcp__jackalope__agreement,mcp__jackalope__message,mcp__jackalope__inbox,mcp__jackalope__acknowledge_message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__browser_configure,mcp__jackalope__browser_inspect,mcp__jackalope__browser_tabs,mcp__jackalope__browser_open_profile,mcp__jackalope__desktop_control,mcp__jackalope__ask_user,mcp__jackalope__user_response,mcp__jackalope__record_validation_step,mcp__jackalope__computer_verify,mcp__jackalope__verification_output",
                 ]);
             }
         }
@@ -1461,6 +1478,14 @@ impl TaskRuntime {
                 self.update(id, |r| r.verification_error = Some(error));
             }
         }
+        // Captured after the result is recorded so screenshots never delay it.
+        let capture_review = success
+            && !quota_stopped
+            && run.error.is_none()
+            && !run.result.is_empty()
+            && self.is_running(id)
+            && attempt_changed(&run)
+            && crate::commands::previews::review::wanted(self, &run);
         if success && run.error.is_none() && !run.result.is_empty() && !quota_stopped {
             self.stage(id, Some("checkpoint"));
             let _guard = crate::commands::integration::execution_guard()?;
@@ -1510,6 +1535,7 @@ impl TaskRuntime {
         self.update(id, |r| {
             r.finishing = false; r.exit_code = exit_code; r.ended_at = Some(Utc::now().to_rfc3339());
             r.status = if canceled || r.status == "stopping" { "stopped" } else if r.routing.is_some() && r.quota_failure.is_some() { r.ended_at = None; "starting" } else if success && r.error.is_none() && !r.result.is_empty() { "review" } else { "failed" }.into();
+            r.review_capturing = capture_review && r.status == "review";
             if r.status == "failed" {
                 if r.error.as_deref().is_none_or(|e| e.trim().is_empty() || e == "null") {
                     if let Some(failure) = &r.quota_failure {
@@ -1520,6 +1546,9 @@ impl TaskRuntime {
                 }
             }
         });
+        if capture_review {
+            crate::commands::previews::review::start(self.clone(), id);
+        }
         Ok(())
     }
 }
@@ -1651,6 +1680,23 @@ impl TaskRuntime {
             })
             .collect()
     }
+    /// Runs that are starting, running, stopping or finishing.
+    pub(in crate::commands) fn active_runs(&self) -> Vec<TaskRun> {
+        self.inner
+            .lock()
+            .map(|inner| {
+                inner
+                    .runs
+                    .values()
+                    .filter(|run| {
+                        ["starting", "running", "stopping"].contains(&run.status.as_str())
+                            || run.finishing
+                    })
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
     pub fn active_work_count(&self) -> usize {
         self.inner
             .lock()
@@ -1671,6 +1717,14 @@ impl TaskRuntime {
     }
     pub fn profiles_root(&self) -> PathBuf {
         self.directory.join("agent-profiles")
+    }
+    /// Persistent agent browser profiles; never synced or exported.
+    pub fn browser_profiles_root(&self) -> PathBuf {
+        self.directory.join("browser-profiles")
+    }
+    /// Bot and task computers; never synced or exported.
+    pub fn computers_root(&self) -> PathBuf {
+        self.directory.join("computers")
     }
     pub fn preferences_directory(&self) -> PathBuf {
         self.directory.join("preferences")
@@ -2089,6 +2143,10 @@ impl TaskRuntime {
                 prompts: vec![],
                 validation_steps: vec![],
                 screenshots: vec![],
+                desktop_actions: vec![],
+                visited_pages: vec![],
+                review_captures: None,
+                review_capturing: false,
             };
             self.save(&run)?;
             crate::commands::browser::register(&run.id);
@@ -2123,6 +2181,7 @@ impl TaskRuntime {
             runtime.mcp_broker.close(&request.id);
             crate::commands::browser::close(&request.id);
             crate::commands::desktop_control::close(&request.id);
+            crate::commands::computers::release_run(&request.id);
         });
         Ok(id)
     }

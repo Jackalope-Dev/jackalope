@@ -139,7 +139,19 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   output into the follow-up draft. Local previews remember project commands, choose a free
   port, check HTTP readiness and embed a sandboxed loopback page. Fresh isolated browser
   captures attach screenshots, page elements and errors to follow-up drafts; they do not
-  reproduce embedded-page sign-in or unsaved interactions.
+  reproduce embedded-page sign-in or unsaved interactions. Finished work with changes
+  gets automatic review screenshots from the saved preview command in a disposable
+  headless browser: up to six pages (configured, named by browser plan criteria, or
+  visited by the agent), desktop and optional narrow, compared before/after in Review.
+  "Before" needs a separate worktree and a clean project checkout at the starting
+  commit; otherwise only the result is captured, with a note. Capture runs after the
+  result is recorded, so it never delays review.
+- Persistent agent browser profiles: a Project browser per project and an optional
+  browser per bot keep sign-ins between tasks in a separate Chromium profile. Agents opt
+  in with `browser_open_profile`; each site asks before first use, sign-in pages pause
+  the agent while the person signs in in a visible window, and only cookie domain names
+  are recorded. Project settings, the bot editor and `/browser` open, clear and delete
+  profiles.
 - Delivery inspects local Git state and optionally reads PR/CI through the GitHub CLI.
   PR, CI and deployment preparation carry evidence into editable drafts. Failing PR
   checks are listed openly with a draft asking the agent to reproduce and fix them.
@@ -221,6 +233,21 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Plan, Work, Check and Review lead to one result, preview, combined diff and outcome
   review before explicit application. Focused review and elapsed integration time remain
   distinct local measurements. Installed-provider and cost/quality acceptance remain open.
+- Plan mode is explicit: **Plan with me** in the composer or beside a plan or
+  investigation assessment, `/plan` in the terminal or `jackalope plan`. A read-only
+  planning attempt explores, asks at most the project's question cap (default 5) and
+  returns one plan document with assumptions, tasks, acceptance criteria and a
+  recommended shape. **Write the plan myself** turns hand-written tasks and outcomes into
+  the same plan document. Revisions, section diffs, direct edits, Save to repo (never
+  committed), exact-revision approval, single/subtasks/swarm hand-off through managed
+  tasks, an independent plan review, deviation decisions and re-planning are
+  implemented; see [plan mode](PLAN-MODE.md). Approval verifies with the project's check,
+  else the plan's command and test criteria, else review only (no check gate; the plan
+  review must pass). Pending deviations raise a notification and the amber needs-you
+  state in the terminal. Planning settings live in Project settings and the terminal's
+  `/settings`. Read-only enforcement covers Codex and
+  Claude Code; other agents are constrained by prompt and a discarded worktree.
+  Installed-provider interviews and plan-to-merge acceptance remain open.
 - Requests continuing with one lead can delegate through available provider subagent
   tools. Unsupported or denied delegation stays sequential. See
   [agent quality](AGENT-QUALITY.md) for boundaries.
@@ -237,22 +264,54 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   retiring learned lessons. One promotion gate refuses credential-like or personal
   data, duplicates, conflicts with hand-written lessons and oversized lessons, and
   changes only unedited lessons it wrote. Lessons start on probation, become active
-  after two deliveries, are archived when unused or over the 40-lesson project cap,
+  after two deliveries, are archived when unused or over the 20-lesson project cap,
   and can be restored; an append-only history records every change with redacted
-  evidence. Project → Context and the terminal show status, use and history. Lessons
-  are profile-local; any effect on task outcomes is unmeasured.
+  evidence. Project → Context and the terminal show status, use and history, and
+  Learning activity shows local counts for calibrating the thresholds, which live in
+  one `Thresholds` definition. A deterministic curator folds near-duplicate unedited
+  lessons into the most used one, reversibly. A supplied lesson the person restates
+  later in that work counts as missed; repeated misses flag it, raise its rank among
+  equal matches and archive it while new. The curator schedule also archives learned
+  lessons naming a project path, package script or make target that no longer
+  exists, and only flags other lessons. Off by default per project: agent
+  reflection with the default agent after work ends (bounded, on that account's
+  quota, through the same gate), and mirroring active lessons into a marked
+  `AGENTS.md` section and a Claude Code skill. Opt-in account sync of learned lessons,
+  off by default and layered on settings sync, matches projects by repository and
+  merges by revision; evidence, use counts and paths stay local. Installed
+  multi-desktop sync, real-provider agent reflection and exported-file use by other
+  agents are unverified; any effect on task outcomes is unmeasured.
 - MCP connections with a curated marketplace, publisher setup presets, token entry,
   agent sign-in guidance and save-and-check results. Full AllMCPs search and custom
   connections remain available; live publisher/account acceptance remains open.
-  Task-owned Chromium sessions and scoped desktop-window grants.
+  Task-owned Chromium sessions and scoped desktop grants. Agents can operate native
+  apps and the user's logged-in browser with a one-window, one-app or full-desktop
+  grant; window and app grants can be remembered per project, browser sites are asked
+  once each, and actions target accessibility element refs through a resident helper.
 - Connected apps link the user's own Composio project. The project key and Composio
   identifiers stay in protected storage; apps connect through Composio's hosted sign-in
   in the user's browser, and one managed on-demand connection delivers them to every
   agent. Composio holds third-party tokens and bills usage to that project. See
   [Connected apps](MCP-DISCOVERY.md#connected-apps-through-composio).
+- Bots can have their own computer: a Linux sandbox in Docker on this device (Docker
+  Desktop, Colima or Docker Engine, detected but never installed) or a cloud machine the
+  person runs and pairs with an HTTPS address and a secret kept in protected storage.
+  Tasks get one only after the person approves `computer_request`. Desktop control acts
+  on the computer without an access question, browser tools drive its Chromium for local
+  sandboxes with networking on, each site still asks first, and `computer_exec` runs
+  bounded commands inside it. A stopped computer starts when an agent, the browser tools
+  or a viewer needs it, waiting up to 90 seconds. Local sandboxes stop after an idle
+  time (10 minutes by default; 5, 30, 60 or never) unless an active run or open viewer
+  holds them, and stop when Jackalope quits unless the person keeps them running;
+  cloud machines are never stopped. Bot settings, the Screen view and Settings →
+  Computers show idle time and start, stop, watch, take over and delete computers;
+  `/computer` shows and changes one in the terminal. Jackalope-hosted computers are
+  listed as coming soon. See
+  [bot computers](BOT-COMPUTERS.md).
 - Task and chat Screen views poll the attempt's existing task browser viewport and
   desktop grant state without opening a browser, requesting access or saving an
-  artifact. People can stop the browser or revoke desktop control from there.
+  artifact. They list recent desktop actions with small after-action captures. People
+  can stop the browser, revoke desktop control or always allow the granted app there.
 - Saved bots keep a name, role, standing instructions, agent and model, project,
   connection scope and a chosen character and colour locally. Messaging a bot starts a
   chat inside the Bots page, or continues its latest open one, whose native persona is
@@ -350,7 +409,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   pinned model gets a fallback model. The hook protocol, replies, deny-rule precedence
   and cost accounting were checked against installed Claude Code 2.1.312; full task
   acceptance and any speed or quality benefit remain unmeasured.
-- Shared appearance, guided onboarding, task notifications and optional settings sync.
+- Shared appearance, guided onboarding, task notifications, optional settings sync
+  and opt-in learned-lesson sync.
   Project setup has three steps: project, agents and an optional first task. Theme editors open directly; existing saved app/project choices remain compatible.
 - Review views save optional local usefulness ratings and reported review minutes with
   each task. These self-reported values do not establish product retention or quality gains.
@@ -441,11 +501,23 @@ tasks run through its headless stream; installed-profile execution is not yet va
 Antigravity named accounts use Gemini API keys; isolated subscription accounts are
 unsupported. Discovery and fixture responses do not establish real account execution.
 
-Desktop control supports Windows and has macOS/X11 and GNOME 46 Wayland backends
-for native validation. GNOME requires the bundled window-control extension and
-explicit per-task window grants; other Wayland compositors remain unavailable.
-XWayland alone is insufficient. Worktrees separate Git changes; agent processes and
+Desktop control supports Windows and has macOS, X11, GNOME 46 Wayland and XDG
+desktop portal backends for native validation. Windows and macOS offer window, app
+and desktop grants with accessibility actions; the macOS helper is compiled and
+self-tested only in CI. X11 and the GNOME extension keep one-window grants with
+coordinate fallback for element refs. Other Wayland desktops that implement the
+RemoteDesktop portal (KDE Plasma 5.27+, GNOME 44+) offer app and desktop grants with
+AT-SPI element actions, portal input and Screenshot-portal captures; physical input
+does not pause control there, and wlroots desktops without RemoteDesktop remain
+unavailable. The portal client compiles only in Linux CI and has no real-portal
+fixture. XWayland alone is insufficient. Worktrees separate Git changes; agent processes and
 configured tools still run with local OS privileges.
+
+Bot computers have unit coverage and an opt-in Docker trial; no image build, container,
+viewer or cloud machine has been accepted in an installed app on any platform. Cloud
+machines reach desktop control and commands but not the browser tools, and the
+in-sandbox agent has no accessibility actions. The idle stop, start on demand and quit
+stop are covered by unit tests only.
 
 Installed provider, accessibility, recovery, performance, signed installation and
 update acceptance remain platform-specific requirements. Real-model quality and
