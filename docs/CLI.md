@@ -222,7 +222,7 @@ rounded content card, following the app's surfaces:
 
 The wordmark, tabs, agent, model, project, open-conversation count and key hints can
 be clicked. A start screen shows the JACKALOPE wordmark (a two-row version in narrow
-windows) and the agents that are set up. Smaller terminals drop the shell for a
+windows), which light sweeps across once when the screen appears, and the agents that are set up. When work finishes cleanly, the status line says how long it took and what usually comes next. Smaller terminals drop the shell for a
 compact header, a status line and a rotating tip.
 
 Your messages and pending work read as tinted blocks with a bar down their left edge.
@@ -230,7 +230,7 @@ When a conversation is blocked, an amber "Needs you" banner above the input says
 and how to carry on; an open question is pinned there instead, and `/answer` reopens
 its options. Running work lists its newest steps (tool calls and narration) as the
 host records them, and `jackalope -p` prints the same steps to standard error.
-`JACKALOPE_REDUCED_MOTION=1` keeps the band, spinners and shimmer still.
+`JACKALOPE_REDUCED_MOTION=1` keeps the band, spinners, shimmer and wordmark sweep still.
 
 The changes panel lists files the conversation's checkout changed since it left
 the project's checked-out commit, committed or not, including untracked files, with

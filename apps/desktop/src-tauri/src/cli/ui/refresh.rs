@@ -278,7 +278,11 @@ impl App {
                 self.work_started = Some((run, Instant::now()));
             }
             Some(_) => {}
-            None => self.work_started = None,
+            None => {
+                if let Some((_, at)) = self.work_started.take() {
+                    self.last_run_took = Some(at.elapsed());
+                }
+            }
         }
         let progress = self.view.as_ref().filter(|_| self.working()).map(|view| {
             format!(

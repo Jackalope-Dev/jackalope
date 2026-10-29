@@ -197,6 +197,10 @@ struct App {
     hover: Option<(u16, u16)>,
     /// The open conversation's draft, shared with the app.
     draft_sync: Option<drafts::DraftSync>,
+    /// How long the work that just stopped ran, for the done message.
+    last_run_took: Option<std::time::Duration>,
+    /// When the start screen was first drawn, for the wordmark's light sweep.
+    intro: Cell<Option<Instant>>,
     /// Animation frame for the working indicator.
     tick: usize,
     /// Currently displayed rotating tip.
@@ -282,6 +286,8 @@ pub fn run(
         hits: RefCell::new(Vec::new()),
         hover: None,
         draft_sync: None,
+        intro: Cell::new(None),
+        last_run_took: None,
         tick: 0,
         tip_index: 0,
         last_tip_change: Instant::now(),
@@ -367,6 +373,8 @@ impl App {
         if session != self.session {
             self.leave_draft();
         }
+        // Coming back to the start screen plays the wordmark's sweep again.
+        self.intro.set(None);
         self.opened.extend(session.clone());
         self.session = session;
         self.set_view(None);
@@ -374,14 +382,31 @@ impl App {
         self.scroll_top = None;
         self.selection = None;
         self.work_started = None;
+        self.last_run_took = None;
         self.last_progress = None;
         self.reset_panel();
         self.refresh();
     }
 
+    /// Replaces the conversation shown. The transcript is laid out again only
+    /// when something in it changed: refreshes arrive constantly while agents
+    /// work, and a long conversation's markdown is the costliest thing to draw.
     fn set_view(&mut self, view: Option<SessionView>) {
+        let unchanged = match (&self.view, &view) {
+            (Some(shown), Some(next)) => {
+                // The shared draft is in the input, not the transcript.
+                let mut next = next.clone();
+                next.draft.clone_from(&shown.draft);
+                next.draft_revision = shown.draft_revision;
+                *shown == next
+            }
+            (None, None) => true,
+            _ => false,
+        };
         self.view = view;
-        self.view_version += 1;
+        if !unchanged {
+            self.view_version += 1;
+        }
     }
 
     /// Switches to another project with no conversation open.

@@ -106,6 +106,18 @@ impl App {
         let mut stdout = std::io::stdout();
         let _ = crossterm::execute!(stdout, SetTitle(format!("{mark} {title} · jackalope")));
         let finished = previous == Some(Signal::Working) && signal != Signal::Working;
+        // Finished cleanly: say how long it took and what usually comes next.
+        if let Some(took) = self.last_run_took.take().filter(|_| finished) {
+            if signal == Signal::Idle {
+                self.flash(
+                    format!(
+                        "Done in {} · /review, /merge or reply",
+                        super::render::duration(took)
+                    ),
+                    Tone::Success,
+                );
+            }
+        }
         let bell = prefs::env_flag("JACKALOPE_BELL") != Some(false);
         if bell && (finished || (previous.is_some() && signal == Signal::NeedsYou)) {
             let _ = stdout.write_all(b"\x07");

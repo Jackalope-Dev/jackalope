@@ -406,7 +406,7 @@ pub struct SessionSummary {
     pub asking: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Message {
     /// `you` or `agent`. An agent message carries the output of the work the
@@ -424,7 +424,7 @@ pub struct Message {
     pub id: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Question {
     pub id: String,
@@ -536,7 +536,7 @@ pub struct PlanSummary {
 
 /// What the terminal needs to render a conversation: the exchange, the work
 /// currently running, and why Jackalope chose the agent it did.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionView {
     pub id: String,

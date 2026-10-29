@@ -617,16 +617,40 @@ fn header_info(app: &App) -> Vec<Line<'static>> {
     lines
 }
 
+/// How far the wordmark's light sweep has crossed (0 to 1), from when the
+/// start screen was first drawn; `None` before and after it runs.
+pub(super) fn intro_sweep(app: &App) -> Option<f32> {
+    const DELAY: f32 = 0.2;
+    const SWEEP: f32 = 1.0;
+    if app.view.is_some() || app.session.is_some() {
+        return None;
+    }
+    let elapsed = app.intro.get()?.elapsed().as_secs_f32() - DELAY;
+    (elapsed < SWEEP).then(|| (elapsed / SWEEP).max(0.0))
+}
+
 /// The start screen, centred in `height` rows: the wordmark, then who can
 /// take the work as chips. Where you are already sits on the frame, and key
 /// hints beneath it.
 fn welcome(app: &App, width: u16, height: u16) -> Vec<Line<'static>> {
     let muted = Style::default().fg(brand::muted());
     let mut group: Vec<Line<'static>> = Vec::new();
+    if app.intro.get().is_none() {
+        app.intro.set(Some(std::time::Instant::now()));
+    }
+    let sweep = intro_sweep(app);
     if usize::from(width) >= brand::WORDMARK_WIDTH + 4 && height >= 12 {
-        group.extend(brand::wordmark().into_iter().map(Line::centered));
+        group.extend(
+            brand::wordmark_sweeping(false, sweep)
+                .into_iter()
+                .map(Line::centered),
+        );
     } else if usize::from(width) >= brand::SMALL_WORDMARK_WIDTH + 2 && height >= 9 {
-        group.extend(brand::small_wordmark().into_iter().map(Line::centered));
+        group.extend(
+            brand::wordmark_sweeping(true, sweep)
+                .into_iter()
+                .map(Line::centered),
+        );
     } else {
         group.push(
             Line::styled(
