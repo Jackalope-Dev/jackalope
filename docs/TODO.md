@@ -100,6 +100,15 @@ release dates.
   setup/check reuse and dependency scheduling. Include failures, independent review,
   corrections and defects; validate requested tiers in installed provider versions.
 
+- [ ] Accept [plan mode](PLAN-MODE.md) with installed providers: Codex and Claude Code
+  interviews that stay read-only and respect the question cap, approval to merge for
+  single, subtasks and swarm shapes, a plan review that finds and repairs a seeded gap,
+  a declared deviation pausing dependent work, and a re-plan that keeps finished tasks.
+  Measure whether interviews reduce repairs and corrections against the same requests
+  without plan mode. Verify the app plan page and terminal panel with keyboard, light
+  and dark themes, reduced motion and narrow windows. The question picker does not yet
+  mark the recommended option (the question card does), and FeaturePlanner keeps its
+  separate step format.
 - [ ] Measure automatic subtasks on representative requests: planning overhead versus
   single-lead time, how often plans return one assignment, validation failures, and
   combined-result quality. Tune the local-rules size threshold from those results.
@@ -252,12 +261,20 @@ release dates.
 - [ ] Verify automatic lessons across tasks, queues, schedules and restart,
   including evidence, edits, removal and frozen task context. Measure outcomes.
 - [ ] Run background learning in the installed app across agents and conversations:
-  cadence and end-of-work reflection, probation, archiving, restore and history.
-  Calibrate the cadence, probation and archive thresholds against real use, and
-  measure whether learned lessons reduce repeated corrections before claiming it.
-- [ ] Add an opt-in account sync layer for learned lessons over settings sync: match
-  by learned id and project ID, merge by revision, append history records by id, and
-  leave evidence excerpts and local use counts on the device.
+  cadence and end-of-work reflection, probation, archiving, restore, curator folds and
+  history. Use Learning activity to calibrate the cadence, probation, archive and
+  curator thresholds against real use, and measure whether learned lessons reduce
+  repeated corrections before claiming it.
+- [ ] Accept learned-lesson sync with two installed desktops on one account and a
+  second account: first enable, offline edits on both sides, tombstones, per-project
+  exclusion, Delete synced lessons and the reset on the other desktop, account
+  switching, and a project without commits. Apply `0019_lesson_sync.sql` before the
+  Worker. Confirm evidence, use counts and paths never reach the service.
+- [ ] Run agent reflection with each supported default agent and account: quota and
+  time limits, failures that stay out of tasks, and whether its suggestions survive
+  probation more often than local reflection.
+- [ ] Check lesson export in real repositories: Claude Code loading the skill, other
+  agents reading the `AGENTS.md` section, CRLF files, worktrees and removal.
 - [ ] Extend codebase semantic coverage, project knowledge and scheduled continuation.
 - [ ] Verify Usage & quota drilldowns against installed history, including dated
   project-attributed Ask Jackalope turns, archived helper conversations and

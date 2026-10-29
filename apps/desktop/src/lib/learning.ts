@@ -10,7 +10,7 @@ export interface Lifecycle {
   /** Text so a newer status still loads; unknown values read as active. */
   status: string;
   statement: string;
-  /** `reflection` (background) or `session` (`/learn`). */
+  /** `reflection` (background), `session` (`/learn`) or `agent`. */
   origin: string;
   bornAt: string;
   deliveries: number;
@@ -68,6 +68,7 @@ const ARCHIVE_REASONS: Record<string, string> = {
   capacity: 'the project reached its limit of learned lessons',
   retired: 'you said it no longer applies',
   user: 'archived by you',
+  merged: 'folded into a similar lesson; restore to keep it separate',
 };
 
 /** One line describing a learned lesson's status and use. */
@@ -97,8 +98,42 @@ const ACTION_LABELS: Record<string, string> = {
   restored: 'Restored',
   edited: 'Edited',
   deleted: 'Removed',
+  curated: 'Folded into a similar lesson',
 };
 
 export function ledgerActionLabel(action: string): string {
   return ACTION_LABELS[action] ?? action;
+}
+
+/** Local learning counts for calibrating thresholds; see `knowledge_learning_metrics`. */
+export interface LearningMetrics {
+  probation: number;
+  active: number;
+  archived: number;
+  deliveries: number;
+  learned: number;
+  promoted: number;
+  archivedEvents: number;
+  restored: number;
+  folded: number;
+  retired: number;
+  byAgent: number;
+  since?: string | null;
+}
+
+/** Label and value pairs for the Project context summary. */
+export function learningMetricRows(metrics: LearningMetrics): [string, number][] {
+  return [
+    ['New', metrics.probation],
+    ['Active', metrics.active],
+    ['Archived', metrics.archived],
+    ['Times supplied to tasks', metrics.deliveries],
+    ['Learned', metrics.learned],
+    ['Suggested by an agent', metrics.byAgent],
+    ['Became active', metrics.promoted],
+    ['Archived (all reasons)', metrics.archivedEvents],
+    ['Folded as duplicates', metrics.folded],
+    ['Retired by you', metrics.retired],
+    ['Restored', metrics.restored],
+  ];
 }

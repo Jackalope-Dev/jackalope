@@ -218,6 +218,12 @@ export interface PendingUserPrompt {
   answer?: string | null;
   createdAt: string;
   answeredAt?: string | null;
+  /** Optional card structure; absent on older questions. */
+  header?: string;
+  recommended?: string;
+  multiSelect?: boolean;
+  allowOther?: boolean;
+  rationale?: string;
 }
 export interface ValidationStep {
   id: string;

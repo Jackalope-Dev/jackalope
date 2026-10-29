@@ -349,7 +349,7 @@ pub fn pull_request(
 
 /// `--yes`, or a yes typed at a terminal. A script without `--yes` is refused
 /// rather than left waiting for an answer nobody will type.
-fn approved(yes: bool, question: &str) -> Result<bool, String> {
+pub fn approved(yes: bool, question: &str) -> Result<bool, String> {
     use std::io::{BufRead, IsTerminal, Write};
     if yes {
         return Ok(true);

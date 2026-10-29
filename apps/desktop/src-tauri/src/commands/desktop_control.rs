@@ -374,7 +374,7 @@ pub async fn execute(
             let prompt = PendingUserPrompt { id: uuid::Uuid::new_v4().to_string(), run_id: run.id.clone(),
                 question: "Allow desktop control for this attempt? Choose one window the agent may read, capture, focus, click, and type into. A desktop glow shows when control is active. Escape or Stop revokes access. Moving the mouse or using the keyboard pauses control until you click Resume. This is your live desktop; input can change files or send data. Other windows and popups need separate access. Do not choose a window containing secrets.".into(),
                 input_type: "choice".into(), options, default_value: None, status: "pending".into(), answer: None,
-                created_at: chrono::Utc::now().to_rfc3339(), answered_at: None };
+                created_at: chrono::Utc::now().to_rfc3339(), answered_at: None, presentation: Default::default() };
             current(&runtime, &run.id)?;
             runtime.update_checked(&run.id, |r| {
                 if ["starting", "running"].contains(&r.status.as_str()) { r.prompts.push(prompt.clone()); }

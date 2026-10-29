@@ -93,6 +93,9 @@ pub struct KnowledgeStore {
     path: PathBuf,
     lock: Arc<Mutex<()>>,
     refreshes: Arc<Mutex<std::collections::HashMap<String, std::time::Instant>>>,
+    /// Bumped on every successful write, so background passes can skip
+    /// unchanged knowledge.
+    changes: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl KnowledgeStore {
@@ -101,7 +104,13 @@ impl KnowledgeStore {
             path,
             lock: Arc::new(Mutex::new(())),
             refreshes: Arc::new(Mutex::new(Default::default())),
+            changes: Default::default(),
         }
+    }
+
+    /// Changes written since this process started.
+    pub fn changes(&self) -> u64 {
+        self.changes.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     fn read(&self) -> Result<Vec<KnowledgeEntry>, String> {
@@ -207,6 +216,8 @@ impl KnowledgeStore {
                 // Turning an archived learned lesson back on restores it.
                 if let Some(state) = source.lifecycle.as_mut() {
                     if entry.enabled && state.archived() {
+                        state.distinct |=
+                            state.archived_reason.as_deref() == Some(learning::FOLDED);
                         state.status = learning::PROBATION.into();
                         state.archived_reason = None;
                         state.opportunities = 0;
@@ -264,7 +275,10 @@ impl KnowledgeStore {
         if bytes.len() > 4_000_000 {
             return Err("Saved knowledge exceeds the storage limit. Remove unused entries before adding more.".into());
         }
-        history::write_atomic(&self.path, &bytes)
+        history::write_atomic(&self.path, &bytes)?;
+        self.changes
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Ok(())
     }
 
     fn remove(&self, id: &str, revision: u64) -> Result<(), String> {

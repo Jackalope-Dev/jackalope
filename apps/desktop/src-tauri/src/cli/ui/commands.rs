@@ -47,6 +47,22 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("history", "search what you have typed before"),
     ("kill", "stop running ! commands"),
     ("clear", "start fresh (Ctrl+L clears notes instead)"),
+    (
+        "plan",
+        "plan with me first: explore, ask, then draft a plan",
+    ),
+    ("plans", "list this project's plans; /plans <n> opens one"),
+    ("revise", "keep planning: send comments for a revised plan"),
+    (
+        "approve",
+        "approve the plan and run it: single, subtasks or swarm",
+    ),
+    ("replan", "revise a running plan from what is done"),
+    ("export", "save the plan into the repository, uncommitted"),
+    (
+        "deviation",
+        "decide on a plan deviation: accept, redo or replan",
+    ),
     ("open", "show Jackalope's app window"),
     ("help", "show these commands"),
     ("quit", "leave (work keeps running)"),
@@ -311,6 +327,7 @@ impl App {
             "Ctrl+A/E line start/end · Ctrl+W, Alt+Backspace delete word",
             "Ctrl+U/K delete to line start/end · Ctrl+Y paste deleted text",
             "Ctrl+L clear notes · Ctrl+Z suspend · Ctrl+C clear, stop commands, leave",
+            "Ctrl+G edit the open plan in $EDITOR",
             "Start a line with a space to keep it out of history",
         ] {
             self.note(format!("  {keys}"));
@@ -433,6 +450,9 @@ impl App {
                 }
             }
             "open" => self.open_app(),
+            name if super::plan::COMMANDS.contains(&name) => {
+                self.plan_command(name, argument);
+            }
             other => match closest_command(other) {
                 Some(name) => self.note(format!("Unknown command /{other}. Did you mean /{name}?")),
                 None => self.note(format!("Unknown command /{other}. Type / to see the list.")),

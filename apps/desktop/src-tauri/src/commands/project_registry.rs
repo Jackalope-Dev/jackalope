@@ -43,6 +43,18 @@ pub struct ProjectRecord {
     /// Absent or out of range means the default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub learning_cadence: Option<u32>,
+    /// Whether learned lessons take part in account lesson sync when it is on
+    /// for this desktop. Absent means included.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sync_lessons: Option<bool>,
+    /// Whether finished work is also reflected on by the default agent, which
+    /// spends that account's quota. Absent means off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_reflection: Option<bool>,
+    /// Whether active learned lessons are mirrored into the project's AGENTS.md
+    /// and a Claude Code skill. Absent means off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub export_lessons: Option<bool>,
     /// Whether Claude Code tasks load the person's own Claude Code settings, plugins,
     /// hooks and MCP servers. `false` limits them to the project's settings and the
     /// connections Jackalope supplies. Absent follows the evaluation default.
@@ -64,6 +76,9 @@ pub struct ProjectSettings {
     pub workspace_mode: WorkspaceMode,
     pub learn_automatically: bool,
     pub learning_cadence: u32,
+    pub sync_lessons: bool,
+    pub agent_reflection: bool,
+    pub export_lessons: bool,
 }
 
 impl Default for ProjectSettings {
@@ -73,6 +88,9 @@ impl Default for ProjectSettings {
             workspace_mode: WorkspaceMode::Worktree,
             learn_automatically: true,
             learning_cadence: super::knowledge::learning::DEFAULT_CADENCE,
+            sync_lessons: true,
+            agent_reflection: false,
+            export_lessons: false,
         }
     }
 }
@@ -91,6 +109,9 @@ impl ProjectRecord {
                 .learning_cadence
                 .filter(|cadence| LEARNING_CADENCES.contains(cadence))
                 .unwrap_or(super::knowledge::learning::DEFAULT_CADENCE),
+            sync_lessons: self.sync_lessons.unwrap_or(true),
+            agent_reflection: self.agent_reflection.unwrap_or(false),
+            export_lessons: self.export_lessons.unwrap_or(false),
         }
     }
 }
@@ -228,6 +249,9 @@ pub fn edit_check(runtime: &TaskRuntime, project_id: &str) -> Option<String> {
 pub struct LearningSettings {
     pub automatic: Option<bool>,
     pub cadence: Option<u32>,
+    pub sync: Option<bool>,
+    pub agent: Option<bool>,
+    pub export: Option<bool>,
 }
 
 /// Records a terminal's change to a project's settings. The app adopts the
@@ -268,6 +292,15 @@ pub fn set_settings(
     if let Some(cadence) = learning.cadence {
         record.learning_cadence = Some(cadence);
     }
+    if let Some(sync) = learning.sync {
+        record.sync_lessons = Some(sync);
+    }
+    if let Some(agent) = learning.agent {
+        record.agent_reflection = Some(agent);
+    }
+    if let Some(export) = learning.export {
+        record.export_lessons = Some(export);
+    }
     let updated = record.clone();
     write_ledger(&file, &ledger)?;
     Ok(updated)
@@ -300,6 +333,9 @@ pub fn ensure(runtime: &TaskRuntime, project_path: &str) -> Result<ProjectRecord
         workspace_mode: None,
         learn_automatically: None,
         learning_cadence: None,
+        sync_lessons: None,
+        agent_reflection: None,
+        export_lessons: None,
         personal_claude_setup: None,
         edit_check: None,
     };
@@ -341,6 +377,9 @@ mod tests {
                     workspace_mode: None,
                     learn_automatically: None,
                     learning_cadence: None,
+                    sync_lessons: None,
+                    agent_reflection: None,
+                    export_lessons: None,
                     personal_claude_setup: None,
                     edit_check: None,
                 },
@@ -353,6 +392,9 @@ mod tests {
                     workspace_mode: Some("current".into()),
                     learn_automatically: Some(false),
                     learning_cadence: Some(5),
+                    sync_lessons: None,
+                    agent_reflection: None,
+                    export_lessons: None,
                     personal_claude_setup: None,
                     edit_check: None,
                 },
@@ -407,6 +449,9 @@ mod tests {
             workspace_mode: None,
             learn_automatically: None,
             learning_cadence: None,
+            sync_lessons: None,
+            agent_reflection: None,
+            export_lessons: None,
             personal_claude_setup: None,
             edit_check: None,
         });

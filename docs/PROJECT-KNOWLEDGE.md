@@ -25,7 +25,8 @@ match future task instructions. Task-derived entries retain a link to the source
 attempt. Manual entries stay under your control. Jackalope also derives bounded local lessons
 from saved user feedback and repository evidence, and keeps
 [learned lessons](#learned-lessons) from conversations and finished work. It does not
-rewrite repository instructions or make background model calls.
+rewrite repository instructions or make background model calls unless you turn on
+[lesson export or agent reflection](#optional-extensions) for a project.
 
 The composer previews matching lessons under **Saved project context**. Skip an
 individual lesson or disable matching for that task. The native launcher applies
@@ -94,7 +95,8 @@ a running task reports another 50 tool calls (25, 50, 100 or 200 in Project
 settings) and when a task or conversation turn ends. `/learn` runs the same
 reflection on demand over a conversation since its previous `/learn`, whether or not
 the setting is on. Reflection is local and deterministic; it adds no model calls and
-never blocks, slows or fails the task. Failures are logged and skipped.
+never blocks, slows or fails the task. Failures are logged and skipped. The optional
+[agent reflection](#optional-extensions) is the only learning step that calls a model.
 
 Reflection reads only what the person wrote (a task's objective, or the messages sent
 in that conversation turn), their typed answers to agent questions, and check
@@ -123,8 +125,9 @@ it is not learned again.
 
 New lessons are on probation (shown as **New**) until they are supplied to two
 distinct tasks, then become **Active**. Each new task that selects saved context is an
-opportunity for every available learned lesson in the project. A lesson never supplied
-in 30 opportunities, or not supplied in the last 100, is archived. A project keeps at
+opportunity for every available learned lesson in the project. A lesson on probation
+never supplied in 30 opportunities, or any lesson not supplied in the last 100, is
+archived. A project keeps at
 most 40 available learned lessons; adding another archives the least used first.
 Archiving never deletes: **Restore** in Project → Context or `/learnings` returns a
 lesson to probation with fresh counts, and turning an archived lesson back on in its
@@ -133,10 +136,86 @@ nothing is archived for lack of use. Use counts record that a lesson was supplie
 not that it caused a better result.
 
 Every change is appended to a per-project history: learned, seen again, updated,
-retired, now active, archived, restored, edited or removed, with the reason and a
+retired, now active, archived, restored, folded, edited or removed, with the reason and a
 redacted excerpt of the source (emails, tokens, keys, credential URLs and the home
 folder are replaced). Open **History** on a learned lesson in Project → Context, or
 choose it in `/learnings`.
+
+### Curator
+
+While automatic learning is on, the background thread also curates each project it
+has reflected on: once after the app starts learning there, again after 10 lesson
+changes, and at least daily while the project is active. A pass compares the
+statements of available lessons Jackalope wrote and nobody edited, of the same kind
+and with the same intent (an **Always** never folds into a **Never**). Two lessons
+whose meaningful words overlap by at least 75% become one: the most used (then the
+oldest) keeps the other's matching phrases and evidence references, and the other is
+archived as folded into a similar lesson. Each pass folds at most five lessons, makes
+no model calls and records both sides in the history. **Restore** undoes a fold, and a
+restored lesson is never folded again. Check commands are never folded.
+
+### Thresholds and activity
+
+Every tunable lives in `Thresholds` (`THRESHOLDS`) in
+`commands/knowledge/learning.rs`; there are no per-project overrides.
+
+| Threshold | Default |
+| --- | --- |
+| Deliveries that end probation | 2 |
+| Opportunities before an unused lesson on probation is archived | 30 |
+| Opportunities since the last delivery before a lesson is archived | 100 |
+| Available learned lessons per project | 40 |
+| Lessons added per reflection | 5 |
+| Folds per curator pass | 5 |
+| Lesson changes that make a curator pass due | 10 |
+| Longest gap between passes of an active project | 24 hours |
+| Word overlap at which lessons fold | 75% |
+| Agent reflections per hour and per day, all projects | 4 and 20 |
+| Agent reflection time limit | 45 seconds |
+| Redacted words one agent reflection reads | 6,000 bytes |
+
+The reflection cadence stays a per-project setting. **Learning activity** in Project →
+Context shows this computer's counts for the project: lessons that are new, active and
+archived, how often current lessons were supplied, and, from the retained history, how
+many were learned, suggested by an agent, became active, archived, folded, retired and
+restored. History rotation bounds the counts; the date shows the oldest record. Use
+them to tell whether lessons are learned too eagerly or archived too soon before
+changing a default.
+
+### Optional extensions
+
+These are per-project settings in Project settings and the terminal's `/settings`.
+All are off by default except sync inclusion, which only applies once lesson sync is
+on for the desktop.
+
+**Reflect with an agent** also shows finished work to the project's default agent
+(the routing agent and account configured in Agents) once the task or conversation
+turn ends. The agent receives the person's redacted words from that work, up to
+6,000 bytes, and the statements of the project's learned lessons, runs without tools,
+and may propose the same add, merge, patch and retire changes. Its proposals pass the
+same promotion gate and are recorded with the origin `agent`; it can only target
+lessons Jackalope wrote. Each call is a short request on that agent account's quota,
+limited to four an hour and twenty a day across projects and stopped after 45
+seconds. Unavailable agents, quota errors, timeouts and malformed answers are logged
+and skipped; they never affect the task.
+
+**Write lessons to AGENTS.md** mirrors the project's active learned lessons, one line
+each, into a section of the project folder's `AGENTS.md` between
+`<!-- jackalope:lessons:start -->` and `<!-- jackalope:lessons:end -->`, and into
+`.claude/skills/jackalope-lessons/SKILL.md` for Claude Code. Text outside the markers
+is never changed; the file is created when missing and keeps its line endings.
+Jackalope refuses to write when the markers are unmatched, out of order or repeated, or
+when the skill file exists without its managed marker. Writes are atomic and happen
+in the background shortly after lessons or settings change. Lessons on probation or
+archived, and lessons whose text looks sensitive, are left out. Turning the setting
+off, or having no active lessons, removes the section (and an `AGENTS.md` that held
+nothing else) and the skill. Jackalope never stages or commits these files. They are
+written to the registered project folder only; isolated worktrees created from a
+commit see them only after you commit them, and running agents read them as their own
+CLI does.
+
+**Sync learned lessons** includes the project in [account lesson sync](SETTINGS-SYNC.md#learned-lessons)
+when it is turned on for this desktop; turn it off to keep a project's lessons here.
 
 ## Workflows
 
@@ -195,19 +274,21 @@ preserved and surfaced; mutations never silently replace unreadable knowledge.
 The store allows 100 entries per project and 500 per profile. Task journals own
 the context receipts; summary polling omits their content bodies.
 
-`commands/knowledge/learning.rs` owns reflection, the promotion gate and the lessons'
-lifecycle. Learned lessons keep their status and use counts under the entry's
-`automatic.lifecycle`; entries saved before it existed load unchanged. Learned ids
-derive from the project ID and the lesson, not the folder, so the same lesson has the
-same id on every device. History is append-only JSON Lines in
-`task-runs-v1/knowledge/ledger/`, one file per project; past 1 MB the file is moved
-aside, replacing the previous one, so two files are kept. Evidence excerpts live only
-there, apart from the entry. Everything stays in the local profile; there is no
-account or cross-machine sharing of lessons.
+`commands/knowledge/learning.rs` owns reflection, the promotion gate, the thresholds
+and the lessons' lifecycle; `learning/curate.rs`, `learning/agent.rs`,
+`learning/export.rs` and `learning/sync.rs` own the curator, agent reflection, export
+and the sync data model. Learned lessons keep their status and use counts under the
+entry's `automatic.lifecycle`; entries saved before it existed load unchanged. Learned
+ids derive from the project ID and the lesson, not the folder; project IDs belong to
+one installation, so sync matches projects by repository instead. History is
+append-only JSON Lines in `task-runs-v1/knowledge/ledger/`, one file per project; past
+1 MB the file is moved aside, replacing the previous one, so two files are kept.
+Evidence excerpts live only there, apart from the entry, and never sync. Lessons stay
+in the local profile unless lesson sync is turned on.
 
 `commands/monitors.rs` owns bounded, read-only Git observations and diffs.
 `commands/schedules.rs` owns timing, persisted observations/notices and guarded
 dispatch. There is no arbitrary background shell runner or new model provider.
-Existing data remains readable through optional/defaulted fields. These features
-remain local; remote workers, semantic retrieval and automatic skill generation
-are separate possible extensions.
+Existing data remains readable through optional/defaulted fields. Apart from opt-in
+lesson sync, agent reflection and export, these features remain local; remote workers
+and semantic retrieval are separate possible extensions.

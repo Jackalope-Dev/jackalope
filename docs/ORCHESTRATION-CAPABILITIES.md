@@ -84,11 +84,20 @@ message. Agents must read pending answers; elapsed time is never an answer.
 | Ask a question | ask_user | POST /v1/user-prompt |
 | Retrieve an answer | user_response | GET /v1/user-prompt/poll?id=question |
 | Record checks | record_validation_step | POST /v1/validation-step |
+| Report a departure from an approved plan | plan_deviation | POST /v1/plan-deviation with summary, optional amendment |
 | Native window control (Windows/macOS/X11; platform readiness required) | desktop_control | POST /v1/desktop/control |
 
 [Native desktop control](DESKTOP-CONTROL.md) requires a fresh human window grant
 for each attempt. It supports accessibility snapshots, screenshots, focus and
 guarded input on Windows; other platforms return unavailable.
+
+`ask_user` accepts optional `header`, `recommended` (one of the options), `multi_select`
+(answered as a JSON array), `allow_other` and `rationale`; unknown recommendations and
+over-long text are dropped. Questions from a [plan mode](PLAN-MODE.md) planning attempt
+are limited by the plan's question cap and end when the person chooses to stop; a closed
+question returns `status: closed` with a message instead of reaching the person.
+`plan_deviation` is accepted only from attempts working on an approved plan, records the
+departure for the person and pauses that plan's dispatch; agents never edit the plan.
 
 HTTP messages use recipientTaskId; the MCP schema uses recipient_task_id. Omit it
 for broadcasts. Agents can see project broadcasts, their received messages and

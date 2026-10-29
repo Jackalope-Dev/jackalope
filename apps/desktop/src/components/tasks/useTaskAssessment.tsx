@@ -94,12 +94,15 @@ export function TaskAssessmentNotice({
   onCancel,
   onSingle,
   onPlan,
+  onPlanWithMe,
 }: {
   assessment?: TaskAssessment;
   busy: boolean;
   onCancel: () => void;
   onSingle: () => void;
   onPlan: () => void;
+  /** Plan mode: interview first, then approve a plan. */
+  onPlanWithMe?: () => void;
 }) {
   if (busy)
     return (
@@ -133,6 +136,11 @@ export function TaskAssessmentNotice({
           >
             {assessment.strategy === 'parallel' ? 'Continue with one lead' : 'Start with one lead'}
           </Button>
+          {onPlanWithMe && (
+            <Button type="button" variant="outline" onClick={onPlanWithMe}>
+              Plan with me
+            </Button>
+          )}
           <Button type="button" variant="ghost" onClick={onCancel}>
             Edit request
           </Button>

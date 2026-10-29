@@ -19,7 +19,7 @@ maintained behavior, a repeatable workflow or a reusable template. Follow the
 ## Workspace contracts
 
 - [Getting started](GETTING-STARTED.md), [core workflow](CORE-WORKFLOW.md), [task outcomes](TASK-OUTCOMES.md)
-- [Parallel workflows](PARALLEL-WORKFLOWS.md), [orchestration](ORCHESTRATION-CAPABILITIES.md)
+- [Parallel workflows](PARALLEL-WORKFLOWS.md), [orchestration](ORCHESTRATION-CAPABILITIES.md), [plan mode](PLAN-MODE.md)
 - [Agent support](AGENT-SUPPORT.md), [agent accounts](AGENT-ACCOUNTS.md), [Antigravity](ANTIGRAVITY.md)
 - [Local agents and context selection](LOCAL-AI.md), [usage and routing](USAGE-AND-ROUTING.md)
 - [Recurring templates](RECURRING-TEMPLATES.md), [example parallel plan](examples/parallel-plan.json)

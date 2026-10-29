@@ -509,6 +509,7 @@ mod tests {
             run_id: "r".into(),
             question: "Which branch?".into(),
             options: Vec::new(),
+            ..Default::default()
         });
         assert_eq!(
             outcome(&asked),

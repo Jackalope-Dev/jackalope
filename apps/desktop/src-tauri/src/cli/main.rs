@@ -13,6 +13,7 @@ mod git;
 mod history;
 mod host;
 mod once;
+mod planning;
 mod prefs;
 mod protocol;
 mod shell;
@@ -42,6 +43,12 @@ USAGE
                                  project branch (-m <message>, --yes)
   jackalope pr <id>              commit, push and open a pull request with your
                                  GitHub CLI (--title <text>, --ready, --yes)
+  jackalope plan \"<goal>\"        plan with me first: explore read-only, ask a few
+                                 questions, then print a plan to approve
+  jackalope plans                list this project's plans
+  jackalope plan show <id>       print a plan (--json)
+  jackalope plan approve <id> [single|subtasks|swarm]
+                                 approve the latest revision and start it (--yes)
   jackalope status               show the host, this project and your agents
   jackalope help                 show this message
 
@@ -132,6 +139,15 @@ fn run() -> Result<(), String> {
             std::process::exit(code);
         }
         Command::List { json } => subcommands::list(cli.cold_start, json),
+        Command::Plan { goal, agent, json } => {
+            let code = planning::start(cli.cold_start, goal, agent, json)?;
+            std::process::exit(code);
+        }
+        Command::PlanShow { id, json } => planning::show(cli.cold_start, &id, json),
+        Command::PlanApprove { id, shape, yes } => {
+            planning::approve(cli.cold_start, &id, shape, yes)
+        }
+        Command::Plans { json } => planning::list(cli.cold_start, json),
         Command::Status { json } => subcommands::status(json),
         Command::Stop { id } => subcommands::stop(cli.cold_start, &id),
         Command::Answer { id, text } => subcommands::answer(cli.cold_start, &id, text),

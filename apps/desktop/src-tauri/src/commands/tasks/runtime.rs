@@ -546,6 +546,7 @@ impl TaskRuntime {
             answer: None,
             created_at: Utc::now().to_rfc3339(),
             answered_at: None,
+            presentation: Default::default(),
         };
         self.record_prompt(&prompt);
         self.update(id, |run| {
@@ -731,13 +732,19 @@ impl TaskRuntime {
             crate::commands::agent_profiles::validate_binding(&self.profiles_root(), binding)?;
             crate::commands::agent_profiles::apply_binding(&mut cmd, binding)?;
         }
+        // Plan sessions explore without editing where the CLI can enforce it.
+        let read_only = crate::commands::planning::read_only(id);
         if adapter == "codex" {
             cmd.args([
                 "exec",
                 "-c",
                 "approval_policy=\"never\"",
                 "-c",
-                "sandbox_mode=\"workspace-write\"",
+                if read_only {
+                    "sandbox_mode=\"read-only\""
+                } else {
+                    "sandbox_mode=\"workspace-write\""
+                },
             ]);
             if let Some(ref old) = previous {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
@@ -750,7 +757,16 @@ impl TaskRuntime {
             if persistent {
                 cmd.args(["--input-format", "stream-json"]);
             }
-            cmd.args(["--permission-mode", "acceptEdits"]);
+            if read_only {
+                cmd.args([
+                    "--permission-mode",
+                    "default",
+                    "--disallowedTools",
+                    "Edit,Write,MultiEdit,NotebookEdit",
+                ]);
+            } else {
+                cmd.args(["--permission-mode", "acceptEdits"]);
+            }
             if let Some(ref old) = previous {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
                 crate::commands::verification::ensure_idle(&old.workspace)?;
@@ -1059,7 +1075,7 @@ impl TaskRuntime {
                     "--permission-prompt-tool",
                     "mcp__jackalope__permission_prompt",
                     "--allowedTools",
-                    "mcp__jackalope__ask_jev,mcp__jackalope__read_context,mcp__jackalope__discover_harness_tools,mcp__jackalope__search_tools,mcp__jackalope__read_tool,mcp__jackalope__read_tool_result,mcp__jackalope__project,mcp__jackalope__peers,mcp__jackalope__peer_read,mcp__jackalope__peer_adopt,mcp__jackalope__propose_subtask,mcp__jackalope__agreement,mcp__jackalope__message,mcp__jackalope__inbox,mcp__jackalope__acknowledge_message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__browser_configure,mcp__jackalope__browser_inspect,mcp__jackalope__browser_tabs,mcp__jackalope__desktop_control,mcp__jackalope__ask_user,mcp__jackalope__user_response,mcp__jackalope__record_validation_step,mcp__jackalope__computer_verify,mcp__jackalope__verification_output",
+                    "mcp__jackalope__ask_jev,mcp__jackalope__read_context,mcp__jackalope__discover_harness_tools,mcp__jackalope__search_tools,mcp__jackalope__read_tool,mcp__jackalope__read_tool_result,mcp__jackalope__project,mcp__jackalope__peers,mcp__jackalope__peer_read,mcp__jackalope__peer_adopt,mcp__jackalope__propose_subtask,mcp__jackalope__plan_deviation,mcp__jackalope__agreement,mcp__jackalope__message,mcp__jackalope__inbox,mcp__jackalope__acknowledge_message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__browser_configure,mcp__jackalope__browser_inspect,mcp__jackalope__browser_tabs,mcp__jackalope__desktop_control,mcp__jackalope__ask_user,mcp__jackalope__user_response,mcp__jackalope__record_validation_step,mcp__jackalope__computer_verify,mcp__jackalope__verification_output",
                 ]);
             }
         }

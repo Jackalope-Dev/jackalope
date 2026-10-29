@@ -15,6 +15,7 @@ import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { KnowledgeEditor, newKnowledge } from './KnowledgeEditor';
 import { LearnedHistory } from './LearnedHistory';
+import { LearningMetrics } from './LearningMetrics';
 
 export function KnowledgeLibrary({ project }: { project: Project }) {
   const { entries, error, loading, refresh } = useKnowledge(project.id, project.path);
@@ -280,6 +281,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
             );
           })}
         </div>
+        {desktop && <LearningMetrics projectId={project.id} projectPath={project.path} />}
       </section>
       <section className="workspace-section workspace-stack" aria-label="Search past decisions">
         <WorkspaceSectionHeading title="Find a decision in past tasks" />

@@ -7,27 +7,78 @@
 use super::*;
 use sha2::{Digest, Sha256};
 
+mod agent;
+mod curate;
+mod export;
 pub mod ledger;
 mod redact;
 mod reflect;
+pub mod sync;
 pub mod watcher;
 
+pub use agent::{agent_reflection, AgentBudget};
+pub use curate::FOLDED;
+pub use export::export_project;
 pub use ledger::LedgerRecord;
 pub use redact::redact;
 pub use reflect::{reflect, Observation, ObservationKind};
 
-/// Distinct deliveries that end a lesson's probation.
-pub const PROBATION_DELIVERIES: u64 = 2;
-/// Eligible tasks after which a lesson that was never delivered is archived.
-pub const PROBATION_OPPORTUNITIES: u64 = 30;
-/// Eligible tasks since its last delivery after which a lesson is archived.
-pub const IDLE_OPPORTUNITIES: u64 = 100;
-/// Available learned lessons per project; the least used is archived first.
-pub const PROJECT_CAPACITY: usize = 40;
-/// Reported tool calls between background reflections of a running task.
+/// Every tunable of the learning loop. Change values here only; the names
+/// below are aliases for use in messages. See docs/PROJECT-KNOWLEDGE.md.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Thresholds {
+    /// Distinct deliveries that end a lesson's probation.
+    pub probation_deliveries: u64,
+    /// Eligible tasks after which a lesson on probation that was never
+    /// delivered is archived.
+    pub probation_opportunities: u64,
+    /// Eligible tasks since its last delivery after which a lesson is archived.
+    pub idle_opportunities: u64,
+    /// Available learned lessons per project; the least used is archived first.
+    pub project_capacity: usize,
+    /// New lessons one reflection may add, so a noisy run cannot flood a project.
+    pub adds_per_reflection: usize,
+    /// Near-duplicates one curator pass may fold.
+    pub folds_per_curation: usize,
+    /// Lesson changes in a project that make a curator pass due.
+    pub curate_after_changes: u64,
+    /// Seconds after which an active project is curated again regardless.
+    pub curate_every_seconds: u64,
+    /// Word overlap (0–1) at which the curator treats two lessons as one.
+    pub fold_similarity: f64,
+    /// Agent reflections per rolling hour and day across all projects.
+    pub agent_reflections_per_hour: usize,
+    pub agent_reflections_per_day: usize,
+    /// Seconds an agent reflection may take before it is stopped.
+    pub agent_timeout_seconds: u64,
+    /// Bytes of the person's redacted words one agent reflection reads.
+    pub agent_window_bytes: usize,
+}
+
+pub const THRESHOLDS: Thresholds = Thresholds {
+    probation_deliveries: 2,
+    probation_opportunities: 30,
+    idle_opportunities: 100,
+    project_capacity: 40,
+    adds_per_reflection: 5,
+    folds_per_curation: 5,
+    curate_after_changes: 10,
+    curate_every_seconds: 24 * 60 * 60,
+    fold_similarity: 0.75,
+    agent_reflections_per_hour: 4,
+    agent_reflections_per_day: 20,
+    agent_timeout_seconds: 45,
+    agent_window_bytes: 6000,
+};
+
+pub const PROBATION_DELIVERIES: u64 = THRESHOLDS.probation_deliveries;
+pub const PROBATION_OPPORTUNITIES: u64 = THRESHOLDS.probation_opportunities;
+pub const IDLE_OPPORTUNITIES: u64 = THRESHOLDS.idle_opportunities;
+pub const PROJECT_CAPACITY: usize = THRESHOLDS.project_capacity;
+const ADDS_PER_REFLECTION: usize = THRESHOLDS.adds_per_reflection;
+/// Reported tool calls between background reflections of a running task; a
+/// per-project setting.
 pub const DEFAULT_CADENCE: u32 = 50;
-/// New lessons one reflection may add, so a noisy run cannot flood a project.
-const ADDS_PER_REFLECTION: usize = 5;
 const EVIDENCE_REFERENCES: usize = 10;
 const RECENT_RUNS: usize = 8;
 
@@ -48,7 +99,7 @@ pub struct Lifecycle {
     /// repeats or contradicts it.
     #[serde(default)]
     pub statement: String,
-    /// `reflection` (background) or `session` (`/learn`).
+    /// `reflection` (background), `session` (`/learn`) or `agent`.
     #[serde(default)]
     pub origin: String,
     #[serde(default)]
@@ -69,6 +120,10 @@ pub struct Lifecycle {
     pub recent_runs: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub archived_reason: Option<String>,
+    /// Restored after the curator folded it into another lesson, so the
+    /// curator leaves it apart from then on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub distinct: bool,
 }
 
 impl Lifecycle {
@@ -128,8 +183,8 @@ pub struct Promotion {
     pub known: Vec<String>,
 }
 
-/// Machine-independent: a project's learned lesson has the same id on every
-/// device, so a later sync layer can match entries without paths.
+/// Independent of the folder. Project ids belong to one installation, so
+/// lesson sync matches projects by repository and keeps these ids as they are.
 pub fn learned_id(project_id: &str, key: &str) -> String {
     let hash = Sha256::digest(format!("learned-v1\0{project_id}\0{key}"));
     let mut bytes = [0u8; 16];
@@ -205,6 +260,7 @@ fn archive(entry: &mut KnowledgeEntry, reason: &str) {
 
 fn restore(entry: &mut KnowledgeEntry) {
     if let Some(state) = lifecycle_mut(entry) {
+        state.distinct |= state.archived_reason.as_deref() == Some(curate::FOLDED);
         state.status = if state.deliveries >= PROBATION_DELIVERIES {
             ACTIVE.into()
         } else {
@@ -657,7 +713,7 @@ impl KnowledgeStore {
             }
             let expired = automatic
                 && managed
-                && if state.deliveries == 0 {
+                && if state.deliveries == 0 && state.on_probation() {
                     state.opportunities >= PROBATION_OPPORTUNITIES
                 } else {
                     state.idle >= IDLE_OPPORTUNITIES
@@ -672,7 +728,8 @@ impl KnowledgeStore {
                 ));
             }
             if expired {
-                let never = lifecycle(entry).is_some_and(|state| state.deliveries == 0);
+                let never = lifecycle(entry)
+                    .is_some_and(|state| state.deliveries == 0 && state.on_probation());
                 archive(entry, "unused");
                 records.push(record(
                     entry,
@@ -765,6 +822,78 @@ pub fn observe_delivery(runtime: &TaskRuntime, request: &super::super::tasks::Ru
     ) {
         eprintln!("Learned lesson usage was not recorded: {error}");
     }
+}
+
+/// Local counts that help calibrate the thresholds: current lessons by status
+/// and their deliveries, and changes recorded in the retained history.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LearningMetrics {
+    pub probation: usize,
+    pub active: usize,
+    pub archived: usize,
+    /// Deliveries of current learned lessons on this device.
+    pub deliveries: u64,
+    pub learned: usize,
+    pub promoted: usize,
+    pub archived_events: usize,
+    pub restored: usize,
+    pub folded: usize,
+    pub retired: usize,
+    /// Lessons an agent reflection suggested.
+    pub by_agent: usize,
+    /// The oldest retained history record, which bounds the counts above.
+    pub since: Option<String>,
+}
+
+impl KnowledgeStore {
+    pub fn metrics(&self, project_id: &str, project_path: &str) -> Result<LearningMetrics, String> {
+        let mut metrics = LearningMetrics::default();
+        for entry in self.list(project_id, project_path)? {
+            let Some(state) = lifecycle(&entry) else {
+                continue;
+            };
+            metrics.deliveries += state.deliveries;
+            if state.archived() {
+                metrics.archived += 1;
+            } else if state.on_probation() {
+                metrics.probation += 1;
+            } else {
+                metrics.active += 1;
+            }
+        }
+        for record in ledger::read_project(&self.ledger_directory(), project_id) {
+            if metrics
+                .since
+                .as_ref()
+                .is_none_or(|since| record.at < *since)
+            {
+                metrics.since = Some(record.at.clone());
+            }
+            match record.action.as_str() {
+                "born" => {
+                    metrics.learned += 1;
+                    metrics.by_agent += usize::from(record.origin == "agent");
+                }
+                "promoted" => metrics.promoted += 1,
+                "archived" => metrics.archived_events += 1,
+                "restored" => metrics.restored += 1,
+                "curated" => metrics.folded += 1,
+                "retired" => metrics.retired += 1,
+                _ => {}
+            }
+        }
+        Ok(metrics)
+    }
+}
+
+#[tauri::command]
+pub fn knowledge_learning_metrics(
+    project_id: String,
+    project_path: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<LearningMetrics, String> {
+    state.knowledge.metrics(&project_id, &project_path)
 }
 
 #[tauri::command]

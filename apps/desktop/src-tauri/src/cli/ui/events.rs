@@ -39,7 +39,11 @@ pub fn event_loop(
         }
         // Windows has no job control; Ctrl+Z is ignored there.
         #[cfg(not(unix))]
-        let _ = (enhanced, std::mem::take(&mut app.suspend));
+        let _ = std::mem::take(&mut app.suspend);
+        if std::mem::take(&mut app.plan_edit) {
+            app.edit_plan_externally(terminal, enhanced)?;
+            redraw = true;
+        }
         if redraw {
             app.signal();
             // Synchronized output makes the terminal paint the frame at once
@@ -84,7 +88,7 @@ fn handle(app: &mut App, event: Event) -> bool {
         Event::Shell(update) => app.shell_update(update),
         Event::Changed => {
             app.refresh();
-            return false;
+            return app.refresh_plan();
         }
         Event::Snapshot(snapshot) => app.apply(*snapshot),
         Event::Overview(overview) => {

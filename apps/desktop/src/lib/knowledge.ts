@@ -20,7 +20,8 @@ export interface KnowledgeEntry {
       | 'repository'
       | 'verification'
       | 'correction'
-      | 'clarification';
+      | 'clarification'
+      | 'insight';
     evidence: string[];
     managed: boolean;
     /** Present on lessons the learning loop wrote. */

@@ -41,6 +41,23 @@
   color: var(--color-text-muted);
   overflow-wrap: anywhere;
 }
+.agent-question-header {
+  margin-top: 12px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.agent-question-recommended {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-subtle);
+  color: var(--color-text-primary);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
 .agent-question-title {
   margin: 16px 0;
   font-size: var(--text-base);

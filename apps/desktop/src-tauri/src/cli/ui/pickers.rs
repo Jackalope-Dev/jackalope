@@ -22,6 +22,9 @@ pub enum Action {
     AutoApprove,
     WorkspaceMode,
     LearnAutomatically,
+    SyncLessons,
+    AgentReflection,
+    ExportLessons,
     OpenApp,
     /// Offer what can be done with a learned lesson.
     Learning(Learning),
@@ -224,6 +227,9 @@ impl App {
                 | Action::AutoApprove
                 | Action::WorkspaceMode
                 | Action::LearnAutomatically
+                | Action::SyncLessons
+                | Action::AgentReflection
+                | Action::ExportLessons
         ) {
             self.picker = None;
         }
@@ -257,12 +263,42 @@ impl App {
             }
             Action::AutoApprove => {
                 let next = !self.project.auto_approve.unwrap_or(true);
-                self.save_project_settings(Some(next), None, None);
+                self.save_project_settings(ProjectChange {
+                    auto_approve: Some(next),
+                    ..Default::default()
+                });
                 self.open_picker(PickerKind::Settings);
             }
             Action::LearnAutomatically => {
                 let next = !self.project.learn_automatically.unwrap_or(true);
-                self.save_project_settings(None, None, Some(next));
+                self.save_project_settings(ProjectChange {
+                    learn_automatically: Some(next),
+                    ..Default::default()
+                });
+                self.open_picker(PickerKind::Settings);
+            }
+            Action::SyncLessons => {
+                let next = !self.project.sync_lessons.unwrap_or(true);
+                self.save_project_settings(ProjectChange {
+                    sync_lessons: Some(next),
+                    ..Default::default()
+                });
+                self.open_picker(PickerKind::Settings);
+            }
+            Action::AgentReflection => {
+                let next = !self.project.agent_reflection.unwrap_or(false);
+                self.save_project_settings(ProjectChange {
+                    agent_reflection: Some(next),
+                    ..Default::default()
+                });
+                self.open_picker(PickerKind::Settings);
+            }
+            Action::ExportLessons => {
+                let next = !self.project.export_lessons.unwrap_or(false);
+                self.save_project_settings(ProjectChange {
+                    export_lessons: Some(next),
+                    ..Default::default()
+                });
                 self.open_picker(PickerKind::Settings);
             }
             Action::Learning(learning) => self.open_learning_actions(learning),
@@ -275,7 +311,10 @@ impl App {
                     Some("current") => "ask",
                     _ => "worktree",
                 };
-                self.save_project_settings(None, Some(next.into()), None);
+                self.save_project_settings(ProjectChange {
+                    workspace_mode: Some(next.into()),
+                    ..Default::default()
+                });
                 self.open_picker(PickerKind::Settings);
             }
             Action::Attribution => {
@@ -388,23 +427,24 @@ impl App {
 
     /// Saves this project's approval, workspace or learning setting in the
     /// host, which the app and every terminal then share.
-    fn save_project_settings(
-        &mut self,
-        auto_approve: Option<bool>,
-        workspace_mode: Option<String>,
-        learn_automatically: Option<bool>,
-    ) {
+    fn save_project_settings(&mut self, change: ProjectChange) {
         if let Some(Response::Project { project }) = self.request(Request::SetProjectSettings {
             project_id: self.project.id.clone(),
-            auto_approve,
-            workspace_mode,
-            learn_automatically,
+            auto_approve: change.auto_approve,
+            workspace_mode: change.workspace_mode,
+            learn_automatically: change.learn_automatically,
             learning_cadence: None,
+            sync_lessons: change.sync_lessons,
+            agent_reflection: change.agent_reflection,
+            export_lessons: change.export_lessons,
         }) {
             self.project.auto_approve = project.auto_approve;
             self.project.workspace_mode = project.workspace_mode;
             self.project.learn_automatically = project.learn_automatically;
             self.project.learning_cadence = project.learning_cadence;
+            self.project.sync_lessons = project.sync_lessons;
+            self.project.agent_reflection = project.agent_reflection;
+            self.project.export_lessons = project.export_lessons;
         }
     }
 
@@ -553,6 +593,33 @@ impl App {
                     "off · /learn still saves lessons on request".into()
                 },
                 action: Action::LearnAutomatically,
+            },
+            Item {
+                label: format!("Reflect with an agent in {}", self.project.name),
+                detail: if self.project.agent_reflection.unwrap_or(false) {
+                    "on · uses your default agent's quota when work ends".into()
+                } else {
+                    "off · reflection makes no model calls".into()
+                },
+                action: Action::AgentReflection,
+            },
+            Item {
+                label: format!("Sync learned lessons from {}", self.project.name),
+                detail: if self.project.sync_lessons.unwrap_or(true) {
+                    "included · when lesson sync is on in the app".into()
+                } else {
+                    "excluded · lessons stay on this computer".into()
+                },
+                action: Action::SyncLessons,
+            },
+            Item {
+                label: format!("Write lessons to AGENTS.md in {}", self.project.name),
+                detail: if self.project.export_lessons.unwrap_or(false) {
+                    "on · managed AGENTS.md section and Claude Code skill".into()
+                } else {
+                    "off · lessons stay in Jackalope".into()
+                },
+                action: Action::ExportLessons,
             },
             Item {
                 label: format!("Commit author in {}", self.project.name),
@@ -812,4 +879,15 @@ mod tests {
         picker.step(true);
         assert_eq!(picker.selected, 1, "stops at the last match");
     }
+}
+
+/// One settings change for the current project; `None` keeps a value.
+#[derive(Default)]
+struct ProjectChange {
+    auto_approve: Option<bool>,
+    workspace_mode: Option<String>,
+    learn_automatically: Option<bool>,
+    sync_lessons: Option<bool>,
+    agent_reflection: Option<bool>,
+    export_lessons: Option<bool>,
 }

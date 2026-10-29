@@ -6,6 +6,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { connectionSupport } from '../../lib/agent-capabilities';
 import { useAgentModels } from '../../lib/agent-models';
 import { effectiveConnections } from '../../lib/mcp-connection';
+import { planCommands } from '../../lib/plan-mode';
 import { planningDraft } from '../../lib/planning';
 import { isQuestionOnly } from '../../lib/question-intent';
 import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog';
@@ -20,6 +21,7 @@ import { workspaceModeFor, workspaceRequest } from '../../lib/workspace-mode';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
+import { usePlanStore } from '../../stores/planStore';
 import {
   agentAccountFor,
   isAgentAllowedForProject,
@@ -295,7 +297,7 @@ export function CaptureTask({
       return { drafts: next };
     });
   };
-  const launch = async (choice: 'assess' | 'single' | 'plan' = 'assess') => {
+  const launch = async (choice: 'assess' | 'single' | 'plan' | 'interview' = 'assess') => {
     if (
       !project ||
       !runner?.available ||
@@ -336,6 +338,15 @@ export function CaptureTask({
         connectionIds: current.connectionIds,
         contextSelection: current.contextSelection,
       };
+      if (choice === 'interview') {
+        const plan = await planCommands.start(request, current.prompt.trim());
+        clear();
+        selectProject(project.id);
+        usePlanStore.getState().select(plan.id);
+        onStarted();
+        navigateWorkspace('plans');
+        return;
+      }
       let autoStart = false;
       if (choice === 'assess') {
         const result = await assessment.assess(request, current.prompt.trim());
@@ -471,6 +482,7 @@ export function CaptureTask({
         }
         onChange={update}
         onLaunch={() => launch()}
+        onPlan={() => void launch('interview')}
         onSave={() => {
           saveIdea();
           clear();
@@ -487,6 +499,7 @@ export function CaptureTask({
         onCancel={() => void assessment.cancel()}
         onSingle={() => void launch('single')}
         onPlan={() => void launch('plan')}
+        onPlanWithMe={() => void launch('interview')}
       />
       {idea && (
         <Disclosure className="mt-4">

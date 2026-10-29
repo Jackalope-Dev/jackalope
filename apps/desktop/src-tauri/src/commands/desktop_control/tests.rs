@@ -32,6 +32,7 @@ fn desktop_permission_requires_an_explicit_answer_for_this_attempt() {
         answer: None,
         created_at: "now".into(),
         answered_at: None,
+        presentation: Default::default(),
     };
     assert!(selected_answer("run", &prompt, &access).unwrap().is_none());
     prompt.answer = Some("1: Fixture".into());

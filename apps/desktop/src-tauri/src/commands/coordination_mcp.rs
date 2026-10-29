@@ -592,6 +592,30 @@ impl CoordinationTools {
     }
 
     #[tool(
+        description = "Report a material departure from the approved plan you are implementing: different files, a changed contract, or a criterion that cannot be met as written. Do not edit the plan. Dependent work pauses until the person accepts the amendment, asks for a redo or re-plans; continue only with unaffected work.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn plan_deviation(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::planning::DeviationInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let headers = request_headers(&context)?;
+        let Json(result) = super::planning::bridge_plan_deviation(
+            WebState(self.service.clone()),
+            headers,
+            Json(input),
+        )
+        .await
+        .map_err(|(_, error)| ErrorData::invalid_request(error, None))?;
+        Ok(CallToolResult::structured(result))
+    }
+
+    #[tool(
         description = "Claim a named responsibility, propose an interface agreement, or respond to a handoff. Use project for IDs and current revisions. Pending or rejected interfaces block integration and dependent work. Ownership paths cannot overlap another assignment. This never grants tool permissions or approves code.",
         annotations(
             read_only_hint = false,
@@ -956,6 +980,12 @@ impl CoordinationTools {
                 None,
             ));
         }
+        let mut input = input;
+        if let Some(reason) = super::planning::question_gate(&run, &mut input) {
+            return Ok(CallToolResult::structured(
+                serde_json::json!({"status": "closed", "message": reason}),
+            ));
+        }
         let prompt = super::harness::ask_user_async(
             &run.id,
             input,
@@ -1029,6 +1059,7 @@ impl CoordinationTools {
                 input_type: "choice".into(),
                 options,
                 default_value: None,
+                presentation: Default::default(),
             };
             let prompt = super::harness::ask_user_async(
                 &run.id,

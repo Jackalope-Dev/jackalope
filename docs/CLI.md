@@ -45,9 +45,10 @@ The command works in the current directory. Inside a Git repository it uses that
 repository's root, and each conversation works where the project's workspace setting
 says: an isolated worktree by default, or a new branch in the checkout, the current
 branch, or a question when the conversation starts. The host's `projects` answer
-carries each project's `autoApprove`, `workspaceMode`, `learnAutomatically` and
-`learningCadence`, and `set-project-settings` changes them for the app and every
-terminal. `learnings`, `learning` and `set-learning-archived` list a project's
+carries each project's `autoApprove`, `workspaceMode`, `learnAutomatically`,
+`learningCadence`, `syncLessons`, `agentReflection` and `exportLessons` (newer fields
+are optional, and older hosts omit them), and `set-project-settings` changes them for
+the app and every terminal. `learnings`, `learning` and `set-learning-archived` list a project's
 learned lessons, show one with its recent history, and archive or restore it. When the
 directory is not a repository yet, an interactive session asks before creating
 one. Saying no, or running non-interactively without `--init`, edits files in
@@ -85,16 +86,21 @@ terminal and the app together. Leaving a terminal does not stop work.
 | `jackalope diff <id>` | Prints a conversation's changes since its worktree left the project's commit, uncommitted edits included; `--stat` summarizes them. New untracked files are listed on stderr |
 | `jackalope merge <id>` | Pauses the conversation, prepares a merge of its latest reviewed attempt into the project's target branch through the app's merge review, lists the files and asks before applying. `-m` sets the commit message; conflicts are reported for the app's merge review. Work that ran on a new branch or the current branch in the checkout has nothing to merge, and the command says what to do instead; when nothing is prepared, the pause it added is undone |
 | `jackalope pr <id>` | Commits remaining changes with the project's commit settings, pushes the branch and opens a draft pull request through the GitHub CLI after you confirm. `--title` replaces the conversation title; `--ready` opens it ready for review |
+| `jackalope plan "<goal>"` | Plans before any code changes: a read-only interview whose questions are asked on the terminal (exit status 2 when there is none), then prints the plan. See [plan mode](#plan-mode) |
+| `jackalope plans` | Lists this project's plans; `--json` |
+| `jackalope plan show <id>` | Prints a plan and its progress; `--json` |
+| `jackalope plan approve <id> [single\|subtasks\|swarm]` | Shows the assumptions, asks, and approves the latest revision; `--yes` skips the question |
 | `jackalope status` | Shows the host, its endpoint and profile |
 
-`ls` and `status` accept `--json`. Options take a value as `--agent codex` or
+`ls`, `status`, `plans` and `plan` accept `--json`. Options take a value as `--agent codex` or
 `--agent=codex`; `--` ends options, and an argument containing a space is
 always message text. Unknown or misplaced options are refused with exit status 64.
 
 Inside a conversation, typing `/` opens an interactive command menu, and `/help`
 lists commands: `/new`, `/bg`, `/init`, `/sessions`, `/projects`, `/agents`, `/settings`,
 `/status`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/learnings`, `/files`, `/review` (or `/diff`), `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
-`/unpause`, `/copy`, `/history`, `/kill`, `/clear`, `/open` and `/quit`. Pickers
+`/unpause`, `/copy`, `/history`, `/kill`, `/clear`, `/plan`, `/plans`, `/revise`,
+`/approve`, `/replan`, `/export`, `/deviation`, `/open` and `/quit`. Pickers
 filter as you type. `/new <message>` starts
 and shows a conversation; `/bg <message>` starts one and stays on the current one.
 `/learn` inspects conversation history since the previous learn command (or session
@@ -104,7 +110,9 @@ added, already known or skipped. `/learnings` (or `/lessons`) lists the project'
 learned lessons with their status (new, active or archived) and use count; choosing
 one shows its text and recent history in the feed, or archives or restores it.
 `/settings` changes the project's **Auto-approve agent requests**, **Where tasks
-work** and **Learn automatically** for the app and every terminal; editing and
+work**, **Learn automatically**, **Reflect with an agent** (uses the default agent's
+quota), **Sync learned lessons** (when lesson sync is on in the app) and **Write
+lessons to AGENTS.md** for the app and every terminal; editing and
 deleting lessons happen in the app. See [project knowledge](PROJECT-KNOWLEDGE.md#learned-lessons). Messages sent while an agent works queue behind it; `/pause` holds
 the queue and `/unpause` sends it. `/clear` starts a fresh conversation like `/new`,
 `/resume` opens the conversation picker, and Ctrl+L clears notes and finished `!` output.
@@ -129,6 +137,31 @@ Naming an agent (`@codex fix the flaky test`) starts the message with that agent
 without the name in the text; naming several starts one conversation per agent and
 shows the first. An agent named while a conversation is open starts a new one, since
 a conversation keeps its agent.
+
+### Plan mode
+
+`/plan <goal>` starts a read-only planning interview for the current project (with the
+agent chosen by `/agent`, or the project's planning agent) and pins the plan panel where
+the changes panel goes; `/plan` alone hides or shows it. Typing `/plan ` or `/revise `
+turns the input green with a plan hint. The planner's questions use the question card,
+which shows a question's header and recommended option; answer by typing, with
+`/answer`, or choose **Use your recommendations for the rest** or **Done, draft the
+plan**. The panel shows the status and revision, the recommended shape and its reason,
+highlighted assumptions, the task graph with dependencies and parallel tasks, which tasks
+cover each acceptance criterion, sections changed since the previous revision, pending
+deviations and progress once the plan runs. `/revise <comments>` asks the planner for a
+new revision, Ctrl+G opens the plan in `$VISUAL` or `$EDITOR` (Notepad or `vi` when
+neither is set) and saves a changed file as a new revision, `/approve [single|subtasks|swarm]`
+approves the revision shown (default: the recommendation), `/export [path]` saves it into
+the repository without committing, `/replan [why]` revises a running plan from what is
+done, and `/deviation accept|redo|replan` decides on a pending deviation. `/plans` lists
+the project's plans and `/plans <n>` opens one.
+
+The host answers `plan-start`, `plans`, `plan-detail` and `plan-action` (`keep`, `replan`,
+`approve` with the exact `revision` and `hash`, `save`, `export`, `accept`, `redo`,
+`replan-deviation`) with `plan`, `plans` or `exported` responses. Questions carry optional
+`header`, `recommended`, `multiSelect` and `rationale`; older hosts omit them and the
+protocol version is unchanged. See [plan mode](PLAN-MODE.md) for the document format.
 
 A leading `/`, `!` or `@` is the input's mode: the prompt at the left of the input
 shows it (accent, amber or green) and the text hides it. Backspace on the empty

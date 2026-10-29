@@ -249,6 +249,9 @@ fn project_summary(record: super::project_registry::ProjectRecord) -> protocol::
         workspace_mode: Some(settings.workspace_mode.as_str().into()),
         learn_automatically: Some(settings.learn_automatically),
         learning_cadence: Some(settings.learning_cadence),
+        sync_lessons: Some(settings.sync_lessons),
+        agent_reflection: Some(settings.agent_reflection),
+        export_lessons: Some(settings.export_lessons),
     }
 }
 
@@ -445,12 +448,7 @@ fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionVie
                 run.prompts
                     .iter()
                     .filter(|prompt| prompt.status == "pending")
-                    .map(|prompt| protocol::Question {
-                        id: prompt.id.clone(),
-                        run_id: prompt.run_id.clone(),
-                        question: prompt.question.clone(),
-                        options: prompt.options.clone(),
-                    })
+                    .map(super::planning::cli::question)
                     .collect()
             })
             .unwrap_or_default(),
@@ -745,6 +743,9 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             workspace_mode,
             learn_automatically,
             learning_cadence,
+            sync_lessons,
+            agent_reflection,
+            export_lessons,
         } => {
             use tauri::Emitter;
             let mode = workspace_mode
@@ -763,6 +764,9 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 super::project_registry::LearningSettings {
                     automatic: learn_automatically,
                     cadence: learning_cadence,
+                    sync: sync_lessons,
+                    agent: agent_reflection,
+                    export: export_lessons,
                 },
             )?;
             // The app adopts registry settings when it merges the registry.
@@ -883,6 +887,82 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 super::delivery::task_pull_request_create(run.id, title, body, draft, app.state())
                     .await?;
             Ok(Response::PullRequest { url })
+        }
+        Request::PlanStart {
+            project_path,
+            goal,
+            agent,
+        } => {
+            let project = ensure_project(app, &project_path)?;
+            let runtime = app.state::<TaskRuntime>();
+            let policy = runtime.policy()?;
+            let default_agent = policy
+                .projects
+                .get(&project.id)
+                .and_then(|project| project.preferred_runner.clone())
+                .filter(|agent| !agent.is_empty())
+                .unwrap_or_else(|| policy.default_meta_agent.clone());
+            let template: super::tasks::RunRequest = serde_json::from_value(serde_json::json!({
+                "id": format!("plan-{}", uuid::Uuid::new_v4().simple()),
+                "projectId": project.id,
+                "projectName": project.name,
+                "projectPath": project.path,
+                "agent": agent.filter(|agent| !agent.is_empty()).unwrap_or(default_agent),
+                "model": null,
+                "prompt": "",
+                "isolated": true,
+                "previousRunId": null,
+            }))
+            .map_err(|error| error.to_string())?;
+            let coordinator = app
+                .state::<super::coordination::Coordinator>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                super::planning::cli::start(&coordinator, template, goal)
+            })
+            .await
+            .map_err(|error| error.to_string())?
+        }
+        Request::Plans { project_path } => {
+            let project = ensure_project(app, &project_path)?;
+            let coordinator = app
+                .state::<super::coordination::Coordinator>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                super::planning::cli::list(&coordinator, &project.id)
+            })
+            .await
+            .map_err(|error| error.to_string())?
+        }
+        Request::PlanDetail { plan_id } => {
+            let coordinator = app
+                .state::<super::coordination::Coordinator>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                super::planning::cli::get(&coordinator, &plan_id)
+            })
+            .await
+            .map_err(|error| error.to_string())?
+        }
+        Request::PlanAction {
+            plan_id,
+            action,
+            text,
+            revision,
+            hash,
+        } => {
+            let coordinator = app
+                .state::<super::coordination::Coordinator>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                super::planning::cli::action(&coordinator, &plan_id, &action, text, revision, hash)
+            })
+            .await
+            .map_err(|error| error.to_string())?
         }
         Request::Ping => Ok(Response::Ok),
         Request::ShowWindow => Ok(show_window(app)),

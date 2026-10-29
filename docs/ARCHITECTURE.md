@@ -192,7 +192,8 @@ referral milestones from member/download/device state; the desktop account comma
 validates and exposes that view without receiving project, prompt or task data. See
 [DESKTOP-ACCOUNT.md](DESKTOP-ACCOUNT.md).
 Optional account-linked preference sync uses strict renderer/native/server
-allowlists and per-device consent. See [settings sync](SETTINGS-SYNC.md) for
+allowlists and per-device consent. Opt-in learned-lesson sync builds on that consent;
+the native host owns its payloads and merge. See [settings sync](SETTINGS-SYNC.md) for
 versioning, conflict handling, deletion and rollout.
 Waitlist access/waitlist.ts owns separate verification sessions and shared ranking;
 access/growth-mail.ts turns durable referral/pass events into the existing outbox.

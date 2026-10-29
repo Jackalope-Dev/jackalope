@@ -48,6 +48,12 @@ export interface ProjectPreferences {
   learnAutomatically?: boolean;
   /** Reported tool calls between background reflections. Undefined means 50. */
   learningCadence?: number;
+  /** Include learned lessons in account lesson sync when it is on. Undefined means included. */
+  syncLessons?: boolean;
+  /** Also reflect on finished work with the default agent, using its quota. Undefined means off. */
+  agentReflection?: boolean;
+  /** Mirror active learned lessons into AGENTS.md and a Claude Code skill. Undefined means off. */
+  exportLessons?: boolean;
   /**
    * Load the person's own Claude Code settings, plugins, hooks and MCP servers in Claude
    * Code tasks. `false` limits them to project settings and Jackalope's connections.
@@ -306,6 +312,9 @@ interface ProjectRecord {
   workspaceMode?: WorkspaceMode;
   learnAutomatically?: boolean;
   learningCadence?: number;
+  syncLessons?: boolean;
+  agentReflection?: boolean;
+  exportLessons?: boolean;
   personalClaudeSetup?: boolean;
   editCheck?: string;
 }
@@ -332,6 +341,9 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
     workspaceMode: preferences?.workspaceMode,
     learnAutomatically: preferences?.learnAutomatically,
     learningCadence: preferences?.learningCadence,
+    syncLessons: preferences?.syncLessons,
+    agentReflection: preferences?.agentReflection,
+    exportLessons: preferences?.exportLessons,
     personalClaudeSetup: preferences?.personalClaudeSetup,
     editCheck: preferences?.editCheck,
   }));
@@ -387,6 +399,10 @@ export async function mergeProjectRegistry() {
         record.learningCadence !== project.preferences?.learningCadence
       )
         changes.learningCadence = record.learningCadence;
+      for (const key of ['syncLessons', 'agentReflection', 'exportLessons'] as const) {
+        if (record[key] !== undefined && record[key] !== project.preferences?.[key])
+          changes[key] = record[key];
+      }
       if (
         record.personalClaudeSetup !== undefined &&
         record.personalClaudeSetup !== project.preferences?.personalClaudeSetup

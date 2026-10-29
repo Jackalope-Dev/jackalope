@@ -34,6 +34,8 @@ representative benefit and installed-platform acceptance remain open.
   and representative comparisons remain in progress.
 
 - Projects, saved tasks, chat sessions and reviewed plans with isolated Git worktrees.
+  Plan mode interviews read-only, then runs an approved plan as one agent, planned
+  subtasks or a swarm with an independent review against it.
   Follow-ups, previews, recorded checks and guarded integration keep work reviewable.
   Saved line comments, visual element selection, a conversation beside review and
   GitHub/Linear/Jira issue intake keep corrections and source work together.
@@ -99,9 +101,11 @@ delivery comparisons retain waits, failures and missing review evidence. Validat
 complete task delivery and quality on representative repositories before claiming gains.
 
 Project review lessons require resolved feedback and matching successful checks.
-Background learning keeps learned lessons on probation, archives unused ones and
-records their history; its thresholds and any effect on corrections need real-use
-calibration. Opt-in account sync of learned lessons is a possible later extension.
+Background learning keeps learned lessons on probation, archives unused ones, folds
+near-duplicates and records their history; its thresholds and any effect on
+corrections need real-use calibration. Opt-in account sync of learned lessons,
+optional agent reflection and export to `AGENTS.md` and a Claude Code skill are
+implemented and need installed acceptance.
 Chronological history comparisons and bounded offline prompt optimization have
 separate validation and held-out gates. Representative first-pass acceptance and
 actual correction counts still need measurement before making outcome claims.

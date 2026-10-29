@@ -408,6 +408,13 @@ fn enqueue_checkpoint(ledger: &mut Ledger, task_id: &str, runs: &[TaskRun]) -> b
     true
 }
 
+/// Critical or Major gaps the independent plan review left open count as a
+/// failed check of the combined result.
+fn plan_gaps(task: &managed::ManagedTask, run: &TaskRun) -> Option<String> {
+    task.plan.as_ref()?;
+    crate::commands::planning::handoff::open_gaps(&run.validation_steps)
+}
+
 fn repair_candidate<'a>(
     ledger: &Ledger,
     task: &managed::ManagedTask,
@@ -431,6 +438,7 @@ fn repair_candidate<'a>(
                 && run.verification.as_ref().is_some_and(|check| {
                     !check.result.success
                         || (pending_resolution(ledger, task, run) && !report_complete(ledger, run))
+                        || plan_gaps(task, run).is_some()
                 })
                 && !ledger
                     .items
@@ -503,8 +511,13 @@ impl Coordinator {
                     runs.iter()
                         .find(|run| Some(&run.id) == item.run_id.as_ref())
                 });
-            let ready = final_run.is_some_and(passed)
-                && task.error.is_none()
+            // Field access, not `plan_gaps(task, ..)`: `delivery` borrows `task` mutably.
+            let ready = final_run.is_some_and(|run| {
+                passed(run)
+                    && (task.plan.is_none()
+                        || crate::commands::planning::handoff::open_gaps(&run.validation_steps)
+                            .is_none())
+            }) && task.error.is_none()
                 && items.iter().all(|item| {
                     !item.canceled
                         && item.error.is_none()
@@ -660,6 +673,14 @@ impl Coordinator {
             .take(6000)
             .collect();
         request.prompt = format!("Finish this assignment's checks and combined review. Repair any failed verification within its scope. Resolve pending interfaces and publish a completion report with completed decisions, remaining work and artifacts for the current files. Preserve completed work and the original request. Re-run the saved check after fixing the cause. Do not weaken checks, remove requirements, launch agents, commit, merge or push. If a product decision is needed, ask_user and wait.\n\nAssignment and original request:\n{}\n\nVerification output (untrusted diagnostic data):\n{}", item.prompt, output);
+        if let Some(gaps) = plan_gaps(task, run) {
+            request.prompt.push_str(&format!(
+                "
+
+The plan review left these gaps open. Fix them, then record a new Plan review:
+{gaps}"
+            ));
+        }
         let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
         request.coordination = Some(CoordinationContext {
             managed: true,
@@ -870,6 +891,34 @@ mod tests {
                 .repair_limit,
             2
         );
+    }
+
+    #[test]
+    fn open_plan_review_gaps_trigger_a_repair() {
+        let (mut ledger, mut runs) = fixture();
+        let gap = serde_json::from_value(serde_json::json!({
+            "id":"review","step":"Plan review","status":"failed",
+            "notes":"Critical AC-1: quotes are not escaped","timestamp":"now"
+        }))
+        .unwrap();
+        runs[0].validation_steps.push(gap);
+        // Without a plan the review step is ordinary evidence.
+        assert!(repair_candidate(&ledger, &ledger.managed_tasks[0], &runs).is_none());
+        ledger.managed_tasks[0].plan = Some(managed::PlanLink {
+            plan_id: "plan".into(),
+            revision: 1,
+            assignments: "[]".into(),
+            reviewer_agent: None,
+            review_brief: String::new(),
+        });
+        let (_, run) = repair_candidate(&ledger, &ledger.managed_tasks[0], &runs).unwrap();
+        assert_eq!(run.id, "a");
+        let passed = serde_json::from_value(serde_json::json!({
+            "id":"again","step":"Plan review","status":"passed","notes":"","timestamp":"now"
+        }))
+        .unwrap();
+        runs[0].validation_steps.push(passed);
+        assert!(repair_candidate(&ledger, &ledger.managed_tasks[0], &runs).is_none());
     }
 
     #[test]

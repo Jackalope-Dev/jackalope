@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   learnedStatus,
+  learningMetricRows,
   learningSettings,
   learningSummary,
   ledgerActionLabel,
@@ -49,4 +50,28 @@ test('summaries explain probation, use and why a lesson was archived', () => {
   );
   assert.equal(ledgerActionLabel('born'), 'Learned');
   assert.equal(ledgerActionLabel('unknown-action'), 'unknown-action');
+});
+
+test('curator folds and metrics read in plain words', () => {
+  assert.match(
+    learningSummary(lifecycle({ status: 'archived', archivedReason: 'merged' })),
+    /folded into a similar lesson/,
+  );
+  assert.equal(ledgerActionLabel('curated'), 'Folded into a similar lesson');
+  const rows = learningMetricRows({
+    probation: 1,
+    active: 2,
+    archived: 3,
+    deliveries: 4,
+    learned: 5,
+    promoted: 6,
+    archivedEvents: 7,
+    restored: 8,
+    folded: 9,
+    retired: 10,
+    byAgent: 11,
+  });
+  assert.equal(rows.length, 11);
+  assert.deepEqual(rows[0], ['New', 1]);
+  assert.ok(rows.some(([label, value]) => label === 'Folded as duplicates' && value === 9));
 });

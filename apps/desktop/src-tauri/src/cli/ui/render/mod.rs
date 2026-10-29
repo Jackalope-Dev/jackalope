@@ -4,6 +4,7 @@ mod chrome;
 mod markdown;
 mod menus;
 mod panel;
+mod plan;
 pub mod transcript;
 
 use super::commands::slash_matches;
@@ -160,7 +161,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
     );
 
     if let Some(panel_area) = panel_area {
-        panel::changes(frame, app, panel_area);
+        if app.plan_shown() {
+            plan::draw(frame, app, panel_area);
+        } else {
+            panel::changes(frame, app, panel_area);
+        }
     }
     if !framed {
         frame.render_widget(Paragraph::new(status(app)), status_area);
@@ -176,6 +181,12 @@ pub fn draw(frame: &mut Frame, app: &App) {
             brand::warning(),
             "!",
             "shell · runs here, not sent to an agent",
+        )
+    } else if text.starts_with("/plan ") || text.starts_with("/revise ") {
+        (
+            brand::success(),
+            "/",
+            "plan · explores read-only, asks, then drafts a plan to approve",
         )
     } else if text.starts_with('/') {
         (brand::accent(), "/", "command")

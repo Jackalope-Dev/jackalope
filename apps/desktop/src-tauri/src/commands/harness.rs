@@ -28,10 +28,64 @@ pub struct PendingUserPrompt {
     pub created_at: String,
     #[serde(alias = "answered_at")]
     pub answered_at: Option<String>,
+    #[serde(flatten)]
+    pub presentation: QuestionPresentation,
 }
 
 fn default_input_type() -> String {
     "text".into()
+}
+
+/// Optional structure for a question card. Every field is optional so prompts
+/// saved before it existed, and agents that never send it, behave as before.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct QuestionPresentation {
+    #[schemars(description = "Optional short label shown above the question, up to 60 characters")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub header: Option<String>,
+    #[schemars(description = "Optional option you recommend; it must be one of options")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recommended: Option<String>,
+    #[schemars(description = "Optional: the person may choose several options")]
+    #[serde(
+        default,
+        alias = "multi_select",
+        skip_serializing_if = "std::ops::Not::not"
+    )]
+    pub multi_select: bool,
+    #[schemars(description = "Optional: false hides the free-text answer when options are given")]
+    #[serde(
+        default,
+        alias = "allow_other",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub allow_other: Option<bool>,
+    #[schemars(
+        description = "Optional one-sentence reason the answer matters, up to 500 characters"
+    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rationale: Option<String>,
+}
+
+impl QuestionPresentation {
+    /// Drops values the card cannot show honestly: an unknown recommendation,
+    /// over-long text, or multi-select without options.
+    pub(super) fn sanitized(mut self, options: &[String]) -> Self {
+        let bounded = |value: Option<String>, limit: usize| {
+            value
+                .map(|text| text.split_whitespace().collect::<Vec<_>>().join(" "))
+                .filter(|text| !text.is_empty())
+                .map(|text| text.chars().take(limit).collect::<String>())
+        };
+        self.header = bounded(self.header, 60);
+        self.rationale = bounded(self.rationale, 500);
+        self.recommended = self
+            .recommended
+            .filter(|value| options.iter().any(|option| option == value));
+        self.multi_select &= !options.is_empty();
+        self
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
@@ -161,6 +215,8 @@ pub struct AskUserInput {
     #[schemars(description = "Optional default suggested value")]
     #[serde(default)]
     pub default_value: Option<String>,
+    #[serde(flatten)]
+    pub presentation: QuestionPresentation,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
@@ -294,17 +350,24 @@ pub async fn ask_user_async(
     registered: impl FnOnce(&PendingUserPrompt),
 ) -> PendingUserPrompt {
     let prompt_id = Uuid::new_v4().to_string();
+    let presentation = input.presentation.sanitized(&input.options);
     let prompt = PendingUserPrompt {
         id: prompt_id.clone(),
         run_id: run_id.to_string(),
         question: input.question,
-        input_type: input.input_type,
+        // Multi-select answers use the existing multiChoice card and its JSON array.
+        input_type: if presentation.multi_select {
+            "multiChoice".into()
+        } else {
+            input.input_type
+        },
         options: input.options,
         default_value: input.default_value,
         status: "pending".into(),
         answer: None,
         created_at: Utc::now().to_rfc3339(),
         answered_at: None,
+        presentation,
     };
 
     let (tx, rx) = tokio::sync::oneshot::channel::<String>();
@@ -382,6 +445,38 @@ mod tests {
     }
 
     #[test]
+    fn saved_questions_load_and_new_question_fields_are_bounded() {
+        let saved: PendingUserPrompt = serde_json::from_value(serde_json::json!({
+            "id": "q", "runId": "r", "question": "Which?", "inputType": "choice",
+            "options": ["A"], "status": "answered", "answer": "A", "createdAt": "now", "answeredAt": "now"
+        }))
+        .unwrap();
+        assert_eq!(saved.presentation, QuestionPresentation::default());
+        let value = serde_json::to_value(&saved).unwrap();
+        assert!(value.get("header").is_none() && value.get("multiSelect").is_none());
+        let input: AskUserInput = serde_json::from_value(serde_json::json!({
+            "question": "Storage?", "input_type": "choice", "options": ["App storage", "Repo"],
+            "header": "Storage", "recommended": "Nowhere", "multi_select": true,
+            "allow_other": false, "rationale": "Decides   where revisions live."
+        }))
+        .unwrap();
+        let shown = input.presentation.sanitized(&input.options);
+        assert_eq!(shown.header.as_deref(), Some("Storage"));
+        assert_eq!(shown.recommended, None);
+        assert!(shown.multi_select);
+        assert_eq!(shown.allow_other, Some(false));
+        assert_eq!(
+            shown.rationale.as_deref(),
+            Some("Decides where revisions live.")
+        );
+        let lone = QuestionPresentation {
+            multi_select: true,
+            ..Default::default()
+        };
+        assert!(!lone.sanitized(&[]).multi_select);
+    }
+
+    #[test]
     fn browser_urls_reject_executable_schemes() {
         assert!(super::super::browser::validate_url("javascript:alert(1)").is_err());
         assert!(super::super::browser::validate_url("http://localhost:5173").is_ok());
@@ -400,6 +495,7 @@ mod tests {
             input_type: default_input_type(),
             options: vec![],
             default_value: None,
+            presentation: Default::default(),
         };
 
         // Times out with no answer: cleaned up, so a later resolve for the

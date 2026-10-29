@@ -78,6 +78,11 @@ fn connection(runtime: &TaskRuntime) -> Result<Option<Connection>, String> {
         .transpose()
 }
 
+/// Whether a swarm Worker is connected; plans offer the swarm shape only then.
+pub(crate) fn configured(runtime: &TaskRuntime) -> bool {
+    connection(runtime).is_ok_and(|connection| connection.is_some())
+}
+
 fn validate(connection: &Connection) -> Result<String, String> {
     let url = reqwest::Url::parse(connection.url.trim())
         .map_err(|_| "Enter the URL of your Jackalope Swarm Worker.")?;

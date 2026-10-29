@@ -221,6 +221,16 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Plan, Work, Check and Review lead to one result, preview, combined diff and outcome
   review before explicit application. Focused review and elapsed integration time remain
   distinct local measurements. Installed-provider and cost/quality acceptance remain open.
+- Plan mode is explicit: **Plan first** in the composer, **Plan with me** beside a plan
+  or investigation assessment, `/plan` in the terminal or `jackalope plan`. A read-only
+  planning attempt explores, asks at most the project's question cap (default 5) and
+  returns one plan document with assumptions, tasks, acceptance criteria and a
+  recommended shape. Revisions, section diffs, direct edits, Save to repo (never
+  committed), exact-revision approval, single/subtasks/swarm hand-off through managed
+  tasks, an independent plan review, deviation decisions and re-planning are
+  implemented; see [plan mode](PLAN-MODE.md). Read-only enforcement covers Codex and
+  Claude Code; other agents are constrained by prompt and a discarded worktree.
+  Installed-provider interviews and plan-to-merge acceptance remain open.
 - Requests continuing with one lead can delegate through available provider subagent
   tools. Unsupported or denied delegation stays sequential. See
   [agent quality](AGENT-QUALITY.md) for boundaries.
@@ -239,8 +249,17 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   changes only unedited lessons it wrote. Lessons start on probation, become active
   after two deliveries, are archived when unused or over the 40-lesson project cap,
   and can be restored; an append-only history records every change with redacted
-  evidence. Project → Context and the terminal show status, use and history. Lessons
-  are profile-local; any effect on task outcomes is unmeasured.
+  evidence. Project → Context and the terminal show status, use and history, and
+  Learning activity shows local counts for calibrating the thresholds, which live in
+  one `Thresholds` definition. A deterministic curator folds near-duplicate unedited
+  lessons into the most used one, reversibly. Off by default per project: agent
+  reflection with the default agent after work ends (bounded, on that account's
+  quota, through the same gate), and mirroring active lessons into a marked
+  `AGENTS.md` section and a Claude Code skill. Opt-in account sync of learned lessons,
+  off by default and layered on settings sync, matches projects by repository and
+  merges by revision; evidence, use counts and paths stay local. Installed
+  multi-desktop sync, real-provider agent reflection and exported-file use by other
+  agents are unverified; any effect on task outcomes is unmeasured.
 - MCP connections with a curated marketplace, publisher setup presets, token entry,
   agent sign-in guidance and save-and-check results. Full AllMCPs search and custom
   connections remain available; live publisher/account acceptance remains open.
@@ -350,7 +369,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   pinned model gets a fallback model. The hook protocol, replies, deny-rule precedence
   and cost accounting were checked against installed Claude Code 2.1.312; full task
   acceptance and any speed or quality benefit remain unmeasured.
-- Shared appearance, guided onboarding, task notifications and optional settings sync.
+- Shared appearance, guided onboarding, task notifications, optional settings sync
+  and opt-in learned-lesson sync.
   Project setup has three steps: project, agents and an optional first task. Theme editors open directly; existing saved app/project choices remain compatible.
 - Review views save optional local usefulness ratings and reported review minutes with
   each task. These self-reported values do not establish product retention or quality gains.

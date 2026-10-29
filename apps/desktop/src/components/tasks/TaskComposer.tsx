@@ -62,6 +62,8 @@ interface Props {
   onChange: (value: Partial<TaskDraft>) => void;
   onLaunch: () => Promise<void>;
   onSave: () => void;
+  /** Plan mode: a read-only interview that ends in a plan to approve. */
+  onPlan?: () => void;
 }
 
 const effortIcons = [Zap, Layers, ShieldCheck];
@@ -98,6 +100,7 @@ export function TaskComposer({
   onChange,
   onLaunch,
   onSave,
+  onPlan,
 }: Props) {
   const [panel, setPanel] = useState<string | null>(null);
   const effort = effortFor(current.effort);
@@ -504,6 +507,16 @@ export function TaskComposer({
           >
             {editingIdea ? 'Save draft' : 'Save for later'}
           </Button>
+          {executionReady && onPlan && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!desktop || !current.prompt.trim() || !runner?.available || submitting}
+              onClick={onPlan}
+            >
+              Plan first
+            </Button>
+          )}
           {executionReady && (
             <Button
               type="submit"

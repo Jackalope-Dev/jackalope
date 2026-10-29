@@ -90,7 +90,7 @@ pub(super) fn negative(text: &str) -> bool {
     .any(|word| text.contains(word))
 }
 
-fn similarity(a: &str, b: &str) -> f64 {
+pub(super) fn similarity(a: &str, b: &str) -> f64 {
     let a: HashSet<_> = phrases(a).into_iter().collect();
     let b: HashSet<_> = phrases(b).into_iter().collect();
     if a.is_empty() || b.is_empty() {

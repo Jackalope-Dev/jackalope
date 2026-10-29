@@ -1,5 +1,32 @@
 [
   {
+    "id": "plan-with-me-before-code-changes",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Plan with me before code changes",
+    "description": "Plan mode reads your code first, asks only what it cannot find, and drafts one plan for you to approve before any work starts.",
+    "items": [
+      "Choose Plan first in the composer, Plan with me after an assessment, /plan in the terminal or jackalope plan. The planner works read-only and asks at most five questions by default, recommended answer first; you can tell it to use its recommendations for the rest.",
+      "Each plan lists its assumptions, tasks with their files and dependencies, and acceptance criteria with how each is checked. Review revisions side by side, edit the plan directly, ask for changes, or save it into the repository without committing.",
+      "Approve an exact revision to run it as one agent, planned subtasks or a swarm. Each worker starts from the plan in a fresh context, and an independent review checks the result against every criterion and repairs serious gaps.",
+      "Departures from the plan pause dependent work until you accept the amendment, ask for a redo or re-plan; re-planning keeps finished tasks."
+    ]
+  },
+  {
+    "id": "lessons-that-travel-and-tidy-themselves",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Lessons that travel and tidy themselves",
+    "description": "Learned lessons can now follow you between desktops, stay free of duplicates and reach agents outside Jackalope.",
+    "items": [
+      "Include learned lessons in settings sync to use them on every desktop signed in to your account. It is off by default, each project can opt out, and evidence, use counts and folder paths stay on your computer.",
+      "Jackalope folds near-duplicate learned lessons into one; restoring a folded lesson keeps it separate.",
+      "Optionally let your default agent reflect on finished work too, on its own account quota with strict limits; its suggestions pass the same checks.",
+      "Optionally mirror active lessons into a marked section of AGENTS.md and a Claude Code skill, removed again when you turn it off.",
+      "Learning activity in Project → Context shows how lessons are learned, used, archived and restored."
+    ]
+  },
+  {
     "id": "faster-steadier-claude-code-tasks",
     "date": "2026-10-28",
     "status": "In development",

@@ -1,6 +1,7 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useShallow } from 'zustand/react/shallow';
 import { LEARNING_CADENCES, learningSettings } from '../../lib/learning';
+import { syncsLessons } from '../../lib/lesson-sync';
 import { VETTED_SKILLS } from '../../lib/skills/catalog';
 import { type WorkspaceMode, workspaceModeFor } from '../../lib/workspace-mode';
 import { useProjectStore } from '../../stores/projectStore';
@@ -209,6 +210,42 @@ export function ProjectPreferences({
                 </Select>
               </Setting>
             )}
+            <Setting
+              title="Reflect with an agent"
+              description="When work ends, also ask this project's default agent to suggest lessons from what you wrote. Uses that agent account's quota; each reflection is short and capped. Suggestions pass the same checks as other lessons."
+            >
+              <Switch
+                label="Reflect with an agent"
+                checked={project.preferences?.agentReflection === true}
+                onCheckedChange={(agentReflection) =>
+                  updateProjectPreferences(project.id, { agentReflection })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Sync learned lessons"
+              description="Include this project's learned lessons when lesson sync is on under Settings → Privacy. Turn off to keep them on this computer."
+            >
+              <Switch
+                label="Sync learned lessons"
+                checked={syncsLessons(project)}
+                onCheckedChange={(syncLessons) =>
+                  updateProjectPreferences(project.id, { syncLessons })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Write lessons to AGENTS.md"
+              description="Keep active learned lessons in a marked section of this project's AGENTS.md and in a Claude Code skill, so agents outside Jackalope see them. Nothing is committed for you; turning this off removes them."
+            >
+              <Switch
+                label="Write lessons to AGENTS.md"
+                checked={project.preferences?.exportLessons === true}
+                onCheckedChange={(exportLessons) =>
+                  updateProjectPreferences(project.id, { exportLessons })
+                }
+              />
+            </Setting>
             <Disclosure className="project-guidelines">
               <DisclosureSummary>Always include guidelines</DisclosureSummary>
               {VETTED_SKILLS.map((skill) => (

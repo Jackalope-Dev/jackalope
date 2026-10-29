@@ -68,6 +68,7 @@ impl App {
             KeyCode::Char('r') if control => self.open_picker(PickerKind::History),
             KeyCode::Char('z') if control => self.suspend = cfg!(unix),
             KeyCode::Char('o') if control => self.toggle_panel(),
+            KeyCode::Char('g') if control => self.request_plan_edit(),
             KeyCode::Up if (alt || shift) && panel => self.step_change(-1),
             KeyCode::Down if (alt || shift) && panel => self.step_change(1),
             // Newline without sending: Shift+Enter where the terminal reports

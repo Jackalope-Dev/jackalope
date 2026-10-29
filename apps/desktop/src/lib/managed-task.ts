@@ -32,6 +32,8 @@ export interface ManagedTask {
   started: boolean;
   error: string | null;
   autoStart?: boolean;
+  /** Set when an approved plan started this task; it has no planner attempt. */
+  plan?: { planId: string; revision: number } | null;
 }
 
 export const managedTaskCommand = <T>(
@@ -44,7 +46,7 @@ export const previewTaskPlan = (id: string) => managedTaskCommand<FeatureStep[]>
 export function managedTaskWork(task: ManagedTask, queue: QueueView, runs: TaskRun[]) {
   const items = queue.items.filter((item) => item.featureId === task.id);
   const roots = new Set([
-    task.plannerRunId,
+    ...(task.plan ? [] : [task.plannerRunId]),
     ...(task.runIds ?? []),
     ...items.flatMap((item) => (item.runId ? [item.runId] : [])),
   ]);

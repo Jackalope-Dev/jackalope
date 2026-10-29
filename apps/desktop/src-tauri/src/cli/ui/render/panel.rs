@@ -17,7 +17,7 @@ const SIDE_BY_SIDE: u16 = 100;
 /// Splits the body between the conversation and the changes panel, when the
 /// panel is showing and there is room for both.
 pub fn split(app: &App, body: Rect) -> (Rect, Option<Rect>) {
-    if !app.panel_shown() {
+    if !app.panel_shown() && !app.plan_shown() {
         return (body, None);
     }
     if body.width >= SIDE_BY_SIDE {
@@ -171,7 +171,7 @@ pub fn question_card(app: &App, width: u16) -> Vec<Line<'static>> {
     } else {
         text
     };
-    let hint = if question.options.is_empty() {
+    let mut hint = if question.options.is_empty() {
         "  Type your answer below and press Enter".to_string()
     } else {
         format!(
@@ -179,11 +179,16 @@ pub fn question_card(app: &App, width: u16) -> Vec<Line<'static>> {
             question.options.len()
         )
     };
-    vec![
-        Line::from(vec![
-            Span::styled(" ? ", warning.add_modifier(Modifier::BOLD)),
-            Span::styled(shown, Style::default().add_modifier(Modifier::BOLD)),
-        ]),
-        Line::styled(hint, muted),
-    ]
+    if let Some(recommended) = &question.recommended {
+        hint.push_str(&format!(" · recommended: {recommended}"));
+    }
+    let mut first = vec![Span::styled(" ? ", warning.add_modifier(Modifier::BOLD))];
+    if let Some(header) = &question.header {
+        first.push(Span::styled(format!("{header} · "), muted));
+    }
+    first.push(Span::styled(
+        shown,
+        Style::default().add_modifier(Modifier::BOLD),
+    ));
+    vec![Line::from(first), Line::styled(hint, muted)]
 }

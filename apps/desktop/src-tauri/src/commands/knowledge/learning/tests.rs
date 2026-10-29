@@ -655,3 +655,84 @@ fn observations_come_from_the_persons_words_answers_and_passing_checks() {
 }
 
 use std::io::Write;
+
+#[test]
+fn metrics_count_statuses_deliveries_and_recorded_changes() {
+    let (_root, store, path) = fixture();
+    learn(
+        &store,
+        &path,
+        &[
+            said(
+                "Always keep migrations reversible in this repository.",
+                "Task a",
+            ),
+            said("Prefer table-driven tests for parsers.", "Task a"),
+        ],
+    );
+    let entries = learned(&store, &path);
+    let used = entries[0].id.clone();
+    for run in ["run-1", "run-2"] {
+        store
+            .record_delivery("p", &path, run, std::slice::from_ref(&used), true)
+            .unwrap();
+    }
+    let other = learned(&store, &path)
+        .into_iter()
+        .find(|entry| entry.id != used)
+        .unwrap();
+    let archived = store.set_archived(&other.id, other.revision, true).unwrap();
+    store
+        .set_archived(&other.id, archived.revision, false)
+        .unwrap();
+    let metrics = store.metrics("p", &path).unwrap();
+    assert_eq!(
+        (metrics.probation, metrics.active, metrics.archived),
+        (1, 1, 0)
+    );
+    assert_eq!(metrics.deliveries, 2);
+    assert_eq!(
+        (
+            metrics.learned,
+            metrics.promoted,
+            metrics.archived_events,
+            metrics.restored
+        ),
+        (2, 1, 1, 1)
+    );
+    assert!(metrics.since.is_some());
+}
+
+#[test]
+fn pulled_active_lessons_are_not_archived_for_lack_of_local_use() {
+    let (_root, store, path) = fixture();
+    learn(
+        &store,
+        &path,
+        &[said(
+            "Always keep migrations reversible in this repository.",
+            "Task a",
+        )],
+    );
+    let mut entry = learned(&store, &path).remove(0);
+    entry
+        .automatic
+        .as_mut()
+        .unwrap()
+        .lifecycle
+        .as_mut()
+        .unwrap()
+        .status = ACTIVE.into();
+    {
+        let _lock = store.lock.lock().unwrap();
+        store.write(&[entry.clone()]).unwrap();
+    }
+    for run in 0..PROBATION_OPPORTUNITIES + 5 {
+        store
+            .record_delivery("p", &path, &format!("run-{run}"), &[], true)
+            .unwrap();
+    }
+    assert!(!lifecycle(&learned(&store, &path).remove(0))
+        .unwrap()
+        .archived());
+}
