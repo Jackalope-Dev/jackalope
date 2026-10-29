@@ -1,6 +1,9 @@
 use super::*;
 
 fn fixture() -> (KnowledgeStore, String) {
+    // Near-duplicates reach the curator through sync, which skips the
+    // promotion gate's similarity check.
+    SKIP_DUPLICATE_CHECK.with(|skip| skip.set(true));
     let root = std::env::temp_dir().join(format!("jackalope-curate-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     let store = KnowledgeStore::new(root.join("knowledge/entries.json"));

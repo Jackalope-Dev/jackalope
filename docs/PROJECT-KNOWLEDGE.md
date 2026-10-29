@@ -128,7 +128,12 @@ distinct tasks, then become **Active**. Each new task that selects saved context
 opportunity for every available learned lesson in the project. A lesson on probation
 never supplied in 30 opportunities, or any lesson not supplied in the last 100, is
 archived. A project keeps at
-most 40 available learned lessons; adding another archives the least used first.
+most 20 available learned lessons; adding another archives the least used first. A
+task receives at most three lessons, chosen by matching keywords in its request, so
+the count bounds the library rather than what any one agent reads. A new lesson whose
+meaningful words overlap an available lesson's by 70% or more, with the same intent,
+strengthens the lesson Jackalope wrote instead of being added, or is skipped beside
+one you wrote.
 Archiving never deletes: **Restore** in Project → Context or `/learnings` returns a
 lesson to probation with fresh counts, and turning an archived lesson back on in its
 editor does the same. With automatic learning off, deliveries are still counted but
@@ -148,7 +153,7 @@ has reflected on: once after the app starts learning there, again after 10 lesso
 changes, and at least daily while the project is active. A pass compares the
 statements of available lessons Jackalope wrote and nobody edited, of the same kind
 and with the same intent (an **Always** never folds into a **Never**). Two lessons
-whose meaningful words overlap by at least 75% become one: the most used (then the
+whose meaningful words overlap by at least 70% become one: the most used (then the
 oldest) keeps the other's matching phrases and evidence references, and the other is
 archived as folded into a similar lesson. Each pass folds at most five lessons, makes
 no model calls and records both sides in the history. **Restore** undoes a fold, and a
@@ -164,12 +169,14 @@ Every tunable lives in `Thresholds` (`THRESHOLDS`) in
 | Deliveries that end probation | 2 |
 | Opportunities before an unused lesson on probation is archived | 30 |
 | Opportunities since the last delivery before a lesson is archived | 100 |
-| Available learned lessons per project | 40 |
-| Lessons added per reflection | 5 |
+| Available learned lessons per project | 20 |
+| Lessons added per reflection | 3 |
 | Folds per curator pass | 5 |
 | Lesson changes that make a curator pass due | 10 |
 | Longest gap between passes of an active project | 24 hours |
-| Word overlap at which lessons fold | 75% |
+| Word overlap at which lessons fold | 70% |
+| Word overlap at which a new lesson counts as already saved | 70% |
+| Most-used active lessons written to AGENTS.md and the Claude Code skill | 12 |
 | Agent reflections per hour and per day, all projects | 4 and 20 |
 | Agent reflection time limit | 45 seconds |
 | Redacted words one agent reflection reads | 6,000 bytes |
@@ -199,7 +206,7 @@ limited to four an hour and twenty a day across projects and stopped after 45
 seconds. Unavailable agents, quota errors, timeouts and malformed answers are logged
 and skipped; they never affect the task.
 
-**Write lessons to AGENTS.md** mirrors the project's active learned lessons, one line
+**Write lessons to AGENTS.md** mirrors the project's 12 most-used active learned lessons, one line
 each, into a section of the project folder's `AGENTS.md` between
 `<!-- jackalope:lessons:start -->` and `<!-- jackalope:lessons:end -->`, and into
 `.claude/skills/jackalope-lessons/SKILL.md` for Claude Code. Text outside the markers

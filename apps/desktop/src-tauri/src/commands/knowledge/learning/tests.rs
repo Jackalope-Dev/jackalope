@@ -455,12 +455,125 @@ fn lifecycle_promotes_used_lessons_and_archives_unused_ones() {
     .archived());
 }
 
+/// Distinct nouns, three per lesson, so generated lessons share no
+/// meaningful words.
+const WORDS: [&str; 75] = [
+    "parser",
+    "router",
+    "billing",
+    "upload",
+    "search",
+    "cache",
+    "ledger",
+    "invoice",
+    "webhook",
+    "schema",
+    "migration",
+    "fixture",
+    "locale",
+    "tooltip",
+    "sidebar",
+    "keyboard",
+    "printer",
+    "modal",
+    "cursor",
+    "gradient",
+    "thread",
+    "socket",
+    "queue",
+    "worker",
+    "cron",
+    "bucket",
+    "pebble",
+    "harbor",
+    "meadow",
+    "lantern",
+    "footer",
+    "banner",
+    "avatar",
+    "badge",
+    "chart",
+    "legend",
+    "axis",
+    "toolbar",
+    "dialog",
+    "drawer",
+    "toast",
+    "spinner",
+    "skeleton",
+    "carousel",
+    "slider",
+    "stepper",
+    "wizard",
+    "accordion",
+    "breadcrumb",
+    "pagination",
+    "calendar",
+    "picker",
+    "uploader",
+    "dropzone",
+    "editor",
+    "terminal",
+    "console",
+    "inspector",
+    "profiler",
+    "tracer",
+    "logger",
+    "metric",
+    "alert",
+    "pager",
+    "rota",
+    "runbook",
+    "playbook",
+    "incident",
+    "postmortem",
+    "canary",
+    "rollout",
+    "flag",
+    "experiment",
+    "cohort",
+    "funnel",
+];
+
+fn distinct_lesson(index: usize) -> String {
+    let [a, b, c] = [0, 1, 2].map(|offset| WORDS[(index * 3 + offset) % WORDS.len()]);
+    format!("Always review {a} {b} {c} changes.")
+}
+
+#[test]
+fn near_duplicates_strengthen_the_saved_lesson_instead_of_adding() {
+    let (_root, store, path) = fixture();
+    let first = learn(
+        &store,
+        &path,
+        &[said(
+            "Always run the billing webhook tests before merging.",
+            "Task a",
+        )],
+    );
+    assert_eq!(first.applied.len(), 1, "{first:?}");
+    let second = learn(
+        &store,
+        &path,
+        &[said(
+            "Always run billing webhook tests before merging please.",
+            "Task b",
+        )],
+    );
+    assert_eq!(
+        learned(&store, &path)
+            .into_iter()
+            .filter(|e| live(e))
+            .count(),
+        1,
+        "{second:?}"
+    );
+}
+
 #[test]
 fn capacity_archives_the_least_used_lesson_first() {
     let (_root, store, path) = fixture();
-    let topics: Vec<String> = (0..PROJECT_CAPACITY)
-        .map(|index| format!("Always document module{index:02} invariants carefully."))
-        .collect();
+    let topics: Vec<String> = (0..PROJECT_CAPACITY).map(distinct_lesson).collect();
     for chunk in topics.chunks(ADDS_PER_REFLECTION) {
         let observations: Vec<_> = chunk.iter().map(|text| said(text, "Task a")).collect();
         let report = learn(&store, &path, &observations);
@@ -470,7 +583,7 @@ fn capacity_archives_the_least_used_lesson_first() {
     // Every lesson but the first gets a delivery.
     let first = learned(&store, &path)
         .into_iter()
-        .find(|e| e.content.contains("module00"))
+        .find(|e| e.content.contains(WORDS[0]))
         .unwrap()
         .id;
     let others: Vec<String> = ids.into_iter().filter(|id| *id != first).collect();
@@ -481,7 +594,7 @@ fn capacity_archives_the_least_used_lesson_first() {
         &store,
         &path,
         &[said(
-            "Always document overflow invariants carefully please.",
+            "Always quarantine flaky snapshot fixtures overnight.",
             "Task b",
         )],
     );
@@ -499,12 +612,7 @@ fn capacity_archives_the_least_used_lesson_first() {
 fn one_reflection_adds_a_bounded_number_of_lessons() {
     let (_root, store, path) = fixture();
     let observations: Vec<_> = (0..ADDS_PER_REFLECTION + 3)
-        .map(|index| {
-            said(
-                &format!("Always check service{index} health endpoints first."),
-                "Task a",
-            )
-        })
+        .map(|index| said(&distinct_lesson(index), "Task a"))
         .collect();
     let report = learn(&store, &path, &observations);
     assert_eq!(report.applied.len(), ADDS_PER_REFLECTION);

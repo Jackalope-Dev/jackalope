@@ -46,6 +46,13 @@ pub struct Thresholds {
     pub curate_every_seconds: u64,
     /// Word overlap (0–1) at which the curator treats two lessons as one.
     pub fold_similarity: f64,
+    /// Word overlap (0–1) at which a new lesson counts as one already saved:
+    /// it strengthens a lesson Jackalope wrote, or is skipped beside one the
+    /// person wrote.
+    pub duplicate_similarity: f64,
+    /// Most-used active lessons mirrored into AGENTS.md and the Claude Code
+    /// skill, which agents read on every run.
+    pub export_limit: usize,
     /// Agent reflections per rolling hour and day across all projects.
     pub agent_reflections_per_hour: usize,
     pub agent_reflections_per_day: usize,
@@ -59,12 +66,14 @@ pub const THRESHOLDS: Thresholds = Thresholds {
     probation_deliveries: 2,
     probation_opportunities: 30,
     idle_opportunities: 100,
-    project_capacity: 40,
-    adds_per_reflection: 5,
+    project_capacity: 20,
+    adds_per_reflection: 3,
     folds_per_curation: 5,
     curate_after_changes: 10,
     curate_every_seconds: 24 * 60 * 60,
-    fold_similarity: 0.75,
+    fold_similarity: 0.7,
+    duplicate_similarity: 0.7,
+    export_limit: 12,
     agent_reflections_per_hour: 4,
     agent_reflections_per_day: 20,
     agent_timeout_seconds: 45,
@@ -190,6 +199,20 @@ pub fn learned_id(project_id: &str, key: &str) -> String {
     let mut bytes = [0u8; 16];
     bytes.copy_from_slice(&hash[..16]);
     uuid::Uuid::from_bytes(bytes).to_string()
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Lets curator tests seed near-duplicates, as sync can deliver them.
+    pub(super) static SKIP_DUPLICATE_CHECK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+fn duplicate_check() -> bool {
+    #[cfg(test)]
+    if SKIP_DUPLICATE_CHECK.with(std::cell::Cell::get) {
+        return false;
+    }
+    true
 }
 
 pub(super) fn lifecycle(entry: &KnowledgeEntry) -> Option<&Lifecycle> {
@@ -401,6 +424,40 @@ fn apply(
                 return Err(format!(
                     "Skipped \"{}\": already covered by \"{}\".",
                     lesson.title, covered.title
+                ));
+            }
+            // A lesson that says nearly the same thing as one already saved
+            // strengthens that one instead of adding another to choose from.
+            if let Some(similar) = entries.iter().filter(|_| duplicate_check()).find(|entry| {
+                in_project(entry, project_id, path)
+                    && !entry.dismissed
+                    && entry.enabled
+                    && entry.kind == KnowledgeKind::Memory
+                    && lifecycle(entry).is_none_or(|state| state.status != ARCHIVED)
+                    && {
+                        let existing = lifecycle(entry)
+                            .map(|state| state.statement.as_str())
+                            .filter(|statement| !statement.is_empty())
+                            .unwrap_or(&entry.content);
+                        reflect::negative(existing) == reflect::negative(&lesson.statement)
+                            && reflect::similarity(existing, &lesson.statement)
+                                >= THRESHOLDS.duplicate_similarity
+                    }
+            }) {
+                if owned(similar) {
+                    let target = similar.id.clone();
+                    return apply(
+                        entries,
+                        project_id,
+                        path,
+                        Proposal::Merge { target, lesson },
+                        origin,
+                        adds,
+                    );
+                }
+                return Err(format!(
+                    "Skipped \"{}\": too similar to \"{}\".",
+                    lesson.title, similar.title
                 ));
             }
             if let Some(conflict) = entries.iter().find(|entry| {

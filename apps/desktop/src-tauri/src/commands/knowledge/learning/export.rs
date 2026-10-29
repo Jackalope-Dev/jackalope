@@ -15,7 +15,8 @@ const SKILL_MARKER: &str = "<!-- jackalope:lessons:managed -->";
 const SKILL_PATH: &str = ".claude/skills/jackalope-lessons/SKILL.md";
 const MAX_FILE: u64 = 1_000_000;
 
-/// One bullet per active learned lesson, oldest first.
+/// One bullet per active learned lesson, most used first, up to the export
+/// limit so the files agents read on every run stay short.
 fn lines(entries: &[KnowledgeEntry]) -> Vec<String> {
     let mut active: Vec<&KnowledgeEntry> = entries
         .iter()
@@ -26,11 +27,16 @@ fn lines(entries: &[KnowledgeEntry]) -> Vec<String> {
         })
         .collect();
     active.sort_by(|a, b| {
+        let used = |entry: &KnowledgeEntry| lifecycle(entry).map_or(0, |state| state.deliveries);
         let born = |entry: &KnowledgeEntry| lifecycle(entry).map(|state| state.born_at.clone());
-        born(a).cmp(&born(b)).then_with(|| a.id.cmp(&b.id))
+        used(b)
+            .cmp(&used(a))
+            .then_with(|| born(a).cmp(&born(b)))
+            .then_with(|| a.id.cmp(&b.id))
     });
     active
         .into_iter()
+        .take(super::THRESHOLDS.export_limit)
         .filter_map(|entry| {
             let managed = entry
                 .automatic
