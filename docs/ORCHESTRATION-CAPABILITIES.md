@@ -85,11 +85,13 @@ message. Agents must read pending answers; elapsed time is never an answer.
 | Retrieve an answer | user_response | GET /v1/user-prompt/poll?id=question |
 | Record checks | record_validation_step | POST /v1/validation-step |
 | Report a departure from an approved plan | plan_deviation | POST /v1/plan-deviation with summary, optional amendment |
-| Native window control (Windows/macOS/X11; platform readiness required) | desktop_control | POST /v1/desktop/control |
+| Native app and logged-in browser control (Windows/macOS; one-window X11/GNOME; platform readiness required) | desktop_control | POST /v1/desktop/control |
 
-[Native desktop control](DESKTOP-CONTROL.md) requires a fresh human window grant
-for each attempt. It supports accessibility snapshots, screenshots, focus and
-guarded input on Windows; other platforms return unavailable.
+[Native desktop control](DESKTOP-CONTROL.md) requires a human grant for one window,
+one app or the full desktop; window and app grants can be remembered per project. It
+supports accessibility snapshots with element refs, accessibility-first actions,
+screenshots, per-site browser permissions and guarded input; unsupported desktops
+return unavailable.
 
 `ask_user` accepts optional `header`, `recommended` (one of the options), `multi_select`
 (answered as a JSON array), `allow_other` and `rationale`; unknown recommendations and

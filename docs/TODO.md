@@ -201,6 +201,14 @@ release dates.
 - [ ] Validate hourly schedules, timezones, missed runs and restart recovery in installed builds.
 - [ ] Complete packaged desktop-control checks, including multiple monitors,
   interruption, indicator failure and permission renewal.
+- [ ] Accept desktop-control grant levels in installed builds on Windows and macOS:
+  app and full-desktop grants, remembered project grants and their removal, the
+  frame/glow on each monitor, switch_window/open_app, clipboard logging, site
+  questions in Chrome, Edge, Firefox, Zen and Safari, page-only snapshots, and
+  accessibility actions against real apps (focus and pointer left untouched).
+- [ ] Run `native_desktop_window_trial` on an interactive Windows test desktop and
+  compare action latency with the per-action baseline before claiming speedups for
+  installed builds.
 - [ ] Validate Gemini CLI task execution with installed profiles: login and account switching,
   headless flags and stream events for the installed version, exact-session resume, reported
   usage, cancellation, the attempt limit, quota and permission failures. Unit tests do not
@@ -378,7 +386,10 @@ release dates.
   discovery, process/PTY/browser behavior and trial packaging. Keep WSL/Xvfb fixtures separate from installed desktop acceptance.
 - [ ] Run macOS helper compilation/guard CI and native desktop-control acceptance
   on macOS and real X11 desktops. Check ScreenCaptureKit and older-system capture
-  paths, physical interruption, permission readiness and held mouse buttons.
+  paths, physical interruption, permission readiness and held mouse buttons. On
+  macOS also accept the resident helper and its one-process fallback, AX element
+  refs, AXPress/AXValue actions, monitor capture with the indicator excluded, the
+  in-control frame and clipboard access.
 - [ ] Validate macOS/Linux notification clicks, permission denial, tray-host loss
   and macOS Dock reopening in installed builds.
 - [ ] Accept the GNOME 46 Wayland extension on Ubuntu 24.04 devices: installation,

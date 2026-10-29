@@ -131,6 +131,9 @@ pub struct TaskRun {
     pub validation_steps: Vec<crate::commands::harness::ValidationStep>,
     #[serde(default)]
     pub screenshots: Vec<crate::commands::harness::ScreenshotArtifact>,
+    /// Desktop-control actions for the Screen view, newest last and bounded.
+    #[serde(default)]
+    pub desktop_actions: Vec<crate::commands::desktop_control::DesktopActionRecord>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -353,6 +356,8 @@ impl TaskRun {
             prompts: self.prompts.clone(),
             validation_steps: self.validation_steps.clone(),
             screenshots: self.screenshots.clone(),
+            desktop_actions: self.desktop_actions[self.desktop_actions.len().saturating_sub(12)..]
+                .to_vec(),
         }
     }
 }

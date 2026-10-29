@@ -65,6 +65,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         prompts: vec![],
         validation_steps: vec![],
         screenshots: vec![],
+        desktop_actions: vec![],
     }
 }
 

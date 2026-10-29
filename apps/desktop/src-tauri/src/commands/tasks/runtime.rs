@@ -2105,6 +2105,7 @@ impl TaskRuntime {
                 prompts: vec![],
                 validation_steps: vec![],
                 screenshots: vec![],
+                desktop_actions: vec![],
             };
             self.save(&run)?;
             crate::commands::browser::register(&run.id);

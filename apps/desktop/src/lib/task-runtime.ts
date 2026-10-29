@@ -175,6 +175,19 @@ export interface TaskRun {
   prompts?: PendingUserPrompt[];
   validationSteps?: ValidationStep[];
   screenshots?: ScreenshotArtifact[];
+  /** Desktop-control actions, newest last; summaries keep only the latest few. */
+  desktopActions?: DesktopActionRecord[];
+}
+/** @public Named in the return types of usage-entries.ts and usage-insights.ts exports. */
+export interface DesktopActionRecord {
+  at: string;
+  action: string;
+  summary: string;
+  /** accessibility, pointer or keyboard for input actions. */
+  method?: string | null;
+  focusChanged?: boolean;
+  site?: string | null;
+  capture?: ScreenshotArtifact | null;
 }
 export interface StepProgress {
   /** Stable key: `workspace`, `dependencies`, `routing`, `agent` or `verification`. */

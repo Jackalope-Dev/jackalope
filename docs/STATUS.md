@@ -272,7 +272,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - MCP connections with a curated marketplace, publisher setup presets, token entry,
   agent sign-in guidance and save-and-check results. Full AllMCPs search and custom
   connections remain available; live publisher/account acceptance remains open.
-  Task-owned Chromium sessions and scoped desktop-window grants.
+  Task-owned Chromium sessions and scoped desktop grants. Agents can operate native
+  apps and the user's logged-in browser with a one-window, one-app or full-desktop
+  grant; window and app grants can be remembered per project, browser sites are asked
+  once each, and actions target accessibility element refs through a resident helper.
 - Connected apps link the user's own Composio project. The project key and Composio
   identifiers stay in protected storage; apps connect through Composio's hosted sign-in
   in the user's browser, and one managed on-demand connection delivers them to every
@@ -280,7 +283,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   [Connected apps](MCP-DISCOVERY.md#connected-apps-through-composio).
 - Task and chat Screen views poll the attempt's existing task browser viewport and
   desktop grant state without opening a browser, requesting access or saving an
-  artifact. People can stop the browser or revoke desktop control from there.
+  artifact. They list recent desktop actions with small after-action captures. People
+  can stop the browser, revoke desktop control or always allow the granted app there.
 - Saved bots keep a name, role, standing instructions, agent and model, project,
   connection scope and a chosen character and colour locally. Messaging a bot starts a
   chat inside the Bots page, or continues its latest open one, whose native persona is
@@ -471,8 +475,11 @@ Antigravity named accounts use Gemini API keys; isolated subscription accounts a
 unsupported. Discovery and fixture responses do not establish real account execution.
 
 Desktop control supports Windows and has macOS/X11 and GNOME 46 Wayland backends
-for native validation. GNOME requires the bundled window-control extension and
-explicit per-task window grants; other Wayland compositors remain unavailable.
+for native validation. Windows and macOS offer window, app and desktop grants with
+accessibility actions; the macOS helper is compiled and self-tested only in CI.
+X11 and GNOME keep one-window grants with coordinate fallback for element refs.
+GNOME requires the bundled window-control extension; other Wayland compositors
+remain unavailable.
 XWayland alone is insufficient. Worktrees separate Git changes; agent processes and
 configured tools still run with local OS privileges.
 

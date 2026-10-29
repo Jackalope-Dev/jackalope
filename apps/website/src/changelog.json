@@ -1,5 +1,19 @@
 [
   {
+    "id": "agents-can-use-your-apps-and-signed-in-browser",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Agents can use your apps and signed-in browser",
+    "description": "Desktop control is much faster, acts on what it sees by name, and lets you grant one window, one app or your whole desktop.",
+    "items": [
+      "Grant one window, every window of one app, or the full desktop. Full desktop is asked for every task; window and app grants can be remembered per project and removed in project settings.",
+      "Agents can work in your own browser with your sign-ins. Each new website asks once, and you can always or never allow it for the project.",
+      "Agents act on buttons, fields and lists by name through accessibility, so they usually leave your mouse and focus alone, and fall back to mouse and keyboard when an app needs it.",
+      "A resident helper answers each action in milliseconds on Windows instead of starting a new process every time.",
+      "The Screen view lists each action with a small capture afterwards, and Escape, Stop or Revoke still ends control at once."
+    ]
+  },
+  {
     "id": "plan-with-me-before-code-changes",
     "date": "2026-10-29",
     "status": "In development",

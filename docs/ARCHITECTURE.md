@@ -77,7 +77,7 @@ names; changes must preserve both sides and old saved records.
 | mcp.rs, mcp_broker.rs, coordination_mcp.rs, harness.rs | Connection configuration, attempt-owned discovery/execution and task-scoped tools/questions |
 | schedules.rs, browser.rs, codebase.rs | Recurring dispatch, browser sessions and repository analysis |
 | bot_hub.rs, bot_hub/ | Mirrored bot directory, wake-ups, bot-to-bot hand-offs, cards and suggestions over persona live sessions |
-| desktop_control.rs, desktop_control/, resources/gnome-extension/ | Attempt-scoped window grants, platform readiness, accessibility, capture and guarded Windows/macOS/X11/GNOME 46 Wayland input |
+| desktop_control.rs, desktop_control/, resources/gnome-extension/ | Attempt-scoped window, app and desktop grants, remembered project permissions, resident native helpers, accessibility refs, capture and guarded Windows/macOS/X11/GNOME 46 Wayland input |
 | knowledge.rs, monitors.rs | Project lessons/workflows, immutable task context receipts and local Git change checks |
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |
@@ -100,8 +100,8 @@ MCP and HTTP handlers use the same seven tools and existing screenshot artifacts
 The daemon is a pinned local implementation detail, not a hosted service or an
 agent-supplied executable. See [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 
-`desktop_control.rs` separately owns explicit per-window grants and a single desktop
-input lease. Both transports share task authorization, cancellation and snapshot
+`desktop_control.rs` separately owns explicit window, app and desktop grants, the
+session's resident helper process and a single desktop input lease. Both transports share task authorization, cancellation and snapshot
 checks. See [DESKTOP-CONTROL.md](DESKTOP-CONTROL.md) for platform support and limits.
 
 Native profiles store task journals, queues, schedules, integration receipts and

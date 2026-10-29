@@ -72,8 +72,8 @@ MCP approvals are unchanged. Other adapters use their configured transport; vali
   40,000 characters, transport responses to 2 MB and saved screenshots to the
   existing 8 MiB preview limit. Large pages can use a scoped snapshot.
 - These browser tools do not automate native app windows, CAPTCHA or login consent.
-  Separate [native desktop control](DESKTOP-CONTROL.md) requires a user-selected
-  window grant. Browser-based actions may change a site; agents must continue to
+  Separate [native desktop control](DESKTOP-CONTROL.md) operates the user's own
+  logged-in browser or other apps after a window, app or desktop grant. Browser-based actions may change a site; agents must continue to
   follow the task's authorization.
 
 ## Screen view
@@ -83,7 +83,7 @@ through `task_agent_screen`. A read never starts a browser, reserves a slot or w
 behind an agent command; a busy browser keeps the previous frame. Frames capture only
 the visible viewport, are returned to the renderer and are not saved as artifacts.
 The same view reports desktop grant state without changing it. **Stop browser** closes
-the attempt's session and **Revoke desktop access** releases its window grant; both
+the attempt's session and **Revoke desktop access** releases its desktop grant; both
 record an activity entry, and the agent receives the existing revoked-access errors.
 Only HTTP and HTTPS pages can be reopened in the person's browser, without task state.
 

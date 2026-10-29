@@ -333,6 +333,146 @@ fn open_lease(path: &std::path::Path) -> Result<super::super::file_lock::FileLoc
     })
 }
 
+/// What this platform's helper implements. Linux helpers keep the original
+/// one-window action set; element refs there fall back to coordinates.
+pub(crate) struct Capabilities {
+    pub scopes: &'static [super::grant::Scope],
+    pub actions: &'static [&'static str],
+    /// The helper performs accessibility actions on element refs itself.
+    pub element_actions: bool,
+    /// The helper accepts arbitrary validated key chords.
+    pub chords: bool,
+}
+
+impl Capabilities {
+    pub fn scope(&self, scope: super::grant::Scope) -> Result<(), String> {
+        if self.scopes.contains(&scope) {
+            Ok(())
+        } else {
+            Err(format!(
+                "This desktop supports only single-window grants; {} grants are available on Windows and macOS.",
+                scope.as_str()
+            ))
+        }
+    }
+
+    pub fn action(&self, action: &str) -> Result<(), String> {
+        if self.actions.contains(&action) {
+            Ok(())
+        } else {
+            Err(format!(
+                "{action} is not available on this desktop. Use snapshot, click, type, press or scroll."
+            ))
+        }
+    }
+}
+
+pub(crate) fn capabilities() -> Capabilities {
+    use super::grant::Scope;
+    if cfg!(any(windows, target_os = "macos")) {
+        Capabilities {
+            scopes: &[Scope::Window, Scope::App, Scope::Desktop],
+            actions: super::actions::ACTIONS,
+            element_actions: true,
+            chords: true,
+        }
+    } else {
+        Capabilities {
+            scopes: &[Scope::Window],
+            actions: &[
+                "request_access",
+                "release",
+                "snapshot",
+                "screenshot",
+                "wait_for",
+                "focus",
+                "list_windows",
+                "click",
+                "type",
+                "press",
+                "scroll",
+                "invoke",
+            ],
+            element_actions: false,
+            chords: false,
+        }
+    }
+}
+
+/// Starts the resident helper for this platform, or None where each action
+/// runs its own helper process.
+pub(crate) fn launcher() -> Option<super::helper::Launcher> {
+    #[cfg(windows)]
+    return Some(std::sync::Arc::new(|| {
+        use base64::Engine as _;
+        Ok(super::helper::Launch {
+            command: super::native_command(include_str!("windows.ps1"), None)?,
+            preamble: vec![
+                base64::engine::general_purpose::STANDARD.encode(include_str!("windows.cs"))
+            ],
+        })
+    }));
+    #[cfg(target_os = "macos")]
+    return Some(std::sync::Arc::new(|| {
+        Ok(super::helper::Launch {
+            command: command(json!({"action":"serve"}))?,
+            preamble: Vec::new(),
+        })
+    }));
+    #[cfg(not(any(windows, target_os = "macos")))]
+    return None;
+}
+
+/// Opens an app by program or app name outside every Jackalope process tree,
+/// so it keeps running after the grant ends. Names are validated beforehand
+/// to contain no paths, arguments or shell syntax.
+pub(super) fn open_app(name: &str) -> Result<(), String> {
+    if name.is_empty()
+        || !name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ' '))
+        || name.starts_with(['-', '.'])
+    {
+        return Err("Name the app by its program or app name only.".into());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        if name.contains(' ') {
+            return Err("Use the program name without spaces, such as notepad or msedge.".into());
+        }
+        let windows =
+            std::env::var_os("SystemRoot").ok_or("Windows system directory is unavailable.")?;
+        let status = std::process::Command::new(PathBuf::from(&windows).join("System32/cmd.exe"))
+            .raw_arg(format!("/d /c start \"\" {name}"))
+            .creation_flags(0x08000000)
+            .status()
+            .map_err(|e| e.to_string())?;
+        return if status.success() {
+            Ok(())
+        } else {
+            Err(format!("Windows could not open {name}."))
+        };
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let mut command = std::process::Command::new("/usr/bin/open");
+        if name.contains('.') && !name.contains(' ') {
+            command.args(["-b", name]);
+        } else {
+            command.args(["-a", name]);
+        }
+        let status = command.status().map_err(|e| e.to_string())?;
+        return if status.success() {
+            Ok(())
+        } else {
+            Err(format!("macOS could not open {name}."))
+        };
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    return Err("Opening apps is not available on this desktop.".into());
+}
+
 pub(super) fn key(key: &str) -> String {
     if cfg!(target_os = "macos") {
         key.into()

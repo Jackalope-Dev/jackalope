@@ -1,46 +1,89 @@
-# Native desktop window control
+# Native desktop control
 
 Windows, macOS and supported Linux desktops expose `desktop_control` through native MCP and authenticated
-`POST /v1/desktop/control`. This operates a user-selected live application window.
-It is separate from the isolated [task browser](BROWSER-AUTOMATION.md).
+`POST /v1/desktop/control`. This operates the user's own live applications, including
+their logged-in browser. It is separate from the isolated [task browser](BROWSER-AUTOMATION.md),
+which has no personal sign-ins.
 macOS, Linux X11 and GNOME 46 Wayland backends are implemented for native validation;
 macOS compilation and installed-device acceptance remain open. GNOME Wayland requires
 the bundled Jackalope Window Control extension. Other Wayland and headless Linux sessions return an
 explicit unavailable response and omit the MCP tool. An XWayland connection is not
-accepted as permission to control a Wayland desktop.
+accepted as permission to control a Wayland desktop. Linux helpers remain one-window
+helpers; another backend, such as a Wayland portal, adds a `platform` launcher and
+capability set.
 
-## Permission and ownership
+## Grant levels and ownership
 
-An agent calls `request_access`. Jackalope lists visible top-level windows in a
-saved task question; only the human's submitted choice grants access. The question
-has no default grant. Window titles are not returned to the agent before selection.
+An agent calls `request_access` with a `scope`, an optional `app` hint and a
+one-sentence `reason`. Jackalope saves a task question; only the human's submitted
+answer grants access, and the question has no default. Window titles are not
+returned to the agent before selection. Jackalope's own windows and its indicator
+are never listed or controllable.
+
+| Scope | Grants | Platforms |
+| --- | --- | --- |
+| `window` | One window; other windows and popups need another grant. | Windows, macOS, Linux |
+| `app` | Every window of one app (image name on Windows, bundle ID on macOS), including new ones. | Windows, macOS |
+| `desktop` | Every app and monitor except Jackalope. Asked for every task and never remembered. | Windows, macOS |
+
+App questions offer "Always allow <app> in <project>", and the Screen view offers the
+same for an active window or app grant. Remembered grants are stored per project in
+`preferences/desktop-grants.json`, listed under Project settings, Desktop control, and
+removable there. A remembered grant answers a later request only when the agent names
+that app; a window request is answered only when the app has exactly one window, and an
+app request only by a remembered app grant. Unknown scopes written by a newer app are
+ignored. Full-desktop grants cannot be stored.
+
 The selected handle, process ID, process start time and window class (bundle ID on macOS) are checked
 on every operation. Hidden, minimized, closed or replaced windows fail the check.
-Release access and request again to choose another window or modal dialog.
+Grants live in memory for the current attempt. Stop, completion, release, Escape, the
+bar's Cancel and the Screen view's Revoke end them at once; restart and continuation
+need a new question unless a remembered grant applies. One attempt may reserve desktop
+control at a time, including across Jackalope profiles through a per-user file lease.
+Calls serialize per attempt. The lease remains held until canceled in-flight work has
+returned. Other applications can still interact with the desktop.
 
-Grants live only in memory for the current attempt. Stop, completion and release
-revoke them; restart and continuation need a new question. One attempt may reserve
-desktop control at a time, including across Jackalope profiles through a per-user
-file lease. Calls serialize per attempt. The lease remains held until canceled
-in-flight work has returned. Other applications can still interact with the desktop.
+### Browsers and websites
+
+App and window grants on a known browser (Chrome, Edge, Firefox, Zen, Brave, Opera,
+Vivaldi, Arc, Safari and close relatives) report the current page. Windows reads the
+URL from the UI Automation document value, else the address bar; macOS reads `AXURL`
+from the web area, else the window document. Snapshots, screenshots and input results
+include `site`. The first time a grant reaches a host, Jackalope asks whether to allow
+it for this task, always allow it in the project, decline it, or never allow it in the
+project. Page content is withheld until the answer. Saved decisions apply to subdomains,
+the nearest saved parent wins, and Project settings lists and removes them. Unreadable
+addresses and internal pages are not gated. Full-desktop grants are not gated by site.
+
+Querying the document through UI Automation makes Chromium build its full web
+accessibility tree; on macOS the helper also sets `AXManualAccessibility` on browser
+apps. `snapshot` with `page: true` reads only the web document, with a deeper and larger
+bound than a whole-window snapshot.
 
 ## Visible control and interruption
 
-On Windows, an opaque black bar sits flush with the top of the selected window's monitor,
-centered above a wide glow in the current desktop accent color. Its rounded lower
+On Windows, an opaque black bar sits flush with the top of the granted window's monitor
+(the primary monitor for desktop grants), centered above a wide glow in the current
+desktop accent color. Desktop grants glow on every monitor; app grants follow the
+app's active window. The bar names what is controlled: a window, the app or your
+computer. The bar and glow are excluded from Jackalope's own monitor captures. Its rounded lower
 corners, shared logo, display-scaled type and real Pause/Resume and Cancel buttons
 keep the status and Escape hint readable. The center of the screen stays clear.
 The overlay has no taskbar entry, does not activate on arrival and uses no animation.
 
-Physical Escape cancels access. Mouse movement, typing, lost foreground focus,
-minimizing or moving/resizing the selected window pauses control. Only the human
+Physical Escape cancels access. Mouse movement and typing pause control. A window
+grant also pauses when that window loses focus, is minimized, moves or resizes; an app
+grant pauses when another app comes forward; a desktop grant pauses only on physical
+input. Only the human
 can Resume from the bar. Agent-generated input is tagged so it does not trigger
 its own pause; an agent's Escape remains scoped to the selected application.
 Every pause/resume invalidates previous snapshots, so resumed work must inspect
 the window again. Paused access also blocks snapshots and captures.
 
 macOS and X11 use a native bar with Pause/Resume and Cancel. Grants start paused;
-click Resume to activate the selected window and begin. macOS uses a listening
+click Resume to activate the granted window or app and begin. On macOS an accent
+frame surrounds the granted window, or the screens for app and desktop grants,
+while control is active; the bar and frames are excluded from screen capture. macOS uses a listening
 Core Graphics event tap; X11 listens to XInput2 raw device events and excludes the
 XTEST virtual devices used for its own input. Other programs using XTEST share
 that exemption; this remains an interaction guard, not an input-security boundary.
@@ -53,7 +96,7 @@ The Windows indicator resets a named event before saving a pause/cancel state. N
 input checks that event, the current epoch, a recent heartbeat and the indicator
 process identity. Closing or losing the indicator disables input and ends the
 grant. The theme bridge follows appearance previews and rollback without changing
-saved settings. These controls do not expand the grant beyond the selected window.
+saved settings. These controls do not expand the grant beyond its window, app or desktop.
 
 This is an interaction guard, not a security sandbox: agents and local programs
 retain their existing OS privileges. A chosen app can change files or send data.
@@ -64,24 +107,51 @@ untrusted observations, never instructions that expand the user's authorization.
 
 | Action | Behavior |
 | --- | --- |
-| `request_access` | Ask for one window, or read the result of that question. |
-| `snapshot` | Bounded native accessibility tree, relative bounds and snapshot ID. |
-| `screenshot` | Capture only the selected window as a saved task PNG artifact. |
-| `focus` | Request foreground focus; fail if the OS refuses or the grant is paused. |
-| `click` | Click window-relative `x`, `y` after checking foreground and occlusion. |
-| `type` | Send up to 1,000 printable characters literally, without interpreting key syntax. |
-| `press` | Send navigation/editing keys or the Primary+a/s/z/y shortcuts (Command on macOS, Control elsewhere), or literal Control shortcuts. |
-| `scroll` | Send up to ten wheel notches at a checked point within the window. |
+| `request_access` | Ask for a window, app or desktop grant, or read the answer. |
+| `snapshot` | Accessibility tree with element refs, window-relative bounds, `site` and a snapshot ID. With a desktop grant and no current window it lists windows and monitors. |
+| `screenshot` | Capture the current window, or one monitor (`monitor`) with a desktop grant, as a task PNG artifact. |
+| `wait_for` | Snapshot repeatedly (up to 15 seconds) until an element's name or value contains `text`. |
+| `focus` | Bring the current window forward, or focus an element by ref. |
+| `list_windows` | Windows inside the grant, plus monitors for desktop grants. |
+| `switch_window` | Make another granted window current (app and desktop grants). |
+| `open_app` | Desktop grants open a program by name; app grants open another window of that app. |
+| `click`, `double_click`, `right_click` | Target an element ref or `x`, `y`. |
+| `invoke`, `select`, `set_value` | Accessibility actions on an element ref; `select` takes an option name in `text`. |
+| `type` | Up to 1,000 printable characters typed literally, optionally into an element. |
+| `press` | A named key, F1 to F12 or a chord such as `Control+Shift+t` or `Primary+s` (Command on macOS). |
+| `scroll` | Up to ten wheel notches at an element or point. |
+| `drag` | From an element or point to `to_element` or `to_x`, `to_y`. |
+| `clipboard_read`, `clipboard_write` | Read (up to 20,000 characters) or replace clipboard text; both are logged. |
 | `release` | Revoke this attempt's desktop grant. |
 
-Input requires `snapshot_id` from the latest snapshot or screenshot. It expires
-after 60 seconds and is consumed even if input fails. A moved/resized window or
-changed foreground requires inspection again. Keyboard modifiers or mouse buttons
-held by the user block input. System-wide shortcuts, clipboard access, arbitrary
-scripts, process launch and elevation are not part of this tool.
+Snapshot elements carry `ref` (such as `e12`), `role`, `name`, `value`, `bounds`
+(`[x, y, width, height]` relative to the captured window), `states` and `actions`.
+Resident helpers keep a ref stable while the element exists. Element actions prefer
+accessibility (UI Automation Invoke, Toggle, SelectionItem, ExpandCollapse, Value and
+Scroll patterns on Windows; `AXPress`, `AXConfirm`, `AXPick`, `AXSelected`, `AXValue`
+and `AXFocused` on macOS), which leave the mouse and window focus alone. When an
+element offers none, the helper falls back to pointer or keyboard input at the
+element's current center. Results report `method` (`accessibility`, `pointer` or
+`keyboard`) and `focusChanged`. Linux helpers do not run accessibility actions; there
+refs resolve to the recorded center and `invoke` becomes a click.
+
+Input requires `snapshot_id` from the latest snapshot, screenshot or `wait_for`. It
+expires after 60 seconds and is consumed even if input fails. Window grants never
+change focus; app and desktop grants may bring a granted window forward for pointer
+or keyboard input and report it. A moved/resized window or changed current window
+requires inspection again. Keyboard modifiers or mouse buttons held by the user block
+input. Chords that switch apps or desktops, open system UI or quit apps (Alt+Tab,
+Primary+Tab, Control/Alt/Primary+Escape, Alt+F4, Primary+q, Primary+Space,
+Control+Alt+Delete) and paste (Primary/Control+v) are rejected. Arbitrary scripts,
+process arguments and elevation are not part of this tool.
+
+Every action is recorded in the attempt's activity and in a bounded desktop action log
+(the latest 200). Input actions keep a 480-pixel-wide capture of the window afterwards
+in the task's screenshot folder. The Screen view shows the grant level, current site,
+recent actions with their method and captures, "Always allow" and Revoke.
 
 Native accessibility password fields (including Windows password edit controls) are redacted from snapshots
-and reject typing/keypresses. Custom controls may omit accessibility metadata;
+and reject typing, keypresses and value changes. Custom controls may omit accessibility metadata;
 redaction cannot guarantee that a selected window contains no sensitive content.
 Screenshots capture what the app renders, including any visible secrets. Some GPU
 or protected applications return blank captures. Inspect the artifact before using
@@ -89,13 +159,25 @@ its coordinates; no automatic retries occur after uncertain or partial input.
 
 ## Implementation and acceptance
 
-`commands/desktop_control.rs` owns grants, task checks, fresh snapshots and artifacts.
-Its bundled `desktop_control/windows.ps1` uses Windows PowerShell 5.1, UI Automation,
-PrintWindow and SendInput. JSON travels through a dedicated environment value,
-never through command interpolation. The helper receives an allowlisted environment,
-runs in an owned process tree and times out after 20 seconds. It cannot elevate or
-bypass Windows foreground/UIPI restrictions. Screenshots retain the existing 8 MiB
-artifact limit. See Microsoft's [password edit styles](https://learn.microsoft.com/en-us/windows/win32/controls/edit-control-styles)
+`commands/desktop_control.rs` owns sessions, task checks, fresh snapshots, artifacts and
+the action log. `desktop_control/grant.rs` owns grant levels, the access and website
+questions and the remembered-permission store; `actions.rs` validates requests and key
+chords; `elements.rs` normalizes accessibility trees and resolves element refs.
+
+`desktop_control/helper.rs` runs one resident helper process per session and talks to it
+in JSON lines (`{"id",...}` requests, `{"id","ok","result"|"error"}` responses). The
+helper starts on first use, is reused for every action, stops after three idle minutes
+or when the grant ends, and restarts on the next call after a crash. A timed-out,
+revoked or crashed call kills the process and reports that input may have occurred;
+nothing is replayed. On Windows, `windows.ps1` is a small Windows PowerShell 5.1
+bootstrap that compiles `windows.cs` once with Add-Type (UI Automation, PrintWindow,
+SendInput, Windows Forms clipboard and screens) and then serves requests; no new
+toolchain is needed. On macOS the bundled Swift helper serves the same protocol with
+`{"action":"serve"}` and falls back to one process per action if its handshake fails.
+Linux helpers still run once per action. Helpers receive an allowlisted environment,
+run in owned process trees and time out after 20 seconds per action. They cannot
+elevate or bypass Windows foreground/UIPI restrictions. Screenshots retain the existing
+8 MiB artifact limit. See Microsoft's [password edit styles](https://learn.microsoft.com/en-us/windows/win32/controls/edit-control-styles)
 and [SendInput contract](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput).
 
 `desktop_control/indicator.rs` owns the indicator process, temporary assets,
@@ -104,10 +186,14 @@ status bar and handles physical interruption. The renderer's
 `lib/desktop-control-theme.ts` forwards the shared accent, including live previews.
 
 Run ordinary guards with `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
---lib --no-default-features desktop_control`. The opt-in
-`native_desktop_window_trial -- --ignored --nocapture` opens and controls its own
-disposable Windows form, records literal text, verifies a PNG and checks rejected
-input. Run it only on an interactive test desktop. It closes only its own fixture.
+--lib desktop_control`. They cover grant scoping, remembered grants, site decisions,
+element refs, validation, saved-data compatibility and the resident helper lifecycle
+against a headless JSON-lines fixture. The opt-in
+`native_desktop_window_trial -- --ignored --nocapture` opens its own disposable Windows
+form, starts a real indicator and drives the resident helper through snapshots, stable
+refs, accessibility value and invoke actions, typing, chords, captures, thumbnails and
+rejected input, printing per-action latency. The fixture closes itself after two
+minutes and is contained in a job object. Run it only on an interactive test desktop.
 This trial does not establish installed-agent, installed-package or arbitrary-app
 acceptance; those remain separate [native release checks](SELF-DEVELOPMENT.md).
 
@@ -125,13 +211,14 @@ the eventual app bundle. No permission bypass or automatic resume is provided.
 architecture and macOS 11 minimum. A small `libproc` shim checks process start
 identity for both GUI apps and the helper and checks all held mouse buttons.
 Captures use ScreenCaptureKit
-on macOS 14 and later, with selected-window Core Graphics images on older systems.
+on macOS 14 and later, with Core Graphics images on older systems; monitor captures
+exclude the indicator's windows.
 Both paths use logical window dimensions and revalidate identity, bounds, focus
 and the active guard before saving; modern capture has an eight-second deadline.
 Accessibility matches must identify a single window. Input rejects unknown focused
 windows and password controls; Unicode events preserve surrogate pairs and respect
 the platform's event length bound. Both macOS CI architectures compile the helper
-and run its noninteractive process/coordinate/guard self-test. These are not TCC,
+and run its noninteractive process/coordinate/guard/ref/key self-test. These are not TCC,
 Retina, multi-monitor, input-monitoring or installed-app acceptance.
 
 `linux.c` is compiled with the target C compiler and pkg-config libraries for GTK3,

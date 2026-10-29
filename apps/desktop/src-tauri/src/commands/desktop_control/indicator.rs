@@ -66,9 +66,18 @@ pub(super) fn parse_state(text: &str, now: i64) -> Result<State, String> {
     })
 }
 
+/// The window the indicator follows. Desktop grants have none, which the
+/// helpers receive as handle 0.
+fn indicator_window(grant: &super::grant::Grant) -> Value {
+    grant.window.as_ref().map_or_else(
+        || json!({"handle":"0","pid":0,"started":"0","title":"","class":""}),
+        |window| json!(window),
+    )
+}
+
 impl Indicator {
     #[cfg(windows)]
-    pub fn start(window: &Window) -> Result<Self, String> {
+    pub fn start(grant: &super::grant::Grant) -> Result<Self, String> {
         let directory =
             std::env::temp_dir().join(format!("jackalope-window-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&directory).map_err(|e| e.to_string())?;
@@ -83,12 +92,14 @@ impl Indicator {
             include_bytes!("../../../icons/32x32.png"),
         )
         .map_err(|e| e.to_string())?;
-        let script=format!("$ErrorActionPreference='Stop'\nAdd-Type -ReferencedAssemblies System.Drawing,System.Windows.Forms -TypeDefinition @'\n{}\n'@\n$r=$env:JACKALOPE_DESKTOP_REQUEST | ConvertFrom-Json\n[JackalopeWindowIndicator]::Run([long]$r.window.handle,[int]$r.window.pid,[string]$r.window.started,[string]$r.file,[string]$r.theme,[string]$r.logo)",include_str!("indicator.cs"));
+        let script=format!("$ErrorActionPreference='Stop'\nAdd-Type -ReferencedAssemblies System.Drawing,System.Windows.Forms -TypeDefinition @'\n{}\n'@\n$r=$env:JACKALOPE_DESKTOP_REQUEST | ConvertFrom-Json\n[JackalopeWindowIndicator]::Run([long]$r.window.handle,[int]$r.window.pid,[string]$r.window.started,[string]$r.file,[string]$r.theme,[string]$r.logo,[string]$r.scope,[string]$r.app,[string]$r.label)",include_str!("indicator.cs"));
         let errors =
             std::fs::File::create(directory.join("error.log")).map_err(|e| e.to_string())?;
         let mut command = super::native_command(
             &script,
-            json!({"window":window,"file":directory.join("state"),"theme":directory.join("theme"),"logo":directory.join("logo.png")}),
+            Some(
+                json!({"window":indicator_window(grant),"scope":grant.scope.as_str(),"app":grant.app,"label":grant.label,"file":directory.join("state"),"theme":directory.join("theme"),"logo":directory.join("logo.png")}),
+            ),
         )?;
         command
             .stdin(Stdio::null())
@@ -133,7 +144,7 @@ impl Indicator {
     }
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]
-    pub fn start(window: &Window) -> Result<Self, String> {
+    pub fn start(grant: &super::grant::Grant) -> Result<Self, String> {
         use std::os::unix::fs::DirBuilderExt;
         let directory =
             std::env::temp_dir().join(format!("jackalope-window-{}", uuid::Uuid::new_v4()));
@@ -141,7 +152,7 @@ impl Indicator {
             .mode(0o700)
             .create(&directory)
             .map_err(|e| e.to_string())?;
-        let result = Self::start_unix(window, directory.clone());
+        let result = Self::start_unix(grant, directory.clone());
         if result.is_err() {
             let _ = std::fs::remove_dir_all(directory);
         }
@@ -149,7 +160,7 @@ impl Indicator {
     }
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]
-    fn start_unix(window: &Window, directory: PathBuf) -> Result<Self, String> {
+    fn start_unix(grant: &super::grant::Grant, directory: PathBuf) -> Result<Self, String> {
         let accent = ACCENT
             .get_or_init(|| Mutex::new("#6366f1".into()))
             .lock()
@@ -158,8 +169,11 @@ impl Indicator {
         std::fs::write(directory.join("theme"), accent).map_err(|e| e.to_string())?;
         let errors =
             std::fs::File::create(directory.join("error.log")).map_err(|e| e.to_string())?;
-        let mut command = super::platform::command(json!({"action":"indicator", "window":window,
-            "file":directory.join("state"),"theme":directory.join("theme")}))?;
+        let mut command = super::platform::command(
+            json!({"action":"indicator", "window":indicator_window(grant),
+            "scope":grant.scope.as_str(),"app":grant.app,"label":grant.label,
+            "file":directory.join("state"),"theme":directory.join("theme")}),
+        )?;
         command
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -203,7 +217,7 @@ impl Indicator {
     }
 
     #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
-    pub fn start(_: &Window) -> Result<Self, String> {
+    pub fn start(_: &super::grant::Grant) -> Result<Self, String> {
         Err("A guarded native desktop backend is unavailable on this desktop.".into())
     }
 
@@ -214,6 +228,11 @@ impl Indicator {
             );
         }
         read_state(&self.directory.join("state"))
+    }
+
+    /// The indicator process, whose windows agents may never target.
+    pub fn pid(&self) -> Option<u32> {
+        Some(self.child.id())
     }
 
     pub fn guard(&self, epoch: u64) -> Value {
@@ -239,7 +258,7 @@ impl Indicator {
                     .is_some_and(|state| state.status != "canceled");
                 if !active {
                     close(&id);
-                    let _ = runtime.update_checked(&id, |run|run.activity.push("Desktop access ended: Escape was pressed or the window indicator closed. A new window grant is required.".into()));
+                    let _ = runtime.update_checked(&id, |run|run.activity.push("Desktop access ended: Escape was pressed or the indicator closed. A new grant is required.".into()));
                     break;
                 }
                 let color = ACCENT.get().unwrap().lock().unwrap().clone();

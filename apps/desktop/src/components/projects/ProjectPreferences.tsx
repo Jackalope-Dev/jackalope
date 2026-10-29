@@ -16,6 +16,7 @@ import { Textarea } from '../ui/Textarea';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { ArtifactsProjectSettings } from './ArtifactsProjectSettings';
+import { DesktopProjectSettings } from './DesktopProjectSettings';
 import { ProjectGitSettings } from './ProjectGitSettings';
 import { ProjectPlanningSettings } from './ProjectPlanningSettings';
 import { RemoveProjectAction } from './RemoveProjectAction';
@@ -268,6 +269,7 @@ export function ProjectPreferences({
           </SettingGroup>
           <ProjectPlanningSettings key={`planning-${project.id}`} projectId={project.id} />
           <ProjectGitSettings key={project.path} projectPath={project.path} />
+          <DesktopProjectSettings key={`desktop-${project.id}`} projectId={project.id} />
           {!project.plainFolder && (
             <ArtifactsProjectSettings
               key={`artifacts-${project.path}`}

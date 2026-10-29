@@ -441,6 +441,11 @@ pub async fn task_screenshot(
         let screenshot = run
             .screenshots
             .iter()
+            .chain(
+                run.desktop_actions
+                    .iter()
+                    .filter_map(|action| action.capture.as_ref()),
+            )
             .find(|item| item.id == screenshot_id)
             .ok_or("Screenshot not found in this task attempt")?;
         (
