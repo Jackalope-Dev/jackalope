@@ -261,10 +261,11 @@ release dates.
 - [ ] Verify automatic lessons across tasks, queues, schedules and restart,
   including evidence, edits, removal and frozen task context. Measure outcomes.
 - [ ] Run background learning in the installed app across agents and conversations:
-  cadence and end-of-work reflection, probation, archiving, restore, curator folds and
-  history. Use Learning activity to calibrate the cadence, probation, archive and
-  curator thresholds against real use, and measure whether learned lessons reduce
-  repeated corrections before claiming it.
+  cadence and end-of-work reflection, probation, archiving, restore, curator folds,
+  missed and contradicted lessons, stale-lesson checks and history. Use Learning
+  activity to calibrate the cadence, probation, archive, miss and curator thresholds
+  against real use, check how often misses and stale references are false positives,
+  and measure whether learned lessons reduce repeated corrections before claiming it.
 - [ ] Accept learned-lesson sync with two installed desktops on one account and a
   second account: first enable, offline edits on both sides, tombstones, per-project
   exclusion, Delete synced lessons and the reset on the other desktop, account

@@ -19,7 +19,9 @@ pub struct LedgerRecord {
     pub project_id: String,
     pub at: String,
     /// `born`, `merged`, `patched`, `retired`, `promoted`, `archived`,
-    /// `restored`, `edited`, `deleted` or `curated` (folded by the curator).
+    /// `restored`, `edited`, `deleted`, `curated` (folded by the curator),
+    /// `missed` (restated after it was supplied), `contradicted` or `stale`
+    /// (names something the project no longer has).
     pub action: String,
     pub reason: String,
     /// The entry revision after the change.

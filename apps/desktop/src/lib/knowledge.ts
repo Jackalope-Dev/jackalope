@@ -34,6 +34,8 @@ export interface KnowledgeEntry {
     } | null;
   } | null;
   dismissed?: boolean;
+  /** Something the lesson names that the project no longer has. */
+  stale?: string | null;
   process?: ProcessTemplate;
   id: string;
   projectId: string;

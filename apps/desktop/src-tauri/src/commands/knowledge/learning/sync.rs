@@ -442,6 +442,7 @@ fn apply_lesson(
             resolution: None,
             lifecycle: Some(Lifecycle::default()),
         }),
+        stale: None,
         source_run_id: None,
         source_head: None,
         revision: remote.revision,

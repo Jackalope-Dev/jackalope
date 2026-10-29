@@ -287,6 +287,8 @@ fn learning_summary(entry: &super::knowledge::KnowledgeEntry) -> Option<protocol
         managed: source.managed,
         updated_at: entry.updated_at.clone(),
         archived_reason: state.archived_reason.clone(),
+        misses: (state.misses > 0).then_some(state.misses),
+        attention: super::knowledge::learning::attention(entry),
     })
 }
 

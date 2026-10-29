@@ -13,6 +13,7 @@ mod export;
 pub mod ledger;
 mod redact;
 mod reflect;
+mod stale;
 pub mod sync;
 pub mod watcher;
 
@@ -21,7 +22,7 @@ pub use curate::FOLDED;
 pub use export::export_project;
 pub use ledger::LedgerRecord;
 pub use redact::redact;
-pub use reflect::{reflect, Observation, ObservationKind};
+pub use reflect::{outcomes, reflect, reflect_delivered, Observation, ObservationKind, Outcome};
 
 /// Every tunable of the learning loop. Change values here only; the names
 /// below are aliases for use in messages. See docs/PROJECT-KNOWLEDGE.md.
@@ -60,6 +61,19 @@ pub struct Thresholds {
     pub agent_timeout_seconds: u64,
     /// Bytes of the person's redacted words one agent reflection reads.
     pub agent_window_bytes: usize,
+    /// Word overlap (0–1) at which something the person says after a lesson
+    /// was supplied restates it (a miss) or, with the opposite intent,
+    /// contradicts it.
+    pub miss_similarity: f64,
+    /// Misses within `miss_window` deliveries that mark a lesson as one
+    /// agents keep missing.
+    pub misses_to_flag: usize,
+    /// Most recent deliveries the misses are counted over.
+    pub miss_window: u64,
+    /// Lessons one stale-lesson check inspects per project.
+    pub stale_lessons_per_check: usize,
+    /// Paths, scripts and targets one lesson may name for the check.
+    pub stale_references_per_lesson: usize,
 }
 
 pub const THRESHOLDS: Thresholds = Thresholds {
@@ -78,6 +92,11 @@ pub const THRESHOLDS: Thresholds = Thresholds {
     agent_reflections_per_day: 20,
     agent_timeout_seconds: 45,
     agent_window_bytes: 6000,
+    miss_similarity: 0.5,
+    misses_to_flag: 2,
+    miss_window: 10,
+    stale_lessons_per_check: 100,
+    stale_references_per_lesson: 8,
 };
 
 pub const PROBATION_DELIVERIES: u64 = THRESHOLDS.probation_deliveries;
@@ -90,6 +109,10 @@ const ADDS_PER_REFLECTION: usize = THRESHOLDS.adds_per_reflection;
 pub const DEFAULT_CADENCE: u32 = 50;
 const EVIDENCE_REFERENCES: usize = 10;
 const RECENT_RUNS: usize = 8;
+/// `archived_reason` of a lesson on probation that agents kept missing.
+pub const IGNORED: &str = "ignored";
+/// `archived_reason` of a lesson that names something the project no longer has.
+pub const STALE: &str = "stale";
 
 pub const PROBATION: &str = "probation";
 pub const ACTIVE: &str = "active";
@@ -133,6 +156,35 @@ pub struct Lifecycle {
     /// curator leaves it apart from then on.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub distinct: bool,
+    /// Times the person restated this lesson after it was supplied, as if the
+    /// agent had not followed it.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub misses: u64,
+    /// Runs already judged against this lesson, newest last, so reflecting
+    /// on a run again never counts it twice.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub corrections: Vec<Correction>,
+    /// Agents keep missing it: ranked first among equally matching lessons
+    /// until the misses fall out of the delivery window.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub missed_often: bool,
+}
+
+/// One run in which the person corrected the agent on a supplied lesson.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Correction {
+    pub run_id: String,
+    /// The lesson's delivery count when it happened.
+    #[serde(default)]
+    pub delivery: u64,
+    /// The person said otherwise rather than restating it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub contradicted: bool,
+}
+
+fn is_zero(value: &u64) -> bool {
+    *value == 0
 }
 
 impl Lifecycle {
@@ -142,6 +194,31 @@ impl Lifecycle {
     pub fn on_probation(&self) -> bool {
         self.status == PROBATION
     }
+    /// Misses within the last `miss_window` deliveries.
+    pub fn recent_misses(&self, thresholds: &Thresholds) -> usize {
+        self.corrections
+            .iter()
+            .filter(|item| {
+                !item.contradicted
+                    && self.deliveries.saturating_sub(item.delivery) < thresholds.miss_window
+            })
+            .count()
+    }
+}
+
+/// Fresh counts for a restored lesson, shared by Restore and the editor.
+pub(super) fn reset_for_restore(state: &mut Lifecycle) {
+    state.distinct |= state.archived_reason.as_deref() == Some(curate::FOLDED);
+    state.status = if state.deliveries >= PROBATION_DELIVERIES {
+        ACTIVE.into()
+    } else {
+        PROBATION.into()
+    };
+    state.archived_reason = None;
+    state.opportunities = 0;
+    state.idle = 0;
+    state.corrections.clear();
+    state.missed_often = false;
 }
 
 /// A lesson reflection wants to exist. Evidence is a reference (task or
@@ -223,6 +300,16 @@ fn lifecycle_mut(entry: &mut KnowledgeEntry) -> Option<&mut Lifecycle> {
     entry.automatic.as_mut()?.lifecycle.as_mut()
 }
 
+/// A short note on why a lesson needs a look, for the terminal's `/learnings`.
+pub fn attention(entry: &KnowledgeEntry) -> Option<String> {
+    if let Some(thing) = &entry.stale {
+        return Some(format!("names {thing}, which no longer exists"));
+    }
+    lifecycle(entry)
+        .filter(|state| state.missed_often && !state.archived())
+        .map(|_| "agents keep missing this".into())
+}
+
 /// Whether the loop may change this entry: Jackalope wrote it and nobody has
 /// edited it since.
 pub(super) fn owned(entry: &KnowledgeEntry) -> bool {
@@ -283,16 +370,9 @@ fn archive(entry: &mut KnowledgeEntry, reason: &str) {
 
 fn restore(entry: &mut KnowledgeEntry) {
     if let Some(state) = lifecycle_mut(entry) {
-        state.distinct |= state.archived_reason.as_deref() == Some(curate::FOLDED);
-        state.status = if state.deliveries >= PROBATION_DELIVERIES {
-            ACTIVE.into()
-        } else {
-            PROBATION.into()
-        };
-        state.archived_reason = None;
-        state.opportunities = 0;
-        state.idle = 0;
+        reset_for_restore(state);
     }
+    entry.stale = None;
     entry.enabled = true;
     touch(entry);
 }
@@ -556,6 +636,7 @@ fn apply(
                         ..Default::default()
                     }),
                 }),
+                stale: None,
                 source_run_id: lesson.run_id.clone(),
                 source_head: None,
                 revision: 1,
@@ -758,6 +839,11 @@ impl KnowledgeStore {
                 state.deliveries += 1;
                 state.idle = 0;
                 state.last_delivered_at = Some(now.clone());
+                if state.missed_often
+                    && state.recent_misses(&THRESHOLDS) < THRESHOLDS.misses_to_flag
+                {
+                    state.missed_often = false;
+                }
             }
             state.recent_runs.push(run_id.into());
             if state.recent_runs.len() > RECENT_RUNS {
@@ -805,6 +891,97 @@ impl KnowledgeStore {
             self.append_ledger(&records);
         }
         Ok(())
+    }
+
+    /// Records what the person said about lessons supplied to a run: a
+    /// restatement counts as a miss, and enough recent misses flag the lesson;
+    /// a lesson Jackalope wrote that is still on probation is then archived. A
+    /// contradiction is only recorded here; reflection patches or retires the
+    /// lesson. Each run is judged once per lesson. Returns the records written.
+    pub fn record_outcomes(
+        &self,
+        project_id: &str,
+        project_path: &str,
+        run_id: &str,
+        found: &[Outcome],
+        thresholds: &Thresholds,
+    ) -> Result<u64, String> {
+        if found.is_empty() {
+            return Ok(0);
+        }
+        let path = canonical(project_path)?;
+        let _lock = self.lock.lock().map_err(|e| e.to_string())?;
+        let mut entries = self.read()?;
+        let mut records = vec![];
+        let mut changed = false;
+        for outcome in found {
+            let Some(entry) = entries.iter_mut().find(|entry| {
+                entry.id == outcome.entry_id && in_project(entry, project_id, &path) && live(entry)
+            }) else {
+                continue;
+            };
+            let managed = owned(entry);
+            let state = lifecycle_mut(entry).unwrap();
+            if state.corrections.iter().any(|item| item.run_id == run_id) {
+                continue;
+            }
+            state.corrections.push(Correction {
+                run_id: run_id.into(),
+                delivery: state.deliveries,
+                contradicted: outcome.contradicted,
+            });
+            if state.corrections.len() > RECENT_RUNS {
+                state.corrections.remove(0);
+            }
+            changed = true;
+            let excerpt: String = redact(&outcome.excerpt).chars().take(240).collect();
+            if outcome.contradicted {
+                records.push(with_evidence(
+                    record(
+                        entry,
+                        "contradicted",
+                        "Supplied to this task, then the person said otherwise.".into(),
+                        "reflection",
+                    ),
+                    &outcome.reference,
+                    &excerpt,
+                ));
+                continue;
+            }
+            state.misses += 1;
+            let recent = state.recent_misses(thresholds);
+            let flagged = recent >= thresholds.misses_to_flag;
+            let newly = flagged && !state.missed_often;
+            state.missed_often |= flagged;
+            let ignored = flagged && managed && state.on_probation();
+            let reason = if newly && !ignored {
+                "Restated after it was supplied to this task. Agents keep missing this, so it is supplied first among equally matching lessons."
+            } else {
+                "Restated after it was supplied to this task, as if the agent had not followed it."
+            };
+            records.push(with_evidence(
+                record(entry, "missed", reason.into(), "reflection"),
+                &outcome.reference,
+                &excerpt,
+            ));
+            if ignored {
+                archive(entry, IGNORED);
+                records.push(record(
+                    entry,
+                    "archived",
+                    format!(
+                        "Ignored by agents: missed {recent} times within its last {} deliveries while new.",
+                        thresholds.miss_window
+                    ),
+                    "lifecycle",
+                ));
+            }
+        }
+        if changed {
+            self.write(&entries)?;
+            self.append_ledger(&records);
+        }
+        Ok(records.len() as u64)
     }
 
     /// Archives or restores a learned lesson for a person. Edited lessons can
@@ -897,6 +1074,11 @@ pub struct LearningMetrics {
     pub restored: usize,
     pub folded: usize,
     pub retired: usize,
+    /// Times a supplied lesson was restated (missed) or contradicted.
+    pub missed: usize,
+    pub contradicted: usize,
+    /// Lessons found to name something the project no longer has.
+    pub stale: usize,
     /// Lessons an agent reflection suggested.
     pub by_agent: usize,
     /// The oldest retained history record, which bounds the counts above.
@@ -937,6 +1119,9 @@ impl KnowledgeStore {
                 "restored" => metrics.restored += 1,
                 "curated" => metrics.folded += 1,
                 "retired" => metrics.retired += 1,
+                "missed" => metrics.missed += 1,
+                "contradicted" => metrics.contradicted += 1,
+                "stale" => metrics.stale += 1,
                 _ => {}
             }
         }

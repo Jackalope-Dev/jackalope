@@ -13,6 +13,7 @@ fn entry(id: usize, kind: KnowledgeKind, phrase: &str) -> KnowledgeEntry {
         content: format!("Use saved project check {id}."),
         keywords: vec![phrase.into()],
         enabled: true,
+        stale: None,
         source_run_id: None,
         source_head: None,
         revision: 0,

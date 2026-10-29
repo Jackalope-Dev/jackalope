@@ -5,9 +5,10 @@
 //! blocks or fails the task: errors are logged and the run is not retried.
 
 use super::{
-    agent_reflection, export_project, reflect, AgentBudget, Observation, ObservationKind,
-    Thresholds, THRESHOLDS,
+    agent_reflection, export_project, outcomes, reflect_delivered, AgentBudget, Observation,
+    ObservationKind, Thresholds, THRESHOLDS,
 };
+use crate::commands::knowledge::KnowledgeKind;
 use crate::commands::live_sessions::LiveSessions;
 use crate::commands::tasks::{TaskRun, TaskRuntime};
 use std::collections::HashMap;
@@ -171,6 +172,13 @@ pub fn launch(runtime: TaskRuntime, sessions: LiveSessions) {
                         {
                             eprintln!("The lesson curator skipped a project: {error}");
                         }
+                        if let Err(error) =
+                            runtime
+                                .knowledge
+                                .check_stale(&project_id, &path, &THRESHOLDS)
+                        {
+                            eprintln!("The stale-lesson check skipped a project: {error}");
+                        }
                     }
                 }
                 let marker = (
@@ -240,6 +248,24 @@ pub(in crate::commands) fn observations(
     found
 }
 
+/// Learned lessons in the run's context receipt, as they were supplied.
+/// Continuations carry the receipt of the run they continue.
+pub(super) fn delivered(run: &TaskRun) -> Vec<crate::commands::knowledge::KnowledgeEntry> {
+    run.context_receipt
+        .entries
+        .iter()
+        .filter(|entry| entry.kind == KnowledgeKind::Memory && super::lifecycle(entry).is_some())
+        .cloned()
+        .collect()
+}
+
+/// Whether the person's statements in this run came after its lessons were
+/// supplied: a follow-up or later conversation turn, not a retry or the
+/// request that selected them.
+pub(super) fn later(run: &TaskRun) -> bool {
+    run.task_id != run.id && run.retry_of.is_none()
+}
+
 /// Reflects on one run and returns how many lesson changes it applied. When
 /// the run has finished and the project allows it, the default agent reflects
 /// too, within the shared budget.
@@ -262,8 +288,16 @@ fn reflect_run(
         return Ok(0);
     }
     let existing = runtime.knowledge.list(&run.project_id, &run.project_path)?;
-    let proposals = reflect(&observations, &existing);
-    let mut changes = 0;
+    let delivered = delivered(run);
+    let mut changes = runtime.knowledge.record_outcomes(
+        &run.project_id,
+        &run.project_path,
+        &run.id,
+        &outcomes(&observations, &delivered, later(run), &THRESHOLDS),
+        &THRESHOLDS,
+    )?;
+    let ids: Vec<String> = delivered.into_iter().map(|entry| entry.id).collect();
+    let proposals = reflect_delivered(&observations, &existing, &ids);
     if !proposals.is_empty() {
         changes += runtime
             .knowledge

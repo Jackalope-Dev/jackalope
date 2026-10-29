@@ -439,6 +439,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
                     .into(),
                 keywords: vec![],
                 enabled: true,
+                stale: None,
                 source_run_id: None,
                 source_head: None,
                 revision: 0,

@@ -178,7 +178,12 @@ pub fn learning_detail(learning: &Learning) -> String {
         uses => format!("used {uses} times"),
     };
     let edited = if learning.managed { "" } else { " · edited" };
-    format!("{status} · {uses}{edited}")
+    let attention = learning
+        .attention
+        .as_deref()
+        .map(|note| format!(" · {note}"))
+        .unwrap_or_default();
+    format!("{status} · {uses}{edited}{attention}")
 }
 
 /// Agents that can take work or need only a sign-in.
@@ -1054,6 +1059,21 @@ mod tests {
             row.detail
         );
         assert!(matches!(row.action, Action::OpenPlan(ref id) if id == "0123456789abcdef"));
+    }
+
+    #[test]
+    fn learning_rows_name_why_a_lesson_needs_a_look() {
+        let mut learning: Learning = serde_json::from_str(
+            r#"{"id":"a","title":"Checks","content":"Run the checks.","status":"active","kind":"preference","uses":3,"managed":true,"updatedAt":""}"#,
+        )
+        .unwrap();
+        assert!(learning.attention.is_none() && learning.misses.is_none());
+        assert_eq!(learning_detail(&learning), "active · used 3 times");
+        learning.attention = Some("agents keep missing this".into());
+        assert_eq!(
+            learning_detail(&learning),
+            "active · used 3 times · agents keep missing this"
+        );
     }
 }
 

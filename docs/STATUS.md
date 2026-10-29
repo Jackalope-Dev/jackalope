@@ -252,12 +252,16 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   retiring learned lessons. One promotion gate refuses credential-like or personal
   data, duplicates, conflicts with hand-written lessons and oversized lessons, and
   changes only unedited lessons it wrote. Lessons start on probation, become active
-  after two deliveries, are archived when unused or over the 40-lesson project cap,
+  after two deliveries, are archived when unused or over the 20-lesson project cap,
   and can be restored; an append-only history records every change with redacted
   evidence. Project → Context and the terminal show status, use and history, and
   Learning activity shows local counts for calibrating the thresholds, which live in
   one `Thresholds` definition. A deterministic curator folds near-duplicate unedited
-  lessons into the most used one, reversibly. Off by default per project: agent
+  lessons into the most used one, reversibly. A supplied lesson the person restates
+  later in that work counts as missed; repeated misses flag it, raise its rank among
+  equal matches and archive it while new. The curator schedule also archives learned
+  lessons naming a project path, package script or make target that no longer
+  exists, and only flags other lessons. Off by default per project: agent
   reflection with the default agent after work ends (bounded, on that account's
   quota, through the same gate), and mirroring active lessons into a marked
   `AGENTS.md` section and a Claude Code skill. Opt-in account sync of learned lessons,

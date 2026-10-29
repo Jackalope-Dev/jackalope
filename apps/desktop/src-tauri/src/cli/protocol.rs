@@ -275,6 +275,14 @@ pub struct Learning {
     pub updated_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub archived_reason: Option<String>,
+    /// Times the person restated it after it was supplied. Absent from older
+    /// hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub misses: Option<u64>,
+    /// Why it needs a look: agents keep missing it, or it names something the
+    /// project no longer has. Absent from older hosts and when nothing is wrong.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attention: Option<String>,
 }
 
 /// One change in a learned lesson's history.
@@ -283,7 +291,8 @@ pub struct Learning {
 pub struct LearningEvent {
     pub at: String,
     /// `born`, `merged`, `patched`, `retired`, `promoted`, `archived`,
-    /// `restored`, `edited` or `deleted`.
+    /// `restored`, `edited`, `deleted`, `curated`, `missed`, `contradicted`
+    /// or `stale`.
     pub action: String,
     pub reason: String,
     /// Redacted excerpts of what prompted the change.

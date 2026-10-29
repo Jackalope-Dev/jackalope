@@ -18,6 +18,10 @@ export interface Lifecycle {
   idle: number;
   lastDeliveredAt?: string | null;
   archivedReason?: string | null;
+  /** Times the person restated it after it was supplied. */
+  misses?: number;
+  /** Agents keep missing it; supplied first among equally matching lessons. */
+  missedOften?: boolean;
 }
 
 export interface LedgerRecord {
@@ -69,6 +73,8 @@ const ARCHIVE_REASONS: Record<string, string> = {
   retired: 'you said it no longer applies',
   user: 'archived by you',
   merged: 'folded into a similar lesson; restore to keep it separate',
+  ignored: 'agents kept missing it while it was new',
+  stale: 'it names something the project no longer has',
 };
 
 /** One line describing a learned lesson's status and use. */
@@ -82,6 +88,27 @@ export function learningSummary(lifecycle: Lifecycle): string {
   }
   if (status === 'probation') return `${uses} · New until it is used in 2 tasks`;
   return uses;
+}
+
+/**
+ * Why a lesson needs a look, or null. `stale` names something the project
+ * no longer has; lessons you wrote are only flagged, never changed.
+ */
+export function lessonAttention(entry: {
+  stale?: string | null;
+  automatic?: { managed: boolean; lifecycle?: Lifecycle | null } | null;
+}): string | null {
+  const lifecycle = entry.automatic?.lifecycle;
+  if (entry.stale) {
+    const archived = learnedStatus(lifecycle) === 'archived';
+    return archived
+      ? `References ${entry.stale}, which no longer exists.`
+      : `References ${entry.stale}, which no longer exists. Edit or remove this lesson.`;
+  }
+  if (lifecycle?.missedOften && learnedStatus(lifecycle) !== 'archived') {
+    return 'Agents keep missing this. It is supplied first among equally matching lessons.';
+  }
+  return null;
 }
 
 export function statusLabel(status: LearnedStatus): string {
@@ -99,6 +126,9 @@ const ACTION_LABELS: Record<string, string> = {
   edited: 'Edited',
   deleted: 'Removed',
   curated: 'Folded into a similar lesson',
+  missed: 'Missed by an agent',
+  contradicted: 'Contradicted',
+  stale: 'Out of date',
 };
 
 export function ledgerActionLabel(action: string): string {
@@ -117,6 +147,11 @@ export interface LearningMetrics {
   restored: number;
   folded: number;
   retired: number;
+  /** Times a supplied lesson was restated or contradicted. */
+  missed: number;
+  contradicted: number;
+  /** Lessons found to name something the project no longer has. */
+  stale: number;
   byAgent: number;
   since?: string | null;
 }
@@ -135,5 +170,8 @@ export function learningMetricRows(metrics: LearningMetrics): [string, number][]
     ['Folded as duplicates', metrics.folded],
     ['Retired by you', metrics.retired],
     ['Restored', metrics.restored],
+    ['Missed by agents', metrics.missed],
+    ['Contradicted after use', metrics.contradicted],
+    ['Found out of date', metrics.stale],
   ];
 }

@@ -117,7 +117,7 @@ A single promotion gate applies proposals. It refuses statements that look like 
 contain a credential, token, key, private key or email address (rather than saving
 them redacted), lessons outside 15–500 characters or without a matching phrase,
 duplicates of existing content, and additions that contradict a hand-written lesson.
-It adds at most five lessons per reflection. Merge, patch, retire and automatic
+It adds at most three lessons per reflection. Merge, patch, retire and automatic
 archiving only ever change lessons Jackalope learned and nobody has edited; manual
 lessons, edited lessons, older automatic lessons and `AGENTS.md` are never changed.
 Editing a learned lesson makes it yours. Removing one keeps a suppression record so
@@ -140,10 +140,36 @@ editor does the same. With automatic learning off, deliveries are still counted 
 nothing is archived for lack of use. Use counts record that a lesson was supplied,
 not that it caused a better result.
 
+### Missed and contradicted lessons
+
+Reflection also compares what the person said with the learned lessons the work was
+given (its saved context receipt, as supplied). Only words that came after the lessons
+were supplied count: a follow-up to a task, a later conversation turn, or a typed
+answer to an agent's question. The request that selected the lessons, a retry and
+check commands do not. A line whose meaningful words overlap a supplied lesson's
+statement by 50% or more:
+
+- with the same intent, is a **miss**: the person restated the lesson as if the agent
+  had not followed it. The lesson's miss count rises and the history records it.
+- with the opposite intent (**Never** against **Always**, or **no longer**), is a
+  **contradiction**, recorded in the history. The usual patch or retire then applies,
+  and when several lessons match, the one the work was given is the one changed.
+
+Each lesson is judged at most once per run, against its closest line. Two misses
+within a lesson's last 10 deliveries mark it **Often missed** (Project → Context, and
+"agents keep missing this" in `/learnings`). A lesson Jackalope wrote that is still on
+probation is then archived as ignored by agents. An active or edited lesson stays
+available and is supplied first among lessons that match a request equally well; it
+never displaces a lesson with more matching phrases. The mark clears once the misses
+fall outside the last 10 deliveries, and Restore clears it. Only learned lessons are
+judged; hand-written lessons have no delivery counts. Jackalope does not detect that
+an agent followed a lesson, so there is no "followed" signal, and a miss means only
+that the person repeated the point.
+
 Every change is appended to a per-project history: learned, seen again, updated,
-retired, now active, archived, restored, folded, edited or removed, with the reason and a
-redacted excerpt of the source (emails, tokens, keys, credential URLs and the home
-folder are replaced). Open **History** on a learned lesson in Project → Context, or
+retired, now active, archived, restored, folded, missed, contradicted, out of date,
+edited or removed, with the reason and a redacted excerpt of the source (emails,
+tokens, keys, credential URLs and the home folder are replaced). Open **History** on a learned lesson in Project → Context, or
 choose it in `/learnings`.
 
 ### Curator
@@ -158,6 +184,33 @@ oldest) keeps the other's matching phrases and evidence references, and the othe
 archived as folded into a similar lesson. Each pass folds at most five lessons, makes
 no model calls and records both sides in the history. **Restore** undoes a fold, and a
 restored lesson is never folded again. Check commands are never folded.
+
+### Stale-lesson check
+
+Each curator pass also checks up to 100 available lessons of the project, at most
+eight references each, against the registered project folder. It reads the folder
+only: no commands run, no network and no model calls. A lesson Jackalope wrote is
+judged by the statement the person made; any other lesson by its current text. It
+counts as stale when it names:
+
+- a project path, written with `/`, whose top folder exists in the project or whose
+  last part has a common source or document extension, and which no longer exists.
+  URLs, scoped packages (`@scope/name`), absolute paths and paths leaving the project
+  are ignored, as are words like `feature/short-topic` whose top folder does not exist;
+- a package script, from `pnpm run X`, `npm run X` or `yarn run X` anywhere, or
+  `pnpm X` and `yarn X` inside backticks or a verified check command, that the root
+  `package.json` no longer declares. A bare `pnpm X` also runs installed binaries, so it
+  is judged only when `node_modules/.bin` exists and holds no `X`;
+- a `make X` target, inside backticks or a check command, missing from the root
+  makefile. Makefiles with includes or pattern rules are not judged.
+
+Anything the check cannot tell, such as a missing `package.json`, counts as present.
+A stale lesson Jackalope wrote and nobody edited is archived with the reason that it
+references something that no longer exists, naming it; Restore returns it, and the
+next pass archives it again if the reference is still missing. Every other lesson is
+only flagged **Out of date** with a note naming the reference; its text, revision and
+availability never change. The flag clears when the reference returns or the lesson is
+edited.
 
 ### Thresholds and activity
 
@@ -180,12 +233,17 @@ Every tunable lives in `Thresholds` (`THRESHOLDS`) in
 | Agent reflections per hour and per day, all projects | 4 and 20 |
 | Agent reflection time limit | 45 seconds |
 | Redacted words one agent reflection reads | 6,000 bytes |
+| Word overlap at which a later line restates or contradicts a supplied lesson | 50% |
+| Misses that mark a lesson as often missed | 2 |
+| Recent deliveries the misses are counted over | 10 |
+| Lessons one stale-lesson check inspects | 100 |
+| References checked per lesson | 8 |
 
 The reflection cadence stays a per-project setting. **Learning activity** in Project →
 Context shows this computer's counts for the project: lessons that are new, active and
 archived, how often current lessons were supplied, and, from the retained history, how
-many were learned, suggested by an agent, became active, archived, folded, retired and
-restored. History rotation bounds the counts; the date shows the oldest record. Use
+many were learned, suggested by an agent, became active, archived, folded, retired,
+restored, missed by agents, contradicted after use and found out of date. History rotation bounds the counts; the date shows the oldest record. Use
 them to tell whether lessons are learned too eagerly or archived too soon before
 changing a default.
 
@@ -283,9 +341,10 @@ the context receipts; summary polling omits their content bodies.
 
 `commands/knowledge/learning.rs` owns reflection, the promotion gate, the thresholds
 and the lessons' lifecycle; `learning/curate.rs`, `learning/agent.rs`,
-`learning/export.rs` and `learning/sync.rs` own the curator, agent reflection, export
-and the sync data model. Learned lessons keep their status and use counts under the
-entry's `automatic.lifecycle`; entries saved before it existed load unchanged. Learned
+`learning/export.rs`, `learning/stale.rs` and `learning/sync.rs` own the curator, agent
+reflection, export, the stale-lesson check and the sync data model. Learned lessons keep their status and use counts under the
+entry's `automatic.lifecycle`, including miss counts; the stale-lesson note is the
+entry's local `stale` field. Entries saved before these existed load unchanged. Learned
 ids derive from the project ID and the lesson, not the folder; project IDs belong to
 one installation, so sync matches projects by repository instead. History is
 append-only JSON Lines in `task-runs-v1/knowledge/ledger/`, one file per project; past
