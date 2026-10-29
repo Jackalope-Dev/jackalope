@@ -97,6 +97,36 @@ page-reported source attributes remain untrusted hints. Selection notes persist 
 desktop profile. Stopping the preview closes its selection browser and temporary profile.
 The embedded iframe and fresh-page capture do not share that window's state.
 
+## Review screenshots
+
+When an attempt that changed files finishes successfully, after its automatic check,
+Jackalope captures review screenshots if the project saves a preview command containing
+`{port}` and **Capture review screenshots** is on (the default once a command exists).
+It runs the command on a free loopback port in the task workspace, waits up to 60
+seconds for an HTTP answer and opens each page in a headless disposable browser with a
+temporary profile, a fixed viewport (desktop 1280×800, optional narrow 390×844), a
+light color scheme and reduced motion. Each image is the first screen as a PNG, at most
+4 MiB, saved under `.jackalope/artifacts/screenshots` in the task workspace and recorded
+in the attempt's `reviewCaptures`.
+
+Pages are the configured review pages (default `/`), then paths named in plan criteria
+tagged `browser` (`AC-n: [browser] …` requirement titles), then local pages the agent
+opened with `browser_navigate` or captured, newest first; at most six distinct pages.
+The "before" side runs the same command in the project checkout only when the task used
+a separate worktree, the checkout is at the attempt's starting commit with no
+uncommitted tracked changes and no other work runs there. Otherwise only the result is
+captured and the review notes say why.
+
+All capture work stops after 150 seconds or when the attempt is stopped. Each preview
+holds the workspace like a running check, so checks, managed previews and integration
+wait; its process tree and browser session are closed as soon as that side finishes.
+Failures become notes and never fail the attempt. Browser criteria with a matching page
+gain a `pending` validation step (`AC-n review screenshots`) that cites the image files;
+screenshots do not change a criterion's check state. Review shows each page as a slider
+or side-by-side comparison with its viewport and a link to the live preview. The
+terminal's `/review`, changes panel and `jackalope diff` report how many screenshots
+are in the app; `/settings` toggles capture for the project.
+
 ## Packaging and maintenance
 
 The root dev dependency pins the upstream npm package exactly. `build.rs` checks
@@ -127,3 +157,6 @@ The opt-in native `real_preview_picker_preserves_current_state_and_crops_the_sel
 test opens an owned preview browser, selects changed page content, checks screenshot
 dimensions and closes the browser. Run it with Cargo's `--ignored --nocapture` flags
 on an interactive desktop; it retains the screenshot in its temporary fixture folder.
+The opt-in `real_review_capture_saves_result_screenshots_and_cleans_up` test runs a
+disposable Node server through the review-screenshot path at both viewports and checks
+that the preview process released the workspace.

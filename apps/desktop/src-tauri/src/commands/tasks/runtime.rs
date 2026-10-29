@@ -1477,6 +1477,15 @@ impl TaskRuntime {
                 self.update(id, |r| r.verification_error = Some(error));
             }
         }
+        if success
+            && !quota_stopped
+            && run.error.is_none()
+            && !run.result.is_empty()
+            && self.is_running(id)
+            && attempt_changed(&run)
+        {
+            crate::commands::previews::review::capture(self, id);
+        }
         if success && run.error.is_none() && !run.result.is_empty() && !quota_stopped {
             self.stage(id, Some("checkpoint"));
             let _guard = crate::commands::integration::execution_guard()?;
@@ -2106,6 +2115,8 @@ impl TaskRuntime {
                 validation_steps: vec![],
                 screenshots: vec![],
                 desktop_actions: vec![],
+                visited_pages: vec![],
+                review_captures: None,
             };
             self.save(&run)?;
             crate::commands::browser::register(&run.id);

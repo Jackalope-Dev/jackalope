@@ -441,6 +441,7 @@ mod tests {
             activity: Vec::new(),
             questions: Vec::new(),
             partial: String::new(),
+            review_screenshots: None,
         }
     }
 

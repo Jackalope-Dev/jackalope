@@ -4,13 +4,23 @@ use super::artifact::{PlanDocument, PlanTask};
 use crate::commands::harness::ValidationStep;
 use serde::Serialize;
 
+/// Marks a requirement whose criterion is verified in a browser, after the ID,
+/// so review screenshots can attach to it.
+pub const BROWSER_TAG: &str = "[browser]";
+
 /// Each criterion as a task requirement title. Requirements keep the ID first
 /// so results can be mapped back to the plan.
 pub fn outcomes(doc: &PlanDocument, ids: &[String]) -> Vec<String> {
     doc.criteria
         .iter()
         .filter(|criterion| ids.is_empty() || ids.contains(&criterion.id))
-        .map(|criterion| format!("{}: {}", criterion.id, criterion.text))
+        .map(|criterion| {
+            if criterion.verify == super::artifact::VerifyKind::Browser {
+                format!("{}: {BROWSER_TAG} {}", criterion.id, criterion.text)
+            } else {
+                format!("{}: {}", criterion.id, criterion.text)
+            }
+        })
         .collect()
 }
 

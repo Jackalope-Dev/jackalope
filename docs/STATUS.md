@@ -139,7 +139,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   output into the follow-up draft. Local previews remember project commands, choose a free
   port, check HTTP readiness and embed a sandboxed loopback page. Fresh isolated browser
   captures attach screenshots, page elements and errors to follow-up drafts; they do not
-  reproduce embedded-page sign-in or unsaved interactions.
+  reproduce embedded-page sign-in or unsaved interactions. Finished work with changes
+  gets automatic review screenshots from the saved preview command in a disposable
+  headless browser: up to six pages (configured, named by browser plan criteria, or
+  visited by the agent), desktop and optional narrow, compared before/after in Review.
+  "Before" needs a separate worktree and a clean project checkout at the starting
+  commit; otherwise only the result is captured, with a note.
 - Delivery inspects local Git state and optionally reads PR/CI through the GitHub CLI.
   PR, CI and deployment preparation carry evidence into editable drafts. Failing PR
   checks are listed openly with a draft asking the agent to reproduce and fix them.

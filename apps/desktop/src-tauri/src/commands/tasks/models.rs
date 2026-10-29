@@ -134,6 +134,12 @@ pub struct TaskRun {
     /// Desktop-control actions for the Screen view, newest last and bounded.
     #[serde(default)]
     pub desktop_actions: Vec<crate::commands::desktop_control::DesktopActionRecord>,
+    /// Local preview paths the agent opened in its task browser, newest last.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub visited_pages: Vec<String>,
+    /// Before/after screenshots Jackalope captured for review.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_captures: Option<crate::commands::previews::review::ReviewCaptures>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -358,6 +364,8 @@ impl TaskRun {
             screenshots: self.screenshots.clone(),
             desktop_actions: self.desktop_actions[self.desktop_actions.len().saturating_sub(12)..]
                 .to_vec(),
+            visited_pages: self.visited_pages.clone(),
+            review_captures: self.review_captures.clone(),
         }
     }
 }

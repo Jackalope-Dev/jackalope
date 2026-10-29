@@ -177,6 +177,8 @@ export interface TaskRun {
   screenshots?: ScreenshotArtifact[];
   /** Desktop-control actions, newest last; summaries keep only the latest few. */
   desktopActions?: DesktopActionRecord[];
+  /** Before/after screenshots Jackalope captured from the preview for review. */
+  reviewCaptures?: import('./review-captures.ts').ReviewCaptures | null;
 }
 /** @public Named in the return types of usage-entries.ts and usage-insights.ts exports. */
 export interface DesktopActionRecord {

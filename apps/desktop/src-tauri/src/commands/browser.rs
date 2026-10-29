@@ -211,51 +211,98 @@ pub(super) fn validate_url(url: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn session_slot(run_id: &str) -> Result<Arc<Slot>, String> {
+    let sessions = sessions().lock().map_err(|e| e.to_string())?;
+    let slot = sessions
+        .get(run_id)
+        .ok_or("This task has no active browser permission. Start or continue the task first.")?
+        .clone();
+    Ok(slot)
+}
+
 async fn with_session<T: Send + 'static>(
     run_id: &str,
     work: impl FnOnce(&Engine) -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
-    let slot = {
+    let slot = session_slot(run_id)?;
+    tauri::async_runtime::spawn_blocking(move || run_session(&slot, work))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn run_session<T>(
+    slot: &Arc<Slot>,
+    work: impl FnOnce(&Engine) -> Result<T, String>,
+) -> Result<T, String> {
+    let mut engine = slot.engine.lock().map_err(|e| e.to_string())?;
+    check_canceled(&slot.canceled)?;
+    if !slot.reserved.load(Ordering::SeqCst) {
         let sessions = sessions().lock().map_err(|e| e.to_string())?;
-        let slot = sessions
-            .get(run_id)
-            .ok_or("This task has no active browser permission. Start or continue the task first.")?
-            .clone();
-        slot
-    };
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut engine = slot.engine.lock().map_err(|e| e.to_string())?;
         check_canceled(&slot.canceled)?;
-        if !slot.reserved.load(Ordering::SeqCst) {
-            let sessions = sessions().lock().map_err(|e| e.to_string())?;
-            check_canceled(&slot.canceled)?;
-            if sessions
-                .values()
-                .filter(|s| s.reserved.load(Ordering::SeqCst))
-                .count()
-                >= 4
-            {
-                return Err(
-                    "Four tasks already own browsers. Finish one before opening another.".into(),
-                );
-            }
-            slot.reserved.store(true, Ordering::SeqCst);
+        if sessions
+            .values()
+            .filter(|s| s.reserved.load(Ordering::SeqCst))
+            .count()
+            >= 4
+        {
+            return Err(
+                "Four tasks already own browsers. Finish one before opening another.".into(),
+            );
         }
-        if engine.is_none() {
-            match Engine::start(slot.clone()) {
-                Ok(started) => *engine = Some(started),
-                Err(error) => {
-                    slot.reserved.store(false, Ordering::SeqCst);
-                    return Err(error);
-                }
+        slot.reserved.store(true, Ordering::SeqCst);
+    }
+    if engine.is_none() {
+        match Engine::start(slot.clone()) {
+            Ok(started) => *engine = Some(started),
+            Err(error) => {
+                slot.reserved.store(false, Ordering::SeqCst);
+                return Err(error);
             }
         }
-        let result = work(engine.as_ref().unwrap());
-        check_canceled(&slot.canceled)?;
-        result
+    }
+    let result = work(engine.as_ref().unwrap());
+    check_canceled(&slot.canceled)?;
+    result
+}
+
+/// Largest review screenshot kept; larger first screens are skipped with a note.
+pub(super) const REVIEW_CAPTURE_LIMIT: usize = 4 * 1024 * 1024;
+
+/// Opens `url` at a fixed viewport with reduced motion in a session the caller
+/// registered (and closes), and returns the final URL and a PNG of the first
+/// screen. Blocks the calling thread; each browser command stays bounded.
+pub(super) fn capture_first_screen(
+    session: &str,
+    url: &str,
+    width: u32,
+    height: u32,
+) -> Result<(String, Vec<u8>), String> {
+    validate_url(url)?;
+    let slot = session_slot(session)?;
+    run_session(&slot, |engine| {
+        engine.call(json!({"action":"viewport", "width":width, "height":height}))?;
+        engine
+            .call(json!({"action":"set_media", "colorScheme":"light", "reducedMotion":"reduce"}))?;
+        engine.call(json!({"action":"navigate", "url":url, "waitUntil":"load"}))?;
+        // Client-rendered pages paint after the load event.
+        std::thread::sleep(std::time::Duration::from_millis(700));
+        let current = engine.call(json!({"action":"url"}))?["url"]
+            .as_str()
+            .unwrap_or(url)
+            .to_owned();
+        let capture = engine
+            .directory
+            .join(format!("review-{}.png", uuid::Uuid::new_v4()));
+        let taken = engine
+            .call(json!({"action":"screenshot", "path":capture, "format":"png", "fullPage":false}));
+        let bytes = taken.and_then(|_| std::fs::read(&capture).map_err(|e| e.to_string()));
+        let _ = std::fs::remove_file(&capture);
+        let bytes = bytes?;
+        if bytes.len() > REVIEW_CAPTURE_LIMIT {
+            return Err("The screenshot exceeds the 4 MiB review limit.".into());
+        }
+        Ok((current, bytes))
     })
-    .await
-    .map_err(|e| e.to_string())?
 }
 
 fn bounded(text: &str) -> (String, bool) {

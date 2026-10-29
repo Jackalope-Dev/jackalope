@@ -85,10 +85,18 @@ pub fn changes(frame: &mut Frame, app: &App, area: Rect) {
             .add_modifier(Modifier::BOLD),
     );
     let selected = app.selected_index();
-    let block = frame_block(title, muted, Some((selected, files))).title_bottom(Line::styled(
-        " Alt+↑↓ file · Ctrl+O hide · /review in app ",
-        muted,
-    ));
+    let shots = app
+        .view
+        .as_ref()
+        .and_then(|view| view.review_screenshots)
+        .unwrap_or(0);
+    let hint = match shots {
+        0 => " Alt+↑↓ file · Ctrl+O hide · /review in app ".to_string(),
+        1 => " Alt+↑↓ file · Ctrl+O hide · /review: 1 screenshot in app ".to_string(),
+        n => format!(" Alt+↑↓ file · Ctrl+O hide · /review: {n} screenshots in app "),
+    };
+    let block =
+        frame_block(title, muted, Some((selected, files))).title_bottom(Line::styled(hint, muted));
     let inner = block.inner(area);
     frame.render_widget(block, area);
     if inner.height < 3 || inner.width < 12 {

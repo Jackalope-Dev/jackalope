@@ -25,6 +25,8 @@ pub enum Action {
     SyncLessons,
     AgentReflection,
     ExportLessons,
+    /// Turn review screenshots from the preview command on or off.
+    ReviewCaptures,
     /// Step the most questions a planning interview may ask.
     QuestionCap,
     /// Step the agent plans use.
@@ -245,6 +247,7 @@ impl App {
                 | Action::SyncLessons
                 | Action::AgentReflection
                 | Action::ExportLessons
+                | Action::ReviewCaptures
                 | Action::QuestionCap
                 | Action::PlannerAgent
         ) {
@@ -314,6 +317,14 @@ impl App {
                 let next = !self.project.export_lessons.unwrap_or(false);
                 self.save_project_settings(ProjectChange {
                     export_lessons: Some(next),
+                    ..Default::default()
+                });
+                self.open_picker(PickerKind::Settings);
+            }
+            Action::ReviewCaptures => {
+                let next = !self.project.review_captures.unwrap_or(true);
+                self.save_project_settings(ProjectChange {
+                    review_captures: Some(next),
                     ..Default::default()
                 });
                 self.open_picker(PickerKind::Settings);
@@ -499,6 +510,7 @@ impl App {
             export_lessons: change.export_lessons,
             question_cap: change.question_cap,
             planner_agent: change.planner_agent,
+            review_captures: change.review_captures,
         }) {
             self.project.auto_approve = project.auto_approve;
             self.project.workspace_mode = project.workspace_mode;
@@ -509,6 +521,8 @@ impl App {
             self.project.export_lessons = project.export_lessons;
             self.project.question_cap = project.question_cap;
             self.project.planner_agent = project.planner_agent;
+            self.project.review_captures = project.review_captures;
+            self.project.preview_command = project.preview_command;
         }
     }
 
@@ -684,6 +698,15 @@ impl App {
                     "off · lessons stay in Jackalope".into()
                 },
                 action: Action::ExportLessons,
+            },
+            Item {
+                label: format!("Review screenshots in {}", self.project.name),
+                detail: review_captures_label(
+                    self.project.review_captures,
+                    self.project.preview_command.is_some(),
+                )
+                .into(),
+                action: Action::ReviewCaptures,
             },
             Item {
                 label: format!("Planning questions in {}", self.project.name),
@@ -1013,6 +1036,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn review_screenshot_setting_explains_the_preview_requirement() {
+        assert!(review_captures_label(None, true).starts_with("on"));
+        assert!(review_captures_label(None, false).contains("preview command"));
+        assert!(review_captures_label(Some(false), true).starts_with("off"));
+    }
+
+    #[test]
     fn typing_in_a_picker_narrows_and_ranks_its_rows() {
         let item = |label: &str, detail: &str| Item {
             label: label.into(),
@@ -1089,4 +1119,13 @@ struct ProjectChange {
     question_cap: Option<u32>,
     /// Empty plans with the task's agent.
     planner_agent: Option<String>,
+    review_captures: Option<bool>,
+}
+
+fn review_captures_label(enabled: Option<bool>, preview: bool) -> &'static str {
+    match (enabled.unwrap_or(true), preview) {
+        (false, _) => "off · no screenshots after work finishes",
+        (true, true) => "on · before/after shots from the preview, shown in the app",
+        (true, false) => "on · save a preview command in the app to start",
+    }
 }

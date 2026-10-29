@@ -262,6 +262,10 @@ fn project_summary(
         auto_verify: record.auto_verify,
         question_cap: Some(planning.question_cap as u32),
         planner_agent: planning.planner_agent.filter(|agent| !agent.is_empty()),
+        preview_command: record
+            .preview_command
+            .filter(|command| !command.trim().is_empty()),
+        review_captures: Some(record.review_captures.unwrap_or(true)),
     }
 }
 
@@ -455,6 +459,10 @@ fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionVie
             .filter(|run| run.result.is_empty() && protocol::working(Some(&run.status)))
             .map(|run| run.streaming.clone())
             .unwrap_or_default(),
+        review_screenshots: run
+            .and_then(|run| run.review_captures.as_ref())
+            .map(|captures| captures.image_count() as u32)
+            .filter(|count| *count > 0),
         questions: run
             .map(|run| {
                 run.prompts
@@ -760,6 +768,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             export_lessons,
             question_cap,
             planner_agent,
+            review_captures,
         } => {
             use tauri::Emitter;
             let mode = workspace_mode
@@ -799,6 +808,12 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 }
                 store.save_settings(&project_id, planning)?;
             }
+            let record = match review_captures {
+                Some(enabled) => {
+                    super::project_registry::set_review_captures(&runtime, &project_id, enabled)?
+                }
+                None => record,
+            };
             // The app adopts registry settings when it merges the registry.
             let _ = app.emit("jackalope:projects-registered", ());
             Ok(Response::Project {

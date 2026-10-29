@@ -1,5 +1,17 @@
 [
   {
+    "id": "before-and-after-screenshots-in-review",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Before and after screenshots in Review",
+    "description": "Finished work now arrives with screenshots of the pages it changed, so you can check the end state without running anything.",
+    "items": [
+      "When work with changes finishes, Jackalope runs the project preview in a private, temporary browser and captures up to six pages, including the pages named in browser checks and the ones the agent visited.",
+      "Review compares each page before and after with a slider or side by side, at desktop and optional narrow sizes, with a link to the live preview.",
+      "Turn it off or choose pages and sizes in Project settings; the terminal's settings and review commands show it too."
+    ]
+  },
+  {
     "id": "agents-can-use-your-apps-and-signed-in-browser",
     "date": "2026-10-29",
     "status": "In development",

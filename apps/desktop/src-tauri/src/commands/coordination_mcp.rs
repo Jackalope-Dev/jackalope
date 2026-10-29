@@ -805,6 +805,9 @@ impl CoordinationTools {
         let result = super::browser::browser_navigate(&run.id, &input.url)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
+        self.service.runtime.update(&run.id, |r| {
+            super::previews::review::record_visit(r, &input.url)
+        });
         Ok(CallToolResult::structured(result))
     }
 

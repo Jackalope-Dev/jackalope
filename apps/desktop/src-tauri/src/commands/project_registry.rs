@@ -77,6 +77,19 @@ pub struct ProjectRecord {
     /// Untracked files copied into fresh workspaces.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub setup_files: Vec<String>,
+    /// The project's preview command, with `{port}` for the local port.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview_command: Option<String>,
+    /// Whether finished work with changes gets before/after review screenshots
+    /// from the preview command. Absent means on when a preview command is saved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_captures: Option<bool>,
+    /// Preview paths always captured for review, such as `/`. Empty means `/`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub review_pages: Vec<String>,
+    /// `desktop` and/or `narrow`. Empty means desktop only.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub review_viewports: Vec<String>,
 }
 
 /// Accepted `learning_cadence` values.
@@ -319,6 +332,27 @@ pub fn set_settings(
     Ok(updated)
 }
 
+/// Records a terminal's review-screenshot choice. The app adopts it when it
+/// next merges the registry.
+pub fn set_review_captures(
+    runtime: &TaskRuntime,
+    project_id: &str,
+    enabled: bool,
+) -> Result<ProjectRecord, String> {
+    let _guard = lock().lock();
+    let file = path(runtime);
+    let mut ledger = read_ledger(&file);
+    let record = ledger
+        .projects
+        .iter_mut()
+        .find(|project| project.id == project_id)
+        .ok_or("That project is not registered.")?;
+    record.review_captures = Some(enabled);
+    let updated = record.clone();
+    write_ledger(&file, &ledger)?;
+    Ok(updated)
+}
+
 /// Returns the record for a repository, creating one when it is not known yet.
 /// Used when work starts from a terminal in a repository the app has never
 /// opened; the UI merges the new entry on its next load.
@@ -355,6 +389,7 @@ pub fn ensure(runtime: &TaskRuntime, project_path: &str) -> Result<ProjectRecord
         auto_verify: None,
         prepare_command: None,
         setup_files: Vec::new(),
+        ..Default::default()
     };
     ledger.projects.push(record.clone());
     write_ledger(&file, &ledger)?;
@@ -403,6 +438,7 @@ mod tests {
                     auto_verify: Some(true),
                     prepare_command: None,
                     setup_files: vec![".env".into()],
+                    ..Default::default()
                 },
                 ProjectRecord {
                     id: "personal".into(),
@@ -422,6 +458,7 @@ mod tests {
                     auto_verify: None,
                     prepare_command: None,
                     setup_files: Vec::new(),
+                    ..Default::default()
                 },
             ],
         };
@@ -485,6 +522,7 @@ mod tests {
             auto_verify: None,
             prepare_command: None,
             setup_files: Vec::new(),
+            ..Default::default()
         });
         write_ledger(&file, &ledger).unwrap();
 

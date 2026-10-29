@@ -10,6 +10,7 @@ use std::{
 };
 use tauri::State;
 pub mod design;
+pub mod review;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -124,6 +125,10 @@ fn http_ready(port: u16) -> bool {
 }
 
 fn http_ready_with_timeout(port: u16, timeout: Duration) -> bool {
+    http_ready_at(port, "/", timeout)
+}
+
+fn http_ready_at(port: u16, path: &str, timeout: Duration) -> bool {
     let address = std::net::SocketAddr::from(([127, 0, 0, 1], port));
     let Ok(mut stream) = TcpStream::connect_timeout(&address, timeout) else {
         return false;
@@ -133,7 +138,8 @@ fn http_ready_with_timeout(port: u16, timeout: Duration) -> bool {
     {
         return false;
     }
-    let request = format!("GET / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
+    let request =
+        format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
     if stream.write_all(request.as_bytes()).is_err() {
         return false;
     }
@@ -217,28 +223,7 @@ fn start_preview(
     })?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
     let expanded = command.replace("{port}", &port.to_string());
-    #[cfg(windows)]
-    let mut cmd = {
-        use std::os::windows::process::CommandExt;
-        let mut c = Command::new("cmd.exe");
-        c.args(["/D", "/S", "/C", &expanded])
-            .creation_flags(0x08000000);
-        c
-    };
-    #[cfg(not(windows))]
-    let mut cmd = {
-        use std::os::unix::process::CommandExt;
-        let mut c = Command::new("/bin/sh");
-        c.args(["-c", &expanded]).process_group(0);
-        c
-    };
-    cmd.current_dir(&run.workspace)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .env("PORT", port.to_string())
-        .env_remove("JACKALOPE_BRIDGE_TOKEN")
-        .env_remove("JACKALOPE_BRIDGE_URL");
+    let mut cmd = preview_process(&expanded, &run.workspace, port);
     runtime.update_checked(&id, |r| {
         r.activity
             .push(format!("Managed preview requested on local port {port}."))
@@ -302,6 +287,34 @@ fn start_preview(
         },
     );
     Ok(result)
+}
+
+/// A preview command ready to spawn in `workspace`, with output piped and the
+/// task bridge credentials removed.
+fn preview_process(expanded: &str, workspace: &str, port: u16) -> Command {
+    #[cfg(windows)]
+    let mut cmd = {
+        use std::os::windows::process::CommandExt;
+        let mut c = Command::new("cmd.exe");
+        c.args(["/D", "/S", "/C", expanded])
+            .creation_flags(0x08000000);
+        c
+    };
+    #[cfg(not(windows))]
+    let mut cmd = {
+        use std::os::unix::process::CommandExt;
+        let mut c = Command::new("/bin/sh");
+        c.args(["-c", expanded]).process_group(0);
+        c
+    };
+    cmd.current_dir(workspace)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .env("PORT", port.to_string())
+        .env_remove("JACKALOPE_BRIDGE_TOKEN")
+        .env_remove("JACKALOPE_BRIDGE_URL");
+    cmd
 }
 
 #[derive(Serialize)]

@@ -1,6 +1,7 @@
 import type { ThemePalette } from '@jackalope/brand/theme';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { reviewPagesForRegistry } from '../lib/review-captures.ts';
 import { nativeTask } from '../lib/task-runtime.ts';
 import { createWorktree, isTauriEnvironment, type WorktreeEntry } from '../lib/tauri-bridge.ts';
 import { WORKSPACE_MODES, type WorkspaceMode } from '../lib/workspace-mode.ts';
@@ -61,6 +62,12 @@ export interface ProjectPreferences {
   personalClaudeSetup?: boolean;
   /** Fast command Claude Code runs after each file edit; `{file}` is the edited path. */
   editCheck?: string;
+  /** Before/after screenshots of finished work from the preview command. Undefined means on. */
+  reviewCaptures?: boolean;
+  /** Preview paths always captured for review, one per entry. Empty means `/`. */
+  reviewPages?: string[];
+  /** Screenshot sizes. Undefined means desktop only. */
+  reviewViewports?: ('desktop' | 'narrow')[];
 }
 
 /**
@@ -322,6 +329,10 @@ interface ProjectRecord {
   autoVerify?: boolean;
   prepareCommand?: string;
   setupFiles?: string[];
+  previewCommand?: string;
+  reviewCaptures?: boolean;
+  reviewPages?: string[];
+  reviewViewports?: string[];
 }
 
 /**
@@ -355,6 +366,10 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
     autoVerify: preferences?.autoVerify,
     prepareCommand: preferences?.prepareCommand?.trim() || undefined,
     setupFiles: preferences?.setupFiles?.length ? preferences.setupFiles : undefined,
+    previewCommand: preferences?.previewCommand?.trim() || undefined,
+    reviewCaptures: preferences?.reviewCaptures,
+    reviewPages: reviewPagesForRegistry(preferences?.reviewPages),
+    reviewViewports: preferences?.reviewViewports?.length ? preferences.reviewViewports : undefined,
   }));
 }
 
@@ -419,6 +434,11 @@ export async function mergeProjectRegistry() {
         changes.personalClaudeSetup = record.personalClaudeSetup;
       if (record.editCheck !== undefined && record.editCheck !== project.preferences?.editCheck)
         changes.editCheck = record.editCheck;
+      if (
+        record.reviewCaptures !== undefined &&
+        record.reviewCaptures !== project.preferences?.reviewCaptures
+      )
+        changes.reviewCaptures = record.reviewCaptures;
       if (Object.keys(changes).length)
         useProjectStore.getState().updateProjectPreferences(project.id, changes);
     }

@@ -427,7 +427,22 @@ impl App {
                     })
                     .is_some()
                 {
-                    self.flash("Opened Changes in Jackalope", Tone::Muted);
+                    let shots = self
+                        .view
+                        .as_ref()
+                        .and_then(|view| view.review_screenshots)
+                        .unwrap_or(0);
+                    match shots {
+                        0 => self.flash("Opened Changes in Jackalope", Tone::Muted),
+                        1 => self.flash(
+                            "Opened Changes in Jackalope · 1 review screenshot there",
+                            Tone::Muted,
+                        ),
+                        n => self.flash(
+                            format!("Opened Changes in Jackalope · {n} review screenshots there"),
+                            Tone::Muted,
+                        ),
+                    }
                 }
             }
             "retry" => self.session_action("retry", "Retrying", Tone::Muted),

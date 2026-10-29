@@ -133,6 +133,10 @@ pub enum Request {
         /// task's agent.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         planner_agent: Option<String>,
+        /// Capture before/after review screenshots from the preview command
+        /// when work with changes finishes. Older hosts ignore it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        review_captures: Option<bool>,
     },
     /// Extract learnings from a conversation's history (up to the previous /learn,
     /// if present) and save them to project context.
@@ -255,6 +259,14 @@ pub struct Project {
     /// task's agent or from older hosts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub planner_agent: Option<String>,
+    /// The project's preview command. Absent when none is saved or from older
+    /// hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview_command: Option<String>,
+    /// Whether finished work gets review screenshots when a preview command is
+    /// saved. Absent from older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_captures: Option<bool>,
 }
 
 /// A lesson Jackalope learned for a project.
@@ -475,6 +487,10 @@ pub struct SessionView {
     /// Empty when nothing is streaming or the host is older.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub partial: String,
+    /// Review screenshots of the latest attempt, viewable in the app. Absent
+    /// when there are none or the host is older.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_screenshots: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -861,11 +877,14 @@ mod tests {
             export_lessons: None,
             question_cap: None,
             planner_agent: None,
+            review_captures: None,
         })
         .unwrap();
         assert!(request.contains("\"sync_lessons\":false"), "{request}");
         assert!(!request.contains("agent_reflection") && !request.contains("export_lessons"));
         assert!(!request.contains("question_cap") && !request.contains("planner_agent"));
+        assert!(!request.contains("review_captures"));
+        assert_eq!(older.review_captures, None);
         let parsed: Request = serde_json::from_str(
             r#"{"request":"set-project-settings","project_id":"p","auto_approve":true}"#,
         )

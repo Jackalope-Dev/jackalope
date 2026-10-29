@@ -706,6 +706,7 @@ export function TaskDetail({
                 visible={tab === 'changes'}
                 section={reviewSection}
                 onSectionChange={setReviewSection}
+                onOpenPreview={() => setTab('preview')}
                 outcomes={outcomes}
                 evidence={evidence}
                 key={run.id}

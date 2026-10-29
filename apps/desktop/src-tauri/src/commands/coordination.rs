@@ -389,6 +389,9 @@ pub(super) async fn bridge_browser_navigate(
     let result = super::browser::browser_navigate(&run.id, &req.url)
         .await
         .map_err(browser_error)?;
+    service.runtime.update(&run.id, |r| {
+        super::previews::review::record_visit(r, &req.url)
+    });
     Ok(Json(result))
 }
 

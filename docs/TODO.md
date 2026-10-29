@@ -53,6 +53,12 @@ release dates.
   Include parent-task links, unified Needs you counts, shared file browsing, preview
   setup explanations and evidence attachment, and blocked-result review. Include optional
   file markers, outcome approval, and real agent-review requests from the review toolbar.
+- [ ] Accept automatic review screenshots in installed apps on Windows, macOS and Linux
+  with real Vite, Next.js and static preview commands: after-only and before/after
+  captures, slow or failing previews hitting the time limits, stop during capture,
+  browser-tagged plan criteria, the slider and side-by-side views at 960 by 640 in
+  light and dark themes, keyboard use of the slider, and the TUI `/settings` toggle.
+  Confirm no browser window appears and no preview process or profile is left behind.
 - [ ] Accept the `jackalope` command in installed macOS, Windows and Linux packages,
   including a folder that is not a Git repository (direct edits, no patch or merge)
   and `--init` (initial commit, starter ignore, refusal of a home directory or drive root):

@@ -196,6 +196,13 @@ pub fn diff(preference: Option<ColdStart>, prefix: &str, stat: bool) -> Result<(
             untracked.join(", ")
         );
     }
+    match view.review_screenshots {
+        Some(1) => eprintln!("1 review screenshot is in the Jackalope app, under Review."),
+        Some(count) => {
+            eprintln!("{count} review screenshots are in the Jackalope app, under Review.")
+        }
+        None => {}
+    }
     Ok(())
 }
 
