@@ -18,6 +18,22 @@ const MAX_REVISIONS: usize = 200;
 
 static LOCK: Mutex<()> = Mutex::new(());
 
+/// Counts plan and planning-settings writes, so terminals watching for work
+/// changes also see plans edited, decided or re-planned in the app.
+fn changes() -> &'static tokio::sync::watch::Sender<u64> {
+    static CHANGES: std::sync::OnceLock<tokio::sync::watch::Sender<u64>> =
+        std::sync::OnceLock::new();
+    CHANGES.get_or_init(|| tokio::sync::watch::channel(0).0)
+}
+
+pub fn revision() -> u64 {
+    *changes().borrow()
+}
+
+pub fn subscribe() -> tokio::sync::watch::Receiver<u64> {
+    changes().subscribe()
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Revision {
@@ -294,7 +310,9 @@ impl Store {
     fn write(&self, record: &PlanRecord) -> Result<(), String> {
         std::fs::create_dir_all(&self.directory).map_err(|error| error.to_string())?;
         let bytes = serde_json::to_vec_pretty(record).map_err(|error| error.to_string())?;
-        history::write_atomic(&self.path(&record.id)?, &bytes)
+        history::write_atomic(&self.path(&record.id)?, &bytes)?;
+        changes().send_modify(|revision| *revision += 1);
+        Ok(())
     }
 
     pub fn create(&self, record: &PlanRecord) -> Result<(), String> {
@@ -379,7 +397,9 @@ impl Store {
         history::write_atomic(
             &self.settings_path(),
             &serde_json::to_vec_pretty(&all).map_err(|error| error.to_string())?,
-        )
+        )?;
+        changes().send_modify(|revision| *revision += 1);
+        Ok(())
     }
 }
 

@@ -54,6 +54,9 @@ impl App {
         if view.paused {
             return ("paused".into(), Tone::Warning);
         }
+        if view.merged && !self.working() {
+            return ("done · merged".into(), Tone::Success);
+        }
         let state = view
             .step
             .clone()
@@ -118,6 +121,16 @@ impl App {
             .or_else(|| self.plan_question())
     }
 
+    /// The conversation to continue when `question` belongs to an attempt that
+    /// has already ended, so the run itself can no longer take an answer.
+    pub(super) fn ended_on(&self, question: &Question) -> Option<String> {
+        let view = self.view.as_ref()?;
+        (view.run_id.as_deref() == Some(question.run_id.as_str())
+            && !protocol::working(view.status.as_deref()))
+        .then(|| self.session.clone())
+        .flatten()
+    }
+
     /// Opens a question with options as a picker, once, so answering is one
     /// keypress. Open questions are answered by typing into the input.
     pub(super) fn offer_question(&mut self) {
@@ -127,7 +140,7 @@ impl App {
             .as_ref()
             .filter(|picker| picker.kind == PickerKind::Question)
         {
-            if picker.question == current {
+            if picker.subject == current {
                 return;
             }
             // Answered elsewhere, such as in the app: a stale list would send
@@ -164,6 +177,25 @@ impl App {
         let Some(question) = self.question().cloned() else {
             return;
         };
+        if let Some(session_id) = self.ended_on(&question) {
+            // The attempt stopped before the answer: continue the conversation
+            // with it, as the app does, since the run can no longer take one.
+            let chosen = serde_json::from_str::<Vec<String>>(&text)
+                .map(|chosen| chosen.join(", "))
+                .unwrap_or(text);
+            let message = format!("You asked: {}\nMy answer: {chosen}", question.question);
+            if self
+                .request(Request::Send {
+                    session_id,
+                    text: message,
+                })
+                .is_some()
+            {
+                self.flash("Answered · continuing the conversation", Tone::Success);
+            }
+            self.refresh();
+            return;
+        }
         if self
             .request(Request::Answer {
                 run_id: question.run_id,

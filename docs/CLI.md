@@ -98,11 +98,20 @@ always message text. Unknown or misplaced options are refused with exit status 6
 
 Inside a conversation, typing `/` opens an interactive command menu, and `/help`
 lists commands: `/new`, `/bg`, `/init`, `/sessions`, `/projects`, `/agents`, `/settings`,
-`/status`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/learnings`, `/files`, `/review` (or `/diff`), `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
-`/unpause`, `/copy`, `/history`, `/kill`, `/clear`, `/plan`, `/plans`, `/revise`,
+`/status`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/learnings`, `/files`, `/review` (or `/diff`), `/merge`, `/pr`, `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
+`/unpause`, `/unqueue`, `/copy`, `/history`, `/kill`, `/clear`, `/plan`, `/plans`, `/revise`,
 `/approve`, `/replan`, `/export`, `/deviation`, `/browser`, `/computer`, `/open` and `/quit`. Pickers
 filter as you type. `/new <message>` starts
 and shows a conversation; `/bg <message>` starts one and stays on the current one.
+`/status` prints the project and branch, the open work's state, agent and model, the
+conversations that need you and each agent's state, without leaving the conversation.
+`/merge [message]` prepares a merge of the latest attempt as `jackalope merge` does,
+lists its files and asks; the conversation is paused only once you confirm, and a
+failed merge resumes it. `/pr [title]` asks whether to open a draft or ready pull
+request, then commits what is left, pushes and opens it. `/unqueue` takes back your
+newest message that has not reached an agent and puts it in the input to edit.
+`/retry` relaunches work that failed to start; to try finished or stopped work again,
+send a follow-up. Another conversation that starts needing you is announced in the feed.
 `/learn` inspects conversation history since the previous learn command (or session
 start) and sends the preferences, corrections, answers and passing check commands it
 finds through the same promotion gate as background learning; it lists what was
@@ -153,7 +162,12 @@ plan**. The question picker marks the recommended option `(recommended)` and sta
 it. A question that takes several answers shows checkboxes: Space ticks an option and
 the send row answers with every ticked option; typing numbers such as `1,3` works too.
 A question answered in the app closes its picker here, and the next waiting question
-replaces it. The panel shows the status and revision, the recommended shape and its reason,
+replaces it; a plan deviation decided in the app closes its picker the same way. A typed
+answer may be an option's number or name. Questions that take only their options, such
+as a permission request, refuse other text instead of reading it as a denial, and
+confirmations offer **Yes, proceed** and **No, adjust**, as in the app. When the agent
+stopped before you answered, the card says so and your answer continues the
+conversation with the question and your answer, as the app does. The panel shows the status and revision, the recommended shape and its reason,
 highlighted assumptions, the task graph with dependencies and parallel tasks, which tasks
 cover each acceptance criterion, how approval will verify the work (the project's check,
 the plan's test criteria, or "No automatic check: results are reviewed but not

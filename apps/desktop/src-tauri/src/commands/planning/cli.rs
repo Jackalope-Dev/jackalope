@@ -6,15 +6,22 @@ use crate::cli_protocol as protocol;
 use crate::commands::{coordination::Coordinator, harness::PendingUserPrompt};
 
 pub fn question(prompt: &PendingUserPrompt) -> protocol::Question {
+    // A confirmation answers with the same two choices the app's card offers.
+    let confirmation = prompt.input_type == "confirmation";
     protocol::Question {
         id: prompt.id.clone(),
         run_id: prompt.run_id.clone(),
         question: prompt.question.clone(),
-        options: prompt.options.clone(),
+        options: if confirmation {
+            vec!["Yes, proceed".into(), "No, adjust".into()]
+        } else {
+            prompt.options.clone()
+        },
         header: prompt.presentation.header.clone(),
         recommended: prompt.presentation.recommended.clone(),
         multi_select: prompt.input_type == "multiChoice",
         rationale: prompt.presentation.rationale.clone(),
+        allow_other: prompt.presentation.allow_other,
     }
 }
 

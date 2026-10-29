@@ -19,7 +19,10 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("projects", "switch to another project"),
     ("agents", "see which agents are ready"),
     ("settings", "change how Jackalope behaves"),
-    ("status", "show the project, host and agents"),
+    (
+        "status",
+        "show this project, the work, what needs you and the agents",
+    ),
     ("agent", "choose the agent for your next conversation"),
     ("model", "choose the model for your next conversation"),
     ("usage", "show account quota and when it resets"),
@@ -37,11 +40,17 @@ pub const COMMANDS: &[(&str, &str)] = &[
         "review",
         "open this work's changes in the app to review and commit",
     ),
+    (
+        "merge",
+        "merge this work into the project's branch, after a check",
+    ),
+    ("pr", "push this work and open a pull request"),
     ("stop", "stop the work that is running"),
-    ("retry", "run the last message again"),
+    ("retry", "relaunch work that failed to start"),
     ("answer", "choose an answer to the agent's question"),
     ("finish", "mark this conversation done"),
     ("pause", "hold queued messages"),
+    ("unqueue", "take back your last queued message to edit it"),
     ("unpause", "send held messages"),
     ("copy", "copy the latest reply"),
     ("history", "search what you have typed before"),
@@ -213,13 +222,15 @@ impl App {
             return;
         }
         if let Some(question) = self.question() {
-            // Numbers like `1,3` pick several options, as `jackalope answer` reads them.
-            let text = if question.multi_select {
-                crate::planning::reply(question, &text)
-            } else {
-                text
-            };
-            self.answer(text);
+            // A number, `1,3` or an option's name picks options, as `jackalope answer`
+            // reads them.
+            match crate::planning::checked_reply(question, &text) {
+                Ok(answer) => self.answer(answer),
+                Err(problem) => {
+                    self.editor.set(text);
+                    self.flash(problem, Tone::Warning);
+                }
+            }
             return;
         }
         let (agents, text) = self.take_agent_mentions(&text);
@@ -308,6 +319,88 @@ impl App {
     }
 
     /// An action on the open conversation, noting when there is none.
+    /// Takes back the newest message not yet sent to an agent and puts it in
+    /// the input, as cancelling a queued message does in the app.
+    fn unqueue(&mut self) {
+        let queued = self.view.as_ref().and_then(|view| {
+            view.messages
+                .iter()
+                .rev()
+                .find(|message| message.role == "you" && !message.sent)
+                .and_then(|message| Some((message.id.clone()?, message.text.clone())))
+        });
+        let (Some(session_id), Some((message_id, text))) = (self.session.clone(), queued) else {
+            self.flash("No queued message to take back", Tone::Muted);
+            return;
+        };
+        if self
+            .request(Request::SessionAction {
+                session_id,
+                action: "cancel-message".into(),
+                message_id: Some(message_id),
+            })
+            .is_some()
+        {
+            if self.editor.text().trim().is_empty() {
+                self.editor.set(text);
+                self.flash("Took back your message · edit and press Enter", Tone::Muted);
+            } else {
+                self.note(format!("Took back your message: {text}"));
+            }
+        }
+    }
+
+    /// Prints where this terminal stands, without leaving the conversation.
+    fn status(&mut self) {
+        let branch = self.branch.clone().unwrap_or_else(|| "no branch".into());
+        self.note(format!(
+            "Project  {} · {branch} · {}",
+            self.project.name, self.project.path
+        ));
+        if let Some(view) = self.view.clone() {
+            let (state, _) = self.work_state(&view);
+            let agent = view
+                .agent
+                .as_deref()
+                .map(|agent| self.agent_name(agent))
+                .unwrap_or_else(|| "not chosen yet".into());
+            let model = view.model.unwrap_or_else(|| "default model".into());
+            self.note(format!(
+                "Work     {} · {state} · {agent} · {model}",
+                view.title
+            ));
+        }
+        let needing: Vec<String> = self
+            .sessions
+            .iter()
+            .filter(|session| super::conversation::needs_you(session))
+            .map(|session| session.title.clone())
+            .collect();
+        if !needing.is_empty() {
+            self.note(format!("Needs you  {}", needing.join(" · ")));
+        }
+        let agents = match &self.overview {
+            Some(Ok(overview)) => overview
+                .agents
+                .iter()
+                .map(|agent| format!("{} {}", agent.name, agent.state))
+                .collect::<Vec<_>>()
+                .join(" · "),
+            Some(Err(error)) => format!("could not be read: {error}"),
+            None => "still loading".into(),
+        };
+        self.note(format!("Agents   {agents}"));
+        self.note(format!(
+            "App      {} · process {}",
+            if self.handshake.windowed {
+                "window open"
+            } else {
+                "running in the background"
+            },
+            self.handshake.pid
+        ));
+    }
+
     fn session_action(&mut self, action: &str, done: &str, tone: Tone) {
         let Some(session_id) = self.session.clone() else {
             self.note("Start a conversation first.");
@@ -317,6 +410,7 @@ impl App {
             .request(Request::SessionAction {
                 session_id,
                 action: action.into(),
+                message_id: None,
             })
             .is_some()
         {
@@ -409,10 +503,7 @@ impl App {
             "projects" => self.open_picker(PickerKind::Projects),
             "agents" => self.open_picker(PickerKind::Agents),
             "settings" | "config" => self.open_picker(PickerKind::Settings),
-            "status" => {
-                self.show(None);
-                self.note("Your conversation is still open; /sessions to go back.");
-            }
+            "status" => self.status(),
             "agent" => self.open_picker(PickerKind::NextAgent),
             "model" if !argument.is_empty() => self.choose_model(Some(argument.into())),
             "model" => {
@@ -459,7 +550,10 @@ impl App {
                     }
                 }
             }
-            "retry" => self.session_action("retry", "Retrying", Tone::Muted),
+            "unqueue" => self.unqueue(),
+            "merge" => self.merge(argument),
+            "pr" => self.pull_request(argument),
+            "retry" => self.session_action("retry", "Relaunching", Tone::Muted),
             "finish" => self.session_action("finish", "Marked done", Tone::Success),
             "pause" => self.session_action("pause", "Paused", Tone::Muted),
             "unpause" => self.session_action("resume", "Resumed", Tone::Muted),

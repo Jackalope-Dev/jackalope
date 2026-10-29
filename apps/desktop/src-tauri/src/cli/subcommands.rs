@@ -154,13 +154,7 @@ pub fn answer(
         );
         return Ok(());
     };
-    let reply = text
-        .trim()
-        .parse::<usize>()
-        .ok()
-        .and_then(|number| question.options.get(number.checked_sub(1)?))
-        .cloned()
-        .unwrap_or(text);
+    let reply = crate::planning::checked_reply(&question, &text)?;
     connection.call(&Request::Answer {
         run_id: question.run_id,
         prompt_id: question.id,
@@ -225,6 +219,7 @@ pub fn merge(
         connection.call(&Request::SessionAction {
             session_id: id.clone(),
             action: "pause".into(),
+            message_id: None,
         })?;
         eprintln!(
             "Paused {} so no new message starts during the merge.",
@@ -243,6 +238,7 @@ pub fn merge(
                 let _ = connection.call(&Request::SessionAction {
                     session_id: id.clone(),
                     action: "resume".into(),
+                    message_id: None,
                 });
             }
             return Err(match other {

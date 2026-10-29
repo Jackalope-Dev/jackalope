@@ -59,6 +59,18 @@ pub enum Action {
     TypeAnswer,
     /// Put an earlier input back in the composer.
     Recall(String),
+    /// Apply a prepared merge.
+    ApplyMerge {
+        plan_id: String,
+        cleanup: bool,
+    },
+    /// Push the branch and open a pull request.
+    OpenPullRequest {
+        title: String,
+        draft: bool,
+    },
+    /// Close the list without doing anything.
+    Dismiss,
 }
 
 pub struct Item {
@@ -81,6 +93,8 @@ pub enum PickerKind {
     LearningActions,
     Plans,
     Deviation,
+    /// Confirming a merge or pull request.
+    Delivery,
 }
 
 pub struct Picker {
@@ -91,9 +105,9 @@ pub struct Picker {
     pub filter: String,
     /// An index into `shown()`.
     pub selected: usize,
-    /// The question this list answers, so it is replaced once that question
-    /// is answered elsewhere, such as in the app.
-    pub question: Option<String>,
+    /// The question or deviation this list decides, so it is replaced once
+    /// that is decided elsewhere, such as in the app.
+    pub subject: Option<String>,
     /// Options ticked on a question that takes several.
     pub checked: Vec<String>,
 }
@@ -260,11 +274,51 @@ impl App {
         }
     }
 
+    /// What a picker of `kind` decides right now: the waiting question or the
+    /// pending deviation.
+    pub(super) fn picker_subject(&self, kind: PickerKind) -> Option<String> {
+        match kind {
+            PickerKind::Question => self.question().map(|question| question.id.clone()),
+            PickerKind::Deviation => self
+                .pending_deviation()
+                .map(|deviation| deviation.id.clone()),
+            _ => None,
+        }
+    }
+
+    /// Keeps an open list current after a refresh: lists of live state are
+    /// rebuilt, and a decision already made elsewhere is closed or replaced so
+    /// a stale choice never lands on something else.
+    pub(super) fn sync_picker(&mut self) {
+        let Some(picker) = self.picker.as_ref() else {
+            return;
+        };
+        let kind = picker.kind;
+        match kind {
+            PickerKind::Sessions | PickerKind::Settings => self.open_picker(kind),
+            // The work it would deliver changed, so the prepared merge is stale.
+            PickerKind::Delivery
+                if picker.subject != self.view.as_ref().and_then(|view| view.run_id.clone()) =>
+            {
+                self.picker = None;
+            }
+            PickerKind::Deviation if picker.subject != self.picker_subject(kind) => {
+                self.picker = None;
+                if self.pending_deviation().is_some() {
+                    self.open_picker(kind);
+                } else {
+                    self.note("The deviation was decided elsewhere.");
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn choose(&mut self, action: Action) {
-        let checked = self
+        let (checked, subject) = self
             .picker
             .as_ref()
-            .map(|picker| picker.checked.clone())
+            .map(|picker| (picker.checked.clone(), picker.subject.clone()))
             .unwrap_or_default();
         // Settings rows change in place; everything else closes the list.
         if !matches!(
@@ -402,7 +456,13 @@ impl App {
                 self.open_picker(PickerKind::Settings);
             }
             Action::OpenPlan(id) => self.open_plan(id),
-            Action::ResolveDeviation(action) => self.resolve_deviation(action),
+            Action::ResolveDeviation(action) => {
+                if subject == self.picker_subject(PickerKind::Deviation) {
+                    self.resolve_deviation(action);
+                } else {
+                    self.note("That deviation was already decided.");
+                }
+            }
             Action::Learning(learning) => self.open_learning_actions(learning),
             Action::ShowLearning(id) => self.show_learning(&id),
             Action::ArchiveLearning(id, archived) => self.archive_learning(&id, archived),
@@ -479,6 +539,9 @@ impl App {
                 self.history_index = None;
             }
             Action::OpenApp => self.open_app(),
+            Action::ApplyMerge { plan_id, cleanup } => self.apply_merge(plan_id, cleanup),
+            Action::OpenPullRequest { title, draft } => self.open_pull_request(title, draft),
+            Action::Dismiss => {}
         }
     }
 
@@ -623,7 +686,7 @@ impl App {
             items,
             filter: String::new(),
             selected: 0,
-            question: None,
+            subject: None,
             checked: Vec::new(),
         });
     }
@@ -916,14 +979,22 @@ impl App {
             .filter(|_| rebuilding)
             .map(|picker| (picker.selected, picker.filter.clone()))
             .unwrap_or_default();
+        if !rebuilding
+            && matches!(
+                kind,
+                PickerKind::Agents | PickerKind::NextAgent | PickerKind::NextModel
+            )
+        {
+            // Agents, sign-ins and models change in the app; the list updates
+            // when the read lands.
+            self.refresh_overview(std::time::Duration::from_secs(10));
+        }
+        let subject = self.picker_subject(kind);
         // Ticks carry over only while the list still shows the same question.
-        let question = (kind == PickerKind::Question)
-            .then(|| self.question().map(|question| question.id.clone()))
-            .flatten();
         let checked = self
             .picker
             .as_ref()
-            .filter(|picker| rebuilding && picker.question == question)
+            .filter(|picker| rebuilding && picker.subject == subject)
             .map(|picker| picker.checked.clone())
             .unwrap_or_default();
         let (title, items) = match kind {
@@ -995,6 +1066,8 @@ impl App {
                 ("History · type to search".to_string(), items)
             }
             PickerKind::Plans => ("Plans · Enter to open".to_string(), self.plan_items()),
+            // Built with its prepared merge or pull request, never rebuilt.
+            PickerKind::Delivery => return,
             PickerKind::Deviation => {
                 let summary = self
                     .pending_deviation()
@@ -1058,11 +1131,16 @@ impl App {
                         action: Action::SendChosen(prompt),
                     });
                 }
-                items.push(Item {
-                    label: "Type a different answer…".into(),
-                    detail: String::new(),
-                    action: Action::TypeAnswer,
-                });
+                if question
+                    .as_ref()
+                    .is_none_or(|question| question.allow_other != Some(false))
+                {
+                    items.push(Item {
+                        label: "Type a different answer…".into(),
+                        detail: String::new(),
+                        action: Action::TypeAnswer,
+                    });
+                }
                 (
                     question
                         .map(|question| {
@@ -1092,7 +1170,7 @@ impl App {
             items,
             filter,
             selected: 0,
-            question,
+            subject,
             checked,
         };
         picker.selected = selected.min(picker.shown().len().saturating_sub(1));
@@ -1185,7 +1263,7 @@ mod tests {
             ],
             filter: String::new(),
             selected: 0,
-            question: None,
+            subject: None,
             checked: Vec::new(),
         };
         assert_eq!(picker.shown(), [0, 1, 2]);

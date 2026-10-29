@@ -68,7 +68,14 @@ pub enum Request {
     /// A conversation and the state of its current work.
     SessionDetail { session_id: String },
     /// `pause`, `resume`, `finish` or `retry`.
-    SessionAction { session_id: String, action: String },
+    SessionAction {
+        session_id: String,
+        action: String,
+        /// The message a `cancel-message` takes back. Sent only then, since
+        /// older hosts refuse fields they do not know.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        message_id: Option<String>,
+    },
     /// Answer a question an agent asked.
     Answer {
         run_id: String,
@@ -398,6 +405,9 @@ pub struct Message {
     /// retried; absent when there was only one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attempt: Option<u32>,
+    /// Your message's id, so a queued one can be taken back. Older hosts omit it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -418,6 +428,10 @@ pub struct Question {
     pub multi_select: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rationale: Option<String>,
+    /// `false` when only the options are valid answers, as for a permission
+    /// request. Absent from older hosts, which accepted any answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allow_other: Option<bool>,
 }
 
 /// A plan as a terminal shows it.
@@ -544,6 +558,9 @@ pub struct SessionView {
     /// when there are none or the host is older.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub review_screenshots: Option<u32>,
+    /// The latest attempt is merged. Older hosts omit it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub merged: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

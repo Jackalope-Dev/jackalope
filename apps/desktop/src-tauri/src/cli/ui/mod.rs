@@ -14,6 +14,7 @@
 mod changes;
 mod commands;
 mod conversation;
+mod delivery;
 mod editor;
 mod events;
 mod feed;
@@ -123,6 +124,9 @@ struct App {
     sessions: Vec<SessionSummary>,
     projects: Vec<Project>,
     overview: Option<Result<Overview, String>>,
+    /// When the agent overview was last asked for, and whether that read is
+    /// still running, so app changes to agents reach this terminal.
+    overview_asked: (Instant, bool),
     /// Why the host cannot be reached, while it cannot.
     offline: Option<String>,
     /// The last host error a refresh reported, so it is noted once.
@@ -233,6 +237,7 @@ pub fn run(
         sessions: Vec::new(),
         projects: Vec::new(),
         overview: None,
+        overview_asked: (Instant::now(), true),
         offline: None,
         problem: None,
         attribution: None,
@@ -371,6 +376,9 @@ impl App {
     fn switch_project(&mut self, project: Project) {
         self.branch = git::branch(&project.path);
         brand::set_accent(project.accent.as_deref());
+        if project.id != self.project.id {
+            self.attribution = None;
+        }
         self.project = project;
         self.show(None);
     }

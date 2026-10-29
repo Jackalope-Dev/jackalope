@@ -88,13 +88,25 @@ fn handle(app: &mut App, event: Event) -> bool {
         Event::Shell(update) => app.shell_update(update),
         Event::Changed => {
             app.refresh();
+            app.refresh_overview(Duration::from_secs(60));
             return app.refresh_plan();
         }
         Event::Snapshot(snapshot) => app.apply(*snapshot),
         Event::Overview(overview) => {
             app.overview = Some(overview);
-            if app.picker.as_ref().map(|picker| picker.kind) == Some(PickerKind::Agents) {
-                app.open_picker(PickerKind::Agents);
+            app.overview_asked.1 = false;
+            if let Some(kind) = app
+                .picker
+                .as_ref()
+                .map(|picker| picker.kind)
+                .filter(|kind| {
+                    matches!(
+                        kind,
+                        PickerKind::Agents | PickerKind::NextAgent | PickerKind::NextModel
+                    )
+                })
+            {
+                app.open_picker(kind);
             }
         }
         Event::Files { directory, files } => app.files_listed(directory, files),
@@ -108,6 +120,9 @@ fn handle(app: &mut App, event: Event) -> bool {
             }
         }
         Event::Tick => {
+            if app.refresh_stale_plan() {
+                return true;
+            }
             let tip_changed = app.rotate_tip_if_elapsed();
             let flash_expired = app
                 .flash
@@ -210,6 +225,17 @@ pub fn spawn_overview(handshake: Handshake, events: Sender<Event>) {
 }
 
 impl App {
+    /// Reads the agent overview again in the background when the last read is
+    /// older than `stale` and none is running.
+    pub(super) fn refresh_overview(&mut self, stale: Duration) {
+        let (asked, running) = self.overview_asked;
+        if running || asked.elapsed() < stale {
+            return;
+        }
+        self.overview_asked = (std::time::Instant::now(), true);
+        spawn_overview(self.handshake.clone(), self.events.clone());
+    }
+
     /// Rotates to the next tip every 8 seconds, returning true when changed.
     fn rotate_tip_if_elapsed(&mut self) -> bool {
         if self.last_tip_change.elapsed() >= Duration::from_secs(8) {
