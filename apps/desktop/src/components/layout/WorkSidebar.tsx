@@ -12,6 +12,19 @@ import { AgentStack } from '../agents/AgentAvatar';
 import { isUnread, useOpenSignalKey, useWorkSignals, WorkSignals } from '../tasks/WorkSignals';
 import { Tooltip } from '../ui/Tooltip';
 
+/** Why a row needs you, when its status alone would only say "Needs attention". */
+function attentionReason(item: WorkItem): string | undefined {
+  const run = item.run;
+  if (run?.prompts?.some((prompt) => prompt.status === 'pending')) return 'Question waiting';
+  if (run?.persistenceError) return 'History needs saving';
+  if (run?.verificationError || run?.verification?.result.success === false) return 'Check failed';
+  const error = item.session?.error || run?.error;
+  if (error) return `Failed · ${error.split('\n')[0]}`;
+  if (run?.status === 'stopped') return 'Stopped before finishing';
+  if (run?.status === 'interrupted') return 'Interrupted';
+  return undefined;
+}
+
 /** What a closed row must change from to come back: its stage, activity or open questions. */
 function closedState(item: WorkItem) {
   const questions = item.run?.prompts?.filter((prompt) => prompt.status === 'pending').length;
@@ -89,9 +102,28 @@ export function WorkSidebar({ onOpen }: { onOpen: () => void }) {
           .slice(0, 12);
         return members.length ? (
           <section key={group}>
-            <h2>
-              {group === 'attention' ? 'Needs you' : group === 'working' ? 'In progress' : 'Recent'}
-            </h2>
+            <div className="work-sidebar-heading">
+              <h2>
+                {group === 'attention'
+                  ? 'Needs you'
+                  : group === 'working'
+                    ? 'In progress'
+                    : 'Recent'}
+              </h2>
+              {group === 'finished' && (
+                <button
+                  type="button"
+                  className="work-sidebar-clear"
+                  onClick={() => {
+                    for (const item of items)
+                      if (item.stage === 'finished')
+                        useWorkSignalsStore.getState().dismiss(item.id, closedState(item));
+                  }}
+                >
+                  Close all
+                </button>
+              )}
+            </div>
             {members.map((item) => {
               const presence = workPresence(item);
               const selected = item.managed
@@ -100,6 +132,10 @@ export function WorkSidebar({ onOpen }: { onOpen: () => void }) {
                   ? item.session.id === selectedSession
                   : item.run?.id === selectedRun;
               const unread = isUnread(item, signals, openKey);
+              const reason =
+                group === 'attention' && item.statusLabel !== 'Ready to review'
+                  ? attentionReason(item)
+                  : undefined;
               return (
                 <div key={item.id} className="work-sidebar-row">
                   <button
@@ -112,7 +148,11 @@ export function WorkSidebar({ onOpen }: { onOpen: () => void }) {
                     <AgentStack agents={presence.agents} state={presence.state} size="xs" />
                     <span>
                       <strong>{item.title}</strong>
-                      {group !== 'finished' && <small>{item.statusLabel ?? presence.action}</small>}
+                      {group !== 'finished' && (
+                        <small title={reason}>
+                          {reason ?? item.statusLabel ?? presence.action}
+                        </small>
+                      )}
                     </span>
                     <WorkSignals
                       item={item}

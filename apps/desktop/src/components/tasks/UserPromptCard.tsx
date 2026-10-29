@@ -11,10 +11,13 @@ export function UserPromptCard({
   prompt,
   active,
   onContinue,
+  accountShown = false,
 }: {
   runId: string;
   prompt: PendingUserPrompt;
   active: boolean;
+  /** The page already names the account, so the card names only the model. */
+  accountShown?: boolean;
   /** Answers a question the attempt ended on by continuing the task with it. */
   onContinue?: (answer: string) => Promise<void>;
 }) {
@@ -29,7 +32,10 @@ export function UserPromptCard({
       ? (customName ?? getAgentMetadata(run.agent)?.name ?? run.agent)
       : undefined;
   const agentDetail = run
-    ? [run.model ?? 'CLI default model', run.accountBinding?.label || run.account]
+    ? [
+        run.model ?? 'CLI default model',
+        !accountShown && (run.accountBinding?.label || run.account),
+      ]
         .filter(Boolean)
         .join(' · ')
     : undefined;

@@ -48,10 +48,26 @@ export function taskDecision(run: TaskRun, integrated = false, changedFiles?: nu
       ? state('Ready to merge', `Merge into ${target}`, 'integrate')
       : state('Reviewed locally', 'View delivery', 'delivery');
   }
-  if (changedFiles === 0) return state('Ready for your review', 'Review result', 'result');
+  if (changedFiles === 0)
+    return looksLikePlan(run.result)
+      ? state('Plan ready for review', 'Review plan', 'result')
+      : state('Ready for your review', 'Review result', 'result');
   return isolated
     ? state('Ready for your review', 'Review and merge', 'integrate')
     : state('Ready for your review', 'Review result', 'changes');
+}
+
+/**
+ * A result written as a plan rather than a report of changes: plan front matter, or a
+ * goal section followed by an approach, tasks or acceptance criteria.
+ */
+export function looksLikePlan(result: string | null | undefined): boolean {
+  const text = (result ?? '').slice(0, 20_000);
+  if (/^\s*(?:---[ \t]*\r?\n)?(?:recommendedShape|shapeReason|workers):/.test(text)) return true;
+  return (
+    /^#{1,3}\s+Goal\b/im.test(text) &&
+    /^#{1,3}\s+(?:Approach|Tasks|Acceptance criteria|Plan)\b/im.test(text)
+  );
 }
 
 export function latestAttempt(runs: TaskRun[], taskId: string) {

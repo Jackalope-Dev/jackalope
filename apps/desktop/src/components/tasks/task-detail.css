@@ -349,3 +349,6 @@
 .task-view-tools .work-branch {
   display: none;
 }
+.task-plan-notice {
+  margin-bottom: 16px;
+}

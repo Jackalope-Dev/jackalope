@@ -45,8 +45,10 @@ export function TaskProgress({
         </div>
         {action && <div className="task-progress-action">{action}</div>}
       </div>
-      <TaskLiveActivity run={run} omitPhase={decision.label} />
-      {active && !!run.activity.length && (
+      {/* While a question waits, the question below is the next step; elapsed time and
+          activity stay a tab away so the question gets the room. */}
+      {!pending && <TaskLiveActivity run={run} omitPhase={decision.label} />}
+      {active && !pending && !!run.activity.length && (
         <Button variant="outline" className="task-progress-activity" onClick={onActivity}>
           <span>View activity</span>
           <ArrowUpRight size={16} />

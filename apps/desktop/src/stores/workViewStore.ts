@@ -12,6 +12,9 @@ interface WorkViewState {
   views: Record<string, WorkView>;
   reading: Record<string, string>;
   split: Record<string, boolean>;
+  /** The attempt whose task page is on screen, so notices about it are not repeated. */
+  viewing: string | null;
+  setViewing: (id: string | null) => void;
   /** The app sidebar shows icons only. */
   navCollapsed: boolean;
   toggleNav: () => void;
@@ -37,6 +40,8 @@ export const useWorkViewStore = create<WorkViewState>()(
       reading: {},
       split: {},
       navCollapsed: false,
+      viewing: null,
+      setViewing: (viewing) => set({ viewing }),
       toggleNav: () => set((state) => ({ navCollapsed: !state.navCollapsed })),
       sizes: {},
       setSize: (id, size) =>

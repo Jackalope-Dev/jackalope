@@ -49,6 +49,19 @@ export function AgentQuestion({
   const freeform = !multiple && (prompt.inputType === 'text' || options.length === 0 || custom);
   const response = multiple ? JSON.stringify(selected) : answer.trim();
   const hasResponse = multiple ? selected.length > 0 : !!answer.trim();
+  /** Selects `option`, or toggles it when several may be chosen. */
+  const choose = (option: string) => {
+    if (multiple) {
+      setSelected((current) =>
+        options.filter((value) =>
+          value === option ? !current.includes(value) : current.includes(value),
+        ),
+      );
+      return;
+    }
+    setCustom(false);
+    setAnswer(option);
+  };
   const submit = async () => {
     if ((!active && !onContinue) || answered || inFlight.current || !hasResponse) return;
     inFlight.current = true;
@@ -109,13 +122,28 @@ export function AgentQuestion({
             event.preventDefault();
             void submit();
           }}
+          onKeyDown={(event) => {
+            // Number keys pick an option and Enter sends, as in the terminal; typing in
+            // the response field keeps both keys for the text.
+            const target = event.target as HTMLElement;
+            if (target instanceof HTMLTextAreaElement || event.metaKey || event.ctrlKey) return;
+            if (event.key === 'Enter' && target.tagName === 'INPUT') {
+              event.preventDefault();
+              void submit();
+              return;
+            }
+            const option = /^[1-9]$/.test(event.key) ? options[Number(event.key) - 1] : undefined;
+            if (option === undefined || sending || prompt.inputType === 'text') return;
+            event.preventDefault();
+            choose(option);
+          }}
         >
           {options.length > 0 && prompt.inputType !== 'text' && (
             <fieldset disabled={sending} className="agent-question-options">
               <legend className="sr-only">
                 {multiple ? 'Choose one or more responses' : 'Choose a response'}
               </legend>
-              {options.map((option) => (
+              {options.map((option, index) => (
                 <label
                   key={option}
                   className="agent-question-option"
@@ -128,22 +156,16 @@ export function AgentQuestion({
                     type={multiple ? 'checkbox' : 'radio'}
                     name={`${id}-choice`}
                     checked={multiple ? selected.includes(option) : !custom && answer === option}
-                    onChange={() => {
-                      if (multiple) {
-                        setSelected((current) =>
-                          options.filter((value) =>
-                            value === option ? !current.includes(value) : current.includes(value),
-                          ),
-                        );
-                        return;
-                      }
-                      setCustom(false);
-                      setAnswer(option);
-                    }}
+                    onChange={() => choose(option)}
                   />
                   <span>{option}</span>
                   {option === prompt.recommended && (
                     <span className="agent-question-recommended">Recommended</span>
+                  )}
+                  {index < 9 && (
+                    <span className="agent-question-key" aria-hidden="true">
+                      {index + 1}
+                    </span>
                   )}
                 </label>
               ))}

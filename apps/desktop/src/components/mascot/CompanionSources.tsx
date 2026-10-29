@@ -10,6 +10,7 @@ import { useNotificationStore } from '../../stores/notificationStore';
 import { usePlanStore } from '../../stores/planStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useReferralStore } from '../../stores/referralStore';
+import { useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace, openSettings } from '../layout/navigation';
 import { useCompanionNotices } from './useCompanionNotices';
 
@@ -115,7 +116,8 @@ export function CompanionSources() {
         ]
       : [],
   );
-  useCompanionNotices('tasks', taskNotices(runs, openCompanionTask));
+  const viewing = useWorkViewStore((state) => state.viewing);
+  useCompanionNotices('tasks', taskNotices(runs, openCompanionTask, viewing));
   // Deviations are recorded as attempts report, so re-read plans when runs change.
   const runSignal = useMemo(() => runs.map((run) => `${run.id}:${run.status}`).join(), [runs]);
   const [waitingPlans, setWaitingPlans] = useState<PlanSummary[]>([]);

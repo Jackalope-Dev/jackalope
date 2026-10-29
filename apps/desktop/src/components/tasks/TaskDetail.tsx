@@ -203,6 +203,13 @@ export function TaskDetail({
   const finished = !active && ['review', 'reviewed'].includes(run.status);
   const canContinue = isLatest && !!run.sessionId && run.status !== 'interrupted' && !integrated;
   const changedFiles = useChangeStats([run])[run.id]?.value.files;
+  useEffect(() => {
+    useWorkViewStore.getState().setViewing(run.id);
+    return () => {
+      if (useWorkViewStore.getState().viewing === run.id)
+        useWorkViewStore.getState().setViewing(null);
+    };
+  }, [run.id]);
   const decision = taskDecision(run, integrated, changedFiles);
   const { followups, queueError, queueing, queueFollowUp, updateFollowUp } = useTaskFollowUps({
     run,
@@ -640,6 +647,7 @@ export function TaskDetail({
               runId={run.id}
               prompt={p}
               active={['starting', 'running'].includes(run.status)}
+              accountShown={active}
               onContinue={
                 canContinue && !active
                   ? (answer) => continueWithAnswer(p.question, answer)
@@ -700,6 +708,21 @@ export function TaskDetail({
                   {run.screenshots.at(-1)?.name} · Recorded by the agent
                 </figcaption>
               </figure>
+            )}
+            {decision.action === 'Review plan' && canContinue && (
+              <InlineNotice
+                className="task-plan-notice"
+                action={
+                  <Button
+                    variant="outline"
+                    onClick={() => addToReply('Implement this plan.', true)}
+                  >
+                    Implement this plan
+                  </Button>
+                }
+              >
+                This is a plan. Nothing in the project has changed yet.
+              </InlineNotice>
             )}
             {run.result ? (
               <div className="task-result-text">
