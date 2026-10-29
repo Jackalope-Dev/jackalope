@@ -3,9 +3,10 @@
 //! pinned plan panel shows the draft, the approval gate and live progress.
 
 use super::feed::Tone;
+use super::pickers::PickerKind;
 use super::App;
 use crate::connection::short;
-use crate::protocol::{PlanView, Question, Request, Response};
+use crate::protocol::{PlanDeviation, PlanView, Question, Request, Response};
 use std::time::{Duration, Instant};
 
 /// Plans re-read at most this often while work is moving.
@@ -16,8 +17,6 @@ pub struct PlanPane {
     pub view: Option<PlanView>,
     pub open: bool,
     read_at: Option<Instant>,
-    /// Plans listed by `/plans`, so `/plans 2` can open one.
-    pub listed: Vec<String>,
 }
 
 impl PlanPane {
@@ -27,7 +26,6 @@ impl PlanPane {
             view,
             open: true,
             read_at: Some(Instant::now()),
-            listed: Vec::new(),
         }
     }
 }
@@ -55,6 +53,19 @@ impl App {
     /// The planner's pending question, answered like any agent question.
     pub(super) fn plan_question(&self) -> Option<&Question> {
         self.plan_view()?.questions.first()
+    }
+
+    /// The open plan's oldest deviation waiting on the person. Dependent
+    /// work stays paused until it is decided.
+    pub(super) fn pending_deviation(&self) -> Option<&PlanDeviation> {
+        self.plan_view()?
+            .deviations
+            .iter()
+            .find(|deviation| deviation.status == "pending")
+    }
+
+    pub(super) fn open_plan(&mut self, id: String) {
+        let _ = self.plan_request(Request::PlanDetail { plan_id: id });
     }
 
     fn set_plan(&mut self, view: PlanView) {
@@ -98,6 +109,7 @@ impl App {
                 view.revision,
                 view.questions.len(),
                 view.progress.clone(),
+                pending_count(view),
             )
         });
         if let Ok(Response::Plan { plan }) =
@@ -108,15 +120,23 @@ impl App {
                 plan.revision,
                 plan.questions.len(),
                 plan.progress.clone(),
+                pending_count(&plan),
             );
             let drafted = before
                 .as_ref()
                 .is_some_and(|before| before.1 != plan.revision && plan.revision.is_some());
+            let deviated = before.as_ref().is_some_and(|before| after.4 > before.4);
             self.set_plan(*plan);
             if drafted {
                 self.note_tone(
                     "Plan ready · /approve to run it, /revise <comments> to keep planning, Ctrl+G to edit",
                     Tone::Success,
+                );
+            }
+            if deviated {
+                self.note_tone(
+                    "The plan needs you · press Enter or /deviation to decide",
+                    Tone::Warning,
                 );
             }
             self.offer_question();
@@ -155,7 +175,7 @@ impl App {
                     );
                 }
             }
-            "plans" => self.list_plans(argument),
+            "plans" => self.open_picker(PickerKind::Plans),
             "revise" if argument.is_empty() => {
                 self.note("Add your comments: /revise <what to change>")
             }
@@ -214,6 +234,7 @@ impl App {
             self.note("There is no draft to approve yet.");
             return;
         }
+        let unchecked = view.verification.as_deref() == Some("review");
         if let Some(view) = self.plan_request(Request::PlanAction {
             plan_id: view.id.clone(),
             action: "approve".into(),
@@ -228,85 +249,51 @@ impl App {
                 ),
                 Tone::Success,
             );
+            if unchecked {
+                self.note_tone(UNCHECKED, Tone::Warning);
+            }
         }
     }
 
+    /// `/deviation` opens the three choices; `/deviation accept`, `redo` or
+    /// `replan` decides directly.
     fn deviation(&mut self, argument: &str) {
-        let Some(view) = self.current_plan() else {
+        if self.current_plan().is_none() {
             return;
-        };
-        let Some(deviation) = view
-            .deviations
-            .iter()
-            .find(|deviation| deviation.status == "pending")
-            .cloned()
-        else {
+        }
+        if self.pending_deviation().is_none() {
+            self.note("No deviation is waiting on you.");
+            return;
+        }
+        match argument {
+            "accept" | "redo" | "replan" => self.resolve_deviation(argument),
+            _ => self.open_picker(PickerKind::Deviation),
+        }
+    }
+
+    /// Decides the oldest pending deviation: `accept`, `redo` or `replan`.
+    pub(super) fn resolve_deviation(&mut self, action: &str) {
+        let (Some(view), Some(deviation)) = (self.plan_view(), self.pending_deviation()) else {
             self.note("No deviation is waiting on you.");
             return;
         };
-        let action = match argument {
-            "accept" => "accept",
-            "redo" => "redo",
-            "replan" => "replan-deviation",
-            _ => {
-                self.note(format!(
-                    "{} · /deviation accept (amend the plan), redo or replan",
-                    deviation.summary
-                ));
-                return;
-            }
+        let (plan_id, deviation_id) = (view.id.clone(), deviation.id.clone());
+        let (action, done) = match action {
+            "accept" => ("accept", "Amended the plan · work resumes"),
+            "redo" => ("redo", "Redoing the work as planned"),
+            _ => ("replan-deviation", "Re-planning what is left"),
         };
-        let _ = self.plan_request(Request::PlanAction {
-            plan_id: view.id,
-            action: action.into(),
-            text: deviation.id,
-            revision: None,
-            hash: None,
-        });
-    }
-
-    fn list_plans(&mut self, argument: &str) {
-        if let Ok(number) = argument.parse::<usize>() {
-            let id = self
-                .plan
-                .as_ref()
-                .and_then(|pane| pane.listed.get(number.wrapping_sub(1)).cloned());
-            match id {
-                Some(id) => {
-                    let _ = self.plan_request(Request::PlanDetail { plan_id: id });
-                }
-                None => self.note("Run /plans first, then /plans <number>."),
-            }
-            return;
-        }
-        let Some(Response::Plans { plans }) = self.request(Request::Plans {
-            project_path: self.project.path.clone(),
-        }) else {
-            return;
-        };
-        if plans.is_empty() {
-            self.note("No plans in this project yet. Start one with /plan <goal>.");
-            return;
-        }
-        for (index, plan) in plans.iter().enumerate().take(20) {
-            self.note(format!(
-                "{:>2}. {:<9} r{:<3} {}",
-                index + 1,
-                plan.status,
-                plan.revision.unwrap_or_default(),
-                plan.title
-            ));
-        }
-        self.note("Open one with /plans <number>.");
-        let listed = plans.into_iter().take(20).map(|plan| plan.id).collect();
-        match &mut self.plan {
-            Some(pane) => pane.listed = listed,
-            None => {
-                let mut pane = PlanPane::new(String::new(), None);
-                pane.open = false;
-                pane.listed = listed;
-                self.plan = Some(pane);
-            }
+        if self
+            .plan_request(Request::PlanAction {
+                plan_id,
+                action: action.into(),
+                text: deviation_id,
+                revision: None,
+                hash: None,
+            })
+            .is_some()
+        {
+            self.flash(done.to_string(), Tone::Success);
         }
     }
 
@@ -370,6 +357,17 @@ impl App {
         }
         Ok(())
     }
+}
+
+/// Shown when a plan runs without any check.
+pub const UNCHECKED: &str =
+    "No automatic check: results are reviewed but not test-verified. Add a check command in the app's Project settings.";
+
+fn pending_count(view: &PlanView) -> usize {
+    view.deviations
+        .iter()
+        .filter(|deviation| deviation.status == "pending")
+        .count()
 }
 
 fn editor_command(path: &std::path::Path) -> std::process::Command {

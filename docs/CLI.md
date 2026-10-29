@@ -111,8 +111,9 @@ learned lessons with their status (new, active or archived) and use count; choos
 one shows its text and recent history in the feed, or archives or restores it.
 `/settings` changes the project's **Auto-approve agent requests**, **Where tasks
 work**, **Learn automatically**, **Reflect with an agent** (uses the default agent's
-quota), **Sync learned lessons** (when lesson sync is on in the app) and **Write
-lessons to AGENTS.md** for the app and every terminal; editing and
+quota), **Sync learned lessons** (when lesson sync is on in the app), **Write
+lessons to AGENTS.md**, **Planning questions** (steps through 0, 3, 5, 8, 10 and 12) and **Planning agent** for the
+app and every terminal; editing and
 deleting lessons happen in the app. See [project knowledge](PROJECT-KNOWLEDGE.md#learned-lessons). Messages sent while an agent works queue behind it; `/pause` holds
 the queue and `/unpause` sends it. `/clear` starts a fresh conversation like `/new`,
 `/resume` opens the conversation picker, and Ctrl+L clears notes and finished `!` output.
@@ -146,21 +147,34 @@ the changes panel goes; `/plan` alone hides or shows it. Typing `/plan ` or `/re
 turns the input green with a plan hint. The planner's questions use the question card,
 which shows a question's header and recommended option; answer by typing, with
 `/answer`, or choose **Use your recommendations for the rest** or **Done, draft the
-plan**. The panel shows the status and revision, the recommended shape and its reason,
+plan**. The question picker marks the recommended option `(recommended)` and starts on
+it. The panel shows the status and revision, the recommended shape and its reason,
 highlighted assumptions, the task graph with dependencies and parallel tasks, which tasks
-cover each acceptance criterion, sections changed since the previous revision, pending
-deviations and progress once the plan runs. `/revise <comments>` asks the planner for a
+cover each acceptance criterion, how approval will verify the work (the project's check,
+the plan's test criteria, or "No automatic check: results are reviewed but not
+test-verified" with a hint to add a check command in the app), sections changed since
+the previous revision, pending deviations and progress once the plan runs. `/revise <comments>` asks the planner for a
 new revision, Ctrl+G opens the plan in `$VISUAL` or `$EDITOR` (Notepad or `vi` when
 neither is set) and saves a changed file as a new revision, `/approve [single|subtasks|swarm]`
 approves the revision shown (default: the recommendation), `/export [path]` saves it into
 the repository without committing, `/replan [why]` revises a running plan from what is
-done, and `/deviation accept|redo|replan` decides on a pending deviation. `/plans` lists
-the project's plans and `/plans <n>` opens one.
+done, and `/deviation` opens a picker to accept and amend, redo or re-plan a pending
+deviation (`/deviation accept|redo|replan` decides directly). While a deviation waits,
+the conversation needs you: its tab dot and window title turn amber, and the banner
+above the input states the deviation and its proposed amendment; Enter on an empty input
+opens the same picker. `/plans` opens a picker of the project's plans with status,
+revision and when each last changed; Enter opens the chosen plan in the panel. `/settings`
+also changes the project's planning question limit and planning agent; approving from a
+terminal uses the project's check as the app mirrors it.
 
 The host answers `plan-start`, `plans`, `plan-detail` and `plan-action` (`keep`, `replan`,
 `approve` with the exact `revision` and `hash`, `save`, `export`, `accept`, `redo`,
 `replan-deviation`) with `plan`, `plans` or `exported` responses. Questions carry optional
-`header`, `recommended`, `multiSelect` and `rationale`; older hosts omit them and the
+`header`, `recommended`, `multiSelect` and `rationale`; plan views carry `verification`
+(`project`, `criteria` or `review`) and `check`; plan summaries carry `needsYou`;
+deviations carry `amendment`; projects carry `verifyCommand`, `autoVerify`,
+`questionCap` and `plannerAgent`; and `set-project-settings` accepts `question_cap` and
+`planner_agent` (empty plans with the task's agent). Older hosts omit them and the
 protocol version is unchanged. See [plan mode](PLAN-MODE.md) for the document format.
 
 A leading `/`, `!` or `@` is the input's mode: the prompt at the left of the input

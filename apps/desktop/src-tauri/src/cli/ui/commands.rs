@@ -51,7 +51,7 @@ pub const COMMANDS: &[(&str, &str)] = &[
         "plan",
         "plan with me first: explore, ask, then draft a plan",
     ),
-    ("plans", "list this project's plans; /plans <n> opens one"),
+    ("plans", "pick one of this project's plans to open"),
     ("revise", "keep planning: send comments for a revised plan"),
     (
         "approve",

@@ -90,6 +90,7 @@ pub fn view(plan: &session::PlanView) -> protocol::PlanView {
                 kind: deviation.kind.clone(),
                 summary: deviation.summary.clone(),
                 status: deviation.status.clone(),
+                amendment: deviation.amendment.clone(),
             })
             .collect(),
         changed: plan
@@ -121,6 +122,8 @@ pub fn view(plan: &session::PlanView) -> protocol::PlanView {
             }
             line
         }),
+        verification: Some(plan.verification.source.into()),
+        check: plan.verification.command.clone(),
     }
 }
 
@@ -141,6 +144,7 @@ pub fn list(coordinator: &Coordinator, project_id: &str) -> Result<protocol::Res
                 status: plan.status,
                 revision: plan.revision,
                 updated_at: plan.updated_at,
+                needs_you: plan.needs_you,
             })
             .collect(),
     })

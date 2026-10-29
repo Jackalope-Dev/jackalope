@@ -1,6 +1,6 @@
 use super::artifact::{self, Criterion, PlanDocument, PlanTask, VerifyKind};
 use super::store::{PlanRecord, PlanSettings, Session, Store};
-use super::{handoff, interview};
+use super::{handoff, interview, session};
 use crate::commands::harness::ValidationStep;
 
 pub(super) fn sample() -> PlanDocument {
@@ -476,4 +476,106 @@ fn execution_and_review_briefs_are_self_contained() {
     for area in interview::COVERAGE {
         assert!(prompt.contains(area), "{area}");
     }
+}
+
+#[test]
+fn approval_checks_with_the_project_then_criteria_then_review_only() {
+    let doc = sample();
+    let project = session::PlanChecks {
+        verify_command: Some(" pnpm verify ".into()),
+        ..Default::default()
+    };
+    let chosen = session::verification(&project, &doc);
+    assert_eq!(
+        (chosen.source, chosen.command.as_deref()),
+        ("project", Some("pnpm verify"))
+    );
+    let none = session::PlanChecks::default();
+    let mut both = doc.clone();
+    both.criteria[1].verify = VerifyKind::Command;
+    both.criteria[1].check = "node smoke.js".into();
+    let chosen = session::verification(&none, &both);
+    assert_eq!(
+        (chosen.source, chosen.command.as_deref()),
+        ("criteria", Some("pnpm test csv && node smoke.js"))
+    );
+    let mut manual = doc;
+    manual.criteria[0].verify = VerifyKind::Test;
+    manual.criteria[0].check.clear();
+    let chosen = session::verification(&none, &manual);
+    assert_eq!((chosen.source, chosen.command), ("review", None));
+}
+
+#[test]
+fn review_only_plans_need_a_passing_review_before_integration() {
+    assert!(
+        handoff::review_cleared(&[], true),
+        "a check gates on its own"
+    );
+    assert!(!handoff::review_cleared(&[], false));
+    let failed = step("Plan review", "failed", "Major AC-1: missing");
+    assert!(!handoff::review_cleared(
+        std::slice::from_ref(&failed),
+        false
+    ));
+    let passed = step("Plan review", "passed", "");
+    assert!(handoff::review_cleared(&[failed, passed], false));
+}
+
+#[test]
+fn written_plans_map_steps_to_tasks_and_outcomes_to_criteria() {
+    let plan = session::ManualPlan {
+        goal: "Add CSV export\nReports only.".into(),
+        tasks: vec![
+            session::ManualTask {
+                title: "Serialize".into(),
+                instructions: "Follow src/json.ts.".into(),
+                scopes: vec!["src/csv.ts".into(), " ".into()],
+                outcomes: vec!["Quotes are escaped".into(), "Commas are quoted".into()],
+                ..Default::default()
+            },
+            session::ManualTask {
+                title: "Button".into(),
+                depends_on: vec![0],
+                outcomes: vec!["The button downloads a file".into()],
+                ..Default::default()
+            },
+        ],
+    };
+    let doc = session::manual_document(&plan).unwrap();
+    assert_eq!(doc.title, "Add CSV export");
+    assert_eq!(doc.front.status, "draft");
+    assert_eq!(doc.tasks[0].key, "task-1");
+    assert_eq!(doc.tasks[0].scopes, ["src/csv.ts"]);
+    assert_eq!(doc.tasks[0].covers, ["AC-1", "AC-2"]);
+    assert_eq!(doc.tasks[1].depends_on, ["task-1"]);
+    assert_eq!(doc.tasks[1].scopes, ["."]);
+    assert_eq!(doc.tasks[1].covers, ["AC-3"]);
+    assert_eq!(doc.tasks[0].briefing, "Follow src/json.ts.");
+    assert!(doc
+        .criteria
+        .iter()
+        .all(|criterion| criterion.verify == VerifyKind::Manual));
+    // It renders and parses like any plan, so it reviews and approves alike.
+    assert_eq!(artifact::parse(&doc.render()).unwrap().tasks, doc.tasks);
+
+    let bare = session::manual_document(&session::ManualPlan {
+        goal: "Tidy the README".into(),
+        tasks: vec![session::ManualTask {
+            title: "Edit".into(),
+            ..Default::default()
+        }],
+    })
+    .unwrap();
+    assert_eq!(bare.criteria[0].text, "Tidy the README");
+    assert_eq!(bare.tasks[0].covers, ["AC-1"]);
+    let cycle = session::manual_document(&session::ManualPlan {
+        goal: "Loop".into(),
+        tasks: vec![session::ManualTask {
+            title: "Self".into(),
+            depends_on: vec![0],
+            ..Default::default()
+        }],
+    });
+    assert!(cycle.is_err());
 }

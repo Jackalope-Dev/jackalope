@@ -42,6 +42,12 @@ pub struct Approval {
     pub approved_by: String,
     pub approved_at: String,
     pub shape: String,
+    /// How the work is verified: `project` (the saved check), `criteria`
+    /// (the plan's command and test criteria) or `review` (no check; the
+    /// independent plan review only). Empty for approvals saved before this
+    /// was recorded, which always used the project check.
+    #[serde(default)]
+    pub verification: String,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

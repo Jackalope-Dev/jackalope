@@ -525,6 +525,7 @@ pub fn run(launch: Launch) {
             commands::planning::plan_archive,
             commands::planning::plan_settings_get,
             commands::planning::plan_settings_set,
+            commands::planning::plan_create,
             agent_profile_rename,
             agent_profile_delete,
             agent_profile_set_active,

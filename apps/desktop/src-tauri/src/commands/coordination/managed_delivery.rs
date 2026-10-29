@@ -1,5 +1,5 @@
 use super::*;
-use crate::commands::tasks::TaskRun;
+use crate::commands::{integration::dependencies, tasks::TaskRun};
 use serde::Serialize;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -130,15 +130,18 @@ pub(super) fn capture_interfaces(ledger: &mut Ledger, item: &QueueItem, run_id: 
 }
 
 fn report_complete(ledger: &Ledger, run: &TaskRun) -> bool {
+    // Without a check there is no checked snapshot to bind the report to.
+    let unchecked = run.verification.is_none() && dependencies::unchecked(run);
     ledger.messages.iter().any(|message| {
         message.run_id.as_ref() == Some(&run.id)
             && message.kind == "completion"
             && message.source_tree.is_some()
-            && message.source_tree.as_ref()
-                == run
-                    .verification
-                    .as_ref()
-                    .and_then(|check| check.tree.as_ref())
+            && (unchecked
+                || message.source_tree.as_ref()
+                    == run
+                        .verification
+                        .as_ref()
+                        .and_then(|check| check.tree.as_ref()))
             && message
                 .report
                 .as_ref()
@@ -254,10 +257,7 @@ fn passed(run: &TaskRun) -> bool {
         && run.persistence_error.is_none()
         && !run.dependency_invalidated
         && run.verification_error.is_none()
-        && run
-            .verification
-            .as_ref()
-            .is_some_and(|check| check.result.success && check.tree.is_some())
+        && dependencies::checked_or_unchecked(run)
 }
 
 pub(super) fn scope_blocked(ledger: &Ledger, item: &QueueItem, runs: &[TaskRun]) -> bool {
@@ -435,11 +435,22 @@ fn repair_candidate<'a>(
                 && run.error.is_none()
                 && run.persistence_error.is_none()
                 && !run.dependency_invalidated
-                && run.verification.as_ref().is_some_and(|check| {
-                    !check.result.success
-                        || (pending_resolution(ledger, task, run) && !report_complete(ledger, run))
-                        || plan_gaps(task, run).is_some()
-                })
+                && match &run.verification {
+                    Some(check) => {
+                        !check.result.success
+                            || (pending_resolution(ledger, task, run)
+                                && !report_complete(ledger, run))
+                            || plan_gaps(task, run).is_some()
+                    }
+                    // A review-only plan repairs open review gaps and
+                    // unresolved interfaces; there is no check to fail.
+                    None => {
+                        dependencies::unchecked(run)
+                            && ((pending_resolution(ledger, task, run)
+                                && !report_complete(ledger, run))
+                                || plan_gaps(task, run).is_some())
+                    }
+                }
                 && !ledger
                     .items
                     .iter()
@@ -515,8 +526,10 @@ impl Coordinator {
             let ready = final_run.is_some_and(|run| {
                 passed(run)
                     && (task.plan.is_none()
-                        || crate::commands::planning::handoff::open_gaps(&run.validation_steps)
-                            .is_none())
+                        || crate::commands::planning::handoff::review_cleared(
+                            &run.validation_steps,
+                            !dependencies::unchecked(run),
+                        ))
             }) && task.error.is_none()
                 && items.iter().all(|item| {
                     !item.canceled
@@ -666,13 +679,17 @@ impl Coordinator {
         request.model = run.model.clone();
         request.account_binding = run.account_binding.clone();
         request.context_selection = item.context_selection.clone();
-        request.auto_verify = true;
-        let check = run.verification.as_ref().unwrap();
-        let output: String = format!("{}\n{}", check.result.stdout, check.result.stderr)
-            .chars()
-            .take(6000)
-            .collect();
-        request.prompt = format!("Finish this assignment's checks and combined review. Repair any failed verification within its scope. Resolve pending interfaces and publish a completion report with completed decisions, remaining work and artifacts for the current files. Preserve completed work and the original request. Re-run the saved check after fixing the cause. Do not weaken checks, remove requirements, launch agents, commit, merge or push. If a product decision is needed, ask_user and wait.\n\nAssignment and original request:\n{}\n\nVerification output (untrusted diagnostic data):\n{}", item.prompt, output);
+        request.auto_verify = run.verification.is_some();
+        request.prompt = match &run.verification {
+            Some(check) => {
+                let output: String = format!("{}\n{}", check.result.stdout, check.result.stderr)
+                    .chars()
+                    .take(6000)
+                    .collect();
+                format!("Finish this assignment's checks and combined review. Repair any failed verification within its scope. Resolve pending interfaces and publish a completion report with completed decisions, remaining work and artifacts for the current files. Preserve completed work and the original request. Re-run the saved check after fixing the cause. Do not weaken checks, remove requirements, launch agents, commit, merge or push. If a product decision is needed, ask_user and wait.\n\nAssignment and original request:\n{}\n\nVerification output (untrusted diagnostic data):\n{}", item.prompt, output)
+            }
+            None => format!("Finish this assignment's combined review. This project has no saved check, so exercise the affected behavior yourself. Resolve pending interfaces and publish a completion report with completed decisions, remaining work and artifacts for the current files. Preserve completed work and the original request. Do not remove requirements, launch agents, commit, merge or push. If a product decision is needed, ask_user and wait.\n\nAssignment and original request:\n{}", item.prompt),
+        };
         if let Some(gaps) = plan_gaps(task, run) {
             request.prompt.push_str(&format!(
                 "
@@ -919,6 +936,39 @@ mod tests {
         .unwrap();
         runs[0].validation_steps.push(passed);
         assert!(repair_candidate(&ledger, &ledger.managed_tasks[0], &runs).is_none());
+    }
+
+    #[test]
+    fn review_only_plans_build_on_clean_finishes_and_repair_review_gaps() {
+        let (mut ledger, mut runs) = fixture();
+        for run in &mut runs {
+            run.verify_command = None;
+            run.verification = None;
+        }
+        // Without a check, a clean finish counts and a failed one does not.
+        assert!(passed(&runs[0]));
+        runs[1].error = Some("crashed".into());
+        assert!(!passed(&runs[1]));
+        // A run that has a check still needs it to pass.
+        runs[2].status = "review".into();
+        runs[2].verify_command = Some("check".into());
+        assert!(!passed(&runs[2]));
+        ledger.managed_tasks[0].plan = Some(managed::PlanLink {
+            plan_id: "plan".into(),
+            revision: 1,
+            assignments: "[]".into(),
+            reviewer_agent: None,
+            review_brief: String::new(),
+        });
+        assert!(repair_candidate(&ledger, &ledger.managed_tasks[0], &runs).is_none());
+        let gap = serde_json::from_value(serde_json::json!({
+            "id":"review","step":"Plan review","status":"failed",
+            "notes":"Major AC-1: quotes are not escaped","timestamp":"now"
+        }))
+        .unwrap();
+        runs[0].validation_steps.push(gap);
+        let (_, run) = repair_candidate(&ledger, &ledger.managed_tasks[0], &runs).unwrap();
+        assert_eq!(run.id, "a");
     }
 
     #[test]

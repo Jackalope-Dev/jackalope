@@ -221,14 +221,19 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Plan, Work, Check and Review lead to one result, preview, combined diff and outcome
   review before explicit application. Focused review and elapsed integration time remain
   distinct local measurements. Installed-provider and cost/quality acceptance remain open.
-- Plan mode is explicit: **Plan first** in the composer, **Plan with me** beside a plan
-  or investigation assessment, `/plan` in the terminal or `jackalope plan`. A read-only
+- Plan mode is explicit: **Plan with me** in the composer or beside a plan or
+  investigation assessment, `/plan` in the terminal or `jackalope plan`. A read-only
   planning attempt explores, asks at most the project's question cap (default 5) and
   returns one plan document with assumptions, tasks, acceptance criteria and a
-  recommended shape. Revisions, section diffs, direct edits, Save to repo (never
+  recommended shape. **Write the plan myself** turns hand-written tasks and outcomes into
+  the same plan document. Revisions, section diffs, direct edits, Save to repo (never
   committed), exact-revision approval, single/subtasks/swarm hand-off through managed
   tasks, an independent plan review, deviation decisions and re-planning are
-  implemented; see [plan mode](PLAN-MODE.md). Read-only enforcement covers Codex and
+  implemented; see [plan mode](PLAN-MODE.md). Approval verifies with the project's check,
+  else the plan's command and test criteria, else review only (no check gate; the plan
+  review must pass). Pending deviations raise a notification and the amber needs-you
+  state in the terminal. Planning settings live in Project settings and the terminal's
+  `/settings`. Read-only enforcement covers Codex and
   Claude Code; other agents are constrained by prompt and a discarded worktree.
   Installed-provider interviews and plan-to-merge acceptance remain open.
 - Requests continuing with one lead can delegate through available provider subagent

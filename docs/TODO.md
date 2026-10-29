@@ -105,10 +105,10 @@ release dates.
   single, subtasks and swarm shapes, a plan review that finds and repairs a seeded gap,
   a declared deviation pausing dependent work, and a re-plan that keeps finished tasks.
   Measure whether interviews reduce repairs and corrections against the same requests
-  without plan mode. Verify the app plan page and terminal panel with keyboard, light
-  and dark themes, reduced motion and narrow windows. The question picker does not yet
-  mark the recommended option (the question card does), and FeaturePlanner keeps its
-  separate step format.
+  without plan mode. Verify the app plan page, written plans, the Planning settings group
+  and terminal panel with keyboard, light and dark themes, reduced motion and narrow
+  windows. Accept a review-only plan (no check) and a criteria-checked plan through
+  merge, and the deviation notification, banner and picker.
 - [ ] Measure automatic subtasks on representative requests: planning overhead versus
   single-lead time, how often plans return one assignment, validation failures, and
   combined-result quality. Tune the local-rules size threshold from those results.

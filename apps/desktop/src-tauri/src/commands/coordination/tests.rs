@@ -236,6 +236,7 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
         prepare_command: None,
         setup_files: Vec::new(),
         auto_verify: false,
+        review_only: false,
         items,
     };
     let mut invalid = entry("invalid", &[]);

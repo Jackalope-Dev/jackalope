@@ -16,7 +16,7 @@ use tauri::State;
 
 use super::tasks::{TaskRuntime, WorkspaceMode};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectRecord {
     pub id: String,
@@ -64,6 +64,19 @@ pub struct ProjectRecord {
     /// replaced by the edited path. Used only by the edit-check evaluation hook.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub edit_check: Option<String>,
+    /// The project's saved check, mirrored from the app so a terminal approving
+    /// a plan uses the same check the app would. Absent when none is saved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verify_command: Option<String>,
+    /// Whether finished work runs the saved check automatically. Absent means off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_verify: Option<bool>,
+    /// The command that prepares a fresh workspace before work starts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prepare_command: Option<String>,
+    /// Untracked files copied into fresh workspaces.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub setup_files: Vec<String>,
 }
 
 /// Accepted `learning_cadence` values.
@@ -227,7 +240,7 @@ pub fn auto_approve(runtime: &TaskRuntime, project_id: &str) -> bool {
     settings(runtime, project_id).auto_approve
 }
 
-fn record(runtime: &TaskRuntime, project_id: &str) -> Option<ProjectRecord> {
+pub fn record(runtime: &TaskRuntime, project_id: &str) -> Option<ProjectRecord> {
     list(runtime)
         .into_iter()
         .find(|project| project.id == project_id)
@@ -338,6 +351,10 @@ pub fn ensure(runtime: &TaskRuntime, project_path: &str) -> Result<ProjectRecord
         export_lessons: None,
         personal_claude_setup: None,
         edit_check: None,
+        verify_command: None,
+        auto_verify: None,
+        prepare_command: None,
+        setup_files: Vec::new(),
     };
     ledger.projects.push(record.clone());
     write_ledger(&file, &ledger)?;
@@ -382,6 +399,10 @@ mod tests {
                     export_lessons: None,
                     personal_claude_setup: None,
                     edit_check: None,
+                    verify_command: Some("pnpm test".into()),
+                    auto_verify: Some(true),
+                    prepare_command: None,
+                    setup_files: vec![".env".into()],
                 },
                 ProjectRecord {
                     id: "personal".into(),
@@ -397,6 +418,10 @@ mod tests {
                     export_lessons: None,
                     personal_claude_setup: None,
                     edit_check: None,
+                    verify_command: None,
+                    auto_verify: None,
+                    prepare_command: None,
+                    setup_files: Vec::new(),
                 },
             ],
         };
@@ -411,6 +436,8 @@ mod tests {
         let legacy: ProjectRecord =
             serde_json::from_str(r#"{"id":"old","name":"Old","path":"/old"}"#).unwrap();
         assert_eq!(legacy.accent, None);
+        assert_eq!(legacy.verify_command, None);
+        assert!(legacy.setup_files.is_empty());
         assert_eq!(legacy.settings(), ProjectSettings::default());
         assert!(legacy.settings().learn_automatically);
         assert_eq!(legacy.settings().learning_cadence, 50);
@@ -454,6 +481,10 @@ mod tests {
             export_lessons: None,
             personal_claude_setup: None,
             edit_check: None,
+            verify_command: None,
+            auto_verify: None,
+            prepare_command: None,
+            setup_files: Vec::new(),
         });
         write_ledger(&file, &ledger).unwrap();
 

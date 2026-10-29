@@ -312,7 +312,7 @@ export function FeatureGraphView({
               icon={Network}
               level={3}
               title="No tasks queued"
-              description="Plan a feature to see how its tasks run."
+              description="Write a plan to see how its tasks run."
             />
           </div>
         ) : (

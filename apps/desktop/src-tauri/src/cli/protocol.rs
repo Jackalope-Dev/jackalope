@@ -126,6 +126,13 @@ pub enum Request {
         /// Mirror active learned lessons into AGENTS.md and a Claude Code skill.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         export_lessons: Option<bool>,
+        /// Most questions a planning interview may ask (0–12).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        question_cap: Option<u32>,
+        /// Plan with this agent instead of the task's; empty plans with the
+        /// task's agent.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        planner_agent: Option<String>,
     },
     /// Extract learnings from a conversation's history (up to the previous /learn,
     /// if present) and save them to project context.
@@ -233,6 +240,21 @@ pub struct Project {
     /// skill. Absent from older hosts; treat absent as off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub export_lessons: Option<bool>,
+    /// The project's saved check, as the app mirrors it. Absent when none is
+    /// saved or from older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verify_command: Option<String>,
+    /// Whether finished work runs the saved check automatically. Absent from
+    /// older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_verify: Option<bool>,
+    /// Most questions a planning interview asks. Absent from older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub question_cap: Option<u32>,
+    /// The agent plans use instead of the task's. Absent when plans use the
+    /// task's agent or from older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub planner_agent: Option<String>,
 }
 
 /// A lesson Jackalope learned for a project.
@@ -352,6 +374,13 @@ pub struct PlanView {
     /// A one-line summary of running work, when it runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub progress: Option<String>,
+    /// How approval would verify the work: `project`, `criteria` or `review`
+    /// (no automatic check). Absent from older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verification: Option<String>,
+    /// The check approval would use, when there is one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -385,6 +414,9 @@ pub struct PlanDeviation {
     pub kind: String,
     pub summary: String,
     pub status: String,
+    /// The amendment the agent proposed. Absent from older hosts.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub amendment: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -395,6 +427,9 @@ pub struct PlanSummary {
     pub status: String,
     pub revision: Option<u32>,
     pub updated_at: String,
+    /// A deviation waits on the person. Absent from older hosts.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub needs_you: bool,
 }
 
 /// What the terminal needs to render a conversation: the exchange, the work
@@ -815,10 +850,13 @@ mod tests {
             sync_lessons: Some(false),
             agent_reflection: None,
             export_lessons: None,
+            question_cap: None,
+            planner_agent: None,
         })
         .unwrap();
         assert!(request.contains("\"sync_lessons\":false"), "{request}");
         assert!(!request.contains("agent_reflection") && !request.contains("export_lessons"));
+        assert!(!request.contains("question_cap") && !request.contains("planner_agent"));
         let parsed: Request = serde_json::from_str(
             r#"{"request":"set-project-settings","project_id":"p","auto_approve":true}"#,
         )

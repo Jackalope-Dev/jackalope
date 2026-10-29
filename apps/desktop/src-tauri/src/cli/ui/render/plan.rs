@@ -62,6 +62,30 @@ pub fn lines(view: &PlanView) -> Vec<Line<'static>> {
             muted,
         ),
     ]));
+    if ["draft", "approved"].contains(&view.status.as_str()) {
+        match (view.verification.as_deref(), &view.check) {
+            (Some("review"), _) => {
+                lines.push(Line::styled(
+                    "No automatic check: results are reviewed but not test-verified",
+                    Style::default().fg(brand::warning()),
+                ));
+                lines.push(Line::styled(
+                    "Add a check command in the app's Project settings",
+                    muted,
+                ));
+            }
+            (Some("criteria"), Some(check)) => {
+                lines.push(Line::styled(
+                    format!("Checked with the plan's test criteria: {check}"),
+                    muted,
+                ));
+            }
+            (_, Some(check)) => {
+                lines.push(Line::styled(format!("Checked with {check}"), muted));
+            }
+            _ => {}
+        }
+    }
     if !view.changed.is_empty() {
         lines.push(Line::styled(
             format!("Changed: {}", view.changed.join(", ")),
@@ -81,7 +105,7 @@ pub fn lines(view: &PlanView) -> Vec<Line<'static>> {
     }
     if !pending.is_empty() {
         lines.push(Line::styled(
-            "/deviation accept · redo · replan  (dependent work is paused)",
+            "Enter or /deviation to decide · dependent work is paused",
             muted,
         ));
     }
@@ -248,6 +272,7 @@ mod tests {
                 kind: "declared".into(),
                 summary: "Needs an API route".into(),
                 status: "pending".into(),
+                ..Default::default()
             }],
             changed: vec!["Assumptions".into()],
             ..Default::default()
@@ -266,5 +291,16 @@ mod tests {
             ..Default::default()
         };
         assert!(text(&lines(&drafting)).contains("interviewing you"));
+        let unchecked = PlanView {
+            verification: Some("review".into()),
+            ..view.clone()
+        };
+        assert!(text(&lines(&unchecked)).contains("No automatic check"));
+        let criteria = PlanView {
+            verification: Some("criteria".into()),
+            check: Some("pnpm test csv".into()),
+            ..view
+        };
+        assert!(text(&lines(&criteria)).contains("test criteria: pnpm test csv"));
     }
 }

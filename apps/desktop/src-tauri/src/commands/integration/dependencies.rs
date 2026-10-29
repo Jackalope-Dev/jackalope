@@ -35,9 +35,36 @@ pub fn validate_dependencies(
     Ok(())
 }
 
+/// Whether the attempt ran without a saved check. Only plans approved without
+/// any check (review-only) queue staged work like this; every other staged
+/// flow refuses to start without a check command.
+pub(in crate::commands) fn unchecked(run: &TaskRun) -> bool {
+    run.verify_command
+        .as_deref()
+        .is_none_or(|command| command.trim().is_empty())
+}
+
+/// Whether the attempt's current files may be built on: a passing check bound
+/// to its snapshot, or, for an attempt without a check, a clean finish.
+pub(in crate::commands) fn checked_or_unchecked(run: &TaskRun) -> bool {
+    match &run.verification {
+        Some(check) => check.result.success && check.tree.is_some(),
+        None => unchecked(run),
+    }
+}
+
 pub(in crate::commands) fn verified(run: &TaskRun, tree: &str) -> Result<(), String> {
     super::super::verification::ensure_idle(&run.workspace)?;
     super::super::previews::ensure_idle(&run.workspace)?;
+    if unchecked(run) && run.verification.is_none() {
+        // No check gate: the snapshot comparison in `validate_dependencies`
+        // still pins consumers to these exact files, and the plan review
+        // gates integration.
+        if !matches!(run.status.as_str(), "review" | "reviewed") || run.error.is_some() {
+            return Err("The predecessor has not finished cleanly.".into());
+        }
+        return Ok(());
+    }
     let check = run
         .verification
         .as_ref()

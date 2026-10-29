@@ -81,6 +81,12 @@ interface PlanDeviation {
   createdAt: string;
 }
 
+export interface PlanVerification {
+  /** The saved project check, the plan's command and test criteria, or none. */
+  source: 'project' | 'criteria' | 'review';
+  command: string | null;
+}
+
 export interface PlanSettings {
   questionCap: number;
   plannerAgent?: string | null;
@@ -112,6 +118,8 @@ export interface PlanView {
     approvedBy: string;
     approvedAt: string;
     shape: PlanShape;
+    /** Empty for approvals recorded before this was saved, which used the project check. */
+    verification: '' | PlanVerification['source'];
   } | null;
   shape: PlanShape;
   swarmConnected: boolean;
@@ -129,7 +137,10 @@ export interface PlanView {
   } | null;
   criteria: { id: string; state: CriterionStateName; detail?: string }[];
   deviations: PlanDeviation[];
-  settings: PlanSettings;
+  /** How approving now would verify the work, from the project's mirrored check. */
+  verification: PlanVerification;
+  /** The check assembled from the plan's command and test criteria, if any. */
+  criteriaCheck: string | null;
 }
 
 export interface PlanSummary {
@@ -139,6 +150,21 @@ export interface PlanSummary {
   status: PlanStatus;
   revision: number | null;
   updatedAt: string;
+  /** A deviation is waiting on the person's decision. */
+  needsYou: boolean;
+}
+
+/** A plan the person wrote: tasks with instructions, scopes and outcomes. */
+export interface ManualPlan {
+  goal: string;
+  tasks: {
+    title: string;
+    instructions: string;
+    scopes: string[];
+    /** Indexes of earlier tasks. */
+    dependsOn: number[];
+    outcomes: string[];
+  }[];
 }
 
 export const planCommands = {
@@ -147,6 +173,8 @@ export const planCommands = {
   get: (id: string) => nativeTask<PlanView>('plan_get', { id }),
   start: (request: RunRequest, goal: string) =>
     nativeTask<PlanView>('plan_start', { request, goal }),
+  create: (request: RunRequest, plan: ManualPlan) =>
+    nativeTask<PlanView>('plan_create', { request, plan }),
   keepPlanning: (id: string, comments: string) =>
     nativeTask<void>('plan_keep_planning', { id, comments }),
   save: (id: string, markdown: string, baseRevision: number) =>
@@ -170,6 +198,46 @@ export const planCommands = {
   saveSettings: (projectId: string, settings: PlanSettings) =>
     nativeTask<void>('plan_settings_set', { projectId, settings }),
 };
+
+/** Steps of a written plan as the plan document's tasks; dependencies become indexes. */
+export function manualPlan(
+  goal: string,
+  steps: {
+    key: string;
+    title: string;
+    prompt: string;
+    scopes: string[];
+    dependsOn: string[];
+    contextSelection?: { outcomes?: string[] };
+  }[],
+): ManualPlan {
+  const index = new Map(steps.map((step, position) => [step.key, position]));
+  return {
+    goal: goal.trim(),
+    tasks: steps.map((step) => ({
+      title: step.title.trim(),
+      instructions: step.prompt.trim(),
+      scopes: step.scopes.map((scope) => scope.trim()).filter(Boolean),
+      dependsOn: step.dependsOn.flatMap((key) => {
+        const position = index.get(key);
+        return position === undefined ? [] : [position];
+      }),
+      outcomes: (step.contextSelection?.outcomes ?? [])
+        .map((outcome) => outcome.trim())
+        .filter(Boolean),
+    })),
+  };
+}
+
+/** How approving will verify the work, given the project's current check. */
+export function approvalVerification(
+  view: Pick<PlanView, 'criteriaCheck'>,
+  projectCheck: string | undefined,
+): PlanVerification {
+  if (projectCheck?.trim()) return { source: 'project', command: projectCheck.trim() };
+  if (view.criteriaCheck) return { source: 'criteria', command: view.criteriaCheck };
+  return { source: 'review', command: null };
+}
 
 const shapeLabels: Record<PlanShape, { label: string; detail: string }> = {
   single: { label: 'One agent', detail: 'One worker implements the plan from a fresh context.' },

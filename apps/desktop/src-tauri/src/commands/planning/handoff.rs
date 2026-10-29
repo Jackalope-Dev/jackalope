@@ -219,6 +219,17 @@ pub fn review(steps: &[ValidationStep]) -> Option<(bool, Vec<Gap>)> {
     Some((step.status == "passed", gaps))
 }
 
+/// Whether the combined result may be integrated as far as the plan review is
+/// concerned. With a check, only open Critical or Major gaps hold it back;
+/// without one the review is the only gate, so it must have passed.
+pub fn review_cleared(steps: &[ValidationStep], checked: bool) -> bool {
+    if checked {
+        open_gaps(steps).is_none()
+    } else {
+        review(steps).is_some_and(|(passed, _)| passed)
+    }
+}
+
 /// Notes of a failed plan review: Critical or Major gaps remain and the
 /// delivery loop treats them like a failed check within its repair limit.
 pub fn open_gaps(steps: &[ValidationStep]) -> Option<String> {

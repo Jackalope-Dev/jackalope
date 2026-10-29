@@ -317,6 +317,11 @@ interface ProjectRecord {
   exportLessons?: boolean;
   personalClaudeSetup?: boolean;
   editCheck?: string;
+  /** Mirrored one way so a terminal approving a plan uses the app's check. */
+  verifyCommand?: string;
+  autoVerify?: boolean;
+  prepareCommand?: string;
+  setupFiles?: string[];
 }
 
 /**
@@ -346,6 +351,10 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
     exportLessons: preferences?.exportLessons,
     personalClaudeSetup: preferences?.personalClaudeSetup,
     editCheck: preferences?.editCheck,
+    verifyCommand: preferences?.verifyCommand?.trim() || undefined,
+    autoVerify: preferences?.autoVerify,
+    prepareCommand: preferences?.prepareCommand?.trim() || undefined,
+    setupFiles: preferences?.setupFiles?.length ? preferences.setupFiles : undefined,
   }));
 }
 

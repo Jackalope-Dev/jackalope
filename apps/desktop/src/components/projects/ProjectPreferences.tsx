@@ -17,6 +17,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { ArtifactsProjectSettings } from './ArtifactsProjectSettings';
 import { ProjectGitSettings } from './ProjectGitSettings';
+import { ProjectPlanningSettings } from './ProjectPlanningSettings';
 import { RemoveProjectAction } from './RemoveProjectAction';
 import '../settings/settings.css';
 
@@ -265,6 +266,7 @@ export function ProjectPreferences({
               ))}
             </Disclosure>
           </SettingGroup>
+          <ProjectPlanningSettings key={`planning-${project.id}`} projectId={project.id} />
           <ProjectGitSettings key={project.path} projectPath={project.path} />
           {!project.plainFolder && (
             <ArtifactsProjectSettings

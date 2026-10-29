@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { managedTaskWork } from '../src/lib/managed-task.ts';
 import {
+  approvalVerification,
   criterionCoverage,
   interviewOptions,
+  manualPlan,
   shapeChoices,
   stateTone,
   taskWaves,
@@ -90,4 +92,43 @@ test('plan-started managed tasks do not report a missing planner attempt', () =>
     managedTaskWork({ ...base, plan: { planId: 'p', revision: 1 } }, queue, []).missingAttempts,
     [],
   );
+});
+
+test('written plans keep task order, map dependencies to positions and drop blank outcomes', () => {
+  const plan = manualPlan(' Add CSV export ', [
+    {
+      key: 'a1',
+      title: ' Serialize ',
+      prompt: 'Follow src/json.ts',
+      scopes: ['src/csv.ts', ' '],
+      dependsOn: [],
+      contextSelection: { outcomes: ['Quotes are escaped', ' '] },
+    },
+    { key: 'b2', title: 'Button', prompt: '', scopes: ['src/ui'], dependsOn: ['a1', 'gone'] },
+  ]);
+  assert.equal(plan.goal, 'Add CSV export');
+  assert.deepEqual(plan.tasks[0], {
+    title: 'Serialize',
+    instructions: 'Follow src/json.ts',
+    scopes: ['src/csv.ts'],
+    dependsOn: [],
+    outcomes: ['Quotes are escaped'],
+  });
+  assert.deepEqual(plan.tasks[1].dependsOn, [0]);
+  assert.deepEqual(plan.tasks[1].outcomes, []);
+});
+
+test('approval checks with the project, then the plan criteria, then review only', () => {
+  assert.deepEqual(approvalVerification({ criteriaCheck: 'pnpm test csv' }, ' pnpm verify '), {
+    source: 'project',
+    command: 'pnpm verify',
+  });
+  assert.deepEqual(approvalVerification({ criteriaCheck: 'pnpm test csv' }, ''), {
+    source: 'criteria',
+    command: 'pnpm test csv',
+  });
+  assert.deepEqual(approvalVerification({ criteriaCheck: null }, undefined), {
+    source: 'review',
+    command: null,
+  });
 });

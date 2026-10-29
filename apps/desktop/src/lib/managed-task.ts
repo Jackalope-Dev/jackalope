@@ -1,8 +1,19 @@
-import type { FeatureStep } from './feature-plan';
+import type { ContextSelection } from './knowledge';
 import type { QueueView } from './queue';
 import type { RunRequest, TaskRun } from './task-runtime';
 import { isActive, nativeTask } from './task-runtime.ts';
 import type { TaskAssessment } from './task-strategy';
+
+/** One assignment of a managed task's proposed plan, as its preview shows it. */
+export interface FeatureStep {
+  key: string;
+  title: string;
+  prompt: string;
+  agent: string;
+  scopes: string[];
+  dependsOn: string[];
+  contextSelection?: ContextSelection;
+}
 
 export interface ManagedTask {
   delivery?: {

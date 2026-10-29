@@ -507,6 +507,13 @@ impl Coordinator {
             .map(|account| [(task.request.agent.clone(), account.clone())].into())
             .unwrap_or_default();
         let count = items.len();
+        // Only an approved plan may run without a check; it was told so at approval.
+        let review_only = task.plan.is_some()
+            && task
+                .request
+                .verify_command
+                .as_deref()
+                .is_none_or(|command| command.trim().is_empty());
         let created = self.import(PlanRequest {
             staged_dependencies: true,
             feature: Some(task.title.clone()),
@@ -519,7 +526,8 @@ impl Coordinator {
             verify_command: task.request.verify_command.clone(),
             prepare_command: task.request.prepare_command.clone(),
             setup_files: task.request.setup_files.clone(),
-            auto_verify: true,
+            auto_verify: !review_only,
+            review_only,
             items,
         })?;
         let mut inner = self.inner.lock().unwrap();

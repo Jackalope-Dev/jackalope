@@ -34,6 +34,7 @@ import { ConfirmAction } from '../ui/ConfirmAction';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
+import { FeaturePlanner } from './FeaturePlanner';
 import { ProjectSetup } from './ProjectSetup';
 import { TaskComposer } from './TaskComposer';
 import { TaskAssessmentNotice, useTaskAssessment } from './useTaskAssessment';
@@ -175,6 +176,7 @@ export function CaptureTask({
         : '';
   const [error, setError] = useState('');
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [writingPlan, setWritingPlan] = useState(false);
   const [setup, setSetup] = useState(false);
   const [setupProject, setSetupProject] = useState<string | null>(null);
   const [servers, setServers] = useState<McpServerConfig[]>([]);
@@ -483,6 +485,7 @@ export function CaptureTask({
         onChange={update}
         onLaunch={() => launch()}
         onPlan={() => void launch('interview')}
+        onWritePlan={project ? () => setWritingPlan(true) : undefined}
         onSave={() => {
           saveIdea();
           clear();
@@ -544,6 +547,17 @@ export function CaptureTask({
             }
           />
         </Disclosure>
+      )}
+      {writingPlan && project && (
+        <FeaturePlanner
+          project={project}
+          initialGoal={current.prompt.trim()}
+          onClose={() => setWritingPlan(false)}
+          onCreated={() => {
+            clear();
+            onStarted();
+          }}
+        />
       )}
       {toolsOpen && (
         <Suspense fallback={null}>

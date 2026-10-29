@@ -123,7 +123,16 @@ impl Coordinator {
         {
             return Err("Use a feature title up to 160 bytes.".into());
         }
+        if request.review_only
+            && request
+                .verify_command
+                .as_ref()
+                .is_some_and(|s| !s.trim().is_empty())
+        {
+            return Err("A review-only plan cannot carry a check command.".into());
+        }
         if request.staged_dependencies
+            && !request.review_only
             && (!request.auto_verify
                 || request
                     .verify_command

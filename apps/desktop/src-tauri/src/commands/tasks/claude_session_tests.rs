@@ -384,6 +384,7 @@ fn hook_callbacks_answer_through_the_control_protocol() {
             export_lessons: None,
             personal_claude_setup: None,
             edit_check: Some("node lint.cjs {file}".into()),
+            ..Default::default()
         }],
     )
     .unwrap();

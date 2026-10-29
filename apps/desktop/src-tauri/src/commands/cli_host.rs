@@ -235,11 +235,15 @@ fn ensure_project(app: &AppHandle, path: &str) -> Result<protocol::Project, Stri
         use tauri::Emitter;
         let _ = app.emit("jackalope:projects-registered", ());
     }
-    Ok(project_summary(record))
+    Ok(project_summary(&runtime, record))
 }
 
-fn project_summary(record: super::project_registry::ProjectRecord) -> protocol::Project {
+fn project_summary(
+    runtime: &TaskRuntime,
+    record: super::project_registry::ProjectRecord,
+) -> protocol::Project {
     let settings = record.settings();
+    let planning = super::planning::session::store_for(runtime).settings(&record.id);
     protocol::Project {
         id: record.id,
         name: record.name,
@@ -252,6 +256,12 @@ fn project_summary(record: super::project_registry::ProjectRecord) -> protocol::
         sync_lessons: Some(settings.sync_lessons),
         agent_reflection: Some(settings.agent_reflection),
         export_lessons: Some(settings.export_lessons),
+        verify_command: record
+            .verify_command
+            .filter(|command| !command.trim().is_empty()),
+        auto_verify: record.auto_verify,
+        question_cap: Some(planning.question_cap as u32),
+        planner_agent: planning.planner_agent.filter(|agent| !agent.is_empty()),
     }
 }
 
@@ -462,7 +472,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             Ok(Response::Projects {
                 projects: super::project_registry::list(&runtime)
                     .into_iter()
-                    .map(project_summary)
+                    .map(|record| project_summary(&runtime, record))
                     .collect(),
             })
         }
@@ -746,6 +756,8 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             sync_lessons,
             agent_reflection,
             export_lessons,
+            question_cap,
+            planner_agent,
         } => {
             use tauri::Emitter;
             let mode = workspace_mode
@@ -769,10 +781,26 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                     export: export_lessons,
                 },
             )?;
+            if question_cap.is_some() || planner_agent.is_some() {
+                let store = super::planning::session::store_for(&runtime);
+                let mut planning = store.settings(&project_id);
+                if let Some(cap) = question_cap {
+                    planning.question_cap = cap as usize;
+                }
+                if let Some(agent) = planner_agent {
+                    let agent = agent.trim().to_string();
+                    if agent.is_empty() || planning.planner_agent.as_deref() != Some(&agent) {
+                        // A planning model belongs to the planning agent.
+                        planning.planner_model = None;
+                    }
+                    planning.planner_agent = Some(agent).filter(|agent| !agent.is_empty());
+                }
+                store.save_settings(&project_id, planning)?;
+            }
             // The app adopts registry settings when it merges the registry.
             let _ = app.emit("jackalope:projects-registered", ());
             Ok(Response::Project {
-                project: project_summary(record),
+                project: project_summary(&runtime, record),
             })
         }
         Request::SessionLearn { session_id } => {

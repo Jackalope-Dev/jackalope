@@ -4,8 +4,8 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useWideWorkspace } from '../../hooks/useWideWorkspace';
 import { getAgentMetadata } from '../../lib/agent-catalog';
-import type { FeatureStep } from '../../lib/feature-plan';
 import {
+  type FeatureStep,
   type ManagedTask,
   managedTaskCommand,
   managedTaskWork,

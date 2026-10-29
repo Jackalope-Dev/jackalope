@@ -17,12 +17,12 @@ use serde::Serialize;
 use uuid::Uuid;
 
 pub fn store(coordinator: &Coordinator) -> Store {
-    Store::new(
-        coordinator
-            .runtime
-            .integration_directory()
-            .with_file_name("plans"),
-    )
+    store_for(&coordinator.runtime)
+}
+
+/// The plan store for a task runtime, for callers without a coordinator.
+pub fn store_for(runtime: &crate::commands::tasks::TaskRuntime) -> Store {
+    Store::new(runtime.integration_directory().with_file_name("plans"))
 }
 
 fn active(status: &str) -> bool {
@@ -83,7 +83,89 @@ pub struct PlanView {
     pub progress: Option<Progress>,
     pub criteria: Vec<handoff::CriterionState>,
     pub deviations: Vec<Deviation>,
-    pub settings: PlanSettings,
+    /// How approving now would verify the work.
+    pub verification: Verification,
+    /// The check assembled from the plan's command and test criteria, used
+    /// when the project has no saved check.
+    pub criteria_check: Option<String>,
+}
+
+/// How an approved plan's work is verified.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Verification {
+    /// `project` (the saved check), `criteria` (the plan's command and test
+    /// criteria) or `review` (no automatic check; reviewed, not test-verified).
+    pub source: &'static str,
+    pub command: Option<String>,
+}
+
+/// Picks the check for an approved plan: the project's saved check, else the
+/// exact commands of the plan's command and test criteria, else none.
+pub fn verification(checks: &PlanChecks, doc: &PlanDocument) -> Verification {
+    if let Some(command) = checks
+        .verify_command
+        .as_deref()
+        .map(str::trim)
+        .filter(|command| !command.is_empty())
+    {
+        return Verification {
+            source: "project",
+            command: Some(command.into()),
+        };
+    }
+    let mut commands: Vec<&str> = vec![];
+    for criterion in &doc.criteria {
+        let check = criterion.check.trim();
+        if matches!(
+            criterion.verify,
+            artifact::VerifyKind::Command | artifact::VerifyKind::Test
+        ) && !check.is_empty()
+            && !commands.contains(&check)
+        {
+            commands.push(check);
+        }
+    }
+    let mut command = String::new();
+    for check in commands {
+        let next = if command.is_empty() {
+            check.to_string()
+        } else {
+            format!("{command} && {check}")
+        };
+        if next.len() > CRITERIA_CHECK_LIMIT {
+            break;
+        }
+        command = next;
+    }
+    if command.is_empty() {
+        Verification {
+            source: "review",
+            command: None,
+        }
+    } else {
+        Verification {
+            source: "criteria",
+            command: Some(command),
+        }
+    }
+}
+
+/// The longest check assembled from criteria commands.
+const CRITERIA_CHECK_LIMIT: usize = 4000;
+
+/// The project's checks as the app last mirrored them to the native registry.
+pub fn project_checks(
+    runtime: &crate::commands::tasks::TaskRuntime,
+    project_id: &str,
+) -> PlanChecks {
+    crate::commands::project_registry::record(runtime, project_id)
+        .map(|project| PlanChecks {
+            verify_command: project.verify_command,
+            prepare_command: project.prepare_command,
+            setup_files: project.setup_files,
+        })
+        .unwrap_or_default()
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -105,6 +187,8 @@ pub struct PlanSummary {
     pub status: String,
     pub revision: Option<u32>,
     pub updated_at: String,
+    /// A deviation is waiting on the person's decision.
+    pub needs_you: bool,
 }
 
 pub fn summary(record: &PlanRecord) -> PlanSummary {
@@ -115,7 +199,16 @@ pub fn summary(record: &PlanRecord) -> PlanSummary {
         status: record.status(),
         revision: record.latest().map(|revision| revision.number),
         updated_at: record.updated_at.clone(),
+        needs_you: pending_deviation(record).is_some(),
     }
+}
+
+/// The oldest deviation still waiting on the person.
+pub fn pending_deviation(record: &PlanRecord) -> Option<&Deviation> {
+    record
+        .deviations
+        .iter()
+        .find(|deviation| deviation.status == "pending")
 }
 
 /// A planning request: read-only, isolated, unchecked and without outcomes.
@@ -222,6 +315,163 @@ pub fn start(
         })?;
         return Ok(record);
     }
+    Ok(record)
+}
+
+/// A plan the person wrote: tasks with their instructions and the outcomes
+/// each must meet.
+#[derive(Clone, Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ManualPlan {
+    pub goal: String,
+    pub tasks: Vec<ManualTask>,
+}
+
+#[derive(Clone, Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ManualTask {
+    pub title: String,
+    #[serde(default)]
+    pub instructions: String,
+    #[serde(default)]
+    pub scopes: Vec<String>,
+    /// Indexes of earlier tasks in `tasks`.
+    #[serde(default)]
+    pub depends_on: Vec<usize>,
+    #[serde(default)]
+    pub outcomes: Vec<String>,
+}
+
+/// The plan document for a written plan: each task becomes a plan task and
+/// each outcome a manual acceptance criterion the task covers. A plan without
+/// outcomes gets one criterion from its goal, covered by every task.
+pub fn manual_document(plan: &ManualPlan) -> Result<PlanDocument, String> {
+    let goal = plan.goal.trim();
+    if goal.is_empty() || goal.len() > 20_000 {
+        return Err("Describe what the plan should accomplish in up to 20,000 characters.".into());
+    }
+    let title: String = goal
+        .lines()
+        .next()
+        .unwrap_or("Plan")
+        .trim()
+        .chars()
+        .take(160)
+        .collect();
+    let mut doc = PlanDocument {
+        title,
+        goal: goal.into(),
+        ..Default::default()
+    };
+    for (index, task) in plan.tasks.iter().enumerate() {
+        let key = format!("task-{}", index + 1);
+        let mut covers = vec![];
+        for outcome in task
+            .outcomes
+            .iter()
+            .map(|o| o.trim())
+            .filter(|o| !o.is_empty())
+        {
+            let id = format!("AC-{}", doc.criteria.len() + 1);
+            doc.criteria.push(artifact::Criterion {
+                id: id.clone(),
+                verify: artifact::VerifyKind::Manual,
+                check: String::new(),
+                text: outcome.replace('\n', " "),
+            });
+            covers.push(id);
+        }
+        let mut scopes: Vec<String> = task
+            .scopes
+            .iter()
+            .map(|scope| scope.trim().to_string())
+            .filter(|scope| !scope.is_empty())
+            .collect();
+        if scopes.is_empty() {
+            scopes.push(".".into());
+        }
+        let depends_on = task
+            .depends_on
+            .iter()
+            .map(|earlier| {
+                if *earlier >= plan.tasks.len() || *earlier == index {
+                    Err(format!(
+                        "Task {} depends on a task that is not in the plan.",
+                        index + 1
+                    ))
+                } else {
+                    Ok(format!("task-{}", earlier + 1))
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        doc.tasks.push(artifact::PlanTask {
+            key,
+            title: task.title.trim().replace('\n', " "),
+            scopes,
+            depends_on,
+            parallel: false,
+            covers,
+            briefing: task.instructions.trim().into(),
+            status: String::new(),
+        });
+    }
+    if let Some(task) = doc.tasks.iter().find(|task| task.title.is_empty()) {
+        return Err(format!(
+            "Give {} a title.",
+            task.key.replace("task-", "task ")
+        ));
+    }
+    if doc.criteria.is_empty() {
+        doc.criteria.push(artifact::Criterion {
+            id: "AC-1".into(),
+            verify: artifact::VerifyKind::Manual,
+            check: String::new(),
+            text: doc.title.chars().take(480).collect(),
+        });
+        for task in &mut doc.tasks {
+            task.covers.push("AC-1".into());
+        }
+    }
+    doc.front.status = "draft".into();
+    doc.validate()?;
+    Ok(doc)
+}
+
+/// Saves a plan the person wrote as revision 1, ready for review and
+/// approval like any drafted plan. No planner runs.
+pub fn create_manual(
+    coordinator: &Coordinator,
+    template: RunRequest,
+    plan: ManualPlan,
+) -> Result<PlanRecord, String> {
+    let doc = manual_document(&plan)?;
+    let store = store(coordinator);
+    let settings = store.settings(&template.project_id);
+    let now = Utc::now().to_rfc3339();
+    let mut record = PlanRecord {
+        id: Uuid::new_v4().to_string(),
+        project_id: template.project_id.clone(),
+        project_name: template.project_name.clone(),
+        project_path: template.project_path.clone(),
+        title: doc.title.clone(),
+        goal: plan.goal.trim().into(),
+        created_at: now.clone(),
+        updated_at: now,
+        request: template,
+        session: Session {
+            question_cap: settings.question_cap,
+            ..Default::default()
+        },
+        revisions: vec![],
+        approval: None,
+        execution: None,
+        deviations: vec![],
+        error: None,
+        reflected: false,
+        archived: false,
+    };
+    record.push_revision(doc, "you", "Written by you", None)?;
+    store.create(&record)?;
     Ok(record)
 }
 
@@ -468,8 +718,12 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
                 record = store
                     .update(id, |saved| {
                         for (kind, summary) in &found {
+                            let deviation = Uuid::new_v4().to_string();
+                            crate::commands::notifications::plan_decision_needed(
+                                &saved.id, &deviation,
+                            );
                             saved.deviations.push(Deviation {
-                                id: Uuid::new_v4().to_string(),
+                                id: deviation,
                                 run_id: None,
                                 kind: kind.clone(),
                                 summary: summary.clone(),
@@ -552,7 +806,19 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
         progress: progress_view,
         criteria,
         deviations: record.deviations.clone(),
-        settings: store.settings(&record.project_id),
+        criteria_check: doc
+            .as_ref()
+            .and_then(|doc| verification(&PlanChecks::default(), doc).command),
+        verification: match &doc {
+            Some(doc) => verification(
+                &project_checks(&coordinator.runtime, &record.project_id),
+                doc,
+            ),
+            None => Verification {
+                source: "review",
+                command: None,
+            },
+        },
         document: doc,
     })
 }
@@ -662,8 +928,8 @@ fn approver(record: &PlanRecord, surface: &str) -> String {
 }
 
 /// The project's checks at approval time. The app sends its current project
-/// settings; the terminal, which cannot read them, reuses the newest task in
-/// the project that ran with a saved check.
+/// settings; the terminal uses the copy the app mirrors to the native project
+/// registry.
 #[derive(Clone, Debug, Default, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanChecks {
@@ -673,23 +939,6 @@ pub struct PlanChecks {
     pub prepare_command: Option<String>,
     #[serde(default)]
     pub setup_files: Vec<String>,
-}
-
-fn checks_from_runs(project_id: &str, runs: &[TaskRun]) -> Option<PlanChecks> {
-    runs.iter()
-        .filter(|run| {
-            run.project_id == project_id
-                && run
-                    .verify_command
-                    .as_deref()
-                    .is_some_and(|command| !command.trim().is_empty())
-        })
-        .max_by(|a, b| a.started_at.cmp(&b.started_at))
-        .map(|run| PlanChecks {
-            verify_command: run.verify_command.clone(),
-            prepare_command: run.prepare_command.clone(),
-            setup_files: run.setup_files.clone(),
-        })
 }
 
 /// Approval is always an explicit call naming the exact revision and hash
@@ -722,16 +971,11 @@ pub fn approve(
     if doc.front.status == "done" {
         return Err("This plan is done.".into());
     }
-    // Hand-off uses staged dependencies and check-based repairs, which need a check.
-    let checks = checks
-        .or_else(|| checks_from_runs(&record.project_id, &runs))
-        .filter(|checks| {
-            checks
-                .verify_command
-                .as_deref()
-                .is_some_and(|command| !command.trim().is_empty())
-        })
-        .ok_or("Save a project check in Project settings before running a plan; Jackalope verifies each task and the combined result with it.")?;
+    let checks = checks.unwrap_or_else(|| project_checks(&coordinator.runtime, &record.project_id));
+    // Without any check the work is reviewed but not test-verified: staged
+    // dependencies continue from clean finishes and integration waits for a
+    // passing plan review.
+    let verified = verification(&checks, &doc);
     if shape == "swarm" && !coordinator.swarm_connected() {
         return Err("Connect a swarm Worker in Settings before running as a swarm.".into());
     }
@@ -762,10 +1006,10 @@ pub fn approve(
     request.isolated = true;
     request.workspace_mode = Some(WorkspaceMode::Worktree);
     request.context_selection.outcomes.clear();
-    request.verify_command = checks.verify_command;
+    request.auto_verify = verified.command.is_some();
+    request.verify_command = verified.command.clone();
     request.prepare_command = checks.prepare_command;
     request.setup_files = checks.setup_files;
-    request.auto_verify = true;
     let planner_agent = planning_run(&record, &runs).map(|run| run.agent.clone());
     let link = PlanLink {
         plan_id: record.id.clone(),
@@ -782,6 +1026,7 @@ pub fn approve(
             approved_by: approved_by.clone(),
             approved_at: approved_at.clone(),
             shape: shape.into(),
+            verification: verified.source.into(),
         });
         set_front(saved, |front| {
             front.status = "approved".into();
@@ -900,6 +1145,7 @@ pub fn declare_deviation(
         });
         Ok(deviation)
     })?;
+    crate::commands::notifications::plan_decision_needed(&plan_id, &deviation);
     coordinator.plan_dispatch(&managed, "pause")?;
     Ok(deviation)
 }

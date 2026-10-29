@@ -256,6 +256,13 @@ pub fn approve(
     for assumption in &view.assumptions {
         eprintln!("  assumes: {assumption}");
     }
+    match (view.verification.as_deref(), &view.check) {
+        (Some("review"), _) => eprintln!(
+            "  No automatic check: results are reviewed but not test-verified. Add a check command in the app's Project settings."
+        ),
+        (_, Some(check)) => eprintln!("  checked with: {check}"),
+        _ => {}
+    }
     if !crate::subcommands::approved(
         yes,
         &format!("Approve revision {revision} and run it as {shape}?"),

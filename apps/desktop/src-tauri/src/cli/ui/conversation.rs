@@ -81,7 +81,9 @@ impl App {
             return;
         };
         let (_, tone) = self.work_state(view);
-        let signal = if self.working() {
+        let signal = if self.pending_deviation().is_some() {
+            Signal::NeedsYou
+        } else if self.working() {
             Signal::Working
         } else if matches!(tone, Tone::Danger | Tone::Warning) {
             Signal::NeedsYou

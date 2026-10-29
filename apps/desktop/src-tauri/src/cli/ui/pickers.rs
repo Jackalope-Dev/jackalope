@@ -25,7 +25,15 @@ pub enum Action {
     SyncLessons,
     AgentReflection,
     ExportLessons,
+    /// Step the most questions a planning interview may ask.
+    QuestionCap,
+    /// Step the agent plans use.
+    PlannerAgent,
     OpenApp,
+    /// Open a plan in the plan panel.
+    OpenPlan(String),
+    /// Decide a deviation: `accept`, `redo` or `replan`.
+    ResolveDeviation(&'static str),
     /// Offer what can be done with a learned lesson.
     Learning(Learning),
     /// Show a learned lesson and its recent history in the feed.
@@ -62,6 +70,8 @@ pub enum PickerKind {
     History,
     Learnings,
     LearningActions,
+    Plans,
+    Deviation,
 }
 
 pub struct Picker {
@@ -230,6 +240,8 @@ impl App {
                 | Action::SyncLessons
                 | Action::AgentReflection
                 | Action::ExportLessons
+                | Action::QuestionCap
+                | Action::PlannerAgent
         ) {
             self.picker = None;
         }
@@ -301,6 +313,49 @@ impl App {
                 });
                 self.open_picker(PickerKind::Settings);
             }
+            Action::QuestionCap => {
+                let current = self.project.question_cap.unwrap_or(5);
+                let next = QUESTION_CAPS
+                    .iter()
+                    .copied()
+                    .find(|cap| *cap > current)
+                    .unwrap_or(QUESTION_CAPS[0]);
+                self.save_project_settings(ProjectChange {
+                    question_cap: Some(next),
+                    ..Default::default()
+                });
+                self.open_picker(PickerKind::Settings);
+            }
+            Action::PlannerAgent => {
+                let agents: Vec<String> = self
+                    .overview
+                    .as_ref()
+                    .and_then(|overview| overview.as_ref().ok())
+                    .map(|overview| {
+                        overview
+                            .agents
+                            .iter()
+                            .filter(|agent| matches!(agent.state.as_str(), "ready" | "installed"))
+                            .map(|agent| agent.id.clone())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                // The task's agent, then each ready agent in turn.
+                let next = match &self.project.planner_agent {
+                    None => agents.first().cloned(),
+                    Some(current) => agents
+                        .iter()
+                        .position(|agent| agent == current)
+                        .and_then(|index| agents.get(index + 1).cloned()),
+                };
+                self.save_project_settings(ProjectChange {
+                    planner_agent: Some(next.unwrap_or_default()),
+                    ..Default::default()
+                });
+                self.open_picker(PickerKind::Settings);
+            }
+            Action::OpenPlan(id) => self.open_plan(id),
+            Action::ResolveDeviation(action) => self.resolve_deviation(action),
             Action::Learning(learning) => self.open_learning_actions(learning),
             Action::ShowLearning(id) => self.show_learning(&id),
             Action::ArchiveLearning(id, archived) => self.archive_learning(&id, archived),
@@ -437,6 +492,8 @@ impl App {
             sync_lessons: change.sync_lessons,
             agent_reflection: change.agent_reflection,
             export_lessons: change.export_lessons,
+            question_cap: change.question_cap,
+            planner_agent: change.planner_agent,
         }) {
             self.project.auto_approve = project.auto_approve;
             self.project.workspace_mode = project.workspace_mode;
@@ -445,6 +502,8 @@ impl App {
             self.project.sync_lessons = project.sync_lessons;
             self.project.agent_reflection = project.agent_reflection;
             self.project.export_lessons = project.export_lessons;
+            self.project.question_cap = project.question_cap;
+            self.project.planner_agent = project.planner_agent;
         }
     }
 
@@ -620,6 +679,23 @@ impl App {
                     "off · lessons stay in Jackalope".into()
                 },
                 action: Action::ExportLessons,
+            },
+            Item {
+                label: format!("Planning questions in {}", self.project.name),
+                detail: match self.project.question_cap.unwrap_or(5) {
+                    0 => "none · the planner records its assumptions".into(),
+                    1 => "at most 1 per plan".into(),
+                    cap => format!("at most {cap} per plan"),
+                },
+                action: Action::QuestionCap,
+            },
+            Item {
+                label: format!("Planning agent in {}", self.project.name),
+                detail: match &self.project.planner_agent {
+                    Some(agent) => format!("{} · plans with this agent", self.agent_name(agent)),
+                    None => "the task's agent".into(),
+                },
+                action: Action::PlannerAgent,
             },
             Item {
                 label: format!("Commit author in {}", self.project.name),
@@ -810,13 +886,28 @@ impl App {
                     .collect();
                 ("History · type to search".to_string(), items)
             }
+            PickerKind::Plans => ("Plans · Enter to open".to_string(), self.plan_items()),
+            PickerKind::Deviation => {
+                let summary = self
+                    .pending_deviation()
+                    .map(|deviation| deviation.summary.clone())
+                    .unwrap_or_else(|| "No deviation is waiting on you".into());
+                (format!("Plan paused · {summary}"), deviation_items())
+            }
             PickerKind::Question => {
                 let question = self.question().cloned();
+                let recommended = question
+                    .as_ref()
+                    .and_then(|question| question.recommended.clone());
                 let mut items: Vec<Item> = question
                     .iter()
                     .flat_map(|question| question.options.clone())
                     .map(|option| Item {
-                        label: option.clone(),
+                        label: if recommended.as_ref() == Some(&option) {
+                            format!("{option} (recommended)")
+                        } else {
+                            option.clone()
+                        },
                         detail: String::new(),
                         action: Action::Answer(option),
                     })
@@ -834,6 +925,15 @@ impl App {
                 )
             }
         };
+        // A fresh question starts on the recommended option.
+        let selected = if kind == PickerKind::Question && !rebuilding {
+            items
+                .iter()
+                .position(|item| item.label.ends_with(" (recommended)"))
+                .unwrap_or(0)
+        } else {
+            selected
+        };
         let mut picker = Picker {
             kind,
             title,
@@ -844,6 +944,63 @@ impl App {
         picker.selected = selected.min(picker.shown().len().saturating_sub(1));
         self.picker = Some(picker);
     }
+
+    fn plan_items(&mut self) -> Vec<Item> {
+        let plans = match self.request(Request::Plans {
+            project_path: self.project.path.clone(),
+        }) {
+            Some(Response::Plans { plans }) => plans,
+            _ => Vec::new(),
+        };
+        plans.iter().map(plan_item).collect()
+    }
+}
+
+/// Steps for the planning question limit.
+const QUESTION_CAPS: [u32; 6] = [0, 3, 5, 8, 10, 12];
+
+/// A plan as a `/plans` row: its title, then status, revision and when it
+/// last changed.
+pub fn plan_item(plan: &protocol::PlanSummary) -> Item {
+    let status = if plan.needs_you {
+        "needs you".to_string()
+    } else {
+        plan.status.clone()
+    };
+    let updated = plan
+        .updated_at
+        .get(..16)
+        .unwrap_or(&plan.updated_at)
+        .replace('T', " ");
+    Item {
+        label: plan.title.clone(),
+        detail: format!(
+            "{status} · r{} · {updated} · {}",
+            plan.revision.unwrap_or_default(),
+            short(&plan.id)
+        ),
+        action: Action::OpenPlan(plan.id.clone()),
+    }
+}
+
+fn deviation_items() -> Vec<Item> {
+    vec![
+        Item {
+            label: "Accept and amend the plan".into(),
+            detail: "adds it to the plan as a new revision; work resumes".into(),
+            action: Action::ResolveDeviation("accept"),
+        },
+        Item {
+            label: "Redo".into(),
+            detail: "the agent returns to the plan as written".into(),
+            action: Action::ResolveDeviation("redo"),
+        },
+        Item {
+            label: "Re-plan".into(),
+            detail: "the planner revises what is left; you approve again".into(),
+            action: Action::ResolveDeviation("replan"),
+        },
+    ]
 }
 
 #[cfg(test)]
@@ -879,6 +1036,25 @@ mod tests {
         picker.step(true);
         assert_eq!(picker.selected, 1, "stops at the last match");
     }
+
+    #[test]
+    fn plan_rows_show_status_revision_and_when_they_changed() {
+        let row = plan_item(&protocol::PlanSummary {
+            id: "0123456789abcdef".into(),
+            title: "Add CSV export".into(),
+            status: "running".into(),
+            revision: Some(3),
+            updated_at: "2026-10-28T09:15:42Z".into(),
+            needs_you: true,
+        });
+        assert_eq!(row.label, "Add CSV export");
+        assert!(
+            row.detail.starts_with("needs you · r3 · 2026-10-28 09:15"),
+            "{}",
+            row.detail
+        );
+        assert!(matches!(row.action, Action::OpenPlan(ref id) if id == "0123456789abcdef"));
+    }
 }
 
 /// One settings change for the current project; `None` keeps a value.
@@ -890,4 +1066,7 @@ struct ProjectChange {
     sync_lessons: Option<bool>,
     agent_reflection: Option<bool>,
     export_lessons: Option<bool>,
+    question_cap: Option<u32>,
+    /// Empty plans with the task's agent.
+    planner_agent: Option<String>,
 }

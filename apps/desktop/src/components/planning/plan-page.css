@@ -230,10 +230,20 @@
   background: var(--color-accent-subtle);
 }
 
-.plan-settings {
+.plan-needs-you {
   display: grid;
   gap: 8px;
-  max-width: 480px;
+}
+
+.plan-check-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.plan-check-form > input {
+  flex: 1 1 220px;
+  min-width: 0;
 }
 
 @media (max-width: 760px) {

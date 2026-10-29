@@ -188,6 +188,21 @@ pub async fn plan_start(
     .await
 }
 
+/// Saves a plan the person wrote as a draft to review and approve.
+#[tauri::command]
+pub async fn plan_create(
+    request: RunRequest,
+    plan: session::ManualPlan,
+    state: State<'_, Coordinator>,
+) -> Result<session::PlanView, String> {
+    let service = state.inner().clone();
+    blocking(move || {
+        let record = session::create_manual(&service, request, plan)?;
+        session::view(&service, &record.id)
+    })
+    .await
+}
+
 #[tauri::command]
 pub async fn plan_keep_planning(
     id: String,

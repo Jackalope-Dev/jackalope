@@ -1,17 +1,27 @@
 # Plan mode
 
-Plan mode is an explicit way to start work: a read-only planning interview produces one
-self-contained plan, the person approves an exact revision, and Jackalope runs it as one
-agent, planned subtasks or a swarm. It never replaces the default task flow. This guide
-covers the plan document, storage, the interview limits, approval and hand-off contracts.
+Plan mode is an explicit way to start work: a read-only planning interview, or a plan the
+person writes, produces one self-contained plan, the person approves an exact revision,
+and Jackalope runs it as one agent, planned subtasks or a swarm. It never replaces the
+default task flow. This guide covers the plan document, storage, the interview limits,
+approval and hand-off contracts.
 Agent coordination contracts are in [orchestration](ORCHESTRATION-CAPABILITIES.md); the
 terminal commands are in [terminal command](CLI.md#plan-mode).
 
 ## Starting a plan
 
-- App: **Plan first** beside **Start task** in the composer, or **Plan with me** when a
-  task assessment suggests a plan or investigation (the existing choices stay).
+- App: **Plan with me** beside **Start task** in the composer, and beside the choices
+  when a task assessment suggests a plan or investigation, starts the interview.
+  **Write the plan myself**, in the composer or on Feature work, opens a form instead.
 - Terminal: `/plan <goal>` in a conversation, or `jackalope plan "<goal>"`.
+
+A written plan skips the interview. Its tasks (title, instructions, files or folders and
+the earlier tasks each starts after) become the plan's tasks, keyed `task-1`, `task-2`
+and so on, and each task's outcomes become manual acceptance criteria that task covers.
+A plan without outcomes gets one criterion from its goal, covered by every task. It is
+saved as revision 1 by `you`, as a draft, and opens on the Plans page for the same
+review, editing, approval, hand-off and tracking as a drafted plan. Unfinished drafts of
+the earlier feature planner open in this form.
 
 Planning runs with the task's agent, or the project's planning agent when one is set. The
 attempt runs in its own worktree and is told it is read-only. Codex runs with a read-only
@@ -103,7 +113,9 @@ with every revision, its author (`planner`, `you` or `amendment`), approval, exe
 link and deviations. Records are written atomically; an unreadable record is quarantined
 as `<id>.json.corrupt` and reported in the plan list rather than overwritten. Per-project
 settings are in `plans/settings.json`: `questionCap`, `plannerAgent`, `plannerModel` and
-`exportPath` (default `docs/plans/{slug}.md`). Missing fields take their defaults.
+`exportPath` (default `docs/plans/{slug}.md`). Missing fields take their defaults. They
+are edited under **Planning** in Project settings (the Plans page links there); the
+terminal's `/settings` changes the question limit and planning agent.
 
 **Save to repo** writes the current revision to the export path inside the project. The
 path must be relative, end in `.md` and stay inside the project; symbolic links are
@@ -112,10 +124,22 @@ refused. Nothing is staged or committed.
 ## Approval and hand-off
 
 Approval is one explicit call naming the revision number and hash the person reviewed;
-a changed plan, a running planner, a done plan, a project without a saved check, or swarm
-without a connected swarm Worker is refused. The app approves with the project's current check, prepare command and setup
-files; the terminal reuses those of the newest task in the project that ran with a saved
-check. Approval records the hash, the target branch head and the approver. Editing
+a changed plan, a running planner, a done plan or swarm without a connected swarm Worker
+is refused. The app approves with the project's current check, prepare command and setup
+files; the terminal uses the copy the app mirrors into the native project registry
+(`preferences/projects.json`: `verifyCommand`, `autoVerify`, `prepareCommand`,
+`setupFiles`). The work is verified with the first of:
+
+| Verification | When | Effect |
+| --- | --- | --- |
+| `project` | The project has a saved check | Each task and the combined result run it |
+| `criteria` | No saved check, but `command` or `test` criteria name exact commands | Those commands, joined with `&&` (deduplicated, at most 4,000 characters), are the check |
+| `review` | Neither | No check gate: results are reviewed but not test-verified |
+
+The approval gate says which applies. Without any check the app shows "No automatic
+check: results are reviewed but not test-verified" with a field that saves a check
+command to Project settings, and the terminal shows the same note with a hint. Approval
+records the hash, the target branch head, the approver and the verification. Editing
 the plan or asking the planner for changes creates a new draft revision that needs its
 own approval.
 
@@ -141,6 +165,13 @@ failed while Critical or Major gaps remain. A failed plan review is repaired lik
 check within the task's existing repair limit, and the combined result is not ready until
 the review passes. Human acceptance of requirements stays in result review.
 
+A review-only plan (no check) is handled explicitly in managed delivery. Only an approved
+plan may queue staged dependencies without a check. Dependent tasks start from a
+predecessor that finished cleanly (no error), still pinned to that predecessor's exact
+snapshot; repairs are started for open review gaps and unresolved interfaces rather than
+failed checks; and the combined result is ready only after a `Plan review` step passed,
+not merely when no gaps are open. Attempts that have a check keep every check gate.
+
 ## Progress, deviations and re-planning
 
 The plan view shows each task as waiting, running, checked, needs attention or merged,
@@ -153,6 +184,14 @@ repairs. A declared deviation pauses the plan's dispatch; running assignments co
 The person chooses **Accept and amend** (the summary and amendment are appended to the
 Decision log and Surprises as an amended revision, the approval moves to it and dispatch
 resumes), **Redo** (the attempt is continued with the plan as written) or **Re-plan**.
+
+A pending deviation needs the person wherever they are. The app raises "A plan needs your
+decision" as a desktop notification (when notifications are on and the window is not
+focused) and as a companion notice; both open the plan. The plan list marks the plan
+**Needs you** and the plan page shows a **Needs you** card with the three choices. In the
+terminal the open plan turns the conversation amber: its tab dot, the window title and a
+banner above the input that states the deviation and its proposed amendment. Enter on an
+empty input, or `/deviation`, opens a picker with the three choices.
 
 Re-planning continues the planning conversation with the current revision and the finished
 tasks. Finished tasks are kept with `status: done` and are not assigned again; the new

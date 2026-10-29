@@ -285,6 +285,7 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
             export_lessons: None,
             personal_claude_setup: None,
             edit_check: None,
+            ..Default::default()
         }],
     )
     .unwrap();

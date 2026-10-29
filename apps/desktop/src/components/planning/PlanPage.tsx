@@ -1,8 +1,9 @@
 import { Badge, Input, Textarea } from '@jackalope/ui';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, Settings2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
+  approvalVerification,
   criterionCoverage,
   criterionStateLabels,
   interviewOptions,
@@ -22,7 +23,7 @@ import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { usePlanStore } from '../../stores/planStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { navigateWorkspace } from '../layout/navigation';
+import { navigateWorkspace, openProjectSettings } from '../layout/navigation';
 import { AgentQuestion } from '../tasks/AgentQuestion';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
@@ -35,7 +36,7 @@ import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { WorkspaceTabs } from '../ui/WorkspaceTabs';
 import './plan-page.css';
 
-type Tab = 'plan' | 'progress' | 'revisions' | 'settings';
+type Tab = 'plan' | 'progress' | 'revisions';
 const toneVariant = {
   success: 'success',
   danger: 'danger',
@@ -127,7 +128,13 @@ export function PlanPage() {
     <WorkspacePage className="plan-page">
       <WorkspaceHeading
         title="Plans"
-        description="Explore read-only, answer a few questions, then approve a plan before code changes."
+        description="Plan with an agent or write the plan yourself, then approve it before code changes."
+        action={
+          <Button variant="outline" onClick={() => openProjectSettings(project.id, 'Project')}>
+            <Settings2 size={16} />
+            Planning settings
+          </Button>
+        }
       />
       {problems.map((problem) => (
         <InlineNotice key={problem} tone="warning">
@@ -140,7 +147,7 @@ export function PlanPage() {
         <EmptyState
           icon={ClipboardList}
           title="No plans yet"
-          description="Write a request in the composer and choose Plan first."
+          description="Write a request in the composer, then choose Plan with me or Write the plan myself."
           action={
             <Button
               onClick={() => {
@@ -165,7 +172,11 @@ export function PlanPage() {
               >
                 <span className="plan-list-title">{plan.title}</span>
                 <span className="plan-muted">
-                  {statusLabels[plan.status] ?? plan.status}
+                  {plan.needsYou ? (
+                    <Badge variant="warning">Needs you</Badge>
+                  ) : (
+                    (statusLabels[plan.status] ?? plan.status)
+                  )}
                   {plan.revision ? ` · r${plan.revision}` : ''}
                 </span>
               </button>
@@ -207,44 +218,52 @@ function PlanDetail({
         </div>
       </header>
       {view.error && <InlineNotice tone="warning">{view.error}</InlineNotice>}
-      {pending.map((deviation) => (
-        <InlineNotice
-          key={deviation.id}
-          tone="warning"
-          action={
-            <div className="plan-actions">
-              <Button
-                variant="outline"
-                onClick={() =>
-                  void act(() => planCommands.resolveDeviation(view.id, deviation.id, 'accept'))
-                }
-              >
-                Accept and amend
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  void act(() => planCommands.resolveDeviation(view.id, deviation.id, 'redo'))
-                }
-              >
-                Redo
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  void act(() => planCommands.resolveDeviation(view.id, deviation.id, 'replan'))
-                }
-              >
-                Re-plan
-              </Button>
-            </div>
-          }
-        >
-          <strong>The work departed from the plan.</strong> {deviation.summary}
-          {deviation.amendment && <p>Proposed amendment: {deviation.amendment}</p>}
-          <p>Dependent tasks are paused until you decide.</p>
-        </InlineNotice>
-      ))}
+      {pending.length > 0 && (
+        <section className="plan-needs-you" aria-labelledby="plan-needs-you">
+          <WorkspaceSectionHeading
+            title="Needs you"
+            titleId="plan-needs-you"
+            description="The work departed from the approved plan. Dependent tasks are paused until you decide."
+          />
+          {pending.map((deviation) => (
+            <InlineNotice
+              key={deviation.id}
+              tone="warning"
+              action={
+                <div className="plan-actions">
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      void act(() => planCommands.resolveDeviation(view.id, deviation.id, 'accept'))
+                    }
+                  >
+                    Accept and amend
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      void act(() => planCommands.resolveDeviation(view.id, deviation.id, 'redo'))
+                    }
+                  >
+                    Redo
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      void act(() => planCommands.resolveDeviation(view.id, deviation.id, 'replan'))
+                    }
+                  >
+                    Re-plan
+                  </Button>
+                </div>
+              }
+            >
+              <strong>{deviationKinds[deviation.kind]}</strong> {deviation.summary}
+              {deviation.amendment && <p>Proposed amendment: {deviation.amendment}</p>}
+            </InlineNotice>
+          ))}
+        </section>
+      )}
       {view.questions.map((prompt) => {
         const { choices, stops } = interviewOptions(prompt);
         return (
@@ -270,7 +289,6 @@ function PlanDetail({
             Progress
           </WorkspaceTabs.Trigger>
           <WorkspaceTabs.Trigger value="revisions">Revisions</WorkspaceTabs.Trigger>
-          <WorkspaceTabs.Trigger value="settings">Settings</WorkspaceTabs.Trigger>
         </WorkspaceTabs.List>
         <WorkspaceTabs.Content value="plan">
           <PlanReview view={view} act={act} />
@@ -280,9 +298,6 @@ function PlanDetail({
         </WorkspaceTabs.Content>
         <WorkspaceTabs.Content value="revisions">
           <PlanRevisions view={view} />
-        </WorkspaceTabs.Content>
-        <WorkspaceTabs.Content value="settings">
-          <PlanSettingsForm view={view} act={act} />
         </WorkspaceTabs.Content>
       </WorkspaceTabs.Root>
     </section>
@@ -301,6 +316,7 @@ function PlanReview({
   const preferences = useProjectStore(
     (state) => state.projects.find((project) => project.id === view.projectId)?.preferences,
   );
+  const verification = approvalVerification(view, preferences?.verifyCommand);
   const [shape, setShape] = useState<PlanShape>(view.shape);
   const [comments, setComments] = useState('');
   const [editing, setEditing] = useState(false);
@@ -366,6 +382,7 @@ function PlanReview({
               </label>
             ))}
           </fieldset>
+          <ApprovalCheck projectId={view.projectId} verification={verification} disabled={busy} />
           <div className="plan-actions">
             <Button
               disabled={busy || !view.revision || !view.hash}
@@ -773,85 +790,67 @@ function PlanRevisions({ view }: { view: PlanView }) {
   );
 }
 
-function PlanSettingsForm({
-  view,
-  act,
+const deviationKinds: Record<PlanView['deviations'][number]['kind'], string> = {
+  declared: 'An agent reported a departure from the plan.',
+  scope: 'A task changed files outside its scope.',
+  criterion: 'The combined result still fails after the allowed repairs.',
+};
+
+/** How approval verifies the work, with a way to save a check when there is none. */
+function ApprovalCheck({
+  projectId,
+  verification,
+  disabled,
 }: {
-  view: PlanView;
-  act: (work: () => Promise<unknown>) => Promise<void>;
+  projectId: string;
+  verification: ReturnType<typeof approvalVerification>;
+  disabled: boolean;
 }) {
   const id = useId();
-  const runners = useExecutionStore((state) => state.runners);
-  const [cap, setCap] = useState(String(view.settings.questionCap));
-  const [agent, setAgent] = useState(view.settings.plannerAgent ?? '');
-  const [path, setPath] = useState(view.settings.exportPath);
-  const [saved, setSaved] = useState(false);
-  const capValue = Number(cap);
-  const valid = Number.isInteger(capValue) && capValue >= 0 && capValue <= 12 && !!path.trim();
+  const [command, setCommand] = useState('');
+  if (verification.source === 'project')
+    return (
+      <p className="plan-muted">Each task and the combined result run {verification.command}.</p>
+    );
+  if (verification.source === 'criteria')
+    return (
+      <p className="plan-muted">
+        No project check is saved, so the plan's test criteria are the check: {verification.command}
+        .
+      </p>
+    );
   return (
-    <form
-      className="plan-settings"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (!valid) return;
-        setSaved(false);
-        void act(async () => {
-          await planCommands.saveSettings(view.projectId, {
-            questionCap: capValue,
-            plannerAgent: agent || null,
-            plannerModel: null,
-            exportPath: path.trim(),
-          });
-          setSaved(true);
-        });
-      }}
-    >
-      <p className="plan-muted">These apply to new plans in this project.</p>
-      <label className="task-label" htmlFor={`${id}-cap`}>
-        Most questions per plan
-      </label>
-      <Input
-        id={`${id}-cap`}
-        type="number"
-        min={0}
-        max={12}
-        value={cap}
-        onChange={(event) => setCap(event.target.value)}
-      />
-      <label className="task-label" htmlFor={`${id}-agent`}>
-        Planning agent
-      </label>
-      <Select
-        id={`${id}-agent`}
-        aria-label="Planning agent"
-        value={agent || 'task'}
-        onValueChange={(value) => setAgent(value === 'task' ? '' : value)}
+    <InlineNotice tone="warning">
+      <strong>No automatic check: results are reviewed but not test-verified.</strong>
+      <p>
+        An independent review and the agents' own assessments decide whether the work is done. Add a
+        check command to test each task and the combined result.
+      </p>
+      <form
+        className="plan-check-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const value = command.trim();
+          if (!value) return;
+          useProjectStore.getState().updateProjectPreferences(projectId, { verifyCommand: value });
+          setCommand('');
+        }}
       >
-        <SelectItem value="task">The task's agent</SelectItem>
-        {runners
-          .filter((runner) => runner.available)
-          .map((runner) => (
-            <SelectItem key={runner.id} value={runner.id}>
-              {runner.name}
-            </SelectItem>
-          ))}
-      </Select>
-      <label className="task-label" htmlFor={`${id}-path`}>
-        Save to repo path
-      </label>
-      <Input
-        id={`${id}-path`}
-        value={path}
-        maxLength={240}
-        onChange={(event) => setPath(event.target.value)}
-      />
-      <p className="plan-muted">{'{slug}'} becomes the plan title. Files are never committed.</p>
-      <div className="plan-actions">
-        <Button type="submit" disabled={!valid}>
-          Save settings
+        <label className="sr-only" htmlFor={`${id}-check`}>
+          Check command
+        </label>
+        <Input
+          id={`${id}-check`}
+          value={command}
+          maxLength={4000}
+          placeholder="pnpm test"
+          disabled={disabled}
+          onChange={(event) => setCommand(event.target.value)}
+        />
+        <Button type="submit" variant="outline" disabled={disabled || !command.trim()}>
+          Add a check command
         </Button>
-        {saved && <span role="status">Saved</span>}
-      </div>
-    </form>
+      </form>
+    </InlineNotice>
   );
 }

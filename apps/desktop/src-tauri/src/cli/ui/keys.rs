@@ -59,6 +59,12 @@ impl App {
         if key.code != KeyCode::Esc {
             self.stop_armed = None;
         }
+        // Enter on an empty input opens the choices for a plan deviation the
+        // banner above the input shows.
+        let deciding = self.editor.is_empty()
+            && self.picker.is_none()
+            && self.question().is_none()
+            && self.pending_deviation().is_some();
         let editor = &mut self.editor;
         match key.code {
             KeyCode::Char(digit @ '1'..='9') if alt && !control => {
@@ -100,6 +106,7 @@ impl App {
                 editor.set(format!("/{chosen}"));
                 self.submit();
             }
+            KeyCode::Enter if deciding => self.open_picker(PickerKind::Deviation),
             KeyCode::Enter => self.submit(),
             KeyCode::Tab if !matches.is_empty() => {
                 let name = matches[self.slash.min(matches.len() - 1)].0;
