@@ -140,7 +140,9 @@ impl Grant {
     }
 }
 
-pub fn question(scope: Scope, project: &str, reason: Option<&str>) -> String {
+/// The access question. `portal` desktops show their own approval dialog and
+/// sharing indicator and cannot pause control on physical input.
+pub fn question(scope: Scope, project: &str, reason: Option<&str>, portal: bool) -> String {
     let what = match scope {
         Scope::Window => "Choose one window the agent may read, capture, focus, click and type into. Other windows and popups need separate access.",
         Scope::App => "Choose one app. The agent may read and control all of its windows, including new ones, but no other app.",
@@ -150,7 +152,12 @@ pub fn question(scope: Scope, project: &str, reason: Option<&str>) -> String {
         .filter(|text| !text.trim().is_empty())
         .map(|text| format!(" The agent says: \u{201c}{}\u{201d}.", text.trim()))
         .unwrap_or_default();
-    format!("Allow desktop control in {project}?{reason} {what} A frame and bar show while control is active. Escape, Stop or Revoke ends access at once; moving the mouse or typing pauses it until you click Resume. Input can change files or send data, so do not choose anything showing secrets.")
+    let control = if portal {
+        "Your desktop then asks you to approve remote control, and its sharing indicator shows while control is active. Stopping the share there, Stop or Revoke ends access at once; on this desktop your own mouse and keyboard input does not pause the agent."
+    } else {
+        "A frame and bar show while control is active. Escape, Stop or Revoke ends access at once; moving the mouse or typing pauses it until you click Resume."
+    };
+    format!("Allow desktop control in {project}?{reason} {what} {control} Input can change files or send data, so do not choose anything showing secrets.")
 }
 
 /// Builds the answer options for a request. Choices are matched by label.
@@ -429,6 +436,9 @@ const BROWSERS: &[&str] = &[
     "waterfox",
     "floorp",
     "chromium",
+    "google chrome",
+    "microsoft edge",
+    "brave browser",
     "com.google.chrome",
     "com.apple.safari",
     "org.mozilla.firefox",

@@ -423,8 +423,14 @@ release dates.
   and macOS Dock reopening in installed builds.
 - [ ] Accept the GNOME 46 Wayland extension on Ubuntu 24.04 devices: installation,
   physical interruption, IME engines, scaling, multiple monitors and extension
-  lifecycle. Retain X11 coverage; other compositors and GNOME versions need their
-  own guarded integration before exposing native input.
+  lifecycle. Retain X11 coverage.
+- [ ] Accept the XDG portal desktop-control backend on installed KDE Plasma 6, GNOME
+  without the extension and a wlroots desktop (Sway with xdg-desktop-portal-wlr must
+  report unavailable): the approval dialog, restore-token reuse, sharing-indicator
+  stop, AT-SPI snapshots and actions in GTK, Qt and Chromium apps, keysym typing,
+  monitor crop and scaling with fractional scaling and multiple monitors, and the
+  Jackalope-window guard for coordinate input. Add a CI fixture that drives a real
+  portal session.
 - [ ] Validate signed installation, older-to-newer updates, real execution and
   saved-data recovery on each intended platform before enabling its download.
 - [ ] Check approved, pending, revoked and offline-expired accounts in development

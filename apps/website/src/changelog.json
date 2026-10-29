@@ -1,5 +1,16 @@
 [
   {
+    "id": "desktop-control-on-kde-plasma-and-other-wayland-desktops",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Desktop control on KDE Plasma and other Wayland desktops",
+    "description": "Agents can now control one app or the whole desktop on Wayland desktops that offer the standard remote desktop portal, after you approve your desktop's own prompt.",
+    "items": [
+      "Works on KDE Plasma and on GNOME without Jackalope's extension, using accessibility actions, keyboard and pointer input and monitor screenshots.",
+      "Your desktop can remember the approval, and stopping the share from its indicator ends access at once."
+    ]
+  },
+  {
     "id": "bots-get-their-own-computer",
     "date": "2026-10-29",
     "status": "In development",

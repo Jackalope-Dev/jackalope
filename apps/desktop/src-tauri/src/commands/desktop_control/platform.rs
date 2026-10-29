@@ -9,21 +9,75 @@ pub fn set_resource_directory(path: PathBuf) {
 
 pub fn supported() -> bool {
     #[cfg(target_os = "linux")]
-    if wayland_session() {
-        return super::native(json!({"action":"permissions"}), &AtomicBool::new(false))
-            .is_ok_and(|value| value["available"] == true && value["protocol"] == 1);
-    }
+    return !matches!(detected(false).selection, Selection::Unavailable(_));
+    #[cfg(not(target_os = "linux"))]
     cfg!(any(windows, target_os = "macos"))
-        || (cfg!(target_os = "linux")
-            && std::env::var_os("DISPLAY").is_some_and(|value| !value.is_empty())
-            && std::env::var("XDG_SESSION_TYPE").as_deref() != Ok("wayland")
-            && std::env::var_os("WAYLAND_DISPLAY").is_none_or(|value| value.is_empty()))
 }
 
+#[cfg(target_os = "linux")]
+use super::portal::Selection;
+
+/// The Linux backend for this session and what its probes reported.
+#[cfg(target_os = "linux")]
+#[derive(Clone)]
+struct Detected {
+    selection: Selection,
+    /// The X11 or GNOME helper's readiness answer, when one was asked.
+    helper: Option<Result<Value, String>>,
+    /// The bundled GNOME extension can be installed in this session.
+    can_install: bool,
+}
+
+/// Selects the Linux backend, cached briefly because probing starts helper
+/// processes and D-Bus calls. Readiness refreshes it.
+#[cfg(target_os = "linux")]
+fn detected(refresh: bool) -> Detected {
+    static CACHE: Mutex<Option<(Instant, Detected)>> = Mutex::new(None);
+    let mut cache = CACHE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some((at, detected)) = cache.as_ref() {
+        if !refresh && at.elapsed() < Duration::from_secs(30) {
+            return detected.clone();
+        }
+    }
+    let wayland = wayland_session();
+    let x11 = !wayland && std::env::var_os("DISPLAY").is_some_and(|value| !value.is_empty());
+    let helper = (wayland || x11)
+        .then(|| super::native(json!({"action":"permissions"}), &AtomicBool::new(false)));
+    let answer = helper.as_ref().and_then(|result| result.as_ref().ok());
+    let gnome_extension =
+        wayland && answer.is_some_and(|value| value["available"] == true && value["protocol"] == 1);
+    let probe = super::portal::Probe {
+        wayland,
+        x11,
+        gnome_extension,
+        portal: (wayland && !gnome_extension)
+            .then(super::portal_linux::probe)
+            .flatten(),
+    };
+    let can_install = wayland && answer.is_some_and(|value| value["canInstall"] == true);
+    let detected = Detected {
+        selection: super::portal::select(&probe),
+        helper,
+        can_install,
+    };
+    *cache = Some((Instant::now(), detected.clone()));
+    detected
+}
+
+/// Whether this session controls the desktop through the XDG portals.
+pub(crate) fn portal_selected() -> bool {
+    #[cfg(target_os = "linux")]
+    return matches!(detected(false).selection, Selection::Portal(_));
+    #[cfg(not(target_os = "linux"))]
+    false
+}
+
+#[cfg(target_os = "linux")]
 fn wayland_session() -> bool {
-    cfg!(target_os = "linux")
-        && (std::env::var("XDG_SESSION_TYPE").as_deref() == Ok("wayland")
-            || std::env::var_os("WAYLAND_DISPLAY").is_some_and(|value| !value.is_empty()))
+    std::env::var("XDG_SESSION_TYPE").as_deref() == Ok("wayland")
+        || std::env::var_os("WAYLAND_DISPLAY").is_some_and(|value| !value.is_empty())
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -86,57 +140,42 @@ pub struct Readiness {
 }
 
 pub fn readiness() -> Readiness {
-    if !wayland_session() && !supported() {
+    #[cfg(target_os = "linux")]
+    return linux_readiness();
+    #[cfg(not(target_os = "linux"))]
+    if !supported() {
         return Readiness { available: false, can_request_permissions: false, missing: Vec::new(),
             message: "Native window control is unavailable in this desktop session. On Linux, use an X11 session with accessibility and compositing support. Task browser automation is available separately.".into() };
     }
     #[cfg(windows)]
     return Readiness { available: true, can_request_permissions: false, missing: Vec::new(),
         message: "Native window control is available. Each task asks you to choose a window before access begins.".into() };
-    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[cfg(target_os = "macos")]
     {
         let result = super::native(json!({"action":"permissions"}), &AtomicBool::new(false));
         let available = result.as_ref().is_ok_and(|value| {
-            if cfg!(target_os = "macos") {
-                ["accessibility", "screenRecording", "inputMonitoring"]
-                    .iter()
-                    .all(|key| value[key] == true)
-            } else {
-                value["available"] == true && (!wayland_session() || value["protocol"] == 1)
-            }
+            ["accessibility", "screenRecording", "inputMonitoring"]
+                .iter()
+                .all(|key| value[key] == true)
         });
         let missing = match &result {
-            Ok(value) if cfg!(target_os = "macos") => {
-                ["accessibility", "screenRecording", "inputMonitoring"]
-                    .into_iter()
-                    .filter(|key| value[*key] != true)
-                    .map(String::from)
-                    .collect()
-            }
+            Ok(value) => ["accessibility", "screenRecording", "inputMonitoring"]
+                .into_iter()
+                .filter(|key| value[*key] != true)
+                .map(String::from)
+                .collect(),
             _ => Vec::new(),
         };
         Readiness {
             available,
             missing,
-            can_request_permissions: (cfg!(target_os = "macos") && result.is_ok())
-                || (cfg!(target_os = "linux")
-                    && result
-                        .as_ref()
-                        .is_ok_and(|value| value["canInstall"] == true)),
+            can_request_permissions: result.is_ok(),
             message: if available {
                 "Native window control is available. Each task asks you to choose a window; click Resume in the native bar to begin.".into()
             } else if let Err(error) = &result {
                 error.clone()
-            } else if cfg!(target_os = "macos") {
-                "Allow Accessibility, Screen Recording and Input Monitoring for Jackalope in System Settings, then restart the app and refresh this device.".into()
-            } else if let Some(message) = result
-                .as_ref()
-                .ok()
-                .and_then(|value| value["message"].as_str())
-            {
-                message.into()
             } else {
-                "This desktop is missing the display, input or accessibility services needed for native window control.".into()
+                "Allow Accessibility, Screen Recording and Input Monitoring for Jackalope in System Settings, then restart the app and refresh this device.".into()
             },
         }
     }
@@ -147,6 +186,40 @@ pub fn readiness() -> Readiness {
         missing: Vec::new(),
         message: "Native window control is unavailable on this platform.".into(),
     }
+}
+
+#[cfg(target_os = "linux")]
+fn linux_readiness() -> Readiness {
+    let detected = detected(true);
+    let (available, message) = match &detected.selection {
+        Selection::X11 | Selection::GnomeExtension => match &detected.helper {
+            Some(Ok(value)) if value["available"] == true => (true, "Native window control is available. Each task asks you to choose a window; click Resume in the native bar to begin.".to_owned()),
+            Some(Err(error)) => (false, error.clone()),
+            Some(Ok(value)) => (false, value["message"].as_str().map(str::to_owned).unwrap_or_else(|| "This desktop is missing the display, input or accessibility services needed for native window control.".into())),
+            None => (false, "Native window control is unavailable in this desktop session.".into()),
+        },
+        Selection::Portal(scopes) => (true, portal_message(*scopes)),
+        Selection::Unavailable(message) => (false, message.clone()),
+    };
+    Readiness {
+        available,
+        message,
+        can_request_permissions: detected.can_install,
+        missing: Vec::new(),
+    }
+}
+
+/// Readiness text for portal desktops, naming the grants the portal allows.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub(crate) fn portal_message(scopes: super::portal::PortalScopes) -> String {
+    let grants = match (scopes.app, scopes.desktop) {
+        (true, true) => "an app or the full desktop",
+        (true, false) => {
+            "an app (full-desktop control needs the portal's monitor sharing and screenshots)"
+        }
+        _ => "the full desktop (app control needs the accessibility service)",
+    };
+    format!("Native control is available through your desktop's remote desktop portal. Each task asks you to choose {grants}, then your desktop asks you to approve remote control. Single-window grants are unavailable here, and your own input does not pause control: stop sharing from the system indicator, or use Stop or Revoke.")
 }
 
 #[tauri::command]
@@ -349,9 +422,11 @@ impl Capabilities {
         if self.scopes.contains(&scope) {
             Ok(())
         } else {
+            let offered: Vec<&str> = self.scopes.iter().map(|scope| scope.as_str()).collect();
             Err(format!(
-                "This desktop supports only single-window grants; {} grants are available on Windows and macOS.",
-                scope.as_str()
+                "{} grants are unavailable on this desktop. Ask for {} access instead.",
+                scope.as_str(),
+                offered.join(" or ")
             ))
         }
     }
@@ -367,8 +442,53 @@ impl Capabilities {
     }
 }
 
+/// Actions the portal backend implements; clipboard access and opening apps
+/// are not offered through the portals.
+const PORTAL_ACTIONS: &[&str] = &[
+    "request_access",
+    "release",
+    "snapshot",
+    "screenshot",
+    "wait_for",
+    "focus",
+    "list_windows",
+    "switch_window",
+    "click",
+    "double_click",
+    "right_click",
+    "drag",
+    "type",
+    "set_value",
+    "press",
+    "scroll",
+    "invoke",
+    "select",
+];
+
+/// Portal desktops never offer single-window grants: the portal cannot
+/// confine input to one window, and window positions stay private.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub(crate) fn portal_capabilities(scopes: super::portal::PortalScopes) -> Capabilities {
+    use super::grant::Scope;
+    Capabilities {
+        scopes: match (scopes.app, scopes.desktop) {
+            (true, true) => &[Scope::App, Scope::Desktop],
+            (true, false) => &[Scope::App],
+            (false, true) => &[Scope::Desktop],
+            (false, false) => &[],
+        },
+        actions: PORTAL_ACTIONS,
+        element_actions: true,
+        chords: true,
+    }
+}
+
 pub(crate) fn capabilities() -> Capabilities {
     use super::grant::Scope;
+    #[cfg(target_os = "linux")]
+    if let Selection::Portal(scopes) = detected(false).selection {
+        return portal_capabilities(scopes);
+    }
     if cfg!(any(windows, target_os = "macos")) {
         Capabilities {
             scopes: &[Scope::Window, Scope::App, Scope::Desktop],

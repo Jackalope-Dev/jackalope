@@ -496,13 +496,16 @@ tasks run through its headless stream; installed-profile execution is not yet va
 Antigravity named accounts use Gemini API keys; isolated subscription accounts are
 unsupported. Discovery and fixture responses do not establish real account execution.
 
-Desktop control supports Windows and has macOS/X11 and GNOME 46 Wayland backends
-for native validation. Windows and macOS offer window, app and desktop grants with
-accessibility actions; the macOS helper is compiled and self-tested only in CI.
-X11 and GNOME keep one-window grants with coordinate fallback for element refs.
-GNOME requires the bundled window-control extension; other Wayland compositors
-remain unavailable.
-XWayland alone is insufficient. Worktrees separate Git changes; agent processes and
+Desktop control supports Windows and has macOS, X11, GNOME 46 Wayland and XDG
+desktop portal backends for native validation. Windows and macOS offer window, app
+and desktop grants with accessibility actions; the macOS helper is compiled and
+self-tested only in CI. X11 and the GNOME extension keep one-window grants with
+coordinate fallback for element refs. Other Wayland desktops that implement the
+RemoteDesktop portal (KDE Plasma 5.27+, GNOME 44+) offer app and desktop grants with
+AT-SPI element actions, portal input and Screenshot-portal captures; physical input
+does not pause control there, and wlroots desktops without RemoteDesktop remain
+unavailable. The portal client compiles only in Linux CI and has no real-portal
+fixture. XWayland alone is insufficient. Worktrees separate Git changes; agent processes and
 configured tools still run with local OS privileges.
 
 Bot computers have unit coverage and an opt-in Docker trial; no image build, container,

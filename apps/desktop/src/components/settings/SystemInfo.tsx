@@ -121,19 +121,20 @@ export function SystemInfoView() {
           />
           {host.desktop_control && (
             <Setting title="Native window control" description={host.desktop_control.message}>
-              {host.desktop_control.can_request_permissions && !host.desktop_control.available && (
-                <Button
-                  variant="outline"
-                  disabled={requestingPermissions || loading}
-                  onClick={() => void requestPermissions()}
-                  loading={requestingPermissions}
-                  loadingLabel="Setting up…"
-                >
-                  {host.os === 'linux'
-                    ? 'Install GNOME window control'
-                    : 'Set up macOS permissions'}
-                </Button>
-              )}
+              {host.desktop_control.can_request_permissions &&
+                (!host.desktop_control.available || host.os === 'linux') && (
+                  <Button
+                    variant="outline"
+                    disabled={requestingPermissions || loading}
+                    onClick={() => void requestPermissions()}
+                    loading={requestingPermissions}
+                    loadingLabel="Setting up…"
+                  >
+                    {host.os === 'linux'
+                      ? 'Install GNOME window control'
+                      : 'Set up macOS permissions'}
+                  </Button>
+                )}
             </Setting>
           )}
           {host.desktop_control &&

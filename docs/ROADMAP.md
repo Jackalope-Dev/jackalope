@@ -141,13 +141,15 @@ in every build, optional settings sync, feedback and delivery need their own acc
 Cross-platform discovery, browser, process cleanup, credential storage and notification
 hardening are implemented for native testing, including notification activation,
 account/settings sync, Unix process guardians and tray/Dock recovery. macOS and X11
-window-control helpers and a GNOME 46 Wayland extension are implemented for validation.
+window-control helpers, a GNOME 46 Wayland extension and an XDG desktop portal
+backend for other Wayland desktops are implemented for validation.
 Installed acceptance remains in progress. Cross-platform signing and branch-based
 release automation use Windows Store and Mac/Linux Cloud candidates. In-app Store
 update checks and installation are implemented for validation; live signing, publication and
 installed upgrades remain acceptance work,
 with Ubuntu 24.04/GNOME 46 the first Wayland acceptance target and X11 compatibility
-retained. Other compositors and GNOME versions remain unsupported.
+retained. KDE Plasma and other GNOME versions use the portal backend, which still
+needs installed acceptance; desktops without the RemoteDesktop portal remain unsupported.
 
 Saved bots keep standing instructions, an agent and model, a project and a connection
 scope; their conversations repeat the instructions in every batch. Bots wake on

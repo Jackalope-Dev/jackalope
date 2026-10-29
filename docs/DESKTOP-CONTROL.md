@@ -5,13 +5,14 @@ Windows, macOS and supported Linux desktops expose `desktop_control` through nat
 their logged-in browser. It is separate from the isolated [task browser](BROWSER-AUTOMATION.md),
 which has no personal sign-ins, and from a [bot computer](BOT-COMPUTERS.md), where
 `desktop_control` acts on the bot's own sandbox or cloud machine without a grant.
-macOS, Linux X11 and GNOME 46 Wayland backends are implemented for native validation;
-macOS compilation and installed-device acceptance remain open. GNOME Wayland requires
-the bundled Jackalope Window Control extension. Other Wayland and headless Linux sessions return an
+macOS, Linux X11, GNOME 46 Wayland and XDG desktop portal backends are implemented
+for native validation; macOS compilation and installed-device acceptance remain open.
+GNOME Wayland uses the bundled Jackalope Window Control extension when it is enabled;
+other Wayland desktops use the [desktop portals](#wayland-desktop-portals) when they
+implement remote desktop control. Sessions with neither, and headless Linux, return an
 explicit unavailable response and omit the MCP tool. An XWayland connection is not
-accepted as permission to control a Wayland desktop. Linux helpers remain one-window
-helpers; another backend, such as a Wayland portal, adds a `platform` launcher and
-capability set.
+accepted as permission to control a Wayland desktop. The X11 and GNOME extension
+helpers are one-window helpers.
 
 ## Grant levels and ownership
 
@@ -23,9 +24,9 @@ are never listed or controllable.
 
 | Scope | Grants | Platforms |
 | --- | --- | --- |
-| `window` | One window; other windows and popups need another grant. | Windows, macOS, Linux |
-| `app` | Every window of one app (image name on Windows, bundle ID on macOS), including new ones. | Windows, macOS |
-| `desktop` | Every app and monitor except Jackalope. Asked for every task and never remembered. | Windows, macOS |
+| `window` | One window; other windows and popups need another grant. | Windows, macOS, X11, GNOME extension |
+| `app` | Every window of one app (image name on Windows, bundle ID on macOS, accessible app name on portal desktops), including new ones. | Windows, macOS, portal desktops |
+| `desktop` | Every app and monitor except Jackalope. Asked for every task and never remembered. | Windows, macOS, portal desktops |
 
 App questions offer "Always allow <app> in <project>", and the Screen view offers the
 same for an active window or app grant. Remembered grants are stored per project in
@@ -133,8 +134,9 @@ Scroll patterns on Windows; `AXPress`, `AXConfirm`, `AXPick`, `AXSelected`, `AXV
 and `AXFocused` on macOS), which leave the mouse and window focus alone. When an
 element offers none, the helper falls back to pointer or keyboard input at the
 element's current center. Results report `method` (`accessibility`, `pointer` or
-`keyboard`) and `focusChanged`. Linux helpers do not run accessibility actions; there
-refs resolve to the recorded center and `invoke` becomes a click.
+`keyboard`) and `focusChanged`. The X11 and GNOME extension helpers do not run
+accessibility actions; there refs resolve to the recorded center and `invoke` becomes
+a click. Portal desktops run AT-SPI actions and have no coordinate fallback for refs.
 
 Input requires `snapshot_id` from the latest snapshot, screenshot or `wait_for`. It
 expires after 60 seconds and is consumed even if input fails. Window grants never
@@ -165,6 +167,10 @@ the action log. `desktop_control/grant.rs` owns grant levels, the access and web
 questions and the remembered-permission store; `actions.rs` validates requests and key
 chords; `elements.rs` normalizes accessibility trees and resolves element refs.
 
+`desktop_control/portal.rs` selects the Linux backend and holds the portal session
+sequence, grant state, restore tokens, key symbols and capture geometry;
+`portal_linux.rs` is its in-process D-Bus client.
+
 `desktop_control/helper.rs` runs one resident helper process per session and talks to it
 in JSON lines (`{"id",...}` requests, `{"id","ok","result"|"error"}` responses). The
 helper starts on first use, is reused for every action, stops after three idle minutes
@@ -189,7 +195,8 @@ status bar and handles physical interruption. The renderer's
 Run ordinary guards with `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 --lib desktop_control`. They cover grant scoping, remembered grants, site decisions,
 element refs, validation, saved-data compatibility and the resident helper lifecycle
-against a headless JSON-lines fixture. The opt-in
+against a headless JSON-lines fixture, plus backend selection, the portal session
+sequence, portal grant state and restore-token storage on every OS. The opt-in
 `native_desktop_window_trial -- --ignored --nocapture` opens its own disposable Windows
 form, starts a real indicator and drives the resident helper through snapshots, stable
 refs, accessibility value and invoke actions, typing, chords, captures, thumbnails and
@@ -287,3 +294,73 @@ protection, typing, keys, clicks, scrolling, capture, focus, epochs, heartbeat e
 external input capture and extension readiness. CI retains X11 coverage and adds this GNOME 46 fixture.
 These tests do not establish real hardware, IME engine, fractional scaling,
 multi-monitor, installed grants or distribution acceptance.
+
+### Wayland desktop portals
+
+Wayland sessions without the enabled GNOME extension use the XDG desktop portals
+through `xdg-desktop-portal` and the desktop's own portal backend. Selection checks,
+in order: an X11 session uses the X11 helper; GNOME with the extension uses it;
+otherwise the portal backend is used when the session portal implements
+`org.freedesktop.portal.RemoteDesktop`. Readiness names the grants the portal allows
+and explains what is missing otherwise. On GNOME 46 without the extension, Devices
+still offers **Install GNOME window control**.
+
+| Desktop | Portal backend | App grants | Desktop grants |
+| --- | --- | --- | --- |
+| KDE Plasma 5.27 and 6 | xdg-desktop-portal-kde | Yes | Yes |
+| GNOME 44 and later | xdg-desktop-portal-gnome | Yes | Yes |
+| Sway, Hyprland and other wlroots desktops | xdg-desktop-portal-wlr or -hyprland | No (no RemoteDesktop) | No |
+| Others implementing RemoteDesktop | Desktop-specific | With keyboard and accessibility | With keyboard, pointer, monitor ScreenCast and Screenshot |
+
+Single-window grants are not offered: the portal cannot confine input to one window
+and compositors keep window positions private. An app grant needs the RemoteDesktop
+keyboard device and the AT-SPI accessibility bus. A desktop grant needs keyboard and
+pointer devices, monitor ScreenCast sources and the Screenshot portal.
+
+After Jackalope's own access question, the grant waits (reported as paused) until the
+user approves the desktop's system dialog: keyboard control for app grants; keyboard,
+pointer and monitor sharing for desktop grants. Declining, closing the dialog or
+waiting five minutes cancels the grant. The session runs CreateSession,
+SelectDevices, SelectSources (desktop grants: monitors, multiple allowed) and Start,
+requesting `persist_mode` 2 on RemoteDesktop version 2 and later. The returned restore
+token is stored per project and scope in `preferences/desktop-portal-tokens.json`
+(mode 0600) and offered on the next grant, so desktops that honor it skip the
+dialog. Jackalope still asks its own question for every task, and desktop grants are
+still never remembered. Removing the file makes the desktop ask again.
+
+The compositor's sharing indicator and Jackalope's Screen view show control; there is
+no Jackalope bar or frame. Stopping the share from the system indicator closes the
+portal session and ends the grant, as do Stop, release and Revoke. Physical mouse and
+keyboard input cannot be observed through the portals and does not pause control.
+Escape is not a cancel shortcut here.
+
+Snapshots read the selected window's AT-SPI tree. Element refs use the AT-SPI Action,
+EditableText, Text, Value, Selection and Component interfaces; elements carry no
+bounds because window positions are unknown. Typing inserts literal text through
+EditableText at the caret, replacing one selection, and falls back to portal keysyms
+when the focused control has no editable text. Keyboard input requires the selected
+window to be active for app grants, and Jackalope not to be active for desktop
+grants; a focused password control blocks it. Jackalope cannot raise windows, so
+`focus` without an element reports the window unchanged. Browser snapshots read the
+page address from the document's `DocURL` attribute where the browser exposes it.
+
+Screenshots and pointer input at coordinates need a desktop grant. Captures use the
+non-interactive Screenshot portal, which captures every monitor into a file the
+portal chooses; Jackalope reads and deletes that file, crops the shared monitor and
+scales it to the monitor's logical size, so capture pixels equal pointer coordinates.
+When the shared monitors do not span the whole screenshot (an unshared monitor
+exists), capture fails rather than guessing; share every monitor. The Screenshot
+portal may ask once for permission. Pointer input uses `NotifyPointerMotionAbsolute`
+on the shared monitor stream, buttons and discrete scroll. Jackalope cannot locate
+its own windows, so coordinate input is refused while any Jackalope window is
+showing and not minimized. App grants keep accessibility snapshots only, and their
+post-input captures are skipped. PipeWire frame capture, clipboard access and
+`open_app` are not implemented on this backend.
+
+Apps must expose AT-SPI accessibility. GTK applications usually do; Qt applications
+may need `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1`, and Chromium-based apps may need
+accessibility enabled (for example `--force-renderer-accessibility`). Apps without it
+appear in no window list. Ordinary guards cover selection, the session sequence, grant
+state, tokens, keys and capture geometry; the D-Bus client compiles only on Linux CI.
+No automated fixture runs a real portal; installed acceptance on KDE Plasma, GNOME
+and a wlroots desktop remains open.

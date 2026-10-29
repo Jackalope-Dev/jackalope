@@ -126,8 +126,13 @@ fn grant_levels_scope_windows_apps_and_the_desktop() {
         "full desktop is never offered as remembered"
     );
     assert!(
-        grant::question(Scope::Desktop, "Site", Some("to compare two apps"))
+        grant::question(Scope::Desktop, "Site", Some("to compare two apps"), false)
             .contains("never remembered")
+    );
+    let portal = grant::question(Scope::App, "Site", None, true);
+    assert!(
+        portal.contains("approve remote control") && !portal.contains("pauses it"),
+        "portal desktops do not promise an input pause they cannot provide"
     );
     let labels: Vec<_> = listed
         .iter()
@@ -619,6 +624,36 @@ fn platform_capabilities_match_the_helpers() {
         cfg!(any(windows, target_os = "macos"))
     );
     assert!(capabilities.scope(Scope::Unknown).is_err());
+}
+
+#[test]
+fn desktop_control_portal_capabilities_offer_no_single_window_grants() {
+    let both = platform::portal_capabilities(portal::PortalScopes {
+        app: true,
+        desktop: true,
+    });
+    assert!(both.scope(Scope::App).is_ok() && both.scope(Scope::Desktop).is_ok());
+    let error = both.scope(Scope::Window).unwrap_err();
+    assert!(error.contains("app or desktop"), "{error}");
+    assert!(both.element_actions && both.chords);
+    for action in ["open_app", "clipboard_read", "clipboard_write"] {
+        assert!(both.action(action).is_err(), "{action}");
+    }
+    for action in actions::ACTIONS {
+        if !["open_app", "clipboard_read", "clipboard_write"].contains(action) {
+            assert!(both.action(action).is_ok(), "{action}");
+        }
+    }
+    let app_only = platform::portal_capabilities(portal::PortalScopes {
+        app: true,
+        desktop: false,
+    });
+    assert!(app_only.scope(Scope::Desktop).is_err());
+    let message = platform::portal_message(portal::PortalScopes {
+        app: true,
+        desktop: false,
+    });
+    assert!(message.contains("does not pause") && message.contains("an app"));
 }
 
 #[test]

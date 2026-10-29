@@ -10,6 +10,9 @@ pub mod grant;
 pub(crate) mod helper;
 pub mod indicator;
 pub mod platform;
+mod portal;
+#[cfg(target_os = "linux")]
+mod portal_linux;
 use grant::{Choice, Grant, Scope};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -149,6 +152,8 @@ struct Access {
 enum Backend {
     Resident(helper::Helper),
     Oneshot,
+    #[cfg(target_os = "linux")]
+    Portal(portal_linux::Backend),
 }
 
 struct Session {
@@ -165,6 +170,10 @@ impl Session {
             access: Mutex::new(Access::default()),
             helper: Mutex::new(match platform::launcher() {
                 Some(launcher) => Backend::Resident(helper::Helper::new(launcher)),
+                #[cfg(target_os = "linux")]
+                None if platform::portal_selected() => {
+                    Backend::Portal(portal_linux::Backend::new())
+                }
                 None => Backend::Oneshot,
             }),
             _lease: lease,
@@ -174,6 +183,10 @@ impl Session {
     /// Runs one helper request. Lock order: access (held by the caller), then helper.
     fn call(&self, payload: Value, timeout: Duration) -> Result<Value, String> {
         let mut backend = self.helper.lock().map_err(|e| e.to_string())?;
+        #[cfg(target_os = "linux")]
+        if let Backend::Portal(portal_backend) = &mut *backend {
+            return portal_backend.call(&payload, timeout, &self.canceled);
+        }
         if let Backend::Resident(helper) = &mut *backend {
             match helper.call(&payload, timeout, &self.canceled) {
                 Ok(value) => return Ok(value),
@@ -189,6 +202,25 @@ impl Session {
         }
         drop(backend);
         native(payload, &self.canceled)
+    }
+
+    /// Starts the grant's indicator: a native bar, or the portal session whose
+    /// system dialog the user approves before control begins.
+    fn start_indicator(
+        &self,
+        grant: &Grant,
+        _preferences: &std::path::Path,
+        _project_id: &str,
+    ) -> Result<indicator::Indicator, String> {
+        #[cfg(target_os = "linux")]
+        if let Backend::Portal(backend) = &mut *self.helper.lock().map_err(|e| e.to_string())? {
+            return Ok(indicator::Indicator::portal(backend.start(
+                grant.scope,
+                portal::token_path(_preferences),
+                _project_id.into(),
+            )));
+        }
+        indicator::Indicator::start(grant)
     }
 }
 
@@ -222,8 +254,11 @@ pub fn close(id: &str) {
     if let Some(session) = sessions().lock().unwrap().remove(id) {
         session.canceled.store(true, Ordering::SeqCst);
         if let Ok(mut backend) = session.helper.try_lock() {
-            if let Backend::Resident(helper) = &mut *backend {
-                helper.shutdown();
+            match &mut *backend {
+                Backend::Resident(helper) => helper.shutdown(),
+                #[cfg(target_os = "linux")]
+                Backend::Portal(portal_backend) => portal_backend.shutdown(),
+                Backend::Oneshot => {}
             }
         }
     }
@@ -525,7 +560,12 @@ impl Call<'_> {
             let prompt = PendingUserPrompt {
                 id: uuid::Uuid::new_v4().to_string(),
                 run_id: self.run.id.clone(),
-                question: grant::question(scope, &self.run.project_name, request.reason.as_deref()),
+                question: grant::question(
+                    scope,
+                    &self.run.project_name,
+                    request.reason.as_deref(),
+                    platform::portal_selected(),
+                ),
                 input_type: "choice".into(),
                 options,
                 default_value: None,
@@ -595,8 +635,23 @@ impl Call<'_> {
     ) -> Result<(), String> {
         let mut grant = Grant::from_choice(choice);
         grant.remembered = saved.as_ref().map(|saved| saved.id.clone());
-        let indicator = indicator::Indicator::start(&grant)?;
+        let indicator = self.session.start_indicator(
+            &grant,
+            &self.runtime.preferences_directory(),
+            &self.run.project_id,
+        )?;
         indicator.watch(self.session, self.runtime.clone(), self.run.id.clone());
+        let (when, ends) = if indicator.is_portal() {
+            (
+                " once you approve your desktop's system dialog",
+                "Stopping the share there, Stop or Revoke ends it; your own input does not pause it on this desktop.",
+            )
+        } else {
+            (
+                "",
+                "Escape, Stop or Revoke ends it; your input pauses it until Resume.",
+            )
+        };
         self.access.indicator = Some(indicator);
         self.access.target = grant.window.clone();
         let how = match &saved {
@@ -607,7 +662,7 @@ impl Call<'_> {
             None => "You granted desktop control.".into(),
         };
         self.activity(format!(
-            "{how} The agent may use {}. Escape, Stop or Revoke ends it; your input pauses it until Resume.",
+            "{how} The agent may use {}{when}. {ends}",
             grant.describe()
         ))?;
         self.access.grant = Some(grant);
@@ -1229,6 +1284,9 @@ pub async fn execute(
         }
         if state.status != "active" {
             call.access.snapshot = None;
+            if call.access.indicator.as_ref().is_some_and(|indicator| indicator.is_portal()) {
+                return Err(format!("Desktop control is not active yet: {} Wait for the user, then take a fresh snapshot.", state.reason));
+            }
             return Err("Desktop control paused. Wait for the user to click Resume on the bar; then take a fresh snapshot. Do not reclaim focus or bypass the pause.".into());
         }
         if let Some(pending) = call.site_answer(&fresh)? {
