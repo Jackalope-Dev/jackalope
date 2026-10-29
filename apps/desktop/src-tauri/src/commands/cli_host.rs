@@ -995,6 +995,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 return Ok(Response::Computer { computer: None });
             };
             let status = tauri::async_runtime::spawn_blocking(move || {
+                computers::usage::refresh_run_leases(&runtime);
                 match action.as_str() {
                     "" => {}
                     "start" => computers::start_background(root.clone(), computer.clone())?,
@@ -1012,6 +1013,8 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                     state: status.state,
                     phase: status.phase,
                     error: status.error,
+                    usage: status.usage,
+                    stopped_idle: status.stopped_idle,
                 }),
             })
         }

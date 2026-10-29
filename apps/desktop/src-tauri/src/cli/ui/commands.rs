@@ -661,6 +661,11 @@ fn computer_line(computer: &crate::protocol::ComputerView) -> String {
         computer.name,
         computer.state.replace('-', " ")
     );
+    if computer.stopped_idle {
+        line.push_str(" (idle)");
+    } else if let Some(usage) = &computer.usage {
+        line.push_str(&format!(" · {usage}"));
+    }
     if let Some(detail) = computer.phase.as_ref().or(computer.error.as_ref()) {
         line.push_str(&format!(" · {detail}"));
     }
@@ -832,6 +837,19 @@ mod tests {
         );
         computer.error = Some("Docker is not installed.".into());
         assert!(computer_line(&computer).ends_with("· Docker is not installed."));
+        computer.error = None;
+        computer.state = "running".into();
+        computer.usage = Some("idle 3 min · stops in 7 min".into());
+        assert_eq!(
+            computer_line(&computer),
+            "Scout computer · local sandbox · running · idle 3 min · stops in 7 min"
+        );
+        computer.state = "stopped".into();
+        computer.stopped_idle = true;
+        assert_eq!(
+            computer_line(&computer),
+            "Scout computer · local sandbox · stopped (idle)"
+        );
         assert!(COMMANDS.iter().any(|(name, _)| *name == "computer"));
     }
 

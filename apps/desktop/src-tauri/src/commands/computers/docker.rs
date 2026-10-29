@@ -215,10 +215,29 @@ pub(crate) fn image_tag(directory: &Path) -> Result<String, String> {
     Ok(format!("jackalope-computer:{hex}"))
 }
 
+/// The settings fixed when a container is created. The idle stop is left
+/// out so changing it never recreates a container, and the field names keep
+/// digests of containers made by earlier builds unchanged.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ContainerConfig<'a> {
+    cpus: f32,
+    memory_mb: u32,
+    network: bool,
+    project_mount: &'a Option<String>,
+}
+
 /// A digest of everything fixed when a container is created; a stopped
 /// container whose digest differs is recreated over the same home volume.
 pub(crate) fn config_digest(computer: &Computer, image: &str) -> String {
-    let settings = serde_json::to_string(&computer.settings).unwrap_or_default();
+    let settings = &computer.settings;
+    let settings = serde_json::to_string(&ContainerConfig {
+        cpus: settings.cpus,
+        memory_mb: settings.memory_mb,
+        network: settings.network,
+        project_mount: &settings.project_mount,
+    })
+    .unwrap_or_default();
     let digest = Sha256::digest(format!("{image}\n{settings}").as_bytes());
     digest[..8]
         .iter()
@@ -527,6 +546,34 @@ impl Provider for LocalDocker {
             return None;
         }
         published(computer, "9223").map(|port| format!("http://127.0.0.1:{port}"))
+    }
+}
+
+/// Asks Docker to stop the containers without waiting for it, for app quit.
+/// The command runs on after Jackalope exits; stopping keeps each container
+/// and its home volume.
+pub(crate) fn stop_detached(names: &[String]) {
+    let mut args = vec!["stop", "--time", "5"];
+    args.extend(names.iter().map(String::as_str));
+    let mut command = docker(&args);
+    command
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB, so a job that closes
+        // with the app does not end the stop; retried without breakaway when
+        // the job forbids it.
+        command.creation_flags(0x08000000 | 0x01000000);
+        if command.spawn().is_ok() {
+            return;
+        }
+        command.creation_flags(0x08000000);
+    }
+    if let Err(error) = command.spawn() {
+        eprintln!("Bot computers could not be stopped on quit: {error}");
     }
 }
 

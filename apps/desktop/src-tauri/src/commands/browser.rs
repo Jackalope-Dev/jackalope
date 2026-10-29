@@ -248,6 +248,35 @@ pub(super) fn peek(run_id: &str) -> Result<Peek, String> {
     Ok(Peek::Frame { url, png })
 }
 
+/// Closes task browsers driving another machine's browser through a guard
+/// for `directory` (a bot computer that stopped). Each slot forgets its route,
+/// so its next command routes again and starts the computer. A browser busy
+/// with a command is left to fail on its own.
+pub(super) fn detach_remote(directory: &Path) {
+    let slots: Vec<Arc<Slot>> = sessions()
+        .lock()
+        .map(|map| map.values().cloned().collect())
+        .unwrap_or_default();
+    for slot in slots {
+        let attached = slot.profile.lock().is_ok_and(|profile| {
+            profile.as_ref().is_some_and(|guard| {
+                guard.remote_devtools().is_some() && guard.directory() == directory
+            })
+        });
+        if !attached {
+            continue;
+        }
+        let Ok(mut engine) = slot.engine.try_lock() else {
+            continue;
+        };
+        engine.take();
+        if let Ok(mut profile) = slot.profile.lock() {
+            *profile = None;
+        }
+        slot.routed.store(false, Ordering::SeqCst);
+    }
+}
+
 pub fn close(run_id: &str) {
     let slot = sessions().lock().unwrap().remove(run_id);
     if let Some(slot) = slot {

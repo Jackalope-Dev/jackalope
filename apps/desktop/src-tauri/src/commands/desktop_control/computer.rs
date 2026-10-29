@@ -441,7 +441,7 @@ pub async fn execute(
     if request.action == "release" {
         close(&run.id);
         return Ok(
-            json!({"status":"released","instruction":"The computer keeps running; it belongs to the bot."}),
+            json!({"status":"released","instruction":"The computer belongs to the bot. It keeps running until it has been idle for its idle stop time."}),
         );
     }
     tauri::async_runtime::spawn_blocking(move || {

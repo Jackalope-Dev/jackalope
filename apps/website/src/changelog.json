@@ -20,7 +20,8 @@
       "Choose None, Local sandbox or Cloud machine in a bot's settings, then start, stop, watch or take over its computer.",
       "Desktop and browser tools act on the bot's computer without desktop access questions; each website still asks first.",
       "Agents in ordinary tasks can ask for a sandbox computer, and you decide whether to share the project read-only.",
-      "Pair your own cloud machine in Settings → Computers; Jackalope-hosted computers are coming soon."
+      "Pair your own cloud machine in Settings → Computers; Jackalope-hosted computers are coming soon.",
+      "Local sandboxes start when an agent or viewer needs them and stop after 10 minutes idle by default, or when Jackalope quits unless you keep them running."
     ]
   },
   {

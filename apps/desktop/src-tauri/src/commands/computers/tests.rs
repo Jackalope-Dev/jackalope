@@ -1,4 +1,5 @@
 use super::*;
+use sha2::Digest;
 
 fn root() -> PathBuf {
     let root = std::env::temp_dir().join(format!("jackalope-computers-{}", uuid::Uuid::new_v4()));
@@ -117,6 +118,7 @@ fn saved_records_from_other_versions_still_load() {
     let saved = list(&root).unwrap();
     assert_eq!(saved.len(), 2);
     assert_eq!(saved[0].settings, ComputerSettings::default());
+    assert_eq!(saved[0].settings.idle_stop_minutes, 10);
     assert!(provider(&saved[1].provider).is_err());
     let status = status(&root, saved[1].clone());
     assert_eq!(status.state, "unavailable");
@@ -327,6 +329,110 @@ fn remote_addresses_require_https_and_real_secrets() {
     assert!(remote::validate_secret("short").is_err());
     assert!(remote::validate_secret(&"x".repeat(40)).is_ok());
     assert!(remote::validate_secret(&format!("{} {}", "a".repeat(20), "b".repeat(20))).is_err());
+}
+
+#[test]
+fn the_idle_stop_is_bounded_and_never_recreates_a_container() {
+    let root = root();
+    let computer = bot(&root, "b1");
+    assert_eq!(computer.settings.idle_stop_minutes, 10);
+    for minutes in [0, 5, 10, 30, 60] {
+        let updated = set_idle_timeout(&root, &computer.id, minutes).unwrap();
+        assert_eq!(updated.settings.idle_stop_minutes, minutes);
+    }
+    assert!(set_idle_timeout(&root, &computer.id, 7).is_err());
+    assert!(set_idle_timeout(&root, "gone", 5).is_err());
+    assert_eq!(
+        get(&root, &computer.id).unwrap().settings.idle_stop_minutes,
+        60
+    );
+
+    let mut changed = computer.clone();
+    changed.settings.idle_stop_minutes = 0;
+    assert_eq!(
+        docker::config_digest(&changed, "img"),
+        docker::config_digest(&computer, "img")
+    );
+    let earlier = sha2::Sha256::digest(
+        "img
+{\"cpus\":2.0,\"memoryMb\":4096,\"network\":true,\"projectMount\":null}"
+            .as_bytes(),
+    );
+    let earlier: String = earlier[..8].iter().map(|b| format!("{b:02x}")).collect();
+    assert_eq!(
+        docker::config_digest(&computer, "img"),
+        earlier,
+        "containers made before the idle stop keep their configuration"
+    );
+}
+
+#[test]
+fn idle_computers_stop_only_past_their_timeout_and_without_a_lease() {
+    let minute = Duration::from_secs(60);
+    assert!(!usage::idle_due(10, 9 * minute, false));
+    assert!(usage::idle_due(10, 10 * minute, false));
+    assert!(
+        !usage::idle_due(10, 60 * minute, true),
+        "a lease keeps it running"
+    );
+    assert!(!usage::idle_due(0, 600 * minute, false), "never stops");
+
+    assert_eq!(
+        usage::describe("running", true, 10, false, 3 * minute, None).as_deref(),
+        Some("idle 3 min · stops in 7 min")
+    );
+    assert_eq!(
+        usage::describe("running", true, 10, false, Duration::from_secs(20), None).as_deref(),
+        Some("just used · stops in 10 min")
+    );
+    assert_eq!(
+        usage::describe("running", true, 10, true, 30 * minute, None).as_deref(),
+        Some("in use")
+    );
+    assert_eq!(
+        usage::describe("running", true, 0, false, 3 * minute, None).as_deref(),
+        Some("idle 3 min")
+    );
+    assert_eq!(
+        usage::describe("running", false, 10, false, 3 * minute, None).as_deref(),
+        Some("idle 3 min"),
+        "cloud machines are never stopped"
+    );
+    assert_eq!(
+        usage::describe("stopped", true, 10, false, Duration::ZERO, Some(10)).as_deref(),
+        Some("Stopped after 10 minutes idle")
+    );
+    assert_eq!(
+        usage::describe("stopped", true, 10, false, Duration::ZERO, None),
+        None
+    );
+}
+
+#[test]
+fn open_viewers_hold_a_computer_until_released() {
+    let root = root();
+    let id = format!("viewer-{}", uuid::Uuid::new_v4().simple());
+    assert!(!usage::in_use(&id));
+    usage::hold_viewer(&root, &id, "a");
+    usage::hold_viewer(&root, &id, "b");
+    assert!(usage::in_use(&id));
+    usage::release_viewer(&id, "a");
+    assert!(usage::in_use(&id));
+    usage::release_viewer(&id, "b");
+    assert!(!usage::in_use(&id));
+}
+
+#[test]
+fn quit_preferences_default_to_stopping_sandboxes() {
+    let root = root();
+    assert!(!usage::preferences(&root).keep_running_on_quit);
+    let keep = ComputerPreferences {
+        keep_running_on_quit: true,
+    };
+    usage::save_preferences(&root, &keep).unwrap();
+    assert_eq!(usage::preferences(&root), keep);
+    std::fs::write(root.join("preferences.json"), b"{not json").unwrap();
+    assert!(!usage::preferences(&root).keep_running_on_quit);
 }
 
 /// Builds the image and drives a real local sandbox. Needs Docker and network

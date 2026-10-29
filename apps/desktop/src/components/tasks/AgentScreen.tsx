@@ -10,7 +10,7 @@ import {
   revokeAgentAccess,
   type AgentScreen as Screen,
 } from '../../lib/agent-screen';
-import { computerStateLabel, providerLabel } from '../../lib/computers';
+import { computerStateLabel, computerUsage, providerLabel } from '../../lib/computers';
 import { isActive, type TaskRun } from '../../lib/task-runtime';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { ComputerViewer } from '../computers/ComputerViewer';
@@ -182,7 +182,7 @@ export function AgentScreen({ run, visible = true }: { run: TaskRun; visible?: b
           <p className="task-muted">
             {computer.phase ??
               computer.error ??
-              `${providerLabel(computer.provider)}. Desktop and browser tools act here, not on your computer.`}
+              `${computerUsage(computer) ? `${computerUsage(computer)}. ` : ''}${providerLabel(computer.provider)}. Desktop and browser tools act here, not on your computer.`}
           </p>
           <ComputerViewer computer={computer} />
         </div>

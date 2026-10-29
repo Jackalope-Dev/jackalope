@@ -24,3 +24,9 @@
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
 }
+
+.computer-idle-stop {
+  display: grid;
+  gap: 8px;
+  min-width: 160px;
+}

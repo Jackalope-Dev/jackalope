@@ -1680,6 +1680,23 @@ impl TaskRuntime {
             })
             .collect()
     }
+    /// Runs that are starting, running, stopping or finishing.
+    pub(in crate::commands) fn active_runs(&self) -> Vec<TaskRun> {
+        self.inner
+            .lock()
+            .map(|inner| {
+                inner
+                    .runs
+                    .values()
+                    .filter(|run| {
+                        ["starting", "running", "stopping"].contains(&run.status.as_str())
+                            || run.finishing
+                    })
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
     pub fn active_work_count(&self) -> usize {
         self.inner
             .lock()

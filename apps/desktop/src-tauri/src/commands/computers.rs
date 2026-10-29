@@ -20,6 +20,9 @@ pub(crate) mod docker;
 pub(crate) mod remote;
 #[cfg(test)]
 mod tests;
+pub(crate) mod usage;
+
+pub use usage::{launch as launch_idle_stop, shutdown, ComputerPreferences};
 
 use super::{
     account_storage,
@@ -33,7 +36,7 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     sync::{atomic::AtomicBool, Arc, Mutex, OnceLock},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 pub(crate) const LOCAL_DOCKER: &str = "local-docker";
@@ -80,6 +83,10 @@ pub struct ComputerSettings {
     /// Host folder mounted read-only at /workspace/project, for task computers.
     #[serde(default)]
     pub project_mount: Option<String>,
+    /// Minutes without use before a local sandbox stops; 0 never stops it.
+    /// Applies at once and is not part of the container's configuration.
+    #[serde(default = "default_idle")]
+    pub idle_stop_minutes: u32,
 }
 
 fn default_cpus() -> f32 {
@@ -91,6 +98,9 @@ fn default_memory() -> u32 {
 fn enabled() -> bool {
     true
 }
+fn default_idle() -> u32 {
+    usage::DEFAULT_IDLE_MINUTES
+}
 
 impl Default for ComputerSettings {
     fn default() -> Self {
@@ -99,6 +109,7 @@ impl Default for ComputerSettings {
             memory_mb: default_memory(),
             network: true,
             project_mount: None,
+            idle_stop_minutes: default_idle(),
         }
     }
 }
@@ -110,6 +121,9 @@ impl ComputerSettings {
         }
         if !(1024..=65536).contains(&self.memory_mb) {
             return Err("Choose between 1 GB and 64 GB of memory.".into());
+        }
+        if !usage::IDLE_CHOICES.contains(&self.idle_stop_minutes) {
+            return Err("Choose 5, 10, 30 or 60 minutes, or never, for the idle stop.".into());
         }
         if let Some(path) = &self.project_mount {
             let path = Path::new(path);
@@ -491,7 +505,7 @@ pub(crate) fn start_background(root: PathBuf, computer: Computer) -> Result<(), 
         };
         match provider.start(&root, &computer, &progress) {
             Ok(()) => {
-                touch(&root, &computer.id);
+                usage::note(&root, &computer.id);
                 set_phase(&computer.id, None, None);
             }
             Err(error) => set_phase(&computer.id, None, Some(error)),
@@ -508,6 +522,7 @@ pub(crate) fn call(
     timeout: Duration,
     canceled: &AtomicBool,
 ) -> Result<Value, String> {
+    usage::note(root, &computer.id);
     let connection = {
         let mut map = connections().lock().map_err(|e| e.to_string())?;
         match map.get(&computer.id) {
@@ -524,31 +539,51 @@ pub(crate) fn call(
     transport.call(&payload, timeout, canceled)
 }
 
-/// The computer ready for agent work. A stopped computer starts in the
-/// background and the agent is told to retry.
+/// How long agent work waits for a stopped computer to start before it is
+/// told to call again (a first image build takes longer).
+const START_WAIT: Duration = Duration::from_secs(90);
+
+/// The computer ready for agent work. A stopped computer starts and the call
+/// waits for it within [`START_WAIT`]; past that the agent is told to retry.
 pub(crate) fn ready(root: &Path, computer: &Computer) -> Result<(), String> {
-    let busy = current_activity(&computer.id);
-    if let Some(phase) = busy.phase {
-        return Err(format!(
-            "{} is starting ({phase}). Call again in about a minute.",
-            computer.name
-        ));
-    }
+    ready_within(root, computer, START_WAIT)
+}
+
+fn ready_within(root: &Path, computer: &Computer, wait: Duration) -> Result<(), String> {
+    usage::note(root, &computer.id);
     let provider = provider(&computer.provider)?;
-    provider.available(root, computer)?;
-    match provider.state(root, computer)? {
-        MachineState::Running => Ok(()),
-        _ => {
-            if let Some(error) = busy.error {
-                set_phase(&computer.id, None, None);
-                return Err(format!("{} could not start: {error}", computer.name));
+    let deadline = Instant::now() + wait;
+    let mut started = false;
+    loop {
+        let busy = current_activity(&computer.id);
+        if busy.phase.is_some() || usage::is_stopping(&computer.id) {
+            if Instant::now() >= deadline {
+                let phase = busy.phase.unwrap_or_else(|| "Stopping".into());
+                return Err(format!(
+                    "{} is starting ({phase}). Call again in about a minute.",
+                    computer.name
+                ));
             }
-            start_background(root.to_path_buf(), computer.clone())?;
-            Err(format!(
-                "{} was stopped and is starting now. Call again in about a minute.",
-                computer.name
-            ))
+            std::thread::sleep(Duration::from_millis(500));
+            continue;
         }
+        provider.available(root, computer)?;
+        if provider.state(root, computer)? == MachineState::Running {
+            usage::note(root, &computer.id);
+            return Ok(());
+        }
+        if let Some(error) = busy.error {
+            set_phase(&computer.id, None, None);
+            return Err(format!("{} could not start: {error}", computer.name));
+        }
+        if started {
+            return Err(format!(
+                "{} did not start. Call again in about a minute.",
+                computer.name
+            ));
+        }
+        start_background(root.to_path_buf(), computer.clone())?;
+        started = true;
     }
 }
 
@@ -827,6 +862,12 @@ pub struct ComputerStatus {
     pub error: Option<String>,
     /// Whether a viewer can be opened now.
     pub viewer: bool,
+    /// An active run or an open viewer holds it, so it is not stopped.
+    pub in_use: bool,
+    /// Stopped by the idle stop; it starts again when next used.
+    pub stopped_idle: bool,
+    /// Idle time and when it stops, or why it stopped, after the state.
+    pub usage: Option<String>,
 }
 
 pub(crate) fn status(root: &Path, computer: Computer) -> ComputerStatus {
@@ -847,7 +888,11 @@ pub(crate) fn status(root: &Path, computer: Computer) -> ComputerStatus {
     if busy.error.is_some() {
         error = busy.error;
     }
+    let usage = usage::view(&computer, &state);
     ComputerStatus {
+        in_use: usage.in_use,
+        stopped_idle: usage.stopped_idle,
+        usage: usage.line,
         viewer: state == "running"
             && (computer.settings.network || computer.provider != LOCAL_DOCKER),
         computer,
@@ -876,8 +921,10 @@ pub async fn computer_docker_status() -> Result<docker::DockerStatus, String> {
 pub async fn computer_list(
     state: tauri::State<'_, TaskRuntime>,
 ) -> Result<Vec<ComputerStatus>, String> {
+    let runtime = state.inner().clone();
     let root = state.computers_root();
     blocking(move || {
+        usage::refresh_run_leases(&runtime);
         Ok(list(&root)?
             .into_iter()
             .map(|computer| status(&root, computer))
@@ -892,10 +939,12 @@ pub async fn computer_status(
     owner_id: String,
     state: tauri::State<'_, TaskRuntime>,
 ) -> Result<Option<ComputerStatus>, String> {
+    let runtime = state.inner().clone();
     let root = state.computers_root();
-    blocking(
-        move || Ok(find(&root, &owner_kind, &owner_id).map(|computer| status(&root, computer))),
-    )
+    blocking(move || {
+        usage::refresh_run_leases(&runtime);
+        Ok(find(&root, &owner_kind, &owner_id).map(|computer| status(&root, computer)))
+    })
     .await
 }
 
@@ -959,7 +1008,7 @@ pub async fn computer_stop(
 }
 
 pub(crate) fn stop(root: &Path, computer: &Computer) -> Result<(), String> {
-    disconnect(&computer.id);
+    usage::release_connections(root, computer);
     set_phase(&computer.id, None, None);
     provider(&computer.provider)?.stop(root, computer)
 }
@@ -979,7 +1028,7 @@ pub(crate) fn delete(root: &Path, id: &str) -> Result<(), String> {
     if current_activity(id).phase.is_some() {
         return Err("Wait for the computer to finish starting, then delete it.".into());
     }
-    disconnect(id);
+    usage::release_connections(root, &computer);
     if let Ok(provider) = provider(&computer.provider) {
         provider.delete(root, &computer)?;
     }
@@ -991,16 +1040,97 @@ pub(crate) fn delete(root: &Path, id: &str) -> Result<(), String> {
     write(root, &index)
 }
 
+/// A viewer address, starting a stopped computer first. `lease` names the
+/// open viewer; it renews the lease with [`computer_viewer_lease`] while open.
 #[tauri::command]
 pub async fn computer_viewer(
     id: String,
     interactive: bool,
+    lease: Option<String>,
     state: tauri::State<'_, TaskRuntime>,
 ) -> Result<Option<String>, String> {
     let root = state.computers_root();
     blocking(move || {
         let computer = get(&root, &id)?;
+        if computer.provider == LOCAL_DOCKER && !computer.settings.network {
+            return Ok(None);
+        }
+        if let Some(lease) = &lease {
+            usage::hold_viewer(&root, &id, lease);
+        }
+        ready(&root, &computer)?;
         provider(&computer.provider)?.viewer(&root, &computer, interactive)
+    })
+    .await
+}
+
+/// Renews (`open`) or releases an open viewer's hold on a computer.
+#[tauri::command]
+pub async fn computer_viewer_lease(
+    id: String,
+    lease: String,
+    open: bool,
+    state: tauri::State<'_, TaskRuntime>,
+) -> Result<(), String> {
+    if open {
+        usage::hold_viewer(&state.computers_root(), &id, &lease);
+    } else {
+        usage::release_viewer(&id, &lease);
+    }
+    Ok(())
+}
+
+/// Sets how long a computer may sit unused before it stops.
+#[tauri::command]
+pub async fn computer_idle_timeout(
+    id: String,
+    minutes: u32,
+    state: tauri::State<'_, TaskRuntime>,
+) -> Result<ComputerStatus, String> {
+    let root = state.computers_root();
+    blocking(move || {
+        let computer = set_idle_timeout(&root, &id, minutes)?;
+        Ok(status(&root, computer))
+    })
+    .await
+}
+
+pub(crate) fn set_idle_timeout(root: &Path, id: &str, minutes: u32) -> Result<Computer, String> {
+    ComputerSettings {
+        idle_stop_minutes: minutes,
+        ..Default::default()
+    }
+    .validate()?;
+    let _guard = index_lock().lock().map_err(|e| e.to_string())?;
+    let mut index = read(root)?;
+    let computer = index
+        .computers
+        .iter_mut()
+        .find(|c| c.id == id)
+        .ok_or("That computer no longer exists.")?;
+    computer.settings.idle_stop_minutes = minutes;
+    let updated = computer.clone();
+    write(root, &index)?;
+    Ok(updated)
+}
+
+#[tauri::command]
+pub async fn computer_preferences(
+    state: tauri::State<'_, TaskRuntime>,
+) -> Result<ComputerPreferences, String> {
+    let root = state.computers_root();
+    blocking(move || Ok(usage::preferences(&root))).await
+}
+
+#[tauri::command]
+pub async fn computer_set_preferences(
+    preferences: ComputerPreferences,
+    state: tauri::State<'_, TaskRuntime>,
+) -> Result<ComputerPreferences, String> {
+    let root = state.computers_root();
+    blocking(move || {
+        usage::save_preferences(&root, &preferences)?;
+        Ok(preferences)
     })
     .await
 }
@@ -1008,6 +1138,7 @@ pub async fn computer_viewer(
 /// A run's computer as the Screen view shows it.
 pub(crate) fn view_for_run(runtime: &TaskRuntime, run_id: &str) -> Option<ComputerStatus> {
     let computer = for_run_id(runtime, run_id)?;
+    usage::refresh_run_leases(runtime);
     Some(status(&runtime.computers_root(), computer))
 }
 

@@ -299,9 +299,14 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Tasks get one only after the person approves `computer_request`. Desktop control acts
   on the computer without an access question, browser tools drive its Chromium for local
   sandboxes with networking on, each site still asks first, and `computer_exec` runs
-  bounded commands inside it. Bot settings, the Screen view and Settings → Computers
-  start, stop, watch, take over and delete computers; `/computer` shows and changes one
-  in the terminal. Jackalope-hosted computers are listed as coming soon. See
+  bounded commands inside it. A stopped computer starts when an agent, the browser tools
+  or a viewer needs it, waiting up to 90 seconds. Local sandboxes stop after an idle
+  time (10 minutes by default; 5, 30, 60 or never) unless an active run or open viewer
+  holds them, and stop when Jackalope quits unless the person keeps them running;
+  cloud machines are never stopped. Bot settings, the Screen view and Settings →
+  Computers show idle time and start, stop, watch, take over and delete computers;
+  `/computer` shows and changes one in the terminal. Jackalope-hosted computers are
+  listed as coming soon. See
   [bot computers](BOT-COMPUTERS.md).
 - Task and chat Screen views poll the attempt's existing task browser viewport and
   desktop grant state without opening a browser, requesting access or saving an
@@ -510,8 +515,9 @@ configured tools still run with local OS privileges.
 
 Bot computers have unit coverage and an opt-in Docker trial; no image build, container,
 viewer or cloud machine has been accepted in an installed app on any platform. Cloud
-machines reach desktop control and commands but not the browser tools, the in-sandbox
-agent has no accessibility actions, and running computers are not stopped automatically.
+machines reach desktop control and commands but not the browser tools, and the
+in-sandbox agent has no accessibility actions. The idle stop, start on demand and quit
+stop are covered by unit tests only.
 
 Installed provider, accessibility, recovery, performance, signed installation and
 update acceptance remain platform-specific requirements. Real-model quality and

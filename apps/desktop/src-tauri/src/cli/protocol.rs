@@ -237,6 +237,12 @@ pub struct ComputerView {
     pub state: String,
     pub phase: Option<String>,
     pub error: Option<String>,
+    /// Idle time and when it stops, or that it is in use. Absent from older apps.
+    #[serde(default)]
+    pub usage: Option<String>,
+    /// Stopped by the idle stop.
+    #[serde(default)]
+    pub stopped_idle: bool,
 }
 
 /// A persistent agent browser profile as a terminal shows it.

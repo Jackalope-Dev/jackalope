@@ -68,13 +68,16 @@ release dates.
   in the embedded viewer, `desktop_control` snapshots, refs, typing and chords on the
   computer, browser tools attached to its Chromium with all four site answers and the
   sign-in pause, `computer_request` answers, `computer_exec` limits, `/computer`, and that
-  no container, volume or `docker exec` process is left behind after delete.
+  no container, volume or `docker exec` process is left behind after delete. Check the
+  idle stop at 5 minutes with no run or viewer, that an active run and an open viewer
+  hold the computer, that an agent call and Watch start a stopped computer, the
+  countdown in each status view, and that quitting stops sandboxes without delaying
+  exit (and leaves them running with the setting on, adopted at the next launch).
 - [ ] Pair a cloud machine on at least one real provider behind HTTPS (Caddy or similar):
   wrong secret, unreachable machine, Test connection, desktop control and commands
   through the agent, the external viewer page and removal. Decide whether browser tools
   should reach cloud machines through an authenticated DevTools proxy.
-- [ ] Add AT-SPI accessibility actions and stable refs to the in-sandbox agent, and an
-  idle stop for unused local computers.
+- [ ] Add AT-SPI accessibility actions and stable refs to the in-sandbox agent.
 - [ ] Accept persistent agent browser profiles in installed apps on Windows, macOS and
   Linux with Chrome, Edge and Chromium: open the Project browser and a bot browser to
   sign in, confirm sign-ins survive closing the window, an app restart and a later

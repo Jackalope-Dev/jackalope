@@ -150,6 +150,7 @@ pub fn run(launch: Launch) {
             let runtime = TaskRuntime::new(directory.clone())?;
             runtime.observe_changes(app.handle().clone());
             commands::computers::install_browser_routing(runtime.clone());
+            commands::computers::launch_idle_stop(runtime.clone());
             let helper = commands::helper::Helper::new(directory.clone(), runtime.clone());
             helper.launch();
             app.manage(helper);
@@ -349,6 +350,10 @@ pub fn run(launch: Launch) {
             commands::computers::computer_stop,
             commands::computers::computer_delete,
             commands::computers::computer_viewer,
+            commands::computers::computer_viewer_lease,
+            commands::computers::computer_idle_timeout,
+            commands::computers::computer_preferences,
+            commands::computers::computer_set_preferences,
             commands::computers::computer_machines,
             commands::computers::computer_machine_add,
             commands::computers::computer_machine_test,
@@ -596,6 +601,7 @@ pub fn run(launch: Launch) {
                 commands::work_terminal::close_all();
                 app.state::<Coordinator>().shutdown();
                 app.state::<TaskRuntime>().stop_all();
+                commands::computers::shutdown(&app.state::<TaskRuntime>().computers_root());
                 app.state::<AppState>().kill_all_pty_sessions();
                 app.state::<SignInService>().stop_all();
             }

@@ -32,17 +32,51 @@ When a run belongs to a bot with a computer, or to a task that was given one:
 - `computer_exec` runs one `bash -lc` command inside the computer as its unprivileged
   user, bounded by a 1 to 600 second limit and 64 KB of output per stream.
 
-A stopped computer starts in the background when an agent first needs it; the agent is
-told to call again. Agents are never given the person's sign-ins. Sign-in pages pause the
-browser tools and ask the person to sign in through **Watch / take over**.
+A stopped computer starts when anything needs it: `computer_request`, `desktop_control`,
+`computer_exec`, the browser tools or a viewer. The call waits up to 90 seconds for the
+start; past that (a first image build takes minutes) the agent is told the computer is
+starting and to call again. Agents are never given the person's sign-ins. Sign-in pages
+pause the browser tools and ask the person to sign in through **Watch / take over**.
 
 The bot's settings, the task's Screen view and Settings → Computers show the computer's
-state, start and stop it, and offer **Watch** (view only) and **Take over** (the person's
-mouse and keyboard reach the computer while the agent may also act). Deleting a local
-computer removes its container, its home volume (files and browser sign-ins) and its
-saved viewer password; deleting a cloud computer only forgets the pairing. The terminal's
-`/computer` shows the conversation's computer and `/computer start` or `/computer stop`
-changes it.
+state with its idle time and when it stops (`Running · idle 3 min · stops in 7 min`,
+`in use`, or `Stopped (idle)`), start and stop it, and offer **Watch** (view only) and
+**Take over** (the person's mouse and keyboard reach the computer while the agent may
+also act). Watch on a stopped computer starts it first. Deleting a local computer removes
+its container, its home volume (files and browser sign-ins) and its saved viewer
+password; deleting a cloud computer only forgets the pairing. The terminal's `/computer`
+shows the conversation's computer with the same status and `/computer start` or
+`/computer stop` changes it.
+
+## Idle stop and quit
+
+Every use records activity: agent requests through the computer's connection, browser
+attaches, commands, starts and viewer opens. A computer is held, and never stopped by
+Jackalope's idle stop, while an active run routes to it (its bot's conversation or its
+task's attempt) or an embedded viewer is open; the viewer renews its hold every 30
+seconds and the hold lapses 90 seconds after the viewer closes or the app stops renewing
+it. A run's hold counts as use, so idle time starts when the run ends.
+
+One background sweep runs every 30 seconds. It closes the cached connection of any
+computer unused for five minutes, and stops a local sandbox that is unheld and idle past
+its **Stop when idle** time: 5, 10 (the default), 30 or 60 minutes, or Never, set in the
+bot's settings or per computer in Settings → Computers. The setting applies at once and
+never recreates the container. Stopping is `docker stop`: the container and its home
+volume stay. It first closes the computer's agent connection and any task browser
+attached to its Chromium, so their next use reconnects and starts the computer again.
+The status then reads **Stopped (idle)** with "Stopped after N minutes idle". A use that
+arrives during an idle stop waits for it and starts the computer again.
+
+When Jackalope quits it closes every computer connection and, unless **Keep computers
+running when Jackalope quits** is on in Settings → Computers (off by default), runs one
+detached `docker stop --time 5` for every local sandbox without waiting for it, so quit
+is not delayed. The global setting is stored in `computers/preferences.json`. A sandbox
+found running at the next launch, for example after a crash or with the setting on, is
+adopted: its idle time starts when Jackalope first sees it.
+
+Jackalope never stops a cloud machine. It only drops idle connections to it; the
+machine's own provider schedule (or the person) decides when it runs. A Jackalope-hosted
+provider would stop its machines on the server side.
 
 ## Local sandboxes
 
@@ -91,9 +125,6 @@ authentication, so any program on this device can reach a running computer's bro
 through its loopback port, as with other local agent tooling. Do not give a computer
 secrets it should not hold; anything signed in inside it is available to its agents.
 
-Computers keep running until stopped, deleted or the Docker engine stops; Jackalope does
-not stop them when the app quits.
-
 ## Cloud machines
 
 A cloud machine is any machine the person runs (a VM from any provider, a home server)
@@ -133,8 +164,11 @@ settings have a stable name, and every operation reports that it is not availabl
 
 `commands/computers.rs` owns the index (`task-runs-v1/computers/computers.json`, written
 atomically; an unreadable file is preserved and blocks changes), secrets, background
-starts, cached connections, run routing, `computer_request`, `computer_exec` and the
-app commands. Records from newer builds with unknown providers load and report
+starts and the bounded wait for them, cached connections, run routing,
+`computer_request`, `computer_exec` and the app commands. `computers/usage.rs` owns
+activity, run and viewer holds, the idle sweep, the quit stop and the quit preference.
+`last_used_at` in the index is rewritten at most every five minutes; idle time itself is
+kept in memory. Records from newer builds with unknown providers load and report
 unavailable. A provider implements the `Provider` trait:
 
 | Method | Contract |
@@ -174,7 +208,9 @@ image would need their notices.
 `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib computers::` covers
 records and compatibility, settings bounds, one machine per bot, the hosted refusal,
 Docker detection messages, container arguments, loopback ports and viewer URLs, the
-image tag and cloud address and secret validation. The opt-in
+image tag, cloud address and secret validation, the idle stop choices and their
+exclusion from the container configuration, idle decisions and status text, viewer
+holds and the quit preference. The opt-in
 `local_docker_computer_round_trip -- --ignored --nocapture` builds the image, starts a
 computer, takes a screenshot and snapshot, runs a command, checks the home volume
 survives a restart and deletes everything; it needs Docker and network access. These

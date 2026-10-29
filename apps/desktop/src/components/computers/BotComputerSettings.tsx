@@ -1,5 +1,5 @@
 import { Badge, FormField, Input, SegmentedControl } from '@jackalope/ui';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   botComputer,
   type CloudMachine,
@@ -7,6 +7,7 @@ import {
   type ComputerStatus,
   cloudMachines,
   computerStateLabel,
+  computerUsage,
   configureBotComputer,
   DEFAULT_COMPUTER_SETTINGS,
   type DockerStatus,
@@ -24,10 +25,17 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { ComputerViewer } from './ComputerViewer';
+import { IdleStopSelect } from './IdleStopSelect';
 import '../settings/settings.css';
 import './computers.css';
 
 type Kind = 'none' | 'local-docker' | 'remote-machine';
+
+/** Status refresh while a computer runs, so its idle countdown stays current. */
+const RUNNING_REFRESH_MS = 30_000;
+
+const resourcesDiffer = (left: ComputerSettings, right: ComputerSettings) =>
+  left.cpus !== right.cpus || left.memoryMb !== right.memoryMb || left.network !== right.network;
 
 /** CPU, memory and network for a local sandbox. Changes apply at the next start. */
 function Resources({
@@ -100,13 +108,19 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
   const [settings, setSettings] = useState<ComputerSettings>(DEFAULT_COMPUTER_SETTINGS);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  // Unsaved resource edits survive status refreshes.
+  const edited = useRef(false);
+  const editSettings = (next: ComputerSettings) => {
+    edited.current = true;
+    setSettings(next);
+  };
 
   const refresh = useCallback(async () => {
     if (!isTauriEnvironment()) return;
     try {
       const next = await botComputer(bot.id);
       setStatus(next);
-      if (next) setSettings(next.settings);
+      if (next && !edited.current) setSettings(next.settings);
     } catch (cause) {
       setError(String(cause));
     } finally {
@@ -125,10 +139,13 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
       .catch(() => setMachines([]));
   }, [refresh]);
 
-  // Follow a starting computer until it settles.
+  // Follow a starting computer until it settles, and a running one's idle time.
   useEffect(() => {
-    if (status?.state !== 'starting') return;
-    const timer = window.setInterval(() => void refresh(), 2000);
+    if (status?.state !== 'starting' && status?.state !== 'running') return;
+    const timer = window.setInterval(
+      () => void refresh(),
+      status.state === 'starting' ? 2000 : RUNNING_REFRESH_MS,
+    );
     return () => window.clearInterval(timer);
   }, [status?.state, refresh]);
 
@@ -153,6 +170,7 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
         kind === 'remote-machine' ? machineId : null,
         settings,
       );
+      edited.current = false;
       await startComputer(created.id);
     });
 
@@ -191,7 +209,15 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
             description={
               status.phase ??
               status.error ??
-              `${providerLabel(status.provider)}${status.provider === 'local-docker' ? ` · ${status.settings.cpus} CPUs · ${status.settings.memoryMb / 1024} GB` : ''}`
+              [
+                computerUsage(status),
+                providerLabel(status.provider),
+                ...(status.provider === 'local-docker'
+                  ? [`${status.settings.cpus} CPUs`, `${status.settings.memoryMb / 1024} GB`]
+                  : []),
+              ]
+                .filter(Boolean)
+                .join(' · ')
             }
           >
             {status.state === 'running' && status.provider === 'local-docker' ? (
@@ -216,15 +242,23 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
               </Button>
             ) : null}
           </Setting>
-          {status.state === 'running' && (
+          {(status.state === 'running' || status.state === 'stopped') && (
             <SettingBody>
               <ComputerViewer computer={status} />
             </SettingBody>
           )}
           {status.provider === 'local-docker' && (
+            <Setting
+              title="Stop when idle"
+              description="Stops the sandbox after this long with no agent work and no open viewer. Its files are kept, and it starts again when an agent or viewer needs it."
+            >
+              <IdleStopSelect computer={status} disabled={!!busy} onChanged={setStatus} />
+            </Setting>
+          )}
+          {status.provider === 'local-docker' && (
             <SettingBody>
-              <Resources settings={settings} disabled={!!busy} onChange={setSettings} />
-              {JSON.stringify(settings) !== JSON.stringify(status.settings) && (
+              <Resources settings={settings} disabled={!!busy} onChange={editSettings} />
+              {resourcesDiffer(settings, status.settings) && (
                 <Button
                   variant="outline"
                   className="mt-3"
@@ -232,9 +266,13 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
                   loadingLabel="Saving…"
                   disabled={!!busy}
                   onClick={() =>
-                    void run('save', () =>
-                      configureBotComputer(bot, 'local-docker', null, settings),
-                    )
+                    void run('save', async () => {
+                      await configureBotComputer(bot, 'local-docker', null, {
+                        ...settings,
+                        idleStopMinutes: status.settings.idleStopMinutes,
+                      });
+                      edited.current = false;
+                    })
                   }
                 >
                   Save resources
@@ -312,7 +350,7 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
                   builds its image, which takes a few minutes.
                 </p>
               )}
-              <Resources settings={settings} disabled={!!busy} onChange={setSettings} />
+              <Resources settings={settings} disabled={!!busy} onChange={editSettings} />
               <Button
                 loading={busy === 'create'}
                 loadingLabel="Creating…"
