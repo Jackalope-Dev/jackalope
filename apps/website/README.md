@@ -72,8 +72,10 @@ it does not reproduce the edited film. Select reviewed runtime exports and updat
 all fields in `tour` together when replacing the film.
 
 `scripts/social-preview.html` is the source for `public/social-preview.png`, the
-Open Graph image. After changing it or `media/tasks-light.png`, regenerate it with
-`node apps/website/scripts/capture-social.mjs`.
+Open Graph image, drawn from the landing page hero with the mark and agent logos from
+`@jackalope/brand`. After changing it, regenerate it with
+`node apps/website/scripts/capture-social.mjs` and bump `SOCIAL_IMAGE` in `src/seo.ts` so
+link previews fetch the new image.
 
 ## Verification
 
