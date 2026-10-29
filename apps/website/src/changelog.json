@@ -1,5 +1,32 @@
 [
   {
+    "id": "finish-work-from-the-terminal-and-stay-in-sync-with-the-app",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Finish work from the terminal and stay in sync with the app",
+    "description": "The jackalope terminal now picks up changes made in the app right away and can merge, open pull requests and take back queued messages.",
+    "items": [
+      "Pausing, finishing or queuing in the app, plan edits and deviation decisions reach open terminals at once, and changes made in a terminal reach the app without waiting.",
+      "/merge and /pr deliver a conversation's work after a confirmation, and /unqueue takes back a message that has not reached an agent yet.",
+      "Permission requests only accept their options, so a typed reply can no longer deny by accident, and questions left open after the agent stopped can still be answered.",
+      "/status summarizes the project, the work and what needs you without leaving the conversation, and other conversations that start needing you are announced."
+    ]
+  },
+  {
+    "id": "easier-agent-questions-in-the-app-and-terminal",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Easier agent questions in the app and terminal",
+    "description": "Questions from agents now get room to read and answer, stay in sync between the app and the terminal, and can still be answered after a task stops.",
+    "items": [
+      "A waiting question takes most of the task page, and you can drag the handle beneath it to resize; the sidebar width can be dragged too, and both sizes are remembered.",
+      "If a task ends with a question open, pick an answer and the task continues with it.",
+      "Answering in the app closes the question in the terminal and shows the next one, and the terminal can answer questions that take several choices.",
+      "Close finished or stale work from the sidebar; it stays on the Work page and returns when it needs you again.",
+      "Terminal tabs show only conversations that need you or that you opened, and plan results show their summary as a list instead of one long heading."
+    ]
+  },
+  {
     "id": "desktop-control-on-kde-plasma-and-other-wayland-desktops",
     "date": "2026-10-29",
     "status": "In development",

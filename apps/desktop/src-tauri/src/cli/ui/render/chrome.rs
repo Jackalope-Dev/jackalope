@@ -16,12 +16,26 @@ type Piece = (Span<'static>, Option<Click>);
 
 /// Writes `pieces` left to right from `x` on row `y`, up to `limit`,
 /// recording where each clickable piece landed. Returns the next column.
+/// Pieces that do what the one under the pointer does highlight together, so
+/// a tab made of several pieces lights up as one.
 fn place(frame: &mut Frame, app: &App, x: u16, y: u16, limit: u16, pieces: Vec<Piece>) -> u16 {
+    let hovered = app.hover.filter(|(_, row)| *row == y).and_then(|(at, _)| {
+        let mut column = x;
+        pieces.iter().find_map(|(span, click)| {
+            let width = span.width() as u16;
+            let found = (column..column + width).contains(&at).then_some(*click);
+            column += width;
+            found
+        })
+    });
     let mut column = x;
-    for (span, click) in pieces {
+    for (mut span, click) in pieces {
         let width = span.width() as u16;
         if column + width > limit {
             break;
+        }
+        if click.is_some() && hovered == Some(click) {
+            span.style = span.style.patch(brand::selection());
         }
         frame.buffer_mut().set_span(column, y, &span, width);
         if let Some(click) = click {
@@ -168,9 +182,10 @@ pub fn header(frame: &mut Frame, app: &App, area: Rect) {
 
 /// Tabs appear once there is more than one conversation to move between.
 fn tabs_shown(app: &App) -> bool {
-    match app.sessions.len() {
+    let order = app.tab_order();
+    match order.len() {
         0 => false,
-        1 => app.session.as_ref() != Some(&app.sessions[0].id),
+        1 => app.session.as_ref() != Some(&order[0]),
         _ => true,
     }
 }
@@ -178,8 +193,7 @@ fn tabs_shown(app: &App) -> bool {
 /// How a tab's conversation is doing: its dot and colour.
 fn tab_state(app: &App, session: &protocol::SessionSummary) -> (&'static str, Color) {
     let current = app.session.as_ref() == Some(&session.id);
-    let needs_you = session.asking
-        || protocol::present(session.error.as_deref()).is_some()
+    let needs_you = super::super::conversation::needs_you(session)
         || (current
             && (app
                 .view
@@ -207,7 +221,7 @@ fn tab_state(app: &App, session: &protocol::SessionSummary) -> (&'static str, Co
 /// Alt+number, a dot for how each is doing, and its title. Titles shorten to
 /// fit; what still does not fit is counted at the end.
 fn tabs(frame: &mut Frame, app: &App, x: u16, y: u16, limit: u16) {
-    let order = app.session_order();
+    let order = app.tab_order();
     let room = limit.saturating_sub(x) as usize;
     let label = |index: usize, title_width: usize| {
         let session = app

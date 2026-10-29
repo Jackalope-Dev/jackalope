@@ -542,6 +542,14 @@ pub fn success() -> Color {
     tone((0x2e, 0xbc, 0x7e), Color::Green)
 }
 
+/// Mentions of agents and files, kept apart from plan mode's green.
+pub fn info() -> Color {
+    if !colored() {
+        return Color::Reset;
+    }
+    tone((0x3b, 0x82, 0xf6), Color::Blue)
+}
+
 /// Work that needs attention: an open question, a sign-in, a stalled action.
 pub fn warning() -> Color {
     if !colored() {
@@ -677,19 +685,25 @@ pub const WORDMARK_WIDTH: usize = 9 * 7 - 1;
 /// Columns the narrow wordmark needs.
 pub const SMALL_WORDMARK_WIDTH: usize = 9 * 5 - 1;
 
-/// "JACKALOPE" in block capitals three rows tall, swept by the accent
-/// gradient. Half blocks give each row two pixels, so the letters keep round
-/// shoulders without box-drawing.
-pub fn wordmark() -> Vec<Line<'static>> {
-    block_letters(&LETTERS)
+/// "JACKALOPE" in block capitals, three rows tall or two when `small` (for
+/// windows narrower than `WORDMARK_WIDTH`), swept by the accent gradient. Half
+/// blocks give each row two pixels, so the letters keep round shoulders
+/// without box-drawing. Light crosses it once while `sweep` (0 to 1) runs on
+/// the start screen; it stays still without motion.
+pub fn wordmark_sweeping(small: bool, sweep: Option<f32>) -> Vec<Line<'static>> {
+    let sweep = sweep.filter(|_| motion() && colored());
+    block_letters(if small { &SMALL_LETTERS } else { &LETTERS }, sweep)
 }
 
-/// The wordmark two rows tall, for windows narrower than `WORDMARK_WIDTH`.
-pub fn small_wordmark() -> Vec<Line<'static>> {
-    block_letters(&SMALL_LETTERS)
+/// How brightly a column at `position` (0 to 1) catches a sweep at `sweep`,
+/// which enters before the first letter and leaves after the last.
+fn sweep_light(position: f32, sweep: f32) -> f32 {
+    const BAND: f32 = 0.12;
+    let center = -BAND + sweep * (1.0 + 2.0 * BAND);
+    (1.0 - ((position - center).abs() / BAND)).max(0.0)
 }
 
-fn block_letters(letters: &[(char, &[&str]); 8]) -> Vec<Line<'static>> {
+fn block_letters(letters: &[(char, &[&str]); 8], sweep: Option<f32>) -> Vec<Line<'static>> {
     let glyphs: Vec<&[&str]> = "JACKALOPE"
         .chars()
         .filter_map(|letter| {
@@ -723,10 +737,13 @@ fn block_letters(letters: &[(char, &[&str]); 8]) -> Vec<Line<'static>> {
                             (false, false) => " ",
                         };
                     let position = (index * (width + 1) + column) as f32 / total as f32;
-                    spans.push(Span::styled(
-                        symbol,
-                        Style::default().fg(gradient(position)),
-                    ));
+                    let light = sweep.map_or(0.0, |sweep| sweep_light(position, sweep));
+                    let color = if light > 0.0 {
+                        mix(gradient(position), lifted(0.85), light)
+                    } else {
+                        gradient(position)
+                    };
+                    spans.push(Span::styled(symbol, Style::default().fg(color)));
                 }
             }
             Line::from(spans)
@@ -916,7 +933,7 @@ mod tests {
 
     #[test]
     fn the_wordmark_spells_jackalope_at_its_declared_width() {
-        let lines = wordmark();
+        let lines = wordmark_sweeping(false, None);
         assert_eq!(lines.len(), 3);
         for line in &lines {
             assert_eq!(line.width(), WORDMARK_WIDTH);
@@ -924,11 +941,28 @@ mod tests {
         for (_, rows) in LETTERS {
             assert!(rows.iter().all(|row| row.len() == 6), "{rows:?}");
         }
-        let small = small_wordmark();
+        let small = wordmark_sweeping(true, None);
         assert_eq!(small.len(), 2);
         for line in &small {
             assert_eq!(line.width(), SMALL_WORDMARK_WIDTH);
         }
+    }
+
+    #[test]
+    fn the_wordmark_sweep_crosses_every_column_and_ends_dark() {
+        for step in 0..=40 {
+            let sweep = step as f32 / 40.0;
+            assert!((0.0..=1.0).contains(&sweep_light(0.5, sweep)));
+        }
+        for column in 0..=20 {
+            let position = column as f32 / 20.0;
+            assert!(
+                (0..=100).any(|step| sweep_light(position, step as f32 / 100.0) > 0.5),
+                "column {position} never lights"
+            );
+        }
+        assert_eq!(sweep_light(0.0, 1.0), 0.0);
+        assert_eq!(sweep_light(1.0, 0.0), 0.0);
     }
 
     #[test]

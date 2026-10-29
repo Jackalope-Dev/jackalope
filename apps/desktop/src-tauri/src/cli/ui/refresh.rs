@@ -5,7 +5,6 @@
 //! round of reads and typing never waits on the host.
 
 use super::feed::Tone;
-use super::pickers::PickerKind;
 use super::{App, Event};
 use crate::connection::Connection;
 use crate::protocol::{self, Handshake, Project, SessionSummary, SessionView};
@@ -203,12 +202,38 @@ impl App {
             self.flash("Reconnected to Jackalope", Tone::Success);
         }
         if let Some(sessions) = snapshot.sessions {
+            // Say when another conversation starts needing you, since only its
+            // tab shows it otherwise. The first read only sets the baseline.
+            let first = self.sessions.is_empty();
+            let newly: Vec<String> = sessions
+                .iter()
+                .filter(|session| {
+                    self.session.as_ref() != Some(&session.id)
+                        && super::conversation::needs_you(session)
+                        && !self.sessions.iter().any(|before| {
+                            before.id == session.id && super::conversation::needs_you(before)
+                        })
+                })
+                .map(|session| session.title.clone())
+                .collect();
             self.sessions = sessions;
+            if !first {
+                for title in newly {
+                    self.note_tone(
+                        format!("{title} needs you · /sessions or its tab"),
+                        Tone::Warning,
+                    );
+                }
+            }
         }
         if let Some(projects) = snapshot.projects {
             self.projects = projects;
         }
         let project = snapshot.project;
+        if project.id != self.project.id {
+            // Commit attribution is per project; read it again when shown.
+            self.attribution = None;
+        }
         if project.accent != self.project.accent || project.id != self.project.id {
             brand::set_accent(project.accent.as_deref());
         }
@@ -226,15 +251,14 @@ impl App {
         }
         if let Some(view) = snapshot.view {
             self.set_view(Some(view));
+            self.adopt_draft();
         }
         if let Some(changes) = snapshot.changes {
             self.set_changes(changes);
         }
         self.track_work();
         self.offer_question();
-        if self.picker.as_ref().map(|picker| picker.kind) == Some(PickerKind::Sessions) {
-            self.open_picker(PickerKind::Sessions);
-        }
+        self.sync_picker();
     }
 
     /// Notes when the current run was first seen working, for its elapsed time.
@@ -254,7 +278,11 @@ impl App {
                 self.work_started = Some((run, Instant::now()));
             }
             Some(_) => {}
-            None => self.work_started = None,
+            None => {
+                if let Some((_, at)) = self.work_started.take() {
+                    self.last_run_took = Some(at.elapsed());
+                }
+            }
         }
         let progress = self.view.as_ref().filter(|_| self.working()).map(|view| {
             format!(

@@ -442,6 +442,7 @@ mod tests {
             text: text.into(),
             sent: true,
             attempt,
+            id: None,
         };
         let view = SessionView {
             id: "s".into(),
@@ -469,6 +470,9 @@ mod tests {
             questions: Vec::new(),
             partial: String::new(),
             review_screenshots: None,
+            merged: false,
+            draft: String::new(),
+            draft_revision: 0,
         };
         let shown: Vec<String> = conversation(&view, 80).iter().map(text).collect();
         let first = shown

@@ -82,7 +82,38 @@ pub fn reply(question: &Question, text: &str) -> String {
             return serde_json::to_string(&chosen).unwrap_or_default();
         }
     }
-    pick(text).unwrap_or_else(|| text.trim().to_string())
+    // An option typed by name, in any case, answers with the option itself.
+    pick(text)
+        .or_else(|| {
+            question
+                .options
+                .iter()
+                .find(|option| option.eq_ignore_ascii_case(text.trim()))
+                .cloned()
+        })
+        .unwrap_or_else(|| text.trim().to_string())
+}
+
+/// `reply`, refusing text that is not one of the options when the question
+/// takes only its options: a permission request would read it as a denial.
+pub fn checked_reply(question: &Question, text: &str) -> Result<String, String> {
+    let answer = reply(question, text);
+    let chosen = if question.multi_select {
+        serde_json::from_str::<Vec<String>>(&answer).is_ok()
+    } else {
+        question.options.contains(&answer)
+    };
+    if question.allow_other == Some(false) && !chosen {
+        let options = question
+            .options
+            .iter()
+            .enumerate()
+            .map(|(index, option)| format!("{}. {option}", index + 1))
+            .collect::<Vec<_>>()
+            .join("  ");
+        return Err(format!("Choose an option by number or name: {options}"));
+    }
+    Ok(answer)
 }
 
 fn ask(question: &Question) -> Result<Option<String>, String> {
@@ -93,16 +124,26 @@ fn ask(question: &Question) -> Result<Option<String>, String> {
     std::io::stderr()
         .flush()
         .map_err(|error| error.to_string())?;
-    let mut line = String::new();
-    if std::io::stdin()
-        .lock()
-        .read_line(&mut line)
-        .map_err(|error| error.to_string())?
-        == 0
-    {
-        return Ok(None);
+    loop {
+        let mut line = String::new();
+        if std::io::stdin()
+            .lock()
+            .read_line(&mut line)
+            .map_err(|error| error.to_string())?
+            == 0
+        {
+            return Ok(None);
+        }
+        match checked_reply(question, &line) {
+            Ok(answer) => return Ok(Some(answer).filter(|text| !text.is_empty())),
+            Err(problem) => {
+                eprint!("{problem}\n> ");
+                std::io::stderr()
+                    .flush()
+                    .map_err(|error| error.to_string())?;
+            }
+        }
     }
-    Ok(Some(reply(question, &line)).filter(|text| !text.is_empty()))
 }
 
 fn next_steps(view: &PlanView) {
@@ -298,7 +339,26 @@ mod tests {
             recommended: Some("CSV".into()),
             multi_select: multi,
             rationale: Some("Decides the serializers.".into()),
+            allow_other: None,
         }
+    }
+
+    #[test]
+    fn options_only_questions_refuse_other_text() {
+        let mut permission = question(false);
+        permission.options = vec!["Allow once".into(), "Deny".into()];
+        permission.allow_other = Some(false);
+        assert_eq!(checked_reply(&permission, "1").unwrap(), "Allow once");
+        assert_eq!(
+            checked_reply(&permission, "allow once").unwrap(),
+            "Allow once"
+        );
+        assert!(checked_reply(&permission, "yes").is_err());
+        assert_eq!(
+            checked_reply(&question(false), "Parquet").unwrap(),
+            "Parquet"
+        );
+        assert_eq!(reply(&question(false), "json"), "JSON");
     }
 
     #[test]
@@ -335,5 +395,37 @@ mod tests {
         let parsed: Request =
             serde_json::from_str(r#"{"request":"plan-detail","plan_id":"p"}"#).unwrap();
         assert!(matches!(parsed, Request::PlanDetail { .. }));
+    }
+
+    #[test]
+    fn new_conversation_fields_stay_compatible_with_older_peers() {
+        // An older host refuses unknown fields, so a plain action omits message_id.
+        let pause = serde_json::to_string(&Request::SessionAction {
+            session_id: "s".into(),
+            action: "pause".into(),
+            message_id: None,
+        })
+        .unwrap();
+        assert_eq!(
+            pause,
+            r#"{"request":"session-action","session_id":"s","action":"pause"}"#
+        );
+        // And an older terminal's request still parses here.
+        let parsed: Request = serde_json::from_str(
+            r#"{"request":"session-action","session_id":"s","action":"finish"}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            parsed,
+            Request::SessionAction {
+                message_id: None,
+                ..
+            }
+        ));
+        let older: crate::protocol::Message =
+            serde_json::from_value(serde_json::json!({"role": "you", "text": "hi", "sent": false}))
+                .unwrap();
+        assert!(older.id.is_none());
+        assert!(question(false).allow_other.is_none());
     }
 }

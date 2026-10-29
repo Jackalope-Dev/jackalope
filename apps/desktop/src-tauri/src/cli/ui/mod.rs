@@ -14,6 +14,8 @@
 mod changes;
 mod commands;
 mod conversation;
+mod delivery;
+mod drafts;
 mod editor;
 mod events;
 mod feed;
@@ -50,6 +52,8 @@ enum Event {
     Scroll(i16),
     /// A press, drag or release of the left button, for selecting text.
     Select(MouseEvent),
+    /// The pointer moved to this column and row, for hover highlights.
+    Hover(u16, u16),
     Paste(String),
     Shell(shell::Update),
     Resize,
@@ -123,6 +127,9 @@ struct App {
     sessions: Vec<SessionSummary>,
     projects: Vec<Project>,
     overview: Option<Result<Overview, String>>,
+    /// When the agent overview was last asked for, and whether that read is
+    /// still running, so app changes to agents reach this terminal.
+    overview_asked: (Instant, bool),
     /// Why the host cannot be reached, while it cannot.
     offline: Option<String>,
     /// The last host error a refresh reported, so it is noted once.
@@ -140,6 +147,8 @@ struct App {
     /// Questions already offered as a picker, so dismissing one does not
     /// reopen it on every refresh.
     offered: HashSet<String>,
+    /// Conversations opened in this terminal, kept as tabs once visited.
+    opened: HashSet<String>,
     history: Vec<String>,
     history_index: Option<usize>,
     files: Option<FileIndex>,
@@ -184,6 +193,14 @@ struct App {
     transcript: RefCell<Option<render::transcript::Cache>>,
     /// Where the last frame drew something clickable.
     hits: RefCell<Vec<(Rect, Click)>>,
+    /// Where the pointer last was, so the clickable piece under it highlights.
+    hover: Option<(u16, u16)>,
+    /// The open conversation's draft, shared with the app.
+    draft_sync: Option<drafts::DraftSync>,
+    /// How long the work that just stopped ran, for the done message.
+    last_run_took: Option<std::time::Duration>,
+    /// When the start screen was first drawn, for the wordmark's light sweep.
+    intro: Cell<Option<Instant>>,
     /// Animation frame for the working indicator.
     tick: usize,
     /// Currently displayed rotating tip.
@@ -231,6 +248,7 @@ pub fn run(
         sessions: Vec::new(),
         projects: Vec::new(),
         overview: None,
+        overview_asked: (Instant::now(), true),
         offline: None,
         problem: None,
         attribution: None,
@@ -240,6 +258,7 @@ pub fn run(
         next_agent: next.agent,
         next_model: next.model,
         offered: HashSet::new(),
+        opened: HashSet::new(),
         history: history::load(),
         history_index: None,
         files: None,
@@ -265,6 +284,10 @@ pub fn run(
         max_scroll: Cell::new(0),
         transcript: RefCell::new(None),
         hits: RefCell::new(Vec::new()),
+        hover: None,
+        draft_sync: None,
+        intro: Cell::new(None),
+        last_run_took: None,
         tick: 0,
         tip_index: 0,
         last_tip_change: Instant::now(),
@@ -347,26 +370,52 @@ fn suspend(terminal: &mut ratatui::DefaultTerminal, enhanced: bool) -> Result<()
 impl App {
     /// Replaces the conversation on screen, or clears it for a new one.
     fn show(&mut self, session: Option<String>) {
+        if session != self.session {
+            self.leave_draft();
+        }
+        // Coming back to the start screen plays the wordmark's sweep again.
+        self.intro.set(None);
+        self.opened.extend(session.clone());
         self.session = session;
         self.set_view(None);
         self.context += 1;
         self.scroll_top = None;
         self.selection = None;
         self.work_started = None;
+        self.last_run_took = None;
         self.last_progress = None;
         self.reset_panel();
         self.refresh();
     }
 
+    /// Replaces the conversation shown. The transcript is laid out again only
+    /// when something in it changed: refreshes arrive constantly while agents
+    /// work, and a long conversation's markdown is the costliest thing to draw.
     fn set_view(&mut self, view: Option<SessionView>) {
+        let unchanged = match (&self.view, &view) {
+            (Some(shown), Some(next)) => {
+                // The shared draft is in the input, not the transcript.
+                let mut next = next.clone();
+                next.draft.clone_from(&shown.draft);
+                next.draft_revision = shown.draft_revision;
+                *shown == next
+            }
+            (None, None) => true,
+            _ => false,
+        };
         self.view = view;
-        self.view_version += 1;
+        if !unchanged {
+            self.view_version += 1;
+        }
     }
 
     /// Switches to another project with no conversation open.
     fn switch_project(&mut self, project: Project) {
         self.branch = git::branch(&project.path);
         brand::set_accent(project.accent.as_deref());
+        if project.id != self.project.id {
+            self.attribution = None;
+        }
         self.project = project;
         self.show(None);
     }

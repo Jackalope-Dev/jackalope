@@ -34,7 +34,7 @@
   flex-shrink: 0;
 }
 .workspace-shell .workspace-navigation {
-  width: 216px;
+  width: var(--sidebar-width, 216px);
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -71,6 +71,13 @@
   flex: 1;
   min-width: 0;
 }
+/* Sits in the gap between the sidebar and the page, so it adds no width of its own. */
+.workspace-shell .workspace-navigation-resizer {
+  margin-inline: -12px;
+}
+.workspace-shell .workspace-navigation:has(+ .workspace-navigation-resizer:active) {
+  transition: none;
+}
 .work-sidebar-list {
   flex: 1;
   min-height: 0;
@@ -82,6 +89,27 @@
   color: var(--color-text-muted);
   margin: 20px 12px 8px;
 }
+.work-sidebar-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.work-sidebar-clear {
+  margin-right: 8px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.work-sidebar-clear:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+.work-sidebar-clear:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
 .work-sidebar-item {
   display: flex;
   gap: 8px;
@@ -91,6 +119,42 @@
   padding: 10px 12px;
   border-radius: var(--radius-md);
   min-height: 44px;
+}
+.work-sidebar-row {
+  position: relative;
+}
+/* Shown on hover or keyboard focus so the list stays quiet while reading it. */
+.work-sidebar-close {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: var(--color-surface-hover);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 120ms ease;
+}
+.work-sidebar-row:hover .work-sidebar-close,
+.work-sidebar-row:focus-within .work-sidebar-close {
+  opacity: 1;
+}
+.work-sidebar-close:hover {
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-text-primary) 10%, var(--color-surface-hover));
+}
+.work-sidebar-close:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .work-sidebar-close {
+    transition: none;
+  }
 }
 .work-sidebar-item:hover {
   background: var(--color-surface-hover);
@@ -259,7 +323,7 @@
 }
 @media (max-width: 1000px) {
   .workspace-shell .workspace-navigation {
-    width: 180px;
+    width: var(--sidebar-width, 180px);
   }
   .workspace-shell .command-trigger.command-jump {
     width: auto;
@@ -283,7 +347,8 @@
   .workspace-shell .workspace-settings {
     margin-top: 0;
   }
-  .workspace-shell .work-sidebar-list {
+  .workspace-shell .work-sidebar-list,
+  .workspace-shell .workspace-navigation-resizer {
     display: none;
   }
   .workspace-shell .workspace-nav-item {

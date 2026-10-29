@@ -179,14 +179,22 @@ pub fn question_card(app: &App, width: u16) -> Vec<Line<'static>> {
     } else {
         text
     };
+    let count = question.options.len();
     let mut hint = if question.options.is_empty() {
         "  Type your answer below and press Enter".to_string()
+    } else if question.multi_select {
+        format!("  {count} options · pick several with /answer · or type numbers like 1,3")
+    } else if question.allow_other == Some(false) {
+        format!("  {count} options · /answer to choose · or type its number")
     } else {
-        format!(
-            "  {} options · /answer to choose · or type your own",
-            question.options.len()
-        )
+        format!("  {count} options · /answer to choose · or type a number or your own")
     };
+    if app.ended_on(question).is_some() {
+        hint = format!(
+            "  The agent stopped first · your answer continues the conversation ·{}",
+            &hint[1..]
+        );
+    }
     if let Some(recommended) = &question.recommended {
         hint.push_str(&format!(" · recommended: {recommended}"));
     }
@@ -198,5 +206,14 @@ pub fn question_card(app: &App, width: u16) -> Vec<Line<'static>> {
         shown,
         Style::default().add_modifier(Modifier::BOLD),
     ));
-    vec![Line::from(first), Line::styled(hint, muted)]
+    let mut lines = vec![Line::from(first)];
+    // Why the answer matters, kept to one line so the conversation keeps its room.
+    if let Some(rationale) = &question.rationale {
+        lines.push(Line::styled(
+            format!("  {}", brand::ellipsize(rationale, room.saturating_sub(2))),
+            muted,
+        ));
+    }
+    lines.push(Line::styled(hint, muted));
+    lines
 }

@@ -37,7 +37,7 @@ import { listMcpServers, type McpServerConfig, openInBrowser } from '../../lib/t
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { useWorkSignalsStore } from '../../stores/workSignalsStore';
+import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { Button } from '../ui/button';
@@ -61,6 +61,7 @@ import { TaskIntegration } from './TaskIntegration';
 import { TaskOutcomes } from './TaskOutcomes';
 import { TaskPreview } from './TaskPreview';
 import { TaskProgress } from './TaskProgress';
+import { TaskQuestions } from './TaskQuestions';
 import { TaskRunDetails } from './TaskRunDetails';
 import { TaskSaveRecovery } from './TaskSaveRecovery';
 import { UserPromptCard } from './UserPromptCard';
@@ -201,7 +202,15 @@ export function TaskDetail({
       run.projectPath.replaceAll('\\', '/').toLowerCase();
   const finished = !active && ['review', 'reviewed'].includes(run.status);
   const canContinue = isLatest && !!run.sessionId && run.status !== 'interrupted' && !integrated;
-  const decision = taskDecision(run, integrated);
+  const changedFiles = useChangeStats([run])[run.id]?.value.files;
+  useEffect(() => {
+    useWorkViewStore.getState().setViewing(run.id);
+    return () => {
+      if (useWorkViewStore.getState().viewing === run.id)
+        useWorkViewStore.getState().setViewing(null);
+    };
+  }, [run.id]);
+  const decision = taskDecision(run, integrated, changedFiles);
   const { followups, queueError, queueing, queueFollowUp, updateFollowUp } = useTaskFollowUps({
     run,
     draftKey: key,
@@ -278,36 +287,40 @@ export function TaskDetail({
     }
   };
 
+  /** Starts the next attempt from this one with `prompt`; throws when it cannot. */
+  const startContinuation = async (prompt: string, stopPreview = false) => {
+    if (stopPreview) await nativeTask('task_preview_stop', { id: run.id });
+    if (active) {
+      await nativeTask('task_stop', { id: run.id });
+      await waitForStoppedAttempt(
+        run.id,
+        async () => {
+          await refresh();
+          return useExecutionStore.getState().runs.find((r) => r.id === run.id);
+        },
+        () => new Promise((resolve) => setTimeout(resolve, 250)),
+      );
+    }
+    if (latestAttempt(useExecutionStore.getState().runs, run.taskId)?.id !== run.id)
+      throw new Error('A newer attempt exists. Open the latest result before continuing.');
+    await start({
+      projectId: run.projectId,
+      projectName: run.projectName,
+      projectPath: run.projectPath,
+      agent: run.agent,
+      prompt,
+      isolated: false,
+      previousRunId: run.id,
+      connectionIds: drafts[key]?.connectionIds,
+    });
+  };
   const continueTask = async (stopPreview = false) => {
     if (!reply.trim() || acting || submitting || !canContinue) return;
     setActing(true);
     setError('');
     const prompt = reply.trim();
     try {
-      if (stopPreview) await nativeTask('task_preview_stop', { id: run.id });
-      if (active) {
-        await nativeTask('task_stop', { id: run.id });
-        await waitForStoppedAttempt(
-          run.id,
-          async () => {
-            await refresh();
-            return useExecutionStore.getState().runs.find((r) => r.id === run.id);
-          },
-          () => new Promise((resolve) => setTimeout(resolve, 250)),
-        );
-      }
-      if (latestAttempt(useExecutionStore.getState().runs, run.taskId)?.id !== run.id)
-        throw new Error('A newer attempt exists. Open the latest result before continuing.');
-      await start({
-        projectId: run.projectId,
-        projectName: run.projectName,
-        projectPath: run.projectPath,
-        agent: run.agent,
-        prompt,
-        isolated: false,
-        previousRunId: run.id,
-        connectionIds: drafts[key]?.connectionIds,
-      });
+      await startContinuation(prompt, stopPreview);
       if (useExecutionStore.getState().drafts[key]?.prompt.trim() === prompt)
         draft(key, { prompt: '' });
     } catch (cause) {
@@ -318,6 +331,17 @@ export function TaskDetail({
   };
   const sendFollowUp = () =>
     active || followups.length ? queueFollowUp() : continueTask(previewRunning);
+  /** Answers a question the attempt ended on by continuing the task with it. */
+  const continueWithAnswer = async (question: string, answer: string) => {
+    if (acting || submitting) throw new Error('The task is already continuing.');
+    setActing(true);
+    setError('');
+    try {
+      await startContinuation(`You asked: ${question}\nMy answer: ${answer}`, previewRunning);
+    } finally {
+      setActing(false);
+    }
+  };
   const openLink = useCallback(async (href: string) => {
     try {
       await openInBrowser(href);
@@ -615,7 +639,7 @@ export function TaskDetail({
         />
       )}
       {!!pending.length && (
-        <div className="space-y-3 mb-5" id="task-questions">
+        <TaskQuestions>
           <h2 className="text-base">{active ? 'A decision needs you' : 'Questions left open'}</h2>
           {pending.map((p) => (
             <UserPromptCard
@@ -623,9 +647,15 @@ export function TaskDetail({
               runId={run.id}
               prompt={p}
               active={['starting', 'running'].includes(run.status)}
+              accountShown={active}
+              onContinue={
+                canContinue && !active
+                  ? (answer) => continueWithAnswer(p.question, answer)
+                  : undefined
+              }
             />
           ))}
-        </div>
+        </TaskQuestions>
       )}
       <Tabs.Root className="task-working-area" value={tab} onValueChange={setTab}>
         <div className="task-view-controls">
@@ -678,6 +708,21 @@ export function TaskDetail({
                   {run.screenshots.at(-1)?.name} · Recorded by the agent
                 </figcaption>
               </figure>
+            )}
+            {decision.action === 'Review plan' && canContinue && (
+              <InlineNotice
+                className="task-plan-notice"
+                action={
+                  <Button
+                    variant="outline"
+                    onClick={() => addToReply('Implement this plan.', true)}
+                  >
+                    Implement this plan
+                  </Button>
+                }
+              >
+                This is a plan. Nothing in the project has changed yet.
+              </InlineNotice>
             )}
             {run.result ? (
               <div className="task-result-text">

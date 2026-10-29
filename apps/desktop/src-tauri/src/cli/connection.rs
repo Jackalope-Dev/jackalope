@@ -212,6 +212,7 @@ mod tests {
     fn only_reads_are_retried() {
         assert!(read_only(&Request::Sessions));
         assert!(!read_only(&Request::Send {
+            draft_revision: None,
             session_id: "s".into(),
             text: "t".into()
         }));

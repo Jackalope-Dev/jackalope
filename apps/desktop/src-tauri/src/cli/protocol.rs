@@ -64,11 +64,32 @@ pub enum Request {
         model: Option<String>,
     },
     /// Add a message to a conversation.
-    Send { session_id: String, text: String },
+    Send {
+        session_id: String,
+        text: String,
+        /// The draft revision this message was typed in, so sending clears
+        /// the shared draft. Sent only when known; older hosts refuse it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        draft_revision: Option<u64>,
+    },
+    /// Save the text being typed in a conversation, shared with the app, when
+    /// `revision` is still the saved one.
+    Draft {
+        session_id: String,
+        text: String,
+        revision: u64,
+    },
     /// A conversation and the state of its current work.
     SessionDetail { session_id: String },
     /// `pause`, `resume`, `finish` or `retry`.
-    SessionAction { session_id: String, action: String },
+    SessionAction {
+        session_id: String,
+        action: String,
+        /// The message a `cancel-message` takes back. Sent only then, since
+        /// older hosts refuse fields they do not know.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        message_id: Option<String>,
+    },
     /// Answer a question an agent asked.
     Answer {
         run_id: String,
@@ -385,7 +406,7 @@ pub struct SessionSummary {
     pub asking: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Message {
     /// `you` or `agent`. An agent message carries the output of the work the
@@ -398,9 +419,12 @@ pub struct Message {
     /// retried; absent when there was only one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attempt: Option<u32>,
+    /// Your message's id, so a queued one can be taken back. Older hosts omit it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Question {
     pub id: String,
@@ -418,6 +442,10 @@ pub struct Question {
     pub multi_select: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rationale: Option<String>,
+    /// `false` when only the options are valid answers, as for a permission
+    /// request. Absent from older hosts, which accepted any answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allow_other: Option<bool>,
 }
 
 /// A plan as a terminal shows it.
@@ -508,7 +536,7 @@ pub struct PlanSummary {
 
 /// What the terminal needs to render a conversation: the exchange, the work
 /// currently running, and why Jackalope chose the agent it did.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionView {
     pub id: String,
@@ -544,6 +572,15 @@ pub struct SessionView {
     /// when there are none or the host is older.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub review_screenshots: Option<u32>,
+    /// The latest attempt is merged. Older hosts omit it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub merged: bool,
+    /// The message being typed, shared with the app, and its revision.
+    /// Older hosts omit both.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub draft: String,
+    #[serde(default)]
+    pub draft_revision: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -607,6 +644,10 @@ pub enum Response {
     },
     Started {
         session_id: String,
+    },
+    /// A draft was saved as this revision.
+    Draft {
+        revision: u64,
     },
     /// Work changed; the client re-reads what it is showing.
     Changed {

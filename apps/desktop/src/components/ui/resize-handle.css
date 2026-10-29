@@ -1,0 +1,42 @@
+/* The hit area is wider than the grip so it is easy to catch without crowding neighbours. */
+.resize-handle {
+  position: relative;
+  flex-shrink: 0;
+  touch-action: none;
+  border-radius: var(--radius-sm);
+}
+.resize-handle[data-orientation="horizontal"] {
+  height: 12px;
+  cursor: row-resize;
+}
+.resize-handle[data-orientation="vertical"] {
+  width: 12px;
+  cursor: col-resize;
+}
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+.resize-handle[data-orientation="horizontal"]::after {
+  inset: 4px calc(50% - 24px);
+  background: var(--color-border);
+}
+.resize-handle[data-orientation="vertical"]::after {
+  inset: calc(50% - 24px) 4px;
+}
+.resize-handle:hover::after,
+.resize-handle:focus-visible::after {
+  background: var(--color-text-muted);
+}
+.resize-handle:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .resize-handle::after {
+    transition: none;
+  }
+}

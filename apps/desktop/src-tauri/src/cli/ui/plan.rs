@@ -17,6 +17,8 @@ pub struct PlanPane {
     pub view: Option<PlanView>,
     pub open: bool,
     read_at: Option<Instant>,
+    /// A change arrived too soon after the last read; read once it is due.
+    stale: bool,
 }
 
 impl PlanPane {
@@ -26,6 +28,7 @@ impl PlanPane {
             view,
             open: true,
             read_at: Some(Instant::now()),
+            stale: false,
         }
     }
 }
@@ -68,12 +71,12 @@ impl App {
         let _ = self.plan_request(Request::PlanDetail { plan_id: id });
     }
 
+    /// Shows `view`; a background re-read keeps a hidden panel hidden.
     fn set_plan(&mut self, view: PlanView) {
         match &mut self.plan {
             Some(pane) if pane.id == view.id => {
                 pane.view = Some(view);
                 pane.read_at = Some(Instant::now());
-                pane.open = true;
             }
             _ => self.plan = Some(PlanPane::new(view.id.clone(), Some(view))),
         }
@@ -84,6 +87,9 @@ impl App {
             Response::Plan { plan } => {
                 let view = *plan;
                 self.set_plan(view.clone());
+                if let Some(pane) = self.plan.as_mut() {
+                    pane.open = true;
+                }
                 Some(view)
             }
             Response::Exported { path } => {
@@ -94,14 +100,23 @@ impl App {
         }
     }
 
+    /// Reads a plan change that arrived while reads were throttled, once due.
+    pub(super) fn refresh_stale_plan(&mut self) -> bool {
+        self.plan.as_ref().is_some_and(|pane| {
+            pane.stale && pane.read_at.is_none_or(|at| at.elapsed() >= REFRESH_EVERY)
+        }) && self.refresh_plan()
+    }
+
     /// Re-reads the open plan after work changed. Returns whether it changed.
     pub(super) fn refresh_plan(&mut self) -> bool {
-        let Some(pane) = self.plan.as_ref() else {
+        let Some(pane) = self.plan.as_mut() else {
             return false;
         };
         if pane.read_at.is_some_and(|at| at.elapsed() < REFRESH_EVERY) {
+            pane.stale = true;
             return false;
         }
+        pane.stale = false;
         let id = pane.id.clone();
         let before = pane.view.as_ref().map(|view| {
             (
@@ -140,6 +155,7 @@ impl App {
                 );
             }
             self.offer_question();
+            self.sync_picker();
             return before.as_ref() != Some(&after);
         }
         false

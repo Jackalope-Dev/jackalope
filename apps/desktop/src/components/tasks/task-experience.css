@@ -93,6 +93,21 @@
   outline: 2px solid var(--color-accent-ink);
   outline-offset: 2px;
 }
+/* The number key that picks the option. */
+.agent-question-key {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+.agent-question-recommended + .agent-question-key {
+  margin-left: 0;
+}
 .agent-question-options:disabled {
   opacity: 0.65;
 }

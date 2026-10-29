@@ -424,6 +424,7 @@ mod tests {
                     text: format!("{role} text"),
                     sent: *sent,
                     attempt: None,
+                    id: None,
                 })
                 .collect(),
             run_id: None,
@@ -442,6 +443,9 @@ mod tests {
             questions: Vec::new(),
             partial: String::new(),
             review_screenshots: None,
+            merged: false,
+            draft: String::new(),
+            draft_revision: 0,
         }
     }
 

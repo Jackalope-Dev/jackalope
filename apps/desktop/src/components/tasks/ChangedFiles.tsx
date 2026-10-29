@@ -1,8 +1,10 @@
 import { Checkbox, Input } from '@jackalope/ui';
 import { FileCode2, Files } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { type CSSProperties, useId, useMemo, useState } from 'react';
 import { reviewFingerprint } from '../../lib/review-fingerprint';
 import { useFileReviewStore } from '../../stores/fileReviewStore';
+import { useWorkViewStore } from '../../stores/workViewStore';
+import { ResizeHandle } from '../ui/ResizeHandle';
 import { DiffPreview } from './DiffPreview';
 import './changed-files.css';
 
@@ -23,14 +25,23 @@ export function ChangedFiles({
   );
   const reviewed = useFileReviewStore((state) => state.reviewed[revision]);
   const mark = useFileReviewStore((state) => state.mark);
+  const listId = useId();
+  const listWidth = useWorkViewStore((state) => state.sizes['changed-files']);
   const [selected, setSelected] = useState('');
   const [search, setSearch] = useState('');
   const file = files.includes(selected) ? selected : '';
   const matches = files.filter((path) => path.toLowerCase().includes(search.toLowerCase()));
   return (
-    <div className="changed-files">
+    <div
+      className="changed-files"
+      style={
+        listWidth === undefined
+          ? undefined
+          : ({ '--changed-files-width': `${listWidth}px` } as CSSProperties)
+      }
+    >
       {files.length > 0 && (
-        <nav className="changed-files-list" aria-label="Changed files">
+        <nav id={listId} className="changed-files-list" aria-label="Changed files">
           {reviewId && (
             <p
               className="changed-files-progress"
@@ -86,6 +97,19 @@ export function ChangedFiles({
           })}
           {!matches.length && <p className="task-muted">No matching files.</p>}
         </nav>
+      )}
+      {files.length > 0 && (
+        <ResizeHandle
+          orientation="vertical"
+          label="Resize file list"
+          controls={listId}
+          className="changed-files-resizer"
+          value={listWidth ?? 200}
+          min={140}
+          max={520}
+          onResize={(width) => useWorkViewStore.getState().setSize('changed-files', width)}
+          onReset={() => useWorkViewStore.getState().setSize('changed-files', null)}
+        />
       )}
       <div className="changed-files-diff">
         {patch ? (

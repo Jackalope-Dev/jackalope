@@ -308,6 +308,10 @@ impl LiveSessions {
         let result = change(&mut ledger)?;
         self.save(&ledger)?;
         inner.ledger = ledger;
+        drop(inner);
+        // Every saved change reaches terminals (through `watch`) and the app, so a
+        // pause or finish made in one is seen in the other without waiting to poll.
+        self.changed();
         Ok(result)
     }
 
@@ -761,7 +765,12 @@ impl LiveSessions {
         })
     }
 
-    fn draft(&self, id: &str, text: String, revision: u64) -> Result<SessionDraft, String> {
+    pub(super) fn draft(
+        &self,
+        id: &str,
+        text: String,
+        revision: u64,
+    ) -> Result<SessionDraft, String> {
         if text.chars().count() > 12_000 {
             return Err("The message is limited to 12,000 characters.".into());
         }
@@ -1087,14 +1096,24 @@ impl LiveSessions {
     }
 
     pub fn launch(&self, app: AppHandle) {
+        // One app event per burst of changes, whoever made them: the app, a
+        // terminal or the dispatcher.
+        let mut changes = self.changes.subscribe();
+        tauri::async_runtime::spawn({
+            let app = app.clone();
+            async move {
+                while changes.changed().await.is_ok() {
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    changes.borrow_and_update();
+                    let _ = app.emit("live-sessions-changed", ());
+                }
+            }
+        });
         let service = self.clone();
         std::thread::spawn(move || {
             while service.alive.load(Ordering::Relaxed) {
                 match service.tick() {
-                    Ok(true) => {
-                        service.changed();
-                        let _ = app.emit("live-sessions-changed", ());
-                    }
+                    Ok(true) => service.changed(),
                     Err(error) => {
                         if let Ok(mut inner) = service.inner.lock() {
                             for session in &mut inner.ledger.sessions {
@@ -1103,7 +1122,6 @@ impl LiveSessions {
                             inner.error = Some(format!("Conversation paused: {error}"));
                         }
                         service.changed();
-                        let _ = app.emit("live-sessions-changed", ());
                     }
                     _ => {}
                 }

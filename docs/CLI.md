@@ -98,11 +98,21 @@ always message text. Unknown or misplaced options are refused with exit status 6
 
 Inside a conversation, typing `/` opens an interactive command menu, and `/help`
 lists commands: `/new`, `/bg`, `/init`, `/sessions`, `/projects`, `/agents`, `/settings`,
-`/status`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/learnings`, `/files`, `/review` (or `/diff`), `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
-`/unpause`, `/copy`, `/history`, `/kill`, `/clear`, `/plan`, `/plans`, `/revise`,
+`/status`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/learnings`, `/files`, `/review` (or `/diff`), `/merge`, `/pr`, `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
+`/unpause`, `/unqueue`, `/copy`, `/history`, `/kill`, `/clear`, `/plan`, `/plans`, `/revise`,
 `/approve`, `/replan`, `/export`, `/deviation`, `/browser`, `/computer`, `/open` and `/quit`. Pickers
 filter as you type. `/new <message>` starts
 and shows a conversation; `/bg <message>` starts one and stays on the current one.
+`/status` prints the project and branch, the open work's state, agent and model, the
+conversations that need you and each agent's state, without leaving the conversation.
+`/merge [message]` prepares a merge of the latest attempt as `jackalope merge` does,
+lists its files and asks; the conversation is paused only once you confirm, and a
+failed merge resumes it. `/pr [title]` asks whether to open a draft or ready pull
+request, then commits what is left, pushes and opens it. `/unqueue` takes back your
+newest message that has not reached an agent and puts it in the input to edit.
+What you type in a conversation is its draft, shared with the app's composer: opening the conversation in either place brings it back, and sending clears it. Clickable parts of the header and status line highlight under the pointer.
+`/retry` relaunches work that failed to start; to try finished or stopped work again,
+send a follow-up. Another conversation that starts needing you is announced in the feed.
 `/learn` inspects conversation history since the previous learn command (or session
 start) and sends the preferences, corrections, answers and passing check commands it
 finds through the same promotion gate as background learning; it lists what was
@@ -150,7 +160,15 @@ turns the input green with a plan hint. The planner's questions use the question
 which shows a question's header and recommended option; answer by typing, with
 `/answer`, or choose **Use your recommendations for the rest** or **Done, draft the
 plan**. The question picker marks the recommended option `(recommended)` and starts on
-it. The panel shows the status and revision, the recommended shape and its reason,
+it. A question that takes several answers shows checkboxes: Space ticks an option and
+the send row answers with every ticked option; typing numbers such as `1,3` works too.
+A question answered in the app closes its picker here, and the next waiting question
+replaces it; a plan deviation decided in the app closes its picker the same way. A typed
+answer may be an option's number or name. Questions that take only their options, such
+as a permission request, refuse other text instead of reading it as a denial, and
+confirmations offer **Yes, proceed** and **No, adjust**, as in the app. When the agent
+stopped before you answered, the card says so and your answer continues the
+conversation with the question and your answer, as the app does. The panel shows the status and revision, the recommended shape and its reason,
 highlighted assumptions, the task graph with dependencies and parallel tasks, which tasks
 cover each acceptance criterion, how approval will verify the work (the project's check,
 the plan's test criteria, or "No automatic check: results are reviewed but not
@@ -190,10 +208,11 @@ rounded content card, following the app's surfaces:
 
 - The header line shows the wordmark, then the conversation's title, or tabs once
   more than one conversation is open, and on the right the agent and model, project
-  and branch. Each tab shows its number, a dot for its state (amber when it needs
+  and branch. Tabs cover conversations that need you, the open one and those opened
+  in this terminal; `/sessions` lists the rest. Each tab shows its number, a dot for its state (amber when it needs
   you, a spinner while working, hollow when idle) and its title; titles shorten to
   fit, and what still does not fit is counted. Alt+1 to Alt+9 show a tab, and
-  Ctrl+N and Ctrl+P step through open conversations across projects.
+  Ctrl+N and Ctrl+P step through the tabs across projects.
 - The card holds the conversation, the changes panel and the input. While work runs,
   a band of light travels along the card's top edge.
 - The status line shows the state as a coloured dot and label, elapsed time, the
@@ -203,7 +222,7 @@ rounded content card, following the app's surfaces:
 
 The wordmark, tabs, agent, model, project, open-conversation count and key hints can
 be clicked. A start screen shows the JACKALOPE wordmark (a two-row version in narrow
-windows) and the agents that are set up. Smaller terminals drop the shell for a
+windows), which light sweeps across once when the screen appears, and the agents that are set up. When work finishes cleanly, the status line says how long it took and what usually comes next. Smaller terminals drop the shell for a
 compact header, a status line and a rotating tip.
 
 Your messages and pending work read as tinted blocks with a bar down their left edge.
@@ -211,7 +230,7 @@ When a conversation is blocked, an amber "Needs you" banner above the input says
 and how to carry on; an open question is pinned there instead, and `/answer` reopens
 its options. Running work lists its newest steps (tool calls and narration) as the
 host records them, and `jackalope -p` prints the same steps to standard error.
-`JACKALOPE_REDUCED_MOTION=1` keeps the band, spinners and shimmer still.
+`JACKALOPE_REDUCED_MOTION=1` keeps the band, spinners, shimmer and wordmark sweep still.
 
 The changes panel lists files the conversation's checkout changed since it left
 the project's checked-out commit, committed or not, including untracked files, with

@@ -345,6 +345,7 @@ fn transcript(session: &LiveSession, runs: &[TaskRun]) -> Vec<protocol::Message>
             text: message.text.clone(),
             sent: message.run_id.is_some(),
             attempt: None,
+            id: Some(message.id.clone()),
         });
         // A reply follows the last message its run carried.
         let Some(run_id) = &message.run_id else {
@@ -365,6 +366,7 @@ fn transcript(session: &LiveSession, runs: &[TaskRun]) -> Vec<protocol::Message>
                     text: run.result.clone(),
                     sent: true,
                     attempt: numbered.then_some(number),
+                    id: None,
                 });
             }
         }
@@ -423,6 +425,9 @@ fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionVie
         error,
         messages: transcript(session, runs),
         run_id: run.map(|run| run.id.clone()),
+        merged: run.is_some_and(|run| session.integrated_run_id.as_deref() == Some(&run.id)),
+        draft: session.draft.text.clone(),
+        draft_revision: session.draft.revision,
         status: run.map(|run| run.status.clone()),
         agent: run.map(|run| run.agent.clone()),
         account: run.map(|run| run.account.clone()),
@@ -564,10 +569,30 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             )?;
             Ok(Response::Started { session_id })
         }
-        Request::Send { session_id, text } => {
+        Request::Send {
+            session_id,
+            text,
+            draft_revision,
+        } => {
             let sessions = app.state::<LiveSessions>();
-            sessions.send(&session_id, uuid::Uuid::new_v4().to_string(), text, None)?;
+            sessions.send(
+                &session_id,
+                uuid::Uuid::new_v4().to_string(),
+                text,
+                draft_revision,
+            )?;
             Ok(Response::Ok)
+        }
+        Request::Draft {
+            session_id,
+            text,
+            revision,
+        } => {
+            let sessions = app.state::<LiveSessions>();
+            let draft = sessions.draft(&session_id, text, revision)?;
+            Ok(Response::Draft {
+                revision: draft.revision,
+            })
         }
         Request::SessionDetail { session_id } => {
             let sessions = app.state::<LiveSessions>();
@@ -583,9 +608,13 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 session: Box::new(session_view(session, &snapshot.runs)),
             })
         }
-        Request::SessionAction { session_id, action } => {
+        Request::SessionAction {
+            session_id,
+            action,
+            message_id,
+        } => {
             let sessions = app.state::<LiveSessions>();
-            sessions.action(&session_id, &action, None)?;
+            sessions.action(&session_id, &action, message_id.as_deref())?;
             Ok(Response::Ok)
         }
         Request::Answer {
@@ -608,9 +637,14 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             let mut tasks = runtime.subscribe();
             let mut conversations = sessions.subscribe();
             let mut projects = super::project_registry::subscribe();
-            // Include project preferences so idle terminals receive saved theme changes.
+            let mut plans = super::planning::store::subscribe();
+            // Include project preferences so idle terminals receive saved theme
+            // changes, and plans so a plan decided in the app reaches the panel.
             let revision = |runtime: &TaskRuntime, sessions: &LiveSessions| {
-                runtime.revision() + sessions.revision() + super::project_registry::revision()
+                runtime.revision()
+                    + sessions.revision()
+                    + super::project_registry::revision()
+                    + super::planning::store::revision()
             };
             let current = revision(&runtime, &sessions);
             if current != since {
@@ -623,6 +657,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                     _ = tasks.changed() => {}
                     _ = conversations.changed() => {}
                     _ = projects.changed() => {}
+                    _ = plans.changed() => {}
                 }
             })
             .await;

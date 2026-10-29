@@ -60,7 +60,7 @@ impl App {
 
     /// Whether anything on screen moves: agent work or a running command.
     pub(super) fn animating(&self) -> bool {
-        self.working() || self.shells_running() > 0
+        self.working() || self.shells_running() > 0 || super::render::intro_sweep(self).is_some()
     }
 
     pub(super) fn run_shell(&mut self, command: &str) {
