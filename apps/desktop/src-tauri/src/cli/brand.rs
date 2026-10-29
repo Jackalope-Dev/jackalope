@@ -542,6 +542,14 @@ pub fn success() -> Color {
     tone((0x2e, 0xbc, 0x7e), Color::Green)
 }
 
+/// Mentions of agents and files, kept apart from plan mode's green.
+pub fn info() -> Color {
+    if !colored() {
+        return Color::Reset;
+    }
+    tone((0x3b, 0x82, 0xf6), Color::Blue)
+}
+
 /// Work that needs attention: an open question, a sign-in, a stalled action.
 pub fn warning() -> Color {
     if !colored() {

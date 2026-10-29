@@ -1,6 +1,15 @@
 import { DropdownMenu as Menu, SearchIcon } from '@jackalope/ui';
 import { Check, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
 import { useWindowEvent } from '../../hooks/useWindowEvent';
 import { unreadBotConversations } from '../../lib/bot-conversations';
@@ -53,6 +62,7 @@ import { TaskWorkspace } from '../tasks/TaskWorkspace';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { LoadingState } from '../ui/LoadingState';
 import { PageErrorBoundary } from '../ui/PageErrorBoundary';
+import { ResizeHandle } from '../ui/ResizeHandle';
 import { Tooltip } from '../ui/Tooltip';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -73,6 +83,10 @@ export type { ActiveTab } from './navigation';
 
 // Workspace views and heavy dialogs load on demand so the first paint ships only
 // the task workspace. Each stays in its own chunk keyed by the tab that shows it.
+// The sidebar's default width matches workspace-shell.css; dragging keeps it in this range.
+const SIDEBAR_WIDTH = 216;
+const SIDEBAR_MIN = 180;
+const SIDEBAR_MAX = 420;
 const RepoTodos = lazy(() => import('../tasks/RepoTodos').then((m) => ({ default: m.RepoTodos })));
 const RemoteHosts = lazy(() =>
   import('../remote/RemoteHosts').then((m) => ({ default: m.RemoteHosts })),
@@ -411,6 +425,7 @@ export function Shell({
   const shortcuts = resolveShortcuts(shortcutSettings);
   const navCollapsed = useWorkViewStore((state) => state.navCollapsed);
   const toggleNav = useWorkViewStore((state) => state.toggleNav);
+  const navWidth = useWorkViewStore((state) => state.sizes.sidebar);
   const shortcut = displayShortcut(shortcuts.search);
   useTauriEvent<string>('desktop-action', (action) => {
     if (action === 'settings') navigate('preferences');
@@ -533,7 +548,16 @@ export function Shell({
         </div>
       </header>
       <div className="workspace-body">
-        <aside className="workspace-navigation" data-collapsed={navCollapsed || undefined}>
+        <aside
+          id="workspace-navigation"
+          className="workspace-navigation"
+          data-collapsed={navCollapsed || undefined}
+          style={
+            navWidth === undefined
+              ? undefined
+              : ({ '--sidebar-width': `${navWidth}px` } as CSSProperties)
+          }
+        >
           <Tooltip
             side="right"
             content={`${navCollapsed ? 'Expand' : 'Collapse'} sidebar (${displayShortcut(shortcuts.sidebar)})`}
@@ -599,6 +623,19 @@ export function Shell({
             </button>
           </Tooltip>
         </aside>
+        {!navCollapsed && (
+          <ResizeHandle
+            orientation="vertical"
+            label="Resize sidebar"
+            controls="workspace-navigation"
+            className="workspace-navigation-resizer"
+            value={navWidth ?? SIDEBAR_WIDTH}
+            min={SIDEBAR_MIN}
+            max={SIDEBAR_MAX}
+            onResize={(width) => useWorkViewStore.getState().setSize('sidebar', width)}
+            onReset={() => useWorkViewStore.getState().setSize('sidebar', null)}
+          />
+        )}
         <main
           ref={canvas}
           id="workspace-content"

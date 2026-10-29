@@ -12,12 +12,15 @@ export function AgentQuestion({
   agentName,
   agentDetail,
   onAnswer,
+  onContinue,
 }: {
   prompt: PendingUserPrompt;
   active: boolean;
   agentName?: string;
   agentDetail?: string;
   onAnswer: (answer: string) => Promise<void>;
+  /** Answers after the attempt ended, by continuing the task with the answer. */
+  onContinue?: (answer: string) => Promise<void>;
 }) {
   const id = useId();
   const multiple = prompt.inputType === 'multiChoice';
@@ -39,6 +42,7 @@ export function AgentQuestion({
   const inFlight = useRef(false);
   const answerRef = useRef<HTMLParagraphElement>(null);
   const answered = prompt.status === 'answered' || sent !== null;
+  const continuing = !active && !!onContinue;
   useEffect(() => {
     if (sent !== null) answerRef.current?.focus();
   }, [sent]);
@@ -46,12 +50,13 @@ export function AgentQuestion({
   const response = multiple ? JSON.stringify(selected) : answer.trim();
   const hasResponse = multiple ? selected.length > 0 : !!answer.trim();
   const submit = async () => {
-    if (!active || answered || inFlight.current || !hasResponse) return;
+    if ((!active && !onContinue) || answered || inFlight.current || !hasResponse) return;
     inFlight.current = true;
     setSending(true);
     setError('');
     try {
-      await onAnswer(response);
+      if (active) await onAnswer(response);
+      else await onContinue?.(displayAnswer(response, multiple) ?? response);
       setSent(response);
     } catch (error) {
       setError(String(error));
@@ -75,7 +80,9 @@ export function AgentQuestion({
             ? 'Your response'
             : active
               ? `${agentName ?? 'The agent'} needs your input`
-              : 'Unanswered question'}
+              : continuing
+                ? 'Answer to continue'
+                : 'Unanswered question'}
         </span>
         <span className="task-experience-meta">
           {answered ? 'Answered' : active ? 'Awaiting response' : 'Task ended'}
@@ -92,7 +99,7 @@ export function AgentQuestion({
           <Check size={18} aria-hidden="true" />
           <span>{displayAnswer(prompt.answer ?? sent, multiple)}</span>
         </p>
-      ) : !active ? (
+      ) : !active && !continuing ? (
         <p className="task-experience-muted">
           This attempt has ended. Include your answer when continuing the task.
         </p>
@@ -171,15 +178,19 @@ export function AgentQuestion({
           )}
           {error && <InlineNotice tone="error">{error}</InlineNotice>}
           <div className="agent-question-footer">
-            <span className="task-experience-muted">Review your answer before sending.</span>
+            <span className="task-experience-muted">
+              {continuing
+                ? 'The agent stopped before you answered. Sending continues the task.'
+                : 'Review your answer before sending.'}
+            </span>
             <Button
               type="submit"
               disabled={sending || !hasResponse}
               loading={sending}
-              loadingLabel="Sending…"
+              loadingLabel={continuing ? 'Continuing…' : 'Sending…'}
             >
               <Send size={16} aria-hidden="true" />
-              Send response
+              {continuing ? 'Continue with this answer' : 'Send response'}
             </Button>
           </div>
         </form>

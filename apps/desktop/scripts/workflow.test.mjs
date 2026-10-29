@@ -78,6 +78,17 @@ test('checks stay inside review instead of replacing the review and merge action
   assert.equal(taskDecision(finished).action, 'Merge into your project');
   assert.equal(taskDecision({ ...finished, targetBranch: 'main' }).action, 'Merge into main');
   assert.equal(taskDecision({ ...finished, status: 'review' }).action, 'Review and merge');
+  // Nothing changed, as with a plan or an answer: there is nothing to merge.
+  assert.equal(taskDecision({ ...finished, status: 'review' }, false, 0).action, 'Review result');
+  assert.equal(taskDecision({ ...finished, status: 'review' }, false, 0).section, 'result');
+  assert.equal(
+    taskDecision({ ...finished, status: 'review' }, false, 2).action,
+    'Review and merge',
+  );
+  // A question the attempt ended on comes first, so it can be answered.
+  const open = { ...finished, status: 'review', prompts: [{ id: 'q', status: 'pending' }] };
+  assert.equal(taskDecision(open).action, 'Answer question');
+  assert.equal(taskDecision(open).section, 'question');
   assert.equal(mergeDestination({ targetBranch: 'release' }), 'release');
   assert.equal(mergeDestination({ targetBranch: null }, { gitBranch: 'main' }), 'main');
   assert.equal(taskDecision({ ...finished, workspace: '/repo' }).section, 'delivery');

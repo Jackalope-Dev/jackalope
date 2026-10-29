@@ -181,6 +181,11 @@ pub fn question_card(app: &App, width: u16) -> Vec<Line<'static>> {
     };
     let mut hint = if question.options.is_empty() {
         "  Type your answer below and press Enter".to_string()
+    } else if question.multi_select {
+        format!(
+            "  {} options · pick several with /answer · or type numbers like 1,3",
+            question.options.len()
+        )
     } else {
         format!(
             "  {} options · /answer to choose · or type your own",

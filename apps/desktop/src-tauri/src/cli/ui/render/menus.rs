@@ -89,7 +89,7 @@ pub fn mention_menu(frame: &mut Frame, mentions: &[Mention], selected: usize, in
                     vec![
                         Span::styled(
                             format!(" {} {name}", if brand::unicode() { "●" } else { "*" }),
-                            strong(Style::default().fg(brand::success())),
+                            strong(Style::default().fg(brand::info())),
                         ),
                         Span::styled("  agent · starts the message with it", muted),
                     ],

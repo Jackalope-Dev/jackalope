@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useMemo } from 'react';
 import { collectWorkspaceWork, type WorkItem, workPresence } from '../../lib/task-collection';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -5,10 +6,17 @@ import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { useChangeStats } from '../../stores/workSignalsStore';
+import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AgentStack } from '../agents/AgentAvatar';
 import { isUnread, useOpenSignalKey, useWorkSignals, WorkSignals } from '../tasks/WorkSignals';
+import { Tooltip } from '../ui/Tooltip';
+
+/** What a closed row must change from to come back: its stage, activity or open questions. */
+function closedState(item: WorkItem) {
+  const questions = item.run?.prompts?.filter((prompt) => prompt.status === 'pending').length;
+  return [item.stage, item.date, item.run?.id, item.run?.status, questions].join('|');
+}
 
 export function useWorkspaceWork() {
   const runs = useExecutionStore((state) => state.runs);
@@ -58,6 +66,7 @@ export function WorkSidebar({ onOpen }: { onOpen: () => void }) {
         item.managed?.request.projectId ??
         item.idea?.projectId) === activeProject,
   );
+  const dismissed = useWorkSignalsStore((state) => state.dismissed);
   const signals = useWorkSignals();
   const openKey = useOpenSignalKey();
   const stats = useChangeStats(items.slice(0, 36).map((item) => item.run));
@@ -72,6 +81,7 @@ export function WorkSidebar({ onOpen }: { onOpen: () => void }) {
           .filter(
             (item) =>
               (item.run || item.session || item.managed) &&
+              dismissed[item.id] !== closedState(item) &&
               (group === 'attention'
                 ? ['attention', 'review'].includes(item.stage)
                 : item.stage === group),
@@ -91,25 +101,55 @@ export function WorkSidebar({ onOpen }: { onOpen: () => void }) {
                   : item.run?.id === selectedRun;
               const unread = isUnread(item, signals, openKey);
               return (
-                <button
-                  type="button"
-                  key={item.id}
-                  aria-current={selected ? 'page' : undefined}
-                  className="work-sidebar-item"
-                  data-unread={unread || undefined}
-                  onClick={() => open(item)}
-                >
-                  <AgentStack agents={presence.agents} state={presence.state} size="xs" />
-                  <span>
-                    <strong>{item.title}</strong>
-                    {group !== 'finished' && <small>{item.statusLabel ?? presence.action}</small>}
-                  </span>
-                  <WorkSignals
-                    item={item}
-                    unread={unread}
-                    stats={item.run ? stats[item.run.id]?.value : undefined}
-                  />
-                </button>
+                <div key={item.id} className="work-sidebar-row">
+                  <button
+                    type="button"
+                    aria-current={selected ? 'page' : undefined}
+                    className="work-sidebar-item"
+                    data-unread={unread || undefined}
+                    onClick={() => open(item)}
+                  >
+                    <AgentStack agents={presence.agents} state={presence.state} size="xs" />
+                    <span>
+                      <strong>{item.title}</strong>
+                      {group !== 'finished' && <small>{item.statusLabel ?? presence.action}</small>}
+                    </span>
+                    <WorkSignals
+                      item={item}
+                      unread={unread}
+                      stats={item.run ? stats[item.run.id]?.value : undefined}
+                    />
+                  </button>
+                  {group !== 'working' && (
+                    <Tooltip
+                      side="right"
+                      content="Close · it stays on the Work page and returns when it changes"
+                    >
+                      <button
+                        type="button"
+                        className="work-sidebar-close"
+                        aria-label={`Close ${item.title}`}
+                        onClick={(event) => {
+                          // Keep keyboard focus in the list once this row is gone.
+                          const rows = [
+                            ...(event.currentTarget
+                              .closest('nav')
+                              ?.querySelectorAll<HTMLElement>('.work-sidebar-item') ?? []),
+                          ];
+                          const row = event.currentTarget
+                            .closest('.work-sidebar-row')
+                            ?.querySelector<HTMLElement>('.work-sidebar-item');
+                          const index = row ? rows.indexOf(row) : -1;
+                          const next = rows[index + 1] ?? rows[index - 1];
+                          useWorkSignalsStore.getState().dismiss(item.id, closedState(item));
+                          next?.focus();
+                        }}
+                      >
+                        <X size={14} aria-hidden="true" />
+                      </button>
+                    </Tooltip>
+                  )}
+                </div>
               );
             })}
           </section>

@@ -140,6 +140,8 @@ struct App {
     /// Questions already offered as a picker, so dismissing one does not
     /// reopen it on every refresh.
     offered: HashSet<String>,
+    /// Conversations opened in this terminal, kept as tabs once visited.
+    opened: HashSet<String>,
     history: Vec<String>,
     history_index: Option<usize>,
     files: Option<FileIndex>,
@@ -240,6 +242,7 @@ pub fn run(
         next_agent: next.agent,
         next_model: next.model,
         offered: HashSet::new(),
+        opened: HashSet::new(),
         history: history::load(),
         history_index: None,
         files: None,
@@ -347,6 +350,7 @@ fn suspend(terminal: &mut ratatui::DefaultTerminal, enhanced: bool) -> Result<()
 impl App {
     /// Replaces the conversation on screen, or clears it for a new one.
     fn show(&mut self, session: Option<String>) {
+        self.opened.extend(session.clone());
         self.session = session;
         self.set_view(None);
         self.context += 1;

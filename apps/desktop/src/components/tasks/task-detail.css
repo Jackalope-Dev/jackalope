@@ -269,10 +269,24 @@
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
 }
-.task-detail #task-questions,
 .task-detail #task-recovery {
   max-height: min(30vh, 220px);
   overflow-y: auto;
+}
+/* A waiting question is what the task needs next, so it gets most of the page;
+   the handle beneath trades that room with the sections below. */
+.task-detail .task-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: min(60vh, 640px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+/* Tucked into the page gap so the handle adds no height of its own. */
+.task-detail .task-questions-resizer {
+  margin-block: -14px -6px;
 }
 .task-detail-navigation > .workspace-heading {
   flex: 1 1 240px;
@@ -302,7 +316,7 @@
 .task-detail > .task-next {
   margin-block: 0;
 }
-.task-detail > :empty {
+.task-detail > :empty:not(.resize-handle) {
   display: none;
 }
 /* The placeholder already names the field; the visible heading only costs height. */

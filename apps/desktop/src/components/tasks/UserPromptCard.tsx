@@ -10,10 +10,13 @@ export function UserPromptCard({
   runId,
   prompt,
   active,
+  onContinue,
 }: {
   runId: string;
   prompt: PendingUserPrompt;
   active: boolean;
+  /** Answers a question the attempt ended on by continuing the task with it. */
+  onContinue?: (answer: string) => Promise<void>;
 }) {
   const run = useExecutionStore((state) => state.runs.find((entry) => entry.id === runId));
   const customName = useAgentConfigStore(
@@ -48,6 +51,7 @@ export function UserPromptCard({
       agentName={agentName}
       agentDetail={agentDetail}
       onAnswer={answer}
+      onContinue={onContinue}
     />
   );
 }

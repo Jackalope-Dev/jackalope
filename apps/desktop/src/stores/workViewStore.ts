@@ -15,6 +15,9 @@ interface WorkViewState {
   /** The app sidebar shows icons only. */
   navCollapsed: boolean;
   toggleNav: () => void;
+  /** Panel sizes the user dragged, in pixels, by panel; absent panels use their default. */
+  sizes: Record<string, number>;
+  setSize: (id: string, size: number | null) => void;
   setSplit: (id: string, split: boolean) => void;
   resetSplits: (ids: string[]) => void;
   remember: (id: string, section: string) => void;
@@ -35,6 +38,14 @@ export const useWorkViewStore = create<WorkViewState>()(
       split: {},
       navCollapsed: false,
       toggleNav: () => set((state) => ({ navCollapsed: !state.navCollapsed })),
+      sizes: {},
+      setSize: (id, size) =>
+        set((state) => {
+          const sizes = { ...state.sizes };
+          if (size === null) delete sizes[id];
+          else sizes[id] = size;
+          return { sizes };
+        }),
       resetSplits: (ids) =>
         set((state) => ({
           split: Object.fromEntries(
@@ -63,12 +74,13 @@ export const useWorkViewStore = create<WorkViewState>()(
     }),
     {
       name: 'jackalope-work-views',
-      partialize: ({ scope, views, reading, split, navCollapsed }) => ({
+      partialize: ({ scope, views, reading, split, navCollapsed, sizes }) => ({
         scope,
         views,
         reading,
         split,
         navCollapsed,
+        sizes,
       }),
     },
   ),

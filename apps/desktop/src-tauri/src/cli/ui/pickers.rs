@@ -46,8 +46,15 @@ pub enum Action {
     NextAgent(Option<String>),
     /// Use this model for the next new conversation; `None` uses the default.
     NextModel(Option<String>),
-    /// Answer the pending question with this option.
-    Answer(String),
+    /// Answer the question with this id with this option.
+    Answer {
+        prompt: String,
+        text: String,
+    },
+    /// Tick or untick an option of a question that takes several.
+    Toggle(String),
+    /// Send the ticked options as the answer to the question with this id.
+    SendChosen(String),
     /// Type a free-form answer instead of choosing an option.
     TypeAnswer,
     /// Put an earlier input back in the composer.
@@ -84,6 +91,11 @@ pub struct Picker {
     pub filter: String,
     /// An index into `shown()`.
     pub selected: usize,
+    /// The question this list answers, so it is replaced once that question
+    /// is answered elsewhere, such as in the app.
+    pub question: Option<String>,
+    /// Options ticked on a question that takes several.
+    pub checked: Vec<String>,
 }
 
 impl Picker {
@@ -214,6 +226,19 @@ impl App {
             KeyCode::Char('r') if control => picker.step(true),
             KeyCode::PageUp => (0..10).for_each(|_| picker.step(false)),
             KeyCode::PageDown => (0..10).for_each(|_| picker.step(true)),
+            // Space ticks an option of a question that takes several.
+            KeyCode::Char(' ')
+                if matches!(
+                    picker.chosen().map(|item| &item.action),
+                    Some(Action::Toggle(_))
+                ) =>
+            {
+                if let Some(Action::Toggle(option)) =
+                    picker.chosen().map(|item| item.action.clone())
+                {
+                    self.toggle(option);
+                }
+            }
             KeyCode::Enter => {
                 if let Some(action) = picker.chosen().map(|item| item.action.clone()) {
                     self.choose(action);
@@ -236,6 +261,11 @@ impl App {
     }
 
     fn choose(&mut self, action: Action) {
+        let checked = self
+            .picker
+            .as_ref()
+            .map(|picker| picker.checked.clone())
+            .unwrap_or_default();
         // Settings rows change in place; everything else closes the list.
         if !matches!(
             action,
@@ -250,6 +280,7 @@ impl App {
                 | Action::ReviewCaptures
                 | Action::QuestionCap
                 | Action::PlannerAgent
+                | Action::Toggle(_)
         ) {
             self.picker = None;
         }
@@ -421,7 +452,27 @@ impl App {
                 });
             }
             Action::NextModel(model) => self.choose_model(model),
-            Action::Answer(option) => self.answer(option),
+            Action::Answer { prompt, text } => self.answer_to(&prompt, text),
+            Action::Toggle(option) => self.toggle(option),
+            Action::SendChosen(prompt) => match self.question() {
+                Some(question) if question.id == prompt => {
+                    // Kept in the question's order, as the app sends them.
+                    let chosen: Vec<String> = question
+                        .options
+                        .iter()
+                        .filter(|option| checked.contains(*option))
+                        .cloned()
+                        .collect();
+                    if chosen.is_empty() {
+                        self.note("Tick at least one option with Space, then send.");
+                        self.open_picker(PickerKind::Question);
+                    } else {
+                        let text = serde_json::to_string(&chosen).unwrap_or_default();
+                        self.answer_to(&prompt, text);
+                    }
+                }
+                _ => self.note("That question was already answered."),
+            },
             Action::TypeAnswer => self.note("Type your answer and press Enter."),
             Action::Recall(entry) => {
                 self.editor.set(entry);
@@ -572,6 +623,8 @@ impl App {
             items,
             filter: String::new(),
             selected: 0,
+            question: None,
+            checked: Vec::new(),
         });
     }
 
@@ -788,6 +841,23 @@ impl App {
         items
     }
 
+    /// Ticks or unticks an option of the open question, keeping the row chosen.
+    fn toggle(&mut self, option: String) {
+        let Some(picker) = self
+            .picker
+            .as_mut()
+            .filter(|picker| picker.kind == PickerKind::Question)
+        else {
+            return;
+        };
+        if let Some(index) = picker.checked.iter().position(|value| *value == option) {
+            picker.checked.remove(index);
+        } else {
+            picker.checked.push(option);
+        }
+        self.open_picker(PickerKind::Question);
+    }
+
     pub(super) fn choose_model(&mut self, model: Option<String>) {
         let agent = self
             .model_agent()
@@ -845,6 +915,16 @@ impl App {
             .as_ref()
             .filter(|_| rebuilding)
             .map(|picker| (picker.selected, picker.filter.clone()))
+            .unwrap_or_default();
+        // Ticks carry over only while the list still shows the same question.
+        let question = (kind == PickerKind::Question)
+            .then(|| self.question().map(|question| question.id.clone()))
+            .flatten();
+        let checked = self
+            .picker
+            .as_ref()
+            .filter(|picker| rebuilding && picker.question == question)
+            .map(|picker| picker.checked.clone())
             .unwrap_or_default();
         let (title, items) = match kind {
             PickerKind::Sessions => {
@@ -924,22 +1004,60 @@ impl App {
             }
             PickerKind::Question => {
                 let question = self.question().cloned();
+                let prompt = question
+                    .as_ref()
+                    .map(|question| question.id.clone())
+                    .unwrap_or_default();
+                let multiple = question
+                    .as_ref()
+                    .is_some_and(|question| question.multi_select);
                 let recommended = question
                     .as_ref()
                     .and_then(|question| question.recommended.clone());
                 let mut items: Vec<Item> = question
                     .iter()
                     .flat_map(|question| question.options.clone())
-                    .map(|option| Item {
-                        label: if recommended.as_ref() == Some(&option) {
-                            format!("{option} (recommended)")
+                    .map(|option| {
+                        let mark = if recommended.as_ref() == Some(&option) {
+                            " (recommended)"
                         } else {
-                            option.clone()
-                        },
-                        detail: String::new(),
-                        action: Action::Answer(option),
+                            ""
+                        };
+                        if multiple {
+                            let tick = match (checked.contains(&option), brand::unicode()) {
+                                (true, true) => "☑",
+                                (false, true) => "☐",
+                                (true, false) => "[x]",
+                                (false, false) => "[ ]",
+                            };
+                            Item {
+                                label: format!("{tick} {option}{mark}"),
+                                detail: String::new(),
+                                action: Action::Toggle(option),
+                            }
+                        } else {
+                            Item {
+                                label: format!("{option}{mark}"),
+                                detail: String::new(),
+                                action: Action::Answer {
+                                    prompt: prompt.clone(),
+                                    text: option,
+                                },
+                            }
+                        }
                     })
                     .collect();
+                if multiple {
+                    items.push(Item {
+                        label: match checked.len() {
+                            0 => "Send · tick options with Space first".into(),
+                            1 => "Send 1 chosen option".into(),
+                            count => format!("Send {count} chosen options"),
+                        },
+                        detail: String::new(),
+                        action: Action::SendChosen(prompt),
+                    });
+                }
                 items.push(Item {
                     label: "Type a different answer…".into(),
                     detail: String::new(),
@@ -947,7 +1065,13 @@ impl App {
                 });
                 (
                     question
-                        .map(|question| question.question)
+                        .map(|question| {
+                            if question.multi_select {
+                                format!("{} · Space ticks, Enter sends", question.question)
+                            } else {
+                                question.question
+                            }
+                        })
                         .unwrap_or_else(|| "Question".into()),
                     items,
                 )
@@ -968,6 +1092,8 @@ impl App {
             items,
             filter,
             selected: 0,
+            question,
+            checked,
         };
         picker.selected = selected.min(picker.shown().len().saturating_sub(1));
         self.picker = Some(picker);
@@ -1059,6 +1185,8 @@ mod tests {
             ],
             filter: String::new(),
             selected: 0,
+            question: None,
+            checked: Vec::new(),
         };
         assert_eq!(picker.shown(), [0, 1, 2]);
         picker.filter = "bill".into();

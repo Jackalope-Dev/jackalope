@@ -191,7 +191,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
     } else if text.starts_with('/') {
         (brand::accent(), "/", "command")
     } else if text.starts_with('@') || mentioning {
-        (brand::success(), "@", "mention an agent or file")
+        (brand::info(), "@", "mention an agent or file")
     } else if app.working() && !text.is_empty() {
         (brand::accent(), "❯", "queues after the current work")
     } else {

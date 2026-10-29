@@ -1,7 +1,10 @@
 import type { TaskRun } from './task-runtime.ts';
 
-/** The task's headline state and next action. Checks surface inside review, not here. */
-export function taskDecision(run: TaskRun, integrated = false) {
+/**
+ * The task's headline state and next action. Checks surface inside review, not here.
+ * `changedFiles`, when known, keeps an attempt that changed nothing from offering a merge.
+ */
+export function taskDecision(run: TaskRun, integrated = false, changedFiles?: number) {
   const active = ['starting', 'running', 'stopping'].includes(run.status);
   const state = (
     label: string,
@@ -26,6 +29,8 @@ export function taskDecision(run: TaskRun, integrated = false) {
     return state('Changes integrated locally', 'View delivery', 'delivery', 'success');
   if (run.status === 'interrupted')
     return state('Work interrupted', 'Inspect interrupted work', 'activity', 'warning');
+  if (run.status === 'review' && run.prompts?.some((p) => p.status === 'pending'))
+    return state('Question left open', 'Answer question', 'question', 'warning');
   if (!['review', 'reviewed'].includes(run.status))
     return state(
       run.status === 'stopped' ? 'Work stopped' : 'Work needs attention',
@@ -43,6 +48,7 @@ export function taskDecision(run: TaskRun, integrated = false) {
       ? state('Ready to merge', `Merge into ${target}`, 'integrate')
       : state('Reviewed locally', 'View delivery', 'delivery');
   }
+  if (changedFiles === 0) return state('Ready for your review', 'Review result', 'result');
   return isolated
     ? state('Ready for your review', 'Review and merge', 'integrate')
     : state('Ready for your review', 'Review result', 'changes');

@@ -212,7 +212,13 @@ impl App {
             self.command(command.trim());
             return;
         }
-        if self.question().is_some() {
+        if let Some(question) = self.question() {
+            // Numbers like `1,3` pick several options, as `jackalope answer` reads them.
+            let text = if question.multi_select {
+                crate::planning::reply(question, &text)
+            } else {
+                text
+            };
             self.answer(text);
             return;
         }

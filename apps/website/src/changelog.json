@@ -1,5 +1,19 @@
 [
   {
+    "id": "easier-agent-questions-in-the-app-and-terminal",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Easier agent questions in the app and terminal",
+    "description": "Questions from agents now get room to read and answer, stay in sync between the app and the terminal, and can still be answered after a task stops.",
+    "items": [
+      "A waiting question takes most of the task page, and you can drag the handle beneath it to resize; the sidebar width can be dragged too, and both sizes are remembered.",
+      "If a task ends with a question open, pick an answer and the task continues with it.",
+      "Answering in the app closes the question in the terminal and shows the next one, and the terminal can answer questions that take several choices.",
+      "Close finished or stale work from the sidebar; it stays on the Work page and returns when it needs you again.",
+      "Terminal tabs show only conversations that need you or that you opened, and plan results show their summary as a list instead of one long heading."
+    ]
+  },
+  {
     "id": "desktop-control-on-kde-plasma-and-other-wayland-desktops",
     "date": "2026-10-29",
     "status": "In development",

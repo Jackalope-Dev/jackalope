@@ -168,9 +168,10 @@ pub fn header(frame: &mut Frame, app: &App, area: Rect) {
 
 /// Tabs appear once there is more than one conversation to move between.
 fn tabs_shown(app: &App) -> bool {
-    match app.sessions.len() {
+    let order = app.tab_order();
+    match order.len() {
         0 => false,
-        1 => app.session.as_ref() != Some(&app.sessions[0].id),
+        1 => app.session.as_ref() != Some(&order[0]),
         _ => true,
     }
 }
@@ -178,8 +179,7 @@ fn tabs_shown(app: &App) -> bool {
 /// How a tab's conversation is doing: its dot and colour.
 fn tab_state(app: &App, session: &protocol::SessionSummary) -> (&'static str, Color) {
     let current = app.session.as_ref() == Some(&session.id);
-    let needs_you = session.asking
-        || protocol::present(session.error.as_deref()).is_some()
+    let needs_you = super::super::conversation::needs_you(session)
         || (current
             && (app
                 .view
@@ -207,7 +207,7 @@ fn tab_state(app: &App, session: &protocol::SessionSummary) -> (&'static str, Co
 /// Alt+number, a dot for how each is doing, and its title. Titles shorten to
 /// fit; what still does not fit is counted at the end.
 fn tabs(frame: &mut Frame, app: &App, x: u16, y: u16, limit: u16) {
-    let order = app.session_order();
+    let order = app.tab_order();
     let room = limit.saturating_sub(x) as usize;
     let label = |index: usize, title_width: usize| {
         let session = app

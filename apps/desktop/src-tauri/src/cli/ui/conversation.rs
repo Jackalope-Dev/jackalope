@@ -121,6 +121,19 @@ impl App {
     /// Opens a question with options as a picker, once, so answering is one
     /// keypress. Open questions are answered by typing into the input.
     pub(super) fn offer_question(&mut self) {
+        let current = self.question().map(|question| question.id.clone());
+        if let Some(picker) = self
+            .picker
+            .as_ref()
+            .filter(|picker| picker.kind == PickerKind::Question)
+        {
+            if picker.question == current {
+                return;
+            }
+            // Answered elsewhere, such as in the app: a stale list would send
+            // its choice to whichever question is waiting now.
+            self.picker = None;
+        }
         let Some(question) = self.question().cloned() else {
             return;
         };
@@ -131,6 +144,20 @@ impl App {
             return;
         }
         self.open_picker(PickerKind::Question);
+    }
+
+    /// Answers the question with this id, unless it is no longer the one
+    /// waiting, so a choice never lands on a different question.
+    pub(super) fn answer_to(&mut self, prompt: &str, text: String) {
+        if self
+            .question()
+            .is_some_and(|question| question.id == prompt)
+        {
+            self.answer(text);
+        } else {
+            self.note("That question was already answered.");
+            self.refresh();
+        }
     }
 
     pub(super) fn answer(&mut self, text: String) {
@@ -179,9 +206,27 @@ impl App {
             .collect()
     }
 
-    /// Shows the open conversation at `index` in the tabs (Alt+1 to Alt+9).
+    /// The conversations shown as tabs, in `session_order`: those that need
+    /// you, the open one and any opened in this terminal. The rest stay in
+    /// `/sessions`, so a new terminal does not fill with past conversations.
+    pub(super) fn tab_order(&self) -> Vec<String> {
+        self.session_order()
+            .into_iter()
+            .filter(|id| {
+                self.session.as_ref() == Some(id)
+                    || self.opened.contains(id)
+                    || self
+                        .sessions
+                        .iter()
+                        .find(|session| &session.id == id)
+                        .is_some_and(needs_you)
+            })
+            .collect()
+    }
+
+    /// Shows the conversation at `index` in the tabs (Alt+1 to Alt+9).
     pub(super) fn jump_session(&mut self, index: usize) {
-        let order = self.session_order();
+        let order = self.tab_order();
         match order.get(index) {
             Some(id) if Some(id) != self.session.as_ref() => self.show(Some(id.clone())),
             Some(_) => {}
@@ -189,12 +234,14 @@ impl App {
         }
     }
 
-    /// Moves to the next (`1`) or previous (`-1`) open conversation, across
-    /// projects, in the order `/sessions` lists them.
+    /// Moves to the next (`1`) or previous (`-1`) tab, across projects.
     pub(super) fn step_session(&mut self, direction: isize) {
-        let order = self.session_order();
+        let order = self.tab_order();
         if order.is_empty() {
-            self.flash("No open conversations", Tone::Muted);
+            self.flash(
+                "No conversations need you · /sessions lists them all",
+                Tone::Muted,
+            );
             return;
         }
         let current = self
@@ -254,4 +301,9 @@ fn status_label(status: &str) -> String {
         other => other,
     }
     .into()
+}
+
+/// An agent is waiting on an answer, or the work failed.
+pub(super) fn needs_you(session: &SessionSummary) -> bool {
+    session.asking || protocol::present(session.error.as_deref()).is_some()
 }
