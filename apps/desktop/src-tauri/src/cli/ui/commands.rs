@@ -63,6 +63,10 @@ pub const COMMANDS: &[(&str, &str)] = &[
         "deviation",
         "decide on a plan deviation: accept, redo or replan",
     ),
+    (
+        "browser",
+        "show the project browser; /browser open [url] to sign in",
+    ),
     ("open", "show Jackalope's app window"),
     ("help", "show these commands"),
     ("quit", "leave (work keeps running)"),
@@ -465,6 +469,7 @@ impl App {
                 }
             }
             "open" => self.open_app(),
+            "browser" => self.browser(argument),
             name if super::plan::COMMANDS.contains(&name) => {
                 self.plan_command(name, argument);
             }
@@ -474,6 +479,47 @@ impl App {
             },
         }
         self.refresh();
+    }
+
+    fn browser(&mut self, argument: &str) {
+        let (action, url) = argument
+            .split_once(char::is_whitespace)
+            .map(|(action, url)| (action, url.trim()))
+            .unwrap_or((argument, ""));
+        let action = match action {
+            "" | "status" => "",
+            "open" | "signin" | "sign-in" => "open",
+            "done" | "close" => "done",
+            other => {
+                self.note(format!(
+                    "/browser {other} is not a choice. Use /browser, /browser open [url] or /browser done."
+                ));
+                return;
+            }
+        };
+        let request = Request::BrowserProfile {
+            project_id: self.project.id.clone(),
+            action: action.into(),
+            url: (!url.is_empty()).then(|| url.to_string()),
+        };
+        let Some(Response::BrowserProfile { profile }) = self.request(request) else {
+            return;
+        };
+        let Some(profile) = profile else {
+            self.note("This project has no browser profile yet. /browser open creates it and opens a window to sign in.");
+            return;
+        };
+        for line in browser_lines(&profile) {
+            self.note(line);
+        }
+        match action {
+            "open" => self.flash(
+                "Sign in in the browser window, then close it or type /browser done",
+                Tone::Success,
+            ),
+            "done" => self.flash("Closed the project browser", Tone::Muted),
+            _ => {}
+        }
     }
 
     fn usage(&mut self) {
@@ -559,6 +605,31 @@ impl App {
             self.flash(format!("Theme set to {accent}"), Tone::Success);
         }
     }
+}
+
+/// What `/browser` shows about a project's persistent browser profile.
+fn browser_lines(profile: &crate::protocol::BrowserProfileView) -> Vec<String> {
+    let megabytes = profile.size_bytes as f64 / 1_048_576.0;
+    let state = match (&profile.in_use, profile.window_open) {
+        (_, true) => "open for signing in".to_string(),
+        (Some(holder), false) => format!("in use by {holder}"),
+        (None, false) => "idle".to_string(),
+    };
+    let mut lines = vec![format!(
+        "{} · {state} · {megabytes:.1} MB · last used {}",
+        profile.name,
+        profile
+            .last_used_at
+            .as_deref()
+            .and_then(|at| at.get(..10))
+            .unwrap_or("never")
+    )];
+    lines.push(if profile.sites.is_empty() {
+        "  No saved sign-ins yet.".to_string()
+    } else {
+        format!("  Sites with saved data: {}", profile.sites.join(", "))
+    });
+    lines
 }
 
 /// The usable agents `text` names with `@id`, in order and once each, and
@@ -684,5 +755,28 @@ mod tests {
             split_agent_mentions("@gemini look", &agents),
             (Vec::new(), "@gemini look".to_string())
         );
+    }
+
+    #[test]
+    fn browser_status_lists_state_size_and_sites() {
+        let mut profile = crate::protocol::BrowserProfileView {
+            name: "Project browser".into(),
+            size_bytes: 3 * 1_048_576,
+            ..Default::default()
+        };
+        let lines = browser_lines(&profile);
+        assert_eq!(
+            lines[0],
+            "Project browser · idle · 3.0 MB · last used never"
+        );
+        assert!(lines[1].contains("No saved sign-ins"));
+        profile.window_open = true;
+        profile.in_use = Some("the sign-in window".into());
+        profile.last_used_at = Some("2026-10-28T10:00:00Z".into());
+        profile.sites = vec!["example.com".into(), "github.com".into()];
+        let lines = browser_lines(&profile);
+        assert!(lines[0].contains("open for signing in") && lines[0].ends_with("2026-10-28"));
+        assert_eq!(lines[1], "  Sites with saved data: example.com, github.com");
+        assert!(COMMANDS.iter().any(|(name, _)| *name == "browser"));
     }
 }

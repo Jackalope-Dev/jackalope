@@ -959,6 +959,25 @@ impl CoordinationTools {
     }
 
     #[tool(
+        description = "Switch this task's browser tools from the disposable browser to a persistent profile where the person's sign-ins are kept: profile project (this project's browser) or bot (your own, in a bot conversation). Use it only for signed-in work. Each site asks the person before first use; sign-in pages pause you while the person signs in. Confirm purchases, sending, deleting and account or billing changes with ask_user first.",
+        annotations(read_only_hint = false, open_world_hint = true)
+    )]
+    async fn browser_open_profile(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::browser_profiles::OpenProfileRequest>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let run = self
+            .service
+            .authorized_run(&request_headers(&context)?)
+            .map_err(bridge_error)?;
+        let value = super::browser_profiles::open_for_run(&self.service.runtime, &run, input)
+            .await
+            .map_err(|e| ErrorData::internal_error(e, None))?;
+        Ok(CallToolResult::structured(value))
+    }
+
+    #[tool(
         description = "Ask the user for required data, choices or confirmation in Jackalope. Do not request secrets. Waits briefly and returns pending when unanswered; retrieve the saved answer with user_response. Neither a default nor elapsed time grants approval.",
         annotations(
             read_only_hint = false,
@@ -1506,6 +1525,7 @@ mod tests {
         assert!(names.contains(&"browser_configure"));
         assert!(names.contains(&"browser_inspect"));
         assert!(names.contains(&"browser_tabs"));
+        assert!(names.contains(&"browser_open_profile"));
         assert!(names.contains(&"ask_user"));
         assert!(names.contains(&"user_response"));
         assert!(names.contains(&"record_validation_step"));

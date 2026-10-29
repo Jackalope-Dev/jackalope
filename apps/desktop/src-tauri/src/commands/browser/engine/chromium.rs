@@ -1,23 +1,29 @@
 use super::{check_canceled, ProcessTree, Slot};
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 use std::{
-    os::unix::process::CommandExt,
     path::Path,
     process::{Child, Command, Stdio},
     sync::Arc,
     time::{Duration, Instant},
 };
 
-pub(super) struct BrowserProcess {
+pub(in crate::commands::browser) struct BrowserProcess {
     child: Child,
     tree: Arc<ProcessTree>,
     pub endpoint: String,
+    /// A persistent profile is closed through CDP first so Chromium writes its
+    /// cookies and storage to disk before the process tree is ended.
+    persistent: bool,
 }
 
 impl BrowserProcess {
+    #[cfg(unix)]
     pub fn start(executable: &Path, directory: &Path, slot: &Slot) -> Result<Self, String> {
         Self::start_with_timeout(executable, directory, slot, super::COMMAND_TIMEOUT)
     }
 
+    #[cfg(unix)]
     fn start_with_timeout(
         executable: &Path,
         directory: &Path,
@@ -26,14 +32,57 @@ impl BrowserProcess {
     ) -> Result<Self, String> {
         let profile = directory.join("chromium");
         std::fs::create_dir(&profile).map_err(|e| e.to_string())?;
+        Self::launch(executable, directory, &profile, slot, timeout, None)
+    }
+
+    /// Launches Chromium on a persistent user-data directory. `directory` is the
+    /// session's private working folder; `start` is an optional first page.
+    pub fn start_persistent(
+        executable: &Path,
+        directory: &Path,
+        profile: &Path,
+        slot: &Slot,
+        start: Option<&str>,
+    ) -> Result<Self, String> {
+        std::fs::create_dir_all(profile).map_err(|e| e.to_string())?;
+        // A port file left by an earlier or crashed session would point at a dead browser.
+        let _ = std::fs::remove_file(profile.join("DevToolsActivePort"));
+        let mut owned = Self::launch(
+            executable,
+            directory,
+            profile,
+            slot,
+            super::COMMAND_TIMEOUT,
+            start,
+        )
+        .map_err(|error| {
+            if error.contains("exited during startup") {
+                "This browser profile is already open in another browser window. Close that window and try again.".to_string()
+            } else {
+                error
+            }
+        })?;
+        owned.persistent = true;
+        Ok(owned)
+    }
+
+    fn launch(
+        executable: &Path,
+        directory: &Path,
+        profile: &Path,
+        slot: &Slot,
+        timeout: Duration,
+        start: Option<&str>,
+    ) -> Result<Self, String> {
         let mut command = Command::new(executable);
+        command.env_clear().current_dir(directory);
+        #[cfg(unix)]
         command
-            .env_clear()
-            .current_dir(directory)
             .env("HOME", directory)
             .env("XDG_CONFIG_HOME", directory.join("config"))
             .env("XDG_CACHE_HOME", directory.join("cache"));
-        for key in [
+        #[cfg(unix)]
+        let keys = [
             "PATH",
             "DISPLAY",
             "WAYLAND_DISPLAY",
@@ -43,7 +92,22 @@ impl BrowserProcess {
             "LANG",
             "LC_ALL",
             "TMPDIR",
-        ] {
+        ];
+        #[cfg(windows)]
+        let keys = [
+            "SystemRoot",
+            "WINDIR",
+            "PATH",
+            "PATHEXT",
+            "ProgramFiles",
+            "ProgramFiles(x86)",
+            "LOCALAPPDATA",
+            "APPDATA",
+            "USERPROFILE",
+            "TEMP",
+            "TMP",
+        ];
+        for key in keys {
             if let Some(value) = std::env::var_os(key) {
                 command.env(key, value);
             }
@@ -63,14 +127,15 @@ impl BrowserProcess {
                 "--use-mock-keychain",
             ])
             .arg(format!("--user-data-dir={}", profile.display()))
-            .arg("about:blank")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .process_group(0);
+            .stderr(Stdio::null());
+        #[cfg(unix)]
+        command.process_group(0);
         if !slot.headed {
             command.arg("--headless=new");
         }
+        command.arg(start.unwrap_or("about:blank"));
         let mut child = command
             .spawn()
             .map_err(|e| format!("Could not start Chromium: {e}"))?;
@@ -86,6 +151,7 @@ impl BrowserProcess {
             child,
             tree,
             endpoint: String::new(),
+            persistent: false,
         };
         slot.trees
             .lock()
@@ -114,13 +180,39 @@ impl BrowserProcess {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     pub fn pid(&self) -> u32 {
         self.child.id()
     }
 
     pub fn terminate(&self) {
         self.tree.terminate();
+    }
+
+    /// Whether Chromium is still running, for a window the person may close.
+    pub fn running(&mut self) -> bool {
+        matches!(self.child.try_wait(), Ok(None))
+    }
+
+    /// Asks Chromium to quit as if its last window closed, then waits briefly.
+    fn close_gracefully(&mut self) {
+        if !self.running() {
+            return;
+        }
+        if super::super::cdp::call(
+            &self.endpoint,
+            "Browser.close",
+            serde_json::json!({}),
+            Duration::from_secs(5),
+        )
+        .is_err()
+        {
+            return;
+        }
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while self.running() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(50));
+        }
     }
 }
 
@@ -145,13 +237,16 @@ fn endpoint(bytes: &[u8]) -> Option<String> {
 
 impl Drop for BrowserProcess {
     fn drop(&mut self) {
+        if self.persistent {
+            self.close_gracefully();
+        }
         self.tree.terminate();
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 

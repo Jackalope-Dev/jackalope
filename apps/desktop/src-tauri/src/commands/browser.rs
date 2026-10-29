@@ -1,4 +1,6 @@
+mod cdp;
 mod engine;
+mod persistent;
 #[cfg(test)]
 mod tests;
 
@@ -10,6 +12,7 @@ use super::{
     process_control::ProcessTree,
 };
 pub use engine::set_resource_directory;
+pub(super) use persistent::{cookie_sites, ProfileWindow};
 
 pub(super) fn codex_tool_policy() -> serde_json::Value {
     let tools: serde_json::Map<String, serde_json::Value> = [
@@ -20,6 +23,7 @@ pub(super) fn codex_tool_policy() -> serde_json::Value {
         "browser_configure",
         "browser_inspect",
         "browser_tabs",
+        "browser_open_profile",
         "desktop_control",
     ]
     .into_iter()
@@ -31,12 +35,38 @@ use engine::Engine;
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
-    path::Path,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex, OnceLock,
     },
 };
+
+/// What a persistent browser profile requires of agent commands. The profile
+/// owner decides; this module enforces the verdicts around every command.
+pub(super) trait ProfileGuard: Send + Sync {
+    /// The Chromium user-data directory that persists between sessions.
+    fn directory(&self) -> &Path;
+    /// Runs before each agent command; an error holds the command while the
+    /// person answers a site or sign-in question.
+    fn before(&self) -> Result<(), String>;
+    /// Whether the agent may read and act on the page at `url`. `login` reports
+    /// a visible password field.
+    fn page(&self, url: &str, login: bool) -> Result<Verdict, String>;
+    /// Opens a visible window of the profile at `url` for the person to sign
+    /// in, after the agent's browser closed. Returns what to tell the agent.
+    fn sign_in(&self, url: &str) -> String;
+    /// Sites holding cookies in the profile, read when its browser closes.
+    fn observed(&self, sites: Vec<String>);
+}
+
+pub(super) enum Verdict {
+    Proceed,
+    SignIn,
+}
+
+/// Reads the current address and whether a password field is visible.
+const PAGE_STATE: &str = "(()=>({url:location.href,login:[...document.querySelectorAll('input[type=password]')].some(e=>!e.disabled&&e.getClientRects().length>0)}))()";
 
 struct Slot {
     headed: bool,
@@ -44,6 +74,8 @@ struct Slot {
     reserved: AtomicBool,
     engine: Mutex<Option<Engine>>,
     trees: Mutex<Vec<Arc<ProcessTree>>>,
+    /// Set when the task switched to a persistent profile.
+    profile: Mutex<Option<Arc<dyn ProfileGuard>>>,
 }
 
 impl Default for Slot {
@@ -54,6 +86,7 @@ impl Default for Slot {
             reserved: AtomicBool::new(false),
             engine: Mutex::new(None),
             trees: Mutex::new(Vec::new()),
+            profile: Mutex::new(None),
         }
     }
 }
@@ -180,15 +213,73 @@ pub(super) fn peek(run_id: &str) -> Result<Peek, String> {
 pub fn close(run_id: &str) {
     let slot = sessions().lock().unwrap().remove(run_id);
     if let Some(slot) = slot {
-        cancel(&slot);
+        shut(slot);
     }
 }
 
 pub fn close_all() {
     let slots = std::mem::take(&mut *sessions().lock().unwrap());
-    for slot in slots.values() {
-        cancel(slot);
+    let closing: Vec<_> = slots.into_values().filter_map(shut).collect();
+    for handle in closing {
+        let _ = handle.join();
     }
+}
+
+/// Ends a session. A persistent profile that is idle first records its cookie
+/// domains and closes gracefully on another thread so sign-ins reach disk; a
+/// busy one is stopped at once.
+fn shut(slot: Arc<Slot>) -> Option<std::thread::JoinHandle<()>> {
+    let guard = slot.profile.lock().ok().and_then(|mut guard| guard.take());
+    let Some(guard) = guard else {
+        cancel(&slot);
+        return None;
+    };
+    Some(std::thread::spawn(move || {
+        if let Ok(mut engine) = slot.engine.try_lock() {
+            if let Some(open) = engine.take() {
+                observe(&open, guard.as_ref());
+            }
+        }
+        cancel(&slot);
+        drop(guard);
+    }))
+}
+
+fn observe(engine: &Engine, guard: &dyn ProfileGuard) {
+    if let Some(endpoint) = engine.devtools() {
+        if let Ok(result) = cdp::call(
+            endpoint,
+            "Storage.getCookies",
+            json!({}),
+            std::time::Duration::from_secs(5),
+        ) {
+            guard.observed(cookie_sites(&result["cookies"]));
+        }
+    }
+}
+
+/// Switches a task's browser to a persistent profile. Any disposable browser it
+/// had closes; the next command opens the profile headless.
+pub(super) fn attach_profile(run_id: &str, guard: Arc<dyn ProfileGuard>) -> Result<(), String> {
+    let slot = session_slot(run_id)?;
+    let mut engine = slot.engine.lock().map_err(|e| e.to_string())?;
+    check_canceled(&slot.canceled)?;
+    let mut profile = slot.profile.lock().map_err(|e| e.to_string())?;
+    if profile.is_some() {
+        return Err("This task already uses a persistent browser profile.".into());
+    }
+    *engine = None;
+    *profile = Some(guard);
+    Ok(())
+}
+
+/// The persistent profile directory a task's browser uses, if any.
+pub(super) fn profile_directory(run_id: &str) -> Option<PathBuf> {
+    let slot = sessions().lock().ok()?.get(run_id)?.clone();
+    let profile = slot.profile.lock().ok()?;
+    profile
+        .as_ref()
+        .map(|guard| guard.directory().to_path_buf())
 }
 
 fn check_canceled(canceled: &AtomicBool) -> Result<(), String> {
@@ -224,8 +315,18 @@ async fn with_session<T: Send + 'static>(
     run_id: &str,
     work: impl FnOnce(&Engine) -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
+    with_target(run_id, None, work).await
+}
+
+/// Like [`with_session`] for a command that opens `target`: in a persistent
+/// profile the target is checked instead of the page being left.
+async fn with_target<T: Send + 'static>(
+    run_id: &str,
+    target: Option<String>,
+    work: impl FnOnce(&Engine) -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
     let slot = session_slot(run_id)?;
-    tauri::async_runtime::spawn_blocking(move || run_session(&slot, work))
+    tauri::async_runtime::spawn_blocking(move || run_guarded(&slot, target.as_deref(), work))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -234,8 +335,38 @@ fn run_session<T>(
     slot: &Arc<Slot>,
     work: impl FnOnce(&Engine) -> Result<T, String>,
 ) -> Result<T, String> {
+    run_guarded(slot, None, work)
+}
+
+/// Applies a persistent profile's verdict to the current page. A sign-in page
+/// closes the agent's browser so the person can sign in in a visible window.
+fn check_page(engine: &mut Option<Engine>, guard: &dyn ProfileGuard) -> Result<(), String> {
+    let Some(open) = engine.as_ref() else {
+        return Ok(());
+    };
+    let state = open.call(json!({"action":"evaluate", "script":PAGE_STATE}))?["result"].clone();
+    let url = state["url"].as_str().unwrap_or_default().to_owned();
+    match guard.page(&url, state["login"] == true)? {
+        Verdict::Proceed => Ok(()),
+        Verdict::SignIn => {
+            observe(open, guard);
+            *engine = None;
+            Err(guard.sign_in(&url))
+        }
+    }
+}
+
+fn run_guarded<T>(
+    slot: &Arc<Slot>,
+    target: Option<&str>,
+    work: impl FnOnce(&Engine) -> Result<T, String>,
+) -> Result<T, String> {
     let mut engine = slot.engine.lock().map_err(|e| e.to_string())?;
     check_canceled(&slot.canceled)?;
+    let guard = slot.profile.lock().map_err(|e| e.to_string())?.clone();
+    if let Some(guard) = &guard {
+        guard.before()?;
+    }
     if !slot.reserved.load(Ordering::SeqCst) {
         let sessions = sessions().lock().map_err(|e| e.to_string())?;
         check_canceled(&slot.canceled)?;
@@ -260,8 +391,20 @@ fn run_session<T>(
             }
         }
     }
+    if let Some(guard) = &guard {
+        match target {
+            Some(target) => {
+                guard.page(target, false)?;
+            }
+            None => check_page(&mut engine, guard.as_ref())?,
+        }
+    }
     let result = work(engine.as_ref().unwrap());
     check_canceled(&slot.canceled)?;
+    if let Some(guard) = &guard {
+        // Content from a page the person has not allowed, or a sign-in page, is withheld.
+        check_page(&mut engine, guard.as_ref())?;
+    }
     result
 }
 
@@ -319,7 +462,10 @@ fn navigate(engine: &Engine, url: &str) -> Result<Value, String> {
 pub async fn browser_navigate(run_id: &str, url: &str) -> Result<Value, String> {
     validate_url(url)?;
     let url = url.to_owned();
-    with_session(run_id, move |engine| navigate(engine, &url)).await
+    with_target(run_id, Some(url.clone()), move |engine| {
+        navigate(engine, &url)
+    })
+    .await
 }
 
 pub async fn browser_snapshot(
@@ -339,7 +485,7 @@ pub async fn browser_snapshot(
     {
         return Err("Use a CSS selector of 1–2,000 characters.".into());
     }
-    with_session(run_id, move |engine| {
+    with_target(run_id, request.url.clone(), move |engine| {
         if let Some(url) = request.url { navigate(engine, &url)?; }
         if request.mode == "html" {
             let selector = serde_json::to_string(&request.selector).map_err(|e| e.to_string())?;
@@ -395,7 +541,7 @@ async fn screenshot(
         validate_url(url)?;
     }
     let workspace = workspace.to_path_buf();
-    with_session(run_id, move |engine| {
+    with_target(run_id, target_url.clone(), move |engine| {
         if let Some(url) = target_url {
             navigate(engine, &url)?;
         }
@@ -612,7 +758,8 @@ pub async fn browser_tabs(run_id: &str, request: BrowserTabsRequest) -> Result<V
         }
         _ => return Err("Choose list, new, switch or close.".into()),
     };
-    with_session(run_id, move |engine| {
+    let target = command["url"].as_str().map(str::to_owned);
+    with_target(run_id, target, move |engine| {
         if command["action"] == "tab_new" {
             let tabs = engine.call(json!({"action":"tab_list"}))?;
             if tabs["tabs"].as_array().is_some_and(|tabs| tabs.len() >= 16) {

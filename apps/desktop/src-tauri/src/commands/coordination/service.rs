@@ -461,6 +461,7 @@ impl Coordinator {
                         .route("/v1/browser/configure", post(bridge_browser_configure))
                         .route("/v1/browser/inspect", post(bridge_browser_inspect))
                         .route("/v1/browser/tabs", post(bridge_browser_tabs))
+                        .route("/v1/browser/profile", post(bridge_browser_profile))
                         .route(
                             "/v1/desktop/control",
                             post(crate::commands::desktop_control::bridge),

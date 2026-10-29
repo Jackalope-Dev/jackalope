@@ -933,6 +933,50 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                     .await?;
             Ok(Response::PullRequest { url })
         }
+        Request::BrowserProfile {
+            project_id,
+            action,
+            url,
+        } => {
+            use super::browser_profiles as profiles;
+            let runtime = app.state::<TaskRuntime>();
+            let root = runtime.browser_profiles_root();
+            super::project_registry::record(&runtime, &project_id)
+                .ok_or("That project is not registered.")?;
+            let profile = tauri::async_runtime::spawn_blocking(move || {
+                let found = profiles::find(&root, "project", &project_id);
+                let profile = match action.as_str() {
+                    "" => found,
+                    "open" => {
+                        let profile =
+                            profiles::ensure(&root, "project", &project_id, "Project browser")?;
+                        profiles::open_window(&root, &profile, url.as_deref())?;
+                        profiles::find(&root, "project", &project_id)
+                    }
+                    "done" => {
+                        if let Some(profile) = &found {
+                            profiles::close_window(&root, &profile.id)?;
+                        }
+                        profiles::find(&root, "project", &project_id)
+                    }
+                    _ => return Err("Use open or done.".to_string()),
+                };
+                Ok::<_, String>(profile.map(|profile| {
+                    let status = profiles::status(&root, profile);
+                    protocol::BrowserProfileView {
+                        name: status.profile.name,
+                        sites: status.profile.signed_in_sites,
+                        size_bytes: status.size_bytes,
+                        last_used_at: status.profile.last_used_at,
+                        in_use: status.in_use,
+                        window_open: status.window_open,
+                    }
+                }))
+            })
+            .await
+            .map_err(|e| e.to_string())??;
+            Ok(Response::BrowserProfile { profile })
+        }
         Request::PlanStart {
             project_path,
             goal,

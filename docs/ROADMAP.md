@@ -154,7 +154,9 @@ scope; their conversations repeat the instructions in every batch. Bots wake on
 schedules, project changes and new connection data, consult each other, and bring
 decisions, questions and sources to the person as cards. Connected apps use the person's own Composio project through one managed
 on-demand connection. A Screen view shows the task browser's viewport and desktop
-grant state with revoke controls. Installed and live-account acceptance remain open.
+grant state with revoke controls. Persistent agent browser profiles, one per project and
+optionally per bot, keep sign-ins between tasks with per-site permission and a
+person-only sign-in window. Installed and live-account acceptance remain open.
 
 Cloudflare Artifacts is available as a beta bring-your-own-account option for new and
 existing projects, with pushes and expiring review snapshots. Live account and installed

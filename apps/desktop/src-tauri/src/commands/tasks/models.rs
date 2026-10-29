@@ -140,6 +140,9 @@ pub struct TaskRun {
     /// Before/after screenshots Jackalope captured for review.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub review_captures: Option<crate::commands::previews::review::ReviewCaptures>,
+    /// Review screenshots are being captured after the attempt finished.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub review_capturing: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -366,6 +369,7 @@ impl TaskRun {
                 .to_vec(),
             visited_pages: self.visited_pages.clone(),
             review_captures: self.review_captures.clone(),
+            review_capturing: self.review_capturing,
         }
     }
 }

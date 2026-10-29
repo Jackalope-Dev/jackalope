@@ -67,6 +67,7 @@ pub mod schedules;
 
 pub mod agent_screen;
 pub mod browser;
+pub mod browser_profiles;
 pub mod cloudflare_artifacts;
 pub mod composio;
 pub mod delivery;

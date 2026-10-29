@@ -179,6 +179,8 @@ export interface TaskRun {
   desktopActions?: DesktopActionRecord[];
   /** Before/after screenshots Jackalope captured from the preview for review. */
   reviewCaptures?: import('./review-captures.ts').ReviewCaptures | null;
+  /** Review screenshots are still being captured after the result was recorded. */
+  reviewCapturing?: boolean;
 }
 /** @public Named in the return types of usage-entries.ts and usage-insights.ts exports. */
 export interface DesktopActionRecord {

@@ -12,6 +12,7 @@ import {
 } from '../../stores/botStore';
 import { useMcpStore } from '../../stores/mcpStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { BrowserProfileSettings } from '../projects/BrowserProfileSettings';
 import { ComposerAgentPicker } from '../sessions/ComposerAgentPicker';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
@@ -348,6 +349,7 @@ export function BotEditor({
           </div>
           {error && <InlineNotice tone="error">{error}</InlineNotice>}
         </form>
+        {bot && <BrowserProfileSettings owner={{ kind: 'bot', id: bot.id, name: bot.name }} />}
         <DialogFooter>
           {bot || step === 0 ? (
             <Button variant="outline" type="button" onClick={onClose}>

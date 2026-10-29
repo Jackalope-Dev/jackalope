@@ -17,6 +17,7 @@ import { Textarea } from '../ui/Textarea';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { ArtifactsProjectSettings } from './ArtifactsProjectSettings';
+import { BrowserProfileSettings } from './BrowserProfileSettings';
 import { DesktopProjectSettings } from './DesktopProjectSettings';
 import { ProjectGitSettings } from './ProjectGitSettings';
 import { ProjectPlanningSettings } from './ProjectPlanningSettings';
@@ -271,6 +272,10 @@ export function ProjectPreferences({
           <ProjectPlanningSettings key={`planning-${project.id}`} projectId={project.id} />
           <ProjectGitSettings key={project.path} projectPath={project.path} />
           <DesktopProjectSettings key={`desktop-${project.id}`} projectId={project.id} />
+          <BrowserProfileSettings
+            key={`browser-${project.id}`}
+            owner={{ kind: 'project', id: project.id, name: project.name }}
+          />
           {!project.plainFolder && (
             <ArtifactsProjectSettings
               key={`artifacts-${project.path}`}

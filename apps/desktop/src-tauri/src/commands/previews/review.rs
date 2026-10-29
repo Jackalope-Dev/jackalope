@@ -12,7 +12,7 @@ use super::super::{
     integration,
     process_control::ProcessTree,
     project_registry,
-    tasks::{events::activity, preparation::StepProgress, TaskRun, TaskRuntime},
+    tasks::{events::activity, TaskRun, TaskRuntime},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -354,8 +354,8 @@ fn serve(
                     .map_or("no exit code".into(), |code| format!("code {code}"))
             ));
         }
-        if !runtime.is_running(id) {
-            return Err("the attempt was stopped".into());
+        if !wanted_now(runtime, id) {
+            return Err("the result was closed or continued".into());
         }
         if Instant::now() >= ready_by {
             return Err(format!(
@@ -455,9 +455,9 @@ impl Pass<'_> {
             "After"
         };
         for capture in captures.iter_mut() {
-            if Instant::now() >= self.deadline || !self.runtime.is_running(self.id) {
+            if Instant::now() >= self.deadline || !wanted_now(self.runtime, self.id) {
                 notes.push(format!(
-                    "{label} screenshots stopped early: the capture time limit was reached or the attempt stopped."
+                    "{label} screenshots stopped early: the capture time limit was reached or the result was closed."
                 ));
                 return;
             }
@@ -630,24 +630,39 @@ pub fn criterion_steps(run: &TaskRun, captures: &ReviewCaptures) -> Vec<Validati
         .collect()
 }
 
-/// Captures review screenshots for an attempt that finished with changes, when
-/// its project allows it. Never fails the attempt.
-pub(in crate::commands) fn capture(runtime: &TaskRuntime, id: &str) {
+/// Whether this attempt should get review screenshots: its project saves a
+/// usable preview command and captures are on.
+pub(in crate::commands) fn wanted(runtime: &TaskRuntime, run: &TaskRun) -> bool {
+    project_registry::record(runtime, &run.project_id)
+        .and_then(|record| settings(&record))
+        .is_some()
+}
+
+/// Whether a capture already under way should keep going: the attempt is still
+/// waiting for review and nothing cleared its capture.
+fn wanted_now(runtime: &TaskRuntime, id: &str) -> bool {
+    runtime
+        .run_snapshot(id)
+        .is_some_and(|run| run.review_capturing && run.status == "review")
+}
+
+/// Captures review screenshots in the background for an attempt whose result is
+/// already recorded with `review_capturing` set. Never fails the attempt.
+pub(in crate::commands) fn start(runtime: TaskRuntime, id: &str) {
+    let id = id.to_string();
+    std::thread::spawn(move || capture(&runtime, &id));
+}
+
+fn capture(runtime: &TaskRuntime, id: &str) {
     let Some(run) = runtime.run_snapshot(id) else {
         return;
     };
     let Some(settings) =
         project_registry::record(runtime, &run.project_id).and_then(|record| settings(&record))
     else {
+        runtime.update(id, |r| r.review_capturing = false);
         return;
     };
-    runtime.update(id, |r| {
-        r.progress = Some(StepProgress::new(
-            "review_capture",
-            "Capturing review screenshots",
-            1,
-        ));
-    });
     let captures = runtime
         .timed(id, "reviewCapture", || {
             Ok(collect(runtime, &run, &settings))
@@ -660,7 +675,7 @@ pub(in crate::commands) fn capture(runtime: &TaskRuntime, id: &str) {
     let steps = criterion_steps(&run, &captures);
     let count = captures.image_count();
     runtime.update(id, |r| {
-        r.progress = None;
+        r.review_capturing = false;
         activity(
             r,
             &match count {
@@ -672,6 +687,22 @@ pub(in crate::commands) fn capture(runtime: &TaskRuntime, id: &str) {
         r.validation_steps.extend(steps);
         r.review_captures = Some(captures);
     });
+}
+
+/// A run saved while screenshots were still being captured, after Jackalope closed.
+pub(in crate::commands) fn recover(run: &mut TaskRun) -> bool {
+    if !run.review_capturing {
+        return false;
+    }
+    run.review_capturing = false;
+    run.review_captures
+        .get_or_insert_with(|| ReviewCaptures {
+            captured_at: chrono::Utc::now().to_rfc3339(),
+            ..Default::default()
+        })
+        .notes
+        .push("Review screenshots stopped because Jackalope closed while capturing them.".into());
+    true
 }
 
 #[cfg(test)]

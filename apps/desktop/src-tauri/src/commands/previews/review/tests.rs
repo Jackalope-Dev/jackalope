@@ -223,11 +223,43 @@ fn fixture() -> (TaskRuntime, PathBuf, String) {
 #[test]
 fn projects_without_a_preview_command_capture_nothing() {
     let (runtime, root, id) = fixture();
-    runtime.update(&id, |run| run.status = "running".into());
+    let run = runtime.run_snapshot(&id).unwrap();
+    assert!(!wanted(&runtime, &run));
+    runtime.update(&id, |run| run.review_capturing = true);
     capture(&runtime, &id);
     let run = runtime.run_snapshot(&id).unwrap();
-    assert!(run.review_captures.is_none() && run.progress.is_none());
+    assert!(run.review_captures.is_none() && !run.review_capturing);
     assert!(!root.join(".jackalope").exists());
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn background_capture_continues_only_while_the_result_awaits_review() {
+    let (runtime, root, id) = fixture();
+    assert!(!wanted_now(&runtime, &id));
+    runtime.update(&id, |run| run.review_capturing = true);
+    assert!(wanted_now(&runtime, &id));
+    runtime.update(&id, |run| run.status = "merged".into());
+    assert!(!wanted_now(&runtime, &id));
+    assert!(!wanted_now(&runtime, "missing"));
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn closing_the_app_mid_capture_leaves_a_note() {
+    let (runtime, root, id) = fixture();
+    let mut run = runtime.run_snapshot(&id).unwrap();
+    assert!(!recover(&mut run));
+    run.review_capturing = true;
+    assert!(recover(&mut run));
+    assert!(!run.review_capturing);
+    let captures = run.review_captures.unwrap();
+    assert!(captures.pages.is_empty());
+    assert!(captures.notes[0].contains("Jackalope closed"));
+    let saved = serde_json::to_value(runtime.run_snapshot(&id).unwrap()).unwrap();
+    assert!(saved.get("reviewCapturing").is_none());
     drop(runtime);
     let _ = std::fs::remove_dir_all(root);
 }
@@ -252,11 +284,12 @@ fn real_review_capture_saves_result_screenshots_and_cleans_up() {
     )
     .unwrap();
     runtime.update(&id, |run| {
-        run.status = "running".into();
+        run.review_capturing = true;
         record_visit(run, "http://127.0.0.1:9999/help");
     });
     capture(&runtime, &id);
     let run = runtime.run_snapshot(&id).unwrap();
+    assert!(!run.review_capturing);
     let captures = run.review_captures.unwrap();
     assert_eq!(captures.pages.len(), 6, "{:?}", captures.notes);
     assert!(

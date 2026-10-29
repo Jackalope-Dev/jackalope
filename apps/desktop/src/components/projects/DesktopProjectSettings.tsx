@@ -63,7 +63,7 @@ export function DesktopProjectSettings({ projectId }: { projectId: string }) {
   return (
     <SettingGroup
       title="Desktop control"
-      description="Apps and websites you chose to always allow, or never allow, when an agent controls your desktop in this project. Full desktop access is asked for every task."
+      description="Apps and websites you chose to always allow, or never allow, when an agent controls your desktop or uses the project browser in this project. Full desktop access is asked for every task."
     >
       {error && (
         <SettingBody>

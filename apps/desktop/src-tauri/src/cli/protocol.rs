@@ -205,6 +205,32 @@ pub enum Request {
         body: String,
         draft: bool,
     },
+    /// A project's persistent agent browser. An empty `action` reads its
+    /// status; `open` opens it in a window to sign in (at `url` when given),
+    /// creating it on first use; `done` closes that window. Answers with
+    /// `Response::BrowserProfile`.
+    BrowserProfile {
+        project_id: String,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        action: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        url: Option<String>,
+    },
+}
+
+/// A persistent agent browser profile as a terminal shows it.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserProfileView {
+    pub name: String,
+    /// Domains holding cookies when the profile last closed.
+    pub sites: Vec<String>,
+    pub size_bytes: u64,
+    pub last_used_at: Option<String>,
+    /// What holds the profile now, if anything.
+    pub in_use: Option<String>,
+    /// Whether its sign-in window is open.
+    pub window_open: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -601,6 +627,10 @@ pub enum Response {
     PullRequest {
         url: String,
     },
+    /// Absent `profile` means the project has no browser profile yet.
+    BrowserProfile {
+        profile: Option<BrowserProfileView>,
+    },
 }
 
 /// A prepared or applied merge, as a terminal shows it.
@@ -896,6 +926,30 @@ mod tests {
                 export_lessons: None,
                 ..
             }
+        ));
+    }
+
+    #[test]
+    fn browser_profile_requests_are_additive() {
+        let status = serde_json::to_string(&Request::BrowserProfile {
+            project_id: "p".into(),
+            action: String::new(),
+            url: None,
+        })
+        .unwrap();
+        assert_eq!(status, r#"{"request":"browser-profile","project_id":"p"}"#);
+        let open: Request = serde_json::from_str(
+            r#"{"request":"browser-profile","project_id":"p","action":"open","url":"https://example.com"}"#,
+        )
+        .unwrap();
+        assert!(
+            matches!(open, Request::BrowserProfile { action, url: Some(_), .. } if action == "open")
+        );
+        let response: Response =
+            serde_json::from_str(r#"{"response":"browser-profile","profile":null}"#).unwrap();
+        assert!(matches!(
+            response,
+            Response::BrowserProfile { profile: None }
         ));
     }
 }

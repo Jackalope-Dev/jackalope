@@ -9,6 +9,7 @@ const OPTIONAL: &[(&str, &str)] = &[
     ("browser_configure", "browser"),
     ("browser_inspect", "browser"),
     ("browser_tabs", "browser"),
+    ("browser_open_profile", "browser"),
     ("desktop_control", "desktop"),
     ("message", "coordination"),
     ("inbox", "coordination"),
@@ -59,8 +60,9 @@ mod tests {
     #[test]
     fn discovery_expands_only_requested_tools_without_hiding_core_capabilities() {
         let mut discovered = requested(&["browser".into()]).unwrap();
-        assert_eq!(discovered.len(), 7);
+        assert_eq!(discovered.len(), 8);
         assert!(visible("browser_interact", &discovered));
+        assert!(visible("browser_open_profile", &discovered));
         assert!(!visible("desktop_control", &discovered));
         assert!(!visible("message", &discovered));
         assert!(visible("ask_user", &discovered));

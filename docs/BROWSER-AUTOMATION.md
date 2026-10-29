@@ -18,6 +18,7 @@ Both native MCP and the authenticated task HTTP bridge expose the same tools:
 | `browser_inspect` | Read element text/value/visibility/enabled/checked state, console messages, page errors, or run an axe accessibility audit. |
 | `browser_tabs` | List, open, switch and close tabs within the same task session. |
 | `browser_screenshot` | Save a full-page PNG through the existing task screenshot artifact and review flow. |
+| `browser_open_profile` | Switch the task's browser tools to a persistent profile: `profile: "project"` (default) or `"bot"` in a bot conversation. See [Persistent agent browser profiles](#persistent-agent-browser-profiles). HTTP bridge: `POST /v1/browser/profile`. |
 
 Take a new snapshot after navigation or a page change before using references.
 The default snapshot includes static text and status output; interactive-only
@@ -39,7 +40,7 @@ zero violations and incomplete checks pass only the automated audit. Keyboard,
 screen-reader and other manual acceptance remain necessary. Reports are untrusted
 page content and may be truncated; the response and saved notes disclose truncation.
 
-Codex receives explicit approval for these seven Jackalope tools through its
+Codex receives explicit approval for these eight Jackalope tools through its
 [per-tool MCP configuration](https://learn.chatgpt.com/docs/extend/mcp).
 This applies only to the task's Jackalope server. Claude's existing launch allowlist
 includes the same tools. No global CLI settings are written and unrelated project
@@ -66,8 +67,8 @@ MCP approvals are unchanged. Other adapters use their configured transport; vali
 - The internal transport is local TCP on Windows and a Unix socket elsewhere.
   It is a process integration, not a security boundary against other local programs.
   Streaming is disabled before browser launch. Global agent-browser configuration,
-  cloud providers, persistent authentication/state, uploads and arbitrary script
-  evaluation are not exposed. HTML reading and preview selection use fixed internal scripts.
+  cloud providers, agent-browser authentication/state files, uploads and arbitrary script
+  evaluation are not exposed. Persistent profiles are Jackalope's own, described below. HTML reading and preview selection use fixed internal scripts.
 - Page text remains untrusted data. Snapshots and diagnostic text are bounded to
   40,000 characters, transport responses to 2 MB and saved screenshots to the
   existing 8 MiB preview limit. Large pages can use a scoped snapshot.
@@ -75,6 +76,52 @@ MCP approvals are unchanged. Other adapters use their configured transport; vali
   Separate [native desktop control](DESKTOP-CONTROL.md) operates the user's own
   logged-in browser or other apps after a window, app or desktop grant. Browser-based actions may change a site; agents must continue to
   follow the task's authorization.
+
+## Persistent agent browser profiles
+
+Disposable temporary profiles stay the default for tasks, previews, review captures
+and tests. For signed-in or long-running work, a project has one **Project browser**
+and each saved bot may have its own **<bot> browser**, usable from that bot's
+conversations in any project. Project profiles are never shared across projects. The
+person's everyday browser and its profiles are never opened or copied.
+
+- **Storage.** Each profile is a Chromium user-data directory at
+  `task-runs-v1/browser-profiles/<id>/data` in the desktop profile, indexed by
+  `browser-profiles/profiles.json` (name, owner kind and ID, created and last-used
+  times, and site names). Profiles are created on first use and removed only by
+  **Delete profile** or a full Jackalope reset. Settings sync and lesson sync read named
+  files only, so profile folders are never synced or exported.
+- **Privacy.** Jackalope never reads, stores or sends passwords. The site list is the
+  set of cookie domain names (leading dot and `www.` removed, at most 200) read through
+  the DevTools protocol when a profile closes; cookie names, values and paths are
+  discarded immediately. The model never receives cookies or profile files.
+- **One session at a time.** An in-memory lease admits one live session per profile:
+  a task, the person's sign-in window, a site cleanup or a deletion. A second request
+  fails with what holds the profile. Leases end with their session, so a crash leaves
+  nothing locked; a stale `DevToolsActivePort` file is discarded at launch, and a
+  profile still open in an orphaned Chromium reports that it is already open.
+- **Agent use.** `browser_open_profile` closes the task's disposable browser and opens
+  the profile headless in a Chromium Jackalope launches directly on every platform,
+  with agent-browser attached over loopback CDP. Each command checks the page before
+  and after it runs. The first use of a site asks the person with the desktop-control
+  choices (allow for this task, always allow, not now, never allow); saved answers use
+  the project's desktop site decisions, or `bot:<id>` for a bot's browser. Loopback
+  pages are allowed. While a question is open, or after a decline, the command returns
+  an error and page content is withheld. Agents are told to confirm purchases,
+  sending, deleting and account, billing or security changes with `ask_user`.
+- **Sign in once.** When a permitted page shows a visible password field, the agent's
+  browser closes gracefully, a visible window of the same profile opens at that page
+  and the task asks **Sign in needed** (`I signed in` / `Skip sign-in`). Agent commands
+  wait until the person answers; the window then closes and the agent continues
+  headless and must navigate again. A skipped site is not asked again in that task.
+  People can also open the profile from Project settings → **Browser profiles**, the
+  bot editor, or the terminal's `/browser open [url]`; closing the window or choosing
+  **Done signing in** (`/browser done`) records its sites.
+- **Closing.** Persistent Chromium is closed with `Browser.close` before its process
+  tree ends, so new sign-ins reach disk. An idle task profile closes this way when the
+  attempt ends; one busy in a command is stopped at once. **Clear site data** removes a
+  site's and its subdomains' cookies and the stored data of its `https`, `https://www.`
+  and `http` origins in a short headless session.
 
 ## Screen view
 
@@ -99,8 +146,8 @@ The embedded iframe and fresh-page capture do not share that window's state.
 
 ## Review screenshots
 
-When an attempt that changed files finishes successfully, after its automatic check,
-Jackalope captures review screenshots if the project saves a preview command containing
+When an attempt that changed files finishes successfully, its result is recorded first
+and Jackalope then captures review screenshots in the background if the project saves a preview command containing
 `{port}` and **Capture review screenshots** is on (the default once a command exists).
 It runs the command on a free loopback port in the task workspace, waits up to 60
 seconds for an HTTP answer and opens each page in a headless disposable browser with a
@@ -117,7 +164,11 @@ a separate worktree, the checkout is at the attempt's starting commit with no
 uncommitted tracked changes and no other work runs there. Otherwise only the result is
 captured and the review notes say why.
 
-All capture work stops after 150 seconds or when the attempt is stopped. Each preview
+While capture runs the attempt carries `reviewCapturing` and Review shows
+**Capturing screenshots…**; the run updates when images are saved. All capture work
+stops after 150 seconds or when the result leaves review (merged, discarded or
+continued). If Jackalope closes mid-capture, the flag is cleared on the next launch with
+a note. Each preview
 holds the workspace like a running check, so checks, managed previews and integration
 wait; its process tree and browser session are closed as soon as that side finishes.
 Failures become notes and never fail the attempt. Browser criteria with a matching page

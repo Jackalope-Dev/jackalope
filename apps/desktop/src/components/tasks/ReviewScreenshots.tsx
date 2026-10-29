@@ -1,5 +1,5 @@
 import { SegmentedControl } from '@jackalope/ui';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { capturedPages, type ReviewCaptures } from '../../lib/review-captures';
 import { nativeTask, type ScreenshotArtifact } from '../../lib/task-runtime';
@@ -62,10 +62,13 @@ function Shot({
 export function ReviewScreenshots({
   runId,
   captures,
+  capturing = false,
   onOpenPreview,
 }: {
   runId: string;
   captures: ReviewCaptures;
+  /** Screenshots are still being captured; the panel updates when they are saved. */
+  capturing?: boolean;
   onOpenPreview?: () => void;
 }) {
   const pages = capturedPages(captures);
@@ -118,7 +121,12 @@ export function ReviewScreenshots({
           )}
         </div>
       </div>
-      {!page && (
+      {capturing && (
+        <p className="review-screenshots-capturing task-muted" role="status">
+          <Loader2 size={16} aria-hidden="true" className="animate-spin" /> Capturing screenshots…
+        </p>
+      )}
+      {!page && !capturing && (
         <InlineNotice tone="info">
           No screenshots were saved. The notes below say what happened.
         </InlineNotice>

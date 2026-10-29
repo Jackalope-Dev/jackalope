@@ -3,7 +3,7 @@ import { ArrowRight, Check, FileDiff, GitMerge, Images, ListChecks, RefreshCw } 
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
-import { capturedPages } from '../../lib/review-captures';
+import { capturedPages, type ReviewCaptures } from '../../lib/review-captures';
 import { reviewFingerprint } from '../../lib/review-fingerprint';
 import { nativeTask, type Review, type TaskRun } from '../../lib/task-runtime';
 import { useProjectStore } from '../../stores/projectStore';
@@ -20,6 +20,13 @@ import { ReviewScreenshots } from './ReviewScreenshots';
 import './result-review.css';
 
 export type ReviewSection = 'changes' | 'screenshots' | 'checks' | 'delivery';
+
+const EMPTY_CAPTURES: ReviewCaptures = {
+  capturedAt: '',
+  beforeAvailable: false,
+  pages: [],
+  notes: [],
+};
 
 export function ResultReview({
   run,
@@ -53,9 +60,10 @@ export function ResultReview({
 }) {
   const [selected, setSelected] = useState<ReviewSection>('changes');
   const hasChecks = !unavailable || !!outcomes || !!evidence;
-  const captures = run.reviewCaptures;
+  const capturing = !!run.reviewCapturing;
+  const captures = run.reviewCaptures ?? (capturing ? EMPTY_CAPTURES : undefined);
   const shots = capturedPages(captures).length;
-  const hasScreenshots = !!captures && (shots > 0 || captures.notes.length > 0);
+  const hasScreenshots = capturing || (!!captures && (shots > 0 || captures.notes.length > 0));
   const requested = section ?? selected;
   const current =
     (requested === 'checks' && !hasChecks) || (requested === 'screenshots' && !hasScreenshots)
@@ -215,7 +223,12 @@ export function ResultReview({
         </ReviewPanel>
         {hasScreenshots && captures && (
           <ReviewPanel current={current} value="screenshots">
-            <ReviewScreenshots runId={run.id} captures={captures} onOpenPreview={onOpenPreview} />
+            <ReviewScreenshots
+              runId={run.id}
+              captures={captures}
+              capturing={capturing}
+              onOpenPreview={onOpenPreview}
+            />
           </ReviewPanel>
         )}
         {hasChecks && (

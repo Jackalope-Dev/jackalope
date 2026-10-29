@@ -144,7 +144,14 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   headless browser: up to six pages (configured, named by browser plan criteria, or
   visited by the agent), desktop and optional narrow, compared before/after in Review.
   "Before" needs a separate worktree and a clean project checkout at the starting
-  commit; otherwise only the result is captured, with a note.
+  commit; otherwise only the result is captured, with a note. Capture runs after the
+  result is recorded, so it never delays review.
+- Persistent agent browser profiles: a Project browser per project and an optional
+  browser per bot keep sign-ins between tasks in a separate Chromium profile. Agents opt
+  in with `browser_open_profile`; each site asks before first use, sign-in pages pause
+  the agent while the person signs in in a visible window, and only cookie domain names
+  are recorded. Project settings, the bot editor and `/browser` open, clear and delete
+  profiles.
 - Delivery inspects local Git state and optionally reads PR/CI through the GitHub CLI.
   PR, CI and deployment preparation carry evidence into editable drafts. Failing PR
   checks are listed openly with a draft asking the agent to reproduce and fix them.

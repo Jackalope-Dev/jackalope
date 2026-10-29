@@ -1,5 +1,18 @@
 [
   {
+    "id": "agent-browsers-that-stay-signed-in",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Agent browsers that stay signed in",
+    "description": "Give agents and bots their own browser profile, sign in once, and keep your everyday browser untouched.",
+    "items": [
+      "Each project gets a Project browser and each bot can have its own; sign-ins last between tasks.",
+      "Agents ask before using each site and pause for you to sign in yourself in a visible window; passwords never reach the agent.",
+      "Manage profiles in Project settings, the bot editor or the terminal's /browser: see sites, clear one site or delete the profile.",
+      "Review screenshots now capture after the result is ready, so they never hold up finished work."
+    ]
+  },
+  {
     "id": "before-and-after-screenshots-in-review",
     "date": "2026-10-29",
     "status": "In development",

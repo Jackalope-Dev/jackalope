@@ -59,6 +59,13 @@ release dates.
   browser-tagged plan criteria, the slider and side-by-side views at 960 by 640 in
   light and dark themes, keyboard use of the slider, and the TUI `/settings` toggle.
   Confirm no browser window appears and no preview process or profile is left behind.
+- [ ] Accept persistent agent browser profiles in installed apps on Windows, macOS and
+  Linux with Chrome, Edge and Chromium: open the Project browser and a bot browser to
+  sign in, confirm sign-ins survive closing the window, an app restart and a later
+  task; site questions (all four answers) and saved decisions; the agent-triggered
+  sign-in pause and resume; a second task refused while the profile is busy; Clear site
+  data, Delete profile and `/browser`; and that no Chromium process or lease remains
+  after stop, completion, quitting during a session or a crash.
 - [ ] Accept the `jackalope` command in installed macOS, Windows and Linux packages,
   including a folder that is not a Git repository (direct edits, no patch or merge)
   and `--init` (initial commit, starter ignore, refusal of a home directory or drive root):

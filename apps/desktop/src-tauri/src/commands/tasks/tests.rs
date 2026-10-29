@@ -68,6 +68,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         desktop_actions: vec![],
         visited_pages: vec![],
         review_captures: None,
+        review_capturing: false,
     }
 }
 
