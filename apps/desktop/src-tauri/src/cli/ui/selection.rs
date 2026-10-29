@@ -106,17 +106,25 @@ impl App {
 }
 
 impl App {
-    /// Acts on whatever clickable part of the last frame is at `at`.
-    fn click(&mut self, (column, row): (u16, u16)) {
-        let hit = self
-            .hits
+    /// What clicking the clickable part of the last frame under the pointer does.
+    pub(super) fn hovered(&self) -> Option<Click> {
+        self.hover.and_then(|at| self.hit(at))
+    }
+
+    fn hit(&self, (column, row): (u16, u16)) -> Option<Click> {
+        self.hits
             .borrow()
             .iter()
             .find(|(area, _)| {
                 (area.left()..area.right()).contains(&column)
                     && (area.top()..area.bottom()).contains(&row)
             })
-            .map(|(_, click)| *click);
+            .map(|(_, click)| *click)
+    }
+
+    /// Acts on whatever clickable part of the last frame is at `at`.
+    fn click(&mut self, at: (u16, u16)) {
+        let hit = self.hit(at);
         match hit {
             Some(Click::Command(command)) => self.command(command),
             Some(Click::Type(text)) => {

@@ -188,6 +188,7 @@ impl App {
                 .request(Request::Send {
                     session_id,
                     text: message,
+                    draft_revision: None,
                 })
                 .is_some()
             {

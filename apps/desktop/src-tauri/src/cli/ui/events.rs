@@ -77,6 +77,8 @@ pub fn event_loop(
             }
         }
     }
+    // Whatever was typed stays with the conversation for the app or next time.
+    app.save_draft(true);
     Ok(())
 }
 
@@ -85,6 +87,12 @@ fn handle(app: &mut App, event: Event) -> bool {
     match event {
         Event::Key(key) => app.key(key),
         Event::Select(mouse) => app.select(mouse),
+        Event::Hover(column, row) => {
+            // Redraw only when the pointer crosses into or out of a clickable piece.
+            let before = app.hovered();
+            app.hover = Some((column, row));
+            return app.hovered() != before;
+        }
         Event::Shell(update) => app.shell_update(update),
         Event::Changed => {
             app.refresh();
@@ -120,6 +128,7 @@ fn handle(app: &mut App, event: Event) -> bool {
             }
         }
         Event::Tick => {
+            app.save_draft(false);
             if app.refresh_stale_plan() {
                 return true;
             }
@@ -156,6 +165,7 @@ pub fn spawn_input(events: Sender<Event>) {
                 MouseEventKind::Down(MouseButton::Left)
                 | MouseEventKind::Drag(MouseButton::Left)
                 | MouseEventKind::Up(MouseButton::Left) => events.send(Event::Select(mouse)),
+                MouseEventKind::Moved => events.send(Event::Hover(mouse.column, mouse.row)),
                 _ => Ok(()),
             },
             Ok(_) => Ok(()),

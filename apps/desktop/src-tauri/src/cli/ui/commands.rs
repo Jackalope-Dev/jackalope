@@ -241,13 +241,16 @@ impl App {
         match self.session.clone() {
             Some(id) => {
                 let busy = self.working();
+                let draft_revision = self.draft_revision(&id);
                 if self
                     .request(Request::Send {
                         session_id: id,
                         text,
+                        draft_revision,
                     })
                     .is_some()
                 {
+                    self.draft_sent();
                     if busy {
                         self.flash("Queued · runs after the current work", Tone::Muted);
                     } else if self.view.as_ref().is_some_and(|view| view.paused) {

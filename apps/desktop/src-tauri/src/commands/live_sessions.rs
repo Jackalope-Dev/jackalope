@@ -765,7 +765,12 @@ impl LiveSessions {
         })
     }
 
-    fn draft(&self, id: &str, text: String, revision: u64) -> Result<SessionDraft, String> {
+    pub(super) fn draft(
+        &self,
+        id: &str,
+        text: String,
+        revision: u64,
+    ) -> Result<SessionDraft, String> {
         if text.chars().count() > 12_000 {
             return Err("The message is limited to 12,000 characters.".into());
         }

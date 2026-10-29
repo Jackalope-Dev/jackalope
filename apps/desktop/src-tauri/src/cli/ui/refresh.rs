@@ -251,6 +251,7 @@ impl App {
         }
         if let Some(view) = snapshot.view {
             self.set_view(Some(view));
+            self.adopt_draft();
         }
         if let Some(changes) = snapshot.changes {
             self.set_changes(changes);

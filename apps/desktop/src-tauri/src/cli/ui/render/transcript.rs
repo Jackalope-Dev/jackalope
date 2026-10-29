@@ -471,6 +471,8 @@ mod tests {
             partial: String::new(),
             review_screenshots: None,
             merged: false,
+            draft: String::new(),
+            draft_revision: 0,
         };
         let shown: Vec<String> = conversation(&view, 80).iter().map(text).collect();
         let first = shown

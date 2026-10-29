@@ -16,12 +16,26 @@ type Piece = (Span<'static>, Option<Click>);
 
 /// Writes `pieces` left to right from `x` on row `y`, up to `limit`,
 /// recording where each clickable piece landed. Returns the next column.
+/// Pieces that do what the one under the pointer does highlight together, so
+/// a tab made of several pieces lights up as one.
 fn place(frame: &mut Frame, app: &App, x: u16, y: u16, limit: u16, pieces: Vec<Piece>) -> u16 {
+    let hovered = app.hover.filter(|(_, row)| *row == y).and_then(|(at, _)| {
+        let mut column = x;
+        pieces.iter().find_map(|(span, click)| {
+            let width = span.width() as u16;
+            let found = (column..column + width).contains(&at).then_some(*click);
+            column += width;
+            found
+        })
+    });
     let mut column = x;
-    for (span, click) in pieces {
+    for (mut span, click) in pieces {
         let width = span.width() as u16;
         if column + width > limit {
             break;
+        }
+        if click.is_some() && hovered == Some(click) {
+            span.style = span.style.patch(brand::selection());
         }
         frame.buffer_mut().set_span(column, y, &span, width);
         if let Some(click) = click {

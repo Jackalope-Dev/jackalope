@@ -444,6 +444,8 @@ mod tests {
             partial: String::new(),
             review_screenshots: None,
             merged: false,
+            draft: String::new(),
+            draft_revision: 0,
         }
     }
 

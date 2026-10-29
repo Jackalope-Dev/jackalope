@@ -426,6 +426,8 @@ fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionVie
         messages: transcript(session, runs),
         run_id: run.map(|run| run.id.clone()),
         merged: run.is_some_and(|run| session.integrated_run_id.as_deref() == Some(&run.id)),
+        draft: session.draft.text.clone(),
+        draft_revision: session.draft.revision,
         status: run.map(|run| run.status.clone()),
         agent: run.map(|run| run.agent.clone()),
         account: run.map(|run| run.account.clone()),
@@ -567,10 +569,30 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             )?;
             Ok(Response::Started { session_id })
         }
-        Request::Send { session_id, text } => {
+        Request::Send {
+            session_id,
+            text,
+            draft_revision,
+        } => {
             let sessions = app.state::<LiveSessions>();
-            sessions.send(&session_id, uuid::Uuid::new_v4().to_string(), text, None)?;
+            sessions.send(
+                &session_id,
+                uuid::Uuid::new_v4().to_string(),
+                text,
+                draft_revision,
+            )?;
             Ok(Response::Ok)
+        }
+        Request::Draft {
+            session_id,
+            text,
+            revision,
+        } => {
+            let sessions = app.state::<LiveSessions>();
+            let draft = sessions.draft(&session_id, text, revision)?;
+            Ok(Response::Draft {
+                revision: draft.revision,
+            })
         }
         Request::SessionDetail { session_id } => {
             let sessions = app.state::<LiveSessions>();

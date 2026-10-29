@@ -15,6 +15,7 @@ mod changes;
 mod commands;
 mod conversation;
 mod delivery;
+mod drafts;
 mod editor;
 mod events;
 mod feed;
@@ -51,6 +52,8 @@ enum Event {
     Scroll(i16),
     /// A press, drag or release of the left button, for selecting text.
     Select(MouseEvent),
+    /// The pointer moved to this column and row, for hover highlights.
+    Hover(u16, u16),
     Paste(String),
     Shell(shell::Update),
     Resize,
@@ -190,6 +193,10 @@ struct App {
     transcript: RefCell<Option<render::transcript::Cache>>,
     /// Where the last frame drew something clickable.
     hits: RefCell<Vec<(Rect, Click)>>,
+    /// Where the pointer last was, so the clickable piece under it highlights.
+    hover: Option<(u16, u16)>,
+    /// The open conversation's draft, shared with the app.
+    draft_sync: Option<drafts::DraftSync>,
     /// Animation frame for the working indicator.
     tick: usize,
     /// Currently displayed rotating tip.
@@ -273,6 +280,8 @@ pub fn run(
         max_scroll: Cell::new(0),
         transcript: RefCell::new(None),
         hits: RefCell::new(Vec::new()),
+        hover: None,
+        draft_sync: None,
         tick: 0,
         tip_index: 0,
         last_tip_change: Instant::now(),
@@ -355,6 +364,9 @@ fn suspend(terminal: &mut ratatui::DefaultTerminal, enhanced: bool) -> Result<()
 impl App {
     /// Replaces the conversation on screen, or clears it for a new one.
     fn show(&mut self, session: Option<String>) {
+        if session != self.session {
+            self.leave_draft();
+        }
         self.opened.extend(session.clone());
         self.session = session;
         self.set_view(None);

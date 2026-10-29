@@ -110,6 +110,7 @@ lists its files and asks; the conversation is paused only once you confirm, and 
 failed merge resumes it. `/pr [title]` asks whether to open a draft or ready pull
 request, then commits what is left, pushes and opens it. `/unqueue` takes back your
 newest message that has not reached an agent and puts it in the input to edit.
+What you type in a conversation is its draft, shared with the app's composer: opening the conversation in either place brings it back, and sending clears it. Clickable parts of the header and status line highlight under the pointer.
 `/retry` relaunches work that failed to start; to try finished or stopped work again,
 send a follow-up. Another conversation that starts needing you is announced in the feed.
 `/learn` inspects conversation history since the previous learn command (or session

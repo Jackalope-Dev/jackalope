@@ -64,7 +64,21 @@ pub enum Request {
         model: Option<String>,
     },
     /// Add a message to a conversation.
-    Send { session_id: String, text: String },
+    Send {
+        session_id: String,
+        text: String,
+        /// The draft revision this message was typed in, so sending clears
+        /// the shared draft. Sent only when known; older hosts refuse it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        draft_revision: Option<u64>,
+    },
+    /// Save the text being typed in a conversation, shared with the app, when
+    /// `revision` is still the saved one.
+    Draft {
+        session_id: String,
+        text: String,
+        revision: u64,
+    },
     /// A conversation and the state of its current work.
     SessionDetail { session_id: String },
     /// `pause`, `resume`, `finish` or `retry`.
@@ -561,6 +575,12 @@ pub struct SessionView {
     /// The latest attempt is merged. Older hosts omit it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub merged: bool,
+    /// The message being typed, shared with the app, and its revision.
+    /// Older hosts omit both.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub draft: String,
+    #[serde(default)]
+    pub draft_revision: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -624,6 +644,10 @@ pub enum Response {
     },
     Started {
         session_id: String,
+    },
+    /// A draft was saved as this revision.
+    Draft {
+        revision: u64,
     },
     /// Work changed; the client re-reads what it is showing.
     Changed {
