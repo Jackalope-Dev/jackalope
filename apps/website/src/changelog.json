@@ -1,5 +1,18 @@
 [
   {
+    "id": "bots-get-their-own-computer",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Bots get their own computer",
+    "description": "A bot can now work on its own Linux desktop with a browser, running in Docker on your machine or on a cloud machine you run, instead of on your computer.",
+    "items": [
+      "Choose None, Local sandbox or Cloud machine in a bot's settings, then start, stop, watch or take over its computer.",
+      "Desktop and browser tools act on the bot's computer without desktop access questions; each website still asks first.",
+      "Agents in ordinary tasks can ask for a sandbox computer, and you decide whether to share the project read-only.",
+      "Pair your own cloud machine in Settings → Computers; Jackalope-hosted computers are coming soon."
+    ]
+  },
+  {
     "id": "agent-browsers-that-stay-signed-in",
     "date": "2026-10-29",
     "status": "In development",

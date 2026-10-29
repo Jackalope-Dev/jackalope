@@ -1,3 +1,4 @@
+import type { ComputerStatus } from './computers.ts';
 import { nativeTask } from './task-runtime.ts';
 
 interface AgentBrowserView {
@@ -44,6 +45,8 @@ export interface DesktopSiteDecision {
 export interface AgentScreen {
   browser: AgentBrowserView;
   desktop: AgentDesktopView | null;
+  /** The run's bot or task computer. Absent from older builds. */
+  computer?: ComputerStatus | null;
   capturedAt: string;
 }
 

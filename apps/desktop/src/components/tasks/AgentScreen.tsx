@@ -1,5 +1,5 @@
 import { Badge } from '@jackalope/ui';
-import { AppWindow, ExternalLink, Globe, Lock, Monitor } from 'lucide-react';
+import { AppWindow, ExternalLink, Globe, Lock, Monitor, Server } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
   desktopLabel,
@@ -10,8 +10,10 @@ import {
   revokeAgentAccess,
   type AgentScreen as Screen,
 } from '../../lib/agent-screen';
+import { computerStateLabel, providerLabel } from '../../lib/computers';
 import { isActive, type TaskRun } from '../../lib/task-runtime';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { ComputerViewer } from '../computers/ComputerViewer';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { ScreenshotPreview } from './ScreenshotPreview';
@@ -95,6 +97,7 @@ export function AgentScreen({ run, visible = true }: { run: TaskRun; visible?: b
 
   const browser = screen?.browser;
   const desktop = screen?.desktop ?? null;
+  const computer = screen?.computer ?? null;
   const desktopState = desktopLabel(desktop);
   const pageUrl = frame?.url ?? browser?.url ?? null;
   const openable = openableUrl(pageUrl);
@@ -166,6 +169,24 @@ export function AgentScreen({ run, visible = true }: { run: TaskRun; visible?: b
           )}
         </div>
       </div>
+
+      {computer && (
+        <div className="agent-screen-section">
+          <div className="agent-screen-heading">
+            <Server size={16} aria-hidden="true" />
+            <h3>{computer.name}</h3>
+            <Badge variant={computer.state === 'running' ? 'accent' : 'default'}>
+              {computerStateLabel(computer)}
+            </Badge>
+          </div>
+          <p className="task-muted">
+            {computer.phase ??
+              computer.error ??
+              `${providerLabel(computer.provider)}. Desktop and browser tools act here, not on your computer.`}
+          </p>
+          <ComputerViewer computer={computer} />
+        </div>
+      )}
 
       <div className="agent-screen-section">
         <div className="agent-screen-heading">

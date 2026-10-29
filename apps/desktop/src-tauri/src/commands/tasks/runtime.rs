@@ -177,6 +177,7 @@ impl TaskRuntime {
         self.mcp_broker.close(id);
         crate::commands::browser::close(id);
         crate::commands::desktop_control::close(id);
+        crate::commands::computers::release_run(id);
         if let Some(process) = process {
             let mut child = process.lock().unwrap();
             if child.try_wait().map_err(|e| e.to_string())?.is_none() {
@@ -1704,6 +1705,10 @@ impl TaskRuntime {
     pub fn browser_profiles_root(&self) -> PathBuf {
         self.directory.join("browser-profiles")
     }
+    /// Bot and task computers; never synced or exported.
+    pub fn computers_root(&self) -> PathBuf {
+        self.directory.join("computers")
+    }
     pub fn preferences_directory(&self) -> PathBuf {
         self.directory.join("preferences")
     }
@@ -2159,6 +2164,7 @@ impl TaskRuntime {
             runtime.mcp_broker.close(&request.id);
             crate::commands::browser::close(&request.id);
             crate::commands::desktop_control::close(&request.id);
+            crate::commands::computers::release_run(&request.id);
         });
         Ok(id)
     }

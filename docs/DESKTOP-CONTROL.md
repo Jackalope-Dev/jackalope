@@ -3,7 +3,8 @@
 Windows, macOS and supported Linux desktops expose `desktop_control` through native MCP and authenticated
 `POST /v1/desktop/control`. This operates the user's own live applications, including
 their logged-in browser. It is separate from the isolated [task browser](BROWSER-AUTOMATION.md),
-which has no personal sign-ins.
+which has no personal sign-ins, and from a [bot computer](BOT-COMPUTERS.md), where
+`desktop_control` acts on the bot's own sandbox or cloud machine without a grant.
 macOS, Linux X11 and GNOME 46 Wayland backends are implemented for native validation;
 macOS compilation and installed-device acceptance remain open. GNOME Wayland requires
 the bundled Jackalope Window Control extension. Other Wayland and headless Linux sessions return an

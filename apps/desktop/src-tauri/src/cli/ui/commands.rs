@@ -67,6 +67,10 @@ pub const COMMANDS: &[(&str, &str)] = &[
         "browser",
         "show the project browser; /browser open [url] to sign in",
     ),
+    (
+        "computer",
+        "show this conversation's computer; /computer start or stop",
+    ),
     ("open", "show Jackalope's app window"),
     ("help", "show these commands"),
     ("quit", "leave (work keeps running)"),
@@ -470,6 +474,7 @@ impl App {
             }
             "open" => self.open_app(),
             "browser" => self.browser(argument),
+            "computer" => self.computer(argument),
             name if super::plan::COMMANDS.contains(&name) => {
                 self.plan_command(name, argument);
             }
@@ -518,6 +523,43 @@ impl App {
                 Tone::Success,
             ),
             "done" => self.flash("Closed the project browser", Tone::Muted),
+            _ => {}
+        }
+    }
+
+    fn computer(&mut self, argument: &str) {
+        let action = match argument.trim() {
+            "" | "status" => "",
+            "start" => "start",
+            "stop" => "stop",
+            other => {
+                self.note(format!(
+                    "/computer {other} is not a choice. Use /computer, /computer start or /computer stop."
+                ));
+                return;
+            }
+        };
+        let Some(session_id) = self.session.clone() else {
+            self.note(
+                "Open a conversation first. A bot's computer is set up in its settings in the app.",
+            );
+            return;
+        };
+        let request = Request::Computer {
+            session_id,
+            action: action.into(),
+        };
+        let Some(Response::Computer { computer }) = self.request(request) else {
+            return;
+        };
+        let Some(computer) = computer else {
+            self.note("This conversation has no computer. Give its bot one in the app, or the agent can ask for one with computer_request.");
+            return;
+        };
+        self.note(computer_line(&computer));
+        match action {
+            "start" => self.flash(format!("Starting {}", computer.name), Tone::Success),
+            "stop" => self.flash(format!("Stopped {}", computer.name), Tone::Muted),
             _ => {}
         }
     }
@@ -607,6 +649,24 @@ impl App {
     }
 }
 
+/// What `/computer` shows about a conversation's computer.
+fn computer_line(computer: &crate::protocol::ComputerView) -> String {
+    let provider = match computer.provider.as_str() {
+        "local-docker" => "local sandbox",
+        "remote-machine" => "cloud machine",
+        other => other,
+    };
+    let mut line = format!(
+        "{} · {provider} · {}",
+        computer.name,
+        computer.state.replace('-', " ")
+    );
+    if let Some(detail) = computer.phase.as_ref().or(computer.error.as_ref()) {
+        line.push_str(&format!(" · {detail}"));
+    }
+    line
+}
+
 /// What `/browser` shows about a project's persistent browser profile.
 fn browser_lines(profile: &crate::protocol::BrowserProfileView) -> Vec<String> {
     let megabytes = profile.size_bytes as f64 / 1_048_576.0;
@@ -680,7 +740,8 @@ mod tests {
     fn command_lines_split_their_argument() {
         assert!(COMMANDS.iter().any(|(name, _)| *name == "bg"));
         assert!(names("/bg fix it").is_empty());
-        assert_eq!(names("/co"), ["copy"]);
+        assert_eq!(names("/co"), ["copy", "computer"]);
+        assert_eq!(names("/cop"), ["copy"]);
     }
 
     #[test]
@@ -755,6 +816,23 @@ mod tests {
             split_agent_mentions("@gemini look", &agents),
             (Vec::new(), "@gemini look".to_string())
         );
+    }
+
+    #[test]
+    fn computer_status_names_provider_state_and_detail() {
+        let mut computer = crate::protocol::ComputerView {
+            name: "Scout computer".into(),
+            provider: "local-docker".into(),
+            state: "not-created".into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            computer_line(&computer),
+            "Scout computer · local sandbox · not created"
+        );
+        computer.error = Some("Docker is not installed.".into());
+        assert!(computer_line(&computer).ends_with("· Docker is not installed."));
+        assert!(COMMANDS.iter().any(|(name, _)| *name == "computer"));
     }
 
     #[test]

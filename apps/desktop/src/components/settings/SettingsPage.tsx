@@ -13,6 +13,7 @@ import {
   Palette,
   Plug,
   Radio,
+  Server,
   Settings2,
   Shield,
   UserRound,
@@ -49,6 +50,7 @@ import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
 import { useShallow } from 'zustand/react/shallow';
 import { ArtifactsConnection } from './ArtifactsConnection';
+import { ComputersSettings } from './ComputersSettings';
 import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
 import { RemoteAccess } from './RemoteAccess';
@@ -69,6 +71,7 @@ const categories = [
   'Saved actions',
   'Decisions',
   'Connected work',
+  'Computers',
   'Cloudflare',
   'Jackalope account',
   'Invitations',
@@ -89,7 +92,7 @@ const navigationGroups: { label: string; categories: SettingsCategory[] }[] = [
     label: 'Workspace',
     categories: ['Project', 'General', 'Appearance', 'Desktop', 'Saved actions'],
   },
-  { label: 'Agents', categories: ['Connected work'] },
+  { label: 'Agents', categories: ['Connected work', 'Computers'] },
   { label: 'Account & access', categories: ['Jackalope account', 'Remote access', 'Privacy'] },
   { label: 'Help & data', categories: ['Updates & support', 'Data & reset'] },
   { label: 'Advanced', categories: ['Decisions', 'Cloudflare', 'Diagnostics', 'System'] },
@@ -102,6 +105,7 @@ const navigationIcons: Partial<Record<SettingsCategory, LucideIcon>> = {
   'Saved actions': Zap,
   Decisions: Gavel,
   'Connected work': Plug,
+  Computers: Server,
   Cloudflare: Cloud,
   Diagnostics: History,
   System: Cpu,
@@ -175,6 +179,7 @@ export function SettingsPage({
         'Saved actions': 'prompt presets commands shortcuts reuse global project',
         Appearance: 'theme color light dark atmosphere picker toolbar companion mascot animations',
         'Connected work': 'GitHub Linear Jira issues pull requests API token',
+        Computers: 'bot computer sandbox Docker Colima cloud machine VM remote desktop VNC hosted',
         Cloudflare: 'Cloudflare Artifacts repository hosted cloud swarm worker forks beta',
         'Remote access': 'hosts phone companion SSH pairing Tailscale device',
         Decisions: 'Jackalope routing Jev TypeSafe API key automatic agent cost tokens capacity',
@@ -321,6 +326,7 @@ export function SettingsPage({
                 <JackalopeAccount onInvitations={() => setCategory('Invitations')} />
               )}
               {c === 'Connected work' && <IssueConnections />}
+              {c === 'Computers' && <ComputersSettings />}
               {c === 'Cloudflare' && (
                 <>
                   <ArtifactsConnection />

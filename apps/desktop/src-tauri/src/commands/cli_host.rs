@@ -977,6 +977,44 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             .map_err(|e| e.to_string())??;
             Ok(Response::BrowserProfile { profile })
         }
+        Request::Computer { session_id, action } => {
+            use super::computers;
+            let runtime = app.state::<TaskRuntime>().inner().clone();
+            let root = runtime.computers_root();
+            let sessions = app.state::<LiveSessions>();
+            let computer = match sessions.persona(&session_id) {
+                Some(persona) => computers::find(&root, "bot", &persona.bot_id),
+                None => runtime
+                    .integration_runs()?
+                    .into_iter()
+                    .filter(|run| run.live_session_id.as_deref() == Some(session_id.as_str()))
+                    .max_by(|left, right| left.started_at.cmp(&right.started_at))
+                    .and_then(|run| computers::find(&root, "task", &run.task_id)),
+            };
+            let Some(computer) = computer else {
+                return Ok(Response::Computer { computer: None });
+            };
+            let status = tauri::async_runtime::spawn_blocking(move || {
+                match action.as_str() {
+                    "" => {}
+                    "start" => computers::start_background(root.clone(), computer.clone())?,
+                    "stop" => computers::stop(&root, &computer)?,
+                    _ => return Err("Use start or stop.".to_string()),
+                }
+                Ok::<_, String>(computers::status(&root, computer))
+            })
+            .await
+            .map_err(|e| e.to_string())??;
+            Ok(Response::Computer {
+                computer: Some(protocol::ComputerView {
+                    name: status.computer.name,
+                    provider: status.computer.provider,
+                    state: status.state,
+                    phase: status.phase,
+                    error: status.error,
+                }),
+            })
+        }
         Request::PlanStart {
             project_path,
             goal,

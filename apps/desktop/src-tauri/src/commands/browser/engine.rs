@@ -54,16 +54,26 @@ impl Engine {
     pub fn start(slot: Arc<Slot>) -> Result<Self, String> {
         check_canceled(&slot.canceled)?;
         slot.trees.lock().map_err(|e| e.to_string())?.clear();
+        let guard = slot.profile.lock().map_err(|e| e.to_string())?.clone();
+        if let Some(endpoint) = guard.as_ref().and_then(|guard| guard.remote_devtools()) {
+            let directory = create_session_directory()?;
+            let result = Self::spawn(
+                slot,
+                directory.clone(),
+                PathBuf::new(),
+                None,
+                Some(endpoint),
+            );
+            if result.is_err() {
+                remove_session_directory(&directory);
+            }
+            return result;
+        }
+        let profile = guard.map(|guard| guard.directory().to_path_buf());
         let browser = crate::commands::harness::find_browser_executable()
             .ok_or("Install Chrome, Edge or Chromium, or set JACKALOPE_BROWSER_EXECUTABLE to its executable, then restart Jackalope.")?;
-        let profile = slot
-            .profile
-            .lock()
-            .map_err(|e| e.to_string())?
-            .as_ref()
-            .map(|guard| guard.directory().to_path_buf());
         let directory = create_session_directory()?;
-        let result = Self::spawn(slot, directory.clone(), browser, profile);
+        let result = Self::spawn(slot, directory.clone(), browser, profile, None);
         if result.is_err() {
             remove_session_directory(&directory);
         }
@@ -75,6 +85,7 @@ impl Engine {
         directory: PathBuf,
         browser: PathBuf,
         profile: Option<PathBuf>,
+        remote: Option<String>,
     ) -> Result<Self, String> {
         let mut command = Command::new(executable()?);
         command
@@ -169,7 +180,9 @@ impl Engine {
             std::thread::sleep(Duration::from_millis(25));
         }
         engine.call(json!({"action":"stream_disable"}))?;
-        if let Some(profile) = &profile {
+        if let Some(endpoint) = remote {
+            engine.call(json!({"action":"launch", "cdpUrl":endpoint, "webmcp":false}))?;
+        } else if let Some(profile) = &profile {
             // Persistent profiles always run in a Chromium Jackalope owns, so the
             // profile can be closed gracefully and its cookie domains read.
             let owned = chromium::BrowserProcess::start_persistent(

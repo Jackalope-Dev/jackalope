@@ -216,6 +216,27 @@ pub enum Request {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         url: Option<String>,
     },
+    /// The conversation's computer: its bot's, or the one its task was given.
+    /// An empty `action` reads its status; `start` and `stop` change it.
+    /// Answers with `Response::Computer`.
+    Computer {
+        session_id: String,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        action: String,
+    },
+}
+
+/// A bot or task computer as a terminal shows it.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComputerView {
+    pub name: String,
+    /// local-docker, remote-machine or jackalope-hosted.
+    pub provider: String,
+    /// not-created, stopped, running, starting or unavailable.
+    pub state: String,
+    pub phase: Option<String>,
+    pub error: Option<String>,
 }
 
 /// A persistent agent browser profile as a terminal shows it.
@@ -631,6 +652,10 @@ pub enum Response {
     BrowserProfile {
         profile: Option<BrowserProfileView>,
     },
+    /// Absent `computer` means the conversation has no computer.
+    Computer {
+        computer: Option<ComputerView>,
+    },
 }
 
 /// A prepared or applied merge, as a terminal shows it.
@@ -927,6 +952,23 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn computer_requests_are_additive() {
+        let status = serde_json::to_string(&Request::Computer {
+            session_id: "s".into(),
+            action: String::new(),
+        })
+        .unwrap();
+        assert_eq!(status, r#"{"request":"computer","session_id":"s"}"#);
+        let start: Request =
+            serde_json::from_str(r#"{"request":"computer","session_id":"s","action":"start"}"#)
+                .unwrap();
+        assert!(matches!(start, Request::Computer { action, .. } if action == "start"));
+        let none: Response =
+            serde_json::from_str(r#"{"response":"computer","computer":null}"#).unwrap();
+        assert!(matches!(none, Response::Computer { computer: None }));
     }
 
     #[test]

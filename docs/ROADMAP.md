@@ -156,7 +156,11 @@ decisions, questions and sources to the person as cards. Connected apps use the 
 on-demand connection. A Screen view shows the task browser's viewport and desktop
 grant state with revoke controls. Persistent agent browser profiles, one per project and
 optionally per bot, keep sign-ins between tasks with per-site permission and a
-person-only sign-in window. Installed and live-account acceptance remain open.
+person-only sign-in window. Bots can also have their own computer, a Linux sandbox in
+Docker or a paired cloud machine the person runs, where desktop and browser tools act
+instead of on the person's desktop; tasks get one only with the person's approval.
+Jackalope-hosted computers are planned, not available. Installed and live-account
+acceptance remain open.
 
 Cloudflare Artifacts is available as a beta bring-your-own-account option for new and
 existing projects, with pushes and expiring review snapshots. Live account and installed

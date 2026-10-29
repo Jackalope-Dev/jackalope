@@ -466,6 +466,14 @@ impl Coordinator {
                             "/v1/desktop/control",
                             post(crate::commands::desktop_control::bridge),
                         )
+                        .route(
+                            "/v1/bot-computer/request",
+                            post(crate::commands::computers::bridge_request),
+                        )
+                        .route(
+                            "/v1/bot-computer/exec",
+                            post(crate::commands::computers::bridge_exec),
+                        )
                         .route("/v1/user-prompt", post(bridge_user_prompt))
                         .route("/v1/user-prompt/poll", get(bridge_get_user_prompt))
                         .route("/v1/validation-step", post(bridge_validation_step))

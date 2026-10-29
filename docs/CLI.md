@@ -100,7 +100,7 @@ Inside a conversation, typing `/` opens an interactive command menu, and `/help`
 lists commands: `/new`, `/bg`, `/init`, `/sessions`, `/projects`, `/agents`, `/settings`,
 `/status`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/learnings`, `/files`, `/review` (or `/diff`), `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
 `/unpause`, `/copy`, `/history`, `/kill`, `/clear`, `/plan`, `/plans`, `/revise`,
-`/approve`, `/replan`, `/export`, `/deviation`, `/open` and `/quit`. Pickers
+`/approve`, `/replan`, `/export`, `/deviation`, `/browser`, `/computer`, `/open` and `/quit`. Pickers
 filter as you type. `/new <message>` starts
 and shows a conversation; `/bg <message>` starts one and stays on the current one.
 `/learn` inspects conversation history since the previous learn command (or session
@@ -123,6 +123,8 @@ windows and resets. `/theme <colour>` takes orange, red, pink, purple, blue,
 teal, green, yellow or any `#rrggbb` and sets the project's accent in every
 terminal and the app: a project with its own app theme changes alone, otherwise
 the app-wide accent changes. `/init` asks an agent to write or refresh `AGENTS.md`.
+`/computer` shows the conversation's [bot or task computer](BOT-COMPUTERS.md) and
+`/computer start` or `/computer stop` changes it; computers are created in the app.
 
 A line starting with `!` runs in the user's shell (`cmd` on Windows) in the
 conversation's worktree, or the project when it has none. Output streams below the

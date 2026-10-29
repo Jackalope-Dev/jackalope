@@ -31,6 +31,11 @@ and is not a list of everything shipped in every installer.
 - The bundled agent-browser executable has its own Apache-2.0 license and
   embedded axe-core MPL-2.0 source and license notices in
   `apps/desktop/src-tauri/resources/agent-browser`. Preserve those accompanying files.
+- The bot computer image definition in `apps/desktop/src-tauri/resources/computer` is
+  Jackalope's own. Building it installs Debian packages (Chromium, Xvfb, Openbox,
+  x11vnc, noVNC, websockify and others) under their own licenses on the building
+  machine; no image is distributed. Publishing one requires their notices. See
+  [bot computers](BOT-COMPUTERS.md).
 - Agent CLIs, models and connected services have their own licenses, subscriptions
   and terms. Jackalope does not include provider access or sublicense their services.
 - Optional private OpenCode downloads retain the upstream MIT notice in

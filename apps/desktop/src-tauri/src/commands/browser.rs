@@ -25,6 +25,8 @@ pub(super) fn codex_tool_policy() -> serde_json::Value {
         "browser_tabs",
         "browser_open_profile",
         "desktop_control",
+        "computer_request",
+        "computer_exec",
     ]
     .into_iter()
     .map(|name| (name.into(), serde_json::json!({"approval_mode":"approve"})))
@@ -58,6 +60,39 @@ pub(super) trait ProfileGuard: Send + Sync {
     fn sign_in(&self, url: &str) -> String;
     /// Sites holding cookies in the profile, read when its browser closes.
     fn observed(&self, sites: Vec<String>);
+    /// A DevTools endpoint of a browser running elsewhere (a bot computer),
+    /// used instead of launching a local browser on `directory`.
+    fn remote_devtools(&self) -> Option<String> {
+        None
+    }
+}
+
+type Router = dyn Fn(&str) -> Result<Option<Arc<dyn ProfileGuard>>, String> + Send + Sync;
+static ROUTER: OnceLock<Box<Router>> = OnceLock::new();
+
+/// Decides, once per task browser, whether it should drive another machine's
+/// browser (a bot computer) instead of a disposable local one.
+pub(super) fn set_router(router: Box<Router>) {
+    let _ = ROUTER.set(router);
+}
+
+/// Attaches the routed guard before a task browser first starts.
+/// An error (such as a computer still starting) leaves the browser unrouted
+/// so a later command decides again.
+fn route(run_id: &str, slot: &Arc<Slot>) -> Result<(), String> {
+    let Some(router) = ROUTER.get() else {
+        return Ok(());
+    };
+    let engine = slot.engine.lock().map_err(|e| e.to_string())?;
+    if engine.is_some() || slot.routed.load(Ordering::SeqCst) {
+        return Ok(());
+    }
+    let mut profile = slot.profile.lock().map_err(|e| e.to_string())?;
+    if profile.is_none() {
+        *profile = router(run_id)?;
+    }
+    slot.routed.store(true, Ordering::SeqCst);
+    Ok(())
 }
 
 pub(super) enum Verdict {
@@ -76,6 +111,8 @@ struct Slot {
     trees: Mutex<Vec<Arc<ProcessTree>>>,
     /// Set when the task switched to a persistent profile.
     profile: Mutex<Option<Arc<dyn ProfileGuard>>>,
+    /// Whether the router has been consulted for this browser.
+    routed: AtomicBool,
 }
 
 impl Default for Slot {
@@ -87,6 +124,7 @@ impl Default for Slot {
             engine: Mutex::new(None),
             trees: Mutex::new(Vec::new()),
             profile: Mutex::new(None),
+            routed: AtomicBool::new(false),
         }
     }
 }
@@ -326,9 +364,13 @@ async fn with_target<T: Send + 'static>(
     work: impl FnOnce(&Engine) -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
     let slot = session_slot(run_id)?;
-    tauri::async_runtime::spawn_blocking(move || run_guarded(&slot, target.as_deref(), work))
-        .await
-        .map_err(|e| e.to_string())?
+    let run_id = run_id.to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        route(&run_id, &slot)?;
+        run_guarded(&slot, target.as_deref(), work)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 fn run_session<T>(

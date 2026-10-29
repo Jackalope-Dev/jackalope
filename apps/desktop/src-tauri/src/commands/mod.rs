@@ -70,6 +70,7 @@ pub mod browser;
 pub mod browser_profiles;
 pub mod cloudflare_artifacts;
 pub mod composio;
+pub mod computers;
 pub mod delivery;
 pub mod desktop_control;
 pub mod github_workflows;

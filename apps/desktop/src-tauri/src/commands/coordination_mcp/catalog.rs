@@ -11,6 +11,8 @@ const OPTIONAL: &[(&str, &str)] = &[
     ("browser_tabs", "browser"),
     ("browser_open_profile", "browser"),
     ("desktop_control", "desktop"),
+    ("computer_request", "desktop"),
+    ("computer_exec", "desktop"),
     ("message", "coordination"),
     ("inbox", "coordination"),
     ("acknowledge_message", "coordination"),
@@ -67,6 +69,8 @@ mod tests {
         assert!(!visible("message", &discovered));
         assert!(visible("ask_user", &discovered));
         assert!(visible("computer_verify", &discovered));
+        assert!(!visible("computer_exec", &discovered));
+        assert_eq!(requested(&["desktop".into()]).unwrap().len(), 3);
         discovered.extend(requested(&["message".into()]).unwrap());
         assert!(visible("message", &discovered));
         assert!(!visible("inbox", &discovered));

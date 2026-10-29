@@ -136,6 +136,7 @@ pub fn run(launch: Launch) {
         .setup(move |app| {
             commands::browser::set_resource_directory(app.path().resource_dir()?);
             commands::desktop_control::platform::set_resource_directory(app.path().resource_dir()?);
+            commands::computers::set_resource_directory(app.path().resource_dir()?);
             let directory = profile
                 .clone()
                 .unwrap_or(app.path().app_data_dir()?)
@@ -148,6 +149,7 @@ pub fn run(launch: Launch) {
             commands::managed_runtime::initialize(directory.join("agent-runtimes"));
             let runtime = TaskRuntime::new(directory.clone())?;
             runtime.observe_changes(app.handle().clone());
+            commands::computers::install_browser_routing(runtime.clone());
             let helper = commands::helper::Helper::new(directory.clone(), runtime.clone());
             helper.launch();
             app.manage(helper);
@@ -339,6 +341,18 @@ pub fn run(launch: Launch) {
             commands::desktop_control::desktop_control_permissions,
             commands::desktop_control::desktop_control_forget,
             commands::browser_profiles::browser_profile_status,
+            commands::computers::computer_docker_status,
+            commands::computers::computer_list,
+            commands::computers::computer_status,
+            commands::computers::computer_configure,
+            commands::computers::computer_start,
+            commands::computers::computer_stop,
+            commands::computers::computer_delete,
+            commands::computers::computer_viewer,
+            commands::computers::computer_machines,
+            commands::computers::computer_machine_add,
+            commands::computers::computer_machine_test,
+            commands::computers::computer_machine_remove,
             commands::browser_profiles::browser_profile_open,
             commands::browser_profiles::browser_profile_close,
             commands::browser_profiles::browser_profile_clear_site,

@@ -29,7 +29,7 @@
     }
   },
   "bundle": {
-    "resources": ["resources/agent-browser/", "resources/desktop-control/"],
+    "resources": ["resources/agent-browser/", "resources/desktop-control/", "resources/computer/"],
     "active": true,
     "targets": "all",
     "linux": {

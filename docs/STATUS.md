@@ -293,6 +293,16 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   in the user's browser, and one managed on-demand connection delivers them to every
   agent. Composio holds third-party tokens and bills usage to that project. See
   [Connected apps](MCP-DISCOVERY.md#connected-apps-through-composio).
+- Bots can have their own computer: a Linux sandbox in Docker on this device (Docker
+  Desktop, Colima or Docker Engine, detected but never installed) or a cloud machine the
+  person runs and pairs with an HTTPS address and a secret kept in protected storage.
+  Tasks get one only after the person approves `computer_request`. Desktop control acts
+  on the computer without an access question, browser tools drive its Chromium for local
+  sandboxes with networking on, each site still asks first, and `computer_exec` runs
+  bounded commands inside it. Bot settings, the Screen view and Settings → Computers
+  start, stop, watch, take over and delete computers; `/computer` shows and changes one
+  in the terminal. Jackalope-hosted computers are listed as coming soon. See
+  [bot computers](BOT-COMPUTERS.md).
 - Task and chat Screen views poll the attempt's existing task browser viewport and
   desktop grant state without opening a browser, requesting access or saving an
   artifact. They list recent desktop actions with small after-action captures. People
@@ -494,6 +504,11 @@ GNOME requires the bundled window-control extension; other Wayland compositors
 remain unavailable.
 XWayland alone is insufficient. Worktrees separate Git changes; agent processes and
 configured tools still run with local OS privileges.
+
+Bot computers have unit coverage and an opt-in Docker trial; no image build, container,
+viewer or cloud machine has been accepted in an installed app on any platform. Cloud
+machines reach desktop control and commands but not the browser tools, the in-sandbox
+agent has no accessibility actions, and running computers are not stopped automatically.
 
 Installed provider, accessibility, recovery, performance, signed installation and
 update acceptance remain platform-specific requirements. Real-model quality and

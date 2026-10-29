@@ -59,6 +59,22 @@ release dates.
   browser-tagged plan criteria, the slider and side-by-side views at 960 by 640 in
   light and dark themes, keyboard use of the slider, and the TUI `/settings` toggle.
   Confirm no browser window appears and no preview process or profile is left behind.
+- [ ] Accept [bot computers](BOT-COMPUTERS.md) in installed apps: Docker Desktop with the
+  WSL 2 backend on Windows, Docker Desktop and Colima on Apple Silicon (arm64 image) and
+  Intel macOS, and Docker Engine on Linux, including missing, stopped and
+  Windows-containers Docker; the first image build and its progress, start, stop,
+  restart persistence of the home volume, changed resources recreating the container,
+  networking off, a task's read-only project share and delete. Check Watch and Take over
+  in the embedded viewer, `desktop_control` snapshots, refs, typing and chords on the
+  computer, browser tools attached to its Chromium with all four site answers and the
+  sign-in pause, `computer_request` answers, `computer_exec` limits, `/computer`, and that
+  no container, volume or `docker exec` process is left behind after delete.
+- [ ] Pair a cloud machine on at least one real provider behind HTTPS (Caddy or similar):
+  wrong secret, unreachable machine, Test connection, desktop control and commands
+  through the agent, the external viewer page and removal. Decide whether browser tools
+  should reach cloud machines through an authenticated DevTools proxy.
+- [ ] Add AT-SPI accessibility actions and stable refs to the in-sandbox agent, and an
+  idle stop for unused local computers.
 - [ ] Accept persistent agent browser profiles in installed apps on Windows, macOS and
   Linux with Chrome, Edge and Chromium: open the Project browser and a bot browser to
   sign in, confirm sign-ins survive closing the window, an app restart and a later

@@ -4,9 +4,10 @@ use super::{
 };
 use rmcp::schemars;
 mod actions;
+pub(crate) mod computer;
 mod elements;
 pub mod grant;
-mod helper;
+pub(crate) mod helper;
 pub mod indicator;
 pub mod platform;
 use grant::{Choice, Grant, Scope};
@@ -1193,6 +1194,9 @@ pub async fn execute(
     request: DesktopRequest,
 ) -> Result<Value, String> {
     actions::validate(&request)?;
+    if let Some(target) = super::computers::for_run(&runtime, &run) {
+        return computer::execute(runtime, run, request, target).await;
+    }
     if request.action == "release" {
         close(&run.id);
         return Ok(json!({"status":"released"}));
