@@ -247,6 +247,8 @@ export interface PendingUserPrompt {
   multiSelect?: boolean;
   allowOther?: boolean;
   rationale?: string;
+  /** Why checking the code cannot answer it; plan questions carry one. */
+  whyAsk?: string;
 }
 export interface ValidationStep {
   id: string;

@@ -214,6 +214,15 @@ pub fn question_card(app: &App, width: u16) -> Vec<Line<'static>> {
             muted,
         ));
     }
+    if let Some(why) = &question.why_ask {
+        lines.push(Line::styled(
+            format!(
+                "  {}",
+                brand::ellipsize(&format!("Why ask: {why}"), room.saturating_sub(2))
+            ),
+            muted,
+        ));
+    }
     lines.push(Line::styled(hint, muted));
     lines
 }

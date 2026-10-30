@@ -195,7 +195,7 @@ terminal uses the project's check as the app mirrors it.
 The host answers `plan-start`, `plans`, `plan-detail` and `plan-action` (`keep`, `replan`,
 `approve` with the exact `revision` and `hash`, `save`, `export`, `accept`, `redo`,
 `replan-deviation`) with `plan`, `plans` or `exported` responses. Questions carry optional
-`header`, `recommended`, `multiSelect` and `rationale`; plan views carry `verification`
+`header`, `recommended`, `multiSelect`, `rationale` and `whyAsk`; plan views carry `verification`
 (`project`, `criteria` or `review`) and `check`; plan summaries carry `needsYou`;
 deviations carry `amendment`; projects carry `verifyCommand`, `autoVerify`,
 `questionCap` and `plannerAgent`; and `set-project-settings` accepts `question_cap` and

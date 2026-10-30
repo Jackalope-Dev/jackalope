@@ -107,6 +107,9 @@ export function AgentQuestion({
         {prompt.question}
       </h3>
       {prompt.rationale && !answered && <p className="task-experience-muted">{prompt.rationale}</p>}
+      {prompt.whyAsk && !answered && (
+        <p className="task-experience-muted">Why ask: {prompt.whyAsk}</p>
+      )}
       {answered ? (
         <p ref={answerRef} tabIndex={-1} className="agent-question-answer" role="status">
           <Check size={18} aria-hidden="true" />

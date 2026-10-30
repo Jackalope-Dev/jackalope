@@ -96,10 +96,12 @@ screenshots, per-site browser permissions and guarded input; unsupported desktop
 return unavailable.
 
 `ask_user` accepts optional `header`, `recommended` (one of the options), `multi_select`
-(answered as a JSON array), `allow_other` and `rationale`; unknown recommendations and
-over-long text are dropped. Questions from a [plan mode](PLAN-MODE.md) planning attempt
-are limited by the plan's question cap and end when the person chooses to stop; a closed
-question returns `status: closed` with a message instead of reaching the person.
+(answered as a JSON array), `allow_other`, `rationale` and `why_ask`; unknown
+recommendations and over-long text are dropped. Questions from a [plan mode](PLAN-MODE.md)
+planning attempt are limited by the plan's question cap and end when the person chooses
+to stop; a closed question returns `status: closed` with a message instead of reaching
+the person. A planning question without `why_ask` returns `status: not_asked` and does
+not count toward the cap.
 `record_validation_step` requirement assessments and the optional `safety_fact` carry an
 evidence level that Jackalope checks locally; `restate_goal` records the agent's short
 restatement once at the start. See [task outcomes](TASK-OUTCOMES.md#evidence-levels).

@@ -2,7 +2,7 @@
 //! read-only, its final message becomes a draft revision, edits add revisions,
 //! approval needs the exact revision, and Save to repo never commits.
 
-use super::session;
+use super::{artifact, session};
 use crate::commands::{
     agent_policy::{AgentPolicy, CustomAgent},
     coordination::Coordinator,
@@ -24,7 +24,7 @@ process.stdin.on('end', () => {
     '---', 'recommendedShape: subtasks', 'shapeReason: Two separate files', 'workers: 2', '---', '',
     '# Add CSV export', '', '## Goal', 'Export reports as CSV.', '', '## Context', 'src/report.ts renders reports.', '',
     '## Clarifications', 'Coverage: Scope Clear · Done signals Partial', '- Q: Which delimiter?', '  A: Comma', '',
-    '## Assumptions', '- Under 10,000 rows', '', '## Out of scope', '- Excel', '',
+    '## Assumptions', '- Checked: Reports render in src/report.ts — evidence: src/report.ts:1', '- Under 10,000 rows', '', '## Out of scope', '- Excel', '',
     '## Approach & Interfaces', 'Add a serializer and a button.', '',
     '## Tasks', '### csv · Serialize reports', '- scopes: src/csv.ts', '- dependsOn: none', '- parallel: no', '- covers: AC-1', '',
     'Follow src/json.ts.', '',
@@ -136,6 +136,17 @@ fn a_fixture_planner_drafts_a_plan_that_is_revised_approved_only_exactly_and_exp
     let doc = view.document.clone().unwrap();
     assert_eq!(doc.tasks.len(), 2);
     assert_eq!(doc.clarifications[0].answer, "Comma");
+    assert_eq!(
+        doc.assumptions,
+        [
+            "Checked: Reports render in src/report.ts — evidence: src/report.ts:1",
+            "Under 10,000 rows"
+        ]
+    );
+    assert_eq!(
+        artifact::checked_assumption(&doc.assumptions[0]),
+        Some("Reports render in src/report.ts — evidence: src/report.ts:1")
+    );
     assert_eq!(view.shape, "subtasks");
     let args = std::fs::read_to_string(folder.join("args.txt")).unwrap();
     assert!(
@@ -144,13 +155,15 @@ fn a_fixture_planner_drafts_a_plan_that_is_revised_approved_only_exactly_and_exp
     );
     let input = std::fs::read_to_string(folder.join("input.txt")).unwrap();
     assert!(input.contains("You are planning, not implementing"));
+    assert!(input.contains("Ask only preference questions") && input.contains("why_ask"));
 
     // Editing directly adds a revision and the diff names the changed section.
     let edited = view
         .markdown
         .clone()
         .unwrap()
-        .replace("- Under 10,000 rows", "- Under 50,000 rows");
+        .replace("- Under 10,000 rows", "- Under 50,000 rows")
+        .replace("src/report.ts:1", "src/report.ts:4");
     assert!(session::save_edit(&coordinator, &record.id, &edited, 0).is_err());
     assert_eq!(
         session::save_edit(&coordinator, &record.id, &edited, 1).unwrap(),

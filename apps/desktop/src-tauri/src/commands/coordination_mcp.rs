@@ -1045,10 +1045,8 @@ impl CoordinationTools {
             ));
         }
         let mut input = input;
-        if let Some(reason) = super::planning::question_gate(&run, &mut input) {
-            return Ok(CallToolResult::structured(
-                serde_json::json!({"status": "closed", "message": reason}),
-            ));
+        if let Some(reply) = super::planning::question_gate(&run, &mut input) {
+            return Ok(CallToolResult::structured(reply));
         }
         let prompt = super::harness::ask_user_async(
             &run.id,

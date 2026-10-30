@@ -455,6 +455,9 @@ pub struct Question {
     pub multi_select: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rationale: Option<String>,
+    /// Why checking the code cannot answer it; plan questions carry one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub why_ask: Option<String>,
     /// `false` when only the options are valid answers, as for a permission
     /// request. Absent from older hosts, which accepted any answer.
     #[serde(default, skip_serializing_if = "Option::is_none")]

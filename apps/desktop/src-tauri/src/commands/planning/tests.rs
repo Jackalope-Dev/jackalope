@@ -193,6 +193,17 @@ fn planning_questions_offer_ways_to_end_the_interview() {
         serde_json::json!({"question": "Delimiter?", "input_type": "choice", "options": ["Comma", "Tab"]}),
     )
     .unwrap();
+    // A question that does not say why checking cannot answer it is returned, unasked.
+    let reply = super::question_gate(&run, &mut input).unwrap();
+    assert_eq!(reply["status"], "not_asked");
+    assert!(reply["message"].as_str().unwrap().contains("Checked:"));
+    assert_eq!(input.options, ["Comma", "Tab"]);
+    input.presentation.why_ask = Some("   ".into());
+    assert_eq!(
+        super::question_gate(&run, &mut input).unwrap()["status"],
+        "not_asked"
+    );
+    input.presentation.why_ask = Some("A product choice the code cannot settle.".into());
     assert_eq!(super::question_gate(&run, &mut input), None);
     assert_eq!(
         input.options,
@@ -209,9 +220,9 @@ fn planning_questions_offer_ways_to_end_the_interview() {
         "answer": "Comma", "createdAt": "now"
     }))
     .unwrap()];
-    assert!(super::question_gate(&asked, &mut input)
-        .unwrap()
-        .contains("2-question"));
+    let closed = super::question_gate(&asked, &mut input).unwrap();
+    assert_eq!(closed["status"], "closed");
+    assert!(closed["message"].as_str().unwrap().contains("2-question"));
 }
 
 #[test]
@@ -478,6 +489,42 @@ fn execution_and_review_briefs_are_self_contained() {
     for area in interview::COVERAGE {
         assert!(prompt.contains(area), "{area}");
     }
+    // Facts are checked and recorded with evidence; only preferences are asked.
+    assert!(prompt.contains("Ask only preference questions"));
+    assert!(prompt.contains("why_ask") && prompt.contains("Checked: <"));
+    let revision = interview::revision_prompt(&doc, "Use tabs");
+    assert!(revision.contains("why_ask") && revision.contains("`Checked:`"));
+}
+
+#[test]
+fn checked_assumptions_round_trip_and_older_plans_are_unchanged() {
+    // A plan saved before checked facts existed parses, renders and hashes as before.
+    let mut older = sample();
+    older.front.status = "draft".into();
+    let rendered = older.render();
+    assert!(rendered.contains("## Assumptions\n\n- Exports stay under 10,000 rows.\n"));
+    let parsed = artifact::parse(&rendered).unwrap();
+    assert_eq!(parsed.render(), rendered);
+    assert_eq!(parsed.content_hash(), older.content_hash());
+    assert_eq!(artifact::checked_assumption(&parsed.assumptions[0]), None);
+
+    let mut doc = older.clone();
+    doc.assumptions.insert(
+        0,
+        "Checked: Reports render in src/report.ts — evidence: src/report.ts:12".into(),
+    );
+    let parsed = artifact::parse(&doc.render()).unwrap();
+    assert_eq!(parsed, doc, "checked facts keep their order and text");
+    assert_eq!(
+        artifact::checked_assumption(&parsed.assumptions[0]),
+        Some("Reports render in src/report.ts — evidence: src/report.ts:12")
+    );
+    assert_eq!(
+        artifact::checked_assumption(" checked: lower case"),
+        Some("lower case")
+    );
+    assert_eq!(artifact::checked_assumption("Check the API"), None);
+    assert_eq!(artifact::checked_assumption("é"), None);
 }
 
 #[test]

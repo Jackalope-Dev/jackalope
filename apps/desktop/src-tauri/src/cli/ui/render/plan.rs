@@ -118,11 +118,14 @@ pub fn lines(view: &PlanView) -> Vec<Line<'static>> {
     if !view.assumptions.is_empty() {
         lines.push(Line::default());
         lines.push(heading("Assumptions"));
+        // Facts the planner checked in the code need less scrutiny than its choices.
         for assumption in &view.assumptions {
-            lines.push(Line::from(vec![
-                Span::styled("! ", Style::default().fg(brand::warning())),
-                Span::raw(assumption.clone()),
-            ]));
+            let mark = if crate::planning::checked(assumption) {
+                Span::styled("✓ ", Style::default().fg(brand::success()))
+            } else {
+                Span::styled("! ", Style::default().fg(brand::warning()))
+            };
+            lines.push(Line::from(vec![mark, Span::raw(assumption.clone())]));
         }
     }
     lines.push(Line::default());
@@ -236,7 +239,10 @@ mod tests {
             shape: "subtasks".into(),
             shape_reason: "Two separate files".into(),
             workers: 2,
-            assumptions: vec!["Under 10,000 rows".into()],
+            assumptions: vec![
+                "Under 10,000 rows".into(),
+                "Checked: Reports render in src/report.ts — evidence: src/report.ts:12".into(),
+            ],
             tasks: vec![
                 PlanTask {
                     key: "csv".into(),
@@ -280,6 +286,7 @@ mod tests {
         let shown = text(&lines(&view));
         assert!(shown.contains("Recommended subtasks · ~2 workers · Two separate files"));
         assert!(shown.contains("! Under 10,000 rows"));
+        assert!(shown.contains("✓ Checked: Reports render in src/report.ts"));
         assert!(shown.contains("button Button  ← csv  [P]  running"));
         assert!(shown.contains("by csv · check-passed"));
         assert!(shown.contains("not covered by a task · unassessed"));

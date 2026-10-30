@@ -66,6 +66,11 @@ pub struct QuestionPresentation {
     )]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rationale: Option<String>,
+    #[schemars(
+        description = "Optional; required in plan mode: one short sentence on why reading the code or a read-only command cannot answer this, up to 300 characters"
+    )]
+    #[serde(default, alias = "why_ask", skip_serializing_if = "Option::is_none")]
+    pub why_ask: Option<String>,
 }
 
 impl QuestionPresentation {
@@ -80,6 +85,7 @@ impl QuestionPresentation {
         };
         self.header = bounded(self.header, 60);
         self.rationale = bounded(self.rationale, 500);
+        self.why_ask = bounded(self.why_ask, 300);
         self.recommended = self
             .recommended
             .filter(|value| options.iter().any(|option| option == value));
@@ -523,7 +529,8 @@ mod tests {
         let input: AskUserInput = serde_json::from_value(serde_json::json!({
             "question": "Storage?", "input_type": "choice", "options": ["App storage", "Repo"],
             "header": "Storage", "recommended": "Nowhere", "multi_select": true,
-            "allow_other": false, "rationale": "Decides   where revisions live."
+            "allow_other": false, "rationale": "Decides   where revisions live.",
+            "why_ask": "  A product choice.  "
         }))
         .unwrap();
         let shown = input.presentation.sanitized(&input.options);
@@ -535,6 +542,8 @@ mod tests {
             shown.rationale.as_deref(),
             Some("Decides where revisions live.")
         );
+        assert_eq!(shown.why_ask.as_deref(), Some("A product choice."));
+        assert!(value.get("whyAsk").is_none());
         let lone = QuestionPresentation {
             multi_select: true,
             ..Default::default()

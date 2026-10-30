@@ -69,6 +69,10 @@ pub fn gate(asked: usize, cap: usize, answers: &[String]) -> Gate {
     Gate::Ask
 }
 
+/// Returned instead of a planning question that does not say why checking
+/// cannot answer it. It is not forwarded and does not count toward the cap.
+pub const NEEDS_WHY_ASK: &str = "Not asked. A planning question must say in why_ask why reading the code or a read-only command cannot answer it. If you can observe the answer, check it yourself and record it under Assumptions as `Checked: <fact> — evidence: <file:line, or the command and what it printed>`. If only the person can decide (product, scope or taste), ask again with why_ask.";
+
 const FORMAT: &str = r#"Return ONLY the plan document, in exactly this Markdown format (no other text before or after):
 
 ---
@@ -91,6 +95,7 @@ Coverage: Scope Clear · Behaviour & UX Partial · Data & contracts Clear · Int
   A: <the person's answer>
 
 ## Assumptions
+- Checked: <a fact you confirmed instead of asking> — evidence: <file:line, or the read-only command and what it printed>
 - <every open point you decided yourself>
 
 ## Out of scope
@@ -137,8 +142,9 @@ pub fn interview_prompt(goal: &str, cap: usize, history: &str) -> String {
         "You are planning, not implementing. Work read-only: do not edit, create or delete files, install dependencies, commit, run formatters or launch other agents. Changes made during planning are discarded.\n\n\
 1. Explore first. Read the repository, its instructions and the project lessons in your context until you understand the code the request touches. Never ask the person anything the code, configuration or history can answer.\n\
 2. Score coverage for each area as Clear, Partial or Missing: {areas}.\n\
-3. Interview only for Partial or Missing areas that change the plan. Ask one question at a time with ask_user, highest impact first, at most {cap} questions in total. Give each question a short header, two to four concrete options with your recommended option first and marked as recommended, a one-sentence rationale, and multi_select only when several options can apply. Wait for each answer before asking the next (poll user_response while it is pending; time passing is never an answer). If the person answers \"{USE_RECOMMENDATIONS}\" or \"{DONE}\", stop asking.\n\
-4. Write the plan. Every point you decided without an answer is an Assumption. Acceptance criteria are testable, numbered AC-1, AC-2…, use WHEN/THEN where it helps, and carry a verify tag: command or test (with the exact command), browser, or manual. Every criterion is covered by at least one task. Split into several tasks only when they can be owned independently; keep tightly coupled work and its tests together, give each shared contract one owner, mark tasks that can run beside others as parallel, and use one task when splitting adds more integration than it saves (each extra worker repeats discovery and setup). Recommend a shape: single (one agent), subtasks (planned parallel tasks) or swarm (subtasks across machines), with a one-line reason and rough worker count. At most 8 tasks and 12 criteria.\n\n\
+3. Sort every open point before asking. A fact question has an answer you can observe: what the code does, where something lives, its output, timing or layout, whether a test or setting exists. Answer it yourself by reading files or running a read-only command (search, list, git log or show, print a config) and record it as an Assumption written `Checked: <fact> — evidence: <file:line, or the command and what it printed>`. A preference question is a product, scope or taste decision only the person can make. Ask only preference questions.\n\
+4. Interview only for Partial or Missing areas that change the plan. Ask one question at a time with ask_user, highest impact first, at most {cap} questions in total. Give each question a short header, two to four concrete options with your recommended option first and marked as recommended, a one-sentence rationale, why_ask (one short sentence on why checking the code cannot settle it), and multi_select only when several options can apply. A question without why_ask is returned unasked. Wait for each answer before asking the next (poll user_response while it is pending; time passing is never an answer). If the person answers \"{USE_RECOMMENDATIONS}\" or \"{DONE}\", stop asking.\n\
+5. Write the plan. Every fact you checked and every point you decided without an answer is an Assumption. Acceptance criteria are testable, numbered AC-1, AC-2…, use WHEN/THEN where it helps, and carry a verify tag: command or test (with the exact command), browser, or manual. Every criterion is covered by at least one task. Split into several tasks only when they can be owned independently; keep tightly coupled work and its tests together, give each shared contract one owner, mark tasks that can run beside others as parallel, and use one task when splitting adds more integration than it saves (each extra worker repeats discovery and setup). Recommend a shape: single (one agent), subtasks (planned parallel tasks) or swarm (subtasks across machines), with a one-line reason and rough worker count. At most 8 tasks and 12 criteria.\n\n\
 {FORMAT}\nRequest:\n{goal}{history}"
     )
 }
@@ -146,7 +152,7 @@ pub fn interview_prompt(goal: &str, cap: usize, history: &str) -> String {
 /// A follow-up turn that revises the current plan with the person's comments.
 pub fn revision_prompt(current: &PlanDocument, comments: &str) -> String {
     format!(
-        "Keep planning. Stay read-only. Revise the plan below using the person's comments. Ask with ask_user only if a comment is genuinely ambiguous and the code cannot answer it. Keep task keys and criterion IDs stable where their meaning is unchanged, and record what changed and why in the Decision log.\n\n{FORMAT}\nComments from the person:\n{comments}\n\nCurrent plan (revision {}):\n{}",
+        "Keep planning. Stay read-only. Revise the plan below using the person's comments. Check facts yourself and record them as `Checked:` Assumptions with evidence. Ask with ask_user, giving why_ask, only if a comment leaves a preference genuinely ambiguous. Keep task keys and criterion IDs stable where their meaning is unchanged, and record what changed and why in the Decision log.\n\n{FORMAT}\nComments from the person:\n{comments}\n\nCurrent plan (revision {}):\n{}",
         current.front.revision,
         current.render()
     )
