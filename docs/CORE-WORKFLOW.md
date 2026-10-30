@@ -36,6 +36,17 @@ work rows; command search also finds projects, tasks, sessions and current-task 
 Parallel planning remains inside Work with the existing ownership and dependency
 contracts; plans stay editable before dispatch.
 
+After 15 minutes without focus or input in any Jackalope window, the next return opens
+Since you left above the work list. It is built locally from recorded attempts, checks,
+questions and captures, with no model call, and stays hidden when nothing changed since
+the person left. It leads with one line naming what waits on them, then one line per item
+that finished or failed meanwhile (screenshot results first, at most six; items opened
+since they changed are left out), then every Needs you item as its own card: the decision,
+what it changes, recorded evidence and a low, medium, high or unknown risk. A suggested next
+step appears only when the record supports it, such as passing checks on a finished
+result. Dismissing it lasts until the next absence; the last-present time is shared by
+all windows in local storage.
+
 The Work page keeps recent work in a collapsible sidebar and opens task review beside
 the conversation on wide windows, or at full width on narrower ones. Other tool tabs can retain the conversation, including terminals and
 activity. The work list offers list and board views; New work opens its composer

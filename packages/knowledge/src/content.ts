@@ -230,6 +230,15 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Needs you lists recovery steps and questions first, then older reviews, so the most urgent item is always at the top.',
         ],
       },
+      {
+        id: 'coming-back',
+        question: 'What do I see when I come back?',
+        paragraphs: [
+          'After 15 minutes away from Jackalope, the Work page opens with Since you left. It starts with one line about what needs you, then lists what finished or failed while you were away, with screenshots first.',
+          'Below that, every item waiting on you has its own card: the decision to make, what it changes, the checks and screenshots behind it, and how risky it is. When the evidence is clear, such as passing checks on a finished task, the card suggests a next step. Open an item from its card, or dismiss the summary when you are done.',
+          'Jackalope builds this from your recorded work on your computer, without asking a model. If nothing changed while you were away, it stays hidden.',
+        ],
+      },
     ],
   },
   {
