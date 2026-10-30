@@ -1,6 +1,7 @@
 import { Checkbox } from '@jackalope/ui';
 import { useState } from 'react';
 import { AgentQuestion } from '../components/tasks/AgentQuestion';
+import { DecisionTrail } from '../components/tasks/DecisionTrail';
 import { PatchPreview } from '../components/tasks/PatchPreview';
 import { TaskActivity } from '../components/tasks/TaskActivity';
 import { TaskContextPanel } from '../components/tasks/TaskContextPanel';
@@ -78,6 +79,64 @@ const outcomePreview = {
     },
   ],
 } satisfies Parameters<typeof TaskOutcomes>[0]['run'];
+
+const trailPreview = [
+  {
+    id: 'trail-first',
+    startedAt: '2026-09-17T09:00:00Z',
+    decisions: [
+      {
+        id: 'd1',
+        at: '2026-09-17T09:05:00Z',
+        phase: 'search',
+        decision: 'Trim the query inside search() instead of at each caller',
+        why: 'One place to change and every caller benefits',
+        evidence: ['src/search.ts:2', 'commit 3a9f1c2'],
+        result: 'done',
+        checks: [
+          { pointer: 'src/search.ts:2', state: 'found' },
+          {
+            pointer: 'commit 3a9f1c2',
+            state: 'missing',
+            note: 'No such commit in this workspace',
+          },
+        ],
+      },
+      {
+        id: 'd2',
+        at: '2026-09-17T09:20:00Z',
+        phase: 'verify',
+        decision: 'Skipped the screen-reader check',
+        why: 'No assistive technology in this fixture',
+        evidence: ['https://example.invalid/a11y-note'],
+        result: 'open',
+        checks: [
+          {
+            pointer: 'https://example.invalid/a11y-note',
+            state: 'external',
+            note: 'Not checked locally',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'trail-second',
+    startedAt: '2026-09-17T10:00:00Z',
+    decisions: [
+      {
+        id: 'd3',
+        at: '2026-09-17T10:04:00Z',
+        phase: 'verify',
+        decision: 'Ran the keyboard walkthrough after all',
+        why: 'The skipped check left the outcome unverified',
+        evidence: ['check:keyboard walkthrough'],
+        result: 'tests pass',
+        supersedes: 'd2',
+      },
+    ],
+  },
+];
 
 export function TaskExperienceExamples() {
   const [scenario, setScenario] = useState('choice');
@@ -195,6 +254,7 @@ export function TaskExperienceExamples() {
         }
         active
       />
+      <DecisionTrail attempts={trailPreview} />
       <PatchPreview
         key={String(long)}
         patch={

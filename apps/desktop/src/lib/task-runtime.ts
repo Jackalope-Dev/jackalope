@@ -176,6 +176,8 @@ export interface TaskRun {
   }[];
   prompts?: PendingUserPrompt[];
   validationSteps?: ValidationStep[];
+  /** Append-only decision trail the agent reported for this attempt. */
+  decisions?: DecisionEntry[];
   screenshots?: ScreenshotArtifact[];
   /** Desktop-control actions, newest last; summaries keep only the latest few. */
   desktopActions?: DesktopActionRecord[];
@@ -275,6 +277,19 @@ export interface ValidationStep {
     breaks: string;
   } | null;
   safetyFact?: SafetyFact;
+}
+export interface DecisionEntry {
+  id: string;
+  at: string;
+  phase: string;
+  decision: string;
+  why: string;
+  evidence: string[];
+  result: string;
+  /** Id of an earlier entry from the same task that this one corrects. */
+  supersedes?: string | null;
+  /** One local check per evidence pointer, recorded when the attempt ends. */
+  checks?: { pointer: string; state: string; note?: string | null }[];
 }
 export interface ScreenshotArtifact {
   id: string;

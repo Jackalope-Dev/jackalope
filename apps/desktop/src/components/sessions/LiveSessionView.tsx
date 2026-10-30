@@ -40,6 +40,7 @@ import { BotCardView } from '../bots/BotCardView';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { AgentQuestion } from '../tasks/AgentQuestion';
 import { AgentScreen } from '../tasks/AgentScreen';
+import { DecisionTrail } from '../tasks/DecisionTrail';
 import { MergeReview } from '../tasks/MergeReview';
 import { ResultReview } from '../tasks/ResultReview';
 import { deliveryHandoff, TaskDelivery } from '../tasks/TaskDelivery';
@@ -691,6 +692,11 @@ export function LiveSessionView({
                           )}
                         </div>
                       </article>
+                    )}
+                    {lastInBatch && run && !!run.decisions?.length && (
+                      <div className="live-card live-trail">
+                        <DecisionTrail attempts={[run]} />
+                      </div>
                     )}
                     {lastInBatch &&
                       run &&

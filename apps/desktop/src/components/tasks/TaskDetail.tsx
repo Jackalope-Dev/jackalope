@@ -48,6 +48,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
 import { AgentScreen } from './AgentScreen';
+import { DecisionTrail } from './DecisionTrail';
 import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview, type ReviewSection } from './ResultReview';
 import { ScreenshotPreview } from './ScreenshotPreview';
@@ -796,6 +797,7 @@ export function TaskDetail({
             </Tabs.Content>
           )}
           <Tabs.Content value="activity">
+            <DecisionTrail attempts={attempts} currentId={run.id} />
             <TaskActivity entries={run.activity} active={active} />
             <Disclosure
               open={detailsOpen}
