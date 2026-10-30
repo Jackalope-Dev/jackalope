@@ -478,6 +478,10 @@ impl Coordinator {
                         .route("/v1/user-prompt/poll", get(bridge_get_user_prompt))
                         .route("/v1/validation-step", post(bridge_validation_step))
                         .route("/v1/goal-restatement", post(bridge_goal_restatement))
+                        .route(
+                            "/v1/decisions",
+                            post(crate::commands::decision_trail::bridge_record),
+                        )
                         .route("/v1/computer/verify", post(bridge_computer_verify))
                         .route("/v1/native/output", post(bridge_native_output))
                         .layer(DefaultBodyLimit::max(65_536))

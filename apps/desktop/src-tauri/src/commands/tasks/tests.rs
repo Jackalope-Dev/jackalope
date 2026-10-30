@@ -1,4 +1,5 @@
 use super::*;
+mod decision_trail;
 mod workbench;
 mod workspace_modes;
 
@@ -65,6 +66,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         usage_observations: vec![],
         prompts: vec![],
         validation_steps: vec![],
+        decisions: vec![],
         screenshots: vec![],
         desktop_actions: vec![],
         visited_pages: vec![],

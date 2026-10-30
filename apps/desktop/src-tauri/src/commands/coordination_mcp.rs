@@ -1257,6 +1257,37 @@ impl CoordinationTools {
     }
 
     #[tool(
+        description = "Add one entry to this attempt's decision trail at a real fork, pivot, revert, blocker or completed unit, with its check result. Evidence is pointers such as a commit, path:line, check:<name> or screenshot:<name>, never prose. Entries are append-only: correct a wrong call with a new entry whose supersedes is the old id. Jackalope checks each pointer when the attempt ends.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn record_decision(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::decision_trail::RecordDecisionInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let headers = request_headers(&context)?;
+        let run = self
+            .service
+            .authorized_run(&headers)
+            .map_err(bridge_error)?;
+        let runtime = self.service.runtime.clone();
+        let entry = tauri::async_runtime::spawn_blocking(move || {
+            super::decision_trail::record(&runtime, &run, input)
+        })
+        .await
+        .map_err(|e| ErrorData::internal_error(e.to_string(), None))?
+        .map_err(|e| ErrorData::invalid_params(e, None))?;
+        let value = serde_json::to_value(entry)
+            .map_err(|_| ErrorData::internal_error("Could not encode the decision", None))?;
+        Ok(CallToolResult::structured(value))
+    }
+
+    #[tool(
         description = "Run this attempt's saved project check with {}. project.verification.command shows the command; replacements and extra arguments are rejected. Reuses a passing result only for the same command and workspace snapshot. Returns process exit status, stdout and stderr with bounded execution and cancellation. Recognized test summaries are parsed output, not independent correctness evidence. Long successful output may omit passing-test records; failures and incomplete captures stay intact. After a lost response or client timeout, verification_output {} recovers the stored result without rerunning.",
         annotations(read_only_hint = false, open_world_hint = false)
     )]
@@ -1541,6 +1572,7 @@ mod tests {
             "ask_user",
             "browser_navigate",
             "record_validation_step",
+            "record_decision",
             "agreement",
             "verification_output",
         ] {
@@ -1591,6 +1623,7 @@ mod tests {
         assert!(names.contains(&"user_response"));
         assert!(names.contains(&"record_validation_step"));
         assert!(names.contains(&"restate_goal"));
+        assert!(names.contains(&"record_decision"));
         assert!(names.contains(&"computer_verify"));
         let verify = tools
             .iter()
@@ -1609,6 +1642,7 @@ mod tests {
         for name in [
             "ask_user",
             "record_validation_step",
+            "record_decision",
             "message",
             "acknowledge_message",
         ] {

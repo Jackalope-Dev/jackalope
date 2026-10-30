@@ -132,6 +132,9 @@ pub struct TaskRun {
     pub prompts: Vec<crate::commands::harness::PendingUserPrompt>,
     #[serde(default)]
     pub validation_steps: Vec<crate::commands::harness::ValidationStep>,
+    /// Append-only decision trail the agent reported for this attempt.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub decisions: Vec<crate::commands::decision_trail::DecisionEntry>,
     #[serde(default)]
     pub screenshots: Vec<crate::commands::harness::ScreenshotArtifact>,
     /// Desktop-control actions for the Screen view, newest last and bounded.
@@ -371,6 +374,7 @@ impl TaskRun {
             usage_observations: self.usage_observations.clone(),
             prompts: self.prompts.clone(),
             validation_steps: self.validation_steps.clone(),
+            decisions: self.decisions.clone(),
             screenshots: self.screenshots.clone(),
             desktop_actions: self.desktop_actions[self.desktop_actions.len().saturating_sub(12)..]
                 .to_vec(),
