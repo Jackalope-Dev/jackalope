@@ -1,8 +1,17 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Columns2, Trophy } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { getAgentMetadata } from '../../lib/agent-catalog';
+import {
+  attemptLabel,
+  buildCombinePrompt,
+  type CombinePort,
+  isIndependentJudge,
+  parseVerdict,
+  pickJudgeAgent,
+} from '../../lib/compare-judge';
+import { startComparisonJudge } from '../../lib/compare-launch';
 import {
   durationLabel,
   elapsedLabel,
@@ -13,13 +22,15 @@ import {
 } from '../../lib/task-runtime';
 import { latestAttempt } from '../../lib/task-workflow';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
-import { comparisonForTask, useCompareStore } from '../../stores/compareStore';
+import { type Comparison, comparisonForTask, useCompareStore } from '../../stores/compareStore';
 import { useExecutionStore } from '../../stores/executionStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
 import { DismissButton } from '../ui/DismissButton';
 import { InlineNotice } from '../ui/InlineNotice';
+import { ComparisonJudge, type LabelledAttempt } from './ComparisonJudge';
 import './task-comparison.css';
 
 interface Stats {
@@ -44,6 +55,8 @@ function plainText(markdown: string) {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+const isFinished = (run: TaskRun) => ['review', 'reviewed'].includes(run.status);
 
 function checkLabel(run: TaskRun) {
   if (!run.verification) return run.verifyCommand ? 'Not run' : 'No check';
@@ -73,6 +86,7 @@ export function TaskComparison({ run }: { run: TaskRun }) {
     customAgents.find((custom) => custom.id === agent)?.name ??
     getAgentMetadata(agent)?.name ??
     agent;
+  const judgeRun = comparison.judge ? latestAttempt(runs, comparison.judge.taskId) : undefined;
   const running = members.filter(isActive).length;
   return (
     <section className="task-comparison" aria-label="Compared agents">
@@ -123,10 +137,9 @@ export function TaskComparison({ run }: { run: TaskRun }) {
       <Dialog.Root open={open} onOpenChange={setOpen}>
         {open && (
           <ComparisonDialog
-            comparisonId={comparison.id}
-            prompt={comparison.prompt}
-            chosenTaskId={comparison.chosenTaskId}
+            comparison={comparison}
             members={members}
+            judgeRun={judgeRun}
             adapter={adapter}
             name={name}
             onClose={() => setOpen(false)}
@@ -138,25 +151,128 @@ export function TaskComparison({ run }: { run: TaskRun }) {
 }
 
 function ComparisonDialog({
-  comparisonId,
-  prompt,
-  chosenTaskId,
+  comparison,
   members,
+  judgeRun,
   adapter,
   name,
   onClose,
 }: {
-  comparisonId: string;
-  prompt: string;
-  chosenTaskId?: string;
+  comparison: Comparison;
   members: TaskRun[];
+  judgeRun?: TaskRun;
   adapter: (agent: string) => string;
   name: (agent: string) => string;
   onClose: () => void;
 }) {
+  const { id: comparisonId, prompt, chosenTaskId, judge } = comparison;
   const [stats, setStats] = useState<Record<string, Stats | 'error'>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const runners = useExecutionStore(useShallow((state) => state.runners));
+  const project = useProjectStore((state) =>
+    state.projects.find((item) => item.id === comparison.projectId),
+  );
+  const finished = members.filter(isFinished);
+  const judgeOptions = runners
+    .filter((runner) => runner.available)
+    .map((runner) => ({ id: runner.id, name: runner.name, adapter: adapter(runner.id) }));
+  const authorAdapters = finished.map((member) => adapter(member.agent));
+  const [judgeAgent, setJudgeAgent] = useState<string>();
+  const judgeChoice =
+    judgeOptions.find((option) => option.id === judgeAgent) ??
+    judgeOptions.find((option) => option.id === pickJudgeAgent(judgeOptions, authorAdapters)?.id);
+  const [judging, setJudging] = useState(false);
+  const attempts: LabelledAttempt[] = (judge?.labels ?? [])
+    .map((taskId, index) => {
+      const run = members.find((member) => member.taskId === taskId);
+      return run && { label: attemptLabel(index), run, name: name(run.agent) };
+    })
+    .filter((attempt): attempt is LabelledAttempt => !!attempt);
+  const labelFor = (taskId: string) =>
+    attempts.find((attempt) => attempt.run.taskId === taskId)?.label;
+  const judgeDone = judgeRun && isFinished(judgeRun) ? judgeRun.id : '';
+  const [fetched, setFetched] = useState<{ id: string; result: string }>();
+  // Run summaries omit the final answer, so read the finished judge's full record once.
+  useEffect(() => {
+    if (!judgeDone) return;
+    let canceled = false;
+    nativeTask<TaskRun[]>('task_runs', { detailId: judgeDone })
+      .then((all) => {
+        const result = all.find((item) => item.id === judgeDone)?.result ?? '';
+        if (!canceled) setFetched({ id: judgeDone, result });
+      })
+      .catch(() => {
+        if (!canceled) setFetched({ id: judgeDone, result: '' });
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [judgeDone]);
+  const judgeResult = judgeDone
+    ? judgeRun?.result || (fetched?.id === judgeDone ? fetched.result : '')
+    : '';
+  const judgeLoading = !!judgeDone && !judgeResult && fetched?.id !== judgeDone;
+  const labels = judge?.labels.map((_, index) => attemptLabel(index)).join(',') ?? '';
+  const verdict = useMemo(
+    () => (judgeResult ? parseVerdict(judgeResult, labels.split(',')) : undefined),
+    [judgeResult, labels],
+  );
+  const [skippedPorts, setSkippedPorts] = useState<Set<number>>(new Set());
+  const selectedPorts = new Set(
+    (verdict?.ports ?? []).map((_, index) => index).filter((index) => !skippedPorts.has(index)),
+  );
+  const portsFor = (winner: TaskRun): CombinePort[] =>
+    (verdict?.ports ?? []).flatMap((port, index) => {
+      const source = attempts.find((attempt) => attempt.label === port.attempt)?.run;
+      if (!selectedPorts.has(index) || !source || source.taskId === winner.taskId) return [];
+      return [
+        {
+          ...port,
+          agentName: name(source.agent),
+          workspace: source.workspace,
+          branch: source.branch,
+          baseHead: source.baseHead,
+        },
+      ];
+    });
+  const startJudge = async () => {
+    if (!judgeChoice || judging) return;
+    setJudging(true);
+    setError('');
+    try {
+      await startComparisonJudge({
+        comparison,
+        attempts: finished,
+        agent: judgeChoice,
+        project,
+        agentName: name,
+      });
+      setSkippedPorts(new Set());
+    } catch (cause) {
+      setError(`The judge could not start. ${String(cause)}`);
+    } finally {
+      setJudging(false);
+    }
+  };
+  /** Opens the kept task with an editable follow-up that brings over the selected parts. */
+  const draftCombine = (winner: TaskRun, ports: CombinePort[]) => {
+    const key = `reply:${winner.taskId}`;
+    const execution = useExecutionStore.getState();
+    const current = execution.drafts[key]?.prompt.trim() ?? '';
+    const request = buildCombinePrompt(ports);
+    execution.draft(key, { prompt: current ? `${current}\n\n${request}` : request });
+    const sources = new Map<string, string>();
+    for (const port of ports) {
+      const source = attempts.find((attempt) => attempt.label === port.attempt)?.run;
+      if (source) sources.set(source.taskId, source.workspace);
+    }
+    useCompareStore.getState().setCombine(comparisonId, {
+      baseTaskId: winner.taskId,
+      sources: [...sources].map(([taskId, workspace]) => ({ taskId, workspace })),
+      draftedAt: new Date().toISOString(),
+    });
+  };
   const finishedIds = members
     .filter((member) => !isActive(member))
     .map((member) => member.id)
@@ -176,7 +292,7 @@ function ComparisonDialog({
       canceled = true;
     };
   }, [finishedIds]);
-  const keep = async (winner: TaskRun) => {
+  const keep = async (winner: TaskRun, ports: CombinePort[] = []) => {
     setBusy(true);
     setError('');
     const failures: string[] = [];
@@ -195,8 +311,10 @@ function ComparisonDialog({
       setError(`Some attempts could not be archived. ${failures.join(' ')}`);
       return;
     }
+    if (ports.length) draftCombine(winner, ports);
     useExecutionStore.getState().select(winner.id);
     onClose();
+    if (ports.length) requestAnimationFrame(() => document.getElementById('task-reply')?.focus());
   };
   return (
     <DialogContent className="task-comparison-dialog" aria-describedby="task-comparison-prompt">
@@ -205,10 +323,42 @@ function ComparisonDialog({
       <p id="task-comparison-prompt" className="task-comparison-prompt">
         {prompt}
       </p>
+      {(finished.length >= 2 || judgeRun) && (
+        <ComparisonJudge
+          judgeRun={judgeRun}
+          judgeName={judge ? name(judge.agent) : ''}
+          verdict={verdict}
+          loading={judgeLoading}
+          attempts={attempts}
+          canStart={finished.length >= 2 && !chosenTaskId}
+          starting={judging}
+          choice={{
+            options: judgeOptions,
+            value: judgeChoice?.id ?? '',
+            independent: !!judgeChoice && isIndependentJudge(judgeChoice.adapter, authorAdapters),
+            onChange: setJudgeAgent,
+          }}
+          selectedPorts={selectedPorts}
+          onTogglePort={(index) =>
+            setSkippedPorts((previous) => {
+              const next = new Set(previous);
+              if (!next.delete(index)) next.add(index);
+              return next;
+            })
+          }
+          onStart={() => void startJudge()}
+          onOpen={(run) => {
+            useExecutionStore.getState().select(run.id);
+            onClose();
+          }}
+        />
+      )}
       <div className="task-comparison-grid">
         {members.map((member) => {
           const stat = stats[member.id];
           const active = isActive(member);
+          const label = labelFor(member.taskId);
+          const ports = chosenTaskId ? [] : portsFor(member);
           return (
             <article
               key={member.id}
@@ -218,7 +368,10 @@ function ComparisonDialog({
               <header>
                 <AgentAvatar provider={adapter(member.agent)} size="sm" working={active} />
                 <div>
-                  <h3>{name(member.agent)}</h3>
+                  <h3>
+                    {label && <span className="task-comparison-label">{label} · </span>}
+                    {name(member.agent)}
+                  </h3>
                   <p>{member.model ?? member.account}</p>
                 </div>
               </header>
@@ -281,12 +434,18 @@ function ComparisonDialog({
                 >
                   Open
                 </Button>
-                <Button
-                  disabled={busy || !['review', 'reviewed'].includes(member.status)}
-                  onClick={() => void keep(member)}
-                >
+                <Button disabled={busy || !isFinished(member)} onClick={() => void keep(member)}>
                   Keep this one
                 </Button>
+                {ports.length > 0 && (
+                  <Button
+                    variant="outline"
+                    disabled={busy || !isFinished(member)}
+                    onClick={() => void keep(member, ports)}
+                  >
+                    Keep and combine
+                  </Button>
+                )}
               </div>
             </article>
           );
@@ -296,7 +455,8 @@ function ComparisonDialog({
       <DialogFooter>
         <p className="task-comparison-footnote">
           Keeping one archives the other finished attempts. Archived work, branches and worktrees
-          stay available to restore.
+          stay available to restore. Keep and combine also drafts a follow-up on the kept attempt;
+          it runs only when you send it.
         </p>
       </DialogFooter>
     </DialogContent>

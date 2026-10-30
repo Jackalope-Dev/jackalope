@@ -13,12 +13,33 @@ export interface Comparison {
   failures?: string[];
   /** The task the user picked to continue with, if any. */
   chosenTaskId?: string;
+  /** A read-only task the user started to grade the attempts. */
+  judge?: ComparisonJudge;
+  /** Parts of other attempts the kept task was asked to bring over. */
+  combine?: ComparisonCombine;
+}
+
+export interface ComparisonJudge {
+  taskId: string;
+  agent: string;
+  /** Task ids in the order the judge labelled them A, B, C… */
+  labels: string[];
+  startedAt: string;
+}
+
+export interface ComparisonCombine {
+  baseTaskId: string;
+  /** Archived attempts whose worktrees the follow-up reads. */
+  sources: { taskId: string; workspace: string }[];
+  draftedAt: string;
 }
 
 interface CompareState {
   comparisons: Comparison[];
   add: (comparison: Comparison) => void;
   choose: (id: string, taskId: string) => void;
+  setJudge: (id: string, judge: ComparisonJudge) => void;
+  setCombine: (id: string, combine: ComparisonCombine) => void;
   remove: (id: string) => void;
   dismissFailure: (id: string, failure: string) => void;
 }
@@ -41,6 +62,14 @@ export const useCompareStore = create<CompareState>()(
         set((state) => ({
           comparisons: state.comparisons.map((c) => (c.id === id ? { ...c, chosenTaskId } : c)),
         })),
+      setJudge: (id, judge) =>
+        set((state) => ({
+          comparisons: state.comparisons.map((c) => (c.id === id ? { ...c, judge } : c)),
+        })),
+      setCombine: (id, combine) =>
+        set((state) => ({
+          comparisons: state.comparisons.map((c) => (c.id === id ? { ...c, combine } : c)),
+        })),
       dismissFailure: (id, failure) =>
         set((state) => ({
           comparisons: state.comparisons.map((c) =>
@@ -55,21 +84,54 @@ export const useCompareStore = create<CompareState>()(
       merge: (saved, current) => {
         const value = saved as Partial<CompareState> | undefined;
         const comparisons = Array.isArray(value?.comparisons)
-          ? value.comparisons.filter(
-              (c): c is Comparison =>
-                !!c &&
-                typeof c.id === 'string' &&
-                typeof c.projectId === 'string' &&
-                typeof c.prompt === 'string' &&
-                Array.isArray(c.taskIds) &&
-                c.taskIds.every((id) => typeof id === 'string'),
-            )
+          ? value.comparisons
+              .filter(
+                (c): c is Comparison =>
+                  !!c &&
+                  typeof c.id === 'string' &&
+                  typeof c.projectId === 'string' &&
+                  typeof c.prompt === 'string' &&
+                  Array.isArray(c.taskIds) &&
+                  c.taskIds.every((id) => typeof id === 'string'),
+              )
+              .map(({ judge, combine, ...comparison }) => ({
+                ...comparison,
+                ...(validJudge(judge) && { judge }),
+                ...(validCombine(combine) && { combine }),
+              }))
           : [];
         return { ...current, comparisons };
       },
     },
   ),
 );
+
+const strings = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+function validJudge(judge: unknown): judge is ComparisonJudge {
+  const value = judge as Partial<ComparisonJudge> | undefined;
+  return (
+    !!value &&
+    typeof value.taskId === 'string' &&
+    typeof value.agent === 'string' &&
+    typeof value.startedAt === 'string' &&
+    strings(value.labels)
+  );
+}
+
+function validCombine(combine: unknown): combine is ComparisonCombine {
+  const value = combine as Partial<ComparisonCombine> | undefined;
+  return (
+    !!value &&
+    typeof value.baseTaskId === 'string' &&
+    typeof value.draftedAt === 'string' &&
+    Array.isArray(value.sources) &&
+    value.sources.every(
+      (source) => typeof source?.taskId === 'string' && typeof source?.workspace === 'string',
+    )
+  );
+}
 
 export function comparisonForTask(comparisons: Comparison[], taskId: string) {
   return comparisons.find((comparison) => comparison.taskIds.includes(taskId));
