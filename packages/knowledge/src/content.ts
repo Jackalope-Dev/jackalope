@@ -1422,6 +1422,14 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         ],
       },
       {
+        id: 'decision-log',
+        question: 'How do I see why the agent made its choices?',
+        paragraphs: [
+          'On long or multi-step work, agents keep a Decision log: real forks, pivots, reverts, blockers and finished steps, each with why, evidence and the result. Find it at the top of a task’s Activity tab, or under the reply in a bot conversation. Each retry or continuation starts a new group, and a corrected entry stays visible and is marked Superseded.',
+          'When the attempt ends, Jackalope checks each evidence pointer on your computer, such as a file and line, a commit or a recorded check, without using any model. Pointers it cannot find are marked Not found. A found pointer is still the agent’s claim, so review the change itself before merging.',
+        ],
+      },
+      {
         id: 'task-speed',
         question: 'Can I speed up tasks without reducing model effort?',
         paragraphs: [

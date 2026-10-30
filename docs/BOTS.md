@@ -129,6 +129,10 @@ prepends it with the teamwork guidance to every batch prompt, so the role surviv
 continuations and restarts without appearing in the transcript. Sessions without a
 persona are unchanged and older records load as before.
 
+Each batch is an ordinary attempt, so a bot doing long unattended work can keep a
+[decision trail](TASK-OUTCOMES.md#read-the-decision-trail); the transcript shows a
+batch's Decision log under its reply.
+
 The bot's memory follows the guidance in every batch: its saved notes with their IDs,
 and in a conversation's first batch the title, date and clipped latest reply of up to
 five of its other conversations. The Bots page lists notes under **Memory**, with the

@@ -85,6 +85,7 @@ message. Agents must read pending answers; elapsed time is never an answer.
 | Retrieve an answer | user_response | GET /v1/user-prompt/poll?id=question |
 | Restate the goal at the start | restate_goal | POST /v1/goal-restatement with goal, problem, smallestChange |
 | Record checks and requirement assessments | record_validation_step | POST /v1/validation-step |
+| Log a fork, pivot, revert, blocker or finished unit | record_decision | POST /v1/decisions with phase, decision, why, evidence pointers, result, optional supersedes |
 | Report a departure from an approved plan | plan_deviation | POST /v1/plan-deviation with summary, optional amendment |
 | Native app and logged-in browser control (Windows/macOS; one-window X11/GNOME; platform readiness required) | desktop_control | POST /v1/desktop/control |
 

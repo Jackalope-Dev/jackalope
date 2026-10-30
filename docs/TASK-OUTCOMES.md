@@ -61,6 +61,34 @@ limited to 400 bytes; a later call replaces the earlier one. The task page shows
 "Understood as" so a misread is visible while work runs. Tasks without a restatement,
 including all earlier history, show nothing.
 
+## Read the decision trail
+
+Long and unattended work can leave a decision trail. Every attempt's harness
+instructions ask the agent to call `record_decision` (HTTP: `POST /v1/decisions`) only
+at a real fork, pivot, revert, blocker or completed unit with its check result. Each
+entry records a phase, the decision, why, up to four evidence pointers and a result.
+Pointers name a commit, `path` or `path:line`, `check:<name>`, `report:<id>`,
+`screenshot:<name>` or an artifact path; they are not prose.
+
+The trail is append-only. A wrong call gets a new entry whose `supersedes` names the
+earlier entry's ID from the same task; the old entry stays and shows as superseded.
+Entries belong to their attempt, so a retry or continuation starts a new group. An
+attempt accepts up to 100 entries and none after it ends.
+
+When an attempt ends, Jackalope checks each pointer locally without model or network
+calls: files and line numbers in the workspace, commits through one
+`git cat-file --batch-check`, and recorded checks, reports and screenshots by name.
+Links and issue numbers are marked as not checked locally. Unresolved pointers are
+marked so a reviewer can see which claims lack backing; a found pointer is still an
+agent claim, not acceptance.
+
+The task's Activity tab shows the Decision log above agent activity, grouped by
+attempt, with time, decision, why, evidence and result. Bot conversations show a
+batch's log under its reply. Entries are saved with the attempt through the history
+journal, included in recovery exports and summarized in recovery handoffs. Older
+attempts have no trail and show nothing. `decision_trail.rs` owns the entry contract,
+validation and pointer checks.
+
 ## Repeat a process with approval gates
 
 Project knowledge workflows can define required inputs, ordered steps and final
