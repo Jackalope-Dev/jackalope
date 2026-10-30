@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import type { Review, TaskRun } from '../../lib/task-runtime';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { CaptureTask } from './CaptureTask';
+import { ChallengeDialog } from './ChallengeReview';
 import { prepareCrossModelReview } from './CrossModelReviewPanel';
 import { ReviewProgress } from './ReviewProgress';
 import { TaskImpact } from './TaskImpact';
@@ -19,13 +20,16 @@ export function ReviewActions({
   run,
   review,
   onRefresh,
+  onChallengeStarted,
 }: {
   run: TaskRun;
   review: Review;
   onRefresh: () => void;
+  onChallengeStarted?: () => void;
 }) {
   const [tool, setTool] = useState<keyof typeof titles | null>(null);
   const [peerDraft, setPeerDraft] = useState<string>();
+  const [challenging, setChallenging] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   return (
     <>
@@ -45,6 +49,11 @@ export function ReviewActions({
                 }
               >
                 Ask another agent to review
+              </Menu.Item>
+            )}
+            {!!review.diff && (
+              <Menu.Item className="workspace-menu-item" onSelect={() => setChallenging(true)}>
+                Challenge this change
               </Menu.Item>
             )}
             <Menu.Item className="workspace-menu-item" onSelect={onRefresh}>
@@ -84,6 +93,17 @@ export function ReviewActions({
           {tool === 'rating' && <TaskUsefulness runId={run.id} expanded />}
         </DialogContent>
       </Dialog.Root>
+      {challenging && (
+        <ChallengeDialog
+          run={run}
+          returnFocus={trigger}
+          onClose={() => setChallenging(false)}
+          onStarted={() => {
+            setChallenging(false);
+            onChallengeStarted?.();
+          }}
+        />
+      )}
       {peerDraft && (
         <CaptureTask
           draftKey={peerDraft}

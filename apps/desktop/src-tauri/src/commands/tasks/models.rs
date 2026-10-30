@@ -143,6 +143,9 @@ pub struct TaskRun {
     /// Review screenshots are being captured after the attempt finished.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub review_capturing: bool,
+    /// The result this attempt challenges, when it is a Challenge reviewer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub challenge_of: Option<crate::commands::challenge_review::ChallengeSource>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -370,6 +373,7 @@ impl TaskRun {
             visited_pages: self.visited_pages.clone(),
             review_captures: self.review_captures.clone(),
             review_capturing: self.review_capturing,
+            challenge_of: self.challenge_of.clone(),
         }
     }
 }

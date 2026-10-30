@@ -2147,6 +2147,7 @@ impl TaskRuntime {
                 visited_pages: vec![],
                 review_captures: None,
                 review_capturing: false,
+                challenge_of: retried.as_ref().and_then(|old| old.challenge_of.clone()),
             };
             self.save(&run)?;
             crate::commands::browser::register(&run.id);

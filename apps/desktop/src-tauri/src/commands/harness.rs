@@ -100,6 +100,71 @@ pub struct ValidationStep {
     pub timestamp: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub requirements: Vec<super::outcomes::RequirementAssessment>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finding: Option<ChallengeFinding>,
+}
+
+impl ValidationStep {
+    /// A checkpoint an agent reported through the bridge or MCP tool.
+    pub(super) fn reported(input: RecordValidationInput) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            step: input.step,
+            status: input.status,
+            notes: input.notes,
+            evidence: input.evidence,
+            timestamp: Utc::now().to_rfc3339(),
+            requirements: input.requirements,
+            finding: input.finding.map(ChallengeFinding::bounded),
+        }
+    }
+}
+
+/// What a Challenge reviewer ran to prove a finding. Review counts a finding as proven
+/// only when both the command and its printed output are present.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ChallengeFinding {
+    #[schemars(description = "The exact command you ran, from your workspace root")]
+    #[serde(default)]
+    pub command: String,
+    #[schemars(description = "What the command printed: the lines that show the failure")]
+    #[serde(default)]
+    pub output: String,
+    #[schemars(description = "The output the task's intent requires instead")]
+    #[serde(default)]
+    pub expected: String,
+    #[schemars(description = "Why the printed output breaks the task's intent")]
+    #[serde(default, alias = "breaksIntent", alias = "breaks_intent")]
+    pub breaks: String,
+}
+
+impl ChallengeFinding {
+    fn bounded(self) -> Self {
+        let bounded = |text: String, limit: usize| -> String {
+            let text = text.replace(char::from(0), "");
+            let text = text.trim();
+            if text.chars().count() <= limit {
+                return text.to_string();
+            }
+            // Failures usually print their decisive lines last, so keep the tail.
+            let tail: String = text
+                .chars()
+                .rev()
+                .take(limit)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
+            format!("…{tail}")
+        };
+        Self {
+            command: bounded(self.command, 2_000),
+            output: bounded(self.output, 6_000),
+            expected: bounded(self.expected, 2_000),
+            breaks: bounded(self.breaks, 2_000),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
@@ -238,6 +303,11 @@ pub struct RecordValidationInput {
         description = "Optional final batch of requirement answers: requirementId from the task contract, met/partial/unverified, concise justification and evidence references. Agent assessments do not accept requirements for the user."
     )]
     pub requirements: Vec<super::outcomes::RequirementAssessment>,
+    #[serde(default)]
+    #[schemars(
+        description = "Only in a Challenge review: the run that proves this finding. Use status failed and the finding title as step."
+    )]
+    pub finding: Option<ChallengeFinding>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]

@@ -181,6 +181,8 @@ export interface TaskRun {
   reviewCaptures?: import('./review-captures.ts').ReviewCaptures | null;
   /** Review screenshots are still being captured after the result was recorded. */
   reviewCapturing?: boolean;
+  /** The result this attempt challenges, when it is a Challenge reviewer. */
+  challengeOf?: { runId: string; tree: string; base: string } | null;
 }
 /** @public Named in the return types of usage-entries.ts and usage-insights.ts exports. */
 export interface DesktopActionRecord {
@@ -255,6 +257,13 @@ export interface ValidationStep {
     summary: string;
     evidence: string[];
   }[];
+  /** A Challenge reviewer's proof: what it ran and what that printed. */
+  finding?: {
+    command: string;
+    output: string;
+    expected: string;
+    breaks: string;
+  } | null;
 }
 export interface ScreenshotArtifact {
   id: string;

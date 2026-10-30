@@ -269,6 +269,7 @@ fn step(name: &str, status: &str, notes: &str) -> ValidationStep {
         evidence: vec![],
         timestamp: "now".into(),
         requirements: vec![],
+        finding: None,
     }
 }
 

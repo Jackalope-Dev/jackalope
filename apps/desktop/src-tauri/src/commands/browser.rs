@@ -805,6 +805,7 @@ pub(super) fn accessibility_checkpoint(value: &Value) -> Option<super::harness::
         evidence: vec![value["content"].as_str().unwrap_or_default().to_owned()],
         timestamp: chrono::Utc::now().to_rfc3339(),
         requirements: vec![],
+        finding: None,
     })
 }
 

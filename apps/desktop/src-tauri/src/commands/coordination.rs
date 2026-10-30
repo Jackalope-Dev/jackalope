@@ -582,15 +582,7 @@ pub(super) async fn bridge_validation_step(
     let run = service.authorized_run(&headers)?;
     super::outcomes::validate_assessments(&input.requirements, Some(&run.contract))
         .map_err(|_| StatusCode::BAD_REQUEST)?;
-    let step = super::harness::ValidationStep {
-        id: Uuid::new_v4().to_string(),
-        step: input.step,
-        status: input.status,
-        notes: input.notes,
-        evidence: input.evidence,
-        timestamp: Utc::now().to_rfc3339(),
-        requirements: input.requirements,
-    };
+    let step = super::harness::ValidationStep::reported(input);
     service.runtime.update(&run.id, |r| {
         r.activity.push(format!(
             "[Checkpoint: {}] {}",

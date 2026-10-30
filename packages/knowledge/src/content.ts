@@ -447,6 +447,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'No. File review markers track your place for the displayed patch and reset when it changes. Approve work records acceptance of the task outcome for its snapshot. Merging is a separate action that applies the prepared change to the target branch.',
           'Agent review prepares an editable request for another agent. It runs only after you submit it. Review its findings and check the actual change; an agent response does not replace your acceptance or required project checks.',
+          'Challenge this change asks one or two other agents to break the change in their own copy of the files. Only failures a reviewer reproduced with a command count, and Checks shows each command, what it printed and what was expected. Run again repeats a command in a fresh copy, and Send to the author adds the findings you select to the follow-up for you to send.',
         ],
       },
       {

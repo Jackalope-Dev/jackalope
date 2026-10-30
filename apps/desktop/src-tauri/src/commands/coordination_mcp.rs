@@ -1215,15 +1215,7 @@ impl CoordinationTools {
             .map_err(bridge_error)?;
         super::outcomes::validate_assessments(&input.requirements, Some(&run.contract))
             .map_err(|e| ErrorData::invalid_params(e, None))?;
-        let step = super::harness::ValidationStep {
-            id: uuid::Uuid::new_v4().to_string(),
-            step: input.step,
-            status: input.status,
-            notes: input.notes,
-            evidence: input.evidence,
-            timestamp: chrono::Utc::now().to_rfc3339(),
-            requirements: input.requirements,
-        };
+        let step = super::harness::ValidationStep::reported(input);
         self.service.runtime.update(&run.id, |r| {
             r.activity.push(format!(
                 "[Checkpoint: {}] {}",

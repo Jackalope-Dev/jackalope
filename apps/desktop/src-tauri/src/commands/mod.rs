@@ -1,6 +1,7 @@
 pub mod attachments;
 pub mod bot_hub;
 pub mod capacity;
+pub mod challenge_review;
 pub mod change_stats;
 pub mod cli_host;
 pub mod cli_install;

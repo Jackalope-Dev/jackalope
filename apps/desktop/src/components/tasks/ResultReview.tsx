@@ -11,6 +11,7 @@ import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
 import { ApproveWork } from './ApproveWork';
+import { ChallengeFindings } from './ChallengeReview';
 import { ChangedFiles } from './ChangedFiles';
 import { DecisionAdvice } from './DecisionAdvice';
 import { ProjectVerification } from './ProjectVerification';
@@ -143,7 +144,12 @@ export function ResultReview({
                 <div className="task-review-actions">
                   <div ref={setFeedbackSlot} className="review-feedback-slot" />
                   {review ? (
-                    <ReviewActions run={run} review={review} onRefresh={() => void load()} />
+                    <ReviewActions
+                      run={run}
+                      review={review}
+                      onRefresh={() => void load()}
+                      onChallengeStarted={() => changeSection('checks')}
+                    />
                   ) : (
                     <Button
                       variant="ghost"
@@ -241,6 +247,7 @@ export function ResultReview({
                   onCorrect={onCorrect}
                 />
               )}
+              <ChallengeFindings run={run} onCorrect={onCorrect} />
               {outcomes}
               {evidence}
             </section>
