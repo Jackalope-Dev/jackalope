@@ -255,7 +255,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'What is a bot?',
         paragraphs: [
           'A bot is a saved agent profile: a name, a role, standing instructions, an agent and model, a project and the connected apps it may use. Each bot keeps the character and color you choose, everywhere it appears.',
-          'Templates cover reviewing, fixing, testing, documentation, security, release notes and onboarding. A template fills in the editor, including a suggested wake-up that starts turned off; it never grants access, enables connections or starts work on its own.',
+          'Templates cover reviewing, fixing, triaging reports, testing, documentation, security, release notes and onboarding. Triage classifies each report as a bug, not a bug, a duplicate or needing more information, reproduces a bug with a failing test or capture before drafting any fix, and asks you before it replies, closes or publishes anything. A template fills in the editor, including a suggested wake-up that starts turned off; it never grants access, enables connections or starts work on its own.',
         ],
       },
       {
