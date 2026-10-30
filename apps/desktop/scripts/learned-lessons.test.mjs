@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  canRetireEnforced,
   learnedStatus,
   learningMetricRows,
   learningSettings,
   learningSummary,
   ledgerActionLabel,
   lessonAttention,
+  lessonCheckDraftKey,
+  lessonCheckOffer,
 } from '../src/lib/learning.ts';
 
 const lifecycle = (overrides = {}) => ({
@@ -74,8 +77,10 @@ test('curator folds and metrics read in plain words', () => {
     contradicted: 13,
     stale: 14,
     byAgent: 11,
+    enforced: 15,
   });
-  assert.equal(rows.length, 14);
+  assert.equal(rows.length, 15);
+  assert.ok(rows.some(([label, value]) => label === 'Made into checks' && value === 15));
   assert.ok(rows.some(([label, value]) => label === 'Missed by agents' && value === 12));
   assert.deepEqual(rows[0], ['New', 1]);
   assert.ok(rows.some(([label, value]) => label === 'Folded as duplicates' && value === 9));
@@ -109,4 +114,54 @@ test('lessons agents miss or that name something gone ask for a look', () => {
   );
   assert.equal(ledgerActionLabel('missed'), 'Missed by an agent');
   assert.equal(ledgerActionLabel('stale'), 'Out of date');
+});
+
+test('lessons agents keep missing suggest a check, and enforced ones stop offering it', () => {
+  const lesson = (overrides = {}) => ({
+    kind: 'memory',
+    enabled: true,
+    automatic: { managed: true, lifecycle: lifecycle({ status: 'active' }) },
+    ...overrides,
+  });
+  const enforced = { by: 'pnpm lint:routes', runId: 'r1', at: '2026-10-30T00:00:00Z' };
+  assert.equal(lessonCheckOffer(lesson()), 'available');
+  assert.equal(lessonCheckOffer(lesson({ automatic: null })), 'available');
+  assert.equal(lessonCheckOffer(lesson({ kind: 'workflow' })), null);
+  assert.equal(
+    lessonCheckOffer(
+      lesson({
+        automatic: { managed: true, lifecycle: lifecycle({ status: 'active', missedOften: true }) },
+      }),
+    ),
+    'suggested',
+  );
+  assert.equal(lessonCheckOffer(lesson({ enforced })), null);
+  const gone = { ...enforced, missing: 'scripts/check-routes.mjs' };
+  assert.equal(lessonCheckOffer(lesson({ enforced: gone })), 'suggested');
+  assert.match(lessonAttention({ enforced: gone }), /scripts\/check-routes\.mjs, which no longer/);
+
+  // A written or edited lesson stays supplied until the person retires it.
+  assert.equal(canRetireEnforced(lesson({ enforced, automatic: null })), true);
+  assert.equal(canRetireEnforced(lesson({ enforced, enabled: false, automatic: null })), false);
+  assert.equal(
+    canRetireEnforced(
+      lesson({
+        enforced,
+        automatic: {
+          managed: true,
+          lifecycle: lifecycle({ status: 'archived', archivedReason: 'enforced' }),
+        },
+      }),
+    ),
+    false,
+  );
+  assert.equal(canRetireEnforced(lesson({ enforced: gone, automatic: null })), false);
+  assert.match(
+    learningSummary(lifecycle({ status: 'archived', archivedReason: 'enforced' })),
+    /the repository now enforces it/,
+  );
+  assert.equal(ledgerActionLabel('enforced'), 'Made a check');
+  assert.equal(ledgerActionLabel('unenforced'), 'No longer enforced');
+  // Drafts open in the composer through the helper-draft event.
+  assert.match(lessonCheckDraftKey('abc'), /^helper-/);
 });

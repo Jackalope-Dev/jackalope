@@ -24,6 +24,17 @@ export interface Lifecycle {
   missedOften?: boolean;
 }
 
+/** The repository check that enforces a lesson; see `Enforcement` in Rust. */
+export interface Enforcement {
+  /** The command or file the accepted task reported. */
+  by: string;
+  runId: string;
+  taskId?: string;
+  at: string;
+  /** What the check names that the project no longer has. */
+  missing?: string | null;
+}
+
 export interface LedgerRecord {
   id: string;
   entryId: string;
@@ -75,6 +86,7 @@ const ARCHIVE_REASONS: Record<string, string> = {
   merged: 'folded into a similar lesson; restore to keep it separate',
   ignored: 'agents kept missing it while it was new',
   stale: 'it names something the project no longer has',
+  enforced: 'the repository now enforces it',
 };
 
 /** One line describing a learned lesson's status and use. */
@@ -96,6 +108,7 @@ export function learningSummary(lifecycle: Lifecycle): string {
  */
 export function lessonAttention(entry: {
   stale?: string | null;
+  enforced?: Enforcement | null;
   automatic?: { managed: boolean; lifecycle?: Lifecycle | null } | null;
 }): string | null {
   const lifecycle = entry.automatic?.lifecycle;
@@ -104,6 +117,9 @@ export function lessonAttention(entry: {
     return archived
       ? `References ${entry.stale}, which no longer exists.`
       : `References ${entry.stale}, which no longer exists. Edit or remove this lesson.`;
+  }
+  if (entry.enforced?.missing) {
+    return `The check that enforced this names ${entry.enforced.missing}, which no longer exists. Make it a check again or turn the lesson back on.`;
   }
   if (lifecycle?.missedOften && learnedStatus(lifecycle) !== 'archived') {
     return 'Agents keep missing this. It is supplied first among equally matching lessons.';
@@ -129,6 +145,9 @@ const ACTION_LABELS: Record<string, string> = {
   missed: 'Missed by an agent',
   contradicted: 'Contradicted',
   stale: 'Out of date',
+  enforced: 'Made a check',
+  unenforced: 'No longer enforced',
+  unreported: 'Check not reported',
 };
 
 export function ledgerActionLabel(action: string): string {
@@ -153,6 +172,8 @@ export interface LearningMetrics {
   /** Lessons found to name something the project no longer has. */
   stale: number;
   byAgent: number;
+  /** Lessons a repository check now enforces, from accepted tasks. */
+  enforced?: number;
   since?: string | null;
 }
 
@@ -173,5 +194,42 @@ export function learningMetricRows(metrics: LearningMetrics): [string, number][]
     ['Missed by agents', metrics.missed],
     ['Contradicted after use', metrics.contradicted],
     ['Found out of date', metrics.stale],
+    ['Made into checks', metrics.enforced ?? 0],
   ];
+}
+
+/** The draft key "Make it a check" uses; `helper-` drafts open in the composer. */
+export function lessonCheckDraftKey(entryId: string): string {
+  return `helper-lesson-check-${entryId}`;
+}
+
+interface CheckableLesson {
+  kind: string;
+  enabled: boolean;
+  enforced?: Enforcement | null;
+  automatic?: { lifecycle?: Lifecycle | null } | null;
+}
+
+/**
+ * How prominently a lesson offers "Make it a check": first for lessons agents
+ * keep missing or whose check disappeared, on demand for any other lesson,
+ * and not at all once a check enforces it.
+ */
+export function lessonCheckOffer(entry: CheckableLesson): 'suggested' | 'available' | null {
+  if (entry.kind !== 'memory') return null;
+  if (entry.enforced && !entry.enforced.missing) return null;
+  const lifecycle = entry.automatic?.lifecycle;
+  if (entry.enforced?.missing) return 'suggested';
+  if (lifecycle?.missedOften && learnedStatus(lifecycle) !== 'archived') return 'suggested';
+  return 'available';
+}
+
+/** An enforced lesson still supplied to tasks, which the person may retire. */
+export function canRetireEnforced(entry: CheckableLesson): boolean {
+  return (
+    !!entry.enforced &&
+    !entry.enforced.missing &&
+    entry.enabled &&
+    learnedStatus(entry.automatic?.lifecycle) !== 'archived'
+  );
 }
