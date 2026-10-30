@@ -227,6 +227,36 @@ attempts keep workspace ownership while verification uses separate capacity. See
 [execution quality and evaluation](EXECUTION-EVALUATION.md) for opt-in staging,
 reservations, structured reports and measurements. Legacy plans retain merge dependencies.
 
+### Comparing agents
+
+Choosing up to four agents beside Send starts the prompt once per agent, each as an
+ordinary isolated task. The comparison is saved in the renderer (`compareStore`); its
+tasks link to each other and **Compare results** shows them side by side. **Keep this
+one** archives the other finished attempts. Archiving hides task records only; their
+branches and worktrees stay until removed explicitly from Project worktrees.
+
+Once two attempts have finished, **Judge results** starts one read-only task. It
+defaults to an available agent whose vendor did not write any attempt, and the picker
+can change it. The judge request labels attempts A, B, C… in launch order, gives each
+worktree, branch, base commit, changed files and a bounded patch excerpt, and asks for
+3–6 criteria derived from the request alone, a 1–5 score per attempt and criterion,
+a recommended base, and one or two parts of other attempts worth porting. The answer
+ends with a `jackalope-verdict` JSON block that the dialog shows as a criteria ×
+attempt table. Unknown labels, ports from the base and out-of-range scores are dropped
+or clamped. When the attempts diverge enough to suggest an ambiguous request, the
+judge returns a clearer prompt instead of a base. An answer with no readable verdict
+links to the judge task and offers **Judge again**.
+
+**Keep and combine** keeps the chosen attempt as above, then writes the selected ports
+into the kept task's follow-up draft. Each port names its source attempt, files,
+worktree, branch and the `git diff` command to read it. The draft runs only when sent.
+Project worktrees treat each source worktree as blocked, offering neither cleanup nor
+archive-and-remove, while that draft has text and no follow-up has started, and while
+the follow-up that started afterwards is running or interrupted. A finished or cleared
+follow-up releases them. This retention is enforced in the app's worktree controls,
+not by the native cleanup command. Comparisons saved before the judge existed load
+without `judge` or `combine` fields and work as before.
+
 ## Coordination contract
 
 The native `Coordinator` owns a durable queue. It validates a complete imported plan,
