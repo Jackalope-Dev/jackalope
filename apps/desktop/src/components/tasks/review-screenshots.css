@@ -114,3 +114,17 @@
   gap: 8px;
   margin: 0;
 }
+.review-screenshots-features {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.review-screenshots-features li {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

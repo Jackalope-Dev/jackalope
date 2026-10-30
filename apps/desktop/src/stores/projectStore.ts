@@ -1,6 +1,7 @@
 import type { ThemePalette } from '@jackalope/brand/theme';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { type FeatureMapEntry, featureMapForRegistry } from '../lib/feature-map.ts';
 import { reviewPagesForRegistry } from '../lib/review-captures.ts';
 import { nativeTask } from '../lib/task-runtime.ts';
 import { createWorktree, isTauriEnvironment, type WorktreeEntry } from '../lib/tauri-bridge.ts';
@@ -68,6 +69,8 @@ export interface ProjectPreferences {
   reviewPages?: string[];
   /** Screenshot sizes. Undefined means desktop only. */
   reviewViewports?: ('desktop' | 'narrow')[];
+  /** User-facing features whose pages review screenshots prefer when their sources change. */
+  featureMap?: FeatureMapEntry[];
 }
 
 /**
@@ -333,6 +336,7 @@ interface ProjectRecord {
   reviewCaptures?: boolean;
   reviewPages?: string[];
   reviewViewports?: string[];
+  featureMap?: FeatureMapEntry[];
 }
 
 /**
@@ -370,6 +374,7 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
     reviewCaptures: preferences?.reviewCaptures,
     reviewPages: reviewPagesForRegistry(preferences?.reviewPages),
     reviewViewports: preferences?.reviewViewports?.length ? preferences.reviewViewports : undefined,
+    featureMap: featureMapForRegistry(preferences?.featureMap),
   }));
 }
 

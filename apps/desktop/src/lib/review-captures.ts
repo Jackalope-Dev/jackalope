@@ -8,12 +8,21 @@ export interface ReviewCapture {
   viewport: 'desktop' | 'narrow';
   width: number;
   height: number;
-  /** Why the page was chosen: `configured`, `plan` or `visited`. */
+  /** Why the page was chosen: `configured`, `plan`, `feature` or `visited`. */
   reasons: string[];
+  /** Feature-map entries for this page; absent in captures saved before the map existed. */
+  features?: ReviewFeature[];
   /** Plan criteria tagged `browser` that name this page. */
   criteria: string[];
   before?: ScreenshotArtifact | null;
   after?: ScreenshotArtifact | null;
+}
+
+/** What a feature-map entry says to check on a captured page. */
+interface ReviewFeature {
+  name: string;
+  working?: string;
+  steps?: string;
 }
 
 export interface ReviewCaptures {
@@ -35,6 +44,12 @@ export function reviewCapturesOn(
 export function reviewPagesForRegistry(pages: string[] | undefined): string[] | undefined {
   const kept = (pages ?? []).map((page) => page.trim()).filter(Boolean);
   return kept.length ? kept : undefined;
+}
+
+/** The page's name in a picker: its feature names when the map labels it, else its path. */
+export function capturePageName(page: Pick<ReviewCapture, 'path' | 'features'>): string {
+  const names = (page.features ?? []).map((feature) => feature.name).filter(Boolean);
+  return names.length ? `${names.join(', ')} (${page.path})` : page.path;
 }
 
 /** Pages with at least one image, in capture order. */

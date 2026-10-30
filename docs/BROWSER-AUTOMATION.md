@@ -157,8 +157,35 @@ light color scheme and reduced motion. Each image is the first screen as a PNG, 
 in the attempt's `reviewCaptures`.
 
 Pages are the configured review pages (default `/`), then paths named in plan criteria
-tagged `browser` (`AC-n: [browser] …` requirement titles), then local pages the agent
-opened with `browser_navigate` or captured, newest first; at most six distinct pages.
+tagged `browser` (`AC-n: [browser] …` requirement titles), then feature-map pages whose
+sources the attempt changed, then local pages the agent opened with `browser_navigate`
+or captured, newest first; at most six distinct pages.
+
+### Feature map
+
+Project settings keep an optional feature map beside the capture settings
+(`featureMap` in project preferences, mirrored to the native project ledger). Each
+entry has a name, a page, what working looks like, optional steps to reach it and
+project-relative source globs (`*`, `**`, `?`, `{a,b}`; a plain path also covers the
+folder beneath it). Screenshots only open the page, so a state worth checking has to
+be reachable by URL, such as `/settings?tab=billing`; the steps are reviewer guidance.
+Changed files are the attempt's diff from its starting commit plus untracked,
+non-ignored files. Every capture of a page carries the entries for that page
+(`features` on the capture), and Review shows their name, working line and steps.
+
+**Suggest from code** reads route files and router setup locally, with no model call:
+Next.js app and pages routers, SvelteKit, Remix and React Router framework routes,
+TanStack Router file routes, Astro and Nuxt pages, plus quoted `path` values in
+router files and `href`/`to` values in navigation files for React Router, Vue Router,
+Angular, wouter, Solid and Preact routers. Each package is read against its own
+`package.json`; dynamic, private and API routes are skipped, and projects without a
+recognized router get no suggestions. The person picks which suggestions to add.
+Settings flag entries whose route file or source globs no longer match any tracked or
+untracked file; **Drop missing paths** and **Remove** change the map only when chosen.
+Entries without sources still label their page but are never preferred. A saved
+entry this build cannot read is dropped when the ledger loads instead of hiding the
+project list. The map is not added to agent context: matches depend on changed files,
+which are known only after the attempt finishes.
 The "before" side runs the same command in the project checkout only when the task used
 a separate worktree, the checkout is at the attempt's starting commit with no
 uncommitted tracked changes and no other work runs there. Otherwise only the result is
