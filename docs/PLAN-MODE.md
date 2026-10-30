@@ -182,8 +182,10 @@ and record them with `record_validation_step` using the criterion ID as the step
 A plan always ends with an independent review, even for one assignment. The reviewer is
 the planning agent when it differs from the implementing agent, otherwise the same agent.
 It checks the combined change against each criterion, classifies gaps as Critical, Major
-or Minor, fixes Critical and Major gaps, and records a `Plan review` validation step:
-failed while Critical or Major gaps remain. A failed plan review is repaired like a failed check within the task's existing repair
+or Minor, fixes Critical and Major gaps, and records a `Plan review` validation step after
+its last edit: failed while Critical or Major gaps remain, with a `Fixed AC-n:` line for
+each gap it fixed itself so result review shows which code only its author has seen. A
+failed plan review is repaired like a failed check within the task's existing repair
 limit. With a check, the combined result is not ready while Critical or Major gaps are
 open; without one, it needs a passing review (below). Human acceptance of requirements
 stays in result review.

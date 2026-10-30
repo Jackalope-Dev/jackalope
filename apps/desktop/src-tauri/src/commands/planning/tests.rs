@@ -483,6 +483,15 @@ fn execution_and_review_briefs_are_self_contained() {
     assert!(brief.contains("Do not edit the plan"));
     let review = interview::review_brief(&doc);
     assert!(review.contains("Plan review") && review.contains("pnpm test csv"));
+    // The reviewer names what it fixed itself; those lines are not open gaps.
+    assert!(review.contains("Fixed AC-n") && review.contains("after your last edit"));
+    let fixed = step(
+        "Plan review",
+        "passed",
+        "Fixed AC-1: escaped quotes\nMinor AC-2: label",
+    );
+    let (passed, gaps) = handoff::review(std::slice::from_ref(&fixed)).unwrap();
+    assert!(passed && gaps.len() == 1 && gaps[0].severity == "minor");
     let prompt = interview::interview_prompt("Export CSV", 3, "- Earlier plan");
     assert!(prompt.contains("at most 3 questions") && prompt.contains("Earlier plan"));
     assert!(prompt.contains("read-only") || prompt.contains("Work read-only"));
