@@ -404,6 +404,8 @@ pub fn run(launch: Launch) {
             commands::cli_install::cli_install_system,
             commands::project_registry::project_registry_list,
             commands::project_registry::project_registry_save,
+            commands::previews::features::project_feature_suggestions,
+            commands::previews::features::project_feature_drift,
             task_pick_project,
             commands::attachments::prompt_attachment_save,
             commands::attachments::prompt_attachment_pick,

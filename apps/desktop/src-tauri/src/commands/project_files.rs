@@ -7,7 +7,7 @@ use tauri_plugin_opener::OpenerExt;
 
 const MAX_FILES: usize = 50_000;
 
-fn list(project: &Path) -> Result<Vec<String>, String> {
+pub(in crate::commands) fn list(project: &Path) -> Result<Vec<String>, String> {
     if !project.is_dir() {
         return Err("The project folder is no longer available".into());
     }
