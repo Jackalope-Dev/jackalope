@@ -65,6 +65,9 @@ pub struct TaskRun {
     pub quota_failure: Option<super::routing::QuotaFailure>,
     #[serde(default)]
     pub contract: crate::commands::outcomes::TaskContract,
+    /// The agent's own restatement of the task, reported once at the start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub understanding: Option<crate::commands::outcomes::GoalRestatement>,
     #[serde(default)]
     pub monitor_change: Option<crate::commands::monitors::MonitorChange>,
     #[serde(default)]
@@ -315,6 +318,7 @@ impl TaskRun {
             routing: self.routing.clone(),
             quota_failure: self.quota_failure.clone(),
             contract: self.contract.clone(),
+            understanding: self.understanding.clone(),
             monitor_change: self.monitor_change.clone(),
             context_receipt: context_receipt,
             id: self.id.clone(),

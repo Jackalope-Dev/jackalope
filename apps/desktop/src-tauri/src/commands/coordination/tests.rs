@@ -98,6 +98,7 @@ fn queue_dispatched_tasks_also_learn_about_the_harness_bridge() {
         "/v1/browser/navigate",
         "/v1/user-prompt",
         "/v1/validation-step",
+        "/v1/goal-restatement",
     ] {
         assert!(help.contains(endpoint));
     }

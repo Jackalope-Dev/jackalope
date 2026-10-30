@@ -110,7 +110,8 @@ fn http_instructions() -> String {
 - Ask user for data/choices: POST $env:JACKALOPE_BRIDGE_URL/v1/user-prompt (JSON {\"question\":\"...\",\"input_type\":\"text\"|\"choice\",\"options\":[...]}; optional header, recommended (one of options), multi_select, allow_other and rationale).
 - If a question is pending, keep the task alive and GET /v1/user-prompt/poll?id=<question-id> to read the saved answer (native MCP: user_response with the question ID). Poll at a modest interval while doing independent work. A default choice or elapsed time is not an answer. Use this bridge for Jackalope-visible questions; an agent's own terminal prompt cannot be answered from Jackalope. If the bridge is unavailable, explain the question and stop for a continuation.
 - Implementing an approved plan: never edit the plan. For a material departure (other files, a changed contract, a criterion that cannot be met as written) POST $env:JACKALOPE_BRIDGE_URL/v1/plan-deviation (JSON {\"summary\":\"...\",\"amendment\":\"...\"}); dependent work pauses until the person decides.
-- Record validation steps: POST $env:JACKALOPE_BRIDGE_URL/v1/validation-step (JSON {\"step\":\"...\",\"status\":\"passed\"|\"failed\"|\"in_progress\",\"notes\":\"...\"}).\n".to_string()
+- Restate the goal once, in your first message: POST $env:JACKALOPE_BRIDGE_URL/v1/goal-restatement (JSON {\"goal\":\"...\",\"problem\":\"...\",\"smallestChange\":\"...\"}), then continue.
+- Record validation steps: POST $env:JACKALOPE_BRIDGE_URL/v1/validation-step (JSON {\"step\":\"...\",\"status\":\"passed\"|\"failed\"|\"in_progress\",\"notes\":\"...\"}; optional requirements with level and safety_fact).\n".to_string()
 }
 
 fn instructions(item: &QueueItem) -> String {
@@ -580,9 +581,7 @@ pub(super) async fn bridge_validation_step(
     Json(input): Json<super::harness::RecordValidationInput>,
 ) -> Result<Json<super::harness::ValidationStep>, StatusCode> {
     let run = service.authorized_run(&headers)?;
-    super::outcomes::validate_assessments(&input.requirements, Some(&run.contract))
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
-    let step = super::harness::ValidationStep::reported(input);
+    let step = super::evidence::checked_step(&run, input).map_err(|_| StatusCode::BAD_REQUEST)?;
     service.runtime.update(&run.id, |r| {
         r.activity.push(format!(
             "[Checkpoint: {}] {}",
@@ -592,6 +591,24 @@ pub(super) async fn bridge_validation_step(
         r.validation_steps.push(step.clone());
     });
     Ok(Json(step))
+}
+
+pub(super) async fn bridge_goal_restatement(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(input): Json<super::outcomes::GoalRestatement>,
+) -> Result<Json<super::outcomes::GoalRestatement>, (StatusCode, String)> {
+    let run = service
+        .authorized_run(&headers)
+        .map_err(|status| (status, "Not authorized".to_string()))?;
+    let understood = input
+        .validated()
+        .map_err(|error| (StatusCode::BAD_REQUEST, error))?;
+    service
+        .runtime
+        .update_checked(&run.id, |r| r.understanding = Some(understood.clone()))
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error))?;
+    Ok(Json(understood))
 }
 
 pub(super) async fn bridge_computer_verify(

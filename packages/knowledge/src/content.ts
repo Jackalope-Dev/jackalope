@@ -448,6 +448,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'No. File review markers track your place for the displayed patch and reset when it changes. Approve work records acceptance of the task outcome for its snapshot. Merging is a separate action that applies the prepared change to the target branch.',
           'Agent review prepares an editable request for another agent. It runs only after you submit it. Review its findings and check the actual change; an agent response does not replace your acceptance or required project checks.',
           'Challenge this change asks one or two other agents to break the change in their own copy of the files. Only failures a reviewer reproduced with a command count, and Checks shows each command, what it printed and what was expected. Run again repeats a command in a fresh copy, and Send to the author adds the findings you select to the follow-up for you to send.',
+          'Agent assessments of expected outcomes show how strong their evidence is: Stated, Cited code, Reasoned through, Ran it or Shown in the app. Jackalope lowers a level when a cited file or line does not exist, a run has no command or output, or no recorded screenshot or preview page matches. Requirements show the weakest level, and Safe because names the one fact the agent says the change depends on. Older reports show Unrated. A strong level is still the agent’s evidence, not your acceptance.',
         ],
       },
       {
@@ -1409,7 +1410,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         steps: [
           'Choose the project and confirm the target branch or workspace. Choose Work in a copy when other work is in progress.',
           'Pick an effort level and review Customize task for agent, account, context, and tools. Include a reachable preview URL when you expect browser checks.',
-          'Start the task and respond if it asks for missing information. Read the result and actual checks, then merge into the target branch and remove the workspace.',
+          'Start the task and check Understood as, the agent’s own short restatement of the goal and the smallest change it plans. If it misread the request, stop or send a correction early. Respond if it asks for missing information. Read the result and actual checks, then merge into the target branch and remove the workspace.',
         ],
       },
       {

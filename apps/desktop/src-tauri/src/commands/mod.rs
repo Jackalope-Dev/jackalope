@@ -56,6 +56,7 @@ pub mod process_control;
 pub mod release;
 pub mod verification;
 
+pub mod evidence;
 pub mod knowledge;
 pub mod monitors;
 pub mod outcomes;

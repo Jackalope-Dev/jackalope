@@ -64,6 +64,7 @@ import { TaskProgress } from './TaskProgress';
 import { TaskQuestions } from './TaskQuestions';
 import { TaskRunDetails } from './TaskRunDetails';
 import { TaskSaveRecovery } from './TaskSaveRecovery';
+import { UnderstoodAs } from './UnderstoodAs';
 import { UserPromptCard } from './UserPromptCard';
 import { useManagedPreview } from './useManagedPreview';
 import { useTaskFollowUps } from './useTaskFollowUps';
@@ -576,6 +577,7 @@ export function TaskDetail({
       </div>
       <div className="task-status-stack">
         <TaskComparison run={run} />
+        <UnderstoodAs understanding={run.understanding} />
         {active && (
           <TaskProgress
             run={run}

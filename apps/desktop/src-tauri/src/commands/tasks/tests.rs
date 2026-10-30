@@ -22,6 +22,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         routing: None,
         quota_failure: None,
         contract: Default::default(),
+        understanding: None,
         monitor_change: None,
         context_receipt: Default::default(),
         id: "test-attempt-123".into(),

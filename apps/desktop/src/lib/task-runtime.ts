@@ -1,7 +1,7 @@
 /** The longest instruction a task, follow-up or schedule accepts. */
 export const PROMPT_MAX_CHARS = 24_000;
 
-import type { TaskContract } from './task-outcomes.ts';
+import type { EvidenceLevel, GoalRestatement, SafetyFact, TaskContract } from './task-outcomes.ts';
 import { isTauriEnvironment } from './tauri-bridge.ts';
 import { invokeNative } from './telemetry-client.ts';
 
@@ -103,6 +103,8 @@ export interface TaskRun {
     }[];
   } | null;
   contract?: TaskContract;
+  /** The agent's own restatement of the task; absent when it never reported one. */
+  understanding?: GoalRestatement | null;
   monitorChange?: { before: string; after: string; path: string; branch: string } | null;
   contextReceipt?: import('./knowledge').ContextReceipt;
   id: string;
@@ -256,6 +258,14 @@ export interface ValidationStep {
     status: 'met' | 'partial' | 'unverified';
     summary: string;
     evidence: string[];
+    /** Claimed strength; absent on reports saved before levels existed. */
+    level?: EvidenceLevel;
+    reasoning?: string;
+    command?: string;
+    output?: string;
+    /** What Jackalope's local check supports. */
+    checkedLevel?: EvidenceLevel;
+    checkNote?: string;
   }[];
   /** A Challenge reviewer's proof: what it ran and what that printed. */
   finding?: {
@@ -264,6 +274,7 @@ export interface ValidationStep {
     expected: string;
     breaks: string;
   } | null;
+  safetyFact?: SafetyFact;
 }
 export interface ScreenshotArtifact {
   id: string;

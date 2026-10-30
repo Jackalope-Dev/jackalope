@@ -683,6 +683,7 @@ pub fn criterion_steps(run: &TaskRun, captures: &ReviewCaptures) -> Vec<Validati
                 timestamp: chrono::Utc::now().to_rfc3339(),
                 requirements: vec![],
                 finding: None,
+                safety_fact: None,
             })
         })
         .collect()

@@ -102,22 +102,13 @@ pub struct ValidationStep {
     pub requirements: Vec<super::outcomes::RequirementAssessment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finding: Option<ChallengeFinding>,
-}
-
-impl ValidationStep {
-    /// A checkpoint an agent reported through the bridge or MCP tool.
-    pub(super) fn reported(input: RecordValidationInput) -> Self {
-        Self {
-            id: Uuid::new_v4().to_string(),
-            step: input.step,
-            status: input.status,
-            notes: input.notes,
-            evidence: input.evidence,
-            timestamp: Utc::now().to_rfc3339(),
-            requirements: input.requirements,
-            finding: input.finding.map(ChallengeFinding::bounded),
-        }
-    }
+    #[serde(
+        default,
+        rename = "safetyFact",
+        alias = "safety_fact",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub safety_fact: Option<super::evidence::SafetyFact>,
 }
 
 /// What a Challenge reviewer ran to prove a finding. Review counts a finding as proven
@@ -140,7 +131,7 @@ pub struct ChallengeFinding {
 }
 
 impl ChallengeFinding {
-    fn bounded(self) -> Self {
+    pub(super) fn bounded(self) -> Self {
         let bounded = |text: String, limit: usize| -> String {
             let text = text.replace(char::from(0), "");
             let text = text.trim();
@@ -300,7 +291,7 @@ pub struct RecordValidationInput {
     pub evidence: Vec<String>,
     #[serde(default)]
     #[schemars(
-        description = "Optional final batch of requirement answers: requirementId from the task contract, met/partial/unverified, concise justification and evidence references. Agent assessments do not accept requirements for the user."
+        description = "Optional final batch of requirement answers: requirementId from the task contract, met/partial/unverified, concise justification, evidence references and evidence level. Agent assessments do not accept requirements for the user."
     )]
     pub requirements: Vec<super::outcomes::RequirementAssessment>,
     #[serde(default)]
@@ -308,6 +299,11 @@ pub struct RecordValidationInput {
         description = "Only in a Challenge review: the run that proves this finding. Use status failed and the finding title as step."
     )]
     pub finding: Option<ChallengeFinding>,
+    #[serde(default, alias = "safetyFact")]
+    #[schemars(
+        description = "Optional: the one fact the change is safe because of, with its own evidence level"
+    )]
+    pub safety_fact: Option<super::evidence::SafetyFact>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]

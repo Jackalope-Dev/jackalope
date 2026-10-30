@@ -1195,7 +1195,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Record validation evidence. After implementation and final checks, include a requirements array to answer the task expectations in one call, with a status, short justification and evidence per requirement. Surfaces in review; does not grant human acceptance.",
+        description = "Record validation evidence. After implementation and final checks, include a requirements array to answer the task expectations in one call, with a status, short justification, evidence and evidence level per requirement, plus an optional safety_fact. Jackalope checks cited files, commands and captures locally and lowers unsupported levels. Surfaces in review; does not grant human acceptance.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
@@ -1213,9 +1213,8 @@ impl CoordinationTools {
             .service
             .authorized_run(&headers)
             .map_err(bridge_error)?;
-        super::outcomes::validate_assessments(&input.requirements, Some(&run.contract))
+        let step = super::evidence::checked_step(&run, input)
             .map_err(|e| ErrorData::invalid_params(e, None))?;
-        let step = super::harness::ValidationStep::reported(input);
         self.service.runtime.update(&run.id, |r| {
             r.activity.push(format!(
                 "[Checkpoint: {}] {}",
@@ -1227,6 +1226,34 @@ impl CoordinationTools {
         let value = serde_json::to_value(step)
             .map_err(|_| ErrorData::internal_error("Could not encode validation step", None))?;
         Ok(CallToolResult::structured(value))
+    }
+
+    #[tool(
+        description = "Record, once and in your first message, your own short restatement of the goal, the problem and the smallest change you expect to make. Shown to the person as \"Understood as\"; continue without waiting for confirmation.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn restate_goal(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::outcomes::GoalRestatement>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let headers = request_headers(&context)?;
+        let Json(understood) = super::coordination::bridge_goal_restatement(
+            WebState(self.service.clone()),
+            headers,
+            Json(input),
+        )
+        .await
+        .map_err(|(_, error)| ErrorData::invalid_params(error, None))?;
+        Ok(CallToolResult::structured(
+            serde_json::to_value(understood)
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?,
+        ))
     }
 
     #[tool(
@@ -1563,6 +1590,7 @@ mod tests {
         assert!(names.contains(&"ask_user"));
         assert!(names.contains(&"user_response"));
         assert!(names.contains(&"record_validation_step"));
+        assert!(names.contains(&"restate_goal"));
         assert!(names.contains(&"computer_verify"));
         let verify = tools
             .iter()

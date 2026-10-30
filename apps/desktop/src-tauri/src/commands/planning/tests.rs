@@ -270,6 +270,7 @@ fn step(name: &str, status: &str, notes: &str) -> ValidationStep {
         timestamp: "now".into(),
         requirements: vec![],
         finding: None,
+        safety_fact: None,
     }
 }
 

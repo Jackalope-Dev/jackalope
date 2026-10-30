@@ -83,7 +83,8 @@ message. Agents must read pending answers; elapsed time is never an answer.
 | Acknowledge reading | acknowledge_message | POST /v1/messages/ack with id |
 | Ask a question | ask_user | POST /v1/user-prompt |
 | Retrieve an answer | user_response | GET /v1/user-prompt/poll?id=question |
-| Record checks | record_validation_step | POST /v1/validation-step |
+| Restate the goal at the start | restate_goal | POST /v1/goal-restatement with goal, problem, smallestChange |
+| Record checks and requirement assessments | record_validation_step | POST /v1/validation-step |
 | Report a departure from an approved plan | plan_deviation | POST /v1/plan-deviation with summary, optional amendment |
 | Native app and logged-in browser control (Windows/macOS; one-window X11/GNOME; platform readiness required) | desktop_control | POST /v1/desktop/control |
 
@@ -98,6 +99,9 @@ return unavailable.
 over-long text are dropped. Questions from a [plan mode](PLAN-MODE.md) planning attempt
 are limited by the plan's question cap and end when the person chooses to stop; a closed
 question returns `status: closed` with a message instead of reaching the person.
+`record_validation_step` requirement assessments and the optional `safety_fact` carry an
+evidence level that Jackalope checks locally; `restate_goal` records the agent's short
+restatement once at the start. See [task outcomes](TASK-OUTCOMES.md#evidence-levels).
 `plan_deviation` is accepted only from attempts working on an approved plan, records the
 departure for the person and pauses that plan's dispatch; agents never edit the plan.
 

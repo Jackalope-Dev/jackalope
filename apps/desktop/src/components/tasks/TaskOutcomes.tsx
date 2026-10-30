@@ -1,10 +1,24 @@
-import { Checkbox, FormField, Textarea } from '@jackalope/ui';
+import {
+  Badge,
+  type BadgeProps,
+  Checkbox,
+  Disclosure,
+  DisclosureBody,
+  DisclosureSummary,
+  FormField,
+  Textarea,
+} from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import {
   correctionPrompt,
+  type EvidenceLevel,
+  evidenceLabel,
+  evidenceStrength,
+  latestSafetyFact,
   type Requirement,
   requirementAssessment,
   requirementState,
+  weakestEvidence,
 } from '../../lib/task-outcomes';
 import { nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -107,6 +121,7 @@ export function TaskOutcomes({
         Review each requirement against the result. Agent reports and screenshots need your
         judgment; acceptance applies only to the reviewed files.
       </p>
+      <EvidenceSummary run={run} requirements={requirements} />
       {requirements.map((item, index) => (
         <article
           key={item.id}
@@ -294,24 +309,112 @@ function RequirementAnswer({ run, requirementId }: { run: OutcomeRun; requiremen
     return <p className="task-muted mt-2">No agent assessment recorded for this requirement.</p>;
   return (
     <div className="mt-3 space-y-2">
-      <p className="text-sm font-medium">
-        Agent assessment ·{' '}
-        {{ met: 'Met', partial: 'Partially met', unverified: 'Not verified' }[report.answer.status]}
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-sm font-medium">
+          Agent assessment ·{' '}
+          {
+            { met: 'Met', partial: 'Partially met', unverified: 'Not verified' }[
+              report.answer.status
+            ]
+          }
+        </p>
+        <EvidenceBadge answer={report.answer} />
+      </div>
       <p className="whitespace-pre-wrap break-words">{report.answer.summary}</p>
-      {!!report.answer.evidence.length && (
+      <EvidenceDetails claim={report.answer} />
+      <p className="task-muted">
+        Reported {new Date(report.timestamp).toLocaleString()}. Agent-supplied evidence; verify
+        against the current diff before accepting.
+      </p>
+    </div>
+  );
+}
+
+const levelTone: Record<EvidenceLevel, BadgeProps['variant']> = {
+  stated: 'outline',
+  cited: 'default',
+  reasoned: 'default',
+  ran: 'accent',
+  reproduced: 'success',
+};
+
+type Claim = NonNullable<ReturnType<typeof requirementAssessment>>['answer'];
+
+/** The checked level, with what the agent claimed when Jackalope lowered it. */
+function EvidenceBadge({ answer }: { answer: Parameters<typeof evidenceStrength>[0] }) {
+  const strength = evidenceStrength(answer);
+  return (
+    <>
+      <Badge variant={strength.checked ? levelTone[strength.checked] : 'outline'}>
+        Evidence: {strength.label}
+      </Badge>
+      {strength.lowered && <span className="task-muted text-sm">{strength.lowered}</span>}
+    </>
+  );
+}
+
+function EvidenceDetails({
+  claim,
+}: {
+  claim: Pick<Claim, 'evidence' | 'reasoning' | 'command' | 'output'>;
+}) {
+  return (
+    <>
+      {!!claim.evidence.length && (
         <ul className="list-disc pl-5 text-sm">
-          {[...new Set(report.answer.evidence)].map((item) => (
+          {[...new Set(claim.evidence)].map((item) => (
             <li key={item} className="break-words">
               {item}
             </li>
           ))}
         </ul>
       )}
-      <p className="task-muted">
-        Reported {new Date(report.timestamp).toLocaleString()}. Agent-supplied evidence; verify
-        against the current diff before accepting.
-      </p>
+      {(claim.reasoning || claim.command) && (
+        <Disclosure>
+          <DisclosureSummary>
+            {claim.command ? 'Command and output' : 'Reasoning'}
+          </DisclosureSummary>
+          <DisclosureBody className="space-y-2">
+            {claim.reasoning && (
+              <p className="whitespace-pre-wrap break-words">{claim.reasoning}</p>
+            )}
+            {claim.command && <code className="break-all">{claim.command}</code>}
+            {claim.output && (
+              <pre className="task-input whitespace-pre-wrap max-h-64 overflow-auto">
+                {claim.output}
+              </pre>
+            )}
+          </DisclosureBody>
+        </Disclosure>
+      )}
+    </>
+  );
+}
+
+/** Weakest checked level across requirements, plus the safety fact when one was given. */
+function EvidenceSummary({ run, requirements }: { run: OutcomeRun; requirements: Requirement[] }) {
+  const { weakest, unrated } = weakestEvidence(run.validationSteps, requirements);
+  const fact = latestSafetyFact(run.validationSteps);
+  const assessed = requirements.some((item) => requirementAssessment(run.validationSteps, item.id));
+  if (!assessed && !fact) return null;
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-medium">Weakest agent evidence</span>
+        <Badge variant={weakest ? levelTone[weakest] : 'outline'}>
+          {weakest ? evidenceLabel[weakest] : 'Unrated'}
+        </Badge>
+        {!!weakest && !!unrated && <span className="task-muted">{unrated} unrated</span>}
+      </div>
+      {fact && (
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium break-words">Safe because: {fact.fact}</p>
+            <EvidenceBadge answer={fact} />
+          </div>
+          <EvidenceDetails claim={fact} />
+        </div>
+      )}
     </div>
   );
 }

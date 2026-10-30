@@ -350,6 +350,7 @@ mod tests {
                 output: "saved".into(),
                 ..Default::default()
             }),
+            safety_fact: None,
         });
         run.result =
             "Done.\n```jackalope-findings\n[{\"command\":\"pnpm test profile\"}]\n```".into();

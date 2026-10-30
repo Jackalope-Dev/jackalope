@@ -806,6 +806,7 @@ pub(super) fn accessibility_checkpoint(value: &Value) -> Option<super::harness::
         timestamp: chrono::Utc::now().to_rfc3339(),
         requirements: vec![],
         finding: None,
+        safety_fact: None,
     })
 }
 

@@ -66,8 +66,13 @@ tool-only measurements; these omit worker execution and cannot establish task sa
   builds and evidence capture in a final verification phase. Explicit test-first or
   repository instructions, and diagnostics necessary to choose an implementation, take
   precedence. Each applicable requirement gets a concise final agent assessment with a status,
-  justification and evidence references through one `record_validation_step` call.
+  justification, evidence references and an evidence level through one
+  `record_validation_step` call; Jackalope lowers levels whose evidence is missing locally.
   These claims appear beside the review controls and never accept requirements for the user.
+  See [evidence levels](TASK-OUTCOMES.md#evidence-levels).
+- Bridged tasks carry a one-line reporting contract: the first message restates the goal,
+  problem and smallest expected change through `restate_goal`, then work continues without
+  waiting. It is reporting, not working-style advice; review shows it as "Understood as".
 - Managed workers batch independent reads/searches where supported, reuse established
   context and keep progress concise. Repository-required checks remain mandatory;
   changes, failures and unresolved concerns justify additional verification.
