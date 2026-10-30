@@ -1,4 +1,5 @@
 mod mcp;
+mod sharpen;
 #[cfg(test)]
 mod tests;
 mod tools;
@@ -43,6 +44,9 @@ pub struct Turn {
     project_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     project_name: Option<String>,
+    /// What made a one-off call outside the conversation, such as `sharpen`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -191,6 +195,12 @@ impl Helper {
                 .extend(inner.view.turns.iter().map(|turn| usage_turn(turn, false)));
         }
         drop(inner);
+        match self.generated_turns() {
+            Ok(turns) => report
+                .turns
+                .extend(turns.iter().map(|turn| usage_turn(turn, false))),
+            Err(_) => report.unavailable.push("generated.json".into()),
+        }
         let Some(directory) = self.path.parent() else {
             report.unavailable.push("archived conversations".into());
             return report;
@@ -550,6 +560,8 @@ pub struct HelperUsageTurn {
     pub status: String,
     pub usage: Usage,
     pub archived: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 #[derive(Clone, Serialize, Default)]
@@ -572,6 +584,7 @@ fn usage_turn(turn: &Turn, archived: bool) -> HelperUsageTurn {
         status: turn.status.clone(),
         usage: turn.usage.clone(),
         archived,
+        source: turn.source.clone(),
     }
 }
 
@@ -664,6 +677,37 @@ pub fn helper_send(helper: State<'_, Helper>, prompt: String) -> Result<View, St
         let _ = service.save(&mut inner);
     });
     Ok(helper.snapshot())
+}
+
+/// Rewrites a task draft into a deeper version of the same task. Runs only on
+/// an explicit request and returns text for the person to edit; nothing is sent.
+#[tauri::command]
+pub async fn helper_sharpen(
+    helper: State<'_, Helper>,
+    draft: String,
+    operation_id: String,
+    max_chars: Option<usize>,
+    project_id: Option<String>,
+    project_name: Option<String>,
+) -> Result<String, String> {
+    let helper = helper.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        sharpen::sharpen_tracked(
+            &helper,
+            &operation_id,
+            &draft,
+            max_chars,
+            project_id,
+            project_name,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub fn helper_sharpen_cancel(operation_id: String) {
+    sharpen::cancel(&operation_id);
 }
 
 #[tauri::command]

@@ -31,6 +31,11 @@
     opacity: 0.5;
     pointer-events: none;
   }
+  /* Unavailable but still focusable and hoverable, so a tooltip can explain why. */
+  :where(.ui-button)[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
   :where(.ui-button[data-variant="primary"]) {
     background: var(--color-action);
     color: var(--color-on-action);

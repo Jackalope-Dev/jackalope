@@ -12,6 +12,9 @@ identifier; they do not create fictitious projects or authorize execution.
 A draft's suggested project is frozen when captured, editable, and preserved
 across navigation/reload. Existing project drafts and saved planning records remain
 accessible. A missing or restricted agent blocks launch without losing the idea.
+Sharpen in either composer rewrites the draft into a deeper version of the same task with
+one-step undo; it runs one helper call on request and never sends (see
+[HELPER.md](HELPER.md#sharpen)).
 
 Project instructions are included; optional guidelines and tool selection remain
 inspectable. Project connection loading must finish before dispatch. An explicitly

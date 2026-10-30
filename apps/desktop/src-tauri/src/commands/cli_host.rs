@@ -866,6 +866,25 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 message: result.message,
             })
         }
+        Request::Sharpen {
+            text,
+            project_id,
+            project_name,
+        } => {
+            let helper = app.state::<super::helper::Helper>().inner().clone();
+            let text = tauri::async_runtime::spawn_blocking(move || {
+                helper.sharpen(
+                    &text,
+                    None,
+                    project_id,
+                    project_name,
+                    &std::sync::atomic::AtomicBool::new(false),
+                )
+            })
+            .await
+            .map_err(|error| error.to_string())??;
+            Ok(Response::Sharpened { text })
+        }
         Request::Learnings { project_id } => {
             let runtime = app.state::<TaskRuntime>();
             let path = project_path(&runtime, &project_id)?;

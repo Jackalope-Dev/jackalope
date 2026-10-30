@@ -22,6 +22,7 @@ import { AttachButton } from '../tasks/AttachButton';
 import { CodexSpeedSelect } from '../tasks/CodexSpeedSelect';
 import { DictationButton } from '../tasks/DictationButton';
 import { PromptPresets } from '../tasks/PromptPresets';
+import { SharpenButton, SharpenNotice, useSharpen } from '../tasks/SharpenButton';
 import { TaskAssessmentNotice, useTaskAssessment } from '../tasks/useTaskAssessment';
 import { Button } from '../ui/button';
 import { DismissButton } from '../ui/DismissButton';
@@ -136,6 +137,18 @@ export function SessionStart({
     return () => window.removeEventListener(ATTACH_TO_COMPOSER, receive);
   }, []);
   const latest = useRef(text);
+  const sharpen = useSharpen({
+    draft: text,
+    apply: (value) => {
+      assessment.clear();
+      pending.current = null;
+      setText(value);
+      input.current?.focus();
+    },
+    current: () => latest.current,
+    project: project && { id: project.id, name: project.name },
+    maxChars: 12000,
+  });
   const mounted = useRef(true);
   const pending = useRef<{ id: string; messageId: string; text: string } | null>(null);
   const sending = useRef(false);
@@ -286,6 +299,7 @@ export function SessionStart({
             rows={3}
             maxLength={12000}
             value={text}
+            readOnly={sharpen.busy}
             onChange={(event) => {
               assessment.clear();
               setText(event.target.value);
@@ -305,6 +319,7 @@ export function SessionStart({
               {error}
             </InlineNotice>
           )}
+          <SharpenNotice state={sharpen} />
           {attachments.error && (
             <InlineNotice
               tone="error"
@@ -345,6 +360,7 @@ export function SessionStart({
                   input.current?.focus();
                 }}
               />
+              <SharpenButton state={sharpen} draft={text} disabled={busy} />
             </div>
             <div className="live-start-buttons">
               <ComposerAgentPicker

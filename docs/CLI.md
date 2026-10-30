@@ -97,7 +97,7 @@ terminal and the app together. Leaving a terminal does not stop work.
 always message text. Unknown or misplaced options are refused with exit status 64.
 
 Inside a conversation, typing `/` opens an interactive command menu, and `/help`
-lists commands: `/new`, `/bg`, `/init`, `/sessions`, `/projects`, `/agents`, `/settings`,
+lists commands: `/new`, `/bg`, `/sharpen`, `/init`, `/sessions`, `/projects`, `/agents`, `/settings`,
 `/status`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/learnings`, `/files`, `/review` (or `/diff`), `/merge`, `/pr`, `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
 `/unpause`, `/unqueue`, `/copy`, `/history`, `/kill`, `/clear`, `/plan`, `/plans`, `/revise`,
 `/approve`, `/replan`, `/export`, `/deviation`, `/browser`, `/computer`, `/open` and `/quit`. Pickers
@@ -110,6 +110,11 @@ lists its files and asks; the conversation is paused only once you confirm, and 
 failed merge resumes it. `/pr [title]` asks whether to open a draft or ready pull
 request, then commits what is left, pushes and opens it. `/unqueue` takes back your
 newest message that has not reached an agent and puts it in the input to edit.
+`/sharpen <draft>` asks a helper agent, on its own connection so the terminal stays usable,
+to rewrite the draft into a deeper version of the same task and puts the result in the
+input to edit; it never sends. If you typed something meanwhile, the rewrite is printed in
+the feed instead. Clearing the input with Esc and running `/sharpen undo` brings back the
+draft. The call counts toward helper usage like Sharpen in the app.
 What you type in a conversation is its draft, shared with the app's composer: opening the conversation in either place brings it back, and sending clears it. Clickable parts of the header and status line highlight under the pointer.
 `/retry` relaunches work that failed to start; to try finished or stopped work again,
 send a follow-up. Another conversation that starts needing you is announced in the feed.

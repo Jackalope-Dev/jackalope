@@ -14,7 +14,7 @@ import { assemblePrompt, PROMPT_VERSION } from '../../lib/skills/context-assembl
 import { resolveTaskGuidelines } from '../../lib/skills/task-context';
 import { ideaStageLabels } from '../../lib/task-collection';
 import { effortPrompt } from '../../lib/task-effort';
-import type { RunRequest } from '../../lib/task-runtime';
+import { PROMPT_MAX_CHARS, type RunRequest } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
 import { isTauriEnvironment, listMcpServers, type McpServerConfig } from '../../lib/tauri-bridge';
 import { workspaceModeFor, workspaceRequest } from '../../lib/workspace-mode';
@@ -36,6 +36,7 @@ import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { FeaturePlanner } from './FeaturePlanner';
 import { ProjectSetup } from './ProjectSetup';
+import { SharpenButton, SharpenNotice, useSharpen } from './SharpenButton';
 import { TaskComposer } from './TaskComposer';
 import { TaskAssessmentNotice, useTaskAssessment } from './useTaskAssessment';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
@@ -237,6 +238,20 @@ export function CaptureTask({
     assessment.clear();
     draft(key, { ...current, ...value });
   };
+  const sharpen = useSharpen({
+    draft: current.prompt,
+    apply: (prompt) => {
+      // A rewrite lands after an await; change only the prompt so settings chosen meanwhile stay.
+      if (useExecutionStore.getState().drafts[key]) {
+        assessment.clear();
+        draft(key, { prompt });
+      } else update({ prompt });
+      requestAnimationFrame(() => document.getElementById('task-intent')?.focus());
+    },
+    current: () => useExecutionStore.getState().drafts[key]?.prompt ?? current.prompt,
+    project: project && { id: project.id, name: project.name },
+    maxChars: PROMPT_MAX_CHARS,
+  });
   const skills = resolveTaskGuidelines(current.prompt, current.skills, project?.preferences);
   const assembled = assemblePrompt({
     rawPrompt: current.prompt.trim(),
@@ -483,6 +498,14 @@ export function CaptureTask({
           })
         }
         onChange={update}
+        draftLocked={sharpen.busy}
+        draftTools={
+          <SharpenButton
+            state={sharpen}
+            draft={current.prompt}
+            disabled={submitting || launchingPlan}
+          />
+        }
         onLaunch={() => launch()}
         onPlan={() => void launch('interview')}
         onWritePlan={project ? () => setWritingPlan(true) : undefined}
@@ -592,6 +615,7 @@ export function CaptureTask({
           Retry loading connections
         </Button>
       )}
+      <SharpenNotice state={sharpen} />
       {(error || connectionError || modelError || toolError) && (
         <InlineNotice tone="error" className="mt-4">
           {error || connectionError || modelError || toolError}

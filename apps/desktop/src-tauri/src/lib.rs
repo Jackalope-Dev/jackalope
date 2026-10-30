@@ -269,6 +269,8 @@ pub fn run(launch: Launch) {
             commands::helper::helper_usage,
             commands::helper::helper_sync,
             commands::helper::helper_send,
+            commands::helper::helper_sharpen,
+            commands::helper::helper_sharpen_cancel,
             commands::helper::helper_stop,
             commands::helper::helper_new_conversation,
             commands::helper::helper_action,
