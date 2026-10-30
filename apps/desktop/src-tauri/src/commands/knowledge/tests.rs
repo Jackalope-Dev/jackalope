@@ -14,6 +14,7 @@ fn entry(id: usize, kind: KnowledgeKind, phrase: &str) -> KnowledgeEntry {
         keywords: vec![phrase.into()],
         enabled: true,
         stale: None,
+        enforced: None,
         source_run_id: None,
         source_head: None,
         revision: 0,

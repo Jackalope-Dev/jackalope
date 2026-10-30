@@ -179,6 +179,13 @@ pub fn launch(runtime: TaskRuntime, sessions: LiveSessions) {
                         {
                             eprintln!("The stale-lesson check skipped a project: {error}");
                         }
+                        if let Err(error) =
+                            runtime
+                                .knowledge
+                                .check_enforcers(&project_id, &path, &THRESHOLDS)
+                        {
+                            eprintln!("The enforced-lesson check skipped a project: {error}");
+                        }
                     }
                 }
                 let marker = (

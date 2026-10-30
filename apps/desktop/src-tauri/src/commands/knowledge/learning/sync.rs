@@ -443,6 +443,7 @@ fn apply_lesson(
             lifecycle: Some(Lifecycle::default()),
         }),
         stale: None,
+        enforced: None,
         source_run_id: None,
         source_head: None,
         revision: remote.revision,

@@ -302,6 +302,8 @@ pub fn run(launch: Launch) {
             commands::knowledge::learning::knowledge_history,
             commands::knowledge::learning::knowledge_learning_metrics,
             commands::knowledge::learning::knowledge_set_archived,
+            commands::knowledge::learning::enforce::knowledge_check_draft,
+            commands::knowledge::learning::enforce::knowledge_retire_enforced,
             commands::knowledge::knowledge_preview,
             commands::knowledge::knowledge_search,
             commands::codebase::codebase_scan,

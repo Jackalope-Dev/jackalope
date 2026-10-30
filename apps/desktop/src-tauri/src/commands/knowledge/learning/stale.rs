@@ -8,7 +8,7 @@ use std::path::Path;
 
 /// File extensions that make a slash-separated word a file path even when
 /// its top folder is gone.
-const EXTENSIONS: &[&str] = &[
+pub(super) const EXTENSIONS: &[&str] = &[
     "rs", "ts", "tsx", "js", "jsx", "mjs", "cjs", "json", "md", "mdx", "toml", "yaml", "yml", "py",
     "go", "java", "kt", "swift", "c", "h", "cpp", "hpp", "cs", "rb", "php", "css", "scss", "html",
     "sh", "ps1", "sql", "lock", "txt", "vue", "svelte",
@@ -76,7 +76,7 @@ const BUILTINS: &[&str] = &[
 const MANIFEST_BYTES: u64 = 256_000;
 
 #[derive(Clone, Debug, PartialEq)]
-enum Reference {
+pub(super) enum Reference {
     Path(String),
     /// `bare` is `pnpm X` or `yarn X`, which may also run an installed binary.
     Script {
@@ -87,7 +87,7 @@ enum Reference {
 }
 
 impl Reference {
-    fn describe(&self) -> String {
+    pub(super) fn describe(&self) -> String {
         match self {
             Reference::Path(path) => path.clone(),
             Reference::Script { name, .. } => format!("the package.json script \"{name}\""),
@@ -96,14 +96,14 @@ impl Reference {
     }
 }
 
-fn clean(token: &str) -> &str {
+pub(super) fn clean(token: &str) -> &str {
     token
         .trim_matches(|c: char| "`'\"()[]{}<>,;!?".contains(c))
         .trim_end_matches([':', '.'])
 }
 
 /// A project-relative path the word names, if it looks like one.
-fn path_reference(root: &Path, word: &str) -> Option<String> {
+pub(super) fn path_reference(root: &Path, word: &str) -> Option<String> {
     let path = word.replace('\\', "/");
     let path = path.strip_prefix("./").unwrap_or(&path);
     if path.len() > 200
@@ -168,7 +168,7 @@ fn script_name(word: Option<&&str>) -> Option<String> {
 /// Scripts and make targets named in `words`. Outside command spans only the
 /// explicit `pnpm|npm|yarn run X` form counts, since prose such as "pnpm only"
 /// or "make sure" is not a command.
-fn commands(words: &[&str], command: bool, found: &mut Vec<Reference>) {
+pub(super) fn commands(words: &[&str], command: bool, found: &mut Vec<Reference>) {
     for (index, word) in words.iter().enumerate() {
         let tool = clean(word);
         let next = words.get(index + 1).map(|next| clean(next));
@@ -217,7 +217,7 @@ fn references(root: &Path, text: &str, check: bool, limit: usize) -> Vec<Referen
 }
 
 /// What the check reads from the project once per pass.
-struct Project<'a> {
+pub(super) struct Project<'a> {
     root: &'a Path,
     /// `None` when there is no readable root package.json.
     scripts: Option<Vec<String>>,
@@ -227,7 +227,7 @@ struct Project<'a> {
 }
 
 impl<'a> Project<'a> {
-    fn read(root: &'a Path) -> Self {
+    pub(super) fn read(root: &'a Path) -> Self {
         let scripts =
             crate::commands::history::read_bounded(&root.join("package.json"), MANIFEST_BYTES)
                 .ok()
@@ -275,7 +275,7 @@ impl<'a> Project<'a> {
 
     /// Whether the project definitely no longer has it. Anything the check
     /// cannot tell counts as present.
-    fn missing(&self, reference: &Reference) -> bool {
+    pub(super) fn missing(&self, reference: &Reference) -> bool {
         match reference {
             Reference::Path(path) => !self.root.join(path).exists(),
             Reference::Script { name, bare } => {

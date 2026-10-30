@@ -378,6 +378,10 @@ pub struct Learning {
     /// project no longer has. Absent from older hosts and when nothing is wrong.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attention: Option<String>,
+    /// The command or file a repository check enforces it with. Absent from
+    /// older hosts and when no accepted task made it a check.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enforced: Option<String>,
 }
 
 /// One change in a learned lesson's history.
@@ -386,8 +390,8 @@ pub struct Learning {
 pub struct LearningEvent {
     pub at: String,
     /// `born`, `merged`, `patched`, `retired`, `promoted`, `archived`,
-    /// `restored`, `edited`, `deleted`, `curated`, `missed`, `contradicted`
-    /// or `stale`.
+    /// `restored`, `edited`, `deleted`, `curated`, `missed`, `contradicted`,
+    /// `stale`, `enforced`, `unenforced` or `unreported`.
     pub action: String,
     pub reason: String,
     /// Redacted excerpts of what prompted the change.

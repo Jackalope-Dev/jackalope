@@ -179,6 +179,7 @@ fn stale_learned_lessons_are_archived_and_hand_written_ones_only_flagged() {
             dismissed: false,
             process: Default::default(),
             stale: None,
+            enforced: None,
             id: uuid::Uuid::new_v4().to_string(),
             project_id: "p".into(),
             project_path: path.clone(),

@@ -206,12 +206,17 @@ pub fn learning_detail(learning: &Learning) -> String {
         uses => format!("used {uses} times"),
     };
     let edited = if learning.managed { "" } else { " · edited" };
+    let enforced = learning
+        .enforced
+        .as_deref()
+        .map(|by| format!(" · enforced by {by}"))
+        .unwrap_or_default();
     let attention = learning
         .attention
         .as_deref()
         .map(|note| format!(" · {note}"))
         .unwrap_or_default();
-    format!("{status} · {uses}{edited}{attention}")
+    format!("{status} · {uses}{edited}{enforced}{attention}")
 }
 
 /// Agents that can take work or need only a sign-in.
@@ -1303,12 +1308,23 @@ mod tests {
             r#"{"id":"a","title":"Checks","content":"Run the checks.","status":"active","kind":"preference","uses":3,"managed":true,"updatedAt":""}"#,
         )
         .unwrap();
-        assert!(learning.attention.is_none() && learning.misses.is_none());
+        assert!(
+            learning.attention.is_none()
+                && learning.misses.is_none()
+                && learning.enforced.is_none()
+        );
         assert_eq!(learning_detail(&learning), "active · used 3 times");
         learning.attention = Some("agents keep missing this".into());
         assert_eq!(
             learning_detail(&learning),
             "active · used 3 times · agents keep missing this"
+        );
+        learning.attention = None;
+        learning.status = "archived".into();
+        learning.enforced = Some("pnpm lint:paths".into());
+        assert_eq!(
+            learning_detail(&learning),
+            "archived · used 3 times · enforced by pnpm lint:paths"
         );
     }
 }

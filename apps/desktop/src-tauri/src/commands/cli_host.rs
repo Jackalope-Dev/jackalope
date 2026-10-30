@@ -293,6 +293,10 @@ fn learning_summary(entry: &super::knowledge::KnowledgeEntry) -> Option<protocol
         archived_reason: state.archived_reason.clone(),
         misses: (state.misses > 0).then_some(state.misses),
         attention: super::knowledge::learning::attention(entry),
+        enforced: entry
+            .enforced
+            .as_ref()
+            .map(|enforcement| enforcement.by.clone()),
     })
 }
 
