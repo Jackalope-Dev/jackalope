@@ -1,8 +1,7 @@
 import { Checkbox, ConfirmDialog, FormField, Input, Textarea } from '@jackalope/ui';
 import { GitPullRequestCreate } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { nativeTask, type TaskRun } from '../../lib/task-runtime';
-import { taskTitle } from '../../lib/task-title';
 import { Button } from '../ui/button';
 
 /** Commit failures arrive as structured objects; everything else as text. */
@@ -15,7 +14,9 @@ function message(cause: unknown) {
 /**
  * Commits the task's remaining changes with the project's commit policy, pushes
  * its branch and opens a pull request through the GitHub CLI. Each step runs
- * only after the person confirms the title, description and draft choice.
+ * only after the person confirms the title, description and draft choice. The title
+ * and description are drafted from the branch's diff alone, so they describe the code
+ * rather than the request or conversation that produced it.
  */
 export function CreatePullRequest({
   run,
@@ -30,12 +31,34 @@ export function CreatePullRequest({
   const [body, setBody] = useState('');
   const [draft, setDraft] = useState(true);
   const [uncommitted, setUncommitted] = useState<string[] | null>(null);
+  const [drafting, setDrafting] = useState(false);
+  const [draftError, setDraftError] = useState('');
+  const attempt = useRef(0);
   const checkout = { repoPath: run.projectPath, worktreePath: run.workspace };
   const prepare = (open: boolean) => {
     if (!open) return;
-    setTitle(taskTitle(run.prompt));
-    setBody(run.result.trim().slice(0, 4000));
+    setTitle('');
+    setBody('');
     setDraft(true);
+    setDraftError('');
+    setDrafting(true);
+    const current = ++attempt.current;
+    void nativeTask<{ title: string; body: string }>('git_generate_pull_request', {
+      ...checkout,
+      base: run.baseHead,
+    })
+      .then((text) => {
+        if (current !== attempt.current) return;
+        // Keep anything the person typed while the draft was being written.
+        setTitle((typed) => typed || text.title);
+        setBody((typed) => typed || text.body);
+      })
+      .catch((cause) => {
+        if (current === attempt.current) setDraftError(message(cause));
+      })
+      .finally(() => {
+        if (current === attempt.current) setDrafting(false);
+      });
     setUncommitted(null);
     void nativeTask<{ files: { path: string }[] }>('git_working_changes', checkout)
       .then((changes) => setUncommitted(changes.files.map((file) => file.path)))
@@ -86,9 +109,19 @@ export function CreatePullRequest({
     >
       {({ busy }) => (
         <div className="workspace-stack">
-          <FormField label="Title">
+          <FormField
+            label="Title"
+            description={
+              drafting
+                ? 'Drafting from the changes…'
+                : draftError
+                  ? `Could not draft from the changes: ${draftError}`
+                  : undefined
+            }
+          >
             <Input
               value={title}
+              placeholder={drafting ? 'Drafting…' : undefined}
               disabled={busy}
               onChange={(event) => setTitle(event.target.value)}
             />

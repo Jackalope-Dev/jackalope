@@ -190,7 +190,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Delivery inspects local Git state and optionally reads PR/CI through the GitHub CLI.
   PR, CI and deployment preparation carry evidence into editable drafts. Failing PR
   checks are listed openly with a draft asking the agent to reproduce and fix them.
-  Create pull request asks for a title, description and draft choice, then commits any
+  Create pull request drafts an editable title and description from the branch's diff alone
+  (never the request or conversation), asks for the draft choice, then commits any
   remaining task changes with the project's commit policy, pushes the task branch and
   opens the PR through the GitHub CLI; nothing is published before that confirmation. Publishing and
   deployment remain explicit user-approved steps; a local merge does not establish either.
