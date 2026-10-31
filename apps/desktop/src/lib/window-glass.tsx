@@ -1,4 +1,4 @@
-import { themeFollowsSystem } from '@jackalope/brand/theme';
+import { refreshThemeAppearance, themeFollowsSystem } from '@jackalope/brand/theme';
 import { useEffect } from 'react';
 import { useSettingsStore } from '../stores/settingsStore';
 import { isMacPlatform } from './platform-shortcuts';
@@ -21,6 +21,15 @@ async function supportsGlass() {
   if (hints?.platform !== 'Windows') return false;
   const { platformVersion } = await hints.getHighEntropyValues(['platformVersion']);
   return Number.parseInt(platformVersion ?? '0', 10) >= 13;
+}
+
+/**
+ * Re-reads the light or dark scheme after a native window theme change, once straight
+ * away and once after the webview has caught up.
+ */
+function settleAppearance() {
+  refreshThemeAppearance();
+  window.setTimeout(refreshThemeAppearance, 150);
 }
 
 /** Whether the app's current background is dark, read from the applied theme tokens. */
@@ -63,6 +72,7 @@ function useWindowGlass() {
         themeFollowsSystem() ? null : appIsDark() ? 'dark' : 'light';
       let theme = windowTheme();
       await window.setTheme(theme);
+      settleAppearance();
       await window.setEffects(
         isMacPlatform()
           ? {
@@ -83,7 +93,11 @@ function useWindowGlass() {
         const next = windowTheme();
         if (next === theme) return;
         theme = next;
-        void window.setTheme(theme).catch(() => {});
+        // Releasing the window theme can flip the scheme an automatic theme reads.
+        void window
+          .setTheme(theme)
+          .then(settleAppearance)
+          .catch(() => {});
       });
       observer.observe(root, { attributes: true, attributeFilter: ['style'] });
     })().catch(() => {});
@@ -97,6 +111,7 @@ function useWindowGlass() {
             const window = getCurrentWindow();
             await window.clearEffects();
             await window.setTheme(null);
+            settleAppearance();
           })
           .catch(() => {});
     };
