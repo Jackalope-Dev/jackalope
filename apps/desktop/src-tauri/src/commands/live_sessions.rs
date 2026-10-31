@@ -249,9 +249,12 @@ impl LiveSessions {
             ),
         };
         let runs = runtime.live_session_runs(None).unwrap_or_default();
+        // A conversation keeps its saved pause state across restarts, so one the person
+        // left running continues. Only an attempt cut off by the restart stops it: that
+        // needs their review before anything is replayed.
         for session in &mut ledger.sessions {
-            session.paused = true;
             if let Some(batch) = session.batches.last_mut().filter(|batch| !batch.settled) {
+                session.paused = true;
                 session.error = Some(
                     "The conversation was interrupted. Review the last attempt before resuming."
                         .into(),

@@ -45,7 +45,10 @@ window leaves execution running. **Pause queue** holds later messages, while
 **Stop work** also stops the active attempt through the existing runtime.
 
 Sessions save messages before claiming a batch, preserve draft revisions across
-windows, and pause after failures or restart. Pending launch retries reuse the saved
+windows, and keep going until the person pauses or stops them or a reply needs them:
+failures, limits and attempts cut off by a restart pause with a reason. Otherwise a
+restart keeps each conversation's saved pause state, and Review holds the queue only
+while it is open. Pending launch retries reuse the saved
 attempt identifier. An interrupted launch requires an explicit retry. Session attempts
 stay in loaded history; a missing completed attempt blocks continuation until restored.
 Interrupted process ownership keeps the normal runtime safeguards.

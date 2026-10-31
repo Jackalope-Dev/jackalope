@@ -147,19 +147,27 @@
   min-height: 28px;
   padding-inline: 8px;
   font-size: var(--text-xs);
+}
+.live-time {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+:is(.live-copy, .live-time) {
   opacity: 0;
   transition: opacity 120ms;
 }
-.live-message:is(:hover, :focus-within) .live-copy {
+.live-message:is(:hover, :focus-within) :is(.live-copy, .live-time) {
   opacity: 1;
 }
 @media (hover: none) {
-  .live-copy {
+  :is(.live-copy, .live-time) {
     opacity: 1;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .live-copy {
+  :is(.live-copy, .live-time) {
     transition: none;
   }
 }
@@ -689,4 +697,22 @@
 .live-card {
   margin: -10px 0 22px 46px;
   max-width: min(88%, 52rem);
+}
+/* With no project in focus, the composer's place holds a project picker of one field width. */
+.live-start-pick {
+  width: min(100%, 360px);
+  margin-inline: auto;
+  text-align: start;
+}
+/* Docked header actions share the control height and gap, so the primary action, the
+   options button and the pop-out icon line up as one group. */
+.live-session:not(.live-session-detached) .live-header .app-titlebar-controls {
+  align-items: center;
+  gap: 8px;
+  height: auto;
+}
+.live-session:not(.live-session-detached) .live-header .app-titlebar-button {
+  width: var(--control-height, 36px);
+  height: var(--control-height, 36px);
+  border-radius: var(--radius-sm);
 }

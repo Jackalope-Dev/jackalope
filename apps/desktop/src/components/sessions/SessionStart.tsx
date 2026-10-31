@@ -1,5 +1,5 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { Textarea } from '@jackalope/ui';
+import { Select, SelectItem, Textarea } from '@jackalope/ui';
 import { FolderOpen } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
@@ -16,7 +16,7 @@ import { workspaceRequest } from '../../lib/workspace-mode';
 import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
-import { agentAccountFor, type Project } from '../../stores/projectStore';
+import { agentAccountFor, type Project, useProjectStore } from '../../stores/projectStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { AttachButton } from '../tasks/AttachButton';
 import { CodexSpeedSelect } from '../tasks/CodexSpeedSelect';
@@ -480,12 +480,37 @@ export function SessionStart({
           ))}
         </fieldset>
       )}
-      {project ? null : (
-        <Button variant="outline" onClick={onOpenProject}>
-          <FolderOpen size={16} />
-          Open project
-        </Button>
-      )}
+      {project ? null : <ProjectPick onOpenProject={onOpenProject} />}
+    </div>
+  );
+}
+
+/**
+ * Without a project in focus, new work first needs one: pick an existing project, or
+ * add one when there are none yet.
+ */
+function ProjectPick({ onOpenProject }: { onOpenProject: () => void }) {
+  const projects = useProjectStore((state) => state.projects);
+  if (!projects.length)
+    return (
+      <Button variant="outline" onClick={onOpenProject}>
+        <FolderOpen size={16} />
+        Open project
+      </Button>
+    );
+  return (
+    <div className="live-start-pick">
+      <Select
+        aria-label="Project for new work"
+        placeholder="Choose a project for new work"
+        onValueChange={(id) => useProjectStore.getState().selectProject(id)}
+      >
+        {projects.map((item) => (
+          <SelectItem key={item.id} value={item.id}>
+            {item.name}
+          </SelectItem>
+        ))}
+      </Select>
     </div>
   );
 }
