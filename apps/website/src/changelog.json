@@ -1,5 +1,17 @@
 [
   {
+    "id": "conversations-that-keep-going",
+    "date": "2026-10-31",
+    "status": "In development",
+    "title": "Conversations that keep going",
+    "description": "Conversations continue until you pause or stop them, or until a reply needs you.",
+    "items": [
+      "A restart keeps each conversation's pause state, and sending in an idle conversation resumes it.",
+      "Messages and replies show when they were sent on hover.",
+      "Right-click a project in the sidebar for its actions, including a new project icon."
+    ]
+  },
+  {
     "id": "compare-plan-and-come-back-with-less-effort",
     "date": "2026-10-31",
     "status": "In development",

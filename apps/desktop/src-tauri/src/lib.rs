@@ -318,6 +318,7 @@ pub fn run(launch: Launch) {
             commands::commit_review::git_working_changes,
             commands::commit_review::git_working_file_diff,
             commands::commit_review::git_generate_commit_message,
+            commands::commit_review::git_generate_pull_request,
             commands::commit_review::git_commit_changes,
             commands::commit_review::git_discard_changes,
             commands::commit_review::git_push_changes,

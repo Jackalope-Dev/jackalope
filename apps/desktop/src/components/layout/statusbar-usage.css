@@ -50,32 +50,38 @@
   );
 }
 .statusbar-allowances {
-  width: min(420px, calc(100vw - 24px));
+  width: min(380px, calc(100vw - 24px));
   max-height: min(600px, var(--radix-popover-content-available-height));
-  padding: 20px;
+  overflow-y: auto;
+  padding: 12px 16px;
+  font-size: var(--text-xs);
 }
 .statusbar-allowances-heading,
 .statusbar-allowance-account > header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 .statusbar-allowances-heading {
   justify-content: space-between;
+  margin: -4px -8px 0 0;
 }
-.statusbar-allowances h2 {
-  margin: 0;
-  font-size: var(--text-base);
-  font-weight: 600;
-}
+.statusbar-allowances h2,
 .statusbar-allowances h3 {
   margin: 0;
+  flex-shrink: 0;
   font-size: var(--text-sm);
   font-weight: 600;
 }
+.statusbar-allowance-login {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .statusbar-allowances p {
   margin: 4px 0 0;
-  font-size: var(--text-xs);
   color: var(--color-text-secondary);
   overflow-wrap: anywhere;
 }
@@ -83,28 +89,37 @@
   color: var(--color-danger);
 }
 .statusbar-allowance-account {
-  padding: 20px 0;
+  display: grid;
+  gap: 6px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--color-border-subtle);
 }
-.statusbar-allowance-account > header > div {
-  min-width: 0;
-}
+/* One row per window: its name, the meter, what is left and when it resets. Fixed side
+   columns keep every account's meters aligned. */
 .statusbar-allowance-window {
   display: grid;
-  gap: 8px;
-  margin-top: 18px;
-  font-size: var(--text-xs);
+  grid-template-columns: 96px minmax(48px, 1fr) 76px 44px;
+  align-items: center;
+  gap: 10px;
+  min-height: 20px;
 }
-.statusbar-allowance-label,
-.statusbar-allowance-caption {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
+.statusbar-allowance-name {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.statusbar-allowance-label strong {
+.statusbar-allowance-window strong {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+.statusbar-allowance-reset {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
 }
 .statusbar-allowance-window[data-tone="low"] strong {
   color: var(--color-warning);
@@ -112,17 +127,28 @@
 .statusbar-allowance-window[data-tone="empty"] strong {
   color: var(--color-danger);
 }
-.statusbar-allowance-window[data-tone="unknown"] strong,
-.statusbar-allowance-caption {
-  color: var(--color-text-secondary);
+.statusbar-allowance-window[data-tone="unknown"] strong {
+  color: var(--color-text-muted);
+  font-weight: 500;
 }
 .statusbar-allowances .statusbar-allowance-empty {
-  margin-top: 16px;
+  margin: 0;
+  color: var(--color-text-muted);
 }
 .statusbar-allowances footer {
-  display: grid;
-  gap: 16px;
-  padding-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+}
+.statusbar-allowances footer > .ui-button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.statusbar-allowances footer p {
+  margin: 0;
+  color: var(--color-text-muted);
 }
 @media (max-width: 760px) {
   .statusbar-usage {

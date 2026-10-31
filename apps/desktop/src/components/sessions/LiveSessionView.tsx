@@ -226,11 +226,15 @@ export function LiveSessionView({
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       await getCurrentWindow()[action]();
     });
-  const changeStats = useChangeStats(simple ? [latest] : []);
+  const changeStats = useChangeStats([latest]);
   const latestChanges = latest ? changeStats[latest.id]?.value : undefined;
+  // Review holds queued messages so the diff stays put; leaving Review lets them run again
+  // when Review was what paused the conversation.
+  const pausedForReview = useRef(false);
   const showReview = () => {
     setTab('changes');
     if (!latest || active || integrated) return;
+    if (!session.paused) pausedForReview.current = true;
     void act(async () => {
       await sessionCommand('action', { id: session.id, action: 'pause' });
       reviewAttempt.current = `${latest.id}:${latest.status}:true`;
@@ -251,13 +255,16 @@ export function LiveSessionView({
       : session.paused
         ? 'Resume queue'
         : 'Pause queue';
-  const togglePause = () =>
+  const togglePause = () => {
+    // A choice made here wins over the pause Review applied.
+    pausedForReview.current = false;
     void act(() =>
       sessionCommand('action', {
         id: session.id,
         action: session.paused || session.closed ? 'resume' : 'pause',
       }),
     );
+  };
   const stopWork = () =>
     void act(async () => {
       if (!active) return;
@@ -408,11 +415,17 @@ export function LiveSessionView({
   );
   const headerActions = (
     <>
-      {!simple && latest && !active && !integrated && tab !== 'changes' && (
-        <Button disabled={busy} onClick={showReview}>
-          Review changes
-        </Button>
-      )}
+      {/* Only once the work changed files: an answer or a report has nothing to review. */}
+      {!simple &&
+        latest &&
+        !active &&
+        !integrated &&
+        tab !== 'changes' &&
+        !!latestChanges?.files && (
+          <Button disabled={busy} onClick={showReview}>
+            Review changes
+          </Button>
+        )}
     </>
   );
   return (
@@ -567,6 +580,10 @@ export function LiveSessionView({
               if (value === 'changes') showReview();
               else {
                 setTab(value);
+                if (pausedForReview.current && value !== 'preview') {
+                  pausedForReview.current = false;
+                  void act(() => sessionCommand('action', { id: session.id, action: 'resume' }));
+                }
                 if (value === 'preview' && !integrated)
                   void act(() => sessionCommand('action', { id: session.id, action: 'pause' }));
               }
@@ -653,6 +670,7 @@ export function LiveSessionView({
                             <X size={12} aria-hidden="true" />
                           </button>
                         )}
+                        <MessageTime at={message.createdAt} />
                         <CopyButton
                           className="live-copy"
                           size="sm"
@@ -683,12 +701,15 @@ export function LiveSessionView({
                             />
                           </Suspense>
                           {!isActive(run) && (
-                            <CopyButton
-                              className="live-copy"
-                              size="sm"
-                              text={run.result}
-                              label="Copy reply"
-                            />
+                            <div className="live-receipt">
+                              {run.endedAt && <MessageTime at={run.endedAt} />}
+                              <CopyButton
+                                className="live-copy"
+                                size="sm"
+                                text={run.result}
+                                label="Copy reply"
+                              />
+                            </div>
                           )}
                         </div>
                       </article>
@@ -904,5 +925,29 @@ function MessageOriginLabel({
         </button>
       )}
     </span>
+  );
+}
+
+/**
+ * When a message was sent or a reply arrived, revealed with Copy on hover or focus: the
+ * time today, and the date as well on earlier days.
+ */
+function MessageTime({ at }: { at: string }) {
+  const date = new Date(at);
+  if (Number.isNaN(date.getTime())) return null;
+  const now = new Date();
+  const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const label =
+    date.toDateString() === now.toDateString()
+      ? time
+      : `${date.toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          ...(date.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
+        })}, ${time}`;
+  return (
+    <time className="live-time" dateTime={at} title={date.toLocaleString()}>
+      {label}
+    </time>
   );
 }

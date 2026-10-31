@@ -104,6 +104,8 @@ export interface Project {
   plainFolder?: boolean;
   worktrees: WorktreeEntry[];
   description?: string;
+  /** Sidebar icon key from ProjectMark's set; the initial shows when unset. */
+  icon?: string;
   preferences?: ProjectPreferences;
   agentProvider: 'codex' | 'grok' | 'claude-code' | 'openhands' | 'ollama' | 'antigravity';
 }

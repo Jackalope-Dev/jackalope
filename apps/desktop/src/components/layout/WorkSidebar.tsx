@@ -1,6 +1,12 @@
-import { DropdownMenu as Menu } from '@jackalope/ui';
-import { ChevronRight, Ellipsis, Plus, Trash2, X } from 'lucide-react';
-import { useMemo } from 'react';
+import { ContextMenu, DropdownMenu as Menu } from '@jackalope/ui';
+import { ChevronRight, Copy, Ellipsis, Plus, Smile, Trash2, X } from 'lucide-react';
+import {
+  type ComponentPropsWithoutRef,
+  forwardRef,
+  type ReactNode,
+  useMemo,
+  useState,
+} from 'react';
 import { collectWorkspaceWork, type WorkItem, workPresence } from '../../lib/task-collection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -10,6 +16,7 @@ import { useTaskStore } from '../../stores/taskStore';
 import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AgentStack } from '../agents/AgentAvatar';
+import { ProjectIconDialog, ProjectMark } from '../projects/ProjectMark';
 import { isUnread, useOpenSignalKey, useWorkSignals, WorkSignals } from '../tasks/WorkSignals';
 import { Tooltip } from '../ui/Tooltip';
 import { type ActiveTab, viewLabel, WORKSPACE_VIEWS } from './navigation';
@@ -102,6 +109,108 @@ function useProjectWork() {
   }, [work, dismissed]);
 }
 
+type ProjectActions = {
+  onOpenProject: (projectId: string, view: ActiveTab) => void;
+  onNewWork: (projectId: string) => void;
+  onRemoveProject: (project: Project) => void;
+};
+
+const projectViews = WORKSPACE_VIEWS.filter(
+  (view) => view.group === 'project' && view.id !== 'swarm',
+);
+
+/**
+ * A project's actions, shared by its options button and its right-click menu so both
+ * offer the same list. `menu` is the DropdownMenu or ContextMenu namespace.
+ */
+function ProjectMenuItems({
+  menu: M,
+  project,
+  onSetIcon,
+  onOpenProject,
+  onNewWork,
+  onRemoveProject,
+}: ProjectActions & {
+  menu: typeof Menu | typeof ContextMenu;
+  project: Project;
+  onSetIcon: (project: Project) => void;
+}) {
+  return (
+    <>
+      <M.Item className="workspace-menu-item" onSelect={() => onNewWork(project.id)}>
+        <Plus size={16} aria-hidden="true" />
+        New work
+      </M.Item>
+      <M.Separator className="menu-separator" />
+      {projectViews.map((view) => (
+        <M.Item
+          key={view.id}
+          className="workspace-menu-item"
+          onSelect={() => onOpenProject(project.id, view.id)}
+        >
+          <view.icon size={16} aria-hidden="true" />
+          {view.id === 'project-overview' ? 'Overview' : viewLabel(view.id)}
+        </M.Item>
+      ))}
+      <M.Separator className="menu-separator" />
+      <M.Item className="workspace-menu-item" onSelect={() => onSetIcon(project)}>
+        <Smile size={16} aria-hidden="true" />
+        Set icon…
+      </M.Item>
+      <M.Item
+        className="workspace-menu-item"
+        onSelect={() => void navigator.clipboard?.writeText(project.path).catch(() => {})}
+      >
+        <Copy size={16} aria-hidden="true" />
+        Copy path
+      </M.Item>
+      <M.Separator className="menu-separator" />
+      <M.Item className="workspace-menu-item" onSelect={() => onRemoveProject(project)}>
+        <Trash2 size={16} aria-hidden="true" />
+        Remove from Jackalope…
+      </M.Item>
+    </>
+  );
+}
+
+/**
+ * Right-clicking a project row opens its actions at the pointer. Other props and the ref
+ * reach the trigger, so an outer Tooltip trigger can wrap it.
+ */
+const ProjectContextMenu = forwardRef<
+  HTMLElement,
+  ProjectActions &
+    Omit<ComponentPropsWithoutRef<typeof ContextMenu.Trigger>, 'children'> & {
+      project: Project;
+      onSetIcon: (project: Project) => void;
+      children: ReactNode;
+    }
+>(
+  (
+    { children, project, onSetIcon, onOpenProject, onNewWork, onRemoveProject, ...trigger },
+    ref,
+  ) => (
+    <ContextMenu.Root>
+      <ContextMenu.Trigger asChild ref={ref} {...trigger}>
+        {children}
+      </ContextMenu.Trigger>
+      <ContextMenu.Portal>
+        <ContextMenu.Content className="workspace-menu min-w-52">
+          <ProjectMenuItems
+            menu={ContextMenu}
+            project={project}
+            onSetIcon={onSetIcon}
+            onOpenProject={onOpenProject}
+            onNewWork={onNewWork}
+            onRemoveProject={onRemoveProject}
+          />
+        </ContextMenu.Content>
+      </ContextMenu.Portal>
+    </ContextMenu.Root>
+  ),
+);
+ProjectContextMenu.displayName = 'ProjectContextMenu';
+
 export function WorkSidebar({
   activeTab,
   onOpen,
@@ -117,6 +226,8 @@ export function WorkSidebar({
   onRemoveProject: (project: Project) => void;
   onAddProject: () => void;
 }) {
+  const actions = { onOpenProject, onNewWork, onRemoveProject };
+  const [iconFor, setIconFor] = useState<Project | null>(null);
   const projects = useProjectStore((state) => state.projects);
   const activeProject = useProjectStore((state) => state.activeProjectId);
   const collapsed = useWorkViewStore((state) => state.collapsedProjects);
@@ -135,9 +246,6 @@ export function WorkSidebar({
   );
   const somethingOpen = Boolean(selectedRun || selectedSession || selectedManaged);
   const projectView = WORKSPACE_VIEWS.find((view) => view.id === activeTab)?.group === 'project';
-  const projectViews = WORKSPACE_VIEWS.filter(
-    (view) => view.group === 'project' && view.id !== 'swarm',
-  );
   const open = (item: WorkItem) => {
     selectWorkItem(item);
     onOpen();
@@ -171,103 +279,91 @@ export function WorkSidebar({
         const listId = `project-tree-${project.id}`;
         return (
           <section key={project.id} className="project-tree-group">
-            <div
-              className="project-tree-head"
-              data-active={project.id === activeProject || undefined}
-            >
-              {items.length ? (
-                <button
-                  type="button"
-                  className="project-tree-toggle"
-                  aria-label={`${expanded ? 'Collapse' : 'Expand'} ${project.name}`}
-                  aria-expanded={expanded}
-                  aria-controls={expanded ? listId : undefined}
-                  onClick={() => useWorkViewStore.getState().toggleProject(project.id)}
-                >
-                  <ChevronRight size={14} aria-hidden="true" className="project-tree-chevron" />
-                </button>
-              ) : (
-                <span className="project-tree-toggle" aria-hidden="true" />
-              )}
-              <button
-                type="button"
-                className="project-tree-name"
-                aria-current={current ? 'page' : undefined}
-                onClick={() => onOpenProject(project.id, 'kanban')}
-                title={project.path}
+            <ProjectContextMenu project={project} onSetIcon={setIconFor} {...actions}>
+              <div
+                className="project-tree-head"
+                data-active={project.id === activeProject || undefined}
               >
-                <span className="project-tree-mark" aria-hidden="true">
-                  {project.name.trim().charAt(0).toUpperCase() || '?'}
-                </span>
-                <span className="project-tree-label">{project.name}</span>
-                {!expanded && (attention > 0 || running > 0) && (
-                  <span className="project-tree-counts">
-                    {attention > 0 && (
-                      <span className="project-tree-count" data-tone="attention">
-                        {attention}
-                        <span className="sr-only"> need you</span>
-                      </span>
-                    )}
-                    {running > 0 && (
-                      <span className="project-tree-count">
-                        {running}
-                        <span className="sr-only"> running</span>
-                      </span>
-                    )}
-                  </span>
-                )}
-              </button>
-              <span className="project-tree-head-actions">
-                <Tooltip side="right" content={`New work in ${project.name}`}>
+                {items.length ? (
                   <button
                     type="button"
-                    className="project-tree-action"
-                    aria-label={`New work in ${project.name}`}
-                    onClick={() => onNewWork(project.id)}
+                    className="project-tree-toggle"
+                    aria-label={`${expanded ? 'Collapse' : 'Expand'} ${project.name}`}
+                    aria-expanded={expanded}
+                    aria-controls={expanded ? listId : undefined}
+                    onClick={() => useWorkViewStore.getState().toggleProject(project.id)}
                   >
-                    <Plus size={14} aria-hidden="true" />
+                    <ChevronRight size={14} aria-hidden="true" className="project-tree-chevron" />
                   </button>
-                </Tooltip>
-                <Menu.Root>
-                  <Menu.Trigger asChild>
+                ) : (
+                  <span className="project-tree-toggle" aria-hidden="true" />
+                )}
+                <button
+                  type="button"
+                  className="project-tree-name"
+                  aria-current={current ? 'page' : undefined}
+                  onClick={() => onOpenProject(project.id, 'kanban')}
+                  title={project.path}
+                >
+                  <ProjectMark project={project} />
+                  <span className="project-tree-label">{project.name}</span>
+                  {!expanded && (attention > 0 || running > 0) && (
+                    <span className="project-tree-counts">
+                      {attention > 0 && (
+                        <span className="project-tree-count" data-tone="attention">
+                          {attention}
+                          <span className="sr-only"> need you</span>
+                        </span>
+                      )}
+                      {running > 0 && (
+                        <span className="project-tree-count">
+                          {running}
+                          <span className="sr-only"> running</span>
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </button>
+                <span className="project-tree-head-actions">
+                  <Tooltip side="right" content={`New work in ${project.name}`}>
                     <button
                       type="button"
                       className="project-tree-action"
-                      aria-label={`${project.name} options`}
+                      aria-label={`New work in ${project.name}`}
+                      onClick={() => onNewWork(project.id)}
                     >
-                      <Ellipsis size={14} aria-hidden="true" />
+                      <Plus size={14} aria-hidden="true" />
                     </button>
-                  </Menu.Trigger>
-                  <Menu.Portal>
-                    <Menu.Content
-                      className="workspace-menu min-w-52"
-                      side="right"
-                      align="start"
-                      collisionPadding={12}
-                    >
-                      {projectViews.map((view) => (
-                        <Menu.Item
-                          key={view.id}
-                          className="workspace-menu-item"
-                          onSelect={() => onOpenProject(project.id, view.id)}
-                        >
-                          <view.icon size={16} aria-hidden="true" />
-                          {view.id === 'project-overview' ? 'Overview' : viewLabel(view.id)}
-                        </Menu.Item>
-                      ))}
-                      <Menu.Separator className="menu-separator" />
-                      <Menu.Item
-                        className="workspace-menu-item"
-                        onSelect={() => onRemoveProject(project)}
+                  </Tooltip>
+                  <Menu.Root>
+                    <Menu.Trigger asChild>
+                      <button
+                        type="button"
+                        className="project-tree-action"
+                        aria-label={`${project.name} options`}
                       >
-                        <Trash2 size={16} aria-hidden="true" />
-                        Remove from Jackalope…
-                      </Menu.Item>
-                    </Menu.Content>
-                  </Menu.Portal>
-                </Menu.Root>
-              </span>
-            </div>
+                        <Ellipsis size={14} aria-hidden="true" />
+                      </button>
+                    </Menu.Trigger>
+                    <Menu.Portal>
+                      <Menu.Content
+                        className="workspace-menu min-w-52"
+                        side="right"
+                        align="start"
+                        collisionPadding={12}
+                      >
+                        <ProjectMenuItems
+                          menu={Menu}
+                          project={project}
+                          onSetIcon={setIconFor}
+                          {...actions}
+                        />
+                      </Menu.Content>
+                    </Menu.Portal>
+                  </Menu.Root>
+                </span>
+              </div>
+            </ProjectContextMenu>
             {expanded && items.length > 0 && (
               <ul id={listId} className="project-tree-items">
                 {items.map((item) => {
@@ -351,16 +447,15 @@ export function WorkSidebar({
           </section>
         );
       })}
+      <ProjectIconDialog project={iconFor} onOpenChange={(next) => !next && setIconFor(null)} />
     </nav>
   );
 }
 
 /** Projects as initials while the sidebar shows icons only. */
-export function CollapsedProjects({
-  onOpenProject,
-}: {
-  onOpenProject: (projectId: string, view: ActiveTab) => void;
-}) {
+export function CollapsedProjects(actions: ProjectActions) {
+  const { onOpenProject } = actions;
+  const [iconFor, setIconFor] = useState<Project | null>(null);
   const projects = useProjectStore((state) => state.projects);
   const activeProject = useProjectStore((state) => state.activeProjectId);
   const byProject = useProjectWork();
@@ -372,21 +467,22 @@ export function CollapsedProjects({
         ).length;
         return (
           <Tooltip key={project.id} side="right" content={project.name}>
-            <button
-              type="button"
-              className="project-rail-item"
-              aria-label={attention ? `${project.name}, ${attention} need you` : project.name}
-              data-active={project.id === activeProject || undefined}
-              onClick={() => onOpenProject(project.id, 'kanban')}
-            >
-              <span className="project-tree-mark" aria-hidden="true">
-                {project.name.trim().charAt(0).toUpperCase() || '?'}
-              </span>
-              {attention > 0 && <span className="project-rail-dot" aria-hidden="true" />}
-            </button>
+            <ProjectContextMenu project={project} onSetIcon={setIconFor} {...actions}>
+              <button
+                type="button"
+                className="project-rail-item"
+                aria-label={attention ? `${project.name}, ${attention} need you` : project.name}
+                data-active={project.id === activeProject || undefined}
+                onClick={() => onOpenProject(project.id, 'kanban')}
+              >
+                <ProjectMark project={project} />
+                {attention > 0 && <span className="project-rail-dot" aria-hidden="true" />}
+              </button>
+            </ProjectContextMenu>
           </Tooltip>
         );
       })}
+      <ProjectIconDialog project={iconFor} onOpenChange={(next) => !next && setIconFor(null)} />
     </nav>
   );
 }
