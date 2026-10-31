@@ -1,4 +1,4 @@
-import { LifeBuoy, Minus, RotateCw, Square, X } from 'lucide-react';
+import { LifeBuoy, Minus, RotateCw, Settings2, Square, X } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { isMacPlatform } from '../../lib/platform-shortcuts';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
@@ -28,10 +28,13 @@ const isMac = isMacPlatform();
 export function TitleBar({
   themePicker = false,
   center,
+  settings,
 }: {
   themePicker?: boolean;
   /** Workspace controls centred in the bar, such as search. */
   center?: ReactNode;
+  /** Opens Settings from the bar; screens without a settings page leave it out. */
+  settings?: { open: () => void; shortcut: string; current: boolean };
 }) {
   const [isMaximized, setIsMaximized] = useState(false);
   const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
@@ -111,6 +114,21 @@ export function TitleBar({
           </Tooltip>
         )}
         {themePicker && showThemePicker && <ArcColorPicker variant="titlebar" />}
+        {settings && (
+          <Tooltip content={`Settings (${settings.shortcut})`}>
+            <button
+              type="button"
+              className="app-titlebar-button"
+              aria-label="Settings"
+              aria-current={settings.current ? 'page' : undefined}
+              onMouseDown={(event) => event.stopPropagation()}
+              onDoubleClick={(event) => event.stopPropagation()}
+              onClick={settings.open}
+            >
+              <Settings2 size={16} />
+            </button>
+          </Tooltip>
+        )}
         <Tooltip content="Help Center">
           <button
             type="button"

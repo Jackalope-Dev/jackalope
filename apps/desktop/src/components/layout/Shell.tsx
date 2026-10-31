@@ -478,6 +478,14 @@ export function Shell({
       <ResizeHandles />
       <TitleBar
         themePicker
+        settings={{
+          open: () =>
+            activeTab === 'preferences'
+              ? setActiveTab(previousView.current)
+              : navigate('preferences'),
+          shortcut: displayShortcut(shortcuts.settings),
+          current: activeTab === 'preferences',
+        }}
         center={
           <Tooltip content={`Search work, projects and commands (${shortcut})`}>
             <button

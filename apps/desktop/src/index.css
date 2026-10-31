@@ -224,6 +224,9 @@ body {
   background: var(--color-surface-hover, rgb(255 255 255 / 0.06));
   color: var(--color-text-primary);
 }
+.app-titlebar-button[aria-current] {
+  color: var(--color-accent-ink);
+}
 .app-titlebar-help {
   position: relative;
   margin-inline-end: 4px;

@@ -62,7 +62,7 @@ export const DEFAULT_SETTINGS: Omit<
 > = {
   mascotReactions: true,
   frostedWindow: true,
-  showThemePickerInToolbar: true,
+  showThemePickerInToolbar: false,
   showTrialPassesInToolbar: true,
   notifications: 'all' as const,
   osNotifications: true,
