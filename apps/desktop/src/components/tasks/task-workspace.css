@@ -275,7 +275,8 @@ select option {
   background: var(--color-surface-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: 10px 12px;
+  min-height: var(--control-height, 36px);
+  padding: 6px 12px;
   font-size: var(--text-sm);
 }
 .task-input:focus-visible {

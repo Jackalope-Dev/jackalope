@@ -95,8 +95,16 @@ export function paletteGradient(theme: ThemePalette) {
   return `linear-gradient(135deg, ${stops.join(', ')})`;
 }
 
+/**
+ * Automatic appearance follows the system's light or dark setting; where no system preference
+ * is available it falls back to dark between 7pm and 7am.
+ */
 export function isDarkAtTime(theme: ThemePalette, now = new Date()) {
   if (theme.appearance !== 'automatic') return theme.isDark !== false;
+  // Typed locally: the brand package also compiles for non-browser targets.
+  const host = globalThis as { matchMedia?: (query: string) => { matches: boolean } };
+  const system = host.matchMedia?.('(prefers-color-scheme: dark)');
+  if (system) return system.matches;
   return now.getHours() < 7 || now.getHours() >= 19;
 }
 
@@ -193,6 +201,17 @@ export function themeTokens(theme: ThemePalette) {
   set('--color-text-primary', tone(dark ? 94 : 14, 4));
   set('--color-text-secondary', tone(dark ? 74 : 32, 4));
   set('--color-text-muted', tone(dark ? 66 : 40, 3));
+  // Categorical chart hues in fixed order, stepped per theme and validated together for
+  // colour-blind separation. Light steps 3 and 4 sit under 3:1 on white, so charts using
+  // them must label every segment. Leftover categories use the neutral "other" step.
+  const series = dark
+    ? ['#3987e5', '#d95926', '#199e70', '#c98500']
+    : ['#2a78d6', '#eb6834', '#1baf7a', '#eda100'];
+  set('--color-series-1', series[0]);
+  set('--color-series-2', series[1]);
+  set('--color-series-3', series[2]);
+  set('--color-series-4', series[3]);
+  set('--color-series-other', tone(dark ? 42 : 72, 4));
 
   const backgrounds = colors.map((color) =>
     relativeLuminance(hslToHex(color.hue, shellSaturation, dark ? 16 : 94)),

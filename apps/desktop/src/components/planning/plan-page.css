@@ -16,7 +16,7 @@
 .plan-list-row {
   display: grid;
   gap: 2px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 8px 12px;
   border-radius: var(--radius-md);
   text-align: left;
@@ -79,7 +79,7 @@
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   height: 100%;
   padding: 12px 14px;
   border-radius: var(--radius-md);
@@ -217,7 +217,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 8px 12px;
   border-radius: var(--radius-md);
   background: var(--color-surface);

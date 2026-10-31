@@ -30,7 +30,7 @@ cc = "1"
 pkg-config = "0.3"
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 # No `zip` feature: it only unpacks Tauri v1 bundles (.msi.zip, .AppImage.tar.gz),

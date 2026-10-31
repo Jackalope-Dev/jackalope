@@ -81,7 +81,7 @@
 .work-topic-list button {
   display: grid;
   gap: 4px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   text-align: left;
@@ -175,7 +175,7 @@
   display: flex;
   align-items: start;
   gap: 8px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 8px;
   border-radius: var(--radius-sm);
 }

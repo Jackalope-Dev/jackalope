@@ -30,19 +30,19 @@ export function ProjectReturn({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {items.slice(0, 3).map((item) => {
         const presence = projectTaskPresence(item, runs, queue);
         return (
           <Panel
             key={item.id}
-            className="p-4 flex flex-wrap justify-between gap-3 items-center rounded-xl"
+            className="px-3 py-2 flex flex-wrap justify-between gap-3 items-center rounded-xl"
           >
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <AgentStack agents={presence.agents} state={presence.state} size="sm" />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <p className="font-medium text-base break-words text-[var(--color-text-primary)]">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-medium text-sm break-words text-[var(--color-text-primary)]">
                     {item.title}
                   </p>
                   <Badge variant={item.stage === 'attention' ? 'warning' : 'outline'}>

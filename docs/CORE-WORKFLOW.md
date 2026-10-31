@@ -29,7 +29,7 @@ connections are tested before their tokens are saved in protected native storage
 ## Work and results
 
 Work combines conversations, tasks and plans, defaults to the selected project and offers an explicit All work scope.
-The work list and recent-work sidebar share discovery without duplicate attempts. Needs-input/recovery
+The work list and project sidebar share discovery without duplicate attempts. Needs-input/recovery
 and failed-check work precede results ready for review, active work, saved ideas and
 finished work. Integration state comes from native verified receipts. Filters, search
 and list/board choices persist per scope and mode. Work rows show the assigned agent character,
@@ -50,7 +50,7 @@ step appears only when the record supports it, such as passing checks on a finis
 result. Dismissing it lasts until the next absence; the last-present time is shared by
 all windows in local storage.
 
-The Work page keeps recent work in a collapsible sidebar and opens task review beside
+The Work page keeps projects and their work in a collapsible sidebar and opens task review beside
 the conversation on wide windows, or at full width on narrower ones. Other tool tabs can retain the conversation, including terminals and
 activity. The work list offers list and board views; New work opens its composer
 explicitly once a project has work. Questions and Stop remain available with the

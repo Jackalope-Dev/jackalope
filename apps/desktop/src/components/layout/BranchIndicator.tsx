@@ -104,7 +104,7 @@ function useSwitchTargets(checkout: string) {
   return targets;
 }
 
-/** The branch in focus, beside the project name, with where it lives and what to do with it. */
+/** The branch in focus, in the status bar beside the project name, with where it lives and what to do with it. */
 export function BranchIndicator() {
   const { host, project, run, managed, checkout } = useFocusedWork();
   const targets = useSwitchTargets(checkout);
@@ -129,9 +129,9 @@ export function BranchIndicator() {
       <Popover.Portal>
         <Popover.Content
           className="workspace-menu statusbar-details"
-          side="bottom"
+          side="top"
           align="start"
-          sideOffset={8}
+          sideOffset={6}
           collisionPadding={12}
         >
           <strong>
@@ -170,7 +170,17 @@ export function BranchIndicator() {
               </ul>
             </section>
           )}
-          <div className="flex flex-wrap gap-2">
+          <div className="branch-actions">
+            {!managed && (
+              <Popover.Close asChild>
+                <Button onClick={() => openChanges(checkout)}>Review changes</Button>
+              </Popover.Close>
+            )}
+            <Popover.Close asChild>
+              <Button variant="outline" onClick={() => navigateWorkspace('worktrees')}>
+                Manage worktrees
+              </Button>
+            </Popover.Close>
             {run?.branch || (!run && !managed && project.gitBranch) ? (
               <CopyButton
                 variant="outline"
@@ -185,16 +195,6 @@ export function BranchIndicator() {
                 label="Copy path"
               />
             ) : null}
-            {!managed && (
-              <Popover.Close asChild>
-                <Button onClick={() => openChanges(checkout)}>Review changes</Button>
-              </Popover.Close>
-            )}
-            <Popover.Close asChild>
-              <Button variant="outline" onClick={() => navigateWorkspace('worktrees')}>
-                Manage worktrees
-              </Button>
-            </Popover.Close>
           </div>
         </Popover.Content>
       </Popover.Portal>

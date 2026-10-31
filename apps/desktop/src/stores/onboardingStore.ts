@@ -19,6 +19,8 @@ interface OnboardingState {
   setFirstTask: (prompt: string) => void;
   go: (step: OnboardingStep) => void;
   finish: () => void;
+  /** Leaves setup started from the workspace without adding the project. */
+  cancel: () => void;
 }
 
 export const useOnboardingStore = create<OnboardingState>()(
@@ -58,6 +60,14 @@ export const useOnboardingStore = create<OnboardingState>()(
       finish: () =>
         set({
           status: 'complete',
+          pendingProject: null,
+          firstTask: null,
+          projectId: null,
+        }),
+      cancel: () =>
+        set({
+          status: 'complete',
+          step: 'project',
           pendingProject: null,
           firstTask: null,
           projectId: null,

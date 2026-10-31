@@ -1,137 +1,383 @@
+/* Shell: the title bar carries search, the sidebar navigates projects and their work,
+   the status bar holds the focused project's context. Dense navigation rows are 32px;
+   coarse pointers get 44px targets back at the end of this file. */
 .workspace-shell .workspace-body {
   display: flex;
   flex: 1;
   min-height: 0;
+  gap: 8px;
+}
+
+/* Dense navigation opts out of the app-wide 44px button minimum; see the coarse-pointer
+   block at the end of this file. */
+:is(
+  .workspace-new-work,
+  .workspace-nav-toggle,
+  .workspace-navigation .workspace-nav-item,
+  .project-tree-action,
+  .project-tree-toggle,
+  .project-tree-name,
+  .work-sidebar-item,
+  .work-sidebar-close,
+  .project-rail-item
+) {
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Title bar with workspace controls: app name left, search centred, window controls right. */
+.app-titlebar.app-titlebar-workspace {
+  height: 40px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 480px) minmax(0, 1fr);
   gap: 12px;
 }
-.workspace-shell .workspace-chrome {
-  height: 60px;
-  flex-shrink: 0;
+.app-titlebar-workspace .app-titlebar-left {
+  padding-inline-start: 16px;
 }
-/* The project name gets hover feedback sized like the branch chip beside it, inside its
-   44px target. A tint of the text colour shows on the shell in both themes. */
-.workspace-shell .workspace-chrome .project-switcher {
-  position: relative;
-  isolation: isolate;
+.app-titlebar-mac .app-titlebar-left {
+  min-width: 78px;
+}
+.app-titlebar-mac.app-titlebar-workspace .app-titlebar-left {
+  padding-inline-start: 80px;
+}
+.app-titlebar-center {
+  display: flex;
+  justify-content: center;
   min-width: 0;
-  padding: 0 8px;
-  margin-left: -8px;
-  background: transparent;
 }
-.workspace-shell .workspace-chrome .project-switcher::before {
-  content: "";
-  position: absolute;
-  inset: 6px 0;
-  z-index: -1;
-  border-radius: var(--radius-sm);
-  transition: background-color 120ms ease;
+.app-titlebar-center .command-trigger.command-jump {
+  width: 100%;
+  min-height: 0;
+  height: 28px;
+  padding: 0 10px;
+  gap: 8px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
 }
-.workspace-shell .workspace-chrome .project-switcher:hover::before,
-.workspace-shell .workspace-chrome .project-switcher[data-state="open"]::before {
-  background: color-mix(in srgb, var(--color-text-primary) 7%, transparent);
+.app-titlebar-center .command-trigger.command-jump > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.workspace-shell .workspace-chrome > div:last-child {
+.app-titlebar-search-icon {
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
 }
+
+/* The vertical navigation is its own rounded panel, matching the content card's radius
+   and height. */
 .workspace-shell .workspace-navigation {
-  width: var(--sidebar-width, 216px);
+  width: var(--sidebar-width, 248px);
   display: flex;
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
-  gap: 4px;
-  padding: 8px;
-  overflow-x: hidden;
-  overflow-y: auto;
+  gap: 2px;
+  padding: 8px 6px 6px;
+  overflow: hidden;
   flex-shrink: 0;
-  transition: width 160ms ease;
-}
-.workspace-shell .workspace-navigation > nav {
-  flex-direction: column;
-  align-items: stretch;
-}
-/* The vertical navigation is its own rounded panel, matching the content card's radius
-   and height. */
-.workspace-shell .workspace-navigation {
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-2xl);
   background: var(--color-navigation);
+  transition: width 160ms ease;
+}
+.workspace-navigation-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.workspace-new-work {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.workspace-new-work:hover {
+  background: var(--color-surface-hover);
+}
+.workspace-nav-toggle,
+.project-tree-action,
+.project-tree-toggle {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.workspace-nav-toggle {
+  width: 32px;
+  height: 32px;
+}
+span.project-tree-toggle {
+  cursor: default;
+}
+.workspace-nav-toggle:hover,
+.project-tree-action:hover,
+button.project-tree-toggle:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+.workspace-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 .workspace-shell .workspace-navigation .workspace-nav-item {
-  text-align: left;
   justify-content: flex-start;
+  gap: 10px;
+  height: 32px;
+  padding: 0 10px;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.workspace-navigation .workspace-nav-item > svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 .workspace-shell .workspace-settings {
   margin-top: auto;
   flex-shrink: 0;
 }
-.workspace-shell .workspace-canvas {
-  --workspace-page-padding: 24px;
-  --workspace-gutter: 24px;
-  flex: 1;
-  min-width: 0;
+/* Bot replies the person has not opened; counts are reserved for things waiting on them. */
+.workspace-shell .workspace-nav-item[data-unread] > span {
+  font-weight: 700;
 }
-/* Sits in the gap between the sidebar and the page, so it adds no width of its own. */
-.workspace-shell .workspace-navigation-resizer {
-  margin-inline: -12px;
+.workspace-shell .workspace-nav-count {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
-.workspace-shell .workspace-navigation:has(+ .workspace-navigation-resizer:active) {
-  transition: none;
-}
-.work-sidebar-list {
+
+/* Projects and their work. */
+.project-tree {
   flex: 1;
   min-height: 0;
+  margin-top: 10px;
+  overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-gutter: stable;
 }
-.work-sidebar-list h2 {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  margin: 20px 12px 8px;
-}
-.work-sidebar-heading {
+.project-tree-heading {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  height: 28px;
+  padding: 0 4px 0 10px;
 }
-.work-sidebar-clear {
-  margin-right: 8px;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
+.project-tree-heading h2 {
+  margin: 0;
   color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
 }
-.work-sidebar-clear:hover {
-  color: var(--color-text-primary);
+.project-tree-action {
+  width: 24px;
+  height: 24px;
+}
+.project-tree-group + .project-tree-group {
+  margin-top: 2px;
+}
+.project-tree-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 32px;
+  border-radius: var(--radius-md);
+}
+.project-tree-head:hover {
   background: var(--color-surface-hover);
 }
-.work-sidebar-clear:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: 1px;
+.project-tree-toggle {
+  width: 20px;
+  height: 32px;
+  margin-left: 2px;
 }
-.work-sidebar-item {
+.project-tree-chevron {
+  transition: rotate 140ms ease;
+}
+.project-tree-toggle[aria-expanded="true"] > .project-tree-chevron {
+  rotate: 90deg;
+}
+.project-tree-name {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  gap: 8px;
   align-items: center;
-  text-align: left;
-  width: 100%;
-  padding: 10px 12px;
+  gap: 8px;
+  height: 32px;
+  padding: 0 6px 0 2px;
   border-radius: var(--radius-md);
-  min-height: 44px;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.project-tree-head:has(.project-tree-name[aria-current="page"]) {
+  background: var(--color-accent-subtle);
+}
+.project-tree-name[aria-current="page"] {
+  color: var(--color-accent-ink);
+}
+.project-tree-mark {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.project-tree-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-tree-counts {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.project-tree-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  text-align: center;
+}
+.project-tree-count[data-tone="attention"] {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+}
+/* Row actions appear on hover or keyboard focus so the tree stays quiet while reading it;
+   the name makes room for them only then. */
+.project-tree-head-actions {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 120ms ease;
+}
+.project-tree-head:is(:hover, :focus-within, :has([data-state="open"])) .project-tree-head-actions {
+  opacity: 1;
+}
+.project-tree-head:is(:hover, :focus-within, :has([data-state="open"])) .project-tree-name {
+  padding-right: 60px;
+}
+.project-tree-head:is(:hover, :focus-within, :has([data-state="open"])) .project-tree-counts {
+  display: none;
+}
+.project-tree-items {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 1px 0 4px;
+  padding: 0;
+  list-style: none;
 }
 .work-sidebar-row {
   position: relative;
 }
-/* Shown on hover or keyboard focus so the list stays quiet while reading it. */
+.work-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  padding: 0 8px 0 26px;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.work-sidebar-item:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+.work-sidebar-item[aria-current="page"] {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+  font-weight: 600;
+}
+.work-sidebar-item:is(
+  [data-unread],
+  [data-stage="attention"],
+  [data-stage="review"],
+  [data-stage="working"]
+):not([aria-current="page"]) {
+  color: var(--color-text-primary);
+}
+.work-sidebar-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-sidebar-item[data-unread] .work-sidebar-title {
+  font-weight: 700;
+}
+.work-sidebar-item .work-signals {
+  align-self: center;
+  flex-shrink: 0;
+}
+/* Waiting on the person: amber for problems and questions, accent for ready to review.
+   Each row also names its state for assistive technology and in its tooltip. */
+.work-sidebar-state {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--color-warning);
+}
+.work-sidebar-state[data-tone="review"] {
+  background: var(--color-accent-ink);
+}
 .work-sidebar-close {
   position: absolute;
   top: 50%;
-  right: 6px;
+  right: 4px;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--radius-sm);
   color: var(--color-text-secondary);
   background: var(--color-surface-hover);
@@ -147,42 +393,138 @@
   color: var(--color-text-primary);
   background: color-mix(in srgb, var(--color-text-primary) 10%, var(--color-surface-hover));
 }
-.work-sidebar-close:focus-visible {
+:is(
+  .work-sidebar-close,
+  .project-tree-action,
+  .project-tree-toggle,
+  .project-tree-name,
+  .workspace-nav-toggle,
+  .work-sidebar-item,
+  .project-rail-item
+):focus-visible {
   outline: 2px solid var(--color-border-focus);
-  outline-offset: 1px;
+  outline-offset: -2px;
+}
+
+/* Icons-only sidebar: projects become initials. */
+.workspace-shell .workspace-navigation[data-collapsed] {
+  width: 52px;
+  align-items: center;
+}
+.workspace-shell .workspace-navigation[data-collapsed] .workspace-navigation-top {
+  flex-direction: column;
+}
+.workspace-shell .workspace-navigation[data-collapsed] .workspace-new-work {
+  flex: none;
+  width: 32px;
+  justify-content: center;
+  padding: 0;
+}
+.workspace-shell
+  .workspace-navigation[data-collapsed]
+  :is(.workspace-new-work, .workspace-nav-item)
+  > span {
+  display: none;
+}
+.workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-item {
+  position: relative;
+  justify-content: center;
+  width: 36px;
+  padding-inline: 0;
+}
+.workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-count {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  min-width: 16px;
+  padding: 0 4px;
+}
+.project-rail {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  overflow-y: auto;
+}
+.project-rail-item {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.project-rail-item:hover {
+  background: var(--color-surface-hover);
+}
+.project-rail-item .project-tree-mark {
+  width: 24px;
+  height: 24px;
+}
+.project-tree-head[data-active] .project-tree-mark {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+}
+.project-rail-item[data-active] .project-tree-mark {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+}
+.project-rail-dot {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--color-navigation);
+  border-radius: var(--radius-full);
+  background: var(--color-warning);
+}
+
+.workspace-shell .workspace-canvas {
+  --workspace-page-padding: 16px;
+  --workspace-gutter: 20px;
+  flex: 1;
+  min-width: 0;
+}
+/* Sits in the gap between the sidebar and the page, so it adds no width of its own. */
+.workspace-shell .workspace-navigation-resizer {
+  margin-inline: -10px;
+}
+.workspace-shell .workspace-navigation:has(+ .workspace-navigation-resizer:active) {
+  transition: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .work-sidebar-close {
+  .work-sidebar-close,
+  .project-tree-head-actions,
+  .project-tree-chevron {
     transition: none;
   }
 }
-.work-sidebar-item:hover {
-  background: var(--color-surface-hover);
-}
-.work-sidebar-item[aria-current="page"] {
-  background: var(--color-accent-subtle);
-}
-.work-sidebar-item > span {
-  min-width: 0;
-}
-.work-sidebar-item strong,
-.work-sidebar-item small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.work-sidebar-item strong {
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-.work-sidebar-item[aria-current="page"] strong {
-  color: var(--color-accent-ink);
-  font-weight: 600;
-}
-.work-sidebar-item small {
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
+@media (max-width: 760px) {
+  .workspace-shell .workspace-body {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .workspace-shell .workspace-navigation {
+    width: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  .workspace-shell .workspace-nav-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .workspace-shell .workspace-settings {
+    margin-top: 0;
+  }
+  .workspace-shell :is(.project-tree, .project-rail, .workspace-navigation-resizer) {
+    display: none;
+  }
 }
 .workspace-statusbar {
   display: flex;
@@ -193,8 +535,8 @@
   border-top: 1px solid var(--color-border-subtle);
   flex-shrink: 0;
   /* Equal space above and below the items (the top border sits above the padding). */
-  padding: 4px 0 5px;
-  margin-top: 8px;
+  padding: 2px 0 3px;
+  margin-top: 4px;
   font-size: var(--text-xs);
 }
 .workspace-statusbar > button,
@@ -202,9 +544,9 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 44px;
+  min-height: 28px;
   border-radius: var(--radius-sm);
-  padding: 6px 8px;
+  padding: 4px 8px;
 }
 /* Tinted from the text colour so the hover reads on any ground and theme. */
 .workspace-statusbar button {
@@ -250,6 +592,15 @@
 .branch-switch {
   margin: 12px 0 16px;
 }
+/* Branch actions share two equal columns: the workspace actions first, then the copies. */
+.branch-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.branch-actions > .ui-button {
+  width: 100%;
+}
 .branch-switch h2 {
   margin: 0 0 4px;
   color: var(--color-text-muted);
@@ -268,7 +619,7 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 6px 8px;
   border: 0;
   border-radius: var(--radius-sm);
@@ -301,109 +652,24 @@
 .companion-inline {
   padding: 0;
 }
+/* The status bar mascot is one bar row tall, like the items beside it; its unread badge
+   tucks into the corner. Coarse pointers restore a 44px target below. */
 .companion-inline .companion-avatar {
-  width: 44px;
-  height: 44px;
+  width: 28px;
+  height: 28px;
 }
-/* The status bar mascot draws smaller than its 44px target so it sits with the bar's text. */
+/* Hover and focus match the other status bar items. */
 .companion-inline .companion-avatar > button {
-  display: grid;
-  place-items: center;
-}
-.companion-inline .companion-avatar > button > svg {
-  width: 32px;
-  height: 32px;
+  min-width: 0;
+  min-height: 0;
+  border-radius: var(--radius-sm);
 }
 .companion-inline .companion-badge {
-  top: 2px;
-  right: -2px;
-  width: 18px;
-  height: 18px;
-  font-size: 0.6875rem;
-}
-@media (max-width: 1000px) {
-  .workspace-shell .workspace-navigation {
-    width: var(--sidebar-width, 180px);
-  }
-  .workspace-shell .command-trigger.command-jump {
-    width: auto;
-  }
-}
-@media (max-width: 760px) {
-  .workspace-shell .workspace-body {
-    flex-direction: column;
-    gap: 4px;
-  }
-  .workspace-shell .workspace-navigation {
-    width: auto;
-    flex-direction: row;
-    flex-wrap: wrap;
-    overflow: visible;
-  }
-  .workspace-shell .workspace-navigation > nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-  .workspace-shell .workspace-settings {
-    margin-top: 0;
-  }
-  .workspace-shell .work-sidebar-list,
-  .workspace-shell .workspace-navigation-resizer {
-    display: none;
-  }
-  .workspace-shell .workspace-nav-item {
-    padding: 8px;
-  }
-}
-.app-titlebar-mac .app-titlebar-left {
-  min-width: 78px;
-}
-.workspace-shell .workspace-nav-toggle {
-  align-self: flex-start;
-  width: auto;
-  padding: 8px 12px;
-  color: var(--color-text-muted);
-}
-.workspace-shell .workspace-navigation[data-collapsed] {
-  width: 60px;
-  align-items: center;
-}
-.workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-toggle {
-  align-self: center;
-}
-/* Bot replies the person has not opened; counts are reserved for things waiting on them. */
-.workspace-shell .workspace-nav-item[data-unread] > span {
-  font-weight: 700;
-}
-.workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-item {
-  justify-content: center;
-  padding-inline: 0;
-  width: 40px;
-}
-.workspace-shell .workspace-nav-count {
-  margin-left: auto;
-  min-width: 20px;
-  padding: 1px 6px;
-  border-radius: var(--radius-sm);
-  background: var(--color-accent-subtle);
-  color: var(--color-accent-ink);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-}
-.workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-item {
-  position: relative;
-}
-.workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-count {
-  position: absolute;
-  top: 0;
-  right: 0;
-  min-width: 16px;
-  padding: 0 4px;
-}
-.workspace-shell .workspace-navigation[data-collapsed] .workspace-nav-item > span {
-  display: none;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  font-size: 0.625rem;
 }
 .workspace-statusbar .statusbar-changes {
   color: var(--color-accent-ink);
@@ -414,7 +680,7 @@
 }
 /* The branch is a bordered chip beside the project name so it reads as a control and
    its lowercase monospace label centres in a box rather than on the project's cap height.
-   The button keeps its 44px target; ::before draws the smaller chip inside it. */
+   ::before draws the chip inside the status bar row. */
 .chrome-branch {
   position: relative;
   isolation: isolate;
@@ -425,8 +691,6 @@
   max-width: 240px;
   padding: 0 8px 0 10px;
   border: 0;
-  /* The header spaces items 16px apart; the branch belongs with the project. */
-  margin-left: -8px;
   background: transparent;
   color: var(--color-text-secondary);
   font-family: var(--font-mono, ui-monospace, monospace);
@@ -438,7 +702,7 @@
 .chrome-branch::before {
   content: "";
   position: absolute;
-  inset: 7px 0;
+  inset: 3px 0;
   z-index: -1;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-full);
@@ -509,15 +773,6 @@
   font-family: var(--font-mono);
   font-size: 0.9em;
 }
-.work-sidebar-item > span:not(.agent-stack, .work-signals) {
-  flex: 1;
-}
-.work-sidebar-item[data-unread] strong {
-  font-weight: 700;
-}
-.work-sidebar-item .work-signals {
-  align-self: center;
-}
 /* Narrow windows keep one status row: secondary entries drop their labels. */
 @media (max-width: 1100px) {
   .workspace-statusbar .statusbar-label {
@@ -542,7 +797,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 44px;
+  min-height: 28px;
   border-radius: var(--radius-sm);
   padding: 6px 8px;
   white-space: nowrap;
@@ -550,4 +805,67 @@
 .workspace-statusbar .statusbar-resume {
   color: var(--color-accent-ink);
   font-weight: 600;
+}
+.workspace-statusbar .statusbar-project {
+  max-width: 200px;
+  padding: 0 2px 0 8px;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Touch and other coarse pointers keep 44px targets in the dense navigation. */
+@media (pointer: coarse) {
+  .workspace-shell .workspace-navigation .workspace-nav-item,
+  .workspace-new-work,
+  .workspace-nav-toggle,
+  .project-tree-head,
+  .project-tree-name,
+  .project-tree-toggle,
+  .work-sidebar-item,
+  .workspace-statusbar > button,
+  .workspace-statusbar > [data-state],
+  .workspace-statusbar .statusbar-paused > button {
+    min-height: 44px;
+  }
+  .project-tree-action,
+  .work-sidebar-close,
+  .companion-inline .companion-avatar {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* Frosted window: the sidebar, page and status bar are panes on clear glass. The title bar
+   and the shared values live with html[data-window-glass] in index.css. */
+html[data-window-glass] body:has(> #root .workspace-shell) {
+  background: var(--glass-backdrop);
+}
+html[data-window-glass] .workspace-shell {
+  background: transparent;
+}
+html[data-window-glass]
+  .workspace-shell
+  :is(.workspace-navigation, .workspace-canvas, .workspace-statusbar) {
+  border: 0;
+  outline: 1px solid var(--glass-edge);
+  outline-offset: -1px;
+  box-shadow: var(--glass-shadow);
+}
+html[data-window-glass] .workspace-shell .workspace-navigation {
+  background: var(--glass-pane-dense);
+}
+html[data-window-glass] .workspace-shell .workspace-canvas {
+  background: var(--glass-page);
+}
+html[data-window-glass] .workspace-shell .workspace-statusbar {
+  margin: 8px 0;
+  padding: 2px 4px;
+  border-radius: var(--radius-lg);
+  background: var(--glass-pane-dense);
+}
+html[data-window-glass] .workspace-shell .app-titlebar-center .command-trigger.command-jump {
+  background: var(--glass-pane-dense);
+  backdrop-filter: none;
 }

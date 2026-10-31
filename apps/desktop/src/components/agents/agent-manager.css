@@ -61,7 +61,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 6px 10px;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
@@ -305,7 +305,7 @@
 }
 
 .agent-account-edit .task-input {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   color: var(--color-text-primary);
 }
 
@@ -351,7 +351,7 @@
   gap: 10px;
   flex: 0 0 44px;
   justify-content: center;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   min-width: 0;
   background: none;
   border: none;
@@ -457,7 +457,7 @@
 .agent-account-group span {
   display: flex;
   align-items: center;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 8px 12px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);

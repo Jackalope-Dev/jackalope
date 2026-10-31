@@ -11,6 +11,7 @@ export function AppearancePreferences({ projectId }: { projectId?: string }) {
   );
   const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
   const mascotReactions = useSettingsStore((state) => state.mascotReactions);
+  const frostedWindow = useSettingsStore((state) => state.frostedWindow);
   const updateSettings = useSettingsStore((state) => state.updateSettings);
   const { projects, updateProjectPreferences } = useProjectStore(
     useShallow((s) => ({
@@ -43,6 +44,16 @@ export function AppearancePreferences({ projectId }: { projectId?: string }) {
       </SettingGroup>
       {!projectId && (
         <SettingGroup title="Interface">
+          <Setting
+            title="Frosted window"
+            description="Show your desktop softly through the window on Windows 11 and macOS."
+          >
+            <Switch
+              label="Frosted window"
+              checked={frostedWindow}
+              onCheckedChange={(next) => updateSettings({ frostedWindow: next })}
+            />
+          </Setting>
           <Setting
             title="Companion animations"
             description="Let the jackalope react to your work. Reduced motion keeps it still."

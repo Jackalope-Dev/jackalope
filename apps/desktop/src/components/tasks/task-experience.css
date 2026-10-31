@@ -74,7 +74,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 10px 14px;
   border-radius: var(--radius-md);
   background: var(--color-surface);
@@ -151,7 +151,7 @@
 }
 .task-experience-summary,
 .task-context-instructions > summary {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   cursor: pointer;
   padding: 8px 0;
 }
@@ -176,7 +176,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   cursor: pointer;
   padding: 10px 4px;
 }
@@ -248,7 +248,7 @@
   background: var(--color-accent-subtle);
 }
 .task-context-guideline > button {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   width: 100%;
   display: flex;
   align-items: center;
@@ -276,7 +276,7 @@
   font-size: var(--text-xs);
 }
 .task-context-guideline summary {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   display: flex;
   align-items: center;
   cursor: pointer;

@@ -69,10 +69,10 @@
     display: block;
     width: 100%;
     min-width: 0;
-    min-height: 44px;
+    min-height: var(--control-height, 36px);
     border: 1px solid var(--color-border);
     border-radius: 8px;
-    padding: 10px 12px;
+    padding: 6px 12px;
     background: var(--color-surface-elevated);
     color: var(--color-text-primary);
     font-size: var(--text-sm, 0.875rem);

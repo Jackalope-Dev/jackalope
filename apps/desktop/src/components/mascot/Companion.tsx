@@ -1,4 +1,4 @@
-import { ExternalLinkIcon, Popover, SearchIcon, SegmentedNav } from '@jackalope/ui';
+import { Button, ExternalLinkIcon, Popover, SearchIcon, SegmentedNav } from '@jackalope/ui';
 import { ArrowLeft, Check, CircleCheck, CircleHelp, Info, Settings2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -157,7 +157,7 @@ export function Companion({
                 </MascotSpeech>
               )}
             <JackalopeMascot
-              size="sm"
+              size={compact ? 'xs' : 'sm'}
               className="companion-avatar"
               showBubble={!open}
               overrideMood={currentMood}
@@ -278,8 +278,8 @@ export function Companion({
                                 <p>{notice.detail}</p>
                                 <div className="companion-notice-actions">
                                   {notice.onOpen && (
-                                    <button
-                                      type="button"
+                                    <Button
+                                      size="sm"
                                       onClick={() => {
                                         markRead([notice.id]);
                                         activate(notice.onOpen as () => void);
@@ -287,23 +287,22 @@ export function Companion({
                                     >
                                       {notice.actionLabel ?? 'View details'}
                                       <ExternalLinkIcon size={16} />
-                                    </button>
+                                    </Button>
                                   )}
-                                  {
-                                    <button
-                                      type="button"
-                                      aria-label={`Mark ${notice.title} as ${isUnread ? 'read' : 'unread'}`}
-                                      onClick={() =>
-                                        isUnread ? markRead([notice.id]) : markUnread(notice.id)
-                                      }
-                                    >
-                                      {isUnread ? 'Mark read' : 'Mark unread'}
-                                    </button>
-                                  }
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    aria-label={`Mark ${notice.title} as ${isUnread ? 'read' : 'unread'}`}
+                                    onClick={() =>
+                                      isUnread ? markRead([notice.id]) : markUnread(notice.id)
+                                    }
+                                  >
+                                    {isUnread ? 'Mark read' : 'Mark unread'}
+                                  </Button>
                                   {notice.onDismiss && (
-                                    <button type="button" onClick={notice.onDismiss}>
+                                    <Button size="sm" variant="ghost" onClick={notice.onDismiss}>
                                       Dismiss
-                                    </button>
+                                    </Button>
                                   )}
                                 </div>
                               </div>

@@ -1,0 +1,7 @@
+/* The connect form appears in Settings and in project onboarding, so it carries its own styles. */
+.artifacts-connect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}

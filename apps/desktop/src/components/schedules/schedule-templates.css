@@ -126,7 +126,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   font-size: var(--text-sm);
   cursor: pointer;
 }

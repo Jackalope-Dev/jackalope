@@ -18,11 +18,18 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 
 ## Desktop workspace
 
-- Work is the shared entry point for conversations, tasks and plans. Its sidebar
-  groups recent work by next action; the bottom bar shows the selected workspace,
-  local activity and visual account allowances with freshness and reset times.
+- Work is the shared entry point for conversations, tasks and plans. The sidebar
+  lists projects as a tree of their work, needs-you first, then running and recent;
+  a project row opens that project's work and its menu opens project pages. The title
+  bar holds command search; the bottom bar shows the focused project, branch, local
+  activity and visual account allowances with freshness and reset times.
   Settings → Desktop holds sleep prevention, owned terminals and preview ports.
   Settings groups account and support details.
+- The window is frosted on Windows 11 (Acrylic) and macOS (vibrancy) by default, keeping
+  text on tinted panes; Settings → Appearance → Frosted window turns it off, and Windows 10,
+  Linux and reduced-transparency settings keep the opaque look. New installs use the Auto
+  theme, which follows the system's light or dark setting. Native macOS acceptance remains
+  open.
 - Desktop preferences include interface zoom, editor and shell selection, terminal
   font size, HTTP links and editable search, new-work and settings shortcuts. Saved
   prompts and commands can apply to all projects or one project; commands require an
@@ -41,7 +48,7 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   before the existing preparation command. Both checkouts must ignore each file;
   links, parent paths and overwrites are refused. Worktree size inspection counts
   bounded logical file sizes, labels partial results and retains existing cleanup guards.
-- The workspace has one layout: a collapsible sidebar of recent work beside the open
+- The workspace has one layout: a collapsible project sidebar beside the open
   item, with review, preview, terminal or activity next to its conversation. The work
   list offers list and board views, and its filters save per project.
   Needs you prioritizes recovery and questions, then older reviews. Task context
@@ -116,7 +123,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Active task, plan and chat views show recent tool activity, workspace file labels and
   native check output from existing events, without extra model calls.
   Project opens an overview with unfinished work, setup and recorded local deliveries.
-- The Work sidebar groups review and blocked work under Needs you, alongside active work. Task
+- The sidebar marks review and blocked work as needing you, ahead of active work, and the
+  Work link counts it across projects. Task
   and session sections remember where the user was reading. Project readiness distinguishes
   unavailable inspection from a clean checkout.
 - Result views prioritize unanswered questions, recovery and failed checks. Isolated

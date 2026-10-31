@@ -27,6 +27,20 @@
     ]
   },
   {
+    "id": "a-denser-workspace-built-around-projects-and-their-agents",
+    "date": "2026-10-30",
+    "status": "In development",
+    "title": "A denser workspace built around projects and their agents",
+    "description": "The desktop app now puts every project and its running work in the sidebar and gives more of the window to the work itself.",
+    "items": [
+      "Projects form a tree in the sidebar with their questions, failures and reviews first, then running and recent work, each with its agent and live status.",
+      "Command search moves into the title bar and the project and branch move to the status bar, removing a whole header row.",
+      "Buttons, fields, tabs, lists and page spacing are more compact with a mouse or trackpad and keep larger targets on touch screens.",
+      "The window is frosted on Windows 11 and macOS, with every label kept readable over any wallpaper; turn it off in Settings → Appearance.",
+      "New installs follow your system light or dark setting, and choosing a project shows a quick overview of its size, languages and latest commit."
+    ]
+  },
+  {
     "id": "finish-work-from-the-terminal-and-stay-in-sync-with-the-app",
     "date": "2026-10-29",
     "status": "In development",

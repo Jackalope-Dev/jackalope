@@ -278,7 +278,7 @@
   overflow-wrap: anywhere;
 }
 .coordination-decisions .task-summary {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   display: list-item;
   padding-block: 12px;
 }
@@ -295,5 +295,5 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }

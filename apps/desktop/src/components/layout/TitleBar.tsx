@@ -1,5 +1,5 @@
 import { LifeBuoy, Minus, RotateCw, Square, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { isMacPlatform } from '../../lib/platform-shortcuts';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -22,9 +22,17 @@ const isMac = isMacPlatform();
  * traffic lights, window corner rounding and shadow — the left column is
  * just empty space reserved for them. Other platforms use `decorations:
  * false` (tauri.conf.json) and get fully custom controls on the right.
- * A no-op outside Tauri (browser dev preview keeps its normal chrome).
+ * Outside Tauri it renders only when it carries `center` content, without
+ * window controls (the browser keeps its own chrome).
  */
-export function TitleBar({ themePicker = false }: { themePicker?: boolean }) {
+export function TitleBar({
+  themePicker = false,
+  center,
+}: {
+  themePicker?: boolean;
+  /** Workspace controls centred in the bar, such as search. */
+  center?: ReactNode;
+}) {
   const [isMaximized, setIsMaximized] = useState(false);
   const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
   const beta = useUpdateStore((state) => state.release?.channel === 'beta');
@@ -51,7 +59,8 @@ export function TitleBar({ themePicker = false }: { themePicker?: boolean }) {
     return () => unlisten?.();
   }, []);
 
-  if (!isTauriEnvironment()) return null;
+  const native = isTauriEnvironment();
+  if (!native && !center) return null;
 
   type Win = ReturnType<typeof import('@tauri-apps/api/window')['getCurrentWindow']>;
 
@@ -61,16 +70,29 @@ export function TitleBar({ themePicker = false }: { themePicker?: boolean }) {
   };
 
   return (
-    <div data-tauri-drag-region className={`app-titlebar${isMac ? ' app-titlebar-mac' : ''}`}>
-      {/* Empty on every platform: on macOS this space sits under the native
-          traffic lights (drawn by the OS via titleBarStyle: Overlay); on
-          other platforms it just balances the right column so the title
-          below stays centered. */}
-      <div className="app-titlebar-left" data-tauri-drag-region />
-      <div className="app-titlebar-label" data-tauri-drag-region>
-        <img src="/mascot.svg" alt="" aria-hidden="true" className="size-3.5" />
-        <span>Jackalope{edition}</span>
+    <div
+      data-tauri-drag-region
+      className={`app-titlebar${isMac ? ' app-titlebar-mac' : ''}${center ? ' app-titlebar-workspace' : ''}`}
+    >
+      {/* On macOS the left edge sits under the native traffic lights (drawn by
+          the OS via titleBarStyle: Overlay). With workspace controls in the
+          centre, the app name moves to the left column. */}
+      <div className="app-titlebar-left" data-tauri-drag-region>
+        {center && (
+          <div className="app-titlebar-label" data-tauri-drag-region>
+            <img src="/mascot.svg" alt="" aria-hidden="true" className="size-3.5" />
+            <span>Jackalope{edition}</span>
+          </div>
+        )}
       </div>
+      {center ? (
+        <div className="app-titlebar-center">{center}</div>
+      ) : (
+        <div className="app-titlebar-label" data-tauri-drag-region>
+          <img src="/mascot.svg" alt="" aria-hidden="true" className="size-3.5" />
+          <span>Jackalope{edition}</span>
+        </div>
+      )}
       <div className="app-titlebar-controls">
         {updateReady && (
           <Tooltip content="The update is downloaded. Jackalope reopens in a few seconds.">
@@ -101,7 +123,7 @@ export function TitleBar({ themePicker = false }: { themePicker?: boolean }) {
             <LifeBuoy size={16} />
           </button>
         </Tooltip>
-        {!isMac && (
+        {native && !isMac && (
           <>
             <button
               type="button"

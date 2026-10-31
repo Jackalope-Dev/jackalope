@@ -25,7 +25,9 @@ automatic checks; reserve full setup and verification for work that changes file
 
 ## Navigation and copy
 
-Peer workspace views use WorkspacePage for gutters and scrolling,
+The title bar holds command search, the sidebar navigates projects and their work, and
+the status bar shows the focused project's branch and activity. Peer workspace views use
+WorkspacePage for gutters and scrolling,
 WorkspaceHeading for the page title and actions, WorkspaceSectionHeading for
 section titles, and WorkspaceSubnavigation for peer tabs. Keep page headers in
 loading and empty states. Use the shared workspace spacing classes and tokens;
@@ -129,7 +131,8 @@ restores the saved appearance. Invalid color input must not change global styles
 
 Show selection with a subtle tinted fill (`--color-accent-subtle`); avoid accent rings and
 one-sided accent borders. Options people choose from look selectable: a bordered row
-with a radio or check indicator, not bare text. Focus rings on fields sit just inside
+with a radio or check indicator (`Choice`, or its `ui-choice` classes around a native input),
+not bare text. Text actions and links to other sites use `LinkButton`. Focus rings on fields sit just inside
 the control so scrolling dialogs and panels never clip them. Contained dialogs pad their
 own body and footer to line up with the header, and content sits on the dialog surface
 rather than nested background panels.
@@ -143,15 +146,27 @@ panel on `--color-navigation`. Pages use one vertical rhythm from their
 layout gap rather than per-section margins. Transient notices, previews and errors the
 user can clear have a visible close control.
 
-Interactive content targets are at least 44 by 44 CSS pixels. Native window
-chrome can follow platform sizing. Dialogs retain viewport space and scroll on
+Sign-in, project setup and the workspace render `WindowGlass`, which turns on the OS window
+material (Acrylic on Windows 11, vibrancy on macOS) and sets `data-window-glass` unless the
+Frosted window setting is off; other platforms and reduced transparency keep the opaque look.
+On glass, text and icons sit only on panes or title bar capsules tinted enough to keep 4.5:1
+over any backdrop: 85% where text is primary, secondary or accent, 90% where muted text appears
+(the workspace). Use the shared `--glass-*` values; screens without `WindowGlass` paint an
+opaque background.
+
+Controls use the shared `--control-height` (36px) and `--control-height-compact` (32px)
+for menu rows, segments and dense navigation; coarse pointers raise both to 44px. Prefer
+compact layouts that keep projects, work and agents in view over extra padding. Native
+window chrome can follow platform sizing. Dialogs retain viewport space and scroll on
 small windows. Respect reduced motion, including preference changes while open.
 
 ## Setup, settings and accounts
 
 Keep setup provisional until workspace entry. Preserve project choice, task
-drafts and explicit preferences across Back, retry and reload. Project onboarding
-has no cancel exit; users reach the final step before entering the workspace.
+drafts and explicit preferences across Back, retry and reload. First-run project
+onboarding has no cancel exit; users reach the final step before entering the workspace.
+Adding another project from the workspace offers Back to workspace, which discards the
+provisional setup.
 The first task remains optional on that final step. Give slow or failed checks a
 clear retry path.
 
@@ -213,7 +228,7 @@ Maintain the existing setup acknowledgment and workspace-entry behavior.
 ## Components and verification
 
 Import portable controls from @jackalope/ui. The library includes Button,
-IconButton, Input, Textarea, FormField, Select, Checkbox, Switch, Badge, Tooltip,
+IconButton, LinkButton, Input, Textarea, FormField, Select, Checkbox, Choice, Switch, Badge, Tooltip,
 DropdownMenu, Popover, Tabs, SegmentedControl, SegmentedNav, dialogs, CopyButton, InlineNotice,
 LoadingState, EmptyState, ErrorState, PageHeader, SectionHeader, Toolbar, Stat,
 DefinitionList, Table, SearchField, Disclosure, SettingRow, SettingGroup and Panel.

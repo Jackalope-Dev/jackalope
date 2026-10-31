@@ -6,6 +6,7 @@ import { createContext, type ReactNode, useContext, useEffect, useRef, useState 
 import { DISCORD_URL } from '../../lib/community';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { WindowGlass } from '../../lib/window-glass';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -151,6 +152,7 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
     );
   return (
     <div className="access-frame">
+      <WindowGlass />
       <ResizeHandles />
       <TitleBar />
       <main className="access-page">

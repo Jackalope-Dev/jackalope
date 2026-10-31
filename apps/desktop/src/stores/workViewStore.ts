@@ -18,6 +18,9 @@ interface WorkViewState {
   /** The app sidebar shows icons only. */
   navCollapsed: boolean;
   toggleNav: () => void;
+  /** Projects folded in the sidebar tree; absent projects are expanded. */
+  collapsedProjects: Record<string, boolean>;
+  toggleProject: (id: string) => void;
   /** Panel sizes the user dragged, in pixels, by panel; absent panels use their default. */
   sizes: Record<string, number>;
   setSize: (id: string, size: number | null) => void;
@@ -43,6 +46,14 @@ export const useWorkViewStore = create<WorkViewState>()(
       viewing: null,
       setViewing: (viewing) => set({ viewing }),
       toggleNav: () => set((state) => ({ navCollapsed: !state.navCollapsed })),
+      collapsedProjects: {},
+      toggleProject: (id) =>
+        set((state) => {
+          const collapsedProjects = { ...state.collapsedProjects };
+          if (collapsedProjects[id]) delete collapsedProjects[id];
+          else collapsedProjects[id] = true;
+          return { collapsedProjects };
+        }),
       sizes: {},
       setSize: (id, size) =>
         set((state) => {
@@ -79,12 +90,13 @@ export const useWorkViewStore = create<WorkViewState>()(
     }),
     {
       name: 'jackalope-work-views',
-      partialize: ({ scope, views, reading, split, navCollapsed, sizes }) => ({
+      partialize: ({ scope, views, reading, split, navCollapsed, collapsedProjects, sizes }) => ({
         scope,
         views,
         reading,
         split,
         navCollapsed,
+        collapsedProjects,
         sizes,
       }),
     },

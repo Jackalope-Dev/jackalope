@@ -1,0 +1,90 @@
+@import "./foundation.css";
+@layer components {
+  /* A selectable row: bordered, with room for a title and a description line, and a radio
+     indicator. Lists of choices stack them with a small gap. */
+  .ui-choice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: var(--control-height, 36px);
+    padding: 8px 12px;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      background-color var(--motion-fast, 120ms) ease,
+      border-color var(--motion-fast, 120ms) ease;
+  }
+  .ui-choice:hover {
+    border-color: var(--color-border);
+    background: var(--color-surface-hover);
+  }
+  .ui-choice:is([aria-pressed="true"], [data-selected], :has(input:checked)) {
+    border-color: var(--color-border);
+    background: var(--color-accent-subtle);
+  }
+  .ui-choice:disabled,
+  .ui-choice:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  .ui-choice:focus-visible,
+  .ui-choice:has(input:focus-visible) {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: -2px;
+  }
+  .ui-choice-body {
+    display: grid;
+    flex: 1;
+    gap: 2px;
+    min-width: 0;
+  }
+  .ui-choice-title,
+  .ui-choice-description {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ui-choice-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 500;
+    line-height: 1.35;
+  }
+  .ui-choice-description {
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs, 0.75rem);
+    line-height: 1.35;
+  }
+  /* An empty ring until chosen, so every option reads as selectable. */
+  .ui-choice-indicator {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-full);
+    color: var(--color-on-action);
+  }
+  .ui-choice:is([aria-pressed="true"], [data-selected]) .ui-choice-indicator {
+    border-color: var(--color-action);
+    background: var(--color-action);
+  }
+  .ui-choice-list {
+    display: grid;
+    gap: 6px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ui-choice {
+      transition: none;
+    }
+  }
+}

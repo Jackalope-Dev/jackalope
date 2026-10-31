@@ -8,7 +8,8 @@ import { MascotSpeech } from './MascotSpeech';
 import { useMascotIdle } from './useMascotIdle';
 
 interface JackalopeMascotProps {
-  size?: 'sm' | 'md' | 'lg';
+  /** `xs` fits a status bar row. */
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   showBubble?: boolean;
   className?: string;
   overrideMood?: MascotMood;
@@ -94,7 +95,7 @@ export function JackalopeMascot({
   const currentMood = overrideMood ?? mood;
   const systemReducedMotion = useReducedMotionPreference();
   const reduceMotion = forceReducedMotion || !!systemReducedMotion;
-  const dim = size === 'sm' ? 40 : size === 'md' ? 88 : 152;
+  const dim = size === 'xs' ? 28 : size === 'sm' ? 40 : size === 'md' ? 88 : 152;
   const resting = currentMood === 'sleep';
   const attentive = (hovered || focused) && !resting;
   const idleMotion = useMascotIdle(
