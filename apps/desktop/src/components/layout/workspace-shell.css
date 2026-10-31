@@ -879,3 +879,51 @@ html[data-window-glass] .workspace-shell .app-titlebar-center .command-trigger.c
   background: var(--glass-pane-dense);
   backdrop-filter: none;
 }
+
+/* Project icon picker: a grid of square choices; the selected one takes the subtle tint. */
+.project-icon-dialog {
+  width: min(400px, calc(100vw - 32px));
+}
+.project-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.project-icon-option {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast, 120ms) ease,
+    color var(--motion-fast, 120ms) ease;
+}
+.project-icon-option:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+.project-icon-option[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+}
+.project-icon-option:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+.project-icon-initial {
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+@media (prefers-reduced-motion: reduce) {
+  .project-icon-option {
+    transition: none;
+  }
+}

@@ -469,6 +469,17 @@ export function Shell({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTab, focusComposer, navigate, shortcutSettings]);
 
+  const projectActions = {
+    onOpenProject: openProject,
+    onNewWork: (id: string) => {
+      switchProject(id);
+      focusComposer();
+    },
+    onRemoveProject: (item: Project) => {
+      removeReturnFocus.current = document.activeElement as HTMLElement | null;
+      setRemovingProject(item);
+    },
+  };
   return (
     <div className="workspace-shell">
       <a className="skip-link" href="#workspace-content">
@@ -597,20 +608,12 @@ export function Shell({
             ))}
           </nav>
           {navCollapsed ? (
-            <CollapsedProjects onOpenProject={openProject} />
+            <CollapsedProjects {...projectActions} />
           ) : (
             <WorkSidebar
+              {...projectActions}
               activeTab={activeTab}
               onOpen={() => setActiveTab('kanban')}
-              onOpenProject={openProject}
-              onNewWork={(id) => {
-                switchProject(id);
-                focusComposer();
-              }}
-              onRemoveProject={(item) => {
-                removeReturnFocus.current = document.activeElement as HTMLElement | null;
-                setRemovingProject(item);
-              }}
               onAddProject={openProjectSetup}
             />
           )}

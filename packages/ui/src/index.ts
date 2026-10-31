@@ -9,6 +9,7 @@ export { Button, type ButtonProps } from './Button';
 export * from './Checkbox';
 export * from './Choice';
 export * from './ConfirmDialog';
+export * as ContextMenu from './ContextMenu';
 export * from './CopyButton';
 export * from './Data';
 export * from './Dialog';

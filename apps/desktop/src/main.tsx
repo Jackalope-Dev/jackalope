@@ -4,6 +4,9 @@ import App from './App';
 import './index.css';
 import { DesktopExperience } from './components/layout/DesktopExperience';
 import { AppErrorBoundary } from './components/ui/AppErrorBoundary';
+import { suppressNativeContextMenu } from './lib/native-context-menu';
+
+suppressNativeContextMenu();
 
 const LiveSessionWindow = React.lazy(() => import('./components/sessions/LiveSessionWindow'));
 const liveSessionId = new URLSearchParams(window.location.search).get('liveSession');

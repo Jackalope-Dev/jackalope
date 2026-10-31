@@ -229,7 +229,7 @@ Maintain the existing setup acknowledgment and workspace-entry behavior.
 
 Import portable controls from @jackalope/ui. The library includes Button,
 IconButton, LinkButton, Input, Textarea, FormField, Select, Checkbox, Choice, Switch, Badge, Tooltip,
-DropdownMenu, Popover, Tabs, SegmentedControl, SegmentedNav, dialogs, CopyButton, InlineNotice,
+DropdownMenu, ContextMenu, Popover, Tabs, SegmentedControl, SegmentedNav, dialogs, CopyButton, InlineNotice,
 LoadingState, EmptyState, ErrorState, PageHeader, SectionHeader, Toolbar, Stat,
 DefinitionList, Table, SearchField, Disclosure, SettingRow, SettingGroup and Panel.
 Reuse desktop compositions such as WorkspaceHeading,
@@ -292,7 +292,8 @@ an immediate controlled preference, not a serialized form field. Wrap a checkbox
 in a label with a comfortable hit area or use FormField. Keep specialized file,
 color, range and editor controls local when their interaction requires it.
 DropdownMenu and Popover keep Portal explicit so nested overlays can choose their
-container. Tabs use arrow-key panel navigation; SegmentedControl uses pressed
+container. Release builds turn off the webview's own right-click menu outside text fields
+and selections; right-click actions use ContextMenu and repeat a visible options menu's items. Tabs use arrow-key panel navigation; SegmentedControl uses pressed
 buttons for filtering and SegmentedNav uses aria-current for view navigation. CopyButton accepts a custom clipboard function, shows
 failure beside the action and clears stale feedback when its text changes.
 
