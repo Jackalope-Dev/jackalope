@@ -52,7 +52,7 @@
 .statusbar-allowances {
   width: min(380px, calc(100vw - 24px));
   max-height: min(600px, var(--radix-popover-content-available-height));
-  overflow-y: auto;
+  overflow: hidden auto;
   padding: 12px 16px;
   font-size: var(--text-xs);
 }
@@ -64,7 +64,8 @@
 }
 .statusbar-allowances-heading {
   justify-content: space-between;
-  margin: -4px -8px 0 0;
+  /* The refresh button's own padding lines its icon up with the rows' right edge. */
+  margin: -4px 0 0;
 }
 .statusbar-allowances h2,
 .statusbar-allowances h3 {
@@ -90,6 +91,8 @@
 }
 .statusbar-allowance-account {
   display: grid;
+  /* A long account name truncates instead of widening the column for every row. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   padding: 10px 0;
   border-bottom: 1px solid var(--color-border-subtle);
@@ -98,7 +101,7 @@
    columns keep every account's meters aligned. */
 .statusbar-allowance-window {
   display: grid;
-  grid-template-columns: 96px minmax(48px, 1fr) 76px 44px;
+  grid-template-columns: 92px minmax(40px, 1fr) 84px 44px;
   align-items: center;
   gap: 10px;
   min-height: 20px;
@@ -110,9 +113,12 @@
   white-space: nowrap;
 }
 .statusbar-allowance-window strong {
+  min-width: 0;
+  overflow: hidden;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   text-align: end;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .statusbar-allowance-reset {

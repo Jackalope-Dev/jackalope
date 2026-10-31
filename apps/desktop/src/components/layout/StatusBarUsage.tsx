@@ -207,7 +207,14 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
                         remaining={remaining}
                         label={`${agentName(record.agent)} · ${window.poolName} · ${name}`}
                       />
-                      <strong>{remaining === null ? label : `${label.split(' ')[0]} left`}</strong>
+                      {/* The column fits a percentage; other states keep their full wording on hover. */}
+                      <strong title={label}>
+                        {remaining !== null
+                          ? `${label.split(' ')[0]} left`
+                          : label === 'Refresh needed'
+                            ? 'Refresh'
+                            : '—'}
+                      </strong>
                       <span
                         className="statusbar-allowance-reset"
                         title={
