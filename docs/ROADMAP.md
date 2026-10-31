@@ -165,6 +165,11 @@ Local sandboxes start when needed and stop when idle or when Jackalope quits.
 Jackalope-hosted computers are planned, not available. Installed and live-account
 acceptance remain open.
 
+Review evidence levels with local checks, proven-findings Challenge review, judged
+comparisons with Keep and combine, plan questions limited to preferences, per-attempt decision trails, the Since you left
+catch-up, Sharpen, lesson-to-check enforcement and a feature map for review captures are
+implemented. Real-agent behavior and installed-app acceptance remain open.
+
 Cloudflare Artifacts is available as a beta bring-your-own-account option for new and
 existing projects, with pushes and expiring review snapshots. Live account and installed
 acceptance remain open.
