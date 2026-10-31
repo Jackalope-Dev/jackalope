@@ -37,6 +37,10 @@ release dates.
   failure, HTTPS setup, pairing expiry, device revocation, project removal, questions,
   disconnect/retry without duplicate sends and host restart. Cover protected storage and
   Tailscale Serve coexistence on each platform; validate access boundaries independently.
+- [ ] Finish the Android and iOS companion (apps/mobile): push notifications when work needs
+  you (host registration of device tokens, a server relay holding the FCM and APNs
+  credentials, generic notification text), Android and iOS project generation and CI builds,
+  QR pairing, and acceptance on real phones before any store listing.
 
 - [ ] Run agent comparisons with installed providers: partial start failures, mixed
   finish times, stopped attempts, keep-one archiving and restore, and later follow-ups on
@@ -459,5 +463,5 @@ release dates.
 - [ ] Verify downloaded artifacts, publication recovery and the selected channel;
   follow [release acceptance](RELEASE.md) and [platform requirements](CROSS-PLATFORM-RELEASES.md).
 
-Managed hosting, native mobile applications and collaboration remain exploratory
+Managed hosting and collaboration remain exploratory
 directions in [BACKEND.md](BACKEND.md) and the roadmap.

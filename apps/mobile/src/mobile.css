@@ -1,0 +1,8 @@
+/* The installed app owns the whole screen: keep content clear of the notch, the
+   home indicator and rounded corners on phones that report safe-area insets. */
+.mobile-body .companion-page {
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-right: max(16px, env(safe-area-inset-right));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  padding-left: max(16px, env(safe-area-inset-left));
+}

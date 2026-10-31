@@ -70,7 +70,8 @@ Python 3. Dictation requires a local transcription service. Installed permission
 recovery and cross-platform behavior still require validation.
 
 Trusted-host pairing and a responsive web companion support scoped task check-ins,
-questions, follow-ups, dispatch and change review. SSH forwarding and HTTPS retain
+questions, follow-ups, dispatch and change review. Android and iOS companion apps
+reuse those screens and add notifications when work needs you. SSH forwarding and HTTPS retain
 the host's execution ownership. Native multi-device, transport and provider acceptance
 remain in progress; implementation does not establish release availability.
 
@@ -185,6 +186,6 @@ unfinished work. See [usage and routing](USAGE-AND-ROUTING.md).
 ## Further out: work across machines
 
 Managed hosting (including hosted Artifacts repositories), agent-native repository
-workflows, native mobile applications, shared workspaces and team collaboration
+workflows, shared workspaces and team collaboration
 depend on validated individual remote workflows. These remain exploratory directions.
 See [BACKEND.md](BACKEND.md).
