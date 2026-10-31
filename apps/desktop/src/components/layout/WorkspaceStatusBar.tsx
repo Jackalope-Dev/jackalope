@@ -110,7 +110,13 @@ export function WorkspaceStatusBar({
       <StatusBarUsage remote={Boolean(host)} />
       <Menu.Root>
         <Menu.Trigger asChild>
-          <button ref={moreButton} type="button" aria-label="More" title="More">
+          <button
+            ref={moreButton}
+            type="button"
+            className="statusbar-icon"
+            aria-label="More"
+            title="More"
+          >
             <Ellipsis size={15} aria-hidden="true" />
           </button>
         </Menu.Trigger>

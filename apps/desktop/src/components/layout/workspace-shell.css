@@ -567,6 +567,12 @@ button.project-tree-toggle:hover {
   outline: 2px solid var(--color-accent-ink);
   outline-offset: 1px;
 }
+/* Icon-only items are square so their hover matches the mascot beside them. */
+.workspace-statusbar > .statusbar-icon {
+  justify-content: center;
+  width: 28px;
+  padding: 0;
+}
 .statusbar-branch {
   max-width: 180px;
   overflow: hidden;
@@ -664,11 +670,12 @@ button.project-tree-toggle:hover {
   min-height: 0;
   border-radius: var(--radius-sm);
 }
+/* Inside the avatar box, so the badge never crosses the bar's edge or rounded corner. */
 .companion-inline .companion-badge {
-  top: -4px;
-  right: -4px;
-  width: 16px;
-  height: 16px;
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
   font-size: 0.625rem;
 }
 .workspace-statusbar .statusbar-changes {
@@ -724,8 +731,9 @@ button.project-tree-toggle:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.chrome-branch:hover,
-.chrome-branch[data-state="open"] {
+/* The pill is the hover; the status bar's rectangular item hover would sit behind it. */
+.workspace-statusbar .chrome-branch:is(:hover, :active, [data-state="open"]) {
+  background: transparent;
   color: var(--color-text-primary);
 }
 .chrome-branch:hover::before,
@@ -733,7 +741,7 @@ button.project-tree-toggle:hover {
   border-color: var(--color-border);
   background: var(--color-surface-hover);
 }
-.chrome-branch:focus-visible {
+.workspace-statusbar .chrome-branch:focus-visible {
   outline: none;
 }
 .chrome-branch:focus-visible::before {
@@ -831,6 +839,7 @@ button.project-tree-toggle:hover {
   }
   .project-tree-action,
   .work-sidebar-close,
+  .workspace-statusbar > .statusbar-icon,
   .companion-inline .companion-avatar {
     width: 44px;
     height: 44px;
@@ -861,7 +870,8 @@ html[data-window-glass] .workspace-shell .workspace-canvas {
 }
 html[data-window-glass] .workspace-shell .workspace-statusbar {
   margin: 8px 0;
-  padding: 2px 4px;
+  /* Side padding keeps the first and last items (the mascot's badge) inside the rounded corners. */
+  padding: 2px 6px;
   border-radius: var(--radius-lg);
   background: var(--glass-pane-dense);
 }
