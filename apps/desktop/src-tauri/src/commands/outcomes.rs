@@ -74,6 +74,29 @@ pub struct RequirementAssessment {
     pub summary: String,
     #[serde(default)]
     pub evidence: Vec<String>,
+    /// Claimed evidence strength. Absent on reports saved before levels existed,
+    /// which review shows as unrated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(
+        description = "How far you proved it: stated (you say so), cited (real file:line in evidence), reasoned (failure case walked step by step, with a citation), ran (command and output) or reproduced (capture or preview page in evidence)"
+    )]
+    pub level: Option<super::evidence::EvidenceLevel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(description = "For reasoned: the failure case walked step by step")]
+    pub reasoning: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(description = "For ran: the exact command that exercised the real code")]
+    pub command: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(description = "For ran: the relevant output, up to 4,000 bytes")]
+    pub output: Option<String>,
+    /// Set by Jackalope from the evidence; agent-supplied values are replaced.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(skip)]
+    pub checked_level: Option<super::evidence::EvidenceLevel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(skip)]
+    pub check_note: Option<String>,
 }
 
 pub fn validate_assessments(
@@ -94,11 +117,48 @@ pub fn validate_assessments(
                     .evidence
                     .iter()
                     .any(|s| s.trim().is_empty() || s.len() > 500 || s.contains('\0'))
+                || !super::evidence::valid_proof(&item.reasoning, &item.command, &item.output)
         })
     {
-        return Err("Use unique current requirement IDs, a short justification (up to 1,200 bytes), and up to eight evidence references (500 bytes each).".into());
+        return Err("Use unique current requirement IDs, a short justification (up to 1,200 bytes), up to eight evidence references (500 bytes each), and reasoning, command and output within 2,000, 1,000 and 4,000 bytes.".into());
     }
     Ok(())
+}
+
+/// Reporting contract for every bridged task: a short restatement first, so a
+/// misread goal is visible before the work is done. Not a request to pause.
+pub const RESTATEMENT_CONTRACT: &str = "\nReporting contract: your first message restates, in your own words and a sentence each, the goal, the problem and the smallest change you expect to make. Record it once with restate_goal (HTTP: POST /v1/goal-restatement {goal,problem,smallestChange}), then continue without waiting for confirmation.\n";
+
+/// The agent's own restatement of the task, shown as "Understood as".
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GoalRestatement {
+    #[schemars(description = "What the person wants, in your own words, one sentence")]
+    pub goal: String,
+    #[schemars(description = "The problem behind it, one sentence")]
+    pub problem: String,
+    #[serde(alias = "smallest_change")]
+    #[schemars(description = "The smallest change you expect to make, one sentence")]
+    pub smallest_change: String,
+    /// Set by Jackalope when recorded.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    #[schemars(skip)]
+    pub recorded_at: String,
+}
+
+impl GoalRestatement {
+    pub fn validated(mut self) -> Result<Self, String> {
+        for field in [&mut self.goal, &mut self.problem, &mut self.smallest_change] {
+            *field = field.split_whitespace().collect::<Vec<_>>().join(" ");
+            if field.is_empty() || field.len() > 400 || field.contains('\0') {
+                return Err(
+                    "Give the goal, problem and smallest change in 1–400 bytes each.".into(),
+                );
+            }
+        }
+        self.recorded_at = chrono::Utc::now().to_rfc3339();
+        Ok(self)
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -189,7 +249,7 @@ impl TaskContract {
         {
             text.push_str(&format!("CURRENT STEP: {}. Perform only this step, report its evidence and stop. Do not advance to later steps; the user must accept this checkpoint in Jackalope first.\n", current.title));
         }
-        text.push_str("Follow process steps in order. At the end, after implementation and required verification, make one record_validation_step call (HTTP: POST /v1/validation-step) with a requirements array covering each applicable requirement: requirementId, status (met, partial or unverified), a short summary explaining the result and justification, and evidence references to changed files, recorded checks or screenshots. Explicitly identify anything not verified; do not invent evidence. Future workflow steps remain unverified. Human acceptance is recorded separately by Jackalope.\n");
+        text.push_str("Follow process steps in order. At the end, after implementation and required verification, make one record_validation_step call (HTTP: POST /v1/validation-step) with a requirements array covering each applicable requirement: requirementId, status (met, partial or unverified), a short summary explaining the result and justification, evidence references, and level with its matching evidence: stated; cited (real file:line references); reasoned (citations plus reasoning that walks the failure case); ran (command and output of a command or test exercising the real code); reproduced (a recorded screenshot ID or opened preview page). Optionally add safety_fact: the one fact the change is safe because of, with its own level and evidence. Jackalope checks references locally and lowers unsupported levels. Explicitly identify anything not verified; do not invent evidence. Future workflow steps remain unverified. Human acceptance is recorded separately by Jackalope.\n");
         text
     }
 
@@ -518,9 +578,64 @@ mod tests {
                 status: AssessmentStatus::Unverified,
                 summary: "Not yet verified".into(),
                 evidence: vec![],
+                level: None,
+                reasoning: None,
+                command: None,
+                output: None,
+                checked_level: None,
+                check_note: None,
             })
             .collect();
         assert!(validate_assessments(&answers, Some(&contract)).is_ok());
         assert!(contract.require_accepted("tree").is_err());
+    }
+
+    #[test]
+    fn saved_assessments_without_levels_load_unrated_and_the_contract_asks_for_levels() {
+        let saved: RequirementAssessment = serde_json::from_value(serde_json::json!({
+            "requirementId": "requirement-0", "status": "met", "summary": "Done", "evidence": []
+        }))
+        .unwrap();
+        assert!(saved.level.is_none() && saved.checked_level.is_none());
+        let value = serde_json::to_value(&saved).unwrap();
+        assert!(value.get("level").is_none() && value.get("checkedLevel").is_none());
+        let contract = TaskContract {
+            requirements: vec![Requirement {
+                id: "requirement-0".into(),
+                title: "Works".into(),
+                checkpoint: false,
+                receipt: None,
+            }],
+            ..Default::default()
+        };
+        let text = contract.text();
+        assert!(text.contains("reproduced") && text.contains("safety_fact"));
+        let mut long = saved;
+        long.output = Some("x".repeat(4001));
+        assert!(validate_assessments(&[long], Some(&contract)).is_err());
+    }
+
+    #[test]
+    fn goal_restatements_are_trimmed_bounded_and_timestamped() {
+        let understood: GoalRestatement = serde_json::from_value(serde_json::json!({
+            "goal": "  Keep long titles   from widening the list ",
+            "problem": "Titles push the sidebar wider",
+            "smallest_change": "Truncate the title cell"
+        }))
+        .unwrap();
+        let understood = understood.validated().unwrap();
+        assert_eq!(understood.goal, "Keep long titles from widening the list");
+        assert!(!understood.recorded_at.is_empty());
+        assert_eq!(
+            serde_json::to_value(&understood).unwrap()["smallestChange"],
+            "Truncate the title cell"
+        );
+        let empty: GoalRestatement = serde_json::from_value(
+            serde_json::json!({"goal": " ", "problem": "p", "smallestChange": "s"}),
+        )
+        .unwrap();
+        assert!(empty.validated().is_err());
+        assert!(RESTATEMENT_CONTRACT.contains("restate_goal"));
+        assert!(RESTATEMENT_CONTRACT.contains("without waiting"));
     }
 }

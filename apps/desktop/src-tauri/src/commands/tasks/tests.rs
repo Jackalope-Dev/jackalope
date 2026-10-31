@@ -1,4 +1,5 @@
 use super::*;
+mod decision_trail;
 mod workbench;
 mod workspace_modes;
 
@@ -22,6 +23,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         routing: None,
         quota_failure: None,
         contract: Default::default(),
+        understanding: None,
         monitor_change: None,
         context_receipt: Default::default(),
         id: "test-attempt-123".into(),
@@ -64,11 +66,13 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         usage_observations: vec![],
         prompts: vec![],
         validation_steps: vec![],
+        decisions: vec![],
         screenshots: vec![],
         desktop_actions: vec![],
         visited_pages: vec![],
         review_captures: None,
         review_capturing: false,
+        challenge_of: None,
     }
 }
 
@@ -444,6 +448,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
                 keywords: vec![],
                 enabled: true,
                 stale: None,
+                enforced: None,
                 source_run_id: None,
                 source_head: None,
                 revision: 0,

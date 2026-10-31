@@ -18,8 +18,9 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { isRetainedWorkspace, retainedWorkspaces } from '../../lib/compare-judge';
 import { nativeTask } from '../../lib/task-runtime';
 import {
   archiveWorktree,
@@ -32,6 +33,8 @@ import {
   type WorktreeOrphan,
 } from '../../lib/tauri-bridge';
 import { openChanges } from '../../stores/commitReviewStore';
+import { useCompareStore } from '../../stores/compareStore';
+import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
@@ -52,6 +55,18 @@ function discarded(worktrees: WorktreeEntry[]): string[] {
 
 const isReady = (wt: WorktreeEntry) =>
   Boolean((wt.cleanup?.merged || wt.cleanup?.content_merged) && !wt.cleanup.blocked_reason);
+
+/** A combine follow-up still reads this worktree, so neither cleanup nor archiving is offered. */
+function retain(wt: WorktreeEntry): WorktreeEntry {
+  return {
+    ...wt,
+    cleanup: wt.cleanup && {
+      ...wt.cleanup,
+      recoverable: false,
+      blocked_reason: 'Kept until the follow-up that combines it finishes.',
+    },
+  };
+}
 
 /** One plain-language status per worktree, so the row reads at a glance. */
 function worktreeStatus(
@@ -107,12 +122,23 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   const refreshing = loading || checkingWorktrees;
   const projectPath = project?.path ?? '';
   const normalizedRoot = projectPath.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
-  const worktrees = (project?.worktrees ?? []).filter(
-    (wt, index) =>
-      index > 0 &&
-      !['main', 'master'].includes(wt.branch) &&
-      wt.path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase() !== normalizedRoot,
+  const comparisons = useCompareStore((s) => s.comparisons);
+  const { runs, drafts } = useExecutionStore(
+    useShallow((s) => ({ runs: s.runs, drafts: s.drafts })),
   );
+  const retained = useMemo(
+    () =>
+      retainedWorkspaces(comparisons, runs, (taskId) => drafts[`reply:${taskId}`]?.prompt ?? ''),
+    [comparisons, runs, drafts],
+  );
+  const worktrees = (project?.worktrees ?? [])
+    .filter(
+      (wt, index) =>
+        index > 0 &&
+        !['main', 'master'].includes(wt.branch) &&
+        wt.path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase() !== normalizedRoot,
+    )
+    .map((wt) => (isRetainedWorkspace(retained, wt.path) ? retain(wt) : wt));
   const ready = worktrees.filter(isReady);
   const active = worktrees.filter((wt) => !isReady(wt));
   const missing = worktrees.filter((wt) => wt.cleanup?.missing && !wt.is_locked);

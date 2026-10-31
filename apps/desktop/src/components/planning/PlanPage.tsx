@@ -10,6 +10,7 @@ import {
   type PlanShape,
   type PlanSummary,
   type PlanView,
+  planAssumption,
   planCommands,
   type SectionChange,
   shapeChoices,
@@ -55,6 +56,31 @@ function Bullets({ items, empty }: { items: string[]; empty: string }) {
       {items.map((item) => (
         <li key={item}>{item}</li>
       ))}
+    </ul>
+  );
+}
+
+/** Facts the planner checked in the code, with their evidence, apart from its own choices. */
+function Assumptions({ items }: { items: string[] }) {
+  if (!items.length) return <p className="plan-muted">None recorded.</p>;
+  return (
+    <ul className="plan-assumptions">
+      {items.map((raw) => {
+        const item = planAssumption(raw);
+        return (
+          <li key={raw}>
+            <Badge variant={item.checked ? 'success' : 'default'}>
+              {item.checked ? 'Checked' : 'Assumed'}
+            </Badge>
+            <span>
+              {item.text}
+              {item.checked && (
+                <span className="plan-evidence">{item.evidence || 'No evidence recorded'}</span>
+              )}
+            </span>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -334,6 +360,10 @@ function PlanReview({
   };
   const waves = useMemo(() => (doc ? taskWaves(doc.tasks) : []), [doc]);
   const coverage = useMemo(() => (doc ? criterionCoverage(doc) : []), [doc]);
+  const assumed = useMemo(
+    () => (doc ? doc.assumptions.filter((item) => !planAssumption(item).checked) : []),
+    [doc],
+  );
   if (!doc) return null;
   const reviewable = !view.planning && ['draft', 'approved'].includes(view.status);
   const running = view.status === 'running';
@@ -352,10 +382,10 @@ function PlanReview({
                 : undefined
             }
           />
-          {doc.assumptions.length > 0 && (
+          {assumed.length > 0 && (
             <InlineNotice tone="warning">
               <strong>Check these assumptions before approving.</strong>
-              <Bullets items={doc.assumptions} empty="" />
+              <Bullets items={assumed} empty="" />
             </InlineNotice>
           )}
           <fieldset className="plan-shapes">
@@ -423,7 +453,7 @@ function PlanReview({
           <WorkspaceSectionHeading
             title="Edit the plan"
             titleId={`${id}-editor`}
-            description="Keep task headings as ### key · title and criteria as - AC-n [verify] text."
+            description="Keep task headings as ### key · title, criteria as - AC-n [verify] text and checked facts as - Checked: fact — evidence: source."
           />
           <Textarea
             aria-labelledby={`${id}-editor`}
@@ -525,6 +555,10 @@ function PlanDocumentView({
         ) : (
           <p className="plan-muted">The code answered everything.</p>
         )}
+      </section>
+      <section data-change={mark('Assumptions')}>
+        <h3>Assumptions</h3>
+        <Assumptions items={doc.assumptions} />
       </section>
       <section data-change={mark('Out of scope')}>
         <h3>Out of scope</h3>

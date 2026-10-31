@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { usePresenceTracking } from '../../stores/presenceStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 
 export function DesktopExperience() {
   const zoom = useSettingsStore((state) => state.interfaceZoom);
+  usePresenceTracking();
   useEffect(() => {
     const value = Number.isFinite(zoom) ? Math.max(0.8, Math.min(1.5, zoom)) : 1;
     if (isTauriEnvironment()) {

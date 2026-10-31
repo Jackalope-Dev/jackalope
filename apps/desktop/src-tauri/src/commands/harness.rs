@@ -66,6 +66,11 @@ pub struct QuestionPresentation {
     )]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rationale: Option<String>,
+    #[schemars(
+        description = "Optional; required in plan mode: one short sentence on why reading the code or a read-only command cannot answer this, up to 300 characters"
+    )]
+    #[serde(default, alias = "why_ask", skip_serializing_if = "Option::is_none")]
+    pub why_ask: Option<String>,
 }
 
 impl QuestionPresentation {
@@ -80,6 +85,7 @@ impl QuestionPresentation {
         };
         self.header = bounded(self.header, 60);
         self.rationale = bounded(self.rationale, 500);
+        self.why_ask = bounded(self.why_ask, 300);
         self.recommended = self
             .recommended
             .filter(|value| options.iter().any(|option| option == value));
@@ -100,6 +106,62 @@ pub struct ValidationStep {
     pub timestamp: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub requirements: Vec<super::outcomes::RequirementAssessment>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finding: Option<ChallengeFinding>,
+    #[serde(
+        default,
+        rename = "safetyFact",
+        alias = "safety_fact",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub safety_fact: Option<super::evidence::SafetyFact>,
+}
+
+/// What a Challenge reviewer ran to prove a finding. Review counts a finding as proven
+/// only when both the command and its printed output are present.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ChallengeFinding {
+    #[schemars(description = "The exact command you ran, from your workspace root")]
+    #[serde(default)]
+    pub command: String,
+    #[schemars(description = "What the command printed: the lines that show the failure")]
+    #[serde(default)]
+    pub output: String,
+    #[schemars(description = "The output the task's intent requires instead")]
+    #[serde(default)]
+    pub expected: String,
+    #[schemars(description = "Why the printed output breaks the task's intent")]
+    #[serde(default, alias = "breaksIntent", alias = "breaks_intent")]
+    pub breaks: String,
+}
+
+impl ChallengeFinding {
+    pub(super) fn bounded(self) -> Self {
+        let bounded = |text: String, limit: usize| -> String {
+            let text = text.replace(char::from(0), "");
+            let text = text.trim();
+            if text.chars().count() <= limit {
+                return text.to_string();
+            }
+            // Failures usually print their decisive lines last, so keep the tail.
+            let tail: String = text
+                .chars()
+                .rev()
+                .take(limit)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
+            format!("…{tail}")
+        };
+        Self {
+            command: bounded(self.command, 2_000),
+            output: bounded(self.output, 6_000),
+            expected: bounded(self.expected, 2_000),
+            breaks: bounded(self.breaks, 2_000),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
@@ -235,9 +297,19 @@ pub struct RecordValidationInput {
     pub evidence: Vec<String>,
     #[serde(default)]
     #[schemars(
-        description = "Optional final batch of requirement answers: requirementId from the task contract, met/partial/unverified, concise justification and evidence references. Agent assessments do not accept requirements for the user."
+        description = "Optional final batch of requirement answers: requirementId from the task contract, met/partial/unverified, concise justification, evidence references and evidence level. Agent assessments do not accept requirements for the user."
     )]
     pub requirements: Vec<super::outcomes::RequirementAssessment>,
+    #[serde(default)]
+    #[schemars(
+        description = "Only in a Challenge review: the run that proves this finding. Use status failed and the finding title as step."
+    )]
+    pub finding: Option<ChallengeFinding>,
+    #[serde(default, alias = "safetyFact")]
+    #[schemars(
+        description = "Optional: the one fact the change is safe because of, with its own evidence level"
+    )]
+    pub safety_fact: Option<super::evidence::SafetyFact>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
@@ -457,7 +529,8 @@ mod tests {
         let input: AskUserInput = serde_json::from_value(serde_json::json!({
             "question": "Storage?", "input_type": "choice", "options": ["App storage", "Repo"],
             "header": "Storage", "recommended": "Nowhere", "multi_select": true,
-            "allow_other": false, "rationale": "Decides   where revisions live."
+            "allow_other": false, "rationale": "Decides   where revisions live.",
+            "why_ask": "  A product choice.  "
         }))
         .unwrap();
         let shown = input.presentation.sanitized(&input.options);
@@ -469,6 +542,8 @@ mod tests {
             shown.rationale.as_deref(),
             Some("Decides where revisions live.")
         );
+        assert_eq!(shown.why_ask.as_deref(), Some("A product choice."));
+        assert!(value.get("whyAsk").is_none());
         let lone = QuestionPresentation {
             multi_select: true,
             ..Default::default()

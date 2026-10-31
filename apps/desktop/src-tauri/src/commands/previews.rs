@@ -10,6 +10,7 @@ use std::{
 };
 use tauri::State;
 pub mod design;
+pub mod features;
 pub mod review;
 
 #[derive(Clone, Serialize)]

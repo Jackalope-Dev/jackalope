@@ -30,6 +30,8 @@
   --text-sm--line-height: 1.5;
   --text-base: 1rem;
   --text-base--line-height: 1.5;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.4;
   --text-xl: 1.25rem;
   --text-xl--line-height: 1.4;
   --text-2xl: 1.75rem;
@@ -118,7 +120,7 @@ body {
 
 .workspace-shell {
   height: calc(100dvh / var(--interface-zoom, 1));
-  padding: 0 12px;
+  padding: 0 8px;
   display: flex;
   flex-direction: column;
   background: var(--color-shell-gradient);
@@ -132,7 +134,7 @@ body {
    of the window, not an inset bar. */
 .app-titlebar {
   height: 32px;
-  margin: 0 -12px;
+  margin: 0 -8px;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -222,6 +224,9 @@ body {
   background: var(--color-surface-hover, rgb(255 255 255 / 0.06));
   color: var(--color-text-primary);
 }
+.app-titlebar-button[aria-current] {
+  color: var(--color-accent-ink);
+}
 .app-titlebar-help {
   position: relative;
   margin-inline-end: 4px;
@@ -308,24 +313,6 @@ body {
   cursor: nesw-resize;
 }
 
-.workspace-chrome {
-  height: 68px;
-  padding: 0 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-  gap: 20px;
-}
-.project-switcher {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  cursor: pointer;
-}
 .command-trigger {
   display: flex;
   align-items: center;
@@ -427,10 +414,11 @@ body {
 }
 .workspace-menu-item {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
-  border-radius: var(--radius-lg);
-  padding: 12px;
+  min-height: var(--control-height-compact, 32px);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
   outline: none;
   font-size: var(--text-xs);
   cursor: pointer;
@@ -592,7 +580,7 @@ img[src="/mascot.svg"] {
   border: 0;
 }
 .starter-chip {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 0 16px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
@@ -612,7 +600,9 @@ img[src="/mascot.svg"] {
   outline-offset: 2px;
 }
 
-/* Every Jackalope message: above the mascot, tail pointing at it. See MascotSpeech. */
+/* Every Jackalope message: above the mascot, tail pointing at it. See MascotSpeech.
+   The bubble is offset by its tail's inset plus half the tail's width (8px + 5px) so
+   the tail's point lands on the mascot's centre line. */
 .mascot-speech {
   position: absolute;
   bottom: calc(100% + 10px);
@@ -622,7 +612,7 @@ img[src="/mascot.svg"] {
   gap: 8px;
   width: max-content;
   max-width: min(320px, calc(100vw - 48px));
-  padding: 8px 8px 8px 14px;
+  padding: 10px 10px 10px 14px;
   border-radius: var(--radius-xl);
   background: var(--color-text-primary);
   color: var(--color-surface-elevated);
@@ -631,11 +621,11 @@ img[src="/mascot.svg"] {
   line-height: 1.5;
 }
 .mascot-speech[data-side="left"] {
-  right: 50%;
+  right: calc(50% - 13px);
   border-bottom-right-radius: var(--radius-xs);
 }
 .mascot-speech[data-side="right"] {
-  left: 50%;
+  left: calc(50% - 13px);
   border-bottom-left-radius: var(--radius-xs);
 }
 .mascot-speech::after {
@@ -654,7 +644,6 @@ img[src="/mascot.svg"] {
   left: 8px;
 }
 .mascot-speech-text {
-  padding-top: 4px;
   overflow-wrap: anywhere;
 }
 /* The bubble is inverted, so its action inverts back to read as a button. Scoped under
@@ -719,7 +708,8 @@ img[src="/mascot.svg"] {
   min-width: 0;
   height: 22px;
   min-height: 0;
-  margin: 1px -4px 0 0;
+  /* Centred on the first 21px line of text. */
+  margin: -1px -2px 0 0;
   padding: 0;
   border-radius: var(--radius-full);
   background: transparent;
@@ -785,4 +775,44 @@ img[src="/mascot.svg"] {
   font-family: var(--font-mono, monospace);
   font-size: var(--text-xs);
   white-space: nowrap;
+}
+
+/* Frosted window (lib/window-glass.tsx sets data-window-glass once the OS effect is on).
+   Tints are the lowest that keep text at 4.5:1 over any backdrop, black to white, in both
+   themes: 85% panes carry primary, secondary and accent text, 90% panes also muted text.
+   The backdrop tint only colours the clear glass between panes, which holds no text. */
+html[data-window-glass] {
+  --glass-backdrop: color-mix(in srgb, var(--color-bg) 20%, transparent);
+  --glass-pane: color-mix(in srgb, var(--color-surface-elevated) 85%, transparent);
+  --glass-pane-dense: color-mix(in srgb, var(--color-surface-elevated) 90%, transparent);
+  --glass-page: color-mix(in srgb, var(--color-bg) 90%, transparent);
+  --glass-edge: color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+  --glass-shadow: 0 16px 60px color-mix(in srgb, var(--color-text-primary) 12%, transparent);
+  background: transparent;
+}
+/* On glass the title bar is clear; its name and controls float as 28px frosted capsules,
+   centred in the bar like the search field and inset to line up with the panes below. */
+html[data-window-glass] .app-titlebar {
+  background: transparent;
+}
+html[data-window-glass] .app-titlebar :is(.app-titlebar-label, .app-titlebar-controls) {
+  outline: 1px solid var(--glass-edge);
+  outline-offset: -1px;
+  background: var(--glass-pane-dense);
+}
+html[data-window-glass] .app-titlebar .app-titlebar-label {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--radius-full);
+}
+html[data-window-glass] .app-titlebar .app-titlebar-controls {
+  align-self: center;
+  height: 28px;
+  margin-inline-end: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+}
+html[data-window-glass] .app-titlebar .app-titlebar-button {
+  width: 40px;
+  min-height: 0;
 }

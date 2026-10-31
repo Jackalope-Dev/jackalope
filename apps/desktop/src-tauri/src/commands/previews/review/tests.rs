@@ -74,12 +74,84 @@ fn pages_follow_settings_then_criteria_then_visits_within_the_cap() {
     let visited: Vec<String> = ["/a", "/b", "/c", "/d", "/e", "/help"]
         .map(String::from)
         .to_vec();
-    let pages = select_pages(&["/".into()], &criteria, &visited);
+    let pages = select_pages(&["/".into()], &criteria, &[], &visited);
     let paths: Vec<&str> = pages.iter().map(|page| page.path.as_str()).collect();
     assert_eq!(paths, ["/", "/settings", "/help", "/e", "/d", "/c"]);
     assert_eq!(pages.len(), PAGE_LIMIT);
     assert_eq!(pages[1].criteria, ["AC-1", "AC-2"]);
     assert_eq!(pages[2].reasons, ["plan", "visited"]);
+}
+
+#[test]
+fn changed_feature_pages_follow_explicit_pages_and_precede_visits() {
+    let criteria = vec![("AC-1".to_string(), "Check /plans".to_string())];
+    let features: Vec<String> = ["/billing", "/plans", "/team"].map(String::from).to_vec();
+    let visited: Vec<String> = ["/team", "/a", "/b", "/c"].map(String::from).to_vec();
+    let pages = select_pages(&["/".into()], &criteria, &features, &visited);
+    let paths: Vec<&str> = pages.iter().map(|page| page.path.as_str()).collect();
+    assert_eq!(paths, ["/", "/plans", "/billing", "/team", "/c", "/b"]);
+    assert_eq!(pages[1].reasons, ["plan", "feature"]);
+    assert_eq!(pages[3].reasons, ["feature", "visited"]);
+    // Feature pages never push configured pages past the cap.
+    let configured: Vec<String> = (0..PAGE_LIMIT).map(|i| format!("/p{i}")).collect();
+    let pages = select_pages(&configured, &[], &features, &[]);
+    assert!(pages.iter().all(|page| page.reasons == ["configured"]));
+}
+
+#[test]
+fn feature_maps_reach_capture_settings_and_changed_files_include_new_ones() {
+    let mut project = record(Some("pnpm dev --port {port}"));
+    project.feature_map = vec![
+        crate::commands::previews::features::Feature {
+            name: " Billing ".into(),
+            page: "/billing/".into(),
+            sources: vec!["src/billing/**".into()],
+            ..Default::default()
+        },
+        crate::commands::previews::features::Feature {
+            name: "Broken".into(),
+            page: "billing".into(),
+            ..Default::default()
+        },
+    ];
+    let features = settings(&project).unwrap().features;
+    assert_eq!(features.len(), 1);
+    assert_eq!(
+        (features[0].name.as_str(), features[0].page.as_str()),
+        ("Billing", "/billing")
+    );
+
+    let root = std::env::temp_dir().join(format!("jackalope-review-diff-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    let git = |args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .args(["-c", "user.name=T", "-c", "user.email=t@example.com"])
+            .args(args)
+            .current_dir(&root)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
+    };
+    git(&["init", "-q"]);
+    std::fs::write(root.join("src/a.ts"), "a").unwrap();
+    std::fs::write(root.join("src/b.ts"), "b").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-qm", "base"]);
+    let base = git(&["rev-parse", "HEAD"]);
+    std::fs::write(root.join("src/a.ts"), "changed").unwrap();
+    git(&["commit", "-qam", "work"]);
+    std::fs::write(root.join("src/b.ts"), "edited").unwrap();
+    std::fs::write(root.join("src/new.ts"), "new").unwrap();
+    let mut run = TaskRun {
+        workspace: root.to_string_lossy().into_owned(),
+        base_head: base,
+        ..Default::default()
+    };
+    assert_eq!(changed_files(&run), ["src/a.ts", "src/b.ts", "src/new.ts"]);
+    run.base_head.clear();
+    assert!(changed_files(&run).is_empty());
+    let _ = std::fs::remove_dir_all(root);
 }
 
 #[test]

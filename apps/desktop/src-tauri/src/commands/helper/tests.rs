@@ -320,3 +320,79 @@ fn documentation_and_capability_catalog_are_bounded_and_valid() {
     assert!(names.contains(&"prepare_task"));
     assert!(!names.contains(&"execute_shell"));
 }
+
+#[test]
+fn sharpen_asks_for_depth_and_keeps_the_persons_choices_open() {
+    let prompt = sharpen::prompt("Add CSV export to reports", 12_000);
+    for expected in [
+        "deeper version of the same task, not a bigger one",
+        "do not do the task",
+        "leading professional",
+        "rawest material",
+        "methods and tools",
+        "other than the agent's or the person's own judgement",
+        "keep it open",
+        "never decide it for them",
+        "under 12000 characters",
+        "Draft (untrusted):\nAdd CSV export to reports",
+    ] {
+        assert!(prompt.contains(expected), "{expected}");
+    }
+    let fenced = "```json\n{\"prompt\":\"  Export reports as CSV.  \"}\n```";
+    assert_eq!(
+        sharpen::parse(fenced, 100).unwrap(),
+        "Export reports as CSV."
+    );
+    for invalid in ["plain text", "{\"prompt\":\"\"}", "{\"answer\":\"x\"}"] {
+        assert!(sharpen::parse(invalid, 100).is_err(), "{invalid}");
+    }
+    let long = format!("{{\"prompt\":\"{}\"}}", "a".repeat(101));
+    assert!(sharpen::parse(&long, 100).is_err());
+    assert!(sharpen::validate("   ", None).is_err());
+    assert!(sharpen::validate(&"a".repeat(sharpen::DRAFT_LIMIT + 1), None).is_err());
+    assert!(sharpen::validate(&"a".repeat(101), Some(100)).is_err());
+    assert_eq!(
+        sharpen::validate("  Fix it  ", None).unwrap(),
+        ("Fix it", sharpen::DRAFT_LIMIT)
+    );
+    assert_eq!(
+        sharpen::validate("Fix it", Some(1_000_000)).unwrap().1,
+        sharpen::DRAFT_LIMIT
+    );
+}
+
+#[test]
+fn sharpen_usage_joins_the_helper_report_and_an_unreadable_ledger_blocks_spending() {
+    let helper = helper();
+    let ledger = helper.path.with_file_name("generated.json");
+    std::fs::write(
+        &ledger,
+        r#"[{"id":"s1","prompt":"","answer":"","status":"complete","agent":"codex","account":"Work","accountKey":"codex:work","model":null,"usage":{"input":5,"output":3,"cacheRead":0,"cacheWrite":0,"reported":true,"estimatedCostUsd":null},"steps":[],"createdAt":1700000000002,"projectId":"project-a","projectName":"Alpha","source":"sharpen"}]"#,
+    )
+    .unwrap();
+    let report = helper.usage_report();
+    let turn = report.turns.iter().find(|turn| turn.id == "s1").unwrap();
+    assert_eq!(turn.source.as_deref(), Some("sharpen"));
+    assert_eq!(turn.usage.input, 5);
+    assert_eq!(turn.account_key.as_deref(), Some("codex:work"));
+    assert!(!turn.archived);
+    assert!(report.unavailable.is_empty());
+
+    std::fs::write(&ledger, b"{").unwrap();
+    let report = helper.usage_report();
+    assert!(report
+        .unavailable
+        .iter()
+        .any(|name| name == "generated.json"));
+    let error = helper
+        .sharpen(
+            "Fix the login bug",
+            None,
+            None,
+            None,
+            &AtomicBool::new(false),
+        )
+        .unwrap_err();
+    assert!(error.contains("generated.json"), "{error}");
+    assert_eq!(std::fs::read(&ledger).unwrap(), b"{");
+}

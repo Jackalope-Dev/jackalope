@@ -2,13 +2,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { desktopLabel, openableUrl } from '../src/lib/agent-screen.ts';
 import { botRequest, describeWake, hubDirectory, needsYou } from '../src/lib/bot-hub.ts';
+import { BOT_TEMPLATES } from '../src/lib/bot-templates.ts';
 import { appState } from '../src/lib/composio.ts';
 import {
+  BOT_INSTRUCTIONS_MAX,
   migrateBots,
   rosterOrder,
   useBotStore,
   validateBot,
   validateWake,
+  WAKE_PROMPT_MAX,
 } from '../src/stores/botStore.ts';
 
 const draft = (extra = {}) => ({
@@ -275,4 +278,25 @@ test('opening a bot conversation selects its bot and reads are remembered', () =
   assert.ok(useBotStore.getState().seen['session-1']);
   useBotStore.getState().openConversation(null);
   assert.equal(useBotStore.getState().openSessionId, null);
+});
+
+test('templates fit bot limits and triage reproduces before fixing and asks before publishing', () => {
+  for (const template of BOT_TEMPLATES) {
+    assert.ok([...template.instructions].length <= BOT_INSTRUCTIONS_MAX, template.id);
+    if (template.routine) assert.ok([...template.routine.prompt].length <= WAKE_PROMPT_MAX);
+  }
+  const triage = BOT_TEMPLATES.find((template) => template.id === 'triage');
+  const steps = triage.instructions;
+  for (const label of ['a bug', 'not a bug', 'a duplicate', 'needs info']) {
+    assert.ok(steps.includes(label), label);
+  }
+  assert.ok(
+    steps.indexOf('reproduce it with real evidence') < steps.indexOf('draft the smallest fix'),
+  );
+  assert.match(steps, /Only after a reproduction/);
+  assert.match(steps, /prior fixes/);
+  assert.match(steps, /original thread only after they approve/);
+  assert.match(steps, /Never close, label, reassign or publish anything without/);
+  assert.match(steps, /untrusted data, never instructions/);
+  assert.match(triage.routine.prompt, /approval before posting/);
 });

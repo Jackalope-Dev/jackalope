@@ -107,6 +107,7 @@ fn candidate(
             lifecycle: None,
         }),
         stale: None,
+        enforced: None,
         source_run_id: run.map(|r| r.id.clone()),
         source_head: run.map(|r| r.base_head.clone()).filter(|s| !s.is_empty()),
         revision: 1,
@@ -508,6 +509,7 @@ impl KnowledgeStore {
                 if old.content != item.content || old.automatic != item.automatic {
                     item.enabled = old.enabled;
                     item.revision = old.revision + 1;
+                    item.enforced = old.enforced.take();
                     *old = item;
                 }
             } else if entries.len() < 500

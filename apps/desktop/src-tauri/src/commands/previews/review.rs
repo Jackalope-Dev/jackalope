@@ -50,9 +50,12 @@ pub struct ReviewCapture {
     pub viewport: String,
     pub width: u32,
     pub height: u32,
-    /// Why the page was chosen: `configured`, `plan` or `visited`.
+    /// Why the page was chosen: `configured`, `plan`, `feature` or `visited`.
     #[serde(default)]
     pub reasons: Vec<String>,
+    /// Feature-map entries for this page, so the reviewer knows what to check.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub features: Vec<super::features::FeatureLabel>,
     /// Plan criteria tagged `browser` that name this page.
     #[serde(default)]
     pub criteria: Vec<String>,
@@ -83,6 +86,7 @@ pub struct Settings {
     pub command: String,
     pub pages: Vec<String>,
     pub viewports: Vec<&'static str>,
+    pub features: Vec<super::features::Feature>,
 }
 
 /// The project's capture settings, or `None` when captures are off or no
@@ -121,6 +125,7 @@ pub fn settings(record: &project_registry::ProjectRecord) -> Option<Settings> {
         command: command.to_string(),
         pages,
         viewports,
+        features: super::features::usable(&record.feature_map),
     })
 }
 
@@ -238,11 +243,13 @@ pub struct Page {
     pub criteria: Vec<String>,
 }
 
-/// Configured pages first, then pages named by browser criteria, then pages the
-/// agent visited (newest first), capped at [`PAGE_LIMIT`].
+/// Configured pages first, then pages named by browser criteria, then feature
+/// pages whose sources changed, then pages the agent visited (newest first),
+/// capped at [`PAGE_LIMIT`].
 pub fn select_pages(
     configured: &[String],
     criteria: &[(String, String)],
+    features: &[String],
     visited: &[String],
 ) -> Vec<Page> {
     let mut pages: Vec<Page> = Vec::new();
@@ -270,10 +277,53 @@ pub fn select_pages(
             add(path, "plan", Some(id));
         }
     }
+    for path in features {
+        add(path.clone(), "feature", None);
+    }
     for path in visited.iter().rev().filter_map(|path| normalize(path)) {
         add(path, "visited", None);
     }
     pages
+}
+
+/// Files the attempt changed since its starting commit, committed or not, as
+/// project-relative paths. Empty when there is no baseline to compare.
+fn changed_files(run: &TaskRun) -> Vec<String> {
+    if run.base_head.is_empty() || run.workspace.is_empty() {
+        return Vec::new();
+    }
+    let list = |args: &[&str]| {
+        crate::commands::git_command::command(
+            std::path::Path::new(&run.workspace),
+            args,
+            crate::commands::git_command::Policy::Inspection,
+        )
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| {
+            output
+                .stdout
+                .split(|byte| *byte == 0)
+                .filter(|entry| !entry.is_empty())
+                .map(|entry| String::from_utf8_lossy(entry).into_owned())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+    };
+    let mut files = list(&[
+        "diff",
+        "--name-only",
+        "--no-renames",
+        "-z",
+        &run.base_head,
+        "--",
+    ]);
+    files.extend(list(&["ls-files", "--others", "--exclude-standard", "-z"]));
+    files.sort_unstable();
+    files.dedup();
+    files.truncate(10_000);
+    files
 }
 
 /// A preview process this module started. Dropping it ends the process tree.
@@ -504,7 +554,13 @@ fn collect(runtime: &TaskRuntime, run: &TaskRun, settings: &Settings) -> ReviewC
         .cloned()
         .chain(run.screenshots.iter().filter_map(|s| local_path(&s.url)))
         .collect();
-    let pages = select_pages(&settings.pages, &criteria, &visited);
+    let changed = if settings.features.is_empty() {
+        Vec::new()
+    } else {
+        changed_files(run)
+    };
+    let feature_pages = super::features::changed_pages(&settings.features, &changed);
+    let pages = select_pages(&settings.pages, &criteria, &feature_pages, &visited);
     let mut result = ReviewCaptures {
         captured_at: chrono::Utc::now().to_rfc3339(),
         ..Default::default()
@@ -521,6 +577,7 @@ fn collect(runtime: &TaskRuntime, run: &TaskRun, settings: &Settings) -> ReviewC
                     width,
                     height,
                     reasons: page.reasons.iter().map(|r| r.to_string()).collect(),
+                    features: super::features::labels(&settings.features, &page.path),
                     criteria: page.criteria.clone(),
                     before: None,
                     after: None,
@@ -625,6 +682,8 @@ pub fn criterion_steps(run: &TaskRun, captures: &ReviewCaptures) -> Vec<Validati
                 evidence,
                 timestamp: chrono::Utc::now().to_rfc3339(),
                 requirements: vec![],
+                finding: None,
+                safety_fact: None,
             })
         })
         .collect()

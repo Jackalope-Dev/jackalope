@@ -6,6 +6,7 @@ import {
   criterionCoverage,
   interviewOptions,
   manualPlan,
+  planAssumption,
   shapeChoices,
   stateTone,
   taskWaves,
@@ -130,5 +131,26 @@ test('approval checks with the project, then the plan criteria, then review only
   assert.deepEqual(approvalVerification({ criteriaCheck: null }, undefined), {
     source: 'review',
     command: null,
+  });
+});
+
+test('checked facts are told apart from the planner choices', () => {
+  assert.deepEqual(planAssumption('Exports stay under 10,000 rows.'), {
+    text: 'Exports stay under 10,000 rows.',
+    checked: false,
+    evidence: '',
+  });
+  assert.deepEqual(
+    planAssumption('Checked: Reports render in src/report.ts — evidence: src/report.ts:12'),
+    { text: 'Reports render in src/report.ts', checked: true, evidence: 'src/report.ts:12' },
+  );
+  assert.deepEqual(
+    planAssumption('checked: No CSV test exists (evidence: rg -l csv tests printed nothing)'),
+    { text: 'No CSV test exists', checked: true, evidence: 'rg -l csv tests printed nothing' },
+  );
+  assert.deepEqual(planAssumption('Checked: The API is versioned'), {
+    text: 'The API is versioned',
+    checked: true,
+    evidence: '',
   });
 });

@@ -28,6 +28,7 @@ import { SessionStart } from '../sessions/SessionStart';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
+import { WorkCatchUp } from './WorkCatchUp';
 
 const ManagedTaskView = lazy(() =>
   import('./ManagedTaskView').then((m) => ({ default: m.ManagedTaskView })),
@@ -342,6 +343,7 @@ export function TaskWorkspace({
       )}
       {loading && <LoadingState label={'Loading task history…'} />}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      {hasWork && !archived && <WorkCatchUp />}
       {hasWork ? (
         <Suspense fallback={<LoadingState label="Loading work list…" />}>
           <TaskCollection

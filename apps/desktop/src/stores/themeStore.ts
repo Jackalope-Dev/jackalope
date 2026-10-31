@@ -19,7 +19,8 @@ interface ThemeState {
   setCustomHsl: (h: number, s: number, l: number) => void;
 }
 
-const initialTheme = DEFAULT_THEME;
+// New installs follow the system's light or dark setting.
+const initialTheme: ThemePalette = { ...DEFAULT_THEME, appearance: 'automatic' };
 applyThemeTokens(initialTheme); // avoids a flash of unstyled theme before persisted state rehydrates
 
 export const useThemeStore = create<ThemeState>()(

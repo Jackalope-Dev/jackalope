@@ -442,6 +442,7 @@ fn output_fields(run: &TaskRun) -> Result<serde_json::Map<String, Value>, String
     field!("efficiency", efficiency);
     field!("progress", progress);
     field!("validationSteps", validation_steps);
+    field!("decisions", decisions);
     field!("screenshots", screenshots);
     fields.insert("persistenceError".into(), Value::Null);
     Ok(fields)

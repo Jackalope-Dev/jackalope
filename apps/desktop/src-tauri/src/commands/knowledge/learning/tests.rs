@@ -202,6 +202,7 @@ fn the_gate_redacts_rejects_secrets_and_never_touches_hand_written_knowledge() {
             keywords: vec!["deploy".into()],
             enabled: true,
             stale: None,
+            enforced: None,
             source_run_id: None,
             source_head: None,
             revision: 0,

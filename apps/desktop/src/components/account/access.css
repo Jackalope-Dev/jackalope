@@ -246,7 +246,7 @@
   gap: 8px;
 }
 .access-learn-links > button {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }
 .access-footer > p,
 .access-caption {
@@ -340,4 +340,20 @@
 }
 .access-welcome:has(.desktop-waitlist) .access-intro h1 {
   font-size: var(--text-xl);
+}
+
+/* Frosted window (lib/window-glass.tsx): tints keep text at 4.5:1 over any backdrop;
+   see the matching rules in onboarding.css. */
+html[data-window-glass] body:has(> #root .access-frame) {
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+}
+html[data-window-glass] .access-frame {
+  --color-text-muted: var(--color-text-secondary);
+  background: transparent;
+}
+html[data-window-glass] .access-page {
+  background: transparent;
+}
+html[data-window-glass] .access-privacy {
+  background: var(--glass-pane);
 }

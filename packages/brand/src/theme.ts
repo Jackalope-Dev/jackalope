@@ -14,14 +14,22 @@ export function startThemeClock() {
     refresh();
     timer = window.setTimeout(tick, 60_000 - (Date.now() % 60_000));
   };
+  const system = window.matchMedia?.('(prefers-color-scheme: dark)');
   window.addEventListener('focus', refresh);
   document.addEventListener('visibilitychange', refresh);
+  system?.addEventListener('change', refresh);
   tick();
   return () => {
     window.clearTimeout(timer);
     window.removeEventListener('focus', refresh);
     document.removeEventListener('visibilitychange', refresh);
+    system?.removeEventListener('change', refresh);
   };
+}
+
+/** Whether the applied theme follows the system's light or dark setting. */
+export function themeFollowsSystem() {
+  return activeTheme?.appearance === 'automatic';
 }
 
 export function applyThemeTokens(theme: ThemePalette) {

@@ -25,7 +25,8 @@ stay available because later batches depend on their workspace and account ident
 
 Work → Archived and Settings → Data & reset list retention archives, restore runs and import
 `jackalope-task-recovery` exports. An import or restoration cannot overwrite an
-existing run. Recovery exports contain private task data; inspect them before sharing.
+existing run. Exports include the attempt's decision trail and its pointer checks.
+Recovery exports contain private task data; inspect them before sharing.
 
 Unreadable journals are preserved. Restore access or disk space, then retry saving
 through the recovery notice. Retain an independent copy before manually repairing

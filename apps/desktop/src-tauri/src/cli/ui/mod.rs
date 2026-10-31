@@ -25,6 +25,7 @@ mod plan;
 mod refresh;
 mod render;
 mod selection;
+mod sharpen;
 
 use crate::connection::Connection;
 use crate::protocol::{AgentStatus, Handshake, Project, SessionSummary, SessionView};
@@ -63,6 +64,11 @@ enum Event {
     Files {
         directory: String,
         files: Vec<String>,
+    },
+    /// A `/sharpen` rewrite finished, or failed with a message.
+    Sharpened {
+        original: String,
+        result: Result<String, String>,
     },
     Tick,
 }
@@ -154,6 +160,10 @@ struct App {
     files: Option<FileIndex>,
     /// A listing is running for this directory.
     indexing: Option<String>,
+    /// A `/sharpen` request is running.
+    sharpening: bool,
+    /// The last rewrite, for `/sharpen undo`.
+    sharpen_undo: Option<sharpen::Sharpened>,
     /// Matches for the last mention query: (query, generation, paths).
     mention_cache: RefCell<Option<(String, u64, Vec<String>)>>,
     /// Esc closed the `@` menu; it reopens once the mention changes.
@@ -263,6 +273,8 @@ pub fn run(
         history_index: None,
         files: None,
         indexing: None,
+        sharpening: false,
+        sharpen_undo: None,
         mention_cache: RefCell::new(None),
         mention_closed: false,
         stop_armed: None,

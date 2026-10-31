@@ -1,7 +1,7 @@
 /** The longest instruction a task, follow-up or schedule accepts. */
 export const PROMPT_MAX_CHARS = 24_000;
 
-import type { TaskContract } from './task-outcomes.ts';
+import type { EvidenceLevel, GoalRestatement, SafetyFact, TaskContract } from './task-outcomes.ts';
 import { isTauriEnvironment } from './tauri-bridge.ts';
 import { invokeNative } from './telemetry-client.ts';
 
@@ -103,6 +103,8 @@ export interface TaskRun {
     }[];
   } | null;
   contract?: TaskContract;
+  /** The agent's own restatement of the task; absent when it never reported one. */
+  understanding?: GoalRestatement | null;
   monitorChange?: { before: string; after: string; path: string; branch: string } | null;
   contextReceipt?: import('./knowledge').ContextReceipt;
   id: string;
@@ -174,6 +176,8 @@ export interface TaskRun {
   }[];
   prompts?: PendingUserPrompt[];
   validationSteps?: ValidationStep[];
+  /** Append-only decision trail the agent reported for this attempt. */
+  decisions?: DecisionEntry[];
   screenshots?: ScreenshotArtifact[];
   /** Desktop-control actions, newest last; summaries keep only the latest few. */
   desktopActions?: DesktopActionRecord[];
@@ -181,6 +185,8 @@ export interface TaskRun {
   reviewCaptures?: import('./review-captures.ts').ReviewCaptures | null;
   /** Review screenshots are still being captured after the result was recorded. */
   reviewCapturing?: boolean;
+  /** The result this attempt challenges, when it is a Challenge reviewer. */
+  challengeOf?: { runId: string; tree: string; base: string } | null;
 }
 /** @public Named in the return types of usage-entries.ts and usage-insights.ts exports. */
 export interface DesktopActionRecord {
@@ -241,6 +247,8 @@ export interface PendingUserPrompt {
   multiSelect?: boolean;
   allowOther?: boolean;
   rationale?: string;
+  /** Why checking the code cannot answer it; plan questions carry one. */
+  whyAsk?: string;
 }
 export interface ValidationStep {
   id: string;
@@ -254,7 +262,36 @@ export interface ValidationStep {
     status: 'met' | 'partial' | 'unverified';
     summary: string;
     evidence: string[];
+    /** Claimed strength; absent on reports saved before levels existed. */
+    level?: EvidenceLevel;
+    reasoning?: string;
+    command?: string;
+    output?: string;
+    /** What Jackalope's local check supports. */
+    checkedLevel?: EvidenceLevel;
+    checkNote?: string;
   }[];
+  /** A Challenge reviewer's proof: what it ran and what that printed. */
+  finding?: {
+    command: string;
+    output: string;
+    expected: string;
+    breaks: string;
+  } | null;
+  safetyFact?: SafetyFact;
+}
+export interface DecisionEntry {
+  id: string;
+  at: string;
+  phase: string;
+  decision: string;
+  why: string;
+  evidence: string[];
+  result: string;
+  /** Id of an earlier entry from the same task that this one corrects. */
+  supersedes?: string | null;
+  /** One local check per evidence pointer, recorded when the attempt ends. */
+  checks?: { pointer: string; state: string; note?: string | null }[];
 }
 export interface ScreenshotArtifact {
   id: string;

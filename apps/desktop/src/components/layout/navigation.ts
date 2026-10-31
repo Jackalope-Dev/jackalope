@@ -67,7 +67,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Resume work, prepare your project and deliver results.',
     icon: Network,
     group: 'project',
-    primary: true,
+    primary: false,
   },
   {
     id: 'changes',

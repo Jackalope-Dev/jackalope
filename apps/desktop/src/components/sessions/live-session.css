@@ -97,7 +97,7 @@
 .live-status {
   display: flex;
   align-items: center;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   font-size: var(--text-xs);
 }
 /* The status sits beside the project name, so the header stays one row. */
@@ -544,7 +544,6 @@
   padding: 8px 6px;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-width: thin;
   border-right: 1px solid var(--color-border-subtle);
   background: var(--color-surface-sunken);
 }
@@ -582,13 +581,12 @@
 .agent-picker-pane {
   display: grid;
   align-content: start;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
   max-height: var(--agent-picker-height);
   padding: 8px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
 }
 .agent-picker-pane[hidden] {
   display: none;
@@ -602,50 +600,12 @@
   font-size: var(--text-sm);
   font-weight: 600;
 }
-.agent-picker-heading small,
-.agent-picker-copy small {
+.agent-picker-heading small {
   overflow: hidden;
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.agent-picker-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 44px;
-  padding: 6px 10px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  text-align: left;
-  cursor: pointer;
-}
-.agent-picker-option:hover {
-  border-color: var(--color-border);
-  background: var(--color-surface-hover);
-}
-.agent-picker-option[aria-pressed="true"] {
-  border-color: var(--color-accent-ink);
-  background: var(--color-accent-subtle);
-}
-/* An empty ring until chosen, so every option reads as selectable. */
-.agent-picker-indicator {
-  display: grid;
-  flex-shrink: 0;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  border: 1.5px solid var(--color-border);
-  border-radius: 50%;
-  color: var(--color-on-action);
-}
-.agent-picker-option[aria-pressed="true"] .agent-picker-indicator {
-  border-color: var(--color-action);
-  background: var(--color-action);
 }
 .provider-mark {
   flex: none;
@@ -654,26 +614,10 @@
   display: inline-flex;
   gap: 2px;
 }
-.agent-picker-option:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: -2px;
-}
 .agent-picker-check input {
   width: 16px;
   height: 16px;
   accent-color: var(--color-accent);
-}
-.agent-picker-copy {
-  display: grid;
-  flex: 1;
-  min-width: 0;
-}
-.agent-picker-copy strong {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--text-sm);
-  font-weight: 500;
 }
 .agent-picker-default {
   font-size: var(--text-xs);
@@ -690,8 +634,7 @@
   padding: 8px 12px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .agent-picker-rail-item,
-  .agent-picker-option {
+  .agent-picker-rail-item {
     transition: none;
   }
 }

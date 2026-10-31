@@ -603,8 +603,9 @@ pub async fn task_mark_reviewed(id: String, state: State<'_, TaskRuntime>) -> Re
         updated.status = "reviewed".into();
         state.save(&updated)?;
         updated.persistence_error = None;
-        *run = updated;
+        *run = updated.clone();
         drop(inner);
+        crate::commands::knowledge::learning::enforce::accept(&state, &updated, &runs);
         state
             .refresh_knowledge(&current.project_id, &current.project_path, true)
             .map_err(|e| format!("Review saved, but project lessons could not refresh: {e}"))

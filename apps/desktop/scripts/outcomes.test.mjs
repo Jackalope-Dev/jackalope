@@ -3,9 +3,59 @@ import test from 'node:test';
 import { recoveryHandoff, returnToProject } from '../src/lib/project-return.ts';
 import {
   correctionPrompt,
+  evidenceStrength,
+  latestSafetyFact,
   requirementAssessment,
   requirementState,
+  weakestEvidence,
 } from '../src/lib/task-outcomes.ts';
+
+test('evidence levels show the checked level, unrated legacy reports and the weakest requirement', () => {
+  assert.equal(evidenceStrength({}).label, 'Unrated');
+  assert.equal(evidenceStrength({ level: 'stated' }).label, 'Unrated');
+  assert.deepEqual(evidenceStrength({ level: 'ran', checkedLevel: 'ran' }), {
+    checked: 'ran',
+    label: 'Ran it',
+    lowered: null,
+  });
+  const lowered = evidenceStrength({
+    level: 'reproduced',
+    checkedLevel: 'cited',
+    checkNote: 'No recorded capture or preview matches the evidence',
+  });
+  assert.equal(lowered.label, 'Cited code');
+  assert.match(lowered.lowered, /Claimed shown in the app\. No recorded capture/);
+  const steps = [
+    {
+      timestamp: 'earlier',
+      requirements: [
+        { requirementId: 'a', status: 'met', summary: '', evidence: [], checkedLevel: 'stated' },
+      ],
+    },
+    {
+      timestamp: 'later',
+      requirements: [
+        {
+          requirementId: 'a',
+          status: 'met',
+          summary: '',
+          evidence: [],
+          checkedLevel: 'reproduced',
+        },
+        { requirementId: 'b', status: 'met', summary: '', evidence: [], checkedLevel: 'ran' },
+        { requirementId: 'c', status: 'met', summary: '', evidence: [] },
+      ],
+      safetyFact: { fact: 'Only stale entries are dropped', level: 'cited', evidence: [] },
+    },
+  ];
+  assert.deepEqual(weakestEvidence(steps, [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }]), {
+    weakest: 'ran',
+    unrated: 2,
+  });
+  assert.deepEqual(weakestEvidence(undefined, [{ id: 'a' }]), { weakest: null, unrated: 1 });
+  assert.equal(latestSafetyFact(steps).fact, 'Only stale entries are dropped');
+  assert.equal(latestSafetyFact([]), null);
+});
 
 test('latest agent answers attach to the matching requirement without accepting it', () => {
   const answer = {

@@ -33,7 +33,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 0 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
@@ -162,4 +162,94 @@
 .task-comparison + .task-progress {
   border-top-color: var(--color-border-subtle);
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+.task-comparison-label {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+.comparison-judge {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.comparison-judge-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.comparison-judge-status {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.comparison-judge-agent {
+  width: min(220px, 100%);
+}
+.comparison-judge-hint {
+  flex-basis: 100%;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.comparison-judge-clarified {
+  display: block;
+  margin-top: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.comparison-judge-table th[scope="row"] {
+  min-width: 180px;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+.comparison-judge-out-of {
+  color: var(--color-text-muted);
+}
+.comparison-judge-note {
+  display: block;
+  min-width: 140px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.comparison-judge-base {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+}
+.comparison-judge-ports {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: var(--text-sm);
+}
+.comparison-judge-ports legend {
+  margin-bottom: 4px;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+.comparison-judge-port {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: var(--control-height, 36px);
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.comparison-judge-port:has(:checked) {
+  background: var(--color-accent-subtle);
+}
+.comparison-judge-files {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
 }

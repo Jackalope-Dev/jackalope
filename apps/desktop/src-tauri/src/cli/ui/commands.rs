@@ -13,6 +13,10 @@ pub const COMMANDS: &[(&str, &str)] = &[
         "start a fresh conversation, optionally with a message",
     ),
     ("bg", "start another conversation and stay on this one"),
+    (
+        "sharpen",
+        "rewrite a draft into a deeper version to edit; /sharpen undo",
+    ),
     ("init", "write or refresh AGENTS.md for this repository"),
     ("sessions", "switch to any open conversation"),
     ("resume", "pick up an earlier conversation"),
@@ -526,6 +530,7 @@ impl App {
                 }
                 None => self.note("Nothing is waiting on an answer."),
             },
+            "sharpen" => self.sharpen(argument),
             "learn" => self.learn(),
             "learnings" | "lessons" => self.open_picker(PickerKind::Learnings),
             "review" | "diff" | "changes" => {
@@ -857,6 +862,7 @@ mod tests {
         assert_eq!(names("/res"), ["resume"]);
         assert_eq!(names("/unp"), ["unpause"]);
         assert_eq!(names("/th"), ["theme"]);
+        assert_eq!(names("/sh"), ["sharpen"]);
     }
 
     #[test]

@@ -1,8 +1,20 @@
 import { Badge, SearchField } from '@jackalope/ui';
 import { BookOpen, Lightbulb, Sparkles, Workflow } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { type KnowledgeEntry, openKnowledgeTask, useKnowledge } from '../../lib/knowledge';
-import { learnedStatus, learningSummary, lessonAttention, statusLabel } from '../../lib/learning';
+import {
+  type KnowledgeEntry,
+  openKnowledgeTask,
+  prepareLessonCheck,
+  useKnowledge,
+} from '../../lib/knowledge';
+import {
+  canRetireEnforced,
+  learnedStatus,
+  learningSummary,
+  lessonAttention,
+  lessonCheckOffer,
+  statusLabel,
+} from '../../lib/learning';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -48,6 +60,23 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
         revision: entry.revision,
         archived,
       });
+      await refresh();
+    } catch (cause) {
+      setActionError(String(cause));
+    }
+  };
+  const makeCheck = async (entry: KnowledgeEntry) => {
+    setActionError('');
+    try {
+      await prepareLessonCheck(project, entry);
+    } catch (cause) {
+      setActionError(String(cause));
+    }
+  };
+  const retireEnforced = async (entry: KnowledgeEntry) => {
+    setActionError('');
+    try {
+      await nativeTask('knowledge_retire_enforced', { id: entry.id, revision: entry.revision });
       await refresh();
     } catch (cause) {
       setActionError(String(cause));
@@ -128,6 +157,8 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
             const lifecycle = entry.automatic?.lifecycle;
             const status = learnedStatus(lifecycle);
             const attention = lessonAttention(entry);
+            const checkOffer = lessonCheckOffer(entry);
+            const enforcedBy = entry.enforced && !entry.enforced.missing ? entry.enforced : null;
             return (
               <article key={entry.id} className="context-knowledge-card">
                 <div className="context-knowledge-type">
@@ -158,11 +189,56 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                       {statusLabel(status)}
                     </Badge>
                   )}
+                  {enforcedBy && <Badge variant="success">Enforced</Badge>}
                   {attention && (
-                    <Badge variant="warning">{entry.stale ? 'Out of date' : 'Often missed'}</Badge>
+                    <Badge variant="warning">
+                      {entry.stale
+                        ? 'Out of date'
+                        : entry.enforced?.missing
+                          ? 'Check missing'
+                          : 'Often missed'}
+                    </Badge>
                   )}
                 </div>
-                {attention && <InlineNotice tone="warning">{attention}</InlineNotice>}
+                {attention && (
+                  <InlineNotice
+                    tone="warning"
+                    action={
+                      checkOffer === 'suggested' && (
+                        <Button variant="outline" onClick={() => void makeCheck(entry)}>
+                          Make it a check
+                        </Button>
+                      )
+                    }
+                  >
+                    {attention}
+                  </InlineNotice>
+                )}
+                {enforcedBy && (
+                  <InlineNotice
+                    tone="success"
+                    role="note"
+                    action={
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="ghost" onClick={() => openSource(enforcedBy.runId)}>
+                          Open task
+                        </Button>
+                        {canRetireEnforced(entry) && (
+                          <Button variant="outline" onClick={() => void retireEnforced(entry)}>
+                            Retire lesson
+                          </Button>
+                        )}
+                      </div>
+                    }
+                  >
+                    <p className="break-words">
+                      Enforced by <code>{enforcedBy.by}</code>.{' '}
+                      {canRetireEnforced(entry)
+                        ? 'Still supplied to tasks until you retire it.'
+                        : 'No longer supplied to tasks.'}
+                    </p>
+                  </InlineNotice>
+                )}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="font-medium">{entry.title}</h3>
@@ -194,10 +270,15 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                         )}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button variant="ghost" onClick={() => setEditing(entry)}>
                       Edit
                     </Button>
+                    {checkOffer === 'available' && (
+                      <Button variant="ghost" onClick={() => void makeCheck(entry)}>
+                        Make it a check
+                      </Button>
+                    )}
                     {status && (
                       <Button
                         variant="ghost"
@@ -256,7 +337,9 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                     ))}
                   </div>
                 )}
-                {status && <LearnedHistory projectId={project.id} entryId={entry.id} />}
+                {(status || entry.enforced) && (
+                  <LearnedHistory projectId={project.id} entryId={entry.id} />
+                )}
                 {entry.sourceRunId && (
                   <Button
                     variant="ghost"

@@ -18,7 +18,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }
 .issue-picker-body {
   display: grid;
@@ -34,7 +34,7 @@
 }
 .issue-picker-list > button {
   text-align: left;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 10px;
   border-radius: var(--radius-md);
   border: 1px solid transparent;

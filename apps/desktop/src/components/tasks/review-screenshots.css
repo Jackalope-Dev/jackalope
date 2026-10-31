@@ -57,14 +57,14 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
 .review-compare-control input {
   flex: 1;
   min-width: 0;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   accent-color: var(--color-action);
 }
 .review-compare-control input:focus-visible {
@@ -113,4 +113,18 @@
   align-items: center;
   gap: 8px;
   margin: 0;
+}
+.review-screenshots-features {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.review-screenshots-features li {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }

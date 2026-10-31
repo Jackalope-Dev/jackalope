@@ -291,6 +291,30 @@ export function criterionCoverage(document: Pick<PlanDocument, 'tasks' | 'criter
   }));
 }
 
+export interface PlanAssumption {
+  text: string;
+  /** A fact the planner confirmed by reading the code or running a read-only command. */
+  checked: boolean;
+  /** For a checked fact, where it was confirmed: file:line, or a command and its output. */
+  evidence: string;
+}
+
+/**
+ * Splits `Checked: <fact> — evidence: <where>` bullets from choices the planner made.
+ * Plans saved before checked facts existed have only plain bullets and read as choices.
+ */
+export function planAssumption(raw: string): PlanAssumption {
+  const marker = /^\s*checked:\s*/i.exec(raw);
+  if (!marker) return { text: raw.trim(), checked: false, evidence: '' };
+  const rest = raw.slice(marker[0].length);
+  const at = rest.search(/evidence:/i);
+  if (at < 0) return { text: rest.trim(), checked: true, evidence: '' };
+  const before = rest.slice(0, at).replace(/[\s—–\-;,(]+$/u, '');
+  let evidence = rest.slice(at + 'evidence:'.length).trim();
+  if (/\(\s*$/.test(rest.slice(0, at))) evidence = evidence.replace(/\)\s*$/, '').trim();
+  return { text: before.trim(), checked: true, evidence };
+}
+
 export const criterionStateLabels: Record<CriterionStateName, string> = {
   unassessed: 'Not assessed',
   'agent-claimed': 'Agent says met',

@@ -11,7 +11,7 @@ import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { Companion } from '../mascot/Companion';
 import { FeedbackDialog } from '../settings/FeedbackDialog';
-import { useFocusedWork } from './BranchIndicator';
+import { BranchIndicator, useFocusedWork } from './BranchIndicator';
 import { InvitationsMenuItem } from './InvitationsMenuItem';
 import { navigateWorkspace } from './navigation';
 import { StatusBarChanges } from './StatusBarChanges';
@@ -56,6 +56,12 @@ export function WorkspaceStatusBar({
           {`${host.wsl ? 'WSL · ' : ''}${host.name}`}
         </button>
       )}
+      {project && !host && (
+        <span className="statusbar-project" title={project.path}>
+          {project.name}
+        </span>
+      )}
+      <BranchIndicator />
       {project && !host && <StatusBarChanges projectPath={project.path} checkout={checkout} />}
       {/* The open sidebar already lists this work; the count stands in while it is collapsed. */}
       {(navCollapsed || host) && (active > 0 || attention > 0) && (

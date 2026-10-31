@@ -25,7 +25,15 @@ draw their agent's character in the text colour; the retired crescent maps to Mo
 
 Templates in `lib/bot-templates.ts` prefill the editor with a role, instructions, an
 appearance and, where useful, a scheduled wake-up that starts turned off. They never
-grant access, enable connections or start work. Creating a bot walks through five short
+grant access, enable connections or start work. The Triage template handles incoming
+reports: it reads the whole report, looks for duplicates and prior fixes, classifies it as
+a bug, not a bug, a duplicate or needs info, reproduces a bug with a failing test or a
+browser or app capture before drafting any fix, keeps a draft fix in its workspace, and
+presents its reply as a decision card before posting it where the report came from. It
+never closes, labels, reassigns or publishes without approval. Its weekday schedule
+starts off; to wake on new reports instead, add a connection data wake-up on a read-only
+issue or inbox listing tool. Report text and connection excerpts are treated as untrusted
+data. Creating a bot walks through five short
 steps; editing shows the same sections on one page, followed by the bot's browser profile
 and its optional [computer](BOT-COMPUTERS.md), both kept natively by bot ID rather than in
 the renderer's bot record.
@@ -128,6 +136,10 @@ native `persona` (bot ID, name, instructions). `live_sessions.rs` validates it a
 prepends it with the teamwork guidance to every batch prompt, so the role survives
 continuations and restarts without appearing in the transcript. Sessions without a
 persona are unchanged and older records load as before.
+
+Each batch is an ordinary attempt, so a bot doing long unattended work can keep a
+[decision trail](TASK-OUTCOMES.md#read-the-decision-trail); the transcript shows a
+batch's Decision log under its reply.
 
 The bot's memory follows the guidance in every batch: its saved notes with their IDs,
 and in a conversation's first batch the title, date and clipped latest reply of up to

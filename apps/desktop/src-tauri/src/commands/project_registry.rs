@@ -90,6 +90,14 @@ pub struct ProjectRecord {
     /// `desktop` and/or `narrow`. Empty means desktop only.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub review_viewports: Vec<String>,
+    /// User-facing features whose pages review screenshots prefer when work
+    /// changes their source files. Unreadable entries are dropped on load.
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "super::previews::features::lenient"
+    )]
+    pub feature_map: Vec<super::previews::features::Feature>,
 }
 
 /// Accepted `learning_cadence` values.

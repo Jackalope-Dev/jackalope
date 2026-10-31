@@ -118,6 +118,7 @@ fn handle(app: &mut App, event: Event) -> bool {
             }
         }
         Event::Files { directory, files } => app.files_listed(directory, files),
+        Event::Sharpened { original, result } => app.sharpened(original, result),
         Event::Resize => {}
         Event::Scroll(lines) => app.scroll(lines),
         Event::Paste(text) => {

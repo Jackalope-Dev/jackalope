@@ -141,6 +141,24 @@ release dates.
   and terminal panel with keyboard, light and dark themes, reduced motion and narrow
   windows. Accept a review-only plan (no check) and a criteria-checked plan through
   merge, and the deviation notification, banner and picker.
+- [ ] Accept review evidence with installed agents: Claude Code, Codex and OpenCode
+  report evidence levels, a safety fact, a goal restatement and decision entries
+  through MCP and HTTP; local checks lower unsupported claims; Challenge reviewers
+  report command-proven findings and Run again reproduces them in a disposable
+  worktree; a comparison judge returns a parseable verdict and can read sibling
+  worktrees; Sharpen runs through the helper account. Verify the new Review, Activity,
+  comparison, Since you left, feature map and lesson-check UI with keyboard, light and
+  dark themes, reduced motion and narrow windows.
+- [ ] Close the review-evidence gaps: keep Challenge Run again output after a reload,
+  enforce Keep and combine worktree retention in native cleanup and integration (it is
+  enforced only in Project worktrees today), and default the planned task's combined
+  reviewer to another model family.
+- [ ] Tighten the merge gate: run the saved check on the combined integration tree in a
+  temporary worktree before apply; launch a fresh plan review after the reviewer fixes
+  gaps itself instead of continuing the same attempt; with a saved check, require a
+  recorded passing plan review (with a relaunch path so plans are not stranded) bound
+  to the tree it saw; optionally let a docs-only or identical-patch change keep an
+  earlier verdict.
 - [ ] Measure automatic subtasks on representative requests: planning overhead versus
   single-lead time, how often plans return one assignment, validation failures, and
   combined-result quality. Tune the local-rules size threshold from those results.

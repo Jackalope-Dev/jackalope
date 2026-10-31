@@ -1,5 +1,46 @@
 [
   {
+    "id": "compare-plan-and-come-back-with-less-effort",
+    "date": "2026-10-31",
+    "status": "In development",
+    "title": "Compare, plan and come back with less effort",
+    "description": "A second agent can judge compared attempts, plan mode looks things up instead of asking, and returning to Jackalope shows what needs you.",
+    "items": [
+      "A different agent can judge compared attempts against criteria taken from your request and recommend which to build on. Keep and combine then drafts a follow-up that brings the best parts of the others into the one you keep.",
+      "Plan mode checks facts in your code and shows them with evidence, apart from what it assumed. Every question it still asks says why only you can answer it.",
+      "After you have been away, Since you left names what needs you, shows what finished or failed with screenshots first, and lays out each decision with its evidence and risk.",
+      "Sharpen rewrites a draft into a deeper version of the same request, in the app or with /sharpen in the terminal, and Undo brings your draft back.",
+      "Make it a check turns a lesson agents keep missing into a lint, type, test or CI check, and a feature map points review screenshots at the pages your change touched."
+    ]
+  },
+  {
+    "id": "agents-that-show-their-work",
+    "date": "2026-10-30",
+    "status": "In development",
+    "title": "Agents that show their work",
+    "description": "Review now shows how well each claim is backed, lets other agents try to break a result, and keeps a log of the decisions behind long work.",
+    "items": [
+      "Each expected outcome shows how strong the agent's evidence is, from stated to shown in the app. Jackalope checks cited files, test output and screenshots locally and lowers claims it can't back up.",
+      "Challenge this change asks one or two agents, preferably from another model family, to break the result in their own copy. Only failures they reproduced with a command count, and you can run each again before sending it to the author.",
+      "Tasks show how the agent understood your request, so a misread is visible early.",
+      "Long and unattended work leaves a Decision log of what the agent chose, why and the evidence behind it, with pointers Jackalope couldn't find flagged when the attempt ends."
+    ]
+  },
+  {
+    "id": "a-denser-workspace-built-around-projects-and-their-agents",
+    "date": "2026-10-30",
+    "status": "In development",
+    "title": "A denser workspace built around projects and their agents",
+    "description": "The desktop app now puts every project and its running work in the sidebar and gives more of the window to the work itself.",
+    "items": [
+      "Projects form a tree in the sidebar with their questions, failures and reviews first, then running and recent work, each with its agent and live status.",
+      "Command search moves into the title bar and the project and branch move to the status bar, removing a whole header row.",
+      "Buttons, fields, tabs, lists and page spacing are more compact with a mouse or trackpad and keep larger targets on touch screens.",
+      "The window is frosted on Windows 11 and macOS, with every label kept readable over any wallpaper; turn it off in Settings → Appearance.",
+      "New installs follow your system light or dark setting, and choosing a project shows a quick overview of its size, languages and latest commit."
+    ]
+  },
+  {
     "id": "finish-work-from-the-terminal-and-stay-in-sync-with-the-app",
     "date": "2026-10-29",
     "status": "In development",

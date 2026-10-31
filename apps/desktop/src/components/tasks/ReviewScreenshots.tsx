@@ -1,7 +1,7 @@
 import { SegmentedControl } from '@jackalope/ui';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { capturedPages, type ReviewCaptures } from '../../lib/review-captures';
+import { capturedPages, capturePageName, type ReviewCaptures } from '../../lib/review-captures';
 import { nativeTask, type ScreenshotArtifact } from '../../lib/task-runtime';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -95,12 +95,14 @@ export function ReviewScreenshots({
           >
             {pages.map((item, index) => (
               <SelectItem key={`${item.path}:${item.viewport}`} value={String(index)}>
-                {item.path} · {item.viewport === 'narrow' ? 'Narrow' : 'Desktop'}
+                {capturePageName(item)} · {item.viewport === 'narrow' ? 'Narrow' : 'Desktop'}
               </SelectItem>
             ))}
           </Select>
         )}
-        {pages.length === 1 && page && <span className="review-screenshots-path">{page.path}</span>}
+        {pages.length === 1 && page && (
+          <span className="review-screenshots-path">{capturePageName(page)}</span>
+        )}
         {viewport && <span className="task-muted">{viewport}</span>}
         <div className="review-screenshots-actions">
           {comparable && (
@@ -121,6 +123,17 @@ export function ReviewScreenshots({
           )}
         </div>
       </div>
+      {page?.features && page.features.length > 0 && (
+        <ul className="review-screenshots-features" aria-label="What to check">
+          {page.features.map((feature) => (
+            <li key={feature.name}>
+              <strong>{feature.name}</strong>
+              {feature.working && <span>{feature.working}</span>}
+              {feature.steps && <span className="task-muted">To reach it: {feature.steps}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
       {capturing && (
         <p className="review-screenshots-capturing task-muted" role="status">
           <Loader2 size={16} aria-hidden="true" className="animate-spin" /> Capturing screenshots…

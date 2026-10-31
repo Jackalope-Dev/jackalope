@@ -176,8 +176,8 @@
   user-select: text;
 }
 .task-close {
-  width: 44px;
-  height: 44px;
+  width: var(--control-height, 36px);
+  height: var(--control-height, 36px);
   display: grid;
   place-items: center;
   border-radius: var(--radius-md);
@@ -190,13 +190,13 @@
 .task-summary,
 .task-back,
 .task-link {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }
 .task-summary {
   padding: 12px 0;
 }
 .task-page {
-  padding-top: 32px;
+  padding-top: 16px;
 }
 .task-dialog {
   max-height: calc(100dvh - 32px);
@@ -208,7 +208,7 @@
 }
 .queue-select-all,
 .queue-dependencies label {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }
 .queue-heading .task-hero-title {
   font-size: var(--text-2xl);
@@ -231,12 +231,15 @@
 :where(button, [role="button"], [role="menuitem"], select, summary) {
   touch-action: manipulation;
 }
-:where(button, [role="button"], [role="menuitem"]) {
-  min-height: 44px;
-  min-width: 44px;
+/* Shared segments, menu rows and links size themselves. */
+:where(button, [role="button"], [role="menuitem"]):where(
+  :not(.ui-segment, .ui-tabs-trigger, .ui-menu-item, .workspace-menu-item, .ui-link)
+) {
+  min-height: var(--control-height, 36px);
+  min-width: var(--control-height, 36px);
 }
 :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select) {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }
 :where(input[type="checkbox"], input[type="radio"]) {
   accent-color: var(--color-accent-ink);
@@ -252,19 +255,14 @@ button:disabled {
   min-height: 32px;
 }
 .appearance-mode-option span {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }
-.workspace-chrome {
-  height: 60px;
-}
-.project-switcher,
 .command-trigger {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   border-radius: var(--radius-lg);
   padding: 10px 12px;
 }
 .command-trigger.command-jump {
-  width: clamp(200px, 23vw, 320px);
   border: 1px solid var(--color-header-search-border);
   background: color-mix(
     in srgb,
@@ -294,8 +292,8 @@ button:disabled {
 }
 .quiet-icon,
 .appearance-trigger {
-  width: 44px;
-  height: 44px;
+  width: var(--control-height, 36px);
+  height: var(--control-height, 36px);
 }
 .workspace-nav-item {
   font-size: var(--text-sm);
@@ -329,10 +327,6 @@ button:disabled {
   max-height: 76vh;
 }
 @media (max-width: 1000px) {
-  .workspace-chrome {
-    padding: 0 8px;
-    gap: 12px;
-  }
   .workspace-navigation {
     padding-inline: 8px;
   }
@@ -344,7 +338,7 @@ button:disabled {
     justify-self: start;
   }
   .task-page {
-    padding: 24px;
+    padding: 16px var(--workspace-gutter, 20px) 24px;
   }
 }
 @media (pointer: coarse) {
@@ -391,14 +385,7 @@ button:disabled {
 @media (max-width: 700px) {
   .command-trigger.command-jump {
     width: auto;
-    min-width: 44px;
-  }
-  .workspace-chrome {
-    height: auto;
-    min-height: 64px;
-  }
-  .workspace-chrome .project-switcher {
-    max-width: 180px;
+    min-width: var(--control-height, 36px);
   }
   .command-trigger kbd {
     display: none;
@@ -457,7 +444,7 @@ button:disabled {
   --workspace-gutter: clamp(24px, 4vw, 48px);
 }
 .task-page {
-  padding: 32px var(--workspace-gutter, 32px) 48px;
+  padding: 16px var(--workspace-gutter, 20px) 24px;
   max-width: none;
   margin-inline: 0;
 }
@@ -566,11 +553,11 @@ button:disabled {
 .workspace-subnavigation {
   flex-shrink: 0;
   min-width: 0;
-  padding: 16px var(--workspace-gutter, 32px) 0;
+  padding: 12px var(--workspace-gutter, 20px) 0;
 }
 .workspace-page {
   width: 100%;
-  padding: 32px;
+  padding: var(--workspace-page-padding, 16px) var(--workspace-gutter, 20px) 24px;
   max-width: none;
   margin-inline: 0;
 }

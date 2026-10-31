@@ -362,6 +362,22 @@ impl PlanDocument {
     }
 }
 
+/// Marks an assumption the planner confirmed by reading the code or running a
+/// read-only command, written `Checked: <fact> — evidence: <file:line, or the
+/// command and its output>`. Other assumptions are choices the planner made.
+/// The marker lives in the bullet text, so plans saved before it existed parse,
+/// render and hash exactly as they did.
+pub const CHECKED: &str = "Checked:";
+
+/// The fact and evidence of a checked assumption, or `None` for a decided one.
+pub fn checked_assumption(text: &str) -> Option<&str> {
+    let text = text.trim_start();
+    let prefix = text.get(..CHECKED.len())?;
+    prefix
+        .eq_ignore_ascii_case(CHECKED)
+        .then(|| text[CHECKED.len()..].trim())
+}
+
 fn split_list(value: &str) -> Vec<String> {
     let value = value.trim();
     if value.is_empty() || value.eq_ignore_ascii_case("none") || value == "-" {

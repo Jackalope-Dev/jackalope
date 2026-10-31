@@ -21,6 +21,7 @@ pub fn question(prompt: &PendingUserPrompt) -> protocol::Question {
         recommended: prompt.presentation.recommended.clone(),
         multi_select: prompt.input_type == "multiChoice",
         rationale: prompt.presentation.rationale.clone(),
+        why_ask: prompt.presentation.why_ask.clone(),
         allow_other: prompt.presentation.allow_other,
     }
 }

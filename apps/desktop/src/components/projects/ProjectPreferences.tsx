@@ -19,6 +19,7 @@ import { WorkspacePage } from '../ui/WorkspacePage';
 import { ArtifactsProjectSettings } from './ArtifactsProjectSettings';
 import { BrowserProfileSettings } from './BrowserProfileSettings';
 import { DesktopProjectSettings } from './DesktopProjectSettings';
+import { FeatureMapSettings } from './FeatureMapSettings';
 import { ProjectGitSettings } from './ProjectGitSettings';
 import { ProjectPlanningSettings } from './ProjectPlanningSettings';
 import { RemoveProjectAction } from './RemoveProjectAction';
@@ -494,6 +495,7 @@ export function ProjectPreferences({
               </>
             )}
           </SettingGroup>
+          {reviewCapturesOn(project.preferences) && <FeatureMapSettings project={project} />}
           <SettingGroup tone="danger">
             <Setting
               title="Remove project"

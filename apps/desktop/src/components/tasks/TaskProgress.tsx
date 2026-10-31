@@ -29,7 +29,7 @@ export function TaskProgress({
     <section className="task-progress" aria-label="Task progress">
       <div className="task-progress-main">
         <div className="task-progress-art">
-          <AgentStack agents={agents} state={presence} size="md" />
+          <AgentStack agents={agents} state={presence} size="sm" />
         </div>
         <div className="task-progress-identity">
           <div className="task-progress-status" role="status">

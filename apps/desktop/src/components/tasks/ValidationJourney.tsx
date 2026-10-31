@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { useState } from 'react';
+import { evidenceStrength } from '../../lib/task-outcomes';
 import type { ScreenshotArtifact, ValidationStep } from '../../lib/task-runtime';
 import { Badge } from '../ui/badge';
 import { useDialogFocus } from '../ui/useDialogFocus';
@@ -118,6 +119,13 @@ export function ValidationJourney({ runId, steps, screenshots = [] }: Validation
                   {step.notes && (
                     <p className="text-xs text-[var(--color-text-secondary)] mt-1 leading-relaxed [overflow-wrap:anywhere]">
                       {step.notes}
+                    </p>
+                  )}
+
+                  {step.safetyFact && (
+                    <p className="text-xs text-[var(--color-text-secondary)] mt-1 [overflow-wrap:anywhere]">
+                      Safe because: {step.safetyFact.fact} · Evidence:{' '}
+                      {evidenceStrength(step.safetyFact).label}
                     </p>
                   )}
 

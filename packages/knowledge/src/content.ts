@@ -230,6 +230,15 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Needs you lists recovery steps and questions first, then older reviews, so the most urgent item is always at the top.',
         ],
       },
+      {
+        id: 'coming-back',
+        question: 'What do I see when I come back?',
+        paragraphs: [
+          'After 15 minutes away from Jackalope, the Work page opens with Since you left. It starts with one line about what needs you, then lists what finished or failed while you were away, with screenshots first.',
+          'Below that, every item waiting on you has its own card: the decision to make, what it changes, the checks and screenshots behind it, and how risky it is. When the evidence is clear, such as passing checks on a finished task, the card suggests a next step. Open an item from its card, or dismiss the summary when you are done.',
+          'Jackalope builds this from your recorded work on your computer, without asking a model. If nothing changed while you were away, it stays hidden.',
+        ],
+      },
     ],
   },
   {
@@ -246,7 +255,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'What is a bot?',
         paragraphs: [
           'A bot is a saved agent profile: a name, a role, standing instructions, an agent and model, a project and the connected apps it may use. Each bot keeps the character and color you choose, everywhere it appears.',
-          'Templates cover reviewing, fixing, testing, documentation, security, release notes and onboarding. A template fills in the editor, including a suggested wake-up that starts turned off; it never grants access, enables connections or starts work on its own.',
+          'Templates cover reviewing, fixing, triaging reports, testing, documentation, security, release notes and onboarding. Triage classifies each report as a bug, not a bug, a duplicate or needing more information, reproduces a bug with a failing test or capture before drafting any fix, and asks you before it replies, closes or publishes anything. A template fills in the editor, including a suggested wake-up that starts turned off; it never grants access, enables connections or starts work on its own.',
         ],
       },
       {
@@ -438,6 +447,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'No. File review markers track your place for the displayed patch and reset when it changes. Approve work records acceptance of the task outcome for its snapshot. Merging is a separate action that applies the prepared change to the target branch.',
           'Agent review prepares an editable request for another agent. It runs only after you submit it. Review its findings and check the actual change; an agent response does not replace your acceptance or required project checks.',
+          'Challenge this change asks one or two other agents to break the change in their own copy of the files. Only failures a reviewer reproduced with a command count, and Checks shows each command, what it printed and what was expected. Run again repeats a command in a fresh copy, and Send to the author adds the findings you select to the follow-up for you to send.',
+          'Agent assessments of expected outcomes show how strong their evidence is: Stated, Cited code, Reasoned through, Ran it or Shown in the app. Jackalope lowers a level when a cited file or line does not exist, a run has no command or output, or no recorded screenshot or preview page matches. Requirements show the weakest level, and Safe because names the one fact the agent says the change depends on. Older reports show Unrated. A strong level is still the agent’s evidence, not your acceptance.',
         ],
       },
       {
@@ -1390,6 +1401,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Work opens with a composer. Send a message to start a conversation, or use Options for a structured brief with effort, agent, and tool choices. For a first task, describe the starting state, desired result, constraints, and how the agent should check it. Replace the example page and commands with ones that exist in your project.',
           'Project setup takes three steps: your repository, your agents, and an optional first task. Decisions, Git behavior and colors start from defaults you can change in Project Settings. Preparation, check, and preview commands are detected in the background without replacing your saved choices. Review or edit them in Project Settings before starting work; setup does not run commands or enable automatic checks.',
+          'Select Sharpen, the sparkle button under the message box, to rewrite your draft into a deeper version of the same task: what an expert would also check, the raw material to start from, the methods to use and an outside check that proves the result. Choices that are yours stay open. It uses one agent call, never sends, and Undo sharpen brings back your draft until you edit it. In the terminal, /sharpen <draft> does the same.',
           'The composer offers optional starters for GitHub issues, PR feedback, failing CI and dependency updates. GitHub evidence is read through your installed, signed-in CLI. The prepared request stays editable; it does not publish, reply or resolve threads.',
         ],
         codeBox: {
@@ -1399,7 +1411,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         steps: [
           'Choose the project and confirm the target branch or workspace. Choose Work in a copy when other work is in progress.',
           'Pick an effort level and review Customize task for agent, account, context, and tools. Include a reachable preview URL when you expect browser checks.',
-          'Start the task and respond if it asks for missing information. Read the result and actual checks, then merge into the target branch and remove the workspace.',
+          'Start the task and check Understood as, the agent’s own short restatement of the goal and the smallest change it plans. If it misread the request, stop or send a correction early. Respond if it asks for missing information. Read the result and actual checks, then merge into the target branch and remove the workspace.',
         ],
       },
       {
@@ -1408,6 +1420,14 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Effort adds guidance to the task: Quick requests a focused change and targeted checks; Balanced asks for a brief plan and verification of affected flows; Thorough asks for deeper investigation, broader checks, and a separate review pass.',
           'These are instructions, not hard token budgets, guaranteed response times, or automatic grants of tools and subagents. Provider and task settings still determine model access and execution.',
+        ],
+      },
+      {
+        id: 'decision-log',
+        question: 'How do I see why the agent made its choices?',
+        paragraphs: [
+          'On long or multi-step work, agents keep a Decision log: real forks, pivots, reverts, blockers and finished steps, each with why, evidence and the result. Find it at the top of a task’s Activity tab, or under the reply in a bot conversation. Each retry or continuation starts a new group, and a corrected entry stays visible and is marked Superseded.',
+          'When the attempt ends, Jackalope checks each evidence pointer on your computer, such as a file and line, a commit or a recorded check, without using any model. Pointers it cannot find are marked Not found. A found pointer is still the agent’s claim, so review the change itself before merging.',
         ],
       },
       {

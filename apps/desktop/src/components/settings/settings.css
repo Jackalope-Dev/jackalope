@@ -29,7 +29,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 6px 10px;
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   font-weight: 500;
@@ -247,7 +247,7 @@
 }
 .referral-progress-heading button {
   display: inline-flex;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   align-items: center;
   gap: 6px;
   color: var(--color-accent-ink);
@@ -304,7 +304,7 @@
     grid-template-columns: 1fr;
   }
   .referral-link-row input {
-    min-height: 44px;
+    min-height: var(--control-height, 36px);
   }
   .referral-progress li {
     align-items: start;
@@ -337,7 +337,7 @@
   flex: 1;
 }
 .settings-page .settings-nav-item {
-  min-height: 44px;
+  min-height: var(--control-height-compact, 32px);
   cursor: pointer;
 }
 .settings-nav-group {
@@ -345,8 +345,8 @@
   gap: 2px;
 }
 .settings-nav-group + .settings-nav-group {
-  margin-top: 14px;
-  padding-top: 14px;
+  margin-top: 10px;
+  padding-top: 10px;
   border-top: 1px solid var(--color-border-subtle);
 }
 .settings-nav-label {
@@ -469,20 +469,4 @@
   .settings-nav-item {
     transition: none;
   }
-}
-
-.artifacts-link {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-accent-ink);
-  font: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-.artifacts-link:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: 2px;
-  border-radius: 2px;
 }

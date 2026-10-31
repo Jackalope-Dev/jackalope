@@ -42,7 +42,7 @@
   display: grid;
   gap: 4px;
   width: 100%;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 4px 0;
   text-align: left;
   font-size: var(--text-xs);
@@ -267,8 +267,8 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: var(--control-height, 36px);
+  min-height: var(--control-height, 36px);
   padding: 0 12px;
   font-size: var(--text-xs);
   font-weight: 500;
@@ -309,8 +309,8 @@
   position: static;
   grid-column: 4;
   grid-row: 1;
-  width: 44px;
-  height: 44px;
+  width: var(--control-height, 36px);
+  height: var(--control-height, 36px);
 }
 .agent-roster-row .agent-roster-name {
   margin-bottom: 0;

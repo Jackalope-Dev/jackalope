@@ -9,6 +9,8 @@ export type NotificationLevel = 'all' | 'failures-only' | 'none';
 export interface SettingsState {
   // Experience & appearance
   mascotReactions: boolean;
+  /** Frost the window over the desktop where the system supports it. */
+  frostedWindow: boolean;
   showThemePickerInToolbar: boolean;
   showTrialPassesInToolbar: boolean;
   notifications: NotificationLevel;
@@ -59,7 +61,8 @@ export const DEFAULT_SETTINGS: Omit<
   'updateSettings' | 'resetAll' | 'exportSettings' | 'setUseMcpMarketplace'
 > = {
   mascotReactions: true,
-  showThemePickerInToolbar: true,
+  frostedWindow: true,
+  showThemePickerInToolbar: false,
   showTrialPassesInToolbar: true,
   notifications: 'all' as const,
   osNotifications: true,

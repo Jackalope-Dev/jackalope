@@ -120,6 +120,27 @@ fn shell(command: &str, workspace: &str) -> Result<Command, String> {
     Ok(cmd)
 }
 
+/// Runs an explicitly requested command in a disposable workspace the caller has reserved,
+/// with a check slot, stall budget and ceiling like a project check. `setup` uses the setup
+/// command's shorter stall budget.
+pub(in crate::commands) fn run_disposable(
+    command: &str,
+    workspace: &str,
+    setup: bool,
+) -> Result<process_control::CommandResult, String> {
+    let _slot = leases::check_slot(|| false)?;
+    process_control::run_supervised(
+        shell(command, workspace)?,
+        check_limits(if setup {
+            PREPARE_STALL_SECS
+        } else {
+            CHECK_STALL_SECS
+        }),
+        || false,
+        |_, _| {},
+    )
+}
+
 pub(in crate::commands) fn prepare(
     runtime: &TaskRuntime,
     id: &str,

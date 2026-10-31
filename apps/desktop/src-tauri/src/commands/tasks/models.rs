@@ -65,6 +65,9 @@ pub struct TaskRun {
     pub quota_failure: Option<super::routing::QuotaFailure>,
     #[serde(default)]
     pub contract: crate::commands::outcomes::TaskContract,
+    /// The agent's own restatement of the task, reported once at the start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub understanding: Option<crate::commands::outcomes::GoalRestatement>,
     #[serde(default)]
     pub monitor_change: Option<crate::commands::monitors::MonitorChange>,
     #[serde(default)]
@@ -129,6 +132,9 @@ pub struct TaskRun {
     pub prompts: Vec<crate::commands::harness::PendingUserPrompt>,
     #[serde(default)]
     pub validation_steps: Vec<crate::commands::harness::ValidationStep>,
+    /// Append-only decision trail the agent reported for this attempt.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub decisions: Vec<crate::commands::decision_trail::DecisionEntry>,
     #[serde(default)]
     pub screenshots: Vec<crate::commands::harness::ScreenshotArtifact>,
     /// Desktop-control actions for the Screen view, newest last and bounded.
@@ -143,6 +149,9 @@ pub struct TaskRun {
     /// Review screenshots are being captured after the attempt finished.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub review_capturing: bool,
+    /// The result this attempt challenges, when it is a Challenge reviewer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub challenge_of: Option<crate::commands::challenge_review::ChallengeSource>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -312,6 +321,7 @@ impl TaskRun {
             routing: self.routing.clone(),
             quota_failure: self.quota_failure.clone(),
             contract: self.contract.clone(),
+            understanding: self.understanding.clone(),
             monitor_change: self.monitor_change.clone(),
             context_receipt: context_receipt,
             id: self.id.clone(),
@@ -364,12 +374,14 @@ impl TaskRun {
             usage_observations: self.usage_observations.clone(),
             prompts: self.prompts.clone(),
             validation_steps: self.validation_steps.clone(),
+            decisions: self.decisions.clone(),
             screenshots: self.screenshots.clone(),
             desktop_actions: self.desktop_actions[self.desktop_actions.len().saturating_sub(12)..]
                 .to_vec(),
             visited_pages: self.visited_pages.clone(),
             review_captures: self.review_captures.clone(),
             review_capturing: self.review_capturing,
+            challenge_of: self.challenge_of.clone(),
         }
     }
 }

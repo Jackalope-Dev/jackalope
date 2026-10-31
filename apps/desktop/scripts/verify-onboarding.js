@@ -301,11 +301,11 @@ async function _verifyOnboarding(page) {
       }, isDark);
       await rescan.scrollIntoViewIfNeeded();
       const control = await rescan.boundingBox();
-      const progress = await page.locator('.onboarding-progress').boundingBox();
+      const heading = await page.locator('#onboarding-heading').boundingBox();
       assert(
-        control.x > progress.x + progress.width &&
-          Math.abs(control.y + control.height / 2 - progress.y - progress.height / 2) < 2,
-        'Re-scan sits at the top right beside progress',
+        control.x > heading.x + heading.width &&
+          Math.abs(control.y + control.height / 2 - heading.y - heading.height / 2) < 2,
+        'Re-scan sits at the top right beside the step heading',
       );
       await page.screenshot({
         path: `output/playwright/onboarding-agent-${isDark ? 'dark' : 'light'}-${width}.png`,

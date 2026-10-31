@@ -12,6 +12,9 @@ identifier; they do not create fictitious projects or authorize execution.
 A draft's suggested project is frozen when captured, editable, and preserved
 across navigation/reload. Existing project drafts and saved planning records remain
 accessible. A missing or restricted agent blocks launch without losing the idea.
+Sharpen in either composer rewrites the draft into a deeper version of the same task with
+one-step undo; it runs one helper call on request and never sends (see
+[HELPER.md](HELPER.md#sharpen)).
 
 Project instructions are included; optional guidelines and tool selection remain
 inspectable. Project connection loading must finish before dispatch. An explicitly
@@ -26,7 +29,7 @@ connections are tested before their tokens are saved in protected native storage
 ## Work and results
 
 Work combines conversations, tasks and plans, defaults to the selected project and offers an explicit All work scope.
-The work list and recent-work sidebar share discovery without duplicate attempts. Needs-input/recovery
+The work list and project sidebar share discovery without duplicate attempts. Needs-input/recovery
 and failed-check work precede results ready for review, active work, saved ideas and
 finished work. Integration state comes from native verified receipts. Filters, search
 and list/board choices persist per scope and mode. Work rows show the assigned agent character,
@@ -36,7 +39,18 @@ work rows; command search also finds projects, tasks, sessions and current-task 
 Parallel planning remains inside Work with the existing ownership and dependency
 contracts; plans stay editable before dispatch.
 
-The Work page keeps recent work in a collapsible sidebar and opens task review beside
+After 15 minutes without focus or input in any Jackalope window, the next return opens
+Since you left above the work list. It is built locally from recorded attempts, checks,
+questions and captures, with no model call, and stays hidden when nothing changed since
+the person left. It leads with one line naming what waits on them, then one line per item
+that finished or failed meanwhile (screenshot results first, at most six; items opened
+since they changed are left out), then every Needs you item as its own card: the decision,
+what it changes, recorded evidence and a low, medium, high or unknown risk. A suggested next
+step appears only when the record supports it, such as passing checks on a finished
+result. Dismissing it lasts until the next absence; the last-present time is shared by
+all windows in local storage.
+
+The Work page keeps projects and their work in a collapsible sidebar and opens task review beside
 the conversation on wide windows, or at full width on narrower ones. Other tool tabs can retain the conversation, including terminals and
 activity. The work list offers list and board views; New work opens its composer
 explicitly once a project has work. Questions and Stop remain available with the
@@ -71,6 +85,44 @@ publication boundaries are described in [parallel workflows](PARALLEL-WORKFLOWS.
 HTTP(S) result links open through the OS browser in desktop. Other schemes are
 not executed. Copy result reports clipboard failures. Screenshots still use the
 native bounded evidence reader and cannot claim current visual acceptance.
+
+## Agent and Challenge review
+
+Review's actions menu offers two optional reviews by another agent. Neither starts
+until you submit it, and both suggest an available reviewer from a model family
+different from the author's (then an agent of unknown family, then the same family);
+you can choose any connected agent. Families come from the model when it names one,
+otherwise from the agent (`src/lib/reviewer-choice.ts`).
+
+- **Ask another agent to review** opens an editable read-only review request in the
+  task composer.
+- **Challenge this change** starts one or two reviewers, each told to break the
+  change. The intent it must hold to is the original request plus the author's
+  result. `task_start_challenge` commits the author's current files, uncommitted
+  work included, onto the task base and starts each reviewer in its own worktree at
+  that commit (recorded as `challengeOf` on the reviewer's attempt), so reviewers
+  never touch the author's workspace. The author must be idle.
+
+A Challenge reviewer reports each finding with `record_validation_step`: status
+`failed`, the title as `step`, and a `finding` with the exact command, the output it
+printed, the output the intent requires and why that breaks it. It also ends its
+reply with the same list in a `jackalope-findings` JSON block, which Review reads for
+agents without the tool. Only findings with both a command and its printed output
+count; findings missing either are shown as a dropped count per reviewer. Review's
+Checks section merges finished reviewers' findings, crediting every reviewer whose
+finding shares a root cause (same command failing the same way, or matching
+titles), says "No proven findings" when there are none, and shows the reply of a
+reviewer that reported in neither form.
+
+**Run again** runs a finding's command only on click, and only a command that
+reviewer reported. Jackalope commits the reviewer's files (the reviewed snapshot
+plus its repro scripts) to a detached worktree under the integrations directory,
+copies the project's setup files, runs the saved setup command, then runs the
+command with a check slot, workspace reservation and the project-check stall and
+time limits, and removes the worktree. The reviewer must be idle and its workspace
+must still exist. **Send to the author** adds the selected findings, with their
+commands, output and the reviewer's workspace path, to the follow-up draft; it
+never sends.
 
 ## Preparation and verification
 

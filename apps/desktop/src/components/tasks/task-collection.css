@@ -1,12 +1,12 @@
 .task-collection {
-  margin-top: 24px;
+  margin-top: 12px;
 }
 .work-toolbar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
 }
 .work-toolbar > [role="combobox"] {
   width: auto;
@@ -18,12 +18,12 @@
 }
 .work-item {
   content-visibility: auto;
-  contain-intrinsic-block-size: auto 72px;
+  contain-intrinsic-block-size: auto 52px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 14px;
+  gap: 12px;
+  padding: 8px 10px;
   width: 100%;
   min-width: 0;
   text-align: left;
@@ -31,13 +31,23 @@
   cursor: pointer;
   transition: background 150ms;
 }
+/* Rows use a smaller avatar than the agent's default so the list stays dense. */
+.work-item .agent-avatar[data-size="sm"] {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+}
+.work-item .agent-avatar[data-size="sm"] svg {
+  width: 26px;
+  height: 26px;
+}
 .work-avatar-fallback {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--color-surface-sunken);
   color: var(--color-text-muted);
 }
@@ -55,14 +65,14 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: var(--control-height, 36px);
+  min-height: var(--control-height, 36px);
   font-size: var(--text-xs);
 }
 .work-archive {
   flex-shrink: 0;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: var(--control-height, 36px);
+  min-height: var(--control-height, 36px);
 }
 .work-cleanup {
   margin-bottom: 16px;
@@ -155,16 +165,20 @@
   flex-basis: 100%;
   margin-bottom: 0;
 }
+/* Fieldsets default to min-content width, which would let long titles widen the page. */
+.work-list {
+  min-width: 0;
+}
 .work-list .work-item-row + .work-item-row {
   border-top: 1px solid var(--color-border-subtle);
 }
 .work-group + .work-group {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 .work-group h2,
 .work-finished > summary {
-  min-height: 44px;
-  padding: 12px 14px;
+  min-height: 32px;
+  padding: 6px 10px;
   font-size: var(--text-sm);
   font-weight: 500;
   border-bottom: 1px solid var(--color-border-subtle);

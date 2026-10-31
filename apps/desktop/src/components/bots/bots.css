@@ -98,8 +98,8 @@
   display: grid;
   flex-shrink: 0;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: var(--control-height, 36px);
+  height: var(--control-height, 36px);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -293,7 +293,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }
 
 /* Every row takes the tallest card's height, so the grid reads as even tiles. */
@@ -398,7 +398,7 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 8px 0 0;
   border: 0;
   border-top: 3px solid var(--color-border-subtle);
@@ -524,7 +524,7 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   cursor: pointer;
 }
 
@@ -552,7 +552,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }
 
 .bot-appearance {

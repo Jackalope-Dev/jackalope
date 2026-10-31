@@ -1045,10 +1045,8 @@ impl CoordinationTools {
             ));
         }
         let mut input = input;
-        if let Some(reason) = super::planning::question_gate(&run, &mut input) {
-            return Ok(CallToolResult::structured(
-                serde_json::json!({"status": "closed", "message": reason}),
-            ));
+        if let Some(reply) = super::planning::question_gate(&run, &mut input) {
+            return Ok(CallToolResult::structured(reply));
         }
         let prompt = super::harness::ask_user_async(
             &run.id,
@@ -1195,7 +1193,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Record validation evidence. After implementation and final checks, include a requirements array to answer the task expectations in one call, with a status, short justification and evidence per requirement. Surfaces in review; does not grant human acceptance.",
+        description = "Record validation evidence. After implementation and final checks, include a requirements array to answer the task expectations in one call, with a status, short justification, evidence and evidence level per requirement, plus an optional safety_fact. Jackalope checks cited files, commands and captures locally and lowers unsupported levels. Surfaces in review; does not grant human acceptance.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
@@ -1213,17 +1211,8 @@ impl CoordinationTools {
             .service
             .authorized_run(&headers)
             .map_err(bridge_error)?;
-        super::outcomes::validate_assessments(&input.requirements, Some(&run.contract))
+        let step = super::evidence::checked_step(&run, input)
             .map_err(|e| ErrorData::invalid_params(e, None))?;
-        let step = super::harness::ValidationStep {
-            id: uuid::Uuid::new_v4().to_string(),
-            step: input.step,
-            status: input.status,
-            notes: input.notes,
-            evidence: input.evidence,
-            timestamp: chrono::Utc::now().to_rfc3339(),
-            requirements: input.requirements,
-        };
         self.service.runtime.update(&run.id, |r| {
             r.activity.push(format!(
                 "[Checkpoint: {}] {}",
@@ -1234,6 +1223,65 @@ impl CoordinationTools {
         });
         let value = serde_json::to_value(step)
             .map_err(|_| ErrorData::internal_error("Could not encode validation step", None))?;
+        Ok(CallToolResult::structured(value))
+    }
+
+    #[tool(
+        description = "Record, once and in your first message, your own short restatement of the goal, the problem and the smallest change you expect to make. Shown to the person as \"Understood as\"; continue without waiting for confirmation.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn restate_goal(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::outcomes::GoalRestatement>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let headers = request_headers(&context)?;
+        let Json(understood) = super::coordination::bridge_goal_restatement(
+            WebState(self.service.clone()),
+            headers,
+            Json(input),
+        )
+        .await
+        .map_err(|(_, error)| ErrorData::invalid_params(error, None))?;
+        Ok(CallToolResult::structured(
+            serde_json::to_value(understood)
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?,
+        ))
+    }
+
+    #[tool(
+        description = "Add one entry to this attempt's decision trail at a real fork, pivot, revert, blocker or completed unit, with its check result. Evidence is pointers such as a commit, path:line, check:<name> or screenshot:<name>, never prose. Entries are append-only: correct a wrong call with a new entry whose supersedes is the old id. Jackalope checks each pointer when the attempt ends.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn record_decision(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::decision_trail::RecordDecisionInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let headers = request_headers(&context)?;
+        let run = self
+            .service
+            .authorized_run(&headers)
+            .map_err(bridge_error)?;
+        let runtime = self.service.runtime.clone();
+        let entry = tauri::async_runtime::spawn_blocking(move || {
+            super::decision_trail::record(&runtime, &run, input)
+        })
+        .await
+        .map_err(|e| ErrorData::internal_error(e.to_string(), None))?
+        .map_err(|e| ErrorData::invalid_params(e, None))?;
+        let value = serde_json::to_value(entry)
+            .map_err(|_| ErrorData::internal_error("Could not encode the decision", None))?;
         Ok(CallToolResult::structured(value))
     }
 
@@ -1522,6 +1570,7 @@ mod tests {
             "ask_user",
             "browser_navigate",
             "record_validation_step",
+            "record_decision",
             "agreement",
             "verification_output",
         ] {
@@ -1571,6 +1620,8 @@ mod tests {
         assert!(names.contains(&"ask_user"));
         assert!(names.contains(&"user_response"));
         assert!(names.contains(&"record_validation_step"));
+        assert!(names.contains(&"restate_goal"));
+        assert!(names.contains(&"record_decision"));
         assert!(names.contains(&"computer_verify"));
         let verify = tools
             .iter()
@@ -1589,6 +1640,7 @@ mod tests {
         for name in [
             "ask_user",
             "record_validation_step",
+            "record_decision",
             "message",
             "acknowledge_message",
         ] {

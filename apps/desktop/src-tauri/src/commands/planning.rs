@@ -62,9 +62,11 @@ pub fn read_only(run_id: &str) -> bool {
 }
 
 /// Applies the interview limits to a question from a planning attempt. Returns
-/// the reason when the question must not be asked; otherwise adds the options
-/// that let the person end the interview.
-pub(super) fn question_gate(run: &TaskRun, input: &mut AskUserInput) -> Option<String> {
+/// the reply the planner gets instead when the question must not be asked:
+/// `closed` once the interview is over, `not_asked` for a question that does
+/// not say why checking cannot answer it. Otherwise adds the options that let
+/// the person end the interview.
+pub(super) fn question_gate(run: &TaskRun, input: &mut AskUserInput) -> Option<serde_json::Value> {
     let planning = planning_run(&run.id)?;
     let answers: Vec<String> = run
         .prompts
@@ -73,7 +75,18 @@ pub(super) fn question_gate(run: &TaskRun, input: &mut AskUserInput) -> Option<S
         .collect();
     let asked = planning.asked_before + run.prompts.len();
     match interview::gate(asked, planning.cap, &answers) {
-        interview::Gate::Closed(reason) => Some(reason),
+        interview::Gate::Closed(reason) => {
+            Some(serde_json::json!({"status": "closed", "message": reason}))
+        }
+        interview::Gate::Ask
+            if input
+                .presentation
+                .why_ask
+                .as_deref()
+                .is_none_or(|why| why.trim().is_empty()) =>
+        {
+            Some(serde_json::json!({"status": "not_asked", "message": interview::NEEDS_WHY_ASK}))
+        }
         interview::Gate::Ask => {
             if !input.options.is_empty() && !input.presentation.multi_select {
                 for stop in [interview::USE_RECOMMENDATIONS, interview::DONE] {

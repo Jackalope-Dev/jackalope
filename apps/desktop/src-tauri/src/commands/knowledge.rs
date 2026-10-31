@@ -33,6 +33,10 @@ pub struct KnowledgeEntry {
     /// revision, and editing the lesson clears it until the next check.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stale: Option<String>,
+    /// The repository check that now enforces this lesson, recorded when the
+    /// task that made it was accepted. A local note like `stale`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enforced: Option<learning::Enforcement>,
     pub id: String,
     pub project_id: String,
     pub project_path: String,
@@ -64,6 +68,10 @@ pub struct ContextSelection {
     pub excluded_memory_ids: Vec<String>,
     #[serde(default)]
     pub memory_off: bool,
+    /// The lesson a "Make it a check" task enforces. Copied to the receipt so
+    /// retries and follow-ups keep the link.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enforces_lesson_id: Option<String>,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
@@ -78,6 +86,9 @@ pub struct ContextReceipt {
     pub reasons: std::collections::BTreeMap<String, String>,
     pub entries: Vec<KnowledgeEntry>,
     pub bytes: usize,
+    /// The lesson this task makes a check; see `ContextSelection`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enforces_lesson_id: Option<String>,
 }
 
 impl ContextReceipt {
@@ -209,6 +220,7 @@ impl KnowledgeStore {
                 return Err("This entry was removed. Reload before saving.".into());
             }
             entry.automatic = old.automatic.clone();
+            entry.enforced = old.enforced.clone();
             entry.dismissed = false;
             let edited = old.content != entry.content
                 || old.keywords != entry.keywords
@@ -249,6 +261,7 @@ impl KnowledgeStore {
             entry.automatic = None;
             entry.dismissed = false;
             entry.stale = None;
+            entry.enforced = None;
             if entry.revision != 0 {
                 return Err("This entry was deleted. Reload before saving.".into());
             }
@@ -310,6 +323,7 @@ impl KnowledgeStore {
                 state.recent_runs.clear();
             }
             entries[index].dismissed = true;
+            entries[index].enforced = None;
             entries[index].enabled = false;
             entries[index].revision += 1;
             entries[index].title = "Removed automatic lesson".into();
@@ -331,11 +345,29 @@ impl KnowledgeStore {
         prompt: &str,
         selection: &ContextSelection,
     ) -> Result<ContextReceipt, String> {
-        if selection.memory_off && selection.workflow_id.is_none() {
+        let unread = selection.memory_off && selection.workflow_id.is_none();
+        if unread && selection.enforces_lesson_id.is_none() {
             return Ok(ContextReceipt::default());
         }
         let entries = self.list(project_id, project_path)?;
-        select(entries, prompt, selection)
+        // A link to a lesson that no longer exists is dropped rather than
+        // blocking the task.
+        let enforces_lesson_id = selection
+            .enforces_lesson_id
+            .as_ref()
+            .filter(|id| {
+                entries
+                    .iter()
+                    .any(|entry| &entry.id == *id && entry.kind == KnowledgeKind::Memory)
+            })
+            .cloned();
+        let mut receipt = if unread {
+            ContextReceipt::default()
+        } else {
+            select(entries, prompt, selection)?
+        };
+        receipt.enforces_lesson_id = enforces_lesson_id;
+        Ok(receipt)
     }
 }
 

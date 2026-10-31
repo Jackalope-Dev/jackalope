@@ -168,7 +168,8 @@ that the person repeated the point.
 
 Every change is appended to a per-project history: learned, seen again, updated,
 retired, now active, archived, restored, folded, missed, contradicted, out of date,
-edited or removed, with the reason and a redacted excerpt of the source (emails,
+made a check, no longer enforced, check not reported, edited or removed, with the
+reason and a redacted excerpt of the source (emails,
 tokens, keys, credential URLs and the home folder are replaced). Open **History** on a learned lesson in Project → Context, or
 choose it in `/learnings`.
 
@@ -212,6 +213,39 @@ only flagged **Out of date** with a note naming the reference; its text, revisio
 availability never change. The flag clears when the reference returns or the lesson is
 edited.
 
+### Making a lesson a check
+
+A lesson agents keep missing offers **Make it a check** beside its **Often missed**
+note in Project → Context; every other lesson offers it on demand. It opens an
+editable task draft in the composer and never starts on its own. The draft quotes the
+lesson and up to five recorded instances of the mistake from its history, redacted as
+stored: restatements after it was supplied first, then where it was learned. It asks
+the agent to make the mistake impossible at the highest level that works: one owner
+and one supported path with the old way deleted, then types, then a lint or CI check
+whose error names the fix, then a test, with written guidance last and only for
+judgment calls. The agent shows the check failing on a real past instance and passing
+on the current tree, and ends its result with `Enforced by: <command or file>`. The
+draft avoids the phrasing reflection learns from, so starting it never adds a lesson.
+**Saved project context** in the composer shows the link; **Unlink lesson** removes it.
+Retries and follow-ups keep it.
+
+When the task is marked reviewed, the lesson records the command or file from the
+newest attempt's `Enforced by:` line, with a link to the task. Without that line the
+lesson is left unmarked and its history notes that no check was reported. A
+lesson Jackalope wrote and nobody edited is then retired: archived with the reason that
+the repository now enforces it. Any other lesson stays available, marked **Enforced**,
+until you choose **Retire lesson**, which archives a learned lesson and pauses a
+hand-written one. Enforced lessons stay in Project → Context with their history and
+in `/learnings`, marked "enforced by" the command or file.
+
+Each curator pass also checks enforced lessons, archived ones included, with the
+stale-lesson rules: paths in the reported value, a single root file name such as
+`biome.json`, and package scripts or make targets written as commands. Anything it
+cannot judge, such as `cargo test routes`, counts as present. When the enforcer is
+gone, a lesson Jackalope wrote loses the mark and, if it was retired for it, is
+supplied to tasks again. Any other lesson is only flagged **Check missing**, offering
+**Make it a check** again; the flag clears when the file or script returns.
+
 ### Thresholds and activity
 
 Every tunable lives in `Thresholds` (`THRESHOLDS`) in
@@ -238,12 +272,14 @@ Every tunable lives in `Thresholds` (`THRESHOLDS`) in
 | Recent deliveries the misses are counted over | 10 |
 | Lessons one stale-lesson check inspects | 100 |
 | References checked per lesson | 8 |
+| Recorded instances quoted in a "Make it a check" draft | 5 |
 
 The reflection cadence stays a per-project setting. **Learning activity** in Project →
 Context shows this computer's counts for the project: lessons that are new, active and
 archived, how often current lessons were supplied, and, from the retained history, how
 many were learned, suggested by an agent, became active, archived, folded, retired,
-restored, missed by agents, contradicted after use and found out of date. History rotation bounds the counts; the date shows the oldest record. Use
+restored, missed by agents, contradicted after use, found out of date and made into
+checks. History rotation bounds the counts; the date shows the oldest record. Use
 them to tell whether lessons are learned too eagerly or archived too soon before
 changing a default.
 
@@ -341,10 +377,13 @@ the context receipts; summary polling omits their content bodies.
 
 `commands/knowledge/learning.rs` owns reflection, the promotion gate, the thresholds
 and the lessons' lifecycle; `learning/curate.rs`, `learning/agent.rs`,
-`learning/export.rs`, `learning/stale.rs` and `learning/sync.rs` own the curator, agent
-reflection, export, the stale-lesson check and the sync data model. Learned lessons keep their status and use counts under the
+`learning/export.rs`, `learning/stale.rs`, `learning/enforce.rs` and `learning/sync.rs`
+own the curator, agent reflection, export, the stale-lesson check, lesson enforcement
+and the sync data model. Learned lessons keep their status and use counts under the
 entry's `automatic.lifecycle`, including miss counts; the stale-lesson note is the
-entry's local `stale` field. Entries saved before these existed load unchanged. Learned
+entry's local `stale` field and the enforcing check is its local `enforced` field;
+a task's link to the lesson it enforces lives on its context receipt. Entries and tasks
+saved before these existed load unchanged. Learned
 ids derive from the project ID and the lesson, not the folder; project IDs belong to
 one installation, so sync matches projects by repository instead. History is
 append-only JSON Lines in `task-runs-v1/knowledge/ledger/`, one file per project; past

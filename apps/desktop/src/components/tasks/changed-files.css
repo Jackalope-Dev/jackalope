@@ -37,8 +37,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: var(--control-height, 36px);
+  height: var(--control-height, 36px);
   flex: none;
   cursor: pointer;
 }
@@ -47,7 +47,7 @@
   align-items: start;
   gap: 8px;
   width: 100%;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 10px 8px;
   border-radius: var(--radius-xs);
   text-align: left;

@@ -8,6 +8,7 @@ import { missingProjectDefaults, type ProjectDefaults } from '../../lib/context/
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { WindowGlass } from '../../lib/window-glass';
 import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -256,6 +257,7 @@ export function OnboardingFlow({
   };
   return (
     <div className="onboarding-shell">
+      <WindowGlass />
       <ResizeHandles />
       <TitleBar />
       <main className="onboarding-layout">
@@ -285,12 +287,28 @@ export function OnboardingFlow({
               </li>
             ))}
           </ol>
+          {/* First-run setup has no exit; adding another project can return to the workspace. */}
+          {projects.length > 0 && (
+            <Button
+              variant="ghost"
+              className="onboarding-exit"
+              disabled={busy}
+              onClick={() => onboarding.cancel()}
+            >
+              <ArrowLeft size={16} />
+              Back to workspace
+            </Button>
+          )}
         </aside>
         <section className="onboarding-content" aria-labelledby="onboarding-heading">
-          <div className="onboarding-step-meta">
-            <p className="onboarding-progress">
-              Step {index + 1} of {steps.length}
-            </p>
+          <div className="onboarding-heading-row">
+            <h2 id="onboarding-heading" ref={heading} data-step={step} tabIndex={-1}>
+              {step === 'project'
+                ? 'Choose a project'
+                : step === 'agent'
+                  ? 'Choose agents for this project'
+                  : 'Describe your first task'}
+            </h2>
             {step === 'agent' && (
               <Button
                 variant="ghost"
@@ -305,13 +323,6 @@ export function OnboardingFlow({
               </Button>
             )}
           </div>
-          <h2 id="onboarding-heading" ref={heading} data-step={step} tabIndex={-1}>
-            {step === 'project'
-              ? 'Choose a project'
-              : step === 'agent'
-                ? 'Choose agents for this project'
-                : 'Describe your first task'}
-          </h2>
           {step === 'project' && (
             <OnboardingProjectStep
               initialPath={project?.path ?? ''}

@@ -33,10 +33,21 @@ prompt and the throwaway worktree; anything they change there is never integrate
 The planner reads the repository and project lessons first, scores eight coverage areas
 (scope, behaviour and UX, data and contracts, integrations, edge and failure cases,
 non-functional, constraints and out of scope, done signals) as Clear, Partial or Missing,
-and asks only what the code cannot answer: one question at a time through `ask_user`,
-recommended option first. Questions can carry an optional header, recommended option,
-multi-select flag, allow-other flag and rationale; prompts saved without them load
-unchanged.
+then sorts each open point before asking anything:
+
+- A **fact question** has an answer it can observe: what the code does, where something
+  lives, its output, timing or layout, whether a test or setting exists. The planner
+  answers it by reading files or running a read-only command in its discarded workspace,
+  and records it as a checked assumption with its evidence (see the plan document).
+- A **preference question** is a product, scope or taste decision only the person can
+  make. Only these are asked: one at a time through `ask_user`, recommended option first.
+
+Questions can carry an optional header, recommended option, multi-select flag,
+allow-other flag, rationale and `why_ask`; prompts saved without them load unchanged.
+A planning question must give `why_ask`, one short sentence on why checking cannot settle
+it, which the app and terminal show under the question. A planning question without it
+returns `{"status":"not_asked","message":...}` telling the planner to check the fact itself
+or ask again with a reason; it does not reach the person or count toward the cap.
 
 Jackalope enforces the limits at the bridge. A planning attempt may forward at most the
 project's question cap (default 5, 0–12) across all of a plan's attempts. Choice questions
@@ -77,6 +88,8 @@ Coverage: Scope Clear · Done signals Partial
 - Q: Which delimiter?
   A: Comma
 ## Assumptions
+- Checked: Reports render in src/report.ts — evidence: src/report.ts:12
+- Exports stay under 10,000 rows
 ## Out of scope
 ## Approach & Interfaces
 ## Tasks
@@ -101,6 +114,15 @@ digits, `-`, `_`) and at least one scope, 1–12 criteria with unique IDs and 1�
 characters, and every `dependsOn` and `covers` reference resolving. Verify tags are
 `command` or `test` (optionally `: <exact command>`), `browser` or `manual`; an untagged
 criterion is manual. Bullet sections render `- None` when empty.
+
+An assumption that starts with `Checked:` is a fact the planner confirmed, followed by
+`evidence:` and the file and line, or the command and what it printed. Every other
+assumption is a choice the planner made without an answer. The marker is part of the
+bullet text, so a person edits, adds or removes checked assumptions like any other line,
+and plans saved before it existed parse, render and hash unchanged. The plan view lists
+checked assumptions as **Checked** with their evidence and the rest as **Assumed**; the
+approval gate asks the person to review only the assumed ones. The terminal marks
+checked assumptions with ✓ and assumed ones with !.
 
 The revision hash is the SHA-256 of the rendered document without front matter, so
 recording an approval or status does not change what was approved. Section changes
@@ -160,10 +182,13 @@ and record them with `record_validation_step` using the criterion ID as the step
 A plan always ends with an independent review, even for one assignment. The reviewer is
 the planning agent when it differs from the implementing agent, otherwise the same agent.
 It checks the combined change against each criterion, classifies gaps as Critical, Major
-or Minor, fixes Critical and Major gaps, and records a `Plan review` validation step:
-failed while Critical or Major gaps remain. A failed plan review is repaired like a failed
-check within the task's existing repair limit, and the combined result is not ready until
-the review passes. Human acceptance of requirements stays in result review.
+or Minor, fixes Critical and Major gaps, and records a `Plan review` validation step after
+its last edit: failed while Critical or Major gaps remain, with a `Fixed AC-n:` line for
+each gap it fixed itself so result review shows which code only its author has seen. A
+failed plan review is repaired like a failed check within the task's existing repair
+limit. With a check, the combined result is not ready while Critical or Major gaps are
+open; without one, it needs a passing review (below). Human acceptance of requirements
+stays in result review.
 
 A review-only plan (no check) is handled explicitly in managed delivery. Only an approved
 plan may queue staged dependencies without a check. Dependent tasks start from a

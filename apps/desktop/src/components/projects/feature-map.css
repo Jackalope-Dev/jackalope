@@ -1,0 +1,77 @@
+.feature-map-dialog {
+  width: min(36rem, calc(100vw - 32px));
+}
+
+.feature-map-form {
+  display: grid;
+  gap: 16px;
+}
+
+.feature-map-path {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.feature-map-row .settings-row-info {
+  min-width: 0;
+}
+
+.feature-map-row .settings-control-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feature-map-drift {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--color-text-primary);
+}
+
+.feature-map-drift svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-warning);
+}
+
+.feature-map-empty {
+  margin: 0;
+}
+
+.feature-map-suggestions {
+  display: grid;
+  gap: 8px;
+  max-height: min(24rem, 50vh);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.feature-map-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--control-height, 36px);
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.feature-map-suggestion:hover {
+  background: var(--color-surface-hover);
+}
+
+.feature-map-suggestion:has(:checked) {
+  background: var(--color-accent-subtle);
+}
+
+.feature-map-suggestion-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--text-sm);
+}

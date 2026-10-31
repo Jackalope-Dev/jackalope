@@ -293,6 +293,10 @@ fn learning_summary(entry: &super::knowledge::KnowledgeEntry) -> Option<protocol
         archived_reason: state.archived_reason.clone(),
         misses: (state.misses > 0).then_some(state.misses),
         attention: super::knowledge::learning::attention(entry),
+        enforced: entry
+            .enforced
+            .as_ref()
+            .map(|enforcement| enforcement.by.clone()),
     })
 }
 
@@ -865,6 +869,25 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 lessons: result.lessons,
                 message: result.message,
             })
+        }
+        Request::Sharpen {
+            text,
+            project_id,
+            project_name,
+        } => {
+            let helper = app.state::<super::helper::Helper>().inner().clone();
+            let text = tauri::async_runtime::spawn_blocking(move || {
+                helper.sharpen(
+                    &text,
+                    None,
+                    project_id,
+                    project_name,
+                    &std::sync::atomic::AtomicBool::new(false),
+                )
+            })
+            .await
+            .map_err(|error| error.to_string())??;
+            Ok(Response::Sharpened { text })
         }
         Request::Learnings { project_id } => {
             let runtime = app.state::<TaskRuntime>();

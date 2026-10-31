@@ -51,6 +51,34 @@ Task prompts/results, files, paths and credentials are excluded. Context older
 than 15 seconds is rejected. Disabling sharing prevents new reads; previous
 conversation text remains until the user starts a new conversation.
 
+## Sharpen
+
+Sharpen rewrites a composer draft into a deeper version of the same task: what a leading
+professional would also do, the rawest material to start from, the methods and tools to
+use, and an outside check that would show the result is right. Choices that belong to the
+person stay open. It does not do the task and never sends.
+
+The New work composer and the task capture dialog show it as an icon button with the
+draft tools; the terminal offers `/sharpen <draft>`. It runs only on that explicit
+action. `useSharpen` in `components/tasks/SharpenButton.tsx` calls `helper_sharpen`
+with the composer's character limit; while it runs the draft is read-only and the
+button stops it through `helper_sharpen_cancel`. The rewrite replaces the draft as
+editable text. **Undo sharpen** restores the original while the draft still holds the
+untouched rewrite; a draft that changed elsewhere meanwhile, such as from the shared
+terminal draft, is kept and the rewrite is dropped. Without the desktop app or a ready,
+enabled Claude Code, Codex, OpenCode, Grok or Kimi Code agent, the button is marked
+unavailable and its tooltip and accessible name give the reason.
+
+`commands/helper/sharpen.rs` owns the prompt, response validation and recording. It
+picks agents and accounts through the same candidate list as Ask Jackalope and generated
+commit messages, makes one tool-free request per candidate until one returns a valid
+`{"prompt": ...}` within the limit (at most 24,000 characters), and treats the draft as
+untrusted data. Each finished call is appended to `helper/generated.json` (the latest
+2,000) with its agent, account, model, project and reported usage, and `source:
+"sharpen"`; draft and rewrite text are not stored. `helper_usage` reports these entries
+with Ask Jackalope turns. An unreadable `generated.json` is reported, left in place and
+blocks Sharpen before any agent runs.
+
 ## Local MCP
 
 Helper settings → External agent connection → Connect an external agent creates a random
@@ -79,7 +107,9 @@ Copy for your agent includes source URLs, examples, bullets and callouts.
 a stale catalog.
 
 Run the JavaScript helper suite and native helper tests for context, history,
-protocol, mutation and MCP authorization contracts. The ignored
+protocol, mutation and MCP authorization contracts. `scripts/sharpen.test.mjs` and the
+native `sharpen_*` helper tests cover availability, undo, the prompt contract, response
+limits and usage recording. The ignored
 `installed_helper_agent_answers_with_document_tools` test uses a signed-in
 provider and its quota; set `JACKALOPE_HELPER_TRIAL_AGENT` to the intended adapter.
 Follow [SELF-DEVELOPMENT.md](SELF-DEVELOPMENT.md) for isolated native checks and

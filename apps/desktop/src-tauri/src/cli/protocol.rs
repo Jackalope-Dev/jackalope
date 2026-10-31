@@ -162,6 +162,15 @@ pub enum Request {
     /// Extract learnings from a conversation's history (up to the previous /learn,
     /// if present) and save them to project context.
     SessionLearn { session_id: String },
+    /// Rewrite a draft into a deeper version of the same task with a helper
+    /// agent. Nothing is sent. Answers with `Response::Sharpened`.
+    Sharpen {
+        text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project_id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project_name: Option<String>,
+    },
     /// A project's learned lessons, archived ones included. Answers with
     /// `Response::Learnings`.
     Learnings { project_id: String },
@@ -369,6 +378,10 @@ pub struct Learning {
     /// project no longer has. Absent from older hosts and when nothing is wrong.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attention: Option<String>,
+    /// The command or file a repository check enforces it with. Absent from
+    /// older hosts and when no accepted task made it a check.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enforced: Option<String>,
 }
 
 /// One change in a learned lesson's history.
@@ -377,8 +390,8 @@ pub struct Learning {
 pub struct LearningEvent {
     pub at: String,
     /// `born`, `merged`, `patched`, `retired`, `promoted`, `archived`,
-    /// `restored`, `edited`, `deleted`, `curated`, `missed`, `contradicted`
-    /// or `stale`.
+    /// `restored`, `edited`, `deleted`, `curated`, `missed`, `contradicted`,
+    /// `stale`, `enforced`, `unenforced` or `unreported`.
     pub action: String,
     pub reason: String,
     /// Redacted excerpts of what prompted the change.
@@ -442,6 +455,9 @@ pub struct Question {
     pub multi_select: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rationale: Option<String>,
+    /// Why checking the code cannot answer it; plan questions carry one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub why_ask: Option<String>,
     /// `false` when only the options are valid answers, as for a permission
     /// request. Absent from older hosts, which accepted any answer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -668,6 +684,10 @@ pub enum Response {
         lessons: Vec<String>,
         message: String,
     },
+    /// A sharpened draft for the person to edit.
+    Sharpened {
+        text: String,
+    },
     Usage {
         accounts: Vec<UsageAccount>,
     },
@@ -793,12 +813,15 @@ const RESPONSE_TIMEOUT: Duration = Duration::from_secs(40);
 /// Merging and pull requests run the repository's commit and push hooks, which
 /// can take as long as its whole test suite.
 const DELIVERY_TIMEOUT: Duration = Duration::from_secs(20 * 60);
+/// A sharpen may try several helper agents, each bounded at two minutes.
+const SHARPEN_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 
 fn response_timeout(request: &Request) -> Duration {
     match request {
         Request::MergePrepare { .. } | Request::MergeApply { .. } | Request::PullRequest { .. } => {
             DELIVERY_TIMEOUT
         }
+        Request::Sharpen { .. } => SHARPEN_TIMEOUT,
         _ => RESPONSE_TIMEOUT,
     }
 }
@@ -999,6 +1022,24 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn sharpen_requests_wait_for_helper_agents_and_omit_unknown_projects() {
+        let request = Request::Sharpen {
+            text: "Fix login".into(),
+            project_id: None,
+            project_name: None,
+        };
+        assert_eq!(
+            serde_json::to_string(&request).unwrap(),
+            r#"{"request":"sharpen","text":"Fix login"}"#
+        );
+        assert!(response_timeout(&request) > RESPONSE_TIMEOUT);
+        let response: Response =
+            serde_json::from_str(r#"{"response":"sharpened","text":"Fix login and add a test"}"#)
+                .unwrap();
+        assert!(matches!(response, Response::Sharpened { text } if text.ends_with("test")));
     }
 
     #[test]

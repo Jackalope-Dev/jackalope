@@ -9,6 +9,7 @@ use sha2::{Digest, Sha256};
 
 mod agent;
 mod curate;
+pub mod enforce;
 mod export;
 pub mod ledger;
 mod redact;
@@ -19,6 +20,7 @@ pub mod watcher;
 
 pub use agent::{agent_reflection, AgentBudget};
 pub use curate::FOLDED;
+pub use enforce::{reported_enforcer, Enforcement};
 pub use export::export_project;
 pub use ledger::LedgerRecord;
 pub use redact::redact;
@@ -74,6 +76,9 @@ pub struct Thresholds {
     pub stale_lessons_per_check: usize,
     /// Paths, scripts and targets one lesson may name for the check.
     pub stale_references_per_lesson: usize,
+    /// Redacted past instances of a lesson's mistake quoted in its
+    /// "Make it a check" task draft.
+    pub check_draft_instances: usize,
 }
 
 pub const THRESHOLDS: Thresholds = Thresholds {
@@ -97,6 +102,7 @@ pub const THRESHOLDS: Thresholds = Thresholds {
     miss_window: 10,
     stale_lessons_per_check: 100,
     stale_references_per_lesson: 8,
+    check_draft_instances: 5,
 };
 
 pub const PROBATION_DELIVERIES: u64 = THRESHOLDS.probation_deliveries;
@@ -113,6 +119,8 @@ const RECENT_RUNS: usize = 8;
 pub const IGNORED: &str = "ignored";
 /// `archived_reason` of a lesson that names something the project no longer has.
 pub const STALE: &str = "stale";
+/// `archived_reason` of a lesson retired because the repository now enforces it.
+pub const ENFORCED: &str = "enforced";
 
 pub const PROBATION: &str = "probation";
 pub const ACTIVE: &str = "active";
@@ -304,6 +312,11 @@ fn lifecycle_mut(entry: &mut KnowledgeEntry) -> Option<&mut Lifecycle> {
 pub fn attention(entry: &KnowledgeEntry) -> Option<String> {
     if let Some(thing) = &entry.stale {
         return Some(format!("names {thing}, which no longer exists"));
+    }
+    if let Some(thing) = entry.enforced.as_ref().and_then(|e| e.missing.as_ref()) {
+        return Some(format!(
+            "the check that enforced it names {thing}, which no longer exists"
+        ));
     }
     lifecycle(entry)
         .filter(|state| state.missed_often && !state.archived())
@@ -637,6 +650,7 @@ fn apply(
                     }),
                 }),
                 stale: None,
+                enforced: None,
                 source_run_id: lesson.run_id.clone(),
                 source_head: None,
                 revision: 1,
@@ -1081,6 +1095,8 @@ pub struct LearningMetrics {
     pub stale: usize,
     /// Lessons an agent reflection suggested.
     pub by_agent: usize,
+    /// Lessons a repository check now enforces, from accepted tasks.
+    pub enforced: usize,
     /// The oldest retained history record, which bounds the counts above.
     pub since: Option<String>,
 }
@@ -1122,6 +1138,7 @@ impl KnowledgeStore {
                 "missed" => metrics.missed += 1,
                 "contradicted" => metrics.contradicted += 1,
                 "stale" => metrics.stale += 1,
+                "enforced" => metrics.enforced += 1,
                 _ => {}
             }
         }

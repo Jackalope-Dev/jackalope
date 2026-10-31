@@ -18,11 +18,18 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 
 ## Desktop workspace
 
-- Work is the shared entry point for conversations, tasks and plans. Its sidebar
-  groups recent work by next action; the bottom bar shows the selected workspace,
-  local activity and visual account allowances with freshness and reset times.
+- Work is the shared entry point for conversations, tasks and plans. The sidebar
+  lists projects as a tree of their work, needs-you first, then running and recent;
+  a project row opens that project's work and its menu opens project pages. The title
+  bar holds command search; the bottom bar shows the focused project, branch, local
+  activity and visual account allowances with freshness and reset times.
   Settings → Desktop holds sleep prevention, owned terminals and preview ports.
   Settings groups account and support details.
+- The window is frosted on Windows 11 (Acrylic) and macOS (vibrancy) by default, keeping
+  text on tinted panes; Settings → Appearance → Frosted window turns it off, and Windows 10,
+  Linux and reduced-transparency settings keep the opaque look. New installs use the Auto
+  theme, which follows the system's light or dark setting. Native macOS acceptance remains
+  open.
 - Desktop preferences include interface zoom, editor and shell selection, terminal
   font size, HTTP links and editable search, new-work and settings shortcuts. Saved
   prompts and commands can apply to all projects or one project; commands require an
@@ -41,7 +48,7 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   before the existing preparation command. Both checkouts must ignore each file;
   links, parent paths and overwrites are refused. Worktree size inspection counts
   bounded logical file sizes, labels partial results and retains existing cleanup guards.
-- The workspace has one layout: a collapsible sidebar of recent work beside the open
+- The workspace has one layout: a collapsible project sidebar beside the open
   item, with review, preview, terminal or activity next to its conversation. The work
   list offers list and board views, and its filters save per project.
   Needs you prioritizes recovery and questions, then older reviews. Task context
@@ -116,7 +123,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Active task, plan and chat views show recent tool activity, workspace file labels and
   native check output from existing events, without extra model calls.
   Project opens an overview with unfinished work, setup and recorded local deliveries.
-- The Work sidebar groups review and blocked work under Needs you, alongside active work. Task
+- The sidebar marks review and blocked work as needing you, ahead of active work, and the
+  Work link counts it across projects. Task
   and session sections remember where the user was reading. Project readiness distinguishes
   unavailable inspection from a clean checkout.
 - Result views prioritize unanswered questions, recovery and failed checks. Isolated
@@ -145,7 +153,34 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   visited by the agent), desktop and optional narrow, compared before/after in Review.
   "Before" needs a separate worktree and a clean project checkout at the starting
   commit; otherwise only the result is captured, with a note. Capture runs after the
-  result is recorded, so it never delays review.
+  result is recorded, so it never delays review. A per-project feature map (page,
+  what working looks like, source globs), suggested locally from route files and router
+  setup, makes captures prefer pages whose sources changed and labels each with what to
+  check; entries whose files are gone are flagged.
+- Requirement assessments and an optional safety fact carry an evidence level (stated,
+  cited, reasoned, ran, reproduced) that Jackalope checks locally and lowers when cited
+  files, command output or captures are missing; Review shows each checked level and the
+  weakest. Bridged tasks report a short goal restatement, shown as Understood as.
+- Review's **Challenge this change** runs one or two reviewers, preferring a different
+  model family, in worktrees at a snapshot of the result. Only findings proven by a
+  command count; Checks shows each command, its output, the expected output and dropped
+  counts, with Run again in a disposable worktree and Send to the author into the
+  follow-up draft. Agent review also defaults to a reviewer from another model family.
+- Compared attempts can start a read-only judge, defaulting to a different agent family,
+  that scores them against criteria taken from the request, recommends a base and lists
+  parts worth porting. Keep and combine drafts a follow-up on the kept attempt and holds
+  the source worktrees from cleanup in Project worktrees until that follow-up finishes.
+- Agents keep an append-only decision trail for each attempt (forks, pivots, reverts,
+  blockers, finished units). Jackalope checks its evidence pointers locally when the
+  attempt ends and shows the Decision log in task Activity and bot conversations.
+- After 15 minutes away, Work opens with Since you left: what needs you, what finished or
+  failed meanwhile with screenshots first, and every waiting item with its decision,
+  evidence, risk and a suggested next step when the record supports one. It is built
+  locally and stays hidden when nothing changed.
+- Sharpen rewrites a composer or terminal draft into a deeper version of the same task
+  with one-step undo, using one helper call recorded with helper usage.
+  Real-agent runs and installed-app acceptance of these review, comparison, trail and
+  Sharpen features remain open.
 - Persistent agent browser profiles: a Project browser per project and an optional
   browser per bot keep sign-ins between tasks in a separate Chromium profile. Agents opt
   in with `browser_open_profile`; each site asks before first use, sign-in pages pause
@@ -237,7 +272,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   investigation assessment, `/plan` in the terminal or `jackalope plan`. A read-only
   planning attempt explores, asks at most the project's question cap (default 5) and
   returns one plan document with assumptions, tasks, acceptance criteria and a
-  recommended shape. **Write the plan myself** turns hand-written tasks and outcomes into
+  recommended shape. The planner checks facts in the code itself and records them as
+  checked assumptions with evidence; only preference questions reach the person, each
+  saying why checking could not settle it. **Write the plan myself** turns hand-written tasks and outcomes into
   the same plan document. Revisions, section diffs, direct edits, Save to repo (never
   committed), exact-revision approval, single/subtasks/swarm hand-off through managed
   tasks, an independent plan review, deviation decisions and re-planning are
@@ -273,7 +310,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   later in that work counts as missed; repeated misses flag it, raise its rank among
   equal matches and archive it while new. The curator schedule also archives learned
   lessons naming a project path, package script or make target that no longer
-  exists, and only flags other lessons. Off by default per project: agent
+  exists, and only flags other lessons. **Make it a check** drafts a task that turns a
+  lesson, especially one agents keep missing, into an architecture, type, lint or test
+  check proven against a past instance; accepting it marks the lesson enforced and
+  retires learned lessons, and a check that later disappears restores or flags the
+  lesson. Off by default per project: agent
   reflection with the default agent after work ends (bounded, on that account's
   quota, through the same gate), and mirroring active lessons into a marked
   `AGENTS.md` section and a Claude Code skill. Opt-in account sync of learned lessons,
@@ -324,7 +365,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   action, source and update cards, and suggest new bots for the person to review. Every
   wake, message and card is labelled in the transcript and activity; hourly, hand-off
   and batch limits bound autonomous work. Templates cover review, fixing, testing, docs,
-  security, release notes and onboarding. Earlier routines remain ordinary schedules.
+  security, release notes and onboarding; Triage classifies reports, reproduces bugs
+  before drafting fixes and asks before replying or closing. Earlier routines remain
+  ordinary schedules.
   See [bots](BOTS.md).
 - Short requests phrased as questions skip workspace preparation, and focused attempts
   that change no files skip automatic checks; planned assignments always verify.

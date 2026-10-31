@@ -45,6 +45,15 @@ fn resolve(connection: &mut Connection, prefix: &str) -> Result<String, String> 
     }
 }
 
+/// Whether a plan assumption is a fact the planner checked rather than a
+/// choice it made: the plan document writes those `Checked: <fact> — evidence: …`.
+pub fn checked(assumption: &str) -> bool {
+    assumption
+        .trim_start()
+        .get(..8)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("checked:"))
+}
+
 /// The question as lines, recommended option marked.
 pub fn question_lines(question: &Question) -> Vec<String> {
     let mut lines = vec![];
@@ -54,6 +63,9 @@ pub fn question_lines(question: &Question) -> Vec<String> {
     lines.push(question.question.clone());
     if let Some(rationale) = &question.rationale {
         lines.push(format!("  {rationale}"));
+    }
+    if let Some(why) = &question.why_ask {
+        lines.push(format!("  Why ask: {why}"));
     }
     for (index, option) in question.options.iter().enumerate() {
         let mark = if question.recommended.as_ref() == Some(option) {
@@ -295,7 +307,11 @@ pub fn approve(
         view.criteria.len()
     );
     for assumption in &view.assumptions {
-        eprintln!("  assumes: {assumption}");
+        if checked(assumption) {
+            eprintln!("  {assumption}");
+        } else {
+            eprintln!("  assumes: {assumption}");
+        }
     }
     match (view.verification.as_deref(), &view.check) {
         (Some("review"), _) => eprintln!(
@@ -339,6 +355,7 @@ mod tests {
             recommended: Some("CSV".into()),
             multi_select: multi,
             rationale: Some("Decides the serializers.".into()),
+            why_ask: Some("A product choice.".into()),
             allow_other: None,
         }
     }
@@ -371,6 +388,7 @@ mod tests {
         assert_eq!(lines[0], "[Formats]");
         assert!(lines.contains(&"  1. CSV (recommended)".to_string()));
         assert!(lines.contains(&"  Decides the serializers.".to_string()));
+        assert!(lines.contains(&"  Why ask: A product choice.".to_string()));
     }
 
     #[test]

@@ -1,6 +1,7 @@
 pub mod attachments;
 pub mod bot_hub;
 pub mod capacity;
+pub mod challenge_review;
 pub mod change_stats;
 pub mod cli_host;
 pub mod cli_install;
@@ -37,6 +38,7 @@ pub mod agent_models;
 pub mod agent_policy;
 pub mod agent_profiles;
 pub mod agent_sign_in;
+pub mod decision_trail;
 pub mod decisions;
 mod experiments;
 pub mod jev;
@@ -55,6 +57,7 @@ pub mod process_control;
 pub mod release;
 pub mod verification;
 
+pub mod evidence;
 pub mod knowledge;
 pub mod monitors;
 pub mod outcomes;
