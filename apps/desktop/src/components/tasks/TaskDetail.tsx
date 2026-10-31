@@ -5,23 +5,19 @@ import {
   DisclosureSummary,
   DropdownMenu as Menu,
 } from '@jackalope/ui';
+import * as Dialog from '@radix-ui/react-dialog';
 import {
-  ArrowLeft,
   CalendarClock,
   Check,
+  ChevronRight,
   Copy,
   GitMerge,
   MailPlus,
   MoreHorizontal,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Play,
   Square,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useWideWorkspace } from '../../hooks/useWideWorkspace';
-import { getAgentMetadata } from '../../lib/agent-catalog';
 import { waitForStoppedAttempt } from '../../lib/continue-task';
 import { projectConnections } from '../../lib/mcp-connection';
 import { recoveryHandoff } from '../../lib/project-return';
@@ -41,17 +37,18 @@ import { listMcpServers, type McpServerConfig, openInBrowser } from '../../lib/t
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { useWorkSignalsStore } from '../../stores/workSignalsStore';
+import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { Button } from '../ui/button';
+import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
-import { Tooltip } from '../ui/Tooltip';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
 import { AgentScreen } from './AgentScreen';
+import { DecisionTrail } from './DecisionTrail';
 import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview, type ReviewSection } from './ResultReview';
 import { ScreenshotPreview } from './ScreenshotPreview';
@@ -65,16 +62,19 @@ import { TaskIntegration } from './TaskIntegration';
 import { TaskOutcomes } from './TaskOutcomes';
 import { TaskPreview } from './TaskPreview';
 import { TaskProgress } from './TaskProgress';
+import { TaskQuestions } from './TaskQuestions';
 import { TaskRunDetails } from './TaskRunDetails';
 import { TaskSaveRecovery } from './TaskSaveRecovery';
+import { UnderstoodAs } from './UnderstoodAs';
 import { UserPromptCard } from './UserPromptCard';
 import { useManagedPreview } from './useManagedPreview';
 import { useTaskFollowUps } from './useTaskFollowUps';
 import { ValidationJourney } from './ValidationJourney';
-import { WorkContext } from './WorkContext';
+import { useWorkSeen, WorkContextDetails } from './WorkContext';
 import { WorkFeedbackInbox } from './WorkFeedbackInbox';
 import { WorkSourceLink } from './WorkSourceLink';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
+import { useWorkspaceActions } from './WorkTools';
 import './task-detail.css';
 
 const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
@@ -168,9 +168,10 @@ export function TaskDetail({
   const [connections, setConnections] = useState<McpServerConfig[] | null>(null);
   const applied = useCallback(() => setIntegrated(true), []);
   const key = `reply:${run.taskId}`;
-  const wide = useWideWorkspace();
-  const split = useWorkViewStore((state) => state.split[run.taskId] ?? wide);
-  const alongside = split && ['changes', 'preview', 'terminal', 'activity', 'screen'].includes(tab);
+  // Each tab takes the whole canvas so the result, review or terminal stays readable.
+  const [contextOpen, setContextOpen] = useState(false);
+  useWorkSeen(run);
+  const workspaceActions = useWorkspaceActions(run);
   const reply = drafts[key]?.prompt ?? '';
   const active = isActive(run);
   const previewRunning = useManagedPreview(run.id, !active && !integrated);
@@ -203,7 +204,15 @@ export function TaskDetail({
       run.projectPath.replaceAll('\\', '/').toLowerCase();
   const finished = !active && ['review', 'reviewed'].includes(run.status);
   const canContinue = isLatest && !!run.sessionId && run.status !== 'interrupted' && !integrated;
-  const decision = taskDecision(run, integrated, currentProject?.preferences?.verifyCommand);
+  const changedFiles = useChangeStats([run])[run.id]?.value.files;
+  useEffect(() => {
+    useWorkViewStore.getState().setViewing(run.id);
+    return () => {
+      if (useWorkViewStore.getState().viewing === run.id)
+        useWorkViewStore.getState().setViewing(null);
+    };
+  }, [run.id]);
+  const decision = taskDecision(run, integrated, changedFiles);
   const { followups, queueError, queueing, queueFollowUp, updateFollowUp } = useTaskFollowUps({
     run,
     draftKey: key,
@@ -235,22 +244,7 @@ export function TaskDetail({
       }
     }
   };
-  const primaryAction = async () => {
-    inspect(decision.section);
-    if (decision.section !== 'verify' || acting) return;
-    const command = run.verifyCommand || currentProject?.preferences?.verifyCommand;
-    if (!command) return;
-    setActing(true);
-    setError('');
-    try {
-      await nativeTask('task_verify', { id: run.id, command });
-      await refresh();
-    } catch (cause) {
-      setError(String(cause));
-    } finally {
-      setActing(false);
-    }
-  };
+  const primaryAction = () => inspect(decision.section);
 
   useEffect(() => {
     if (tab !== 'activity' || !detailsOpen || !isLatest || connections !== null) return;
@@ -295,36 +289,40 @@ export function TaskDetail({
     }
   };
 
+  /** Starts the next attempt from this one with `prompt`; throws when it cannot. */
+  const startContinuation = async (prompt: string, stopPreview = false) => {
+    if (stopPreview) await nativeTask('task_preview_stop', { id: run.id });
+    if (active) {
+      await nativeTask('task_stop', { id: run.id });
+      await waitForStoppedAttempt(
+        run.id,
+        async () => {
+          await refresh();
+          return useExecutionStore.getState().runs.find((r) => r.id === run.id);
+        },
+        () => new Promise((resolve) => setTimeout(resolve, 250)),
+      );
+    }
+    if (latestAttempt(useExecutionStore.getState().runs, run.taskId)?.id !== run.id)
+      throw new Error('A newer attempt exists. Open the latest result before continuing.');
+    await start({
+      projectId: run.projectId,
+      projectName: run.projectName,
+      projectPath: run.projectPath,
+      agent: run.agent,
+      prompt,
+      isolated: false,
+      previousRunId: run.id,
+      connectionIds: drafts[key]?.connectionIds,
+    });
+  };
   const continueTask = async (stopPreview = false) => {
     if (!reply.trim() || acting || submitting || !canContinue) return;
     setActing(true);
     setError('');
     const prompt = reply.trim();
     try {
-      if (stopPreview) await nativeTask('task_preview_stop', { id: run.id });
-      if (active) {
-        await nativeTask('task_stop', { id: run.id });
-        await waitForStoppedAttempt(
-          run.id,
-          async () => {
-            await refresh();
-            return useExecutionStore.getState().runs.find((r) => r.id === run.id);
-          },
-          () => new Promise((resolve) => setTimeout(resolve, 250)),
-        );
-      }
-      if (latestAttempt(useExecutionStore.getState().runs, run.taskId)?.id !== run.id)
-        throw new Error('A newer attempt exists. Open the latest result before continuing.');
-      await start({
-        projectId: run.projectId,
-        projectName: run.projectName,
-        projectPath: run.projectPath,
-        agent: run.agent,
-        prompt,
-        isolated: false,
-        previousRunId: run.id,
-        connectionIds: drafts[key]?.connectionIds,
-      });
+      await startContinuation(prompt, stopPreview);
       if (useExecutionStore.getState().drafts[key]?.prompt.trim() === prompt)
         draft(key, { prompt: '' });
     } catch (cause) {
@@ -335,6 +333,17 @@ export function TaskDetail({
   };
   const sendFollowUp = () =>
     active || followups.length ? queueFollowUp() : continueTask(previewRunning);
+  /** Answers a question the attempt ended on by continuing the task with it. */
+  const continueWithAnswer = async (question: string, answer: string) => {
+    if (acting || submitting) throw new Error('The task is already continuing.');
+    setActing(true);
+    setError('');
+    try {
+      await startContinuation(`You asked: ${question}\nMy answer: ${answer}`, previewRunning);
+    } finally {
+      setActing(false);
+    }
+  };
   const openLink = useCallback(async (href: string) => {
     try {
       await openInBrowser(href);
@@ -409,11 +418,6 @@ export function TaskDetail({
   if (run.detailsOmitted)
     return (
       <WorkspacePage className="task-detail" aria-busy="true">
-        <Tooltip content="All tasks">
-          <Button variant="ghost" size="icon" aria-label="All tasks" onClick={onBack}>
-            <ArrowLeft size={18} aria-hidden="true" />
-          </Button>
-        </Tooltip>
         <WorkspaceHeading title={title} />
         <p role="status">Loading task…</p>
       </WorkspacePage>
@@ -421,27 +425,14 @@ export function TaskDetail({
   return (
     <WorkspacePage className="task-detail">
       <div className="task-detail-navigation">
-        <Tooltip content="All tasks">
-          <Button variant="ghost" size="icon" aria-label="All tasks" onClick={onBack}>
-            <ArrowLeft size={18} aria-hidden="true" />
-          </Button>
-        </Tooltip>
         <WorkspaceHeading
           title={title}
           titleRef={heading}
           description={
-            active ? (
-              run.projectName
-            ) : (
-              <span className="task-heading-meta">
-                <Badge appearance="plain" variant={decision.tone}>
-                  {decision.label}
-                </Badge>
-                <span>
-                  {run.projectName} · {getAgentMetadata(run.agent)?.name ?? run.agent} ·{' '}
-                  {run.accountBinding?.label || run.account}
-                </span>
-              </span>
+            active ? undefined : (
+              <Badge appearance="plain" variant={decision.tone}>
+                {decision.label}
+              </Badge>
             )
           }
         />
@@ -454,22 +445,14 @@ export function TaskDetail({
         )}
         <div className="task-detail-utilities">
           {!active && isLatest && (
-            <>
-              {run.workspace && run.status !== 'interrupted' && !integrated && (
-                <Button variant="outline" onClick={() => setTab('preview')}>
-                  <Play size={16} />
-                  Try result
-                </Button>
-              )}
-              <Button
-                disabled={acting || submitting}
-                loading={acting}
-                loadingLabel="Working…"
-                onClick={() => void primaryAction()}
-              >
-                {decision.action}
-              </Button>
-            </>
+            <Button
+              disabled={acting || submitting}
+              loading={acting}
+              loadingLabel="Working…"
+              onClick={() => void primaryAction()}
+            >
+              {decision.action}
+            </Button>
           )}
           <WorkSourceLink prompts={attempts.map((attempt) => attempt.prompt)} />
           {attempts.length > 1 && (
@@ -519,17 +502,49 @@ export function TaskDetail({
                     <Check size={16} /> Mark reviewed
                   </Menu.Item>
                 )}
-                {finished && isLatest && isolated && (
+                {finished && (
                   <Menu.Item
                     className="workspace-menu-item"
                     onSelect={() => {
                       setTab('changes');
-                      setIntegrating(true);
+                      if (isLatest && isolated) setIntegrating(true);
                       setReviewSection('delivery');
                     }}
                   >
-                    <GitMerge size={16} /> {integrated ? 'Merge receipt' : 'Review and merge'}
+                    <GitMerge size={16} /> {integrated ? 'Merge receipt' : 'Merge and publish'}
                   </Menu.Item>
+                )}
+                <Menu.Item className="workspace-menu-item" onSelect={() => setContextOpen(true)}>
+                  Task context
+                </Menu.Item>
+                {!!workspaceActions.groups.length && (
+                  <Menu.Sub>
+                    <Menu.SubTrigger className="workspace-menu-item workspace-menu-sub">
+                      Workspace
+                      <ChevronRight size={14} aria-hidden="true" />
+                    </Menu.SubTrigger>
+                    <Menu.Portal>
+                      <Menu.SubContent className="workspace-menu">
+                        {workspaceActions.groups.map((group, index) => [
+                          index > 0 && (
+                            <Menu.Separator
+                              key={`separator-${group[0]?.id}`}
+                              className="menu-separator"
+                            />
+                          ),
+                          ...group.map((entry) => (
+                            <Menu.Item
+                              key={entry.id}
+                              className="workspace-menu-item"
+                              onSelect={entry.onSelect}
+                            >
+                              {entry.label}
+                            </Menu.Item>
+                          )),
+                        ])}
+                      </Menu.SubContent>
+                    </Menu.Portal>
+                  </Menu.Sub>
                 )}
                 <Menu.Item
                   className="workspace-menu-item"
@@ -549,30 +564,26 @@ export function TaskDetail({
                 >
                   <MailPlus size={16} /> Mark unread
                 </Menu.Item>
-                {finished && (
-                  <Menu.Item
-                    className="workspace-menu-item"
-                    onSelect={() => {
-                      setTab('changes');
-                      setReviewSection('delivery');
-                    }}
-                  >
-                    PR, CI &amp; delivery
-                  </Menu.Item>
-                )}
               </Menu.Content>
             </Menu.Portal>
           </Menu.Root>
+          <Dialog.Root open={contextOpen} onOpenChange={setContextOpen}>
+            <DialogContent aria-describedby={undefined}>
+              <DialogCloseButton />
+              <DialogHeader title="Task context" />
+              <WorkContextDetails run={run} />
+            </DialogContent>
+          </Dialog.Root>
         </div>
       </div>
       <div className="task-status-stack">
         <TaskComparison run={run} />
+        <UnderstoodAs understanding={run.understanding} />
         {active && (
           <TaskProgress
             run={run}
             integrated={integrated}
             pending={pending.length}
-            verifyCommand={currentProject?.preferences?.verifyCommand}
             onActivity={() => setTab('activity')}
             action={
               active ? (
@@ -631,7 +642,7 @@ export function TaskDetail({
         />
       )}
       {!!pending.length && (
-        <div className="space-y-3 mb-5" id="task-questions">
+        <TaskQuestions>
           <h2 className="text-base">{active ? 'A decision needs you' : 'Questions left open'}</h2>
           {pending.map((p) => (
             <UserPromptCard
@@ -639,9 +650,15 @@ export function TaskDetail({
               runId={run.id}
               prompt={p}
               active={['starting', 'running'].includes(run.status)}
+              accountShown={active}
+              onContinue={
+                canContinue && !active
+                  ? (answer) => continueWithAnswer(p.question, answer)
+                  : undefined
+              }
             />
           ))}
-        </div>
+        </TaskQuestions>
       )}
       <Tabs.Root className="task-working-area" value={tab} onValueChange={setTab}>
         <div className="task-view-controls">
@@ -659,35 +676,9 @@ export function TaskDetail({
               </Tabs.Trigger>
             ))}
           </Tabs.List>
-          <div className="task-view-tools">
-            {['changes', 'preview', 'terminal', 'activity', 'screen'].includes(tab) && (
-              <Tooltip content={split ? 'Hide conversation' : 'Show conversation'}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="conversation-toggle"
-                  aria-label={split ? 'Hide conversation' : 'Show conversation'}
-                  aria-pressed={split}
-                  onClick={() => useWorkViewStore.getState().setSplit(run.taskId, !split)}
-                >
-                  {split ? (
-                    <PanelLeftClose size={16} aria-hidden="true" />
-                  ) : (
-                    <PanelLeftOpen size={16} aria-hidden="true" />
-                  )}
-                </Button>
-              </Tooltip>
-            )}
-            <WorkContext
-              key={`context:${run.taskId}`}
-              run={run}
-              onTerminal={() => setTab('terminal')}
-              hideTerminal
-            />
-          </div>
         </div>
-        <div className="result-canvas" data-alongside={alongside || undefined}>
-          <Tabs.Content value="result" forceMount hidden={tab !== 'result' && !alongside}>
+        <div className="result-canvas">
+          <Tabs.Content value="result" forceMount hidden={tab !== 'result'}>
             {attempts
               .filter((attempt) => Date.parse(attempt.startedAt) < Date.parse(run.startedAt))
               .map((attempt, index) => (
@@ -721,6 +712,21 @@ export function TaskDetail({
                 </figcaption>
               </figure>
             )}
+            {decision.action === 'Review plan' && canContinue && (
+              <InlineNotice
+                className="task-plan-notice"
+                action={
+                  <Button
+                    variant="outline"
+                    onClick={() => addToReply('Implement this plan.', true)}
+                  >
+                    Implement this plan
+                  </Button>
+                }
+              >
+                This is a plan. Nothing in the project has changed yet.
+              </InlineNotice>
+            )}
             {run.result ? (
               <div className="task-result-text">
                 <Suspense
@@ -748,6 +754,7 @@ export function TaskDetail({
                 visible={tab === 'changes'}
                 section={reviewSection}
                 onSectionChange={setReviewSection}
+                onOpenPreview={() => setTab('preview')}
                 outcomes={outcomes}
                 evidence={evidence}
                 key={run.id}
@@ -772,10 +779,6 @@ export function TaskDetail({
                         key={run.id}
                         run={run}
                         integrated={integrated}
-                        onReview={() => {
-                          setTab('changes');
-                          setReviewSection('changes');
-                        }}
                         onHandoff={(text) => {
                           const id = useTaskStore.getState().addTask({
                             projectId: run.projectId,
@@ -794,6 +797,7 @@ export function TaskDetail({
             </Tabs.Content>
           )}
           <Tabs.Content value="activity">
+            <DecisionTrail attempts={attempts} currentId={run.id} />
             <TaskActivity entries={run.activity} active={active} />
             <Disclosure
               open={detailsOpen}

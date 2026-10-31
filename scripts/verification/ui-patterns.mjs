@@ -103,7 +103,17 @@ export async function verifyPatternLayout(page, reducedMotion) {
   await search.fill('A long search to check room beside the clear button');
   const clear = page.getByRole('button', { name: 'Clear workspace search' });
   const box = await clear.boundingBox();
-  assert(box.width >= 44 && box.height >= 44, 'Search clear action has a comfortable target');
+  // Targets follow the shared control height: 36px for fine pointers, 44px for coarse ones.
+  const control = await page.evaluate(() =>
+    Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--control-height'),
+    ),
+  );
+  assert(control >= 36, 'The shared control height is defined');
+  assert(
+    box.width >= control && box.height >= control,
+    'Search clear action has a comfortable target',
+  );
   assert(
     await search.evaluate(
       (element) => Number.parseFloat(getComputedStyle(element).paddingRight) >= 44,

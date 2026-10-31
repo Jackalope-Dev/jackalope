@@ -11,6 +11,7 @@ const phases: Record<string, string> = {
   processSpawn: 'Process launch',
   verificationWait: 'Waiting for check capacity',
   verification: 'Check commands',
+  reviewCapture: 'Review screenshots',
 };
 
 export function TaskTiming({ run }: { run: TaskRun }) {

@@ -9,6 +9,7 @@ use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
 pub mod beta;
 pub mod feedback;
+pub mod lesson_sync;
 pub mod settings_sync;
 mod waitlist;
 
@@ -280,6 +281,16 @@ async fn request(
     secret: Option<&str>,
     body: Option<serde_json::Value>,
 ) -> Result<(u16, serde_json::Value), String> {
+    request_with_limit(api, path, method, secret, body, 16384).await
+}
+async fn request_with_limit(
+    api: &reqwest::Url,
+    path: &str,
+    method: reqwest::Method,
+    secret: Option<&str>,
+    body: Option<serde_json::Value>,
+    limit: usize,
+) -> Result<(u16, serde_json::Value), String> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .redirect(reqwest::redirect::Policy::none())
@@ -309,7 +320,7 @@ async fn request(
         .await
         .map_err(|_| "The account response was interrupted. Please retry.")?
     {
-        if bytes.len() + chunk.len() > 16384 {
+        if bytes.len() + chunk.len() > limit {
             return Err("The account service returned an invalid response.".into());
         }
         bytes.extend_from_slice(&chunk);

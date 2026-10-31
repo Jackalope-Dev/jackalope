@@ -14,9 +14,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use tauri::State;
 
-use super::tasks::TaskRuntime;
+use super::tasks::{TaskRuntime, WorkspaceMode};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectRecord {
     pub id: String,
@@ -26,6 +26,128 @@ pub struct ProjectRecord {
     /// same colour as the app. Absent for a repository the app has not opened.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accent: Option<String>,
+    /// Whether routine agent requests are approved without asking, escalating
+    /// only high-risk ones. Absent means on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_approve: Option<bool>,
+    /// Where new work runs: `worktree`, `branch`, `current` or `ask`. Kept as
+    /// text so a value from a newer app cannot make the ledger unreadable;
+    /// absent or unknown means an isolated worktree.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_mode: Option<String>,
+    /// Whether Jackalope reflects on work in the background and keeps learned
+    /// lessons tidy. Absent means on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub learn_automatically: Option<bool>,
+    /// Reported tool calls between background reflections of a running task.
+    /// Absent or out of range means the default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub learning_cadence: Option<u32>,
+    /// Whether learned lessons take part in account lesson sync when it is on
+    /// for this desktop. Absent means included.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sync_lessons: Option<bool>,
+    /// Whether finished work is also reflected on by the default agent, which
+    /// spends that account's quota. Absent means off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_reflection: Option<bool>,
+    /// Whether active learned lessons are mirrored into the project's AGENTS.md
+    /// and a Claude Code skill. Absent means off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub export_lessons: Option<bool>,
+    /// Whether Claude Code tasks load the person's own Claude Code settings, plugins,
+    /// hooks and MCP servers. `false` limits them to the project's settings and the
+    /// connections Jackalope supplies. Absent follows the evaluation default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub personal_claude_setup: Option<bool>,
+    /// A fast command Claude Code sessions run after each file edit, with `{file}`
+    /// replaced by the edited path. Used only by the edit-check evaluation hook.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edit_check: Option<String>,
+    /// The project's saved check, mirrored from the app so a terminal approving
+    /// a plan uses the same check the app would. Absent when none is saved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verify_command: Option<String>,
+    /// Whether finished work runs the saved check automatically. Absent means off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_verify: Option<bool>,
+    /// The command that prepares a fresh workspace before work starts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prepare_command: Option<String>,
+    /// Untracked files copied into fresh workspaces.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub setup_files: Vec<String>,
+    /// The project's preview command, with `{port}` for the local port.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview_command: Option<String>,
+    /// Whether finished work with changes gets before/after review screenshots
+    /// from the preview command. Absent means on when a preview command is saved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_captures: Option<bool>,
+    /// Preview paths always captured for review, such as `/`. Empty means `/`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub review_pages: Vec<String>,
+    /// `desktop` and/or `narrow`. Empty means desktop only.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub review_viewports: Vec<String>,
+    /// User-facing features whose pages review screenshots prefer when work
+    /// changes their source files. Unreadable entries are dropped on load.
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "super::previews::features::lenient"
+    )]
+    pub feature_map: Vec<super::previews::features::Feature>,
+}
+
+/// Accepted `learning_cadence` values.
+pub const LEARNING_CADENCES: std::ops::RangeInclusive<u32> = 10..=1000;
+
+/// A project's agent-approval and workspace settings, with their defaults.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProjectSettings {
+    pub auto_approve: bool,
+    pub workspace_mode: WorkspaceMode,
+    pub learn_automatically: bool,
+    pub learning_cadence: u32,
+    pub sync_lessons: bool,
+    pub agent_reflection: bool,
+    pub export_lessons: bool,
+}
+
+impl Default for ProjectSettings {
+    fn default() -> Self {
+        Self {
+            auto_approve: true,
+            workspace_mode: WorkspaceMode::Worktree,
+            learn_automatically: true,
+            learning_cadence: super::knowledge::learning::DEFAULT_CADENCE,
+            sync_lessons: true,
+            agent_reflection: false,
+            export_lessons: false,
+        }
+    }
+}
+
+impl ProjectRecord {
+    pub fn settings(&self) -> ProjectSettings {
+        ProjectSettings {
+            auto_approve: self.auto_approve.unwrap_or(true),
+            workspace_mode: self
+                .workspace_mode
+                .as_deref()
+                .and_then(WorkspaceMode::parse)
+                .unwrap_or_default(),
+            learn_automatically: self.learn_automatically.unwrap_or(true),
+            learning_cadence: self
+                .learning_cadence
+                .filter(|cadence| LEARNING_CADENCES.contains(cadence))
+                .unwrap_or(super::knowledge::learning::DEFAULT_CADENCE),
+            sync_lessons: self.sync_lessons.unwrap_or(true),
+            agent_reflection: self.agent_reflection.unwrap_or(false),
+            export_lessons: self.export_lessons.unwrap_or(false),
+        }
+    }
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -126,6 +248,119 @@ pub fn set_accent(runtime: &TaskRuntime, project_id: &str, accent: &str) -> Resu
     write_ledger(&file, &ledger)
 }
 
+/// The settings for a project, or the defaults for one the app has not saved.
+pub fn settings(runtime: &TaskRuntime, project_id: &str) -> ProjectSettings {
+    list(runtime)
+        .into_iter()
+        .find(|project| project.id == project_id)
+        .map(|project| project.settings())
+        .unwrap_or_default()
+}
+
+pub fn auto_approve(runtime: &TaskRuntime, project_id: &str) -> bool {
+    settings(runtime, project_id).auto_approve
+}
+
+pub fn record(runtime: &TaskRuntime, project_id: &str) -> Option<ProjectRecord> {
+    list(runtime)
+        .into_iter()
+        .find(|project| project.id == project_id)
+}
+
+pub fn personal_claude_setup(runtime: &TaskRuntime, project_id: &str) -> Option<bool> {
+    record(runtime, project_id).and_then(|project| project.personal_claude_setup)
+}
+
+pub fn edit_check(runtime: &TaskRuntime, project_id: &str) -> Option<String> {
+    record(runtime, project_id)
+        .and_then(|project| project.edit_check)
+        .map(|command| command.trim().to_string())
+        .filter(|command| !command.is_empty() && command.len() <= 4000)
+}
+
+/// Learning changes a terminal can make; `None` keeps the saved value.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct LearningSettings {
+    pub automatic: Option<bool>,
+    pub cadence: Option<u32>,
+    pub sync: Option<bool>,
+    pub agent: Option<bool>,
+    pub export: Option<bool>,
+}
+
+/// Records a terminal's change to a project's settings. The app adopts the
+/// saved values when it next merges the registry.
+pub fn set_settings(
+    runtime: &TaskRuntime,
+    project_id: &str,
+    auto_approve: Option<bool>,
+    workspace_mode: Option<WorkspaceMode>,
+    learning: LearningSettings,
+) -> Result<ProjectRecord, String> {
+    if let Some(cadence) = learning.cadence {
+        if !LEARNING_CADENCES.contains(&cadence) {
+            return Err(format!(
+                "Choose a learning cadence from {} to {} tool calls.",
+                LEARNING_CADENCES.start(),
+                LEARNING_CADENCES.end()
+            ));
+        }
+    }
+    let _guard = lock().lock();
+    let file = path(runtime);
+    let mut ledger = read_ledger(&file);
+    let record = ledger
+        .projects
+        .iter_mut()
+        .find(|project| project.id == project_id)
+        .ok_or("That project is not registered.")?;
+    if let Some(auto_approve) = auto_approve {
+        record.auto_approve = Some(auto_approve);
+    }
+    if let Some(mode) = workspace_mode {
+        record.workspace_mode = Some(mode.as_str().into());
+    }
+    if let Some(automatic) = learning.automatic {
+        record.learn_automatically = Some(automatic);
+    }
+    if let Some(cadence) = learning.cadence {
+        record.learning_cadence = Some(cadence);
+    }
+    if let Some(sync) = learning.sync {
+        record.sync_lessons = Some(sync);
+    }
+    if let Some(agent) = learning.agent {
+        record.agent_reflection = Some(agent);
+    }
+    if let Some(export) = learning.export {
+        record.export_lessons = Some(export);
+    }
+    let updated = record.clone();
+    write_ledger(&file, &ledger)?;
+    Ok(updated)
+}
+
+/// Records a terminal's review-screenshot choice. The app adopts it when it
+/// next merges the registry.
+pub fn set_review_captures(
+    runtime: &TaskRuntime,
+    project_id: &str,
+    enabled: bool,
+) -> Result<ProjectRecord, String> {
+    let _guard = lock().lock();
+    let file = path(runtime);
+    let mut ledger = read_ledger(&file);
+    let record = ledger
+        .projects
+        .iter_mut()
+        .find(|project| project.id == project_id)
+        .ok_or("That project is not registered.")?;
+    record.review_captures = Some(enabled);
+    let updated = record.clone();
+    write_ledger(&file, &ledger)?;
+    Ok(updated)
+}
+
 /// Returns the record for a repository, creating one when it is not known yet.
 /// Used when work starts from a terminal in a repository the app has never
 /// opened; the UI merges the new entry on its next load.
@@ -149,6 +384,20 @@ pub fn ensure(runtime: &TaskRuntime, project_path: &str) -> Result<ProjectRecord
         name,
         path: project_path.to_string(),
         accent: None,
+        auto_approve: None,
+        workspace_mode: None,
+        learn_automatically: None,
+        learning_cadence: None,
+        sync_lessons: None,
+        agent_reflection: None,
+        export_lessons: None,
+        personal_claude_setup: None,
+        edit_check: None,
+        verify_command: None,
+        auto_verify: None,
+        prepare_command: None,
+        setup_files: Vec::new(),
+        ..Default::default()
     };
     ledger.projects.push(record.clone());
     write_ledger(&file, &ledger)?;
@@ -184,12 +433,40 @@ mod tests {
                     name: "Work".into(),
                     path: "/work".into(),
                     accent: Some("#00aa88".into()),
+                    auto_approve: None,
+                    workspace_mode: None,
+                    learn_automatically: None,
+                    learning_cadence: None,
+                    sync_lessons: None,
+                    agent_reflection: None,
+                    export_lessons: None,
+                    personal_claude_setup: None,
+                    edit_check: None,
+                    verify_command: Some("pnpm test".into()),
+                    auto_verify: Some(true),
+                    prepare_command: None,
+                    setup_files: vec![".env".into()],
+                    ..Default::default()
                 },
                 ProjectRecord {
                     id: "personal".into(),
                     name: "Personal".into(),
                     path: "/personal".into(),
                     accent: Some("#aa00ff".into()),
+                    auto_approve: Some(false),
+                    workspace_mode: Some("current".into()),
+                    learn_automatically: Some(false),
+                    learning_cadence: Some(5),
+                    sync_lessons: None,
+                    agent_reflection: None,
+                    export_lessons: None,
+                    personal_claude_setup: None,
+                    edit_check: None,
+                    verify_command: None,
+                    auto_verify: None,
+                    prepare_command: None,
+                    setup_files: Vec::new(),
+                    ..Default::default()
                 },
             ],
         };
@@ -204,6 +481,27 @@ mod tests {
         let legacy: ProjectRecord =
             serde_json::from_str(r#"{"id":"old","name":"Old","path":"/old"}"#).unwrap();
         assert_eq!(legacy.accent, None);
+        assert_eq!(legacy.verify_command, None);
+        assert!(legacy.setup_files.is_empty());
+        assert_eq!(legacy.settings(), ProjectSettings::default());
+        assert!(legacy.settings().learn_automatically);
+        assert_eq!(legacy.settings().learning_cadence, 50);
+        let future: ProjectRecord = serde_json::from_str(
+            r#"{"id":"new","name":"New","path":"/new","workspaceMode":"cloud","autoApprove":false}"#,
+        )
+        .unwrap();
+        assert_eq!(future.settings().workspace_mode, WorkspaceMode::Worktree);
+        assert!(!future.settings().auto_approve);
+        assert_eq!(
+            ledger.projects[1].settings().workspace_mode,
+            WorkspaceMode::Current
+        );
+        assert!(!ledger.projects[1].settings().learn_automatically);
+        assert_eq!(
+            ledger.projects[1].settings().learning_cadence,
+            50,
+            "an out-of-range cadence reads as the default"
+        );
     }
 
     #[test]
@@ -219,6 +517,20 @@ mod tests {
             name: "repo".into(),
             path: directory.to_string_lossy().into_owned(),
             accent: None,
+            auto_approve: None,
+            workspace_mode: None,
+            learn_automatically: None,
+            learning_cadence: None,
+            sync_lessons: None,
+            agent_reflection: None,
+            export_lessons: None,
+            personal_claude_setup: None,
+            edit_check: None,
+            verify_command: None,
+            auto_verify: None,
+            prepare_command: None,
+            setup_files: Vec::new(),
+            ..Default::default()
         });
         write_ledger(&file, &ledger).unwrap();
 

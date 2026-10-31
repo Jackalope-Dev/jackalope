@@ -230,6 +230,15 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Needs you lists recovery steps and questions first, then older reviews, so the most urgent item is always at the top.',
         ],
       },
+      {
+        id: 'coming-back',
+        question: 'What do I see when I come back?',
+        paragraphs: [
+          'After 15 minutes away from Jackalope, the Work page opens with Since you left. It starts with one line about what needs you, then lists what finished or failed while you were away, with screenshots first.',
+          'Below that, every item waiting on you has its own card: the decision to make, what it changes, the checks and screenshots behind it, and how risky it is. When the evidence is clear, such as passing checks on a finished task, the card suggests a next step. Open an item from its card, or dismiss the summary when you are done.',
+          'Jackalope builds this from your recorded work on your computer, without asking a model. If nothing changed while you were away, it stays hidden.',
+        ],
+      },
     ],
   },
   {
@@ -246,7 +255,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'What is a bot?',
         paragraphs: [
           'A bot is a saved agent profile: a name, a role, standing instructions, an agent and model, a project and the connected apps it may use. Each bot keeps the character and color you choose, everywhere it appears.',
-          'Templates cover reviewing, fixing, testing, documentation, security, release notes and onboarding. A template fills in the editor, including a suggested wake-up that starts turned off; it never grants access, enables connections or starts work on its own.',
+          'Templates cover reviewing, fixing, triaging reports, testing, documentation, security, release notes and onboarding. Triage classifies each report as a bug, not a bug, a duplicate or needing more information, reproduces a bug with a failing test or capture before drafting any fix, and asks you before it replies, closes or publishes anything. A template fills in the editor, including a suggested wake-up that starts turned off; it never grants access, enables connections or starts work on its own.',
         ],
       },
       {
@@ -438,6 +447,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'No. File review markers track your place for the displayed patch and reset when it changes. Approve work records acceptance of the task outcome for its snapshot. Merging is a separate action that applies the prepared change to the target branch.',
           'Agent review prepares an editable request for another agent. It runs only after you submit it. Review its findings and check the actual change; an agent response does not replace your acceptance or required project checks.',
+          'Challenge this change asks one or two other agents to break the change in their own copy of the files. Only failures a reviewer reproduced with a command count, and Checks shows each command, what it printed and what was expected. Run again repeats a command in a fresh copy, and Send to the author adds the findings you select to the follow-up for you to send.',
+          'Agent assessments of expected outcomes show how strong their evidence is: Stated, Cited code, Reasoned through, Ran it or Shown in the app. Jackalope lowers a level when a cited file or line does not exist, a run has no command or output, or no recorded screenshot or preview page matches. Requirements show the weakest level, and Safe because names the one fact the agent says the change depends on. Older reports show Unrated. A strong level is still the agent’s evidence, not your acceptance.',
         ],
       },
       {
@@ -956,18 +967,20 @@ export const knowledgeGuides: KnowledgeGuide[] = [
   {
     slug: 'windows-desktop-control',
     category: 'desktop-control',
-    title: 'Let an agent work in a Windows app',
+    title: 'Let an agent work in your apps',
     shortTitle: 'Windows desktop control',
     description:
-      'Select a window for a task, understand its control status, and pause or cancel when you need your computer.',
+      'Grant a window, an app or your desktop for a task, understand its control status, and pause or cancel when you need your computer.',
     readingTime: '2 min read',
     sections: [
       {
         id: 'window-grants',
-        question: 'How do window grants work?',
+        question: 'How do window, app and desktop grants work?',
         paragraphs: [
-          'On Windows, explicitly select an application window for the current task attempt. Jackalope’s desktop tools check that grant before accessibility reads, captures, and native input.',
-          'These grants control Jackalope’s desktop tools, not the agent’s other local capabilities. Desktop control operates the live user session and does not create an OS sandbox. This guide covers Windows. macOS, Linux X11 and GNOME 46 Wayland backends require platform acceptance before release; GNOME Wayland also requires the Jackalope Window Control extension. Other Wayland and headless Linux sessions are unsupported.',
+          'When an agent asks, you choose what it may use for the current task: one window, every window of one app, or your whole desktop. Jackalope’s own windows are always off limits. Jackalope’s desktop tools check that grant before accessibility reads, captures, and native input.',
+          'For a window or app you can choose Always allow for the project, so later tasks that name that app start without asking. Full desktop access is asked for every task. Remove remembered apps and websites in Project settings under Desktop control.',
+          'To use your signed-in web accounts, grant your browser as an app. The first time the agent reaches a website, Jackalope asks whether to allow it for this task, always, or never.',
+          'These grants control Jackalope’s desktop tools, not the agent’s other local capabilities. Desktop control operates the live user session and does not create an OS sandbox. This guide covers Windows. macOS, Linux X11, GNOME 46 Wayland and Wayland desktop portal backends require platform acceptance before release; GNOME Wayland uses the Jackalope Window Control extension when it is enabled. Other Wayland desktops, such as KDE Plasma, offer app and full-desktop grants when they provide the remote desktop portal: approve your desktop’s prompt to begin, and stop sharing from its indicator to end access. Your own input does not pause control there. Headless Linux sessions and Wayland desktops without that portal are unsupported.',
         ],
       },
       {
@@ -1004,10 +1017,11 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'first-window-task',
         question: 'How do I start and check a window task?',
         paragraphs: [
-          'Begin with an inspection task, such as reading the labels in a sample app. Browser pages usually fit the built-in browser tools; native desktop control is for an explicitly selected Windows application window.',
+          'Begin with an inspection task, such as reading the labels in a sample app. Public pages usually fit the built-in browser tools; desktop control is for your own apps and your signed-in browser.',
         ],
         steps: [
-          'Open the application in your Windows session and select its window for the current task attempt. State the intended action and anything that requires your review.',
+          'Open the application in your Windows session and choose its window or app when the agent asks. State the intended action and anything that requires your review.',
+          'Follow along in the task’s Screen view, which lists each action, how it was sent and a small capture afterwards.',
           'Keep the target visible and watch the control status. If you need the computer, pause or cancel through the status bar.',
           'After an interruption, review the current window before resuming. The agent needs a fresh snapshot because the UI may have changed.',
           'Read the task result and inspect the application itself. A completed input action is not proof that an external service accepted or saved it.',
@@ -1387,6 +1401,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Work opens with a composer. Send a message to start a conversation, or use Options for a structured brief with effort, agent, and tool choices. For a first task, describe the starting state, desired result, constraints, and how the agent should check it. Replace the example page and commands with ones that exist in your project.',
           'Project setup takes three steps: your repository, your agents, and an optional first task. Decisions, Git behavior and colors start from defaults you can change in Project Settings. Preparation, check, and preview commands are detected in the background without replacing your saved choices. Review or edit them in Project Settings before starting work; setup does not run commands or enable automatic checks.',
+          'Select Sharpen, the sparkle button under the message box, to rewrite your draft into a deeper version of the same task: what an expert would also check, the raw material to start from, the methods to use and an outside check that proves the result. Choices that are yours stay open. It uses one agent call, never sends, and Undo sharpen brings back your draft until you edit it. In the terminal, /sharpen <draft> does the same.',
           'The composer offers optional starters for GitHub issues, PR feedback, failing CI and dependency updates. GitHub evidence is read through your installed, signed-in CLI. The prepared request stays editable; it does not publish, reply or resolve threads.',
         ],
         codeBox: {
@@ -1396,7 +1411,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         steps: [
           'Choose the project and confirm the target branch or workspace. Choose Work in a copy when other work is in progress.',
           'Pick an effort level and review Customize task for agent, account, context, and tools. Include a reachable preview URL when you expect browser checks.',
-          'Start the task and respond if it asks for missing information. Read the result and actual checks, then merge into the target branch and remove the workspace.',
+          'Start the task and check Understood as, the agent’s own short restatement of the goal and the smallest change it plans. If it misread the request, stop or send a correction early. Respond if it asks for missing information. Read the result and actual checks, then merge into the target branch and remove the workspace.',
         ],
       },
       {
@@ -1405,6 +1420,14 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Effort adds guidance to the task: Quick requests a focused change and targeted checks; Balanced asks for a brief plan and verification of affected flows; Thorough asks for deeper investigation, broader checks, and a separate review pass.',
           'These are instructions, not hard token budgets, guaranteed response times, or automatic grants of tools and subagents. Provider and task settings still determine model access and execution.',
+        ],
+      },
+      {
+        id: 'decision-log',
+        question: 'How do I see why the agent made its choices?',
+        paragraphs: [
+          'On long or multi-step work, agents keep a Decision log: real forks, pivots, reverts, blockers and finished steps, each with why, evidence and the result. Find it at the top of a task’s Activity tab, or under the reply in a bot conversation. Each retry or continuation starts a new group, and a corrected entry stays visible and is marked Superseded.',
+          'When the attempt ends, Jackalope checks each evidence pointer on your computer, such as a file and line, a commit or a recorded check, without using any model. Pointers it cannot find are marked Not found. A found pointer is still the agent’s claim, so review the change itself before merging.',
         ],
       },
       {

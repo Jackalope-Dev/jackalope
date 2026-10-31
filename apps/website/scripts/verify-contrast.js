@@ -34,8 +34,11 @@ async function _verifyContrast(page) {
           continue;
         if (![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue;
         const style = getComputedStyle(el);
-        // Gradient-clipped headings have no single text color to measure.
-        if (style.backgroundClip === 'text') continue;
+        // Gradient-clipped text has no single colour to measure, including spans inside it.
+        let clipped = false;
+        for (let node = el; node && !clipped; node = node.parentElement)
+          clipped = getComputedStyle(node).backgroundClip === 'text';
+        if (clipped) continue;
         const ancestors = [];
         let node = el;
         while (node) {
@@ -85,20 +88,28 @@ async function _verifyContrast(page) {
       const checks = [];
       const record = async (state) => checks.push({ state, ...(await audit()) });
       await record('default');
-      for (const name of ['Review', 'Agents', 'Schedules']) {
-        await page.getByRole('tab', { name, exact: true }).click();
-        await record(name);
-      }
+      await page.locator('.lp-download').hover();
+      await record('download hover');
+      const terminal = page.getByRole('textbox', { name: 'Message the demo agent' });
+      await terminal.fill('/');
+      await record('terminal command menu');
+      await terminal.fill('');
       await page.locator('.landing-header .appearance-toggle').hover();
       await record('appearance hover');
       await page.locator('.landing-header .button').hover();
       await record('header action hover');
       await page.locator('.lp-final .button').hover();
       await record('final signup hover');
-      await page.locator('.lp-actions').getByRole('button', { name: 'Join the waitlist' }).click();
-      await page.getByRole('dialog').waitFor();
-      await record('signup dialog');
-      await page.keyboard.press('Escape');
+      // Builds without configured downloads offer signup in a dialog from the header.
+      const signup = page
+        .locator('.landing-header')
+        .getByRole('button', { name: 'Sign up', exact: true });
+      if (await signup.count()) {
+        await signup.click();
+        await page.getByRole('dialog').waitFor();
+        await record('signup dialog');
+        await page.keyboard.press('Escape');
+      }
       const failures = checks.flatMap((check) =>
         check.failures.map((failure) => ({ state: check.state, ...failure })),
       );

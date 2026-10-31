@@ -1,5 +1,261 @@
 [
   {
+    "id": "conversations-that-keep-going",
+    "date": "2026-10-31",
+    "status": "In development",
+    "title": "Conversations that keep going",
+    "description": "Conversations continue until you pause or stop them, or until a reply needs you.",
+    "items": [
+      "A restart keeps each conversation's pause state, and sending in an idle conversation resumes it.",
+      "Messages and replies show when they were sent on hover.",
+      "Right-click a project in the sidebar for its actions, including a new project icon."
+    ]
+  },
+  {
+    "id": "compare-plan-and-come-back-with-less-effort",
+    "date": "2026-10-31",
+    "status": "In development",
+    "title": "Compare, plan and come back with less effort",
+    "description": "A second agent can judge compared attempts, plan mode looks things up instead of asking, and returning to Jackalope shows what needs you.",
+    "items": [
+      "A different agent can judge compared attempts against criteria taken from your request and recommend which to build on. Keep and combine then drafts a follow-up that brings the best parts of the others into the one you keep.",
+      "Plan mode checks facts in your code and shows them with evidence, apart from what it assumed. Every question it still asks says why only you can answer it.",
+      "After you have been away, Since you left names what needs you, shows what finished or failed with screenshots first, and lays out each decision with its evidence and risk.",
+      "Sharpen rewrites a draft into a deeper version of the same request, in the app or with /sharpen in the terminal, and Undo brings your draft back.",
+      "Make it a check turns a lesson agents keep missing into a lint, type, test or CI check, and a feature map points review screenshots at the pages your change touched."
+    ]
+  },
+  {
+    "id": "agents-that-show-their-work",
+    "date": "2026-10-30",
+    "status": "In development",
+    "title": "Agents that show their work",
+    "description": "Review now shows how well each claim is backed, lets other agents try to break a result, and keeps a log of the decisions behind long work.",
+    "items": [
+      "Each expected outcome shows how strong the agent's evidence is, from stated to shown in the app. Jackalope checks cited files, test output and screenshots locally and lowers claims it can't back up.",
+      "Challenge this change asks one or two agents, preferably from another model family, to break the result in their own copy. Only failures they reproduced with a command count, and you can run each again before sending it to the author.",
+      "Tasks show how the agent understood your request, so a misread is visible early.",
+      "Long and unattended work leaves a Decision log of what the agent chose, why and the evidence behind it, with pointers Jackalope couldn't find flagged when the attempt ends."
+    ]
+  },
+  {
+    "id": "a-denser-workspace-built-around-projects-and-their-agents",
+    "date": "2026-10-30",
+    "status": "In development",
+    "title": "A denser workspace built around projects and their agents",
+    "description": "The desktop app now puts every project and its running work in the sidebar and gives more of the window to the work itself.",
+    "items": [
+      "Projects form a tree in the sidebar with their questions, failures and reviews first, then running and recent work, each with its agent and live status.",
+      "Command search moves into the title bar and the project and branch move to the status bar, removing a whole header row.",
+      "Buttons, fields, tabs, lists and page spacing are more compact with a mouse or trackpad and keep larger targets on touch screens.",
+      "The window is frosted on Windows 11 and macOS, with every label kept readable over any wallpaper; turn it off in Settings → Appearance.",
+      "New installs follow your system light or dark setting, and choosing a project shows a quick overview of its size, languages and latest commit."
+    ]
+  },
+  {
+    "id": "finish-work-from-the-terminal-and-stay-in-sync-with-the-app",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Finish work from the terminal and stay in sync with the app",
+    "description": "The jackalope terminal now picks up changes made in the app right away and can merge, open pull requests and take back queued messages.",
+    "items": [
+      "Pausing, finishing or queuing in the app, plan edits and deviation decisions reach open terminals at once, and changes made in a terminal reach the app without waiting.",
+      "/merge and /pr deliver a conversation's work after a confirmation, and /unqueue takes back a message that has not reached an agent yet.",
+      "Permission requests only accept their options, so a typed reply can no longer deny by accident, and questions left open after the agent stopped can still be answered.",
+      "/status summarizes the project, the work and what needs you without leaving the conversation, and other conversations that start needing you are announced."
+    ]
+  },
+  {
+    "id": "easier-agent-questions-in-the-app-and-terminal",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Easier agent questions in the app and terminal",
+    "description": "Questions from agents now get room to read and answer, stay in sync between the app and the terminal, and can still be answered after a task stops.",
+    "items": [
+      "A waiting question takes most of the task page, and you can drag the handle beneath it to resize; the sidebar width can be dragged too, and both sizes are remembered.",
+      "If a task ends with a question open, pick an answer and the task continues with it.",
+      "Answering in the app closes the question in the terminal and shows the next one, and the terminal can answer questions that take several choices.",
+      "Close finished or stale work from the sidebar; it stays on the Work page and returns when it needs you again.",
+      "Terminal tabs show only conversations that need you or that you opened, and plan results show their summary as a list instead of one long heading."
+    ]
+  },
+  {
+    "id": "desktop-control-on-kde-plasma-and-other-wayland-desktops",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Desktop control on KDE Plasma and other Wayland desktops",
+    "description": "Agents can now control one app or the whole desktop on Wayland desktops that offer the standard remote desktop portal, after you approve your desktop's own prompt.",
+    "items": [
+      "Works on KDE Plasma and on GNOME without Jackalope's extension, using accessibility actions, keyboard and pointer input and monitor screenshots.",
+      "Your desktop can remember the approval, and stopping the share from its indicator ends access at once."
+    ]
+  },
+  {
+    "id": "bots-get-their-own-computer",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Bots get their own computer",
+    "description": "A bot can now work on its own Linux desktop with a browser, running in Docker on your machine or on a cloud machine you run, instead of on your computer.",
+    "items": [
+      "Choose None, Local sandbox or Cloud machine in a bot's settings, then start, stop, watch or take over its computer.",
+      "Desktop and browser tools act on the bot's computer without desktop access questions; each website still asks first.",
+      "Agents in ordinary tasks can ask for a sandbox computer, and you decide whether to share the project read-only.",
+      "Pair your own cloud machine in Settings → Computers; Jackalope-hosted computers are coming soon.",
+      "Local sandboxes start when an agent or viewer needs them and stop after 10 minutes idle by default, or when Jackalope quits unless you keep them running."
+    ]
+  },
+  {
+    "id": "agent-browsers-that-stay-signed-in",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Agent browsers that stay signed in",
+    "description": "Give agents and bots their own browser profile, sign in once, and keep your everyday browser untouched.",
+    "items": [
+      "Each project gets a Project browser and each bot can have its own; sign-ins last between tasks.",
+      "Agents ask before using each site and pause for you to sign in yourself in a visible window; passwords never reach the agent.",
+      "Manage profiles in Project settings, the bot editor or the terminal's /browser: see sites, clear one site or delete the profile.",
+      "Review screenshots now capture after the result is ready, so they never hold up finished work."
+    ]
+  },
+  {
+    "id": "before-and-after-screenshots-in-review",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Before and after screenshots in Review",
+    "description": "Finished work now arrives with screenshots of the pages it changed, so you can check the end state without running anything.",
+    "items": [
+      "When work with changes finishes, Jackalope runs the project preview in a private, temporary browser and captures up to six pages, including the pages named in browser checks and the ones the agent visited.",
+      "Review compares each page before and after with a slider or side by side, at desktop and optional narrow sizes, with a link to the live preview.",
+      "Turn it off or choose pages and sizes in Project settings; the terminal's settings and review commands show it too."
+    ]
+  },
+  {
+    "id": "agents-can-use-your-apps-and-signed-in-browser",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Agents can use your apps and signed-in browser",
+    "description": "Desktop control is much faster, acts on what it sees by name, and lets you grant one window, one app or your whole desktop.",
+    "items": [
+      "Grant one window, every window of one app, or the full desktop. Full desktop is asked for every task; window and app grants can be remembered per project and removed in project settings.",
+      "Agents can work in your own browser with your sign-ins. Each new website asks once, and you can always or never allow it for the project.",
+      "Agents act on buttons, fields and lists by name through accessibility, so they usually leave your mouse and focus alone, and fall back to mouse and keyboard when an app needs it.",
+      "A resident helper answers each action in milliseconds on Windows instead of starting a new process every time.",
+      "The Screen view lists each action with a small capture afterwards, and Escape, Stop or Revoke still ends control at once."
+    ]
+  },
+  {
+    "id": "plan-with-me-before-code-changes",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Plan with me before code changes",
+    "description": "Plan mode reads your code first, asks only what it cannot find, and drafts one plan for you to approve before any work starts.",
+    "items": [
+      "Choose Plan with me in the composer or after an assessment, /plan in the terminal or jackalope plan. The planner works read-only and asks at most five questions by default, recommended answer first; you can tell it to use its recommendations for the rest.",
+      "Prefer to write it yourself? Write the plan myself turns your tasks and outcomes into the same plan, with the same approval, review and tracking.",
+      "Each plan lists its assumptions, tasks with their files and dependencies, and acceptance criteria with how each is checked. Review revisions side by side, edit the plan directly, ask for changes, or save it into the repository without committing.",
+      "Approve an exact revision to run it as one agent, planned subtasks or a swarm. Each worker starts from the plan in a fresh context, and an independent review checks the result against every criterion and repairs serious gaps. Projects without a saved check can still run plans, checked by the plan's own test commands or by review alone.",
+      "Departures from the plan pause dependent work and notify you until you accept the amendment, ask for a redo or re-plan; re-planning keeps finished tasks."
+    ]
+  },
+  {
+    "id": "lessons-that-travel-and-tidy-themselves",
+    "date": "2026-10-29",
+    "status": "In development",
+    "title": "Lessons that travel and tidy themselves",
+    "description": "Learned lessons can now follow you between desktops, stay free of duplicates and reach agents outside Jackalope.",
+    "items": [
+      "Include learned lessons in settings sync to use them on every desktop signed in to your account. It is off by default, each project can opt out, and evidence, use counts and folder paths stay on your computer.",
+      "Jackalope folds near-duplicate learned lessons into one; restoring a folded lesson keeps it separate.",
+      "Optionally let your default agent reflect on finished work too, on its own account quota with strict limits; its suggestions pass the same checks.",
+      "Optionally mirror active lessons into a marked section of AGENTS.md and a Claude Code skill, removed again when you turn it off.",
+      "Learning activity in Project → Context shows how lessons are learned, used, archived and restored."
+    ]
+  },
+  {
+    "id": "faster-steadier-claude-code-tasks",
+    "date": "2026-10-28",
+    "status": "In development",
+    "title": "Faster, steadier Claude Code tasks",
+    "description": "Claude Code now keeps one warm session per conversation and checks its own work as it goes.",
+    "items": [
+      "Follow-up messages reuse the running Claude Code session, so replies start sooner and reuse the prompt cache.",
+      "Replies stream into the terminal as they are written.",
+      "Claude Code fixes problems from a project's quick check after each edit, and keeps working when the verification command fails before it finishes.",
+      "Project lessons reach Claude Code with every message, and a pinned model falls back to another when it is overloaded."
+    ]
+  },
+  {
+    "id": "a-redesigned-terminal",
+    "date": "2026-10-28",
+    "status": "In development",
+    "title": "A redesigned terminal",
+    "description": "The jackalope terminal now looks and works like the app, with tabs for every open conversation.",
+    "items": [
+      "A rounded content card on the app's own surface colours, with the project's accent, contrast checked against them.",
+      "Tabs for open conversations show which need you, which are working and which are idle; Alt+1–9 or a click switches.",
+      "@ names agents as well as files: @codex starts a message with Codex, and naming two starts one conversation each.",
+      "Leading /, ! and @ switch the input into command, shell or mention mode, and a Needs you banner says what a blocked conversation is waiting on."
+    ]
+  },
+  {
+    "id": "jackalope-learns-from-your-work",
+    "date": "2026-10-28",
+    "status": "In development",
+    "title": "Jackalope learns from your work.",
+    "description": "Every agent now benefits from lessons Jackalope saves in the background from what you tell it and from checks that pass.",
+    "items": [
+      "Lessons are saved while long tasks run and when work finishes, and /learn still saves on request.",
+      "New lessons stay on probation until tasks use them; unused ones are archived and can be restored.",
+      "Each lesson keeps a history of why it was learned or changed, in Project context and the terminal's /learnings.",
+      "Turn Learn automatically off for any project in its settings."
+    ]
+  },
+  {
+    "id": "auto-approved-agent-requests-and-project-workspace-modes",
+    "date": "2026-10-28",
+    "status": "In development",
+    "title": "Auto-approved agent requests and project workspace modes",
+    "description": "Agents keep working without stopping for routine permission requests, and each project chooses where its tasks run.",
+    "items": [
+      "Routine tool use from Claude Code, Kimi Code and OpenCode is approved automatically and listed in the task's activity; deletes, force pushes, deploys, credentials, elevated commands and changes outside the workspace still ask. Turn it off per project in Project settings.",
+      "Projects can run tasks in an isolated worktree, on a new branch in the project checkout, directly on the current branch, or ask each time a task starts."
+    ]
+  },
+  {
+    "id": "recursive-flint-for-local-agents",
+    "date": "2026-10-27",
+    "status": "In development",
+    "title": "Recursive Flint for local agents",
+    "description": "Local agent setup now offers Recursive Flint, a fast open coding model for computers with 48 GB of memory or more.",
+    "items": [
+      "Pick Recursive Flint · 40B in Agents → Try a local agent. It downloads through Ollama like the other local models and must pass the same local check before you connect it.",
+      "If your Ollama is too old for a model, setup now says to update Ollama instead of pointing at your connection or disk space."
+    ]
+  },
+  {
+    "id": "free-to-sign-up-no-waitlist",
+    "date": "2026-10-26",
+    "status": "Released",
+    "title": "Free to sign up, no waitlist",
+    "description": "Anyone can create a free Jackalope account and download the app right away.",
+    "items": [
+      "Sign up at jackalope.dev, confirm your email and you land on the download page, already signed in.",
+      "With no coding agent installed, setup opens the list of supported agents and their install commands."
+    ]
+  },
+  {
+    "id": "claude-code-asks-before-it-acts",
+    "date": "2026-10-26",
+    "status": "Released",
+    "title": "Claude Code asks before it acts",
+    "description": "When Claude Code needs a command or tool its settings do not already allow, Jackalope shows you the request and waits for your answer.",
+    "items": [
+      "The request shows the exact command or tool, so you can see what you are approving. Before, those requests were refused without asking you.",
+      "Always allow, per project: approve a tool, or a command such as pnpm add, for one project so Claude Code stops asking. Commands that chain, pipe or redirect always ask.",
+      "jackalope answer <id> shows the question a conversation is waiting on and answers it by option number or text, so scripts can reply too."
+    ]
+  },
+  {
     "id": "one-name-for-every-kind-of-work",
     "date": "2026-10-12",
     "status": "In development",

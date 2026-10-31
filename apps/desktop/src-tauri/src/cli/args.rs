@@ -60,6 +60,27 @@ pub enum Command {
         ready: bool,
         yes: bool,
     },
+    /// `plan "<goal>"`: a read-only planning interview that ends in a draft.
+    Plan {
+        goal: String,
+        agent: Option<String>,
+        json: bool,
+    },
+    /// `plan show <id>`.
+    PlanShow {
+        id: String,
+        json: bool,
+    },
+    /// `plan approve <id> [single|subtasks|swarm]`.
+    PlanApprove {
+        id: String,
+        shape: Option<String>,
+        yes: bool,
+    },
+    /// `plans`: this project's plans.
+    Plans {
+        json: bool,
+    },
     Help,
     Version,
 }
@@ -280,6 +301,45 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
                     yes,
                 }
             }
+            Some("plans") => {
+                extra(1)?;
+                Command::Plans { json }
+            }
+            Some("plan") => match words.get(1).map(String::as_str) {
+                Some("show") => {
+                    extra(3)?;
+                    Command::PlanShow {
+                        id: words
+                            .get(2)
+                            .cloned()
+                            .ok_or("Which plan? Run 'jackalope plans' to see them.")?,
+                        json,
+                    }
+                }
+                Some("approve") => {
+                    extra(4)?;
+                    let shape = words.get(3).cloned();
+                    if shape
+                        .as_deref()
+                        .is_some_and(|shape| !["single", "subtasks", "swarm"].contains(&shape))
+                    {
+                        return Err(format!("Approve as single, subtasks or swarm. {USAGE}"));
+                    }
+                    Command::PlanApprove {
+                        id: words
+                            .get(2)
+                            .cloned()
+                            .ok_or("Which plan? Run 'jackalope plans' to see them.")?,
+                        shape,
+                        yes,
+                    }
+                }
+                _ => Command::Plan {
+                    goal: words[1.min(words.len())..].join(" "),
+                    agent: agent.take(),
+                    json,
+                },
+            },
             Some("answer") => Command::Answer {
                 id: argument().ok_or("Which conversation? Run 'jackalope ls' to see them.")?,
                 text: Some(words[2.min(words.len())..].join(" ")).filter(|text| !text.is_empty()),
@@ -298,7 +358,12 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
 
     let json_applies = matches!(
         command,
-        Command::Once { .. } | Command::List { .. } | Command::Status { .. }
+        Command::Once { .. }
+            | Command::List { .. }
+            | Command::Status { .. }
+            | Command::Plan { .. }
+            | Command::PlanShow { .. }
+            | Command::Plans { .. }
     );
     if stream {
         match &command {
@@ -314,9 +379,14 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
     if stat && !matches!(command, Command::Diff { .. }) {
         return Err(format!("--stat applies to diff. {USAGE}"));
     }
-    let delivers = matches!(command, Command::Merge { .. } | Command::PullRequest { .. });
+    let delivers = matches!(
+        command,
+        Command::Merge { .. } | Command::PullRequest { .. } | Command::PlanApprove { .. }
+    );
     if yes && !delivers {
-        return Err(format!("--yes applies to merge and pr. {USAGE}"));
+        return Err(format!(
+            "--yes applies to merge, pr and plan approve. {USAGE}"
+        ));
     }
     if message.is_some() {
         return Err(format!("--message applies to merge. {USAGE}"));
@@ -325,7 +395,9 @@ pub fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Cli, String>
         return Err(format!("--title and --ready apply to pr. {USAGE}"));
     }
     if json && !json_applies {
-        return Err(format!("--json applies to -p, ls and status. {USAGE}"));
+        return Err(format!(
+            "--json applies to -p, ls, status and plans. {USAGE}"
+        ));
     }
     if compare.is_some() {
         return Err(format!("--agents applies to -p. {USAGE}"));
@@ -382,6 +454,37 @@ mod tests {
 
     fn command(line: &[&str]) -> Command {
         parse_line(line).unwrap().command
+    }
+
+    #[test]
+    fn plan_commands_parse_their_goal_shape_and_flags() {
+        assert_eq!(
+            command(&["plan", "add CSV export", "--agent", "claude"]),
+            Command::Plan {
+                goal: "add CSV export".into(),
+                agent: Some("claude".into()),
+                json: false,
+            }
+        );
+        assert_eq!(
+            command(&["plan", "approve", "ab12", "subtasks", "--yes"]),
+            Command::PlanApprove {
+                id: "ab12".into(),
+                shape: Some("subtasks".into()),
+                yes: true,
+            }
+        );
+        assert_eq!(
+            command(&["plan", "show", "ab12", "--json"]),
+            Command::PlanShow {
+                id: "ab12".into(),
+                json: true,
+            }
+        );
+        assert_eq!(command(&["plans"]), Command::Plans { json: false });
+        assert!(parse_line(&["plan", "approve", "ab12", "everything"]).is_err());
+        assert!(parse_line(&["plan", "approve"]).is_err());
+        assert!(parse_line(&["plan", "show", "ab12", "--yes"]).is_err());
     }
 
     #[test]

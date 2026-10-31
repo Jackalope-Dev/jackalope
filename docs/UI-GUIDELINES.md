@@ -25,7 +25,9 @@ automatic checks; reserve full setup and verification for work that changes file
 
 ## Navigation and copy
 
-Peer workspace views use WorkspacePage for gutters and scrolling,
+The title bar holds command search, the sidebar navigates projects and their work, and
+the status bar shows the focused project's branch and activity. Peer workspace views use
+WorkspacePage for gutters and scrolling,
 WorkspaceHeading for the page title and actions, WorkspaceSectionHeading for
 section titles, and WorkspaceSubnavigation for peer tabs. Keep page headers in
 loading and empty states. Use the shared workspace spacing classes and tokens;
@@ -71,7 +73,8 @@ width, with separate Changes, Checks and Merge views. Put approval and optional
 review actions in a toolbar above the diff; never in a competing side panel.
 File review markers are optional tracking, not acceptance or merge gates. Task, planned-task
 and conversation review reuse `ResultReview`; file navigation and diffs reuse `ChangedFiles`.
-Keep check failures visible in navigation, preserve review inputs when switching views,
+Keep check failures visible in review navigation rather than in a task's headline status
+or primary action. Preserve review inputs when switching views,
 and load optional tools on first use. Keep one follow-up composer per task. Worker links resolve to their parent task instead of a second result screen.
 Use `WorkspaceTabs` for keyboard-navigable task and review panels with the same
 appearance as workspace navigation. Keep the task agent beside its heading.
@@ -128,7 +131,8 @@ restores the saved appearance. Invalid color input must not change global styles
 
 Show selection with a subtle tinted fill (`--color-accent-subtle`); avoid accent rings and
 one-sided accent borders. Options people choose from look selectable: a bordered row
-with a radio or check indicator, not bare text. Focus rings on fields sit just inside
+with a radio or check indicator (`Choice`, or its `ui-choice` classes around a native input),
+not bare text. Text actions and links to other sites use `LinkButton`. Focus rings on fields sit just inside
 the control so scrolling dialogs and panels never clip them. Contained dialogs pad their
 own body and footer to line up with the header, and content sits on the dialog surface
 rather than nested background panels.
@@ -142,15 +146,27 @@ panel on `--color-navigation`. Pages use one vertical rhythm from their
 layout gap rather than per-section margins. Transient notices, previews and errors the
 user can clear have a visible close control.
 
-Interactive content targets are at least 44 by 44 CSS pixels. Native window
-chrome can follow platform sizing. Dialogs retain viewport space and scroll on
+Sign-in, project setup and the workspace render `WindowGlass`, which turns on the OS window
+material (Acrylic on Windows 11, vibrancy on macOS) and sets `data-window-glass` unless the
+Frosted window setting is off; other platforms and reduced transparency keep the opaque look.
+On glass, text and icons sit only on panes or title bar capsules tinted enough to keep 4.5:1
+over any backdrop: 85% where text is primary, secondary or accent, 90% where muted text appears
+(the workspace). Use the shared `--glass-*` values; screens without `WindowGlass` paint an
+opaque background.
+
+Controls use the shared `--control-height` (36px) and `--control-height-compact` (32px)
+for menu rows, segments and dense navigation; coarse pointers raise both to 44px. Prefer
+compact layouts that keep projects, work and agents in view over extra padding. Native
+window chrome can follow platform sizing. Dialogs retain viewport space and scroll on
 small windows. Respect reduced motion, including preference changes while open.
 
 ## Setup, settings and accounts
 
 Keep setup provisional until workspace entry. Preserve project choice, task
-drafts and explicit preferences across Back, retry and reload. Project onboarding
-has no cancel exit; users reach the final step before entering the workspace.
+drafts and explicit preferences across Back, retry and reload. First-run project
+onboarding has no cancel exit; users reach the final step before entering the workspace.
+Adding another project from the workspace offers Back to workspace, which discards the
+provisional setup.
 The first task remains optional on that final step. Give slow or failed checks a
 clear retry path.
 
@@ -212,8 +228,8 @@ Maintain the existing setup acknowledgment and workspace-entry behavior.
 ## Components and verification
 
 Import portable controls from @jackalope/ui. The library includes Button,
-IconButton, Input, Textarea, FormField, Select, Checkbox, Switch, Badge, Tooltip,
-DropdownMenu, Popover, Tabs, SegmentedControl, SegmentedNav, dialogs, CopyButton, InlineNotice,
+IconButton, LinkButton, Input, Textarea, FormField, Select, Checkbox, Choice, Switch, Badge, Tooltip,
+DropdownMenu, ContextMenu, Popover, Tabs, SegmentedControl, SegmentedNav, dialogs, CopyButton, InlineNotice,
 LoadingState, EmptyState, ErrorState, PageHeader, SectionHeader, Toolbar, Stat,
 DefinitionList, Table, SearchField, Disclosure, SettingRow, SettingGroup and Panel.
 Reuse desktop compositions such as WorkspaceHeading,
@@ -276,7 +292,8 @@ an immediate controlled preference, not a serialized form field. Wrap a checkbox
 in a label with a comfortable hit area or use FormField. Keep specialized file,
 color, range and editor controls local when their interaction requires it.
 DropdownMenu and Popover keep Portal explicit so nested overlays can choose their
-container. Tabs use arrow-key panel navigation; SegmentedControl uses pressed
+container. Release builds turn off the webview's own right-click menu outside text fields
+and selections; right-click actions use ContextMenu and repeat a visible options menu's items. Tabs use arrow-key panel navigation; SegmentedControl uses pressed
 buttons for filtering and SegmentedNav uses aria-current for view navigation. CopyButton accepts a custom clipboard function, shows
 failure beside the action and clears stale feedback when its text changes.
 

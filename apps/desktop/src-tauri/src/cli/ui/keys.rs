@@ -3,7 +3,7 @@
 use super::commands::{slash_matches, COMMANDS};
 use super::feed::Tone;
 use super::pickers::PickerKind;
-use super::{App, Event, FileIndex};
+use super::{App, Event, FileIndex, Mention};
 use crate::files;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::time::{Duration, Instant};
@@ -59,12 +59,22 @@ impl App {
         if key.code != KeyCode::Esc {
             self.stop_armed = None;
         }
+        // Enter on an empty input opens the choices for a plan deviation the
+        // banner above the input shows.
+        let deciding = self.editor.is_empty()
+            && self.picker.is_none()
+            && self.question().is_none()
+            && self.pending_deviation().is_some();
         let editor = &mut self.editor;
         match key.code {
+            KeyCode::Char(digit @ '1'..='9') if alt && !control => {
+                self.jump_session(digit as usize - '1' as usize)
+            }
             KeyCode::Char('l') if control => self.clear_feed(),
             KeyCode::Char('r') if control => self.open_picker(PickerKind::History),
             KeyCode::Char('z') if control => self.suspend = cfg!(unix),
             KeyCode::Char('o') if control => self.toggle_panel(),
+            KeyCode::Char('g') if control => self.request_plan_edit(),
             KeyCode::Up if (alt || shift) && panel => self.step_change(-1),
             KeyCode::Down if (alt || shift) && panel => self.step_change(1),
             // Newline without sending: Shift+Enter where the terminal reports
@@ -77,8 +87,8 @@ impl App {
                 editor.insert("\n");
             }
             KeyCode::Enter | KeyCode::Tab if !mentions.is_empty() => {
-                let path = mentions[self.slash.min(mentions.len() - 1)].clone();
-                self.complete_mention(&path);
+                let mention = mentions[self.slash.min(mentions.len() - 1)].clone();
+                self.complete_mention(&mention);
             }
             KeyCode::Up if !mentions.is_empty() => self.slash = self.slash.saturating_sub(1),
             KeyCode::Down if !mentions.is_empty() => {
@@ -96,6 +106,7 @@ impl App {
                 editor.set(format!("/{chosen}"));
                 self.submit();
             }
+            KeyCode::Enter if deciding => self.open_picker(PickerKind::Deviation),
             KeyCode::Enter => self.submit(),
             KeyCode::Tab if !matches.is_empty() => {
                 let name = matches[self.slash.min(matches.len() - 1)].0;
@@ -171,6 +182,11 @@ impl App {
             }
             _ => {}
         }
+        // A leading `/`, `!` or `@` is the input's mode and drawn as the prompt,
+        // so the cursor stays after it; only Backspace leaves the mode.
+        if self.editor.cursor() == 0 && self.editor.text().starts_with(['/', '!', '@']) {
+            self.editor.set_cursor(1);
+        }
     }
 
     /// Scrolls back (positive) or forward (negative) by `lines`. Reaching the
@@ -212,7 +228,9 @@ impl App {
     }
 
     /// Workspace files matching the `@` mention at the cursor, best first.
-    pub(super) fn mention_matches(&self) -> Vec<String> {
+    /// What the `@` at the cursor could name: matching agents first, then
+    /// files in the workspace.
+    pub(super) fn mention_matches(&self) -> Vec<Mention> {
         let text = self.editor.text();
         if self.mention_closed || text.starts_with('/') || text.starts_with('!') {
             return Vec::new();
@@ -220,21 +238,48 @@ impl App {
         let Some((_, query)) = files::mention_at(text, self.editor.cursor()) else {
             return Vec::new();
         };
+        let wanted = query.to_lowercase();
+        let mut mentions: Vec<Mention> = match &self.overview {
+            Some(Ok(overview)) => overview
+                .agents
+                .iter()
+                .filter(|agent| super::pickers::usable(agent))
+                .filter(|agent| {
+                    agent.id.to_lowercase().starts_with(&wanted)
+                        || agent
+                            .name
+                            .to_lowercase()
+                            .replace(' ', "")
+                            .starts_with(&wanted)
+                })
+                .map(|agent| Mention::Agent {
+                    id: agent.id.clone(),
+                    name: agent.name.clone(),
+                })
+                .collect(),
+            _ => Vec::new(),
+        };
         let Some(index) = &self.files else {
-            return Vec::new();
+            return mentions;
         };
         let mut cache = self.mention_cache.borrow_mut();
-        if let Some((cached, generation, paths)) = cache.as_ref() {
-            if *cached == query && *generation == index.generation {
-                return paths.clone();
+        let paths = match cache.as_ref() {
+            Some((cached, generation, paths))
+                if *cached == query && *generation == index.generation =>
+            {
+                paths.clone()
             }
-        }
-        let paths: Vec<String> = files::matches(&index.files, &query, 8)
-            .into_iter()
-            .map(String::from)
-            .collect();
-        *cache = Some((query, index.generation, paths.clone()));
-        paths
+            _ => {
+                let paths: Vec<String> = files::matches(&index.files, &query, 8)
+                    .into_iter()
+                    .map(String::from)
+                    .collect();
+                *cache = Some((query, index.generation, paths.clone()));
+                paths
+            }
+        };
+        mentions.extend(paths.into_iter().map(Mention::File));
+        mentions
     }
 
     /// Lists the workspace's files in the background once a mention starts,
@@ -275,11 +320,18 @@ impl App {
     }
 
     /// Replaces the mention at the cursor with `@path `.
-    fn complete_mention(&mut self, path: &str) {
+    fn complete_mention(&mut self, mention: &Mention) {
         let Some((start, _)) = files::mention_at(self.editor.text(), self.editor.cursor()) else {
             return;
         };
         self.editor.delete_to(start);
+        let path = match mention {
+            Mention::Agent { id, .. } => {
+                self.editor.insert(&format!("@{id} "));
+                return;
+            }
+            Mention::File(path) => path,
+        };
         // Paths with spaces are quoted so the agent reads them whole.
         if path.contains(' ') {
             self.editor.insert(&format!("@\"{path}\" "));

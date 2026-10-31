@@ -30,6 +30,9 @@ public sealed class JackalopeWindowIndicator : Form {
     [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr window,IntPtr after,int x,int y,int width,int height,uint flags);
     [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+    [DllImport("user32.dll")] static extern bool SetWindowDisplayAffinity(IntPtr window,uint affinity);
+    // Keeps the bar and glow out of the helper's monitor captures (Windows 10 2004+).
+    static void ExcludeFromCapture(IntPtr window) { SetWindowDisplayAffinity(window,0x11); }
 
     sealed class Glow : Form {
         [StructLayout(LayoutKind.Sequential)] struct SizeNative { public int Width,Height; }
@@ -45,6 +48,7 @@ public sealed class JackalopeWindowIndicator : Form {
         Color previousColor;
         
         public Glow() { FormBorderStyle=FormBorderStyle.None; ShowInTaskbar=false; TopMost=true; }
+        protected override void OnHandleCreated(EventArgs args) { base.OnHandleCreated(args); ExcludeFromCapture(Handle); }
         protected override bool ShowWithoutActivation { get { return true; } }
         protected override CreateParams CreateParams { get { var value=base.CreateParams; value.ExStyle|=0x08000000|0x80000|0x80|0x20; return value; } }
         public void Render(Rectangle area,Color accent) {
@@ -65,7 +69,9 @@ public sealed class JackalopeWindowIndicator : Form {
     readonly int processId;
     readonly long processStarted;
     readonly string stateFile,themeFile;
-    readonly Glow glow=new Glow();
+    readonly System.Collections.Generic.List<Glow> glows=new System.Collections.Generic.List<Glow>();
+    readonly string scope,app,label;
+    readonly System.Collections.Generic.Dictionary<uint,string> processNames=new System.Collections.Generic.Dictionary<uint,string>();
     readonly Image logoImage;
     readonly Label heading=new Label();
     readonly Label hint=new Label();
@@ -82,8 +88,10 @@ public sealed class JackalopeWindowIndicator : Form {
     bool disposed;
 
     protected override bool ShowWithoutActivation { get { return true; } }
-    public JackalopeWindowIndicator(long handle,int pid,long started,string file,string theme,string logo) {
+    protected override void OnHandleCreated(EventArgs args) { base.OnHandleCreated(args); ExcludeFromCapture(Handle); }
+    public JackalopeWindowIndicator(long handle,int pid,long started,string file,string theme,string logo,string grantScope,string grantApp,string grantLabel) {
         target=new IntPtr(handle); processId=pid; processStarted=started; stateFile=file; themeFile=theme;
+        scope=String.IsNullOrEmpty(grantScope) ? "window" : grantScope; app=(grantApp??"").ToLowerInvariant(); label=grantLabel??"";
         gate=new System.Threading.EventWaitHandle(false,System.Threading.EventResetMode.ManualReset,"Local\\JackalopeDesktop-"+Path.GetFileName(Path.GetDirectoryName(file)));
         gate.Reset();
         Text="Jackalope desktop control"; AccessibleName=Text; FormBorderStyle=FormBorderStyle.None;
@@ -108,18 +116,43 @@ public sealed class JackalopeWindowIndicator : Form {
         timer.Interval=100; timer.Tick+=(sender,args)=>Pulse();
         FormClosing+=(sender,args)=>{ gate.Reset(); state="canceled"; epoch++; WriteState(); Cleanup(); };
     }
+    // App and desktop grants outlive any one window; only window grants follow the target.
     bool TargetValid() {
+        if(scope!="window") return true;
         uint pid;
         if(!IsWindow(target)) return false;
         GetWindowThreadProcessId(target,out pid);
         if(pid!=processId) return false;
         try { using(var process=Process.GetProcessById(processId)) return process.StartTime.ToUniversalTime().Ticks==processStarted; } catch { return false; }
     }
+    string ProcessName(IntPtr window) {
+        uint pid; GetWindowThreadProcessId(window,out pid);
+        string name;
+        if(processNames.TryGetValue(pid,out name)) return name;
+        try { using(var process=Process.GetProcessById((int)pid)) name=process.ProcessName.ToLowerInvariant(); } catch { name=""; }
+        processNames[pid]=name;
+        return name;
+    }
+    bool ForegroundAllowed() {
+        var foreground=GetForegroundWindow();
+        if(scope=="desktop") return true;
+        if(scope=="app") return foreground==Handle || ProcessName(foreground)==app;
+        return foreground==target;
+    }
+    IntPtr AnchorWindow() {
+        if(scope=="app") { var foreground=GetForegroundWindow(); if(ProcessName(foreground)==app) return foreground; }
+        return target;
+    }
     void Resume() {
         if(!TargetValid()) { Console.Error.WriteLine("Selected window identity changed before resuming."); Cancel(); return; }
-        if(IsIconic(target) || !IsWindowVisible(target)) { Pause("Restore the selected window"); return; }
-        SetForegroundWindow(target);
-        if(GetForegroundWindow()!=target) { Pause("Focus the window, then resume"); return; }
+        if(scope=="window") {
+            if(IsIconic(target) || !IsWindowVisible(target)) { Pause("Restore the selected window"); return; }
+            SetForegroundWindow(target);
+            if(GetForegroundWindow()!=target) { Pause("Focus the window, then resume"); return; }
+        } else if(scope=="app" && !ForegroundAllowed()) {
+            if(IsWindow(target) && !IsIconic(target)) SetForegroundWindow(target);
+            if(!ForegroundAllowed()) { Pause("Bring "+label+" forward, then resume"); return; }
+        }
         gate.Reset(); GetWindowRect(target,out prior); GetCursorPos(out pointer); state="active"; reason=""; epoch++; UpdateLabels();
         if(WriteState() && state=="active") gate.Set(); Pulse();
     }
@@ -132,7 +165,8 @@ public sealed class JackalopeWindowIndicator : Form {
     void Cancel() { gate.Reset(); state="canceled"; epoch++; WriteState(); Close(); }
     void UpdateLabels() {
         bool active=state=="active";
-        heading.Text=active ? "Jackalope is using your computer" : "Jackalope is Paused";
+        string using_=scope=="desktop" ? "your computer" : scope=="app" ? label : "a "+label+" window";
+        heading.Text=active ? "Jackalope is using "+using_ : "Jackalope is Paused";
         hint.Text=active ? "Esc to cancel   ·   Mouse or keyboard activity pauses control" : "Click Resume to continue   ·   Esc to cancel";
         toggle.Text=active ? "Pause" : "Resume";
         toggle.AccessibleName=toggle.Text+" desktop control";
@@ -140,7 +174,7 @@ public sealed class JackalopeWindowIndicator : Form {
         heading.AccessibleDescription=reason;
     }
     void LayoutBar() {
-        var screen=Screen.FromHandle(target).Bounds;
+        var screen=(scope=="desktop" ? Screen.PrimaryScreen : Screen.FromHandle(AnchorWindow())).Bounds;
         float scale=0.9f*Math.Min(Math.Max(1,GetDpiForWindow(Handle)/96f),(screen.Width-24)/850f);
         int width=(int)(850*scale), height=(int)(100*scale);
         if(ClientSize.Width!=width || ClientSize.Height!=height) {
@@ -190,16 +224,22 @@ public sealed class JackalopeWindowIndicator : Form {
     void Pulse() {
         if(disposed || state=="canceled") return;
         if(!TargetValid()) { Cancel(); return; }
-        Rect rect; if(!GetWindowRect(target,out rect)) { Cancel(); return; }
-        bool visible=IsWindowVisible(target) && !IsIconic(target);
-        if(state=="active" && (!visible || GetForegroundWindow()!=target)) Pause("Window is no longer active");
-        if(state=="active" && (rect.Left!=prior.Left || rect.Top!=prior.Top || rect.Right!=prior.Right || rect.Bottom!=prior.Bottom)) Pause("Window moved or resized");
-        prior=rect;
-        var screen=Screen.FromHandle(target).Bounds;
+        if(scope=="window") {
+            Rect rect; if(!GetWindowRect(target,out rect)) { Cancel(); return; }
+            bool visible=IsWindowVisible(target) && !IsIconic(target);
+            if(state=="active" && (!visible || GetForegroundWindow()!=target)) Pause("Window is no longer active");
+            if(state=="active" && (rect.Left!=prior.Left || rect.Top!=prior.Top || rect.Right!=prior.Right || rect.Bottom!=prior.Bottom)) Pause("Window moved or resized");
+            prior=rect;
+        } else if(scope=="app" && state=="active" && !ForegroundAllowed()) Pause(label+" is no longer active");
+        var areas=new System.Collections.Generic.List<Rectangle>();
+        if(scope=="desktop") foreach(var each in Screen.AllScreens) areas.Add(each.Bounds);
+        else areas.Add(Screen.FromHandle(AnchorWindow()).Bounds);
         LayoutBar();
         Color accent=Color.FromArgb(99,102,241);
         try { string hex=File.ReadAllText(themeFile).Trim(); if(System.Text.RegularExpressions.Regex.IsMatch(hex,"^#[0-9a-fA-F]{6}$")) accent=ColorTranslator.FromHtml(hex); } catch { }
-        glow.Show(); glow.Render(screen,accent);
+        while(glows.Count<areas.Count) glows.Add(new Glow());
+        while(glows.Count>areas.Count) { glows[glows.Count-1].Dispose(); glows.RemoveAt(glows.Count-1); }
+        for(int i=0;i<areas.Count;i++) { glows[i].Show(); glows[i].Render(areas[i],accent); }
         SetWindowPos(Handle,new IntPtr(-1),0,0,0,0,0x13);
         WriteState();
     }
@@ -217,15 +257,15 @@ public sealed class JackalopeWindowIndicator : Form {
         gate.Reset();
         if(keyboardHook!=IntPtr.Zero) UnhookWindowsHookEx(keyboardHook);
         if(mouseHook!=IntPtr.Zero) UnhookWindowsHookEx(mouseHook);
-        glow.Dispose();
+        foreach(var each in glows) each.Dispose();
         logoImage.Dispose();
         gate.Dispose();
     }
-    public static void Run(long handle,int pid,string started,string file,string theme,string logo) {
+    public static void Run(long handle,int pid,string started,string file,string theme,string logo,string scope,string app,string label) {
         SetProcessDpiAwarenessContext(new IntPtr(-4)); SetThreadDpiAwarenessContext(new IntPtr(-4));
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
         Application.EnableVisualStyles();
-        using(var form=new JackalopeWindowIndicator(handle,pid,long.Parse(started),file,theme,logo)) {
+        using(var form=new JackalopeWindowIndicator(handle,pid,long.Parse(started),file,theme,logo,scope,app,label)) {
             try { Application.Run(form); } finally { form.Cleanup(); }
         }
     }

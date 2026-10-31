@@ -28,3 +28,21 @@ test('real code and mixed answers are left alone', () => {
   ])
     assert.equal(normalizeAgentMarkdown(content), content, content);
 });
+
+test('leading front matter becomes a readable list instead of a heading', () => {
+  const plan =
+    'recommendedShape: subtasks\nshapeReason: One shared module lands first.\nworkers: 3\n---\n\n# One growth queue';
+  const expected =
+    '- **Recommended shape:** subtasks\n- **Shape reason:** One shared module lands first.\n- **Workers:** 3\n\n# One growth queue';
+  assert.equal(normalizeAgentMarkdown(plan), expected);
+  assert.equal(normalizeAgentMarkdown(`---\n${plan}`), expected);
+  assert.equal(
+    normalizeAgentMarkdown('---\ntitle: "Plan"\nempty:\n---\nBody'),
+    '- **Title:** Plan\n\nBody',
+  );
+});
+
+test('prose that merely contains a colon before a rule is left alone', () => {
+  for (const content of ['Note: read this\n\n---\n\nMore', 'Summary\n---\nBody'])
+    assert.equal(normalizeAgentMarkdown(content), content, content);
+});

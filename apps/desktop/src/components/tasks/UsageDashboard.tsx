@@ -241,7 +241,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
                 helperReport || helperLedgerError || helperError || helper.error
                   ? {
                       source:
-                        'Ask Jackalope current and archived conversations. Separate from task totals. A period filter omits turns with no recorded date. Unreadable files are listed and left on disk.',
+                        'Ask Jackalope current and archived conversations, plus Sharpen rewrites. Separate from task totals. A period filter omits turns with no recorded date. Unreadable files are listed and left on disk.',
                       usage: helperUsage,
                       error: helperLedgerError ?? helperError ?? helper.error ?? undefined,
                       unavailable: helperReport?.unavailable ?? [],
@@ -637,7 +637,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
           >
             <WorkspaceSectionHeading
               title="Ask Jackalope"
-              description="Separate from task totals. Project, account and period filters apply to dated turns."
+              description="Includes Sharpen rewrites. Separate from task totals. Project, account and period filters apply to dated turns."
               action={
                 <Button variant="outline" onClick={() => void loadHelperLedger()}>
                   Refresh helper history

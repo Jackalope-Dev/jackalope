@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useExecutionStore } from '../stores/executionStore';
-import { useProjectStore } from '../stores/projectStore';
+import { type Project, useProjectStore } from '../stores/projectStore';
+import { type Enforcement, type Lifecycle, lessonCheckDraftKey } from './learning';
 import { createReadCache } from './read-cache';
 import { nativeTask } from './task-runtime';
 import { isTauriEnvironment } from './tauri-bridge';
+import { workspaceModeFor } from './workspace-mode';
 
 interface ProcessTemplate {
   outcomes: string[];
@@ -12,9 +14,19 @@ interface ProcessTemplate {
 }
 export interface KnowledgeEntry {
   automatic?: {
-    kind: 'preference' | 'adjustment' | 'review' | 'repository' | 'verification';
+    kind:
+      | 'preference'
+      | 'adjustment'
+      | 'review'
+      | 'repository'
+      | 'verification'
+      | 'correction'
+      | 'clarification'
+      | 'insight';
     evidence: string[];
     managed: boolean;
+    /** Present on lessons the learning loop wrote. */
+    lifecycle?: Lifecycle | null;
     resolution?: {
       runId: string;
       requirementId: string;
@@ -23,6 +35,10 @@ export interface KnowledgeEntry {
     } | null;
   } | null;
   dismissed?: boolean;
+  /** Something the lesson names that the project no longer has. */
+  stale?: string | null;
+  /** The repository check that enforces it, from an accepted task. */
+  enforced?: Enforcement | null;
   process?: ProcessTemplate;
   id: string;
   projectId: string;
@@ -44,6 +60,8 @@ export interface ContextSelection {
   workflowId?: string | null;
   excludedMemoryIds?: string[];
   memoryOff?: boolean;
+  /** The lesson a "Make it a check" task enforces. */
+  enforcesLessonId?: string | null;
 }
 export interface ContextReceipt {
   jevPreparation?: JevPreparation | null;
@@ -51,6 +69,7 @@ export interface ContextReceipt {
   reasons?: Record<string, string>;
   entries: KnowledgeEntry[];
   bytes: number;
+  enforcesLessonId?: string | null;
 }
 
 interface JevPreparation {
@@ -144,4 +163,30 @@ export async function openKnowledgeTask(projectId: string, runId: string) {
   useProjectStore.getState().selectProject(projectId);
   useExecutionStore.getState().select(runId);
   window.dispatchEvent(new CustomEvent('jackalope:navigate', { detail: 'kanban' }));
+}
+
+/**
+ * Opens an editable "Make it a check" task for a lesson in the composer. An
+ * unfinished draft for the same lesson is reopened as it was left; nothing
+ * starts until the person launches it.
+ */
+export async function prepareLessonCheck(project: Project, entry: KnowledgeEntry) {
+  const key = lessonCheckDraftKey(entry.id);
+  const store = useExecutionStore.getState();
+  if (!store.drafts[key]) {
+    const prompt = await nativeTask<string>('knowledge_check_draft', {
+      projectId: project.id,
+      projectPath: project.path,
+      entryId: entry.id,
+    });
+    store.draft(key, {
+      projectId: project.id,
+      title: `Make a check: ${entry.title}`.slice(0, 120),
+      prompt,
+      agent: '',
+      isolated: workspaceModeFor(project) === 'worktree',
+      contextSelection: { enforcesLessonId: entry.id },
+    });
+  }
+  window.dispatchEvent(new CustomEvent('jackalope:helper-draft', { detail: key }));
 }

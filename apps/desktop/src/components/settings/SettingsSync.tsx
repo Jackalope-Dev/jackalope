@@ -1,5 +1,7 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect } from 'react';
+import { lessonSyncStatus } from '../../lib/lesson-sync';
+import { useLessonSyncStore } from '../../stores/lessonSyncStore';
 import { useSettingsSyncStore } from '../../stores/settingsSyncStore';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
@@ -23,6 +25,7 @@ export function SettingsSync() {
           onCheckedChange={(enabled) => void sync.configure(enabled)}
         />
       </Setting>
+      <LessonSync settingsOn={sync.enabled && Boolean(sync.owner)} />
       <SettingBody>
         <Disclosure className="space-y-2">
           <DisclosureSummary className="min-h-11 cursor-pointer py-3 text-sm rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent">
@@ -45,7 +48,8 @@ export function SettingsSync() {
               Delete synced settings
             </Button>
             <p className="settings-row-description">
-              Deletes the cloud copy and turns sync off everywhere. Keeps local settings.
+              Deletes the cloud copy, including synced lessons, and turns sync off everywhere. Keeps
+              local settings and lessons.
             </p>
           </div>
         )}
@@ -87,5 +91,56 @@ export function SettingsSync() {
         )}
       </SettingBody>
     </SettingGroup>
+  );
+}
+
+function LessonSync({ settingsOn }: { settingsOn: boolean }) {
+  const lessons = useLessonSyncStore();
+  const { view } = lessons;
+  return (
+    <>
+      <Setting
+        title="Include learned lessons"
+        description="Also sync lessons Jackalope learned, with their history, so every desktop signed in to this account uses them. Evidence, use counts and folder paths stay here. Exclude a project in its settings."
+      >
+        <Switch
+          label="Include learned lessons"
+          checked={view.enabled}
+          disabled={!settingsOn || !view.available || lessons.busy}
+          onCheckedChange={(enabled) => void lessons.configure(enabled)}
+        />
+      </Setting>
+      <SettingBody>
+        <p role="status">{lessonSyncStatus(view, lessons.busy)}</p>
+        {view.enabled && (
+          <div className="flex flex-wrap gap-3">
+            <Button variant="outline" disabled={lessons.busy} onClick={() => void lessons.sync()}>
+              Sync lessons now
+            </Button>
+            <Button variant="outline" disabled={lessons.busy} onClick={() => void lessons.remove()}>
+              Delete synced lessons
+            </Button>
+          </div>
+        )}
+        {view.enabled && (
+          <p className="settings-row-description">
+            Deleting removes the cloud copy and turns lesson sync off on every desktop. Lessons on
+            each desktop stay.
+          </p>
+        )}
+        {lessons.error && (
+          <div className="space-y-2">
+            <p role="alert">{lessons.error}</p>
+            <Button
+              variant="outline"
+              disabled={lessons.busy}
+              onClick={() => void lessons.refresh()}
+            >
+              Retry
+            </Button>
+          </div>
+        )}
+      </SettingBody>
+    </>
   );
 }

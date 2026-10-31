@@ -1,4 +1,5 @@
 pub(super) mod antigravity;
+mod claude_session;
 mod delegation;
 mod efficiency;
 pub(super) mod effort;
@@ -28,6 +29,7 @@ pub(super) mod timing;
 mod tool_activity;
 mod warm_opencode;
 
+pub(in crate::commands) use claude_session::bridge_token;
 pub(super) use events::consume_adapter_event;
 use events::*;
 pub use models::*;
@@ -71,12 +73,45 @@ pub struct TaskRuntime {
     // Drop joins the writer before releasing the profile lock below.
     writer: journal::Writer,
     warm_helpers: Arc<warm_opencode::Pool>,
+    claude_sessions: Arc<claude_session::Pool>,
     _owner: Arc<super::file_lock::FileLock>,
+}
+
+/// A run's progress as background learning sees it.
+pub struct RunActivity {
+    pub id: String,
+    pub project_id: String,
+    /// Tool calls the agent reported so far, across every tool.
+    pub tool_calls: u64,
+    /// The agent stopped and nothing more will be added to this attempt.
+    pub finished: bool,
 }
 
 impl TaskRuntime {
     pub(super) fn invalidate_account_helpers(&self, directory: &Path) {
         self.warm_helpers.invalidate_account(directory);
+        self.claude_sessions.invalidate_account(directory);
+    }
+
+    /// Every loaded run's tool-call total and whether it finished, without
+    /// cloning run records.
+    pub(in crate::commands) fn learning_activity(&self) -> Vec<RunActivity> {
+        let Ok(inner) = self.inner.lock() else {
+            return vec![];
+        };
+        inner
+            .runs
+            .values()
+            .filter(|run| !run.details_omitted)
+            .map(|run| RunActivity {
+                id: run.id.clone(),
+                project_id: run.project_id.clone(),
+                tool_calls: run.efficiency.tool_calls.values().sum(),
+                finished: !run.finishing
+                    && !["starting", "running", "stopping", "routing", "queued"]
+                        .contains(&run.status.as_str()),
+            })
+            .collect()
     }
 }
 
@@ -406,6 +441,16 @@ pub async fn task_screenshot(
         let screenshot = run
             .screenshots
             .iter()
+            .chain(
+                run.desktop_actions
+                    .iter()
+                    .filter_map(|action| action.capture.as_ref()),
+            )
+            .chain(
+                run.review_captures
+                    .as_ref()
+                    .and_then(|captures| captures.artifact(&screenshot_id)),
+            )
             .find(|item| item.id == screenshot_id)
             .ok_or("Screenshot not found in this task attempt")?;
         (
@@ -558,8 +603,9 @@ pub async fn task_mark_reviewed(id: String, state: State<'_, TaskRuntime>) -> Re
         updated.status = "reviewed".into();
         state.save(&updated)?;
         updated.persistence_error = None;
-        *run = updated;
+        *run = updated.clone();
         drop(inner);
+        crate::commands::knowledge::learning::enforce::accept(&state, &updated, &runs);
         state
             .refresh_knowledge(&current.project_id, &current.project_path, true)
             .map_err(|e| format!("Review saved, but project lessons could not refresh: {e}"))

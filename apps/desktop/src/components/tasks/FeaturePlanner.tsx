@@ -1,20 +1,19 @@
 import { Checkbox, Input, Textarea } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { featureDraftKey } from '../../lib/feature-draft';
-import {
-  type FeatureStep,
-  featurePlanningPrompt,
-  multiAgentPlanningPrompt,
-  readFeaturePlan,
-} from '../../lib/feature-plan';
-import { queueCommand } from '../../lib/queue';
-import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { manualPlan, planCommands } from '../../lib/plan-mode';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { agentAccountFor, isAgentAllowedForProject, type Project } from '../../stores/projectStore';
+import { usePlanStore } from '../../stores/planStore';
+import {
+  agentAccountFor,
+  isAgentAllowedForProject,
+  type Project,
+  useProjectStore,
+} from '../../stores/projectStore';
+import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -22,66 +21,95 @@ import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { OutcomeEditor } from './OutcomeEditor';
 
-interface Draft {
-  featureId: string;
-  goal: string;
-  agent: string;
-  runId?: string;
-  steps: FeatureStep[];
-  added?: boolean;
-  stagedDependencies?: boolean;
+/** The most tasks a plan holds. */
+const MAX_TASKS = 8;
+
+interface Step {
+  key: string;
+  title: string;
+  prompt: string;
+  scopes: string[];
+  dependsOn: string[];
+  contextSelection?: { outcomes?: string[] };
 }
 
+/**
+ * A plan being written. Drafts saved by the earlier feature planner have the
+ * same goal, agent and steps and still load; their other fields are ignored.
+ */
+interface Draft {
+  goal: string;
+  agent: string;
+  steps: Step[];
+}
+
+function savedDraft(key: string): Draft | null {
+  try {
+    const raw = JSON.parse(localStorage.getItem(key) ?? 'null');
+    if (
+      raw &&
+      typeof raw.goal === 'string' &&
+      typeof raw.agent === 'string' &&
+      Array.isArray(raw.steps) &&
+      !raw.added
+    )
+      return {
+        goal: raw.goal,
+        agent: raw.agent,
+        steps: raw.steps
+          .filter((step: unknown) => step && typeof step === 'object')
+          .map((step: Partial<Step>) => ({
+            key: typeof step.key === 'string' ? step.key : crypto.randomUUID(),
+            title: typeof step.title === 'string' ? step.title : '',
+            prompt: typeof step.prompt === 'string' ? step.prompt : '',
+            scopes: Array.isArray(step.scopes) ? step.scopes : ['.'],
+            dependsOn: Array.isArray(step.dependsOn) ? step.dependsOn : [],
+            contextSelection: { outcomes: step.contextSelection?.outcomes ?? [] },
+          })),
+      };
+  } catch {
+    /* Keep an unreadable draft until the user saves a replacement. */
+  }
+  return null;
+}
+
+const emptyStep = (): Step => ({
+  key: crypto.randomUUID(),
+  title: '',
+  prompt: '',
+  scopes: ['.'],
+  dependsOn: [],
+  contextSelection: { outcomes: [] },
+});
+
+/** "Write the plan myself": tasks and outcomes become a plan to review, approve and track. */
 export function FeaturePlanner({
   project,
   onClose,
-  onAdded,
+  onCreated,
   initialGoal = '',
-  multiAgent = false,
 }: {
   project: Project;
   initialGoal?: string;
-  multiAgent?: boolean;
   onClose: () => void;
-  onAdded: () => Promise<void>;
+  /** Called once the plan is saved, before the Plans page opens. */
+  onCreated?: () => void;
 }) {
   const focus = useDialogFocus();
-  const { runners, runs, start, submitting } = useExecutionStore(
-    useShallow((s) => ({
-      runners: s.runners,
-      runs: s.runs,
-      start: s.start,
-      submitting: s.submitting,
-    })),
-  );
+  const runners = useExecutionStore((s) => s.runners);
   const config = useAgentConfigStore(useShallow((s) => ({ isAgentEnabled: s.isAgentEnabled })));
   const available = runners.filter(
     (r) => r.available && config.isAgentEnabled(r.id) && isAgentAllowedForProject(project, r.id),
   );
-  const [storageKey] = useState(() => featureDraftKey(localStorage, project.id, multiAgent));
-  const [draft, setDraft] = useState<Draft>(() => {
-    try {
-      const raw = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
-      if (
-        raw &&
-        typeof raw.goal === 'string' &&
-        typeof raw.agent === 'string' &&
-        Array.isArray(raw.steps)
-      )
-        return {
-          ...raw,
-          featureId: typeof raw.featureId === 'string' ? raw.featureId : crypto.randomUUID(),
-        };
-    } catch {
-      /* Keep an unreadable draft until the user saves a replacement. */
-    }
-    return {
-      featureId: crypto.randomUUID(),
-      goal: initialGoal,
-      agent: project.preferences?.preferredRunner || 'auto',
-      steps: [],
-    };
-  });
+  const [storageKey] = useState(() => featureDraftKey(localStorage, project.id));
+  const [draft, setDraft] = useState<Draft>(
+    () =>
+      savedDraft(storageKey) ?? {
+        goal: initialGoal,
+        agent: project.preferences?.preferredRunner || 'auto',
+        steps: [emptyStep()],
+      },
+  );
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const update = (patch: Partial<Draft>) => {
@@ -95,24 +123,40 @@ export function FeaturePlanner({
       );
     }
   };
-  const run = runs.find((r) => r.id === draft.runId);
-  const planning = run && isActive(run);
-  const act = async (fn: () => Promise<void>) => {
+  const change = (index: number, patch: Partial<Step>) =>
+    update({ steps: draft.steps.map((s, i) => (i === index ? { ...s, ...patch } : s)) });
+  const agentReady = draft.agent === 'auto' || available.some((r) => r.id === draft.agent);
+  const create = async () => {
     if (busy) return;
     setBusy(true);
     setError('');
     try {
-      await fn();
+      const plan = await planCommands.create(
+        {
+          id: crypto.randomUUID(),
+          projectId: project.id,
+          projectName: project.name,
+          projectPath: project.path,
+          agent: draft.agent,
+          agentProfileId:
+            draft.agent === 'auto' ? undefined : agentAccountFor(project, draft.agent),
+          targetBranch: project.preferences?.baseBranch || project.gitBranch,
+          prompt: draft.goal.trim(),
+          isolated: true,
+        },
+        manualPlan(draft.goal, draft.steps),
+      );
+      localStorage.removeItem(storageKey);
+      useProjectStore.getState().selectProject(project.id);
+      usePlanStore.getState().select(plan.id);
+      onCreated?.();
+      onClose();
+      navigateWorkspace('plans');
     } catch (cause) {
       setError(String(cause));
     } finally {
       setBusy(false);
     }
-  };
-  const change = (index: number, patch: Partial<FeatureStep>) =>
-    update({ steps: draft.steps.map((s, i) => (i === index ? { ...s, ...patch } : s)) });
-  const autoAssignBestAgents = () => {
-    update({ steps: draft.steps.map((step) => ({ ...step, agent: 'auto' })) });
   };
   return (
     <Dialog.Root
@@ -122,23 +166,15 @@ export function FeaturePlanner({
       }}
     >
       <DialogContent {...focus} className="feature-planner">
-        <DialogCloseButton disabled={busy} label="Close feature plan" />
+        <DialogCloseButton disabled={busy} label="Close plan" />
         <DialogHeader
-          title="Plan a feature"
-          description={
-            <>
-              Plan from the repository and the complete request. Review ownership, outcomes and
-              dependencies before dispatch.
-            </>
-          }
+          title="Write the plan myself"
+          description="List the tasks and what each must achieve. You review and approve the plan before any work starts, and Jackalope tracks it like any plan."
         />
-        <fieldset
-          disabled={busy || submitting || !!planning || draft.added}
-          className="space-y-3 mt-5"
-        >
+        <fieldset disabled={busy} className="space-y-3 mt-5">
           <div>
             <label className="task-label block mb-1.5" htmlFor="feature-goal">
-              What should this feature accomplish?
+              What should this plan accomplish?
             </label>
             <Textarea
               id="feature-goal"
@@ -166,178 +202,24 @@ export function FeaturePlanner({
               ))}
             </Select>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              disabled={
-                !draft.goal.trim() ||
-                (draft.agent !== 'auto' && !available.some((r) => r.id === draft.agent))
-              }
-              onClick={() =>
-                void act(async () => {
-                  const runId = await start(
-                    {
-                      projectId: project.id,
-                      projectName: project.name,
-                      projectPath: project.path,
-                      agent: draft.agent,
-                      agentProfileId:
-                        draft.agent === 'auto' ? undefined : agentAccountFor(project, draft.agent),
-                      targetBranch: project.preferences?.baseBranch || project.gitBranch,
-                      isolated: true,
-                      prompt: multiAgent
-                        ? multiAgentPlanningPrompt(draft.goal, available)
-                        : featurePlanningPrompt(draft.goal),
-                    },
-                    { background: true },
-                  );
-                  update({ runId });
-                })
-              }
-            >
-              Ask for a proposed plan
-            </Button>
-            <Button
-              variant="outline"
-              disabled={draft.steps.length >= 12}
-              onClick={() =>
-                update({
-                  steps: [
-                    ...draft.steps,
-                    {
-                      key: crypto.randomUUID(),
-                      title: '',
-                      prompt: '',
-                      agent: draft.agent,
-                      scopes: ['.'],
-                      dependsOn: [],
-                      contextSelection: { outcomes: [] },
-                    },
-                  ],
-                })
-              }
-            >
-              Add a task myself
-            </Button>
-          </div>
         </fieldset>
-        {run && (
-          <div className="task-notice my-4">
-            <p>
-              {planning
-                ? 'Planning in an isolated workspace. You can close this dialog; the draft keeps its task link.'
-                : `Planning task: ${run.status}`}
-            </p>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                useExecutionStore.getState().select(run.id);
-                onClose();
-              }}
-            >
-              Open planning task
-            </Button>
-            {!planning && (
-              <Button
-                disabled={busy || draft.added}
-                onClick={() =>
-                  void act(async () => {
-                    const detail = (
-                      await nativeTask<TaskRun[]>('task_runs', { detailId: run.id })
-                    ).find((r) => r.id === run.id);
-                    if (!detail) throw new Error('Planning result is unavailable.');
-                    update({ steps: readFeaturePlan(detail.result, draft.agent) });
-                  })
-                }
-              >
-                Review proposed tasks
-              </Button>
-            )}
-          </div>
-        )}
-        {draft.steps.length > 1 && (
-          <div className="flex flex-wrap gap-2 justify-end mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={busy || draft.added}
-              onClick={autoAssignBestAgents}
-            >
-              <Sparkles size={14} />
-              Use automatic routing
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={
-                busy ||
-                draft.added ||
-                draft.steps.length >= 12 ||
-                draft.steps.some((s) => s.key === 'independent-review')
-              }
-              onClick={() =>
-                update({
-                  steps: [
-                    ...draft.steps,
-                    {
-                      key: 'independent-review',
-                      title: 'Review and verify the combined feature',
-                      agent: 'auto',
-                      scopes: ['.'],
-                      dependsOn: draft.steps.map((s) => s.key),
-                      prompt:
-                        'Independently inspect the combined implementation against every requirement in the original request. Verify behavior and meaningful regressions. Treat previous agent reports as unverified claims. Fix confirmed defects within scope, rerun relevant checks, and report remaining limitations with evidence.',
-                      contextSelection: {
-                        outcomes: [
-                          'The combined feature satisfies the original request, with recorded verification and explicit remaining limitations.',
-                        ],
-                      },
-                    },
-                  ],
-                })
-              }
-            >
-              Add independent review
-            </Button>
-          </div>
-        )}
-        <fieldset disabled={busy || draft.added} className="space-y-5 mt-5">
+        <fieldset disabled={busy} className="space-y-5 mt-5">
           {draft.steps.map((step, index) => (
             <article
               key={step.key}
               className="border-t border-[var(--color-border)] pt-4 space-y-3"
             >
-              <div className="grid sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="task-label block mb-1.5" htmlFor={`feature-title-${step.key}`}>
-                    Task {index + 1}
-                  </label>
-                  <Input
-                    id={`feature-title-${step.key}`}
-                    className="task-input w-full"
-                    maxLength={160}
-                    value={step.title}
-                    onChange={(e) => change(index, { title: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="task-label block mb-1.5" htmlFor={`feature-agent-${step.key}`}>
-                    Assigned agent
-                  </label>
-                  <Select
-                    id={`feature-agent-${step.key}`}
-                    value={step.agent || draft.agent}
-                    onValueChange={(agent) => change(index, { agent })}
-                  >
-                    <SelectItem value="auto">Automatic routing</SelectItem>
-                    {available.map((r) => (
-                      <SelectItem key={r.id} value={r.id}>
-                        {r.name}
-                      </SelectItem>
-                    ))}
-                  </Select>
-                </div>
+              <div>
+                <label className="task-label block mb-1.5" htmlFor={`feature-title-${step.key}`}>
+                  Task {index + 1}
+                </label>
+                <Input
+                  id={`feature-title-${step.key}`}
+                  className="task-input w-full"
+                  maxLength={160}
+                  value={step.title}
+                  onChange={(e) => change(index, { title: e.target.value })}
+                />
               </div>
               <div>
                 <label
@@ -350,7 +232,7 @@ export function FeaturePlanner({
                   id={`feature-instruction-${step.key}`}
                   className="task-input w-full"
                   rows={3}
-                  maxLength={20000}
+                  maxLength={4000}
                   value={step.prompt}
                   onChange={(e) => change(index, { prompt: e.target.value })}
                 />
@@ -368,15 +250,10 @@ export function FeaturePlanner({
                   }
                 />
               </div>
-              <fieldset>
-                <legend>
-                  {draft.stagedDependencies
-                    ? 'Starts from these verified snapshots'
-                    : 'Starts after these tasks are integrated'}
-                </legend>
-                {draft.steps
-                  .filter((s) => s.key !== step.key)
-                  .map((other) => (
+              {index > 0 && (
+                <fieldset>
+                  <legend>Starts after</legend>
+                  {draft.steps.slice(0, index).map((other) => (
                     <label key={other.key} className="flex gap-3 min-h-11 items-center">
                       <Checkbox
                         checked={step.dependsOn.includes(other.key)}
@@ -391,96 +268,65 @@ export function FeaturePlanner({
                       {other.title || 'Untitled task'}
                     </label>
                   ))}
-              </fieldset>
+                </fieldset>
+              )}
               <OutcomeEditor
                 values={step.contextSelection?.outcomes ?? []}
                 onChange={(outcomes) =>
                   change(index, { contextSelection: { ...step.contextSelection, outcomes } })
                 }
               />
-              <Button
-                variant="ghost"
-                onClick={() =>
-                  update({
-                    steps: draft.steps
-                      .filter((s) => s.key !== step.key)
-                      .map((s) => ({
-                        ...s,
-                        dependsOn: s.dependsOn.filter((id) => id !== step.key),
-                      })),
-                  })
-                }
-              >
-                Remove task
-              </Button>
+              {draft.steps.length > 1 && (
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    update({
+                      steps: draft.steps
+                        .filter((s) => s.key !== step.key)
+                        .map((s) => ({
+                          ...s,
+                          dependsOn: s.dependsOn.filter((id) => id !== step.key),
+                        })),
+                    })
+                  }
+                >
+                  Remove task
+                </Button>
+              )}
             </article>
           ))}
+          <Button
+            variant="outline"
+            disabled={draft.steps.length >= MAX_TASKS}
+            onClick={() => update({ steps: [...draft.steps, emptyStep()] })}
+          >
+            Add a task
+          </Button>
         </fieldset>
         {error && (
           <InlineNotice tone="error" className="my-3">
             {error}
           </InlineNotice>
         )}
-        <label className="flex items-center gap-2 mt-4 min-h-11">
-          <Checkbox
-            checked={draft.stagedDependencies ?? false}
-            disabled={busy || draft.added}
-            onChange={(event) => update({ stagedDependencies: event.target.checked })}
-          />
-          <span>
-            Continue dependencies from verified snapshots before final merge. Requires a saved
-            project check. Changed predecessors require a new plan.
-          </span>
-        </label>
-        {!!draft.steps.length && (
-          <div className="mt-5 space-y-3">
-            <p className="task-muted">
-              Adding the plan pauses dispatch for this project. Review it in Feature work, then
-              choose Run ready tasks.
-            </p>
-            <Button
-              disabled={busy || submitting || !!planning || !draft.agent || !draft.goal.trim()}
-              onClick={() =>
-                void act(async () => {
-                  if (!draft.added) {
-                    const items = readFeaturePlan(JSON.stringify(draft.steps), draft.agent).map(
-                      (step) => ({
-                        ...step,
-                        prompt: `${step.prompt}\n\nComplete feature request (shared context; perform only your assigned work):\n${draft.goal}`,
-                      }),
-                    );
-                    localStorage.setItem(storageKey, JSON.stringify(draft));
-                    await queueCommand('queue_import', {
-                      request: {
-                        projectId: project.id,
-                        projectName: project.name,
-                        projectPath: project.path,
-                        featureId: draft.featureId,
-                        stagedDependencies: draft.stagedDependencies === true,
-                        feature: draft.goal.trim().split('\n')[0].slice(0, 120),
-                        targetBranch: project.preferences?.baseBranch || project.gitBranch,
-                        agentAccounts: project.preferences?.agentAccounts,
-                        verifyCommand: project.preferences?.verifyCommand,
-                        prepareCommand: project.preferences?.prepareCommand,
-                        setupFiles: project.preferences?.setupFiles,
-                        autoVerify: project.preferences?.autoVerify === true,
-                        items,
-                      },
-                    });
-                    update({ added: true });
-                  }
-                  await onAdded();
-                  localStorage.removeItem(storageKey);
-                  onClose();
-                })
-              }
-              loading={busy}
-              loadingLabel="Saving…"
-            >
-              {draft.added ? 'Open saved plan' : 'Add reviewed plan, paused'}
-            </Button>
-          </div>
-        )}
+        <div className="mt-5 space-y-3">
+          <p className="task-muted">
+            Outcomes become the plan's acceptance criteria. Nothing runs until you approve the plan.
+          </p>
+          <Button
+            disabled={
+              busy ||
+              !agentReady ||
+              !draft.goal.trim() ||
+              !draft.steps.length ||
+              draft.steps.some((step) => !step.title.trim())
+            }
+            onClick={() => void create()}
+            loading={busy}
+            loadingLabel="Saving…"
+          >
+            Review the plan
+          </Button>
+        </div>
       </DialogContent>
     </Dialog.Root>
   );

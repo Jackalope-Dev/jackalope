@@ -15,6 +15,10 @@ timeout 120 xvfb-run -a -s '-screen 0 1280x840x24 -nolisten tcp' dbus-run-sessio
   set -euo pipefail
   openbox >"$HOME/openbox.log" 2>&1 & wm=$!
   xcompmgr >"$HOME/compositor.log" 2>&1 & compositor=$!
-  trap '\''kill "$wm" "$compositor" 2>/dev/null || true; wait "$wm" "$compositor" 2>/dev/null || true'\'' EXIT
+  report() { echo "--- openbox.log"; cat "$HOME/openbox.log"; echo "--- compositor.log"; cat "$HOME/compositor.log"; } >&2
+  trap '\''status=$?; [ "$status" = 0 ] || report; kill "$wm" "$compositor" 2>/dev/null || true; wait "$wm" "$compositor" 2>/dev/null || true; exit "$status"'\'' EXIT
+  # The helper lists only windows the manager has registered, so wait until openbox publishes EWMH state.
+  for _ in $(seq 100); do xdotool get_desktop >/dev/null 2>&1 && break; sleep 0.1; done
+  xdotool get_desktop >/dev/null 2>&1 || { echo "openbox did not start managing the display" >&2; exit 1; }
   python3 "$JACKALOPE_X11_TRIAL" "$JACKALOPE_X11_HELPER"
 '

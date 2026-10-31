@@ -1,0 +1,103 @@
+.challenge-dialog {
+  width: min(520px, calc(100vw - 32px));
+}
+.challenge-dialog-form {
+  display: grid;
+  gap: 20px;
+}
+.challenge-review-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.challenge-reviewers,
+.challenge-findings {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.challenge-reviewers li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.challenge-reviewers li > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.challenge-findings {
+  gap: 12px;
+}
+.challenge-finding {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: 12px;
+}
+.challenge-finding-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: var(--control-height, 36px);
+  font-weight: 500;
+  cursor: pointer;
+}
+.challenge-finding-title .ui-checkbox {
+  margin-top: 2px;
+  flex: none;
+}
+.challenge-finding-proof {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 0;
+}
+.challenge-finding-proof dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.challenge-finding-proof dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.challenge-finding-proof code,
+.challenge-finding-proof pre,
+.challenge-rerun-output {
+  font: var(--text-xs) / 1.6 var(--font-mono);
+}
+.challenge-finding-proof pre,
+.challenge-rerun-output {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+.challenge-finding-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .challenge-finding-proof {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .challenge-finding-proof dt:not(:first-child) {
+    margin-top: 6px;
+  }
+}

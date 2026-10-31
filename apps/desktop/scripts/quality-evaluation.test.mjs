@@ -287,6 +287,32 @@ test('quality latency includes failures and reports partial measurements without
   });
 });
 
+test('session metrics separate follow-up turns and keep unmeasured checks unknown', () => {
+  const summary = qualitySummary([
+    {
+      variant: 'after',
+      attempts: 2,
+      cacheRead: 40,
+      efficiency: {
+        firstTokenMs: 900,
+        firstCheckPassed: false,
+        stopCheckRounds: 2,
+        turns: [
+          { firstTokenMs: 900, elapsedMs: 5000 },
+          { firstTokenMs: 200, elapsedMs: 1000 },
+        ],
+      },
+    },
+    { variant: 'after', attempts: 1, efficiency: { firstTokenMs: 800 } },
+  ]).after;
+  assert.deepEqual(summary.followUpFirstTokenMs, { coverage: 1, total: 200, p50: 200, p95: 200 });
+  assert.deepEqual(summary.turnMs, { coverage: 2, total: 6000, p50: 1000, p95: 5000 });
+  assert.deepEqual(summary.firstCheckPassed, { passed: 0, measured: 1 });
+  assert.equal(summary.attempts.total, 3);
+  assert.equal(summary.cacheRead.coverage, 1);
+  assert.equal(summary.stopCheckRounds.coverage, 1);
+});
+
 test('quality oracles reject initial defects, accept solutions, and detect unrelated edits', () => {
   for (const fixture of qualityCases) {
     const root = mkdtempSync(path.join(tmpdir(), 'jackalope-quality-oracle-'));

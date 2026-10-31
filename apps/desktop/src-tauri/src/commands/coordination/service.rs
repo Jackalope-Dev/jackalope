@@ -123,7 +123,16 @@ impl Coordinator {
         {
             return Err("Use a feature title up to 160 bytes.".into());
         }
+        if request.review_only
+            && request
+                .verify_command
+                .as_ref()
+                .is_some_and(|s| !s.trim().is_empty())
+        {
+            return Err("A review-only plan cannot carry a check command.".into());
+        }
         if request.staged_dependencies
+            && !request.review_only
             && (!request.auto_verify
                 || request
                     .verify_command
@@ -315,6 +324,7 @@ impl Coordinator {
                 account_binding: None,
                 prompt: item.prompt,
                 isolated: true,
+                workspace_mode: None,
                 previous_run_id: None,
                 connection_ids: None,
                 coordination: Some(CoordinationContext {
@@ -431,6 +441,10 @@ impl Coordinator {
                         .route("/v1/peers/read", post(peers::bridge_peer_read))
                         .route("/v1/peers/adopt", post(peers::bridge_peer_adopt))
                         .route("/v1/subtasks", post(subtasks::bridge_propose_subtask))
+                        .route(
+                            "/v1/plan-deviation",
+                            post(crate::commands::planning::bridge_plan_deviation),
+                        )
                         .route("/v1/agreements", post(agreements::bridge_agreement))
                         .route("/v1/bots/{tool}", post(bridge_bot_tool))
                         .route("/v1/tools/search", post(bridge_tool_search))
@@ -447,13 +461,27 @@ impl Coordinator {
                         .route("/v1/browser/configure", post(bridge_browser_configure))
                         .route("/v1/browser/inspect", post(bridge_browser_inspect))
                         .route("/v1/browser/tabs", post(bridge_browser_tabs))
+                        .route("/v1/browser/profile", post(bridge_browser_profile))
                         .route(
                             "/v1/desktop/control",
                             post(crate::commands::desktop_control::bridge),
                         )
+                        .route(
+                            "/v1/bot-computer/request",
+                            post(crate::commands::computers::bridge_request),
+                        )
+                        .route(
+                            "/v1/bot-computer/exec",
+                            post(crate::commands::computers::bridge_exec),
+                        )
                         .route("/v1/user-prompt", post(bridge_user_prompt))
                         .route("/v1/user-prompt/poll", get(bridge_get_user_prompt))
                         .route("/v1/validation-step", post(bridge_validation_step))
+                        .route("/v1/goal-restatement", post(bridge_goal_restatement))
+                        .route(
+                            "/v1/decisions",
+                            post(crate::commands::decision_trail::bridge_record),
+                        )
                         .route("/v1/computer/verify", post(bridge_computer_verify))
                         .route("/v1/native/output", post(bridge_native_output))
                         .layer(DefaultBodyLimit::max(65_536))
@@ -691,10 +719,11 @@ impl Coordinator {
             .and_then(|h| h.to_str().ok())
             .and_then(|h| h.strip_prefix("Bearer "))
             .ok_or(StatusCode::UNAUTHORIZED)?;
+        let token = crate::commands::tasks::bridge_token(token);
         let inner = self.inner.lock().unwrap();
         let (id, run_id) = inner
             .grants
-            .get(token)
+            .get(&token)
             .cloned()
             .ok_or(StatusCode::UNAUTHORIZED)?;
         let item = inner
@@ -771,10 +800,11 @@ impl Coordinator {
             .and_then(|h| h.to_str().ok())
             .and_then(|h| h.strip_prefix("Bearer "))
             .ok_or(StatusCode::UNAUTHORIZED)?;
+        let token = crate::commands::tasks::bridge_token(token);
         let inner = self.inner.lock().unwrap();
         let (_id, run_id) = inner
             .grants
-            .get(token)
+            .get(&token)
             .cloned()
             .ok_or(StatusCode::UNAUTHORIZED)?;
         drop(inner);

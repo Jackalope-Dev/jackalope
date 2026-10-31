@@ -14,7 +14,8 @@ const silhouettes: Record<string, string> = {
   grok: 'M38 17C52 17 62 27 62 41C62 55 52 65 38 65C24 65 14 55 14 41C14 27 24 17 38 17Z',
   antigravity: 'M10 62L28 19C32 9 43 9 48 19L65 62C48 55 27 55 10 62Z',
   opencode: 'M24 18H52L65 31V54L52 67H24L11 54V31Z',
-  kimi: 'M50 16C34 18 20 32 20 48C20 64 34 76 50 72C38 66 30 58 30 44C30 30 38 22 50 16Z',
+  // A full moon with a bite from the right: still a crescent, wide enough for the face.
+  kimi: 'M62.7 27.6A28 28 0 1 0 62.7 60.4A18 18 0 0 1 62.7 27.6Z',
   // Bot-only shapes. Each keeps the face (x 31 and 47, y 37 to 41) inside the fill.
   moon: 'M47.3 17A28 28 0 1 0 67 36.7A17 17 0 0 1 47.3 17Z',
   blob: 'M40 14C56 12 68 24 66 40C64 56 56 68 40 68C22 68 12 58 12 42C12 26 24 16 40 14Z',

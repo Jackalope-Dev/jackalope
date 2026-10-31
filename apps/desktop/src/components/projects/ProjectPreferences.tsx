@@ -1,20 +1,52 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useShallow } from 'zustand/react/shallow';
+import { LEARNING_CADENCES, learningSettings } from '../../lib/learning';
+import { syncsLessons } from '../../lib/lesson-sync';
+import { REVIEW_PAGE_LIMIT, reviewCapturesOn } from '../../lib/review-captures';
 import { VETTED_SKILLS } from '../../lib/skills/catalog';
+import { type WorkspaceMode, workspaceModeFor } from '../../lib/workspace-mode';
 import { useProjectStore } from '../../stores/projectStore';
 import { openProjectSettings } from '../layout/navigation';
 import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { FormField } from '../ui/FormField';
 import { Input } from '../ui/input';
+import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { Textarea } from '../ui/Textarea';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { ArtifactsProjectSettings } from './ArtifactsProjectSettings';
+import { BrowserProfileSettings } from './BrowserProfileSettings';
+import { DesktopProjectSettings } from './DesktopProjectSettings';
+import { FeatureMapSettings } from './FeatureMapSettings';
 import { ProjectGitSettings } from './ProjectGitSettings';
+import { ProjectPlanningSettings } from './ProjectPlanningSettings';
 import { RemoveProjectAction } from './RemoveProjectAction';
 import '../settings/settings.css';
+
+const WORKSPACE_MODES: Record<WorkspaceMode, { label: string; description: string }> = {
+  worktree: {
+    label: 'Isolated worktree',
+    description:
+      'Each task works in its own worktree and branch. Review and merge when it finishes.',
+  },
+  branch: {
+    label: 'New branch here',
+    description:
+      'Each task switches this checkout to a new branch for review or a pull request. Requires a clean checkout; one task at a time.',
+  },
+  current: {
+    label: 'Current branch',
+    description:
+      'Tasks edit this checkout on the target branch, alongside your own changes. One task at a time; there is no merge step.',
+  },
+  ask: {
+    label: 'Ask each time',
+    description: 'Each task asks where to work when it starts.',
+  },
+};
+
 export function ProjectPreferences({
   embedded = false,
   projectId,
@@ -125,6 +157,100 @@ export function ProjectPreferences({
                 }
               />
             </Setting>
+            <Setting
+              title="Auto-approve agent requests"
+              description="Approve routine tool use without asking; each approval is listed in the task's activity. Deleting files, force pushes, deploys, credentials, elevated commands and changes outside the workspace still ask. Codex, Gemini CLI, Grok and Antigravity follow their own CLI rules."
+            >
+              <Switch
+                label="Auto-approve agent requests"
+                checked={project.preferences?.autoApprove !== false}
+                onCheckedChange={(autoApprove) =>
+                  updateProjectPreferences(project.id, { autoApprove })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Use my Claude Code setup"
+              description="Claude Code tasks load your own Claude Code settings, plugins, hooks and MCP servers. Turn off to use only this project's settings and the connections chosen here."
+            >
+              <Switch
+                label="Use my Claude Code setup"
+                checked={project.preferences?.personalClaudeSetup !== false}
+                onCheckedChange={(personalClaudeSetup) =>
+                  updateProjectPreferences(project.id, { personalClaudeSetup })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Learn automatically"
+              description="Save lessons from what you tell agents and from checks that pass, while work runs and when it finishes. New lessons stay on probation until tasks use them; unused ones are archived. Review them under Context."
+            >
+              <Switch
+                label="Learn automatically"
+                checked={learningSettings(project).automatic}
+                onCheckedChange={(learnAutomatically) =>
+                  updateProjectPreferences(project.id, { learnAutomatically })
+                }
+              />
+            </Setting>
+            {learningSettings(project).automatic && (
+              <Setting
+                title="Learn during long tasks"
+                description="How often a running task is reviewed for new lessons."
+                descriptionId="project-learning-cadence-description"
+              >
+                <Select
+                  aria-label="Learn during long tasks"
+                  aria-describedby="project-learning-cadence-description"
+                  value={String(learningSettings(project).cadence)}
+                  onValueChange={(value) =>
+                    updateProjectPreferences(project.id, { learningCadence: Number(value) })
+                  }
+                >
+                  {LEARNING_CADENCES.map((cadence) => (
+                    <SelectItem key={cadence} value={String(cadence)}>
+                      Every {cadence} tool calls
+                    </SelectItem>
+                  ))}
+                </Select>
+              </Setting>
+            )}
+            <Setting
+              title="Reflect with an agent"
+              description="When work ends, also ask this project's default agent to suggest lessons from what you wrote. Uses that agent account's quota; each reflection is short and capped. Suggestions pass the same checks as other lessons."
+            >
+              <Switch
+                label="Reflect with an agent"
+                checked={project.preferences?.agentReflection === true}
+                onCheckedChange={(agentReflection) =>
+                  updateProjectPreferences(project.id, { agentReflection })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Sync learned lessons"
+              description="Include this project's learned lessons when lesson sync is on under Settings → Privacy. Turn off to keep them on this computer."
+            >
+              <Switch
+                label="Sync learned lessons"
+                checked={syncsLessons(project)}
+                onCheckedChange={(syncLessons) =>
+                  updateProjectPreferences(project.id, { syncLessons })
+                }
+              />
+            </Setting>
+            <Setting
+              title="Write lessons to AGENTS.md"
+              description="Keep active learned lessons in a marked section of this project's AGENTS.md and in a Claude Code skill, so agents outside Jackalope see them. Nothing is committed for you; turning this off removes them."
+            >
+              <Switch
+                label="Write lessons to AGENTS.md"
+                checked={project.preferences?.exportLessons === true}
+                onCheckedChange={(exportLessons) =>
+                  updateProjectPreferences(project.id, { exportLessons })
+                }
+              />
+            </Setting>
             <Disclosure className="project-guidelines">
               <DisclosureSummary>Always include guidelines</DisclosureSummary>
               {VETTED_SKILLS.map((skill) => (
@@ -144,7 +270,13 @@ export function ProjectPreferences({
               ))}
             </Disclosure>
           </SettingGroup>
+          <ProjectPlanningSettings key={`planning-${project.id}`} projectId={project.id} />
           <ProjectGitSettings key={project.path} projectPath={project.path} />
+          <DesktopProjectSettings key={`desktop-${project.id}`} projectId={project.id} />
+          <BrowserProfileSettings
+            key={`browser-${project.id}`}
+            owner={{ kind: 'project', id: project.id, name: project.name }}
+          />
           {!project.plainFolder && (
             <ArtifactsProjectSettings
               key={`artifacts-${project.path}`}
@@ -153,6 +285,30 @@ export function ProjectPreferences({
             />
           )}
           <SettingGroup title="Workspace">
+            {!project.plainFolder && (
+              <Setting
+                title="Where tasks work"
+                description={WORKSPACE_MODES[workspaceModeFor(project)].description}
+                descriptionId="project-workspace-mode-description"
+              >
+                <Select
+                  aria-label="Where tasks work"
+                  aria-describedby="project-workspace-mode-description"
+                  value={workspaceModeFor(project)}
+                  onValueChange={(value) =>
+                    updateProjectPreferences(project.id, {
+                      workspaceMode: value as WorkspaceMode,
+                    })
+                  }
+                >
+                  {(Object.keys(WORKSPACE_MODES) as WorkspaceMode[]).map((mode) => (
+                    <SelectItem key={mode} value={mode}>
+                      {WORKSPACE_MODES[mode].label}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </Setting>
+            )}
             <Setting
               title="Target branch"
               description="Starting branch for new tasks and their review."
@@ -226,6 +382,25 @@ export function ProjectPreferences({
               />
             </Setting>
             <Setting
+              title="Check after each edit"
+              description="A fast check Claude Code runs after it edits a file, so it fixes problems straight away. {file} is the edited file. One-minute limit."
+              controlId="edit-check"
+              descriptionId="edit-check-description"
+            >
+              <Input
+                id="edit-check"
+                aria-describedby="edit-check-description"
+                className="project-setting-input"
+                value={project.preferences?.editCheck ?? ''}
+                placeholder="pnpm exec biome check {file}"
+                onChange={(e) =>
+                  updateProjectPreferences(project.id, {
+                    editCheck: e.target.value,
+                  })
+                }
+              />
+            </Setting>
+            <Setting
               title="Check results automatically"
               description="Run this command after new tasks and scheduled runs finish successfully."
             >
@@ -241,8 +416,8 @@ export function ProjectPreferences({
               title="Preview command"
               description={
                 <>
-                  Runs only when you choose Start preview. Use {'{port}'} for an available local
-                  port.
+                  Runs when you choose Start preview, and briefly for review screenshots. Use{' '}
+                  {'{port}'} for an available local port.
                 </>
               }
               controlId="project-preview-command"
@@ -260,7 +435,67 @@ export function ProjectPreferences({
                 }
               />
             </Setting>
+            <Setting
+              title="Capture review screenshots"
+              description={
+                project.preferences?.previewCommand?.trim()
+                  ? 'When work with changes finishes, open the preview in a private, temporary browser and save before and after screenshots for review. Adds up to a few minutes to finishing.'
+                  : 'Save a preview command to capture before and after screenshots when work finishes.'
+              }
+            >
+              <Switch
+                label="Capture review screenshots"
+                checked={reviewCapturesOn(project.preferences)}
+                disabled={!project.preferences?.previewCommand?.trim()}
+                onCheckedChange={(reviewCaptures) =>
+                  updateProjectPreferences(project.id, { reviewCaptures })
+                }
+              />
+            </Setting>
+            {reviewCapturesOn(project.preferences) && (
+              <>
+                <Setting
+                  title="Screenshot sizes"
+                  description="Narrow adds a phone-width capture of each page."
+                  descriptionId="project-review-viewports-description"
+                >
+                  <Select
+                    aria-label="Screenshot sizes"
+                    aria-describedby="project-review-viewports-description"
+                    value={
+                      project.preferences?.reviewViewports?.includes('narrow') ? 'both' : 'desktop'
+                    }
+                    onValueChange={(value) =>
+                      updateProjectPreferences(project.id, {
+                        reviewViewports: value === 'both' ? ['desktop', 'narrow'] : ['desktop'],
+                      })
+                    }
+                  >
+                    <SelectItem value="desktop">Desktop</SelectItem>
+                    <SelectItem value="both">Desktop and narrow</SelectItem>
+                  </Select>
+                </Setting>
+                <SettingBody>
+                  <FormField
+                    label="Pages to capture"
+                    description={`One path per line, such as /settings. Pages named in browser checks and pages the agent opened are added, up to ${REVIEW_PAGE_LIMIT} in all. Empty captures /.`}
+                  >
+                    <Textarea
+                      rows={3}
+                      placeholder="/"
+                      value={(project.preferences?.reviewPages ?? []).join('\n')}
+                      onChange={(event) =>
+                        updateProjectPreferences(project.id, {
+                          reviewPages: event.target.value.split('\n'),
+                        })
+                      }
+                    />
+                  </FormField>
+                </SettingBody>
+              </>
+            )}
           </SettingGroup>
+          {reviewCapturesOn(project.preferences) && <FeatureMapSettings project={project} />}
           <SettingGroup tone="danger">
             <Setting
               title="Remove project"

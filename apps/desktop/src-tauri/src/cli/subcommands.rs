@@ -154,13 +154,7 @@ pub fn answer(
         );
         return Ok(());
     };
-    let reply = text
-        .trim()
-        .parse::<usize>()
-        .ok()
-        .and_then(|number| question.options.get(number.checked_sub(1)?))
-        .cloned()
-        .unwrap_or(text);
+    let reply = crate::planning::checked_reply(&question, &text)?;
     connection.call(&Request::Answer {
         run_id: question.run_id,
         prompt_id: question.id,
@@ -196,6 +190,13 @@ pub fn diff(preference: Option<ColdStart>, prefix: &str, stat: bool) -> Result<(
             untracked.join(", ")
         );
     }
+    match view.review_screenshots {
+        Some(1) => eprintln!("1 review screenshot is in the Jackalope app, under Review."),
+        Some(count) => {
+            eprintln!("{count} review screenshots are in the Jackalope app, under Review.")
+        }
+        None => {}
+    }
     Ok(())
 }
 
@@ -218,18 +219,33 @@ pub fn merge(
         connection.call(&Request::SessionAction {
             session_id: id.clone(),
             action: "pause".into(),
+            message_id: None,
         })?;
         eprintln!(
             "Paused {} so no new message starts during the merge.",
             view.title
         );
     }
-    let plan = match connection.call(&Request::MergePrepare {
+    let prepared = connection.call(&Request::MergePrepare {
         session_id: id.clone(),
         message,
-    })? {
-        Response::Merge { plan } => plan,
-        _ => return Err(unexpected()),
+    });
+    let plan = match prepared {
+        Ok(Response::Merge { plan }) => plan,
+        other => {
+            // Nothing was prepared, so the pause this command added is undone.
+            if !view.paused {
+                let _ = connection.call(&Request::SessionAction {
+                    session_id: id.clone(),
+                    action: "resume".into(),
+                    message_id: None,
+                });
+            }
+            return Err(match other {
+                Err(error) => error,
+                _ => unexpected(),
+            });
+        }
     };
     if !plan.conflicts.is_empty() {
         return Err(format!(
@@ -336,7 +352,7 @@ pub fn pull_request(
 
 /// `--yes`, or a yes typed at a terminal. A script without `--yes` is refused
 /// rather than left waiting for an answer nobody will type.
-fn approved(yes: bool, question: &str) -> Result<bool, String> {
+pub fn approved(yes: bool, question: &str) -> Result<bool, String> {
     use std::io::{BufRead, IsTerminal, Write};
     if yes {
         return Ok(true);
@@ -514,6 +530,8 @@ mod tests {
             pending: 0,
             error: Some("null".into()),
             updated_at: String::new(),
+            status: None,
+            asking: false,
         };
         assert_eq!(state(&session), "open");
         session.pending = 2;

@@ -1,15 +1,19 @@
 import { Badge } from '@jackalope/ui';
-import { AppWindow, ExternalLink, Globe, Lock, Monitor } from 'lucide-react';
+import { AppWindow, ExternalLink, Globe, Lock, Monitor, Server } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
   desktopLabel,
+  desktopScopeLabel,
   openableUrl,
   readAgentScreen,
+  rememberDesktopGrant,
   revokeAgentAccess,
   type AgentScreen as Screen,
 } from '../../lib/agent-screen';
+import { computerStateLabel, computerUsage, providerLabel } from '../../lib/computers';
 import { isActive, type TaskRun } from '../../lib/task-runtime';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { ComputerViewer } from '../computers/ComputerViewer';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { ScreenshotPreview } from './ScreenshotPreview';
@@ -28,6 +32,7 @@ export function AgentScreen({ run, visible = true }: { run: TaskRun; visible?: b
   const [frame, setFrame] = useState<{ src: string; url: string | null } | null>(null);
   const [error, setError] = useState('');
   const [revoking, setRevoking] = useState<'' | 'browser' | 'desktop'>('');
+  const [remembering, setRemembering] = useState(false);
   const [imageAttempt, setImageAttempt] = useState(0);
   const runId = run.id;
   const reading = useRef(false);
@@ -77,12 +82,28 @@ export function AgentScreen({ run, visible = true }: { run: TaskRun; visible?: b
     }
   };
 
+  const remember = async () => {
+    setRemembering(true);
+    setError('');
+    try {
+      await rememberDesktopGrant(runId);
+      setScreen(await readAgentScreen(runId, false));
+    } catch (cause) {
+      setError(String(cause));
+    } finally {
+      setRemembering(false);
+    }
+  };
+
   const browser = screen?.browser;
   const desktop = screen?.desktop ?? null;
+  const computer = screen?.computer ?? null;
   const desktopState = desktopLabel(desktop);
   const pageUrl = frame?.url ?? browser?.url ?? null;
   const openable = openableUrl(pageUrl);
   const captures = (run.screenshots ?? []).slice(-4).reverse();
+  const desktopActions = (run.desktopActions ?? []).slice(-8).reverse();
+  const scopeLabel = desktopScopeLabel(desktop?.scope);
   const browserLabel = !active
     ? 'Attempt ended'
     : browser?.status === 'live'
@@ -149,35 +170,74 @@ export function AgentScreen({ run, visible = true }: { run: TaskRun; visible?: b
         </div>
       </div>
 
+      {computer && (
+        <div className="agent-screen-section">
+          <div className="agent-screen-heading">
+            <Server size={16} aria-hidden="true" />
+            <h3>{computer.name}</h3>
+            <Badge variant={computer.state === 'running' ? 'accent' : 'default'}>
+              {computerStateLabel(computer)}
+            </Badge>
+          </div>
+          <p className="task-muted">
+            {computer.phase ??
+              computer.error ??
+              `${computerUsage(computer) ? `${computerUsage(computer)}. ` : ''}${providerLabel(computer.provider)}. Desktop and browser tools act here, not on your computer.`}
+          </p>
+          <ComputerViewer computer={computer} />
+        </div>
+      )}
+
       <div className="agent-screen-section">
         <div className="agent-screen-heading">
           <Monitor size={16} aria-hidden="true" />
-          <h3>Desktop window</h3>
+          <h3>Desktop</h3>
+          {scopeLabel && <Badge>{scopeLabel}</Badge>}
           <Badge variant={desktopState.tone}>{desktopState.label}</Badge>
         </div>
-        {desktop?.window ? (
+        {desktop?.window || desktop?.app ? (
           <p className="agent-screen-window">
             <AppWindow size={16} aria-hidden="true" />
             <span>
-              <strong>{desktop.window}</strong>
-              {desktop.app && <small>{desktop.app}</small>}
+              <strong>{desktop.window ?? desktop.app}</strong>
+              {desktop.app && desktop.window && <small>{desktop.app}</small>}
             </span>
           </p>
         ) : (
           <p className="task-muted">
             {desktop?.status === 'choosing'
-              ? 'The agent asked to control one window. Answer its question to choose a window or decline.'
-              : 'The agent cannot see or control your desktop. It must ask, and you choose one window.'}
+              ? 'The agent asked for desktop control. Answer its question to choose a window, an app or the full desktop, or decline.'
+              : 'The agent cannot see or control your desktop. It must ask, and you choose one window, one app or the full desktop.'}
+          </p>
+        )}
+        {desktop?.site && (
+          <p className="agent-screen-window">
+            <Globe size={16} aria-hidden="true" />
+            <span>
+              <strong>{desktop.site}</strong>
+              <small>Current site in your browser</small>
+            </span>
           </p>
         )}
         {desktop?.status === 'paused' && (
           <InlineNotice tone="warning">
-            {desktop.reason || 'Your input paused control.'} Use Resume on the bar above the window
-            to continue.
+            {desktop.reason || 'Your input paused control.'} Use Resume on the Jackalope bar to
+            continue.
           </InlineNotice>
         )}
         {active && desktop && desktop.status !== 'canceled' && (
           <div className="agent-screen-actions">
+            {desktop.rememberable && !desktop.remembered && desktop.app && (
+              <Button
+                variant="outline"
+                loading={remembering}
+                loadingLabel="Saving…"
+                disabled={remembering || !!revoking}
+                onClick={() => void remember()}
+              >
+                Always allow {desktop.app} in this project
+              </Button>
+            )}
             <Button
               variant="danger"
               loading={revoking === 'desktop'}
@@ -188,6 +248,44 @@ export function AgentScreen({ run, visible = true }: { run: TaskRun; visible?: b
               Revoke desktop access
             </Button>
           </div>
+        )}
+        {desktop?.remembered && (
+          <p className="task-muted">
+            Allowed for this project. Remove it in Project settings under Desktop control.
+          </p>
+        )}
+        {desktopActions.length > 0 && (
+          <ol className="agent-screen-log" aria-label="Recent desktop actions">
+            {desktopActions.map((entry, index) => (
+              <li key={`${entry.at}:${entry.action}:${entry.summary}`}>
+                <div className="agent-screen-log-line">
+                  <span>{entry.summary}</span>
+                  <time className="task-muted" dateTime={entry.at}>
+                    {new Date(entry.at).toLocaleTimeString()}
+                  </time>
+                </div>
+                {(entry.method || entry.site) && (
+                  <small className="task-muted">
+                    {[
+                      entry.method &&
+                        `${entry.method}${entry.focusChanged ? ', changed focus' : ''}`,
+                      entry.site,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </small>
+                )}
+                {entry.capture && index < 3 && (
+                  <ScreenshotPreview
+                    key={`${entry.capture.id}:${imageAttempt}`}
+                    runId={run.id}
+                    screenshot={entry.capture}
+                    onRetry={() => setImageAttempt((value) => value + 1)}
+                  />
+                )}
+              </li>
+            ))}
+          </ol>
         )}
       </div>
 

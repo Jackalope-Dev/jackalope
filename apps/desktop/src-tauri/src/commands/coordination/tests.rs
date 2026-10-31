@@ -89,7 +89,8 @@ fn queue_dispatched_tasks_also_learn_about_the_harness_bridge() {
     let text = instructions(&item);
     assert!(text.contains("Own only these paths: docs"));
     assert!(text.contains("ask_user"));
-    assert!(text.len() < 1600);
+    assert!(text.contains("record_decision"));
+    assert!(text.len() < 1900);
     assert!(!text.contains("/v1/browser/navigate"));
     assert!(http_bootstrap().contains("/v1/help"));
     let help = http_instructions();
@@ -98,6 +99,8 @@ fn queue_dispatched_tasks_also_learn_about_the_harness_bridge() {
         "/v1/browser/navigate",
         "/v1/user-prompt",
         "/v1/validation-step",
+        "/v1/goal-restatement",
+        "/v1/decisions",
     ] {
         assert!(help.contains(endpoint));
     }
@@ -236,6 +239,7 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
         prepare_command: None,
         setup_files: Vec::new(),
         auto_verify: false,
+        review_only: false,
         items,
     };
     let mut invalid = entry("invalid", &[]);

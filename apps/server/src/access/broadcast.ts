@@ -153,8 +153,9 @@ ${
       preheader: draft.preview || draft.intro.split('\n')[0] || draft.headline,
       origin,
       content,
-      // Sequenzy appends the required unsubscribe link to campaign sends.
-      footer: 'You subscribed to Jackalope product notes. {{unsubscribe_link}}',
+      // Sequenzy fills {{unsubscribeUrl}} per recipient, and only recognizes it inside an href.
+      footer:
+        'You subscribed to Jackalope product notes. <a href="{{unsubscribeUrl}}" style="color:inherit;text-decoration:underline">Unsubscribe</a>.',
     }),
   };
 }

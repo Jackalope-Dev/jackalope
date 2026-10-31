@@ -1,7 +1,7 @@
 //! Selecting text by dragging. The interface captures the mouse to scroll
 //! the conversation, so it selects and copies itself, from the drawn screen.
 
-use super::App;
+use super::{App, Click};
 use crossterm::event::{MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 
@@ -88,6 +88,7 @@ impl App {
                 if selection.anchor == selection.head {
                     // A click, not a drag.
                     self.selection = None;
+                    self.click(at);
                     return;
                 }
                 let text = self
@@ -100,6 +101,38 @@ impl App {
                 }
             }
             _ => {}
+        }
+    }
+}
+
+impl App {
+    /// What clicking the clickable part of the last frame under the pointer does.
+    pub(super) fn hovered(&self) -> Option<Click> {
+        self.hover.and_then(|at| self.hit(at))
+    }
+
+    fn hit(&self, (column, row): (u16, u16)) -> Option<Click> {
+        self.hits
+            .borrow()
+            .iter()
+            .find(|(area, _)| {
+                (area.left()..area.right()).contains(&column)
+                    && (area.top()..area.bottom()).contains(&row)
+            })
+            .map(|(_, click)| *click)
+    }
+
+    /// Acts on whatever clickable part of the last frame is at `at`.
+    fn click(&mut self, at: (u16, u16)) {
+        let hit = self.hit(at);
+        match hit {
+            Some(Click::Command(command)) => self.command(command),
+            Some(Click::Type(text)) => {
+                self.editor.set(text.to_string());
+                self.slash = 0;
+            }
+            Some(Click::Tab(index)) => self.jump_session(index),
+            None => {}
         }
     }
 }

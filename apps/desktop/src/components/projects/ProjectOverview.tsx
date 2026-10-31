@@ -1,9 +1,15 @@
-import { Badge, Disclosure, DisclosureSummary, SettingGroup, SettingRow } from '@jackalope/ui';
+import {
+  Disclosure,
+  DisclosureSummary,
+  DropdownMenu as Menu,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
 import {
   FolderOpen,
   GitBranch,
-  ListTodo,
   MonitorPlay,
+  MoreHorizontal,
   Plus,
   RefreshCw,
   ShieldCheck,
@@ -146,21 +152,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
         <div className="workspace-sections">
           <WorkspaceHeading
             title={project.name}
-            description={
-              <span className="project-heading-description">
-                {project.description && (
-                  <span className="text-[var(--color-text-secondary)]">{project.description}</span>
-                )}
-                <button
-                  type="button"
-                  className="project-path-pill"
-                  title="Click to copy path"
-                  onClick={() => void navigator.clipboard.writeText(project.path)}
-                >
-                  {project.path}
-                </button>
-              </span>
-            }
+            description={project.description || undefined}
             action={
               <div className="workspace-actions">
                 <Button
@@ -174,31 +166,41 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   <Plus size={14} />
                   New task
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    useWorkViewStore.getState().setScope('project');
-                    selectWork();
-                    navigateWorkspace('kanban');
-                  }}
-                >
-                  <ListTodo size={14} />
-                  Tasks board
-                </Button>
+                <Menu.Root>
+                  <Menu.Trigger asChild>
+                    <Button variant="outline" size="sm" aria-label="Project options">
+                      <MoreHorizontal size={16} aria-hidden="true" />
+                    </Button>
+                  </Menu.Trigger>
+                  <Menu.Portal>
+                    <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
+                      <Menu.Item
+                        className="workspace-menu-item"
+                        onSelect={() => {
+                          useWorkViewStore.getState().setScope('project');
+                          selectWork();
+                          navigateWorkspace('kanban');
+                        }}
+                      >
+                        Open task board
+                      </Menu.Item>
+                      <Menu.Separator className="menu-separator" />
+                      <Menu.Item
+                        className="workspace-menu-item"
+                        title={project.path}
+                        onSelect={() => void navigator.clipboard.writeText(project.path)}
+                      >
+                        Copy folder path
+                      </Menu.Item>
+                    </Menu.Content>
+                  </Menu.Portal>
+                </Menu.Root>
               </div>
             }
           />
 
           <section className="workspace-section workspace-stack">
-            <WorkspaceSectionHeading
-              title="Active tasks"
-              action={
-                unfinished.length > 0 ? (
-                  <Badge variant="outline">{unfinished.length} open</Badge>
-                ) : undefined
-              }
-            />
+            <WorkspaceSectionHeading title="Active tasks" />
             <ProjectReturn
               key={project.id}
               items={unfinished}
@@ -271,7 +273,6 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                       ) : (
                         'Working tree clean'
                       )}
-                      {readiness?.head && ` · ${readiness.head.slice(0, 7)}`}
                     </>
                   )
                 }

@@ -18,11 +18,18 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 
 ## Desktop workspace
 
-- Work is the shared entry point for conversations, tasks and plans. Its sidebar
-  groups recent work by next action; the bottom bar shows the selected workspace,
-  local activity and visual account allowances with freshness and reset times.
+- Work is the shared entry point for conversations, tasks and plans. The sidebar
+  lists projects as a tree of their work, needs-you first, then running and recent;
+  a project row opens that project's work and its menu opens project pages. The title
+  bar holds command search; the bottom bar shows the focused project, branch, local
+  activity and visual account allowances with freshness and reset times.
   Settings → Desktop holds sleep prevention, owned terminals and preview ports.
   Settings groups account and support details.
+- The window is frosted on Windows 11 (Acrylic) and macOS (vibrancy) by default, keeping
+  text on tinted panes; Settings → Appearance → Frosted window turns it off, and Windows 10,
+  Linux and reduced-transparency settings keep the opaque look. New installs use the Auto
+  theme, which follows the system's light or dark setting. Native macOS acceptance remains
+  open.
 - Desktop preferences include interface zoom, editor and shell selection, terminal
   font size, HTTP links and editable search, new-work and settings shortcuts. Saved
   prompts and commands can apply to all projects or one project; commands require an
@@ -41,7 +48,7 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   before the existing preparation command. Both checkouts must ignore each file;
   links, parent paths and overwrites are refused. Worktree size inspection counts
   bounded logical file sizes, labels partial results and retains existing cleanup guards.
-- The workspace has one layout: a collapsible sidebar of recent work beside the open
+- The workspace has one layout: a collapsible project sidebar beside the open
   item, with review, preview, terminal or activity next to its conversation. The work
   list offers list and board views, and its filters save per project.
   Needs you prioritizes recovery and questions, then older reviews. Task context
@@ -64,10 +71,13 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   the question, and a home directory or drive root is refused. A second app
   launch raises the running host. Inside conversations, `!` runs shell commands with
   streamed output, follow-ups queue behind running work, `/bg` starts parallel
-  conversations, a live header shows other open work and agent readiness, the input
-  wraps and grows, and dragging copies text. `/learn` extracts session learnings into
-  project knowledge, `/model` and `/usage` choose a model and show account quota,
-  `/init` writes `AGENTS.md`, `--resume` picks or rejoins a conversation, and a rotating tips footer highlights commands and shortcuts.
+  conversations, open conversations appear as tabs with their state (Alt+1–9 or a click
+  switches), a pinned banner says what a blocked conversation needs, `@` names agents as
+  well as files, a leading `/`, `!` or `@` sets the input's mode, the input wraps and
+  grows, and dragging copies text. With 24-bit colour it paints the app's surfaces in a
+  rounded card with clickable header and status lines. `/learn` sends session learnings through
+  the learning gate, `/learnings` lists, shows, archives and restores learned lessons, `/model` and `/usage` choose a model and show account quota,
+  `/init` writes `AGENTS.md`, and `--resume` picks or rejoins a conversation.
   The status bar, command search and Cmd/Ctrl+J open it in an app window that can
   hand the conversation to the system terminal. Release builds link the command onto
   PATH; agent questions can be answered in the terminal. The transcript shows every
@@ -113,7 +123,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Active task, plan and chat views show recent tool activity, workspace file labels and
   native check output from existing events, without extra model calls.
   Project opens an overview with unfinished work, setup and recorded local deliveries.
-- The Work sidebar groups review and blocked work under Needs you, alongside active work. Task
+- The sidebar marks review and blocked work as needing you, ahead of active work, and the
+  Work link counts it across projects. Task
   and session sections remember where the user was reading. Project readiness distinguishes
   unavailable inspection from a clean checkout.
 - Result views prioritize unanswered questions, recovery and failed checks. Isolated
@@ -136,11 +147,51 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   output into the follow-up draft. Local previews remember project commands, choose a free
   port, check HTTP readiness and embed a sandboxed loopback page. Fresh isolated browser
   captures attach screenshots, page elements and errors to follow-up drafts; they do not
-  reproduce embedded-page sign-in or unsaved interactions.
+  reproduce embedded-page sign-in or unsaved interactions. Finished work with changes
+  gets automatic review screenshots from the saved preview command in a disposable
+  headless browser: up to six pages (configured, named by browser plan criteria, or
+  visited by the agent), desktop and optional narrow, compared before/after in Review.
+  "Before" needs a separate worktree and a clean project checkout at the starting
+  commit; otherwise only the result is captured, with a note. Capture runs after the
+  result is recorded, so it never delays review. A per-project feature map (page,
+  what working looks like, source globs), suggested locally from route files and router
+  setup, makes captures prefer pages whose sources changed and labels each with what to
+  check; entries whose files are gone are flagged.
+- Requirement assessments and an optional safety fact carry an evidence level (stated,
+  cited, reasoned, ran, reproduced) that Jackalope checks locally and lowers when cited
+  files, command output or captures are missing; Review shows each checked level and the
+  weakest. Bridged tasks report a short goal restatement, shown as Understood as.
+- Review's **Challenge this change** runs one or two reviewers, preferring a different
+  model family, in worktrees at a snapshot of the result. Only findings proven by a
+  command count; Checks shows each command, its output, the expected output and dropped
+  counts, with Run again in a disposable worktree and Send to the author into the
+  follow-up draft. Agent review also defaults to a reviewer from another model family.
+- Compared attempts can start a read-only judge, defaulting to a different agent family,
+  that scores them against criteria taken from the request, recommends a base and lists
+  parts worth porting. Keep and combine drafts a follow-up on the kept attempt and holds
+  the source worktrees from cleanup in Project worktrees until that follow-up finishes.
+- Agents keep an append-only decision trail for each attempt (forks, pivots, reverts,
+  blockers, finished units). Jackalope checks its evidence pointers locally when the
+  attempt ends and shows the Decision log in task Activity and bot conversations.
+- After 15 minutes away, Work opens with Since you left: what needs you, what finished or
+  failed meanwhile with screenshots first, and every waiting item with its decision,
+  evidence, risk and a suggested next step when the record supports one. It is built
+  locally and stays hidden when nothing changed.
+- Sharpen rewrites a composer or terminal draft into a deeper version of the same task
+  with one-step undo, using one helper call recorded with helper usage.
+  Real-agent runs and installed-app acceptance of these review, comparison, trail and
+  Sharpen features remain open.
+- Persistent agent browser profiles: a Project browser per project and an optional
+  browser per bot keep sign-ins between tasks in a separate Chromium profile. Agents opt
+  in with `browser_open_profile`; each site asks before first use, sign-in pages pause
+  the agent while the person signs in in a visible window, and only cookie domain names
+  are recorded. Project settings, the bot editor and `/browser` open, clear and delete
+  profiles.
 - Delivery inspects local Git state and optionally reads PR/CI through the GitHub CLI.
   PR, CI and deployment preparation carry evidence into editable drafts. Failing PR
   checks are listed openly with a draft asking the agent to reproduce and fix them.
-  Create pull request asks for a title, description and draft choice, then commits any
+  Create pull request drafts an editable title and description from the branch's diff alone
+  (never the request or conversation), asks for the draft choice, then commits any
   remaining task changes with the project's commit policy, pushes the task branch and
   opens the PR through the GitHub CLI; nothing is published before that confirmation. Publishing and
   deployment remain explicit user-approved steps; a local merge does not establish either.
@@ -188,6 +239,14 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Live provider calibration and native cross-platform acceptance remain open.
 - Isolated Git worktrees, task checkpoints, verification, snapshot-bound outcome
   acceptance, combined patch review and guarded integration with recoverable cleanup.
+  Each project chooses where new tasks, composer drafts and conversations work: an
+  isolated worktree (the default), a new `jackalope/<id>` branch in the project
+  checkout, the checkout's current branch, or a choice asked when each task starts.
+  In-place modes hold the checkout for one task at a time, never carry, stash or
+  discard the person's changes (a new branch requires a clean checkout), create no
+  automatic checkpoint commits and have no merge step; a new branch stays for review
+  or a pull request. Parallel subtasks, comparisons, schedules and coordinated work
+  keep isolated worktrees.
   Agents can report
   all requirement assessments in one call; review shows their justifications and
   evidence separately from human acceptance.
@@ -210,6 +269,23 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Plan, Work, Check and Review lead to one result, preview, combined diff and outcome
   review before explicit application. Focused review and elapsed integration time remain
   distinct local measurements. Installed-provider and cost/quality acceptance remain open.
+- Plan mode is explicit: **Plan with me** in the composer or beside a plan or
+  investigation assessment, `/plan` in the terminal or `jackalope plan`. A read-only
+  planning attempt explores, asks at most the project's question cap (default 5) and
+  returns one plan document with assumptions, tasks, acceptance criteria and a
+  recommended shape. The planner checks facts in the code itself and records them as
+  checked assumptions with evidence; only preference questions reach the person, each
+  saying why checking could not settle it. **Write the plan myself** turns hand-written tasks and outcomes into
+  the same plan document. Revisions, section diffs, direct edits, Save to repo (never
+  committed), exact-revision approval, single/subtasks/swarm hand-off through managed
+  tasks, an independent plan review, deviation decisions and re-planning are
+  implemented; see [plan mode](PLAN-MODE.md). Approval verifies with the project's check,
+  else the plan's command and test criteria, else review only (no check gate; the plan
+  review must pass). Pending deviations raise a notification and the amber needs-you
+  state in the terminal. Planning settings live in Project settings and the terminal's
+  `/settings`. Read-only enforcement covers Codex and
+  Claude Code; other agents are constrained by prompt and a discarded worktree.
+  Installed-provider interviews and plan-to-merge acceptance remain open.
 - Requests continuing with one lead can delegate through available provider subagent
   tools. Unsupported or denied delegation stays sequential. See
   [agent quality](AGENT-QUALITY.md) for boundaries.
@@ -221,18 +297,63 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Chat supports per-request lesson opt-outs. Automatic review lessons require a later
   accepted revision and a successful check of the accepted tree; unresolved notes
   remain visible without entering task context.
+- Per-project background learning, on by default: local reflection every 50 reported
+  tool calls (configurable) and when work ends proposes adding, merging, patching or
+  retiring learned lessons. One promotion gate refuses credential-like or personal
+  data, duplicates, conflicts with hand-written lessons and oversized lessons, and
+  changes only unedited lessons it wrote. Lessons start on probation, become active
+  after two deliveries, are archived when unused or over the 20-lesson project cap,
+  and can be restored; an append-only history records every change with redacted
+  evidence. Project → Context and the terminal show status, use and history, and
+  Learning activity shows local counts for calibrating the thresholds, which live in
+  one `Thresholds` definition. A deterministic curator folds near-duplicate unedited
+  lessons into the most used one, reversibly. A supplied lesson the person restates
+  later in that work counts as missed; repeated misses flag it, raise its rank among
+  equal matches and archive it while new. The curator schedule also archives learned
+  lessons naming a project path, package script or make target that no longer
+  exists, and only flags other lessons. **Make it a check** drafts a task that turns a
+  lesson, especially one agents keep missing, into an architecture, type, lint or test
+  check proven against a past instance; accepting it marks the lesson enforced and
+  retires learned lessons, and a check that later disappears restores or flags the
+  lesson. Off by default per project: agent
+  reflection with the default agent after work ends (bounded, on that account's
+  quota, through the same gate), and mirroring active lessons into a marked
+  `AGENTS.md` section and a Claude Code skill. Opt-in account sync of learned lessons,
+  off by default and layered on settings sync, matches projects by repository and
+  merges by revision; evidence, use counts and paths stay local. Installed
+  multi-desktop sync, real-provider agent reflection and exported-file use by other
+  agents are unverified; any effect on task outcomes is unmeasured.
 - MCP connections with a curated marketplace, publisher setup presets, token entry,
   agent sign-in guidance and save-and-check results. Full AllMCPs search and custom
   connections remain available; live publisher/account acceptance remains open.
-  Task-owned Chromium sessions and scoped desktop-window grants.
+  Task-owned Chromium sessions and scoped desktop grants. Agents can operate native
+  apps and the user's logged-in browser with a one-window, one-app or full-desktop
+  grant; window and app grants can be remembered per project, browser sites are asked
+  once each, and actions target accessibility element refs through a resident helper.
 - Connected apps link the user's own Composio project. The project key and Composio
   identifiers stay in protected storage; apps connect through Composio's hosted sign-in
   in the user's browser, and one managed on-demand connection delivers them to every
   agent. Composio holds third-party tokens and bills usage to that project. See
   [Connected apps](MCP-DISCOVERY.md#connected-apps-through-composio).
+- Bots can have their own computer: a Linux sandbox in Docker on this device (Docker
+  Desktop, Colima or Docker Engine, detected but never installed) or a cloud machine the
+  person runs and pairs with an HTTPS address and a secret kept in protected storage.
+  Tasks get one only after the person approves `computer_request`. Desktop control acts
+  on the computer without an access question, browser tools drive its Chromium for local
+  sandboxes with networking on, each site still asks first, and `computer_exec` runs
+  bounded commands inside it. A stopped computer starts when an agent, the browser tools
+  or a viewer needs it, waiting up to 90 seconds. Local sandboxes stop after an idle
+  time (10 minutes by default; 5, 30, 60 or never) unless an active run or open viewer
+  holds them, and stop when Jackalope quits unless the person keeps them running;
+  cloud machines are never stopped. Bot settings, the Screen view and Settings →
+  Computers show idle time and start, stop, watch, take over and delete computers;
+  `/computer` shows and changes one in the terminal. Jackalope-hosted computers are
+  listed as coming soon. See
+  [bot computers](BOT-COMPUTERS.md).
 - Task and chat Screen views poll the attempt's existing task browser viewport and
   desktop grant state without opening a browser, requesting access or saving an
-  artifact. People can stop the browser or revoke desktop control from there.
+  artifact. They list recent desktop actions with small after-action captures. People
+  can stop the browser, revoke desktop control or always allow the granted app there.
 - Saved bots keep a name, role, standing instructions, agent and model, project,
   connection scope and a chosen character and colour locally. Messaging a bot starts a
   chat inside the Bots page, or continues its latest open one, whose native persona is
@@ -245,7 +366,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   action, source and update cards, and suggest new bots for the person to review. Every
   wake, message and card is labelled in the transcript and activity; hourly, hand-off
   and batch limits bound autonomous work. Templates cover review, fixing, testing, docs,
-  security, release notes and onboarding. Earlier routines remain ordinary schedules.
+  security, release notes and onboarding; Triage classifies reports, reproduces bugs
+  before drafting fixes and asks before replying or closing. Earlier routines remain
+  ordinary schedules.
   See [bots](BOTS.md).
 - Short requests phrased as questions skip workspace preparation, and focused attempts
   that change no files skip automatic checks; planned assignments always verify.
@@ -310,12 +433,28 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   An external Harbor adapter runs prepared Git repositories through the same native
   task path with separate upstream grading and optional request metering. Its initial
   payload targets Linux x86_64/OpenCode; broader provider and benchmark acceptance remain open.
+  Projects auto-approve agent requests by default: Claude Code, Kimi Code/ACP and
+  OpenCode permission requests pass a native risk check that approves routine tool
+  use and asks only for recursive or out-of-workspace deletes, Git pushes and history
+  or working-tree loss, piped or encoded code, elevated or system changes, credential
+  files, publishing and deploys, process kills and writes outside the workspace.
+  Each automatic approval and escalation is recorded in the task's activity. Saved
+  always-allow rules still apply. Codex keeps its workspace-write sandbox; Gemini
+  CLI, Grok and Antigravity follow their own CLI approval policies.
   OpenCode tasks use an authenticated owned server for recoverable permission prompts,
   structured questions, exact-session continuation and child-session usage. Scope,
   native-output and provider-effort ablations retain matched permission policies and
   independent accounting; cross-platform installed acceptance and representative
   improvement claims remain open.
-- Shared appearance, guided onboarding, task notifications and optional settings sync.
+  Claude Code streams partial text into the terminal view, and a project can skip the
+  person's own Claude Code settings, plugins, hooks and MCP servers. By default each
+  live conversation keeps a warm Claude Code process with SDK hooks for edit checks,
+  stop-time saved checks, context delivery, permission decisions and tool timing, and a
+  pinned model gets a fallback model. The hook protocol, replies, deny-rule precedence
+  and cost accounting were checked against installed Claude Code 2.1.312; full task
+  acceptance and any speed or quality benefit remain unmeasured.
+- Shared appearance, guided onboarding, task notifications, optional settings sync
+  and opt-in learned-lesson sync.
   Project setup has three steps: project, agents and an optional first task. Theme editors open directly; existing saved app/project choices remain compatible.
 - Review views save optional local usefulness ratings and reported review minutes with
   each task. These self-reported values do not establish product retention or quality gains.
@@ -406,11 +545,23 @@ tasks run through its headless stream; installed-profile execution is not yet va
 Antigravity named accounts use Gemini API keys; isolated subscription accounts are
 unsupported. Discovery and fixture responses do not establish real account execution.
 
-Desktop control supports Windows and has macOS/X11 and GNOME 46 Wayland backends
-for native validation. GNOME requires the bundled window-control extension and
-explicit per-task window grants; other Wayland compositors remain unavailable.
-XWayland alone is insufficient. Worktrees separate Git changes; agent processes and
+Desktop control supports Windows and has macOS, X11, GNOME 46 Wayland and XDG
+desktop portal backends for native validation. Windows and macOS offer window, app
+and desktop grants with accessibility actions; the macOS helper is compiled and
+self-tested only in CI. X11 and the GNOME extension keep one-window grants with
+coordinate fallback for element refs. Other Wayland desktops that implement the
+RemoteDesktop portal (KDE Plasma 5.27+, GNOME 44+) offer app and desktop grants with
+AT-SPI element actions, portal input and Screenshot-portal captures; physical input
+does not pause control there, and wlroots desktops without RemoteDesktop remain
+unavailable. The portal client compiles only in Linux CI and has no real-portal
+fixture. XWayland alone is insufficient. Worktrees separate Git changes; agent processes and
 configured tools still run with local OS privileges.
+
+Bot computers have unit coverage and an opt-in Docker trial; no image build, container,
+viewer or cloud machine has been accepted in an installed app on any platform. Cloud
+machines reach desktop control and commands but not the browser tools, and the
+in-sandbox agent has no accessibility actions. The idle stop, start on demand and quit
+stop are covered by unit tests only.
 
 Installed provider, accessibility, recovery, performance, signed installation and
 update acceptance remain platform-specific requirements. Real-model quality and

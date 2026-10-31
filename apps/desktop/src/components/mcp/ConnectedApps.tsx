@@ -1,13 +1,14 @@
 import {
   Badge,
   ConfirmDialog,
-  FormField,
+  ExternalLinkIcon,
   Input,
-  RefreshIcon,
+  LinkButton,
+  DropdownMenu as Menu,
   SearchField,
   SegmentedControl,
 } from '@jackalope/ui';
-import { ExternalLink, KeyRound } from 'lucide-react';
+import { Blocks, ExternalLink, KeyRound, MoreHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type AppState,
@@ -65,10 +66,7 @@ export function ConnectedApps() {
   }, [load]);
   return (
     <WorkspacePage className="connected-apps">
-      <WorkspaceHeading
-        title="Connected apps"
-        description="Sign in to apps once; every agent can use them as tools."
-      />
+      <WorkspaceHeading title="Connected apps" />
       {!isTauriEnvironment() && (
         <InlineNotice>Connected apps are available in the desktop app.</InlineNotice>
       )}
@@ -100,77 +98,100 @@ function KeySetup({ onSaved }: { onSaved: (status: ComposioStatus) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   return (
-    <section className="connected-apps-setup">
-      <div className="connected-apps-steps">
-        <h2>Connect your Composio project</h2>
-        <ol>
-          <li>
-            Sign in to the{' '}
-            <button
-              type="button"
-              className="connected-apps-link"
-              onClick={() => void openExternalUrl(DASHBOARD)}
+    <section className="connected-apps-setup" aria-labelledby="connected-apps-setup-heading">
+      <header className="connected-apps-intro">
+        <span className="connected-apps-mark" aria-hidden="true">
+          <Blocks size={20} />
+        </span>
+        <div>
+          <h2 id="connected-apps-setup-heading">Connect your apps once</h2>
+          <p>
+            Sign in to apps such as GitHub, Linear and Slack once through your own Composio project,
+            and every agent can use them.
+          </p>
+        </div>
+      </header>
+      <ol className="connected-apps-steps">
+        <li>
+          <span className="connected-apps-step" aria-hidden="true">
+            1
+          </span>
+          <div className="connected-apps-step-body">
+            <strong>Choose a Composio project</strong>
+            <p>Sign in to Composio and pick or create a project.</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => void openExternalUrl(DASHBOARD)}>
+            Open dashboard
+            <ExternalLinkIcon size={16} />
+          </Button>
+        </li>
+        <li>
+          <span className="connected-apps-step" aria-hidden="true">
+            2
+          </span>
+          <div className="connected-apps-step-body">
+            <strong>Copy a project key</strong>
+            <p>
+              In Settings → API Keys, copy a key that starts with <code>ak_</code>.
+            </p>
+          </div>
+        </li>
+        <li>
+          <span className="connected-apps-step" aria-hidden="true">
+            3
+          </span>
+          <div className="connected-apps-step-body">
+            <strong>Paste it here</strong>
+            <p>
+              Jackalope checks it with Composio, then keeps it in this device’s protected storage.
+            </p>
+            <form
+              className="connected-apps-key"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                setBusy(true);
+                setError('');
+                try {
+                  onSaved(await saveComposioKey(key));
+                  setKey('');
+                } catch (cause) {
+                  setError(String(cause));
+                } finally {
+                  setBusy(false);
+                }
+              }}
             >
-              Composio dashboard
-            </button>{' '}
-            and choose or create a project.
-          </li>
-          <li>Open Settings → API Keys and copy a project key that starts with ak_.</li>
-          <li>Paste it here. Jackalope keeps it in this device’s protected storage.</li>
-        </ol>
-        <p className="task-muted">
-          Composio runs the sign-ins and tool calls under your own project, and bills any usage
-          beyond its free plan to that project.{' '}
-          <button
-            type="button"
-            className="connected-apps-link"
-            onClick={() => void openExternalUrl(PRICING)}
-          >
-            Composio pricing
-          </button>
-        </p>
-      </div>
-      <form
-        className="connected-apps-key"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          setBusy(true);
-          setError('');
-          try {
-            onSaved(await saveComposioKey(key));
-            setKey('');
-          } catch (cause) {
-            setError(String(cause));
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        <FormField
-          label="Composio project key"
-          error={error || undefined}
-          description="Checked with Composio before it is saved."
-        >
-          <Input
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="ak_…"
-            value={key}
-            onChange={(event) => setKey(event.target.value)}
-            required
-          />
-        </FormField>
-        <Button
-          type="submit"
-          disabled={!key.trim() || !isTauriEnvironment()}
-          loading={busy}
-          loadingLabel="Checking key…"
-        >
-          <KeyRound size={16} aria-hidden="true" />
-          Save key
-        </Button>
-      </form>
+              <Input
+                type="password"
+                aria-label="Composio project key"
+                aria-invalid={error ? true : undefined}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="ak_…"
+                value={key}
+                onChange={(event) => setKey(event.target.value)}
+                required
+              />
+              <Button
+                type="submit"
+                disabled={!key.trim() || !isTauriEnvironment()}
+                loading={busy}
+                loadingLabel="Checking key…"
+              >
+                <KeyRound size={16} aria-hidden="true" />
+                Save key
+              </Button>
+            </form>
+            {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          </div>
+        </li>
+      </ol>
+      <p className="connected-apps-billing">
+        Composio bills usage beyond its free plan to your project.{' '}
+        <LinkButton external onClick={() => void openExternalUrl(PRICING)}>
+          Composio pricing
+        </LinkButton>
+      </p>
     </section>
   );
 }
@@ -184,6 +205,7 @@ function AppCatalog({ status, onRemoved }: { status: ComposioStatus; onRemoved: 
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState('');
   const [waiting, setWaiting] = useState<string | null>(null);
+  const [removingKey, setRemovingKey] = useState(false);
   const polls = useRef(0);
 
   const readAccounts = useCallback(async () => {
@@ -282,33 +304,18 @@ function AppCatalog({ status, onRemoved }: { status: ComposioStatus; onRemoved: 
 
   return (
     <>
-      <div className="connected-apps-summary">
-        <p>
-          <strong>{connectedCount}</strong> {connectedCount === 1 ? 'app' : 'apps'} connected ·
-          Composio project key ending in <code>{status.keyHint}</code>
-        </p>
-        <div className="connected-apps-summary-actions">
-          <Button
-            variant="ghost"
-            aria-label="Refresh apps"
-            disabled={loading}
-            onClick={() => void refresh(true)}
-          >
-            <RefreshIcon />
-          </Button>
-          <ConfirmDialog
-            trigger={<Button variant="outline">Remove key</Button>}
-            title="Remove the Composio key?"
-            description="Agents lose access to connected apps. Apps stay connected in your Composio project; disconnect them first if you also want to revoke their sign-ins."
-            label="Remove key"
-            busyLabel="Removing…"
-            onConfirm={async () => {
-              await removeComposioKey();
-              onRemoved();
-            }}
-          />
-        </div>
-      </div>
+      <ConfirmDialog
+        open={removingKey}
+        onOpenChange={setRemovingKey}
+        title="Remove the Composio key?"
+        description="Agents lose access to connected apps. Apps stay connected in your Composio project; disconnect them first if you also want to revoke their sign-ins."
+        label="Remove key"
+        busyLabel="Removing…"
+        onConfirm={async () => {
+          await removeComposioKey();
+          onRemoved();
+        }}
+      />
       {waitingApp && (
         <InlineNotice
           action={
@@ -329,7 +336,7 @@ function AppCatalog({ status, onRemoved }: { status: ComposioStatus; onRemoved: 
           onChange={setView}
           items={[
             { id: 'all', label: 'All apps' },
-            { id: 'connected', label: `Connected (${connectedCount})` },
+            { id: 'connected', label: 'Connected', count: connectedCount },
           ]}
         />
         <SearchField
@@ -339,6 +346,28 @@ function AppCatalog({ status, onRemoved }: { status: ComposioStatus; onRemoved: 
           onValueChange={setQuery}
           containerClassName="connected-apps-search"
         />
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button variant="outline" aria-label="Connected apps options">
+              <MoreHorizontal size={16} aria-hidden="true" />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
+              <Menu.Item
+                className="workspace-menu-item"
+                disabled={loading}
+                onSelect={() => void refresh(true)}
+              >
+                Refresh apps
+              </Menu.Item>
+              <Menu.Separator className="menu-separator" />
+              <Menu.Item className="workspace-menu-item" onSelect={() => setRemovingKey(true)}>
+                Remove key ending in {status.keyHint}…
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Portal>
+        </Menu.Root>
       </div>
       {catalog === null ? (
         loading && <LoadingState label="Loading apps…" />

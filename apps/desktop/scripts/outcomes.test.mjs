@@ -1,12 +1,61 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFeaturePlan } from '../src/lib/feature-plan.ts';
 import { recoveryHandoff, returnToProject } from '../src/lib/project-return.ts';
 import {
   correctionPrompt,
+  evidenceStrength,
+  latestSafetyFact,
   requirementAssessment,
   requirementState,
+  weakestEvidence,
 } from '../src/lib/task-outcomes.ts';
+
+test('evidence levels show the checked level, unrated legacy reports and the weakest requirement', () => {
+  assert.equal(evidenceStrength({}).label, 'Unrated');
+  assert.equal(evidenceStrength({ level: 'stated' }).label, 'Unrated');
+  assert.deepEqual(evidenceStrength({ level: 'ran', checkedLevel: 'ran' }), {
+    checked: 'ran',
+    label: 'Ran it',
+    lowered: null,
+  });
+  const lowered = evidenceStrength({
+    level: 'reproduced',
+    checkedLevel: 'cited',
+    checkNote: 'No recorded capture or preview matches the evidence',
+  });
+  assert.equal(lowered.label, 'Cited code');
+  assert.match(lowered.lowered, /Claimed shown in the app\. No recorded capture/);
+  const steps = [
+    {
+      timestamp: 'earlier',
+      requirements: [
+        { requirementId: 'a', status: 'met', summary: '', evidence: [], checkedLevel: 'stated' },
+      ],
+    },
+    {
+      timestamp: 'later',
+      requirements: [
+        {
+          requirementId: 'a',
+          status: 'met',
+          summary: '',
+          evidence: [],
+          checkedLevel: 'reproduced',
+        },
+        { requirementId: 'b', status: 'met', summary: '', evidence: [], checkedLevel: 'ran' },
+        { requirementId: 'c', status: 'met', summary: '', evidence: [] },
+      ],
+      safetyFact: { fact: 'Only stale entries are dropped', level: 'cited', evidence: [] },
+    },
+  ];
+  assert.deepEqual(weakestEvidence(steps, [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }]), {
+    weakest: 'ran',
+    unrated: 2,
+  });
+  assert.deepEqual(weakestEvidence(undefined, [{ id: 'a' }]), { weakest: null, unrated: 1 });
+  assert.equal(latestSafetyFact(steps).fact, 'Only stale entries are dropped');
+  assert.equal(latestSafetyFact([]), null);
+});
 
 test('latest agent answers attach to the matching requirement without accepting it', () => {
   const answer = {
@@ -43,44 +92,6 @@ test('acceptance is unknown until a current file snapshot has been inspected', (
   assert.equal(requirementState(requirement, 'tree'), 'Accepted by you');
   assert.equal(requirementState(requirement, 'changed'), 'Evidence needs refreshing');
   assert.match(correctionPrompt([requirement]), /Reset works.*\n.*Verified reset/);
-});
-
-test('feature plan validation preserves outcomes and rejects cycles, missing dependencies and escaping scopes', () => {
-  const first = {
-    key: 'api',
-    title: 'API',
-    prompt: 'Implement the API',
-    scopes: ['src/api'],
-    dependsOn: [],
-    outcomes: ['Invalid input rejected'],
-  };
-  const second = {
-    key: 'ui',
-    title: 'UI',
-    prompt: 'Use the API',
-    scopes: ['src/ui'],
-    dependsOn: ['api'],
-    outcomes: ['Errors shown'],
-  };
-  const parsed = readFeaturePlan(
-    `\`\`\`json\n${JSON.stringify([first, second])}\n\`\`\``,
-    'claude',
-  );
-  assert.equal(parsed[1].agent, 'claude');
-  assert.deepEqual(parsed[0].contextSelection.outcomes, ['Invalid input rejected']);
-  assert.deepEqual(readFeaturePlan(JSON.stringify(parsed), 'codex')[1].contextSelection.outcomes, [
-    'Errors shown',
-  ]);
-  assert.throws(
-    () => readFeaturePlan(JSON.stringify([{ ...first, dependsOn: ['ui'] }, second]), 'claude'),
-    /cycle/,
-  );
-  assert.throws(() => readFeaturePlan(JSON.stringify([second]), 'claude'), /Missing dependency/);
-  assert.throws(
-    () => readFeaturePlan(JSON.stringify([{ ...first, scopes: ['../secrets'] }]), 'claude'),
-    /scopes/,
-  );
-  assert.throws(() => readFeaturePlan(JSON.stringify([first, first]), 'claude'), /unique/);
 });
 
 test('return view selects latest attempts, prioritizes blockers and retains reviewed unintegrated work', () => {

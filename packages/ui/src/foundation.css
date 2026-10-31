@@ -11,6 +11,16 @@
     --radius-2xl: 18px;
     --radius-3xl: 24px;
     --radius-full: 999px;
+    /* Control heights: buttons, fields and tabs use the regular height, menu rows and
+       segments the compact one. Coarse pointers get 44px touch targets. */
+    --control-height: 36px;
+    --control-height-compact: 32px;
+  }
+  @media (pointer: coarse) {
+    :root {
+      --control-height: 44px;
+      --control-height-compact: 44px;
+    }
   }
 }
 @layer components {

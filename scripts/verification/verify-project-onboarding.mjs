@@ -67,7 +67,9 @@ try {
   );
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.getByText('Step 2 of 3', { exact: true }).waitFor();
+  await page
+    .getByRole('heading', { name: 'Choose agents for this project', exact: true })
+    .waitFor();
   assert.equal(
     await page.getByRole('button', { name: /Customize decisions|Use essential setup/ }).count(),
     0,
@@ -91,12 +93,14 @@ try {
     1,
   );
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByText('Step 3 of 3', { exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Describe your first task', exact: true }).waitFor();
   assert.equal(await page.getByText('Workspace readiness', { exact: true }).count(), 0);
   const prompt = page.getByLabel('Your first task (optional)', { exact: true });
   await prompt.fill('Fix the empty search state and verify keyboard access.');
   await page.getByRole('button', { name: 'Back', exact: true }).click();
-  await page.getByText('Step 2 of 3', { exact: true }).waitFor();
+  await page
+    .getByRole('heading', { name: 'Choose agents for this project', exact: true })
+    .waitFor();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   assert.equal(await prompt.inputValue(), 'Fix the empty search state and verify keyboard access.');
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -142,13 +146,15 @@ try {
         path: `${output}/setup-${width}-${dark ? 'dark' : 'light'}.png`,
       });
       await page.getByRole('button', { name: 'Back', exact: true }).click();
-      await page.getByText('Step 2 of 3', { exact: true }).waitFor();
+      await page
+        .getByRole('heading', { name: 'Choose agents for this project', exact: true })
+        .waitFor();
       assert.equal(await page.locator('.onboarding-steps li').count(), 3);
       await page.screenshot({
         path: `${output}/step-2-${width}-${dark ? 'dark' : 'light'}.png`,
       });
       await page.getByRole('button', { name: 'Continue', exact: true }).click();
-      await page.getByText('Step 3 of 3', { exact: true }).waitFor();
+      await page.getByRole('heading', { name: 'Describe your first task', exact: true }).waitFor();
     }
   }
   await page.getByRole('button', { name: 'Review first task', exact: true }).click();
@@ -241,12 +247,12 @@ try {
     window.setupFixture.state().finish();
     window.setupFixture.pending['C:/Fixture/second'].resolve('', { verifyCommand: 'late check' });
   });
-  await page.getByText('Step 1 of 3', { exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Choose a project', exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.setupFixture.state().pendingProject), null);
   await page.evaluate(() => localStorage.clear());
   await page.goto(`${url}/?unavailable`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByText('Step 3 of 3', { exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Describe your first task', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
   await page.waitForFunction(() => window.setupFixture.finished?.skipped);
   await page.goto(`${url}/?overview`, { waitUntil: 'domcontentloaded' });

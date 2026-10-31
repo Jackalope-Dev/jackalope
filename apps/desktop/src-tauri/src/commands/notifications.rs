@@ -99,6 +99,35 @@ fn notices(runs: &[Snapshot]) -> Vec<Notice> {
         .collect()
 }
 
+/// Plan deviations recorded since the loop last looked. Planning pushes them as
+/// they are recorded so the loop never has to read every plan record.
+static PLAN_DECISIONS: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
+
+/// Raises "a plan needs your decision" for a deviation waiting on the person.
+/// Activation opens the plan, not a task.
+pub fn plan_decision_needed(plan_id: &str, deviation_id: &str) {
+    if let Ok(mut pending) = PLAN_DECISIONS.lock() {
+        if pending.len() < 200 {
+            pending.push((plan_id.into(), deviation_id.into()));
+        }
+    }
+}
+
+fn plan_notices() -> Vec<Notice> {
+    PLAN_DECISIONS
+        .lock()
+        .map(|mut pending| std::mem::take(&mut *pending))
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(plan, deviation)| Notice {
+            key: format!("plan:{plan}:{deviation}"),
+            run_id: format!("plan:{plan}"),
+            title: "A plan needs your decision",
+            attention: true,
+        })
+        .collect()
+}
+
 /// Bot cards and suggestions waiting on the person. Activation opens the bot, not a task.
 fn bot_notices() -> Vec<Notice> {
     super::bot_hub::installed()
@@ -182,6 +211,7 @@ pub fn launch(app: tauri::AppHandle) {
             }
             let mut current = notices(&app.state::<TaskRuntime>().notification_snapshot());
             current.extend(bot_notices());
+            current.extend(plan_notices());
             let focused = app.get_webview_window("main").is_some_and(|window| {
                 window.is_focused().unwrap_or(false) && window.is_visible().unwrap_or(false)
             });

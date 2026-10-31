@@ -65,6 +65,9 @@ pub struct TaskRun {
     pub quota_failure: Option<super::routing::QuotaFailure>,
     #[serde(default)]
     pub contract: crate::commands::outcomes::TaskContract,
+    /// The agent's own restatement of the task, reported once at the start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub understanding: Option<crate::commands::outcomes::GoalRestatement>,
     #[serde(default)]
     pub monitor_change: Option<crate::commands::monitors::MonitorChange>,
     #[serde(default)]
@@ -108,6 +111,10 @@ pub struct TaskRun {
     pub ended_at: Option<String>,
     pub session_id: Option<String>,
     pub result: String,
+    /// Text the model is still writing, from partial messages. Kept in memory only and
+    /// cleared when the message completes into activity or `result`.
+    #[serde(skip)]
+    pub streaming: String,
     #[serde(default)]
     pub details_omitted: bool,
     pub activity: Vec<String>,
@@ -125,8 +132,26 @@ pub struct TaskRun {
     pub prompts: Vec<crate::commands::harness::PendingUserPrompt>,
     #[serde(default)]
     pub validation_steps: Vec<crate::commands::harness::ValidationStep>,
+    /// Append-only decision trail the agent reported for this attempt.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub decisions: Vec<crate::commands::decision_trail::DecisionEntry>,
     #[serde(default)]
     pub screenshots: Vec<crate::commands::harness::ScreenshotArtifact>,
+    /// Desktop-control actions for the Screen view, newest last and bounded.
+    #[serde(default)]
+    pub desktop_actions: Vec<crate::commands::desktop_control::DesktopActionRecord>,
+    /// Local preview paths the agent opened in its task browser, newest last.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub visited_pages: Vec<String>,
+    /// Before/after screenshots Jackalope captured for review.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_captures: Option<crate::commands::previews::review::ReviewCaptures>,
+    /// Review screenshots are being captured after the attempt finished.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub review_capturing: bool,
+    /// The result this attempt challenges, when it is a Challenge reviewer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub challenge_of: Option<crate::commands::challenge_review::ChallengeSource>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -171,6 +196,12 @@ pub struct RunRequest {
     pub account_binding: Option<crate::commands::agent_profiles::AccountBinding>,
     pub prompt: String,
     pub isolated: bool,
+    /// Where a new Git task runs. When present it overrides `isolated`: only
+    /// `worktree` isolates, `branch` and `current` edit the project checkout,
+    /// and `ask` asks the person when the task starts. Absent keeps the
+    /// `isolated` choice, so callers that need worktrees are unaffected.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_mode: Option<WorkspaceMode>,
     pub previous_run_id: Option<String>,
     /// The failed attempt this run replaces. Unlike `previous_run_id` it resumes no agent
     /// session: it is a fresh attempt that may reuse the earlier attempt's prepared workspace.
@@ -180,6 +211,42 @@ pub struct RunRequest {
     pub connection_ids: Option<Vec<String>>,
     #[serde(skip)]
     pub coordination: Option<CoordinationContext>,
+}
+
+/// Where new work in a Git project runs.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WorkspaceMode {
+    /// A separate worktree on a new `jackalope/<name>` branch named after the request.
+    #[default]
+    Worktree,
+    /// A new `jackalope/<name>` branch checked out in the project checkout.
+    Branch,
+    /// The project checkout on its current branch.
+    Current,
+    /// Ask the person when the task starts.
+    Ask,
+}
+
+impl WorkspaceMode {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "worktree" => Some(Self::Worktree),
+            "branch" => Some(Self::Branch),
+            "current" => Some(Self::Current),
+            "ask" => Some(Self::Ask),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Worktree => "worktree",
+            Self::Branch => "branch",
+            Self::Current => "current",
+            Self::Ask => "ask",
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -254,6 +321,7 @@ impl TaskRun {
             routing: self.routing.clone(),
             quota_failure: self.quota_failure.clone(),
             contract: self.contract.clone(),
+            understanding: self.understanding.clone(),
             monitor_change: self.monitor_change.clone(),
             context_receipt: context_receipt,
             id: self.id.clone(),
@@ -284,6 +352,7 @@ impl TaskRun {
             ended_at: self.ended_at.clone(),
             session_id: self.session_id.clone(),
             result: Default::default(),
+            streaming: String::new(),
             details_omitted: true,
             activity: if ["starting", "running", "stopping"].contains(&self.status.as_str()) {
                 self.activity
@@ -305,7 +374,14 @@ impl TaskRun {
             usage_observations: self.usage_observations.clone(),
             prompts: self.prompts.clone(),
             validation_steps: self.validation_steps.clone(),
+            decisions: self.decisions.clone(),
             screenshots: self.screenshots.clone(),
+            desktop_actions: self.desktop_actions[self.desktop_actions.len().saturating_sub(12)..]
+                .to_vec(),
+            visited_pages: self.visited_pages.clone(),
+            review_captures: self.review_captures.clone(),
+            review_capturing: self.review_capturing,
+            challenge_of: self.challenge_of.clone(),
         }
     }
 }

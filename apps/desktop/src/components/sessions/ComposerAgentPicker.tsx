@@ -1,5 +1,5 @@
-import { Badge, Popover, Tabs } from '@jackalope/ui';
-import { Check, ChevronDown, GitCompareArrows, Sparkles } from 'lucide-react';
+import { Badge, Choice, Popover, Tabs } from '@jackalope/ui';
+import { ChevronDown, GitCompareArrows, Sparkles } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAgentModels } from '../../lib/agent-models';
@@ -162,10 +162,12 @@ export function ComposerAgentPicker({
             </Tabs.List>
             <Tabs.Content value="auto" className="agent-picker-pane">
               <PaneHeading title="Automatic" detail="Jackalope picks an agent and account" />
-              <OptionButton selected={current === 'auto'} onSelect={() => choose([])}>
-                <strong>Use Automatic</strong>
-                <small>Routes each message by your project’s Decisions setting.</small>
-              </OptionButton>
+              <Choice
+                selected={current === 'auto'}
+                onClick={() => choose([])}
+                title="Use Automatic"
+                description="Routes each message by your project’s Decisions setting."
+              />
             </Tabs.Content>
             {roster.map((agent) => (
               <Tabs.Content key={agent.id} value={agent.id} className="agent-picker-pane">
@@ -188,7 +190,7 @@ export function ComposerAgentPicker({
               {agents.map((agent) => {
                 const checked = selected.includes(agent.id) && (comparing || !!single);
                 return (
-                  <label key={agent.id} className="agent-picker-option agent-picker-check">
+                  <label key={agent.id} className="ui-choice agent-picker-check">
                     <input
                       type="checkbox"
                       checked={checked}
@@ -196,8 +198,8 @@ export function ComposerAgentPicker({
                       onChange={(event) => toggleCompared(agent.id, event.target.checked)}
                     />
                     <ProviderMark provider={agent.adapter} size={18} />
-                    <span className="agent-picker-copy">
-                      <strong>{agent.name}</strong>
+                    <span className="ui-choice-body">
+                      <span className="ui-choice-title">{agent.name}</span>
                     </span>
                   </label>
                 );
@@ -252,33 +254,6 @@ function PaneHeading({ title, detail }: { title: string; detail?: string }) {
   );
 }
 
-function OptionButton({
-  selected,
-  disabled,
-  onSelect,
-  children,
-}: {
-  selected: boolean;
-  disabled?: boolean;
-  onSelect: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      className="agent-picker-option"
-      aria-pressed={selected}
-      disabled={disabled}
-      onClick={onSelect}
-    >
-      <span className="agent-picker-copy">{children}</span>
-      <span className="agent-picker-indicator" aria-hidden="true">
-        {selected && <Check size={12} strokeWidth={3} />}
-      </span>
-    </button>
-  );
-}
-
 function AgentModelsPane({
   agent,
   project,
@@ -320,10 +295,12 @@ function AgentModelsPane({
         <p className="agent-picker-hint">{agent.unavailable}</p>
       ) : (
         <>
-          <OptionButton selected={selected && !model} onSelect={() => onChoose(null)}>
-            <strong>Default model</strong>
-            <small>{defaultName ? defaultName : 'Uses this agent’s own default'}</small>
-          </OptionButton>
+          <Choice
+            selected={selected && !model}
+            onClick={() => onChoose(null)}
+            title="Default model"
+            description={defaultName ? defaultName : 'Uses this agent’s own default'}
+          />
           {loading && <LoadingState compact label="Reading models…" />}
           {error && !loading && (
             <p className="agent-picker-hint">
@@ -331,21 +308,22 @@ function AgentModelsPane({
             </p>
           )}
           {models.map((item) => (
-            <OptionButton
+            <Choice
               key={item.id}
               selected={selected && model?.id === item.id}
-              onSelect={() => onChoose({ id: item.id, name: item.name })}
-            >
-              <strong>
-                {item.name}
-                {item.id === defaultId && (
-                  <Badge appearance="plain" className="agent-picker-default">
-                    default
-                  </Badge>
-                )}
-              </strong>
-              {item.name !== item.id && <small>{item.id}</small>}
-            </OptionButton>
+              onClick={() => onChoose({ id: item.id, name: item.name })}
+              title={
+                <>
+                  {item.name}
+                  {item.id === defaultId && (
+                    <Badge appearance="plain" className="agent-picker-default">
+                      default
+                    </Badge>
+                  )}
+                </>
+              }
+              description={item.name !== item.id ? item.id : undefined}
+            />
           ))}
         </>
       )}

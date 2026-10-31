@@ -182,6 +182,25 @@ pub(super) fn workspace_tree(run: &TaskRun, directory: &Path) -> Result<String, 
     Ok(snapshot(run, directory)?.tree)
 }
 
+/// Commits a task's current files, uncommitted work included, onto its base so another
+/// workspace can start from exactly that snapshot. Returns the tree and the commit.
+/// Call under the execution guard.
+pub(super) fn snapshot_commit(
+    run: &TaskRun,
+    directory: &Path,
+    message: &str,
+) -> Result<(String, String), String> {
+    let source = snapshot(run, directory)?;
+    let project = canonical(&run.project_path)?;
+    let parent = if run.base_head.is_empty() {
+        &source.head
+    } else {
+        &run.base_head
+    };
+    let commit = commit_tree(&project, &source.tree, &[parent], message)?;
+    Ok((source.tree, commit))
+}
+
 fn commit_tree(path: &Path, tree: &str, parents: &[&str], message: &str) -> Result<String, String> {
     let name = "Jackalope review";
     let email = "review@jackalope.invalid";

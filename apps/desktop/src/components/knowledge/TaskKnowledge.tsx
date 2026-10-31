@@ -57,6 +57,9 @@ export function TaskKnowledge({
     };
   }, [projectId, projectPath, prompt, signature]);
   const workflow = entries.find((e) => e.id === selection.workflowId);
+  const enforces = selection.enforcesLessonId
+    ? entries.find((e) => e.id === selection.enforcesLessonId)
+    : undefined;
   const workflows = entries.filter((e) => e.kind === 'workflow' && e.enabled);
   const Container = embedded ? 'section' : 'details';
   const Heading = embedded ? 'div' : 'summary';
@@ -64,8 +67,26 @@ export function TaskKnowledge({
     <Container className="task-knowledge">
       <Heading className="task-knowledge-heading">
         Saved project context{receipt ? ` · ${receipt.entries.length} included` : ''}
+        {selection.enforcesLessonId ? ' · makes a lesson a check' : ''}
       </Heading>
       <div className="task-knowledge-body">
+        {selection.enforcesLessonId && (
+          <InlineNotice
+            action={
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => onChange({ ...selection, enforcesLessonId: null })}
+              >
+                Unlink lesson
+              </Button>
+            }
+          >
+            {enforces
+              ? `Makes “${enforces.title}” a check. Accepting the result marks the lesson enforced.`
+              : 'The lesson this task would enforce is no longer saved.'}
+          </InlineNotice>
+        )}
         {allowWorkflows && (
           <label className="task-knowledge-field" htmlFor="task-workflow">
             <span>Workflow</span>

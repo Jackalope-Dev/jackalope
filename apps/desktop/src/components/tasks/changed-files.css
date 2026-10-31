@@ -1,6 +1,6 @@
 .changed-files {
   display: grid;
-  grid-template-columns: clamp(150px, 20%, 240px) minmax(0, 1fr);
+  grid-template-columns: var(--changed-files-width, clamp(150px, 20%, 240px)) auto minmax(0, 1fr);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -37,8 +37,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: var(--control-height, 36px);
+  height: var(--control-height, 36px);
   flex: none;
   cursor: pointer;
 }
@@ -47,7 +47,7 @@
   align-items: start;
   gap: 8px;
   width: 100%;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 10px 8px;
   border-radius: var(--radius-xs);
   text-align: left;
@@ -84,7 +84,15 @@
 .changed-files-diff > p {
   padding: 16px;
 }
+/* Overlaps the list's border so the handle adds no width. */
+.changed-files-resizer {
+  margin-inline: -6px;
+  z-index: 1;
+}
 @container (max-width: 620px) {
+  .changed-files-resizer {
+    display: none;
+  }
   .changed-files-list {
     grid-column: 1 / -1;
     max-height: 190px;

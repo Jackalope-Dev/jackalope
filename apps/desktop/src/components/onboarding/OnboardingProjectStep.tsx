@@ -1,5 +1,5 @@
-import { Badge, Input, SegmentedControl } from '@jackalope/ui';
-import { ArrowRight, FolderOpen, FolderPlus } from 'lucide-react';
+import { Input, SegmentedControl } from '@jackalope/ui';
+import { ArrowRight, Cloud, FolderOpen, FolderPlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
   type ArtifactsStatus,
@@ -14,6 +14,7 @@ import type { Project } from '../../stores/projectStore';
 import { ArtifactsConnectForm } from '../settings/ArtifactsConnection';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
+import { ProjectPreview } from './ProjectPreview';
 
 /** Open an existing repository, or create a new project folder locally or backed by Cloudflare Artifacts. */
 export function OnboardingProjectStep({
@@ -64,32 +65,39 @@ export function OnboardingProjectStep({
   const needsConnection = projectMode === 'artifacts' && !artifacts?.connected;
   return (
     <>
-      <fieldset className="onboarding-project-options" aria-label="Project setup">
-        <Button
-          variant={projectMode === 'existing' ? 'primary' : 'outline'}
-          aria-pressed={projectMode === 'existing'}
-          disabled={busy}
-          onClick={() => {
-            setProjectMode('existing');
+      <div className="onboarding-project-options">
+        <SegmentedControl
+          label="Project setup"
+          value={creating ? 'create' : 'existing'}
+          onChange={(choice) => {
+            if (choice === 'existing') setProjectMode('existing');
+            else if (!creating) setProjectMode('new');
             clearError();
           }}
-        >
-          <FolderOpen size={16} />
-          Open existing
-        </Button>
-        <Button
-          variant={creating ? 'primary' : 'outline'}
-          aria-pressed={creating}
-          disabled={busy}
-          onClick={() => {
-            if (!creating) setProjectMode('new');
-            clearError();
-          }}
-        >
-          <FolderPlus size={16} />
-          Create new project
-        </Button>
-      </fieldset>
+          items={[
+            {
+              id: 'existing',
+              label: (
+                <>
+                  <FolderOpen size={16} aria-hidden="true" />
+                  Open existing
+                </>
+              ),
+              disabled: busy,
+            },
+            {
+              id: 'create',
+              label: (
+                <>
+                  <FolderPlus size={16} aria-hidden="true" />
+                  Create new project
+                </>
+              ),
+              disabled: busy,
+            },
+          ]}
+        />
+      </div>
       {creating && (
         <div className="onboarding-project-storage">
           <span className="task-label" aria-hidden="true">
@@ -108,7 +116,7 @@ export function OnboardingProjectStep({
                 id: 'artifacts',
                 label: (
                   <>
-                    Cloudflare Artifacts <Badge variant="accent">Beta</Badge>
+                    Cloudflare Artifacts <span className="onboarding-beta">Beta</span>
                   </>
                 ),
                 disabled: busy,
@@ -129,13 +137,17 @@ export function OnboardingProjectStep({
         </InlineNotice>
       )}
       {desktop && needsConnection && artifacts && (
-        <>
-          <p className="onboarding-note">
-            Cloudflare Artifacts stores your project as a Git repository built for many agents
-            working at once. Connect your Cloudflare account to continue.
-          </p>
-          <ArtifactsConnectForm className="space-y-3" disabled={busy} onConnected={setArtifacts} />
-        </>
+        <section className="onboarding-artifacts" aria-labelledby="onboarding-artifacts-heading">
+          <h3 id="onboarding-artifacts-heading">
+            <Cloud size={16} aria-hidden="true" />
+            Connect your Cloudflare account
+          </h3>
+          <ArtifactsConnectForm
+            className="onboarding-artifacts-connect"
+            disabled={busy}
+            onConnected={setArtifacts}
+          />
+        </section>
       )}
       <form
         hidden={needsConnection}
@@ -264,6 +276,7 @@ export function OnboardingProjectStep({
                 Browse
               </Button>
             </div>
+            <ProjectPreview path={path} />
           </>
         )}
         <div className="onboarding-actions">

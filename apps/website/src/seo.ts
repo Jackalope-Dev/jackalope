@@ -1,4 +1,5 @@
 import { guideMarkdown, knowledgeFiles } from '@jackalope/knowledge';
+import benchmarks from './benchmark-summary.json' with { type: 'json' };
 import { serializeBlogPost } from './blog-types.ts';
 import { company, normalizePath, pages, posts, siteOrigin, tour, updates } from './content.ts';
 import { knowledgeGuides } from './knowledge-content.ts';
@@ -12,6 +13,11 @@ const escapeHtml = (value: string) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] ||
       character,
   );
+/** The share image; bump the version when the image changes so link previews refetch it. */
+const SOCIAL_IMAGE = '/social-preview.png?v=2';
+const SOCIAL_IMAGE_ALT =
+  'Jackalope: Run your agents side by side. Codex, Claude Code, Gemini CLI and more, each in its own Git worktree.';
+
 export const routes = pages.map((page) => page.path);
 const indexablePages = pages.filter((page) => !page.noindex);
 
@@ -90,7 +96,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
             dateModified: comparison.reviewed,
             author: { '@id': `${origin}/#organization` },
             publisher: { '@id': `${origin}/#organization` },
-            image: `${origin}/social-preview.png`,
+            image: `${origin}${SOCIAL_IMAGE}`,
             mainEntityOfPage: url,
             citation: comparison.sources.map((source) => source.href),
             about: [
@@ -108,14 +114,14 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
               dateModified: post.updated ?? post.date,
               author: { '@type': 'Organization', name: company.name, url: company.url },
               publisher: { '@id': `${origin}/#organization` },
-              image: `${origin}/social-preview.png`,
+              image: `${origin}${SOCIAL_IMAGE}`,
               mainEntityOfPage: url,
             }
           : isArticle
             ? {
                 author: { '@type': 'Organization', name: company.name, url: company.url },
                 publisher: { '@id': `${origin}/#organization` },
-                image: `${origin}/social-preview.png`,
+                image: `${origin}${SOCIAL_IMAGE}`,
                 mainEntityOfPage: url,
               }
             : {}),
@@ -129,7 +135,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
       url: origin,
       applicationCategory: 'DeveloperApplication',
       description,
-      image: `${origin}/social-preview.png`,
+      image: `${origin}${SOCIAL_IMAGE}`,
       featureList: [
         'Parallel coding-agent tasks',
         'Isolated Git worktrees',
@@ -222,16 +228,16 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
     `<meta property="og:title" content="${escapeHtml(title)}" />`,
     `<meta property="og:description" content="${escapeHtml(description)}" />`,
     `<meta property="og:url" content="${escapeHtml(url)}" />`,
-    `<meta property="og:image" content="${origin}/social-preview.png" />`,
+    `<meta property="og:image" content="${origin}${SOCIAL_IMAGE}" />`,
     `<meta property="og:image:width" content="1200" />`,
     `<meta property="og:image:height" content="630" />`,
-    `<meta property="og:image:alt" content="Jackalope: Many agents. One workspace. Run coding agents in parallel, keep project context, and review changes." />`,
+    `<meta property="og:image:alt" content="${SOCIAL_IMAGE_ALT}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:site" content="@JackalopeDotDev" />`,
-    `<meta name="twitter:image:alt" content="Jackalope: A desktop workspace for parallel coding agents and code review." />`,
+    `<meta name="twitter:image:alt" content="${SOCIAL_IMAGE_ALT}" />`,
     `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
     `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
-    `<meta name="twitter:image" content="${origin}/social-preview.png" />`,
+    `<meta name="twitter:image" content="${origin}${SOCIAL_IMAGE}" />`,
     ...(post
       ? [
           `<meta property="article:published_time" content="${post.date}T12:00:00Z" />`,
@@ -308,7 +314,7 @@ export function discoveryFiles(origin = siteOrigin, env: Record<string, string |
     'robots.txt': `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`,
     'sitemap.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${publicPages.map((page) => `<url><loc>${escapeHtml(origin + page.path)}</loc>${lastModified(page.path) ? `<lastmod>${lastModified(page.path)}</lastmod>` : ''}</url>`).join('')}</urlset>`,
     'llms.txt': `${intro}## Agent support\n\nNative task adapters: Codex, Claude Code, Grok Build, OpenCode, Kimi Code, Gemini CLI, and Antigravity. Direct project MCP connections support Codex, Claude Code, OpenCode, and Kimi Code; all seven adapters support on-demand discovery. Kimi supports named accounts, model selection, structured questions, task tokens, membership quota, routing, and Ask Jackalope. Antigravity is worker-only; its current model and subscription quota use read-only CLI commands. Named profiles use Gemini API keys with separate billing, while subscription login is shared. Gemini CLI runs worker tasks with session continuation and file-edit approval; shell and HTTP tools follow its own permission policy. Its quota is unknown, and it does not coordinate routing or Ask Jackalope. Installed-provider acceptance remains open. Provider access and reported usage vary by adapter. See ${origin}/agents/ for coverage and limits and ${origin}/agents/kimi-code/ for Kimi setup.\n\n## Knowledgebase & Diagnostics\n\n- [Agent-readable documentation index](${origin}/knowledge/llms.txt)\n- [Ask Jackalope and local MCP tools](${origin}/knowledge/ask-jackalope/index.md)\n\nOfficial documentation, architecture guides, and troubleshooting recipes are available at ${origin}/knowledge/:\n- Isolated Git Worktree Architecture: Preventing checkout collisions across parallel agents\n- Task Routing & Quota Handoff: Reported quota windows, preflight headroom estimates, and up to three handoffs\n- Multi-Account Profiles: Segregating Work and Personal agent provider sign-ins\n- MCP Tools & Built-In Browser Automation: Central Model Context Protocol management\n- Diagnostic Playbook: Resolving missing CLI PATH, expired tokens, and worktree lock errors\n\n## Pages\n\n${links}\n\n## Optional\n\n- [Full text](${origin}/llms-full.txt)\n- [RSS feed](${origin}/feed.xml)\n`,
-    'llms-full.txt': `${intro}${marketingPages.map((page) => marketingPageText(page, origin)).join('\n\n')}\n\n# Jackalope Knowledgebase & Documentation\n${origin}/knowledge/\n\n${knowledgeGuides.map((guide) => guideMarkdown(guide, origin)).join('\n\n')}\n\n${posts.map((post) => `# ${post.title}\n${origin}/blog/${post.slug}/\nPublished ${post.date} by ${company.name}.${post.updated ? ` Updated ${post.updated}.` : ''}\n\n${serializeBlogPost(post)}`).join('\n\n')}\n\n# Changelog\n\n${updates.map((update) => `## ${update.date}: ${update.title} (${update.status})\n\n${update.description}\n${update.items.map((item) => `- ${item}`).join('\n')}\n\n${update.note ?? ''}`).join('\n\n')}\n`,
+    'llms-full.txt': `${intro}${marketingPages.map((page) => marketingPageText(page, origin)).join('\n\n')}\n\n# ${tour.title}\n${origin}/tour/\n\n${tour.description}\n\nTranscript: ${tour.transcript}\n\n# Agent performance benchmarks\n${origin}/benchmarks/\n\nMeasured ${benchmarks.date} across ${benchmarks.agentTrials} agent trials. ${benchmarks.environment.scope}.\n\n${[...benchmarks.comparisons, ...benchmarks.experiments].map((entry) => `## ${entry.title}\n\n${entry.detail}`).join('\n\n')}\n\n# Jackalope Knowledgebase & Documentation\n${origin}/knowledge/\n\n${knowledgeGuides.map((guide) => guideMarkdown(guide, origin)).join('\n\n')}\n\n${posts.map((post) => `# ${post.title}\n${origin}/blog/${post.slug}/\nPublished ${post.date} by ${company.name}.${post.updated ? ` Updated ${post.updated}.` : ''}\n\n${serializeBlogPost(post)}`).join('\n\n')}\n\n# Changelog\n${origin}/changelog/\n\n${updates.map((update) => `## ${update.date}: ${update.title} (${update.status})\n\n${update.description}\n${update.items.map((item) => `- ${item}`).join('\n')}\n\n${update.note ?? ''}`).join('\n\n')}\n`,
     'feed.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Jackalope field notes</title><link>${origin}/blog/</link><description>Notes from the Jackalope studio.</description><language>en</language><atom:link href="${origin}/feed.xml" rel="self" type="application/rss+xml"/>${posts.map((post) => `<item><title>${escapeHtml(post.title)}</title><link>${origin}/blog/${post.slug}/</link><guid isPermaLink="true">${origin}/blog/${post.slug}/</guid><pubDate>${new Date(`${post.date}T12:00:00Z`).toUTCString()}</pubDate><description>${escapeHtml(post.description)}</description></item>`).join('')}</channel></rss>`,
     'site.webmanifest': JSON.stringify({
       name: 'Jackalope',

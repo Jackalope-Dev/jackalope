@@ -164,19 +164,25 @@ fn stale_drafts_do_not_overwrite_other_windows_or_new_typing() {
 }
 
 #[test]
-fn restart_pauses_dispatch_and_preserves_unclaimed_messages() {
+fn restart_keeps_saved_pause_state_and_unclaimed_messages() {
     let (_root, service, id) = fixture();
     service
         .send(&id, Uuid::new_v4().to_string(), "Fix focus".into(), None)
         .unwrap();
-    let restored = LiveSessions::new(
-        service.path.clone(),
-        service.runtime.clone(),
-        service.coordinator.clone(),
-    );
-    let snapshot = restored.snapshot(None).unwrap();
-    assert!(snapshot.sessions[0].paused);
+    let restore = || {
+        LiveSessions::new(
+            service.path.clone(),
+            service.runtime.clone(),
+            service.coordinator.clone(),
+        )
+    };
+    let snapshot = restore().snapshot(None).unwrap();
+    assert!(!snapshot.sessions[0].paused);
+    assert!(snapshot.sessions[0].error.is_none());
     assert!(snapshot.sessions[0].messages[0].run_id.is_none());
+    service.action(&id, "pause", None).unwrap();
+    let restored = restore();
+    assert!(restored.snapshot(None).unwrap().sessions[0].paused);
     assert!(!restored.tick().unwrap());
 }
 

@@ -380,7 +380,7 @@
   border-top: 1px solid var(--color-border);
 }
 .local-ai-dialog button {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }
 .local-ai-entry:focus-visible,
 .local-ai-model:focus-within {

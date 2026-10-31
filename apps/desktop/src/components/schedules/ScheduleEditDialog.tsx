@@ -235,7 +235,10 @@ export function ScheduleEditDialog({
                       placeholder="America/Denver"
                     />
                   </FormField>
-                  <FormField label="After missed runs">
+                  <FormField
+                    label="After missed runs"
+                    description="Overlapping or interrupted runs are skipped and failed starts are not retried. Pausing keeps active runs."
+                  >
                     <Select
                       id="schedule-missed"
                       value={editing.missed}

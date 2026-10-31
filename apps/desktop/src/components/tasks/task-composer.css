@@ -35,7 +35,7 @@
 }
 .composer-customization > summary {
   width: fit-content;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 12px 0;
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
@@ -98,7 +98,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
@@ -253,8 +253,6 @@
   padding: 4px;
   margin: -4px;
   border-radius: 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border) transparent;
   scroll-padding: 12px;
 }
 .capture-dialog > details,
@@ -367,7 +365,7 @@
 .composer-outcomes > summary {
   display: list-item;
   width: fit-content;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 12px 0;
   color: var(--color-text-secondary);
   font-size: var(--text-sm);

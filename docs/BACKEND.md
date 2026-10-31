@@ -10,6 +10,8 @@ The coordination bridge binds to loopback. It is not a remote execution server
 and must not be exposed by changing its bind address. See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 apps/server implements Cloudflare ingestion with D1 and private R2 update serving.
+Its account service also stores optional settings sync and opt-in learned-lesson sync
+for approved desktops; see [settings sync](SETTINGS-SYNC.md).
 Deployment state is operator-specific and belongs in private records. Public
 configuration is local/example configuration; remote operations explicitly select
 wrangler.deploy.jsonc. See [SERVER-LAUNCH.md](SERVER-LAUNCH.md) and

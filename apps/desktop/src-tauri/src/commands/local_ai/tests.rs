@@ -27,6 +27,15 @@ fn download_events_reject_invalid_data_and_accept_unterminated_success() {
 }
 
 #[test]
+fn download_explains_an_outdated_ollama() {
+    let error = DownloadProgress::default()
+        .consume(&json!({"error":"model requires ollama version v0.40.8 or newer (current version is v0.40.3)"}))
+        .err()
+        .unwrap();
+    assert!(error.contains("newer Ollama"));
+}
+
+#[test]
 fn check_folder_cleanup_only_removes_the_owned_child() {
     let parent = std::env::temp_dir().join(format!(
         "jackalope-local-check-test-{}",

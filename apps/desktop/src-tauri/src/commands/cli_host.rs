@@ -235,12 +235,103 @@ fn ensure_project(app: &AppHandle, path: &str) -> Result<protocol::Project, Stri
         use tauri::Emitter;
         let _ = app.emit("jackalope:projects-registered", ());
     }
-    Ok(protocol::Project {
+    Ok(project_summary(&runtime, record))
+}
+
+fn project_summary(
+    runtime: &TaskRuntime,
+    record: super::project_registry::ProjectRecord,
+) -> protocol::Project {
+    let settings = record.settings();
+    let planning = super::planning::session::store_for(runtime).settings(&record.id);
+    protocol::Project {
         id: record.id,
         name: record.name,
         path: record.path,
         accent: record.accent,
+        auto_approve: Some(settings.auto_approve),
+        workspace_mode: Some(settings.workspace_mode.as_str().into()),
+        learn_automatically: Some(settings.learn_automatically),
+        learning_cadence: Some(settings.learning_cadence),
+        sync_lessons: Some(settings.sync_lessons),
+        agent_reflection: Some(settings.agent_reflection),
+        export_lessons: Some(settings.export_lessons),
+        verify_command: record
+            .verify_command
+            .filter(|command| !command.trim().is_empty()),
+        auto_verify: record.auto_verify,
+        question_cap: Some(planning.question_cap as u32),
+        planner_agent: planning.planner_agent.filter(|agent| !agent.is_empty()),
+        preview_command: record
+            .preview_command
+            .filter(|command| !command.trim().is_empty()),
+        review_captures: Some(record.review_captures.unwrap_or(true)),
+    }
+}
+
+/// A registered project's folder, which knowledge is scoped by.
+fn project_path(runtime: &TaskRuntime, project_id: &str) -> Result<String, String> {
+    super::project_registry::list(runtime)
+        .into_iter()
+        .find(|project| project.id == project_id)
+        .map(|project| project.path)
+        .ok_or_else(|| "That project is not registered.".into())
+}
+
+fn learning_summary(entry: &super::knowledge::KnowledgeEntry) -> Option<protocol::Learning> {
+    let source = entry.automatic.as_ref()?;
+    let state = source.lifecycle.as_ref()?;
+    Some(protocol::Learning {
+        id: entry.id.clone(),
+        title: entry.title.clone(),
+        content: entry.content.clone(),
+        status: state.status.clone(),
+        kind: source.kind.clone(),
+        uses: state.deliveries,
+        managed: source.managed,
+        updated_at: entry.updated_at.clone(),
+        archived_reason: state.archived_reason.clone(),
+        misses: (state.misses > 0).then_some(state.misses),
+        attention: super::knowledge::learning::attention(entry),
+        enforced: entry
+            .enforced
+            .as_ref()
+            .map(|enforcement| enforcement.by.clone()),
     })
+}
+
+fn learning_detail(
+    runtime: &TaskRuntime,
+    project_id: &str,
+    entry: &super::knowledge::KnowledgeEntry,
+) -> Result<Response, String> {
+    let learning = learning_summary(entry).ok_or("That is not a learned lesson.")?;
+    let history = runtime
+        .knowledge
+        .history(project_id, &entry.id, 8)
+        .into_iter()
+        .map(|record| protocol::LearningEvent {
+            at: record.at,
+            action: record.action,
+            reason: record.reason,
+            evidence: record.evidence,
+        })
+        .collect();
+    Ok(Response::Learning { learning, history })
+}
+
+fn learned_entry(
+    runtime: &TaskRuntime,
+    project_id: &str,
+    entry_id: &str,
+) -> Result<super::knowledge::KnowledgeEntry, String> {
+    let path = project_path(runtime, project_id)?;
+    runtime
+        .knowledge
+        .list(project_id, &path)?
+        .into_iter()
+        .find(|entry| entry.id == entry_id)
+        .ok_or_else(|| "That lesson no longer exists.".into())
 }
 
 /// The conversation as turns: each batch of messages, then what the agent
@@ -258,6 +349,7 @@ fn transcript(session: &LiveSession, runs: &[TaskRun]) -> Vec<protocol::Message>
             text: message.text.clone(),
             sent: message.run_id.is_some(),
             attempt: None,
+            id: Some(message.id.clone()),
         });
         // A reply follows the last message its run carried.
         let Some(run_id) = &message.run_id else {
@@ -278,6 +370,7 @@ fn transcript(session: &LiveSession, runs: &[TaskRun]) -> Vec<protocol::Message>
                     text: run.result.clone(),
                     sent: true,
                     attempt: numbered.then_some(number),
+                    id: None,
                 });
             }
         }
@@ -307,11 +400,15 @@ fn attempts<'a>(run_id: &str, runs: &'a [TaskRun]) -> Vec<&'a TaskRun> {
 const ACTIVITY_TAIL: usize = 12;
 
 /// Projects the newest attempt in a conversation into what a terminal renders.
-fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionView {
-    let run = runs
-        .iter()
+/// The conversation's most recently started run.
+fn latest_run<'a>(session: &LiveSession, runs: &'a [TaskRun]) -> Option<&'a TaskRun> {
+    runs.iter()
         .filter(|run| run.live_session_id.as_deref() == Some(session.id.as_str()))
-        .max_by(|left, right| left.started_at.cmp(&right.started_at));
+        .max_by(|left, right| left.started_at.cmp(&right.started_at))
+}
+
+fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionView {
+    let run = latest_run(session, runs);
     let decision = run
         .and_then(|run| run.routing.as_ref())
         .and_then(|routing| routing.decisions.last());
@@ -332,6 +429,9 @@ fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionVie
         error,
         messages: transcript(session, runs),
         run_id: run.map(|run| run.id.clone()),
+        merged: run.is_some_and(|run| session.integrated_run_id.as_deref() == Some(&run.id)),
+        draft: session.draft.text.clone(),
+        draft_revision: session.draft.revision,
         status: run.map(|run| run.status.clone()),
         agent: run.map(|run| run.agent.clone()),
         account: run.map(|run| run.account.clone()),
@@ -348,24 +448,36 @@ fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionVie
             .map(|progress| progress.attempt),
         workspace: run.map(|run| run.workspace.clone()),
         branch: run.map(|run| run.branch.clone()),
-        result: run.map(|run| run.result.clone()).unwrap_or_default(),
+        // Streamed text stands in for the output until the message completes.
+        result: run
+            .map(|run| {
+                if run.result.is_empty() {
+                    run.streaming.clone()
+                } else {
+                    run.result.clone()
+                }
+            })
+            .unwrap_or_default(),
         activity: run
             .map(|run| {
                 let skip = run.activity.len().saturating_sub(ACTIVITY_TAIL);
                 run.activity[skip..].to_vec()
             })
             .unwrap_or_default(),
+        partial: run
+            .filter(|run| run.result.is_empty() && protocol::working(Some(&run.status)))
+            .map(|run| run.streaming.clone())
+            .unwrap_or_default(),
+        review_screenshots: run
+            .and_then(|run| run.review_captures.as_ref())
+            .map(|captures| captures.image_count() as u32)
+            .filter(|count| *count > 0),
         questions: run
             .map(|run| {
                 run.prompts
                     .iter()
                     .filter(|prompt| prompt.status == "pending")
-                    .map(|prompt| protocol::Question {
-                        id: prompt.id.clone(),
-                        run_id: prompt.run_id.clone(),
-                        question: prompt.question.clone(),
-                        options: prompt.options.clone(),
-                    })
+                    .map(super::planning::cli::question)
                     .collect()
             })
             .unwrap_or_default(),
@@ -379,12 +491,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             Ok(Response::Projects {
                 projects: super::project_registry::list(&runtime)
                     .into_iter()
-                    .map(|record| protocol::Project {
-                        id: record.id,
-                        name: record.name,
-                        path: record.path,
-                        accent: record.accent,
-                    })
+                    .map(|record| project_summary(&runtime, record))
                     .collect(),
             })
         }
@@ -410,6 +517,10 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                         .count(),
                     error: protocol::present(session.error.as_deref()).map(str::to_string),
                     updated_at: session.updated_at.clone(),
+                    status: latest_run(session, &snapshot.runs).map(|run| run.status.clone()),
+                    asking: latest_run(session, &snapshot.runs).is_some_and(|run| {
+                        run.prompts.iter().any(|prompt| prompt.status == "pending")
+                    }),
                 })
                 .collect();
             open.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
@@ -440,6 +551,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 "model": model.filter(|model| !model.trim().is_empty()),
                 "prompt": "",
                 "isolated": true,
+                "workspaceMode": super::project_registry::settings(&app.state::<TaskRuntime>(), &project.id).workspace_mode,
                 "previousRunId": null,
             }))
             .map_err(|error| error.to_string())?;
@@ -461,10 +573,30 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             )?;
             Ok(Response::Started { session_id })
         }
-        Request::Send { session_id, text } => {
+        Request::Send {
+            session_id,
+            text,
+            draft_revision,
+        } => {
             let sessions = app.state::<LiveSessions>();
-            sessions.send(&session_id, uuid::Uuid::new_v4().to_string(), text, None)?;
+            sessions.send(
+                &session_id,
+                uuid::Uuid::new_v4().to_string(),
+                text,
+                draft_revision,
+            )?;
             Ok(Response::Ok)
+        }
+        Request::Draft {
+            session_id,
+            text,
+            revision,
+        } => {
+            let sessions = app.state::<LiveSessions>();
+            let draft = sessions.draft(&session_id, text, revision)?;
+            Ok(Response::Draft {
+                revision: draft.revision,
+            })
         }
         Request::SessionDetail { session_id } => {
             let sessions = app.state::<LiveSessions>();
@@ -480,9 +612,13 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 session: Box::new(session_view(session, &snapshot.runs)),
             })
         }
-        Request::SessionAction { session_id, action } => {
+        Request::SessionAction {
+            session_id,
+            action,
+            message_id,
+        } => {
             let sessions = app.state::<LiveSessions>();
-            sessions.action(&session_id, &action, None)?;
+            sessions.action(&session_id, &action, message_id.as_deref())?;
             Ok(Response::Ok)
         }
         Request::Answer {
@@ -505,9 +641,14 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             let mut tasks = runtime.subscribe();
             let mut conversations = sessions.subscribe();
             let mut projects = super::project_registry::subscribe();
-            // Include project preferences so idle terminals receive saved theme changes.
+            let mut plans = super::planning::store::subscribe();
+            // Include project preferences so idle terminals receive saved theme
+            // changes, and plans so a plan decided in the app reaches the panel.
             let revision = |runtime: &TaskRuntime, sessions: &LiveSessions| {
-                runtime.revision() + sessions.revision() + super::project_registry::revision()
+                runtime.revision()
+                    + sessions.revision()
+                    + super::project_registry::revision()
+                    + super::planning::store::revision()
             };
             let current = revision(&runtime, &sessions);
             if current != since {
@@ -520,6 +661,7 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                     _ = tasks.changed() => {}
                     _ = conversations.changed() => {}
                     _ = projects.changed() => {}
+                    _ = plans.changed() => {}
                 }
             })
             .await;
@@ -654,6 +796,69 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
             );
             Ok(Response::Ok)
         }
+        Request::SetProjectSettings {
+            project_id,
+            auto_approve,
+            workspace_mode,
+            learn_automatically,
+            learning_cadence,
+            sync_lessons,
+            agent_reflection,
+            export_lessons,
+            question_cap,
+            planner_agent,
+            review_captures,
+        } => {
+            use tauri::Emitter;
+            let mode = workspace_mode
+                .as_deref()
+                .map(|mode| {
+                    super::tasks::WorkspaceMode::parse(mode)
+                        .ok_or("Choose worktree, branch, current or ask.")
+                })
+                .transpose()?;
+            let runtime = app.state::<TaskRuntime>();
+            let record = super::project_registry::set_settings(
+                &runtime,
+                &project_id,
+                auto_approve,
+                mode,
+                super::project_registry::LearningSettings {
+                    automatic: learn_automatically,
+                    cadence: learning_cadence,
+                    sync: sync_lessons,
+                    agent: agent_reflection,
+                    export: export_lessons,
+                },
+            )?;
+            if question_cap.is_some() || planner_agent.is_some() {
+                let store = super::planning::session::store_for(&runtime);
+                let mut planning = store.settings(&project_id);
+                if let Some(cap) = question_cap {
+                    planning.question_cap = cap as usize;
+                }
+                if let Some(agent) = planner_agent {
+                    let agent = agent.trim().to_string();
+                    if agent.is_empty() || planning.planner_agent.as_deref() != Some(&agent) {
+                        // A planning model belongs to the planning agent.
+                        planning.planner_model = None;
+                    }
+                    planning.planner_agent = Some(agent).filter(|agent| !agent.is_empty());
+                }
+                store.save_settings(&project_id, planning)?;
+            }
+            let record = match review_captures {
+                Some(enabled) => {
+                    super::project_registry::set_review_captures(&runtime, &project_id, enabled)?
+                }
+                None => record,
+            };
+            // The app adopts registry settings when it merges the registry.
+            let _ = app.emit("jackalope:projects-registered", ());
+            Ok(Response::Project {
+                project: project_summary(&runtime, record),
+            })
+        }
         Request::SessionLearn { session_id } => {
             let sessions = app.state::<LiveSessions>();
             let runtime = app.state::<TaskRuntime>();
@@ -665,11 +870,71 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 message: result.message,
             })
         }
+        Request::Sharpen {
+            text,
+            project_id,
+            project_name,
+        } => {
+            let helper = app.state::<super::helper::Helper>().inner().clone();
+            let text = tauri::async_runtime::spawn_blocking(move || {
+                helper.sharpen(
+                    &text,
+                    None,
+                    project_id,
+                    project_name,
+                    &std::sync::atomic::AtomicBool::new(false),
+                )
+            })
+            .await
+            .map_err(|error| error.to_string())??;
+            Ok(Response::Sharpened { text })
+        }
+        Request::Learnings { project_id } => {
+            let runtime = app.state::<TaskRuntime>();
+            let path = project_path(&runtime, &project_id)?;
+            let mut learnings: Vec<_> = runtime
+                .knowledge
+                .list(&project_id, &path)?
+                .iter()
+                .filter_map(learning_summary)
+                .collect();
+            // Available lessons first, most used first.
+            learnings.sort_by(|a, b| {
+                (a.status == "archived")
+                    .cmp(&(b.status == "archived"))
+                    .then(b.uses.cmp(&a.uses))
+                    .then(b.updated_at.cmp(&a.updated_at))
+            });
+            Ok(Response::Learnings { learnings })
+        }
+        Request::Learning {
+            project_id,
+            entry_id,
+        } => {
+            let runtime = app.state::<TaskRuntime>();
+            let entry = learned_entry(&runtime, &project_id, &entry_id)?;
+            learning_detail(&runtime, &project_id, &entry)
+        }
+        Request::SetLearningArchived {
+            project_id,
+            entry_id,
+            archived,
+        } => {
+            let runtime = app.state::<TaskRuntime>();
+            let entry = learned_entry(&runtime, &project_id, &entry_id)?;
+            let saved = runtime
+                .knowledge
+                .set_archived(&entry.id, entry.revision, archived)?;
+            learning_detail(&runtime, &project_id, &saved)
+        }
         Request::MergePrepare {
             session_id,
             message,
         } => {
             let run = reviewable_run(app, &session_id)?;
+            if let Some(reason) = in_place_delivery(&run, &session_id) {
+                return Err(reason);
+            }
             let plan = super::integration::integration_prepare(
                 app.state(),
                 app.state(),
@@ -726,6 +991,167 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                     .await?;
             Ok(Response::PullRequest { url })
         }
+        Request::BrowserProfile {
+            project_id,
+            action,
+            url,
+        } => {
+            use super::browser_profiles as profiles;
+            let runtime = app.state::<TaskRuntime>();
+            let root = runtime.browser_profiles_root();
+            super::project_registry::record(&runtime, &project_id)
+                .ok_or("That project is not registered.")?;
+            let profile = tauri::async_runtime::spawn_blocking(move || {
+                let found = profiles::find(&root, "project", &project_id);
+                let profile = match action.as_str() {
+                    "" => found,
+                    "open" => {
+                        let profile =
+                            profiles::ensure(&root, "project", &project_id, "Project browser")?;
+                        profiles::open_window(&root, &profile, url.as_deref())?;
+                        profiles::find(&root, "project", &project_id)
+                    }
+                    "done" => {
+                        if let Some(profile) = &found {
+                            profiles::close_window(&root, &profile.id)?;
+                        }
+                        profiles::find(&root, "project", &project_id)
+                    }
+                    _ => return Err("Use open or done.".to_string()),
+                };
+                Ok::<_, String>(profile.map(|profile| {
+                    let status = profiles::status(&root, profile);
+                    protocol::BrowserProfileView {
+                        name: status.profile.name,
+                        sites: status.profile.signed_in_sites,
+                        size_bytes: status.size_bytes,
+                        last_used_at: status.profile.last_used_at,
+                        in_use: status.in_use,
+                        window_open: status.window_open,
+                    }
+                }))
+            })
+            .await
+            .map_err(|e| e.to_string())??;
+            Ok(Response::BrowserProfile { profile })
+        }
+        Request::Computer { session_id, action } => {
+            use super::computers;
+            let runtime = app.state::<TaskRuntime>().inner().clone();
+            let root = runtime.computers_root();
+            let sessions = app.state::<LiveSessions>();
+            let computer = match sessions.persona(&session_id) {
+                Some(persona) => computers::find(&root, "bot", &persona.bot_id),
+                None => runtime
+                    .integration_runs()?
+                    .into_iter()
+                    .filter(|run| run.live_session_id.as_deref() == Some(session_id.as_str()))
+                    .max_by(|left, right| left.started_at.cmp(&right.started_at))
+                    .and_then(|run| computers::find(&root, "task", &run.task_id)),
+            };
+            let Some(computer) = computer else {
+                return Ok(Response::Computer { computer: None });
+            };
+            let status = tauri::async_runtime::spawn_blocking(move || {
+                computers::usage::refresh_run_leases(&runtime);
+                match action.as_str() {
+                    "" => {}
+                    "start" => computers::start_background(root.clone(), computer.clone())?,
+                    "stop" => computers::stop(&root, &computer)?,
+                    _ => return Err("Use start or stop.".to_string()),
+                }
+                Ok::<_, String>(computers::status(&root, computer))
+            })
+            .await
+            .map_err(|e| e.to_string())??;
+            Ok(Response::Computer {
+                computer: Some(protocol::ComputerView {
+                    name: status.computer.name,
+                    provider: status.computer.provider,
+                    state: status.state,
+                    phase: status.phase,
+                    error: status.error,
+                    usage: status.usage,
+                    stopped_idle: status.stopped_idle,
+                }),
+            })
+        }
+        Request::PlanStart {
+            project_path,
+            goal,
+            agent,
+        } => {
+            let project = ensure_project(app, &project_path)?;
+            let runtime = app.state::<TaskRuntime>();
+            let policy = runtime.policy()?;
+            let default_agent = policy
+                .projects
+                .get(&project.id)
+                .and_then(|project| project.preferred_runner.clone())
+                .filter(|agent| !agent.is_empty())
+                .unwrap_or_else(|| policy.default_meta_agent.clone());
+            let template: super::tasks::RunRequest = serde_json::from_value(serde_json::json!({
+                "id": format!("plan-{}", uuid::Uuid::new_v4().simple()),
+                "projectId": project.id,
+                "projectName": project.name,
+                "projectPath": project.path,
+                "agent": agent.filter(|agent| !agent.is_empty()).unwrap_or(default_agent),
+                "model": null,
+                "prompt": "",
+                "isolated": true,
+                "previousRunId": null,
+            }))
+            .map_err(|error| error.to_string())?;
+            let coordinator = app
+                .state::<super::coordination::Coordinator>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                super::planning::cli::start(&coordinator, template, goal)
+            })
+            .await
+            .map_err(|error| error.to_string())?
+        }
+        Request::Plans { project_path } => {
+            let project = ensure_project(app, &project_path)?;
+            let coordinator = app
+                .state::<super::coordination::Coordinator>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                super::planning::cli::list(&coordinator, &project.id)
+            })
+            .await
+            .map_err(|error| error.to_string())?
+        }
+        Request::PlanDetail { plan_id } => {
+            let coordinator = app
+                .state::<super::coordination::Coordinator>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                super::planning::cli::get(&coordinator, &plan_id)
+            })
+            .await
+            .map_err(|error| error.to_string())?
+        }
+        Request::PlanAction {
+            plan_id,
+            action,
+            text,
+            revision,
+            hash,
+        } => {
+            let coordinator = app
+                .state::<super::coordination::Coordinator>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                super::planning::cli::action(&coordinator, &plan_id, &action, text, revision, hash)
+            })
+            .await
+            .map_err(|error| error.to_string())?
+        }
         Request::Ping => Ok(Response::Ok),
         Request::ShowWindow => Ok(show_window(app)),
     }
@@ -733,6 +1159,31 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
 
 /// The conversation's newest attempt when it has finished and kept its own
 /// worktree, which is what merging and pull requests act on.
+/// Why merging does not apply to work that ran in the project checkout
+/// itself (the "new branch" and "current branch" workspace modes), and what
+/// to do instead. `None` for work in its own worktree.
+fn in_place_delivery(run: &TaskRun, session_id: &str) -> Option<String> {
+    let same = |a: &str, b: &str| match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => a == b,
+    };
+    if !same(&run.workspace, &run.project_path) {
+        return None;
+    }
+    let short: String = session_id.chars().take(8).collect();
+    Some(if run.branch.starts_with("jackalope/") {
+        format!(
+            "This work is on its own branch, {}, in your checkout, so there is no worktree to merge. Open a pull request with `jackalope pr {short}`, or merge the branch with Git.",
+            run.branch
+        )
+    } else {
+        format!(
+            "This work ran directly on {} in your checkout, so its changes are already there. Review and commit them as usual.",
+            run.branch
+        )
+    })
+}
+
 fn reviewable_run(app: &AppHandle, session_id: &str) -> Result<TaskRun, String> {
     let snapshot = app.state::<LiveSessions>().snapshot(Some(session_id))?;
     let session = snapshot

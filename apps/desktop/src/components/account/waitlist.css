@@ -50,5 +50,5 @@
   gap: 8px;
 }
 .desktop-waitlist-share-actions > button {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }

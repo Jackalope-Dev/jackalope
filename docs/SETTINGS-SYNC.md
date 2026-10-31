@@ -69,6 +69,76 @@ An account-level deletion marker prevents future default-on connections from
 recreating deleted settings. Only explicitly enabling sync overrides that marker
 for the chosen desktop; the marker contains no settings or identifying text.
 
+## Learned lessons
+
+**Include learned lessons**, under the settings sync switch in Settings → Privacy, is
+off by default and needs settings sync. The choice is saved on the desktop for the
+connected account; connecting a different account starts with it off. While it is
+on, every project's [learned lessons](PROJECT-KNOWLEDGE.md#learned-lessons) take part
+unless the project's **Sync learned lessons** setting (Project settings or the
+terminal's `/settings`) is off.
+
+Only learned lessons sync: entries with a learning lifecycle, never hand-written
+lessons, workflows or older automatic lessons. A lesson carries its learned id, a
+project key, revision, update time, title, content, matching phrases, on/off state,
+kind, status, statement, origin, learned date, archive reason, whether Jackalope may
+still change it and whether it was kept apart from the curator. Removed lessons sync
+as tombstones. History records carry their id, lesson id, time, action, reason,
+revision, origin and title. Evidence references and excerpts, use counts,
+opportunities, recent runs, last use, source tasks and commits, project IDs, names and
+folder paths never leave the desktop. A lesson whose text looks like it holds a
+credential, email address, credential URL or the home folder stays local; the status
+line counts them.
+
+Projects match by a key derived from the repository's root commits, so a clone of the
+same repository matches on every computer without sending a path or remote URL. A
+folder without a commit cannot sync. When two registered projects share a repository,
+the first receives its lessons. Project IDs differ between installations, so a lesson
+learned separately on two computers can arrive as two entries; the curator folds such
+duplicates.
+
+A newer copy wins: the higher revision, then the later update time; when both match,
+the service copy stands. Applying a copy changes only the synced fields, keeping
+local use counts and evidence; a lesson restored elsewhere restarts its local counts
+as a local restore does. Tombstones remove the lesson and keep its suppression so it
+is not learned again. History records are appended once by id. An active lesson that
+arrives without local use is archived only after 100 opportunities without delivery.
+
+The native host does all transfers; lesson text never passes through the renderer,
+whose status parser accepts only status fields. A sync downloads changes since its
+saved cursor, then uploads local changes in batches of at most 25 lessons and 100
+history records under 24 KB. It runs when the app starts, every five minutes, on
+window focus at most once a minute, when the network returns, when settings sync
+changes and from **Sync lessons now**. Offline or failed syncs change nothing remote
+and resume from the saved state. That state lives in
+`task-runs-v1/knowledge/lesson-sync.json`: per account (a hash of the service and
+email), the cursor, deletion epoch, last exchanged revision of each lesson and which
+account each lesson was exchanged with. A lesson exchanged with one account is never
+uploaded to another; lessons downloaded from an account remain on the desktop after
+switching accounts.
+
+**Delete synced lessons** removes the account's lessons and their history and starts
+a new deletion epoch. Every other desktop's next sync receives `lessons_reset`, turns
+lesson sync off there and keeps its local lessons; turning it back on uploads that
+desktop's lessons again. **Delete synced settings** also deletes synced lessons.
+
+The service accepts lesson sync only from an approved device with settings sync
+consent, through the existing device credential, rate limits and 32 KB request limit:
+
+- `POST /v1/desktop/lessons/pull` with `{epoch, cursor}` returns up to 40 lessons and
+  100 history records changed after the cursor, with the next cursor and `more`.
+- `POST /v1/desktop/lessons/push` with `{epoch, lessons, records}` applies the newer
+  copies and returns the stored revision and update time of each lesson.
+- `DELETE /v1/desktop/lessons` deletes everything and advances the epoch.
+
+Strict schemas allow only the fields above: a title up to 120 characters, content up
+to 800, a statement up to 500, ten phrases of 2–60 characters, known statuses and
+history actions, and no recognizable credentials. An account holds at most 2,000
+lessons including tombstones (`413 lessons_full`) and its newest 4,000 history
+records. A stale epoch receives `409 lessons_reset`; missing consent receives
+`403 settings_sync_disabled`. Rows are keyed by member ID in D1 and deleted with the
+membership.
+
 ## Ownership and extension
 
 - `apps/server/src/access/settings.ts` owns the versioned strict schema and
@@ -79,6 +149,11 @@ for the chosen desktop; the marker contains no settings or identifying text.
 - `src/stores/settingsSyncStore.ts` owns retry, checkpoints, transfer state and
   applying saved preferences. Checkpoints contain only portable preferences and
   an opaque connection identity. No credential reaches the renderer.
+- Lesson sync: `apps/server/src/access/lessons.ts` owns the strict schemas, limits,
+  conditional writes and deletion; `commands/account/lesson_sync.rs` owns account
+  binding, the per-account choice and transfers; `commands/knowledge/learning/sync.rs`
+  owns the wire allowlist, merging and exchange state; `src/lib/lesson-sync.ts` and
+  `src/stores/lessonSyncStore.ts` own the status view and schedule.
 
 Writes use a server revision comparison. A stale writer receives 409. Local and
 remote changes since the saved baseline require an explicit choice; neither
@@ -109,6 +184,10 @@ Worker; older service and desktop builds remain compatible with this additive
 schema. The updated desktop and website must also be shipped for the new flows.
 Migration `0012_settings_sync_defaults.sql` adds the account deletion marker used
 by the new default-on connection flow. Both migrations precede the Worker rollout.
+
+Migration `0019_lesson_sync.sql` adds the lesson and lesson-history tables and the
+member's lesson sequence and deletion epoch. Apply it before deploying the matching
+Worker; older desktops never call the lesson endpoints.
 
 Server tests cover consent, account isolation, forbidden fields, unknown versions,
 concurrent writes, delete/opt-out behavior and waitlist pairing without admission.

@@ -35,6 +35,17 @@ test('a task question has a stable identity, targets its exact attempt, and clea
   );
 });
 
+test('the task on screen gets no notice, since its page already asks', () => {
+  const task = run('a', 'running', {
+    prompts: [{ id: 'question-a', status: 'pending', question: 'Which scope?' }],
+  });
+  assert.deepEqual(
+    taskNotices([task], () => {}, 'a'),
+    [],
+  );
+  assert.equal(taskNotices([task], () => {}, 'b').length, 1);
+});
+
 test('retries replace old failures and retain the original task title', () => {
   const failed = run('old', 'failed');
   const retry = run('new', 'running', {

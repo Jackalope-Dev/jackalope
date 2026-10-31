@@ -51,6 +51,11 @@ export function useFocusedWork() {
 }
 
 const MAX_SWITCH_TARGETS = 8;
+
+/** Older task branches end in a generated id; its first eight characters still tell them apart. */
+function branchLabel(branch: string) {
+  return branch.replace(/(^|\/)([0-9a-f]{8})(?:-[0-9a-f]{1,4}){2,4}[0-9a-f-]*$/i, '$1$2');
+}
 const samePath = (a: string, b: string) => a.replace(/[\\/]+$/, '') === b.replace(/[\\/]+$/, '');
 
 /**
@@ -99,7 +104,7 @@ function useSwitchTargets(checkout: string) {
   return targets;
 }
 
-/** The branch in focus, beside the project name, with where it lives and what to do with it. */
+/** The branch in focus, in the status bar beside the project name, with where it lives and what to do with it. */
 export function BranchIndicator() {
   const { host, project, run, managed, checkout } = useFocusedWork();
   const targets = useSwitchTargets(checkout);
@@ -117,16 +122,16 @@ export function BranchIndicator() {
       <Popover.Trigger asChild>
         <button type="button" className="chrome-branch" title={`Branch: ${branch}`}>
           <GitBranch size={14} aria-hidden="true" />
-          <span className="chrome-branch-name">{branch}</span>
+          <span className="chrome-branch-name">{branchLabel(branch)}</span>
           <ChevronDown size={12} aria-hidden="true" className="chrome-branch-chevron" />
         </button>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
           className="workspace-menu statusbar-details"
-          side="bottom"
+          side="top"
           align="start"
-          sideOffset={8}
+          sideOffset={6}
           collisionPadding={12}
         >
           <strong>
@@ -156,7 +161,7 @@ export function BranchIndicator() {
                         }}
                       >
                         <GitBranch size={14} aria-hidden="true" />
-                        <span className="branch-switch-name">{target.branch}</span>
+                        <span className="branch-switch-name">{branchLabel(target.branch)}</span>
                         <span className="branch-switch-label">{target.label}</span>
                       </button>
                     </Popover.Close>
@@ -165,7 +170,17 @@ export function BranchIndicator() {
               </ul>
             </section>
           )}
-          <div className="flex flex-wrap gap-2">
+          <div className="branch-actions">
+            {!managed && (
+              <Popover.Close asChild>
+                <Button onClick={() => openChanges(checkout)}>Review changes</Button>
+              </Popover.Close>
+            )}
+            <Popover.Close asChild>
+              <Button variant="outline" onClick={() => navigateWorkspace('worktrees')}>
+                Manage worktrees
+              </Button>
+            </Popover.Close>
             {run?.branch || (!run && !managed && project.gitBranch) ? (
               <CopyButton
                 variant="outline"
@@ -180,16 +195,6 @@ export function BranchIndicator() {
                 label="Copy path"
               />
             ) : null}
-            {!managed && (
-              <Popover.Close asChild>
-                <Button onClick={() => openChanges(checkout)}>Review changes</Button>
-              </Popover.Close>
-            )}
-            <Popover.Close asChild>
-              <Button variant="outline" onClick={() => navigateWorkspace('worktrees')}>
-                Manage worktrees
-              </Button>
-            </Popover.Close>
           </div>
         </Popover.Content>
       </Popover.Portal>

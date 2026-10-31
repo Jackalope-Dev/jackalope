@@ -23,6 +23,8 @@ pub struct BrowserView {
 pub struct AgentScreen {
     pub browser: BrowserView,
     pub desktop: Option<desktop_control::DesktopView>,
+    /// The run's bot or task computer, when it has one.
+    pub computer: Option<super::computers::ComputerStatus>,
     pub captured_at: String,
 }
 
@@ -41,6 +43,7 @@ pub async fn task_agent_screen(
     state: State<'_, TaskRuntime>,
 ) -> Result<AgentScreen, String> {
     ensure_run(&state, &run_id)?;
+    let runtime = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let browser = if capture.unwrap_or(true) {
             match browser::peek(&run_id) {
@@ -64,6 +67,7 @@ pub async fn task_agent_screen(
         AgentScreen {
             browser,
             desktop: desktop_control::view(&run_id),
+            computer: super::computers::view_for_run(&runtime, &run_id),
             captured_at: chrono::Utc::now().to_rfc3339(),
         }
     })

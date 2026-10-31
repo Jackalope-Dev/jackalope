@@ -424,6 +424,7 @@ mod tests {
                     text: format!("{role} text"),
                     sent: *sent,
                     attempt: None,
+                    id: None,
                 })
                 .collect(),
             run_id: None,
@@ -440,6 +441,11 @@ mod tests {
             result: String::new(),
             activity: Vec::new(),
             questions: Vec::new(),
+            partial: String::new(),
+            review_screenshots: None,
+            merged: false,
+            draft: String::new(),
+            draft_revision: 0,
         }
     }
 
@@ -508,6 +514,7 @@ mod tests {
             run_id: "r".into(),
             question: "Which branch?".into(),
             options: Vec::new(),
+            ..Default::default()
         });
         assert_eq!(
             outcome(&asked),

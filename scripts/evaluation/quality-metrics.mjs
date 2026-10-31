@@ -61,6 +61,26 @@ export function qualitySummary(trials, variants = ['before', 'after']) {
           msPerOracleSuccess:
             successes && elapsed.total !== null ? elapsed.total / successes : null,
           firstActivityMs: measurements(rows.map((trial) => trial.efficiency?.firstActivityMs)),
+          firstTokenMs: measurements(rows.map((trial) => trial.efficiency?.firstTokenMs)),
+          // Later turns of a continued conversation, where a warm session can skip startup.
+          followUpFirstTokenMs: measurements(
+            rows.flatMap((trial) =>
+              (trial.efficiency?.turns ?? []).slice(1).map((turn) => turn.firstTokenMs),
+            ),
+          ),
+          turnMs: measurements(
+            rows.flatMap((trial) => (trial.efficiency?.turns ?? []).map((turn) => turn.elapsedMs)),
+          ),
+          cacheRead: measurements(rows.map((trial) => trial.cacheRead)),
+          cacheWrite: measurements(rows.map((trial) => trial.cacheWrite)),
+          attempts: measurements(rows.map((trial) => trial.attempts)),
+          firstCheckPassed: {
+            passed: rows.filter((trial) => trial.efficiency?.firstCheckPassed === true).length,
+            measured: rows.filter(
+              (trial) => typeof trial.efficiency?.firstCheckPassed === 'boolean',
+            ).length,
+          },
+          stopCheckRounds: measurements(rows.map((trial) => trial.efficiency?.stopCheckRounds)),
           verificationReuses: measurements(
             rows.map((trial) => trial.efficiency?.verificationReuses),
           ),

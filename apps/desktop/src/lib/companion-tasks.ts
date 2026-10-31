@@ -3,7 +3,12 @@ import { getAgentMetadata } from './agent-catalog.ts';
 import { isActive, type TaskRun } from './task-runtime.ts';
 import { taskTitle } from './task-title.ts';
 
-export function taskNotices(runs: TaskRun[], open: (run: TaskRun) => void): CompanionNotice[] {
+/** Notices for tasks that need the person; none for `viewing`, whose page already shows it. */
+export function taskNotices(
+  runs: TaskRun[],
+  open: (run: TaskRun) => void,
+  viewing: string | null = null,
+): CompanionNotice[] {
   const latest = new Map<string, TaskRun>();
   const titles = new Map<string, string>();
   for (const run of [...runs].sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt))) {
@@ -12,7 +17,7 @@ export function taskNotices(runs: TaskRun[], open: (run: TaskRun) => void): Comp
     if (!titles.has(key)) titles.set(key, taskTitle(run.prompt));
   }
   return [...latest.values()].reverse().flatMap((run): CompanionNotice[] => {
-    if (run.archivedAt) return [];
+    if (run.archivedAt || run.id === viewing) return [];
     // Name the agent so a waiting or failed attempt is attributable from the
     // companion alone. A routed attempt has no agent until routing resolves.
     const agent =

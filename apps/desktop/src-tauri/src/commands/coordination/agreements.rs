@@ -431,7 +431,8 @@ impl Coordinator {
             .and_then(|h| h.to_str().ok())
             .and_then(|h| h.strip_prefix("Bearer "))
             .ok_or(StatusCode::UNAUTHORIZED)?;
-        let (_, run_id) = inner.grants.get(token).ok_or(StatusCode::UNAUTHORIZED)?;
+        let token = crate::commands::tasks::bridge_token(token);
+        let (_, run_id) = inner.grants.get(&token).ok_or(StatusCode::UNAUTHORIZED)?;
         if self
             .runtime
             .integration_runs()

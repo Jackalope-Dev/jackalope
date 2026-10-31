@@ -7,13 +7,15 @@ isolated parallel work, coordination and review before integration.
 
 ### Live sessions
 
-Task review and preview open beside the conversation on windows at least 1280 pixels
-wide and take the full width on narrower ones. Individual
-conversation toggles remain available and are saved per task.
-
-The task toolbar shows the branch and changes since a previous visit. Task context
-opens the workspace and saved checks. Terminal opens a shell view in that exact
-workspace; Workspace tools opens its installed editor or a separate task window.
+Task review and preview open beside the task on windows at least 1280 pixels wide and
+take the full width on narrower ones; the toggle is saved per task. Conversations
+instead switch the whole view between Conversation, Review, Preview, Terminal and
+Screen tabs. Their options menu holds Task context (workspace, branch and saved
+checks), Topics and a Workspace submenu for editors, separate task windows and copying
+the path or branch. The task toolbar shows the branch and changes since a
+previous visit, with the same Task context and Workspace tools. Terminal opens a shell
+view in that exact workspace. New task branches and worktree folders are named after the
+request with a short id suffix, such as `jackalope/fix-login-bug-909b03`.
 The task terminal is a separate shell, not a resumed provider conversation. Stop it
 before agent work, checks, previews or integration. Its bounded output survives closing
 and reopening a view while the app runs. Controls reject commands addressed to an
@@ -43,7 +45,10 @@ window leaves execution running. **Pause queue** holds later messages, while
 **Stop work** also stops the active attempt through the existing runtime.
 
 Sessions save messages before claiming a batch, preserve draft revisions across
-windows, and pause after failures or restart. Pending launch retries reuse the saved
+windows, and keep going until the person pauses or stops them or a reply needs them:
+failures, limits and attempts cut off by a restart pause with a reason. Otherwise a
+restart keeps each conversation's saved pause state, and Review holds the queue only
+while it is open. Pending launch retries reuse the saved
 attempt identifier. An interrupted launch requires an explicit retry. Session attempts
 stay in loaded history; a missing completed attempt blocks continuation until restored.
 Interrupted process ownership keeps the normal runtime safeguards.
@@ -190,14 +195,14 @@ another continuation. A failed save preserves the draft.
 Tasks continuing with one lead ask that agent to delegate useful independent work through
 available provider subagent tools. This stays
 within the provider session and does not create native queue entries; see
-[agent quality](AGENT-QUALITY.md) for limits. Explicit feature plans remain available
-for reviewing a queue before dispatch. Unfinished drafts from the former split
-dialog reopen in feature planning after any unfinished regular plan is imported;
-their saved run, steps and storage remain intact.
+[agent quality](AGENT-QUALITY.md) for limits. Written plans (**Write the plan myself**)
+go through [plan mode](PLAN-MODE.md) approval before dispatch. Unfinished drafts from
+the former feature and split planning dialogs open in that form with their goal, agent
+and steps; their saved storage is left intact until the plan is saved.
 
 1. Open the native desktop app and choose a Git project with a committed local target branch.
-2. In Tasks, choose **Plan parallel work**. Add focused tasks, or **Import a plan**
-   from JSON. Review titles, instructions, assigned agents, owned paths and dependencies.
+2. In Work's options menu, choose **Plan feature work**. Add focused tasks, or **Import a
+   plan** from JSON, from that page's options menu. Review titles, instructions, assigned agents, owned paths and dependencies.
 3. Choose the concurrency limit and **Run ready tasks**. The limit counts currently
    active application attempts across projects. Explicit single-task launches remain
    available separately. Pausing dispatch leaves current attempts running; each has Stop.
@@ -224,6 +229,36 @@ integration. Queue admission favors critical paths and fair project access; fini
 attempts keep workspace ownership while verification uses separate capacity. See
 [execution quality and evaluation](EXECUTION-EVALUATION.md) for opt-in staging,
 reservations, structured reports and measurements. Legacy plans retain merge dependencies.
+
+### Comparing agents
+
+Choosing up to four agents beside Send starts the prompt once per agent, each as an
+ordinary isolated task. The comparison is saved in the renderer (`compareStore`); its
+tasks link to each other and **Compare results** shows them side by side. **Keep this
+one** archives the other finished attempts. Archiving hides task records only; their
+branches and worktrees stay until removed explicitly from Project worktrees.
+
+Once two attempts have finished, **Judge results** starts one read-only task. It
+defaults to an available agent whose vendor did not write any attempt, and the picker
+can change it. The judge request labels attempts A, B, C… in launch order, gives each
+worktree, branch, base commit, changed files and a bounded patch excerpt, and asks for
+3–6 criteria derived from the request alone, a 1–5 score per attempt and criterion,
+a recommended base, and one or two parts of other attempts worth porting. The answer
+ends with a `jackalope-verdict` JSON block that the dialog shows as a criteria ×
+attempt table. Unknown labels, ports from the base and out-of-range scores are dropped
+or clamped. When the attempts diverge enough to suggest an ambiguous request, the
+judge returns a clearer prompt instead of a base. An answer with no readable verdict
+links to the judge task and offers **Judge again**.
+
+**Keep and combine** keeps the chosen attempt as above, then writes the selected ports
+into the kept task's follow-up draft. Each port names its source attempt, files,
+worktree, branch and the `git diff` command to read it. The draft runs only when sent.
+Project worktrees treat each source worktree as blocked, offering neither cleanup nor
+archive-and-remove, while that draft has text and no follow-up has started, and while
+the follow-up that started afterwards is running or interrupted. A finished or cleared
+follow-up releases them. This retention is enforced in the app's worktree controls,
+not by the native cleanup command. Comparisons saved before the judge existed load
+without `judge` or `combine` fields and work as before.
 
 ## Coordination contract
 

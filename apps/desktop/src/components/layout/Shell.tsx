@@ -1,6 +1,15 @@
-import { DropdownMenu as Menu, SearchIcon } from '@jackalope/ui';
-import { Check, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { SearchIcon } from '@jackalope/ui';
+import { PanelLeftClose, PanelLeftOpen, Plus, Settings2 } from 'lucide-react';
+import {
+  type CSSProperties,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
 import { useWindowEvent } from '../../hooks/useWindowEvent';
 import { unreadBotConversations } from '../../lib/bot-conversations';
@@ -15,6 +24,7 @@ import { swarmConnection } from '../../lib/swarm';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
+import { WindowGlass } from '../../lib/window-glass';
 import { selectWork } from '../../lib/work-selection';
 import { observeWorkbenchPerformance } from '../../lib/workbench-performance';
 import { useAgentScopeStore } from '../../stores/agentScopeStore';
@@ -33,11 +43,10 @@ import { observeWorkbenchPreferences } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AccessNoticeSlot } from '../account/AccessBoundary';
 import { useTrackOpenWork } from '../tasks/WorkSignals';
-import { BranchIndicator } from './BranchIndicator';
 import { ShortcutSheet } from './ShortcutSheet';
 import { WelcomeDialog } from './WelcomeDialog';
 import { WhatsNewDialog } from './WhatsNewDialog';
-import { WorkSidebar } from './WorkSidebar';
+import { CollapsedProjects, NeedsYouCount, WorkSidebar } from './WorkSidebar';
 import { WorkspaceStatusBar } from './WorkspaceStatusBar';
 import { WorkTabs } from './WorkTabs';
 import './workspace-shell.css';
@@ -50,9 +59,9 @@ import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
 
 import { UnsavedTasksNotice } from '../tasks/TaskSaveRecovery';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
-import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { LoadingState } from '../ui/LoadingState';
 import { PageErrorBoundary } from '../ui/PageErrorBoundary';
+import { ResizeHandle } from '../ui/ResizeHandle';
 import { Tooltip } from '../ui/Tooltip';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -73,6 +82,10 @@ export type { ActiveTab } from './navigation';
 
 // Workspace views and heavy dialogs load on demand so the first paint ships only
 // the task workspace. Each stays in its own chunk keyed by the tab that shows it.
+// The sidebar's default width matches workspace-shell.css; dragging keeps it in this range.
+const SIDEBAR_WIDTH = 248;
+const SIDEBAR_MIN = 200;
+const SIDEBAR_MAX = 420;
 const RepoTodos = lazy(() => import('../tasks/RepoTodos').then((m) => ({ default: m.RepoTodos })));
 const RemoteHosts = lazy(() =>
   import('../remote/RemoteHosts').then((m) => ({ default: m.RemoteHosts })),
@@ -110,6 +123,7 @@ const BotsWorkspace = lazy(() =>
 const SwarmBoard = lazy(() =>
   import('../swarm/SwarmBoard').then((m) => ({ default: m.SwarmBoard })),
 );
+const PlanPage = lazy(() => import('../planning/PlanPage').then((m) => ({ default: m.PlanPage })));
 const ConnectedApps = lazy(() =>
   import('../mcp/ConnectedApps').then((m) => ({ default: m.ConnectedApps })),
 );
@@ -170,7 +184,6 @@ export function Shell({
   initialDraftKey?: string;
   focusOnMount?: boolean;
 } = {}) {
-  const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
   useEffect(observeLiveSessions, []);
   useEffect(observeBots, []);
   const botsWaiting = useBotHubStore((state) => needsYou(state).count);
@@ -186,7 +199,7 @@ export function Shell({
   );
   useEffect(observeManagedTasks, []);
   const canvas = useRef<HTMLElement>(null);
-  const projectSwitcher = useRef<HTMLButtonElement>(null);
+  const removeReturnFocus = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (focusOnMount && !initialDraftKey && !initialTaskAgent && !initialCapture)
       canvas.current?.focus();
@@ -345,6 +358,15 @@ export function Shell({
     selectWork();
     selectProject(id);
   };
+  /** A project row opens that project's work list, or one of its pages from its menu. */
+  const openProject = (id: string, tab: ActiveTab) => {
+    switchProject(id);
+    if (tab === 'kanban') {
+      selectWork();
+      useWorkViewStore.getState().setScope('project');
+    }
+    setActiveTab(tab);
+  };
   useTrackOpenWork();
   const selectedTaskId = useExecutionStore((state) => state.selectedId);
   const selectedSessionId = useLiveSessionStore((state) => state.selectedId);
@@ -410,6 +432,8 @@ export function Shell({
   const shortcuts = resolveShortcuts(shortcutSettings);
   const navCollapsed = useWorkViewStore((state) => state.navCollapsed);
   const toggleNav = useWorkViewStore((state) => state.toggleNav);
+  const navWidth = useWorkViewStore((state) => state.sizes.sidebar);
+  const workScope = useWorkViewStore((state) => state.scope);
   const shortcut = displayShortcut(shortcuts.search);
   useTauriEvent<string>('desktop-action', (action) => {
     if (action === 'settings') navigate('preferences');
@@ -445,131 +469,116 @@ export function Shell({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTab, focusComposer, navigate, shortcutSettings]);
 
+  const projectActions = {
+    onOpenProject: openProject,
+    onNewWork: (id: string) => {
+      switchProject(id);
+      focusComposer();
+    },
+    onRemoveProject: (item: Project) => {
+      removeReturnFocus.current = document.activeElement as HTMLElement | null;
+      setRemovingProject(item);
+    },
+  };
   return (
     <div className="workspace-shell">
       <a className="skip-link" href="#workspace-content">
         Skip to workspace
       </a>
+      <WindowGlass />
       <ResizeHandles />
-      <TitleBar onSettings={() => navigate('preferences')} />
-      <AccessNoticeSlot />
-      <header className="workspace-chrome">
-        <div className="flex items-center gap-4 min-w-0">
-          <img src="/mascot.svg" alt="Jackalope" className="size-8 shrink-0" />
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <button
-                ref={projectSwitcher}
-                type="button"
-                className="project-switcher"
-                aria-label="Switch project"
-              >
-                <span className="truncate max-w-52">{project?.name ?? 'Choose a project'}</span>
-                <ChevronDown className="size-3 text-[var(--color-text-muted)]" />
-              </button>
-            </Menu.Trigger>
-            <Menu.Portal>
-              <Menu.Content
-                className="workspace-menu min-w-64"
-                align="start"
-                sideOffset={12}
-                collisionPadding={12}
-              >
-                <Menu.Label className="menu-label">Your projects</Menu.Label>
-                {projects.map((item) => (
-                  <Menu.Item
-                    key={item.id}
-                    onSelect={() => switchProject(item.id)}
-                    className="workspace-menu-item"
-                  >
-                    <span className="flex-1">{item.name}</span>
-                    {item.id === activeProjectId && <Check className="size-3.5" />}
-                  </Menu.Item>
-                ))}
-                <Menu.Separator className="menu-separator" />
-                <Menu.Item className="workspace-menu-item" onSelect={openProjectSetup}>
-                  Add a project…
-                </Menu.Item>
-                {project && (
-                  <Menu.Item
-                    className="workspace-menu-item"
-                    onSelect={() => setRemovingProject(project)}
-                  >
-                    Remove from Jackalope…
-                  </Menu.Item>
-                )}
-              </Menu.Content>
-            </Menu.Portal>
-          </Menu.Root>
-          <BranchIndicator />
-        </div>
-        <div className="flex items-center gap-3">
-          {(activeTab !== 'kanban' || selectedTaskId || selectedSessionId || selectedManagedId) && (
-            <Tooltip content={`New work (${displayShortcut(shortcuts.newWork)})`}>
-              <button
-                type="button"
-                className="command-trigger command-new"
-                onClick={focusComposer}
-                aria-label="New work"
-              >
-                <Plus size={16} />
-                <span>New work</span>
-              </button>
-            </Tooltip>
-          )}
-          <Tooltip content={`Search commands (${shortcut})`}>
+      <TitleBar
+        themePicker
+        settings={{
+          open: () =>
+            activeTab === 'preferences'
+              ? setActiveTab(previousView.current)
+              : navigate('preferences'),
+          shortcut: displayShortcut(shortcuts.settings),
+          current: activeTab === 'preferences',
+        }}
+        center={
+          <Tooltip content={`Search work, projects and commands (${shortcut})`}>
             <button
               type="button"
               onClick={() => setCommandsOpen(true)}
+              onMouseDown={(event) => event.stopPropagation()}
+              onDoubleClick={(event) => event.stopPropagation()}
               className="command-trigger command-jump"
               aria-label="Search commands"
             >
-              <SearchIcon className="" />
-              <span className="hidden sm:inline">Jump to…</span>
+              <SearchIcon className="app-titlebar-search-icon" />
+              <span>Search or jump to…</span>
               <kbd>{shortcut}</kbd>
             </button>
           </Tooltip>
-          {!isTauriEnvironment() && showThemePicker && <ArcColorPicker />}
-          {!isTauriEnvironment() && (
-            <Tooltip content={`Settings (${displayShortcut(shortcuts.settings)})`}>
+        }
+      />
+      <AccessNoticeSlot />
+      <div className="workspace-body">
+        <aside
+          id="workspace-navigation"
+          className="workspace-navigation"
+          data-collapsed={navCollapsed || undefined}
+          style={
+            navWidth === undefined
+              ? undefined
+              : ({ '--sidebar-width': `${navWidth}px` } as CSSProperties)
+          }
+        >
+          <div className="workspace-navigation-top">
+            <Tooltip side="right" content={`New work (${displayShortcut(shortcuts.newWork)})`}>
               <button
                 type="button"
-                onClick={() => navigate('preferences')}
-                className="quiet-icon"
-                aria-label="Settings and preferences"
+                className="workspace-new-work"
+                onClick={focusComposer}
+                aria-label="New work"
               >
-                <Settings2 className="size-4" />
+                <Plus size={16} aria-hidden="true" />
+                <span>New work</span>
               </button>
             </Tooltip>
-          )}
-        </div>
-      </header>
-      <div className="workspace-body">
-        <aside className="workspace-navigation" data-collapsed={navCollapsed || undefined}>
-          <Tooltip
-            side="right"
-            content={`${navCollapsed ? 'Expand' : 'Collapse'} sidebar (${displayShortcut(shortcuts.sidebar)})`}
-          >
-            <button
-              type="button"
-              className="workspace-nav-item workspace-nav-toggle"
-              aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              aria-expanded={!navCollapsed}
-              onClick={toggleNav}
+            <Tooltip
+              side="right"
+              content={`${navCollapsed ? 'Expand' : 'Collapse'} sidebar (${displayShortcut(shortcuts.sidebar)})`}
             >
-              {navCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-            </button>
-          </Tooltip>
-          <nav aria-label="Workspace" className="flex items-center gap-1">
+              <button
+                type="button"
+                className="workspace-nav-toggle"
+                aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-expanded={!navCollapsed}
+                onClick={toggleNav}
+              >
+                {navCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+              </button>
+            </Tooltip>
+          </div>
+          <nav aria-label="Workspace" className="workspace-nav-list">
             {WORKSPACE_VIEWS.filter((item) => item.primary).map((item) => (
               <button
                 type="button"
                 key={item.id}
                 onClick={() => {
-                  if (item.id === 'kanban') selectWork();
+                  if (item.id === 'kanban') {
+                    // Work lists every project; a project row opens one project's work.
+                    selectWork();
+                    useWorkViewStore.getState().setScope('all');
+                  }
                   setActiveTab(item.id);
                 }}
-                aria-current={view.group === item.group ? 'page' : undefined}
+                aria-current={
+                  item.id === 'kanban'
+                    ? activeTab === 'kanban' &&
+                      !selectedTaskId &&
+                      !selectedSessionId &&
+                      !selectedManagedId &&
+                      workScope === 'all'
+                      ? 'page'
+                      : undefined
+                    : view.group === item.group
+                      ? 'page'
+                      : undefined
+                }
                 aria-label={
                   item.id === 'bots' && (botsWaiting > 0 || botsUnread > 0)
                     ? [
@@ -585,33 +594,55 @@ export function Shell({
                 }
                 title={item.label}
                 className="workspace-nav-item"
+                data-unread={(item.id === 'bots' && !botsWaiting && botsUnread > 0) || undefined}
               >
-                <item.icon className="size-3.5" />
+                <item.icon aria-hidden="true" />
                 <span>{item.label}</span>
-                {item.id === 'bots' &&
-                  (botsWaiting > 0 ? (
-                    <small className="workspace-nav-count" aria-hidden="true">
-                      {botsWaiting}
-                    </small>
-                  ) : (
-                    botsUnread > 0 && <small className="workspace-nav-unread" aria-hidden="true" />
-                  ))}
+                {item.id === 'kanban' && <NeedsYouCount />}
+                {item.id === 'bots' && botsWaiting > 0 && (
+                  <small className="workspace-nav-count" aria-hidden="true">
+                    {botsWaiting}
+                  </small>
+                )}
               </button>
             ))}
           </nav>
-          {!navCollapsed && <WorkSidebar onOpen={() => setActiveTab('kanban')} />}
-          <button
-            type="button"
-            className="workspace-nav-item workspace-settings"
-            aria-label="Settings"
-            aria-current={activeTab === 'preferences' ? 'page' : undefined}
-            title="Settings"
-            onClick={() => navigate('preferences')}
-          >
-            <Settings2 size={18} />
-            <span>Settings</span>
-          </button>
+          {navCollapsed ? (
+            <CollapsedProjects {...projectActions} />
+          ) : (
+            <WorkSidebar
+              {...projectActions}
+              activeTab={activeTab}
+              onOpen={() => setActiveTab('kanban')}
+              onAddProject={openProjectSetup}
+            />
+          )}
+          <Tooltip side="right" content={`Settings (${displayShortcut(shortcuts.settings)})`}>
+            <button
+              type="button"
+              className="workspace-nav-item workspace-settings"
+              aria-label="Settings"
+              aria-current={activeTab === 'preferences' ? 'page' : undefined}
+              onClick={() => navigate('preferences')}
+            >
+              <Settings2 aria-hidden="true" />
+              <span>Settings</span>
+            </button>
+          </Tooltip>
         </aside>
+        {!navCollapsed && (
+          <ResizeHandle
+            orientation="vertical"
+            label="Resize sidebar"
+            controls="workspace-navigation"
+            className="workspace-navigation-resizer"
+            value={navWidth ?? SIDEBAR_WIDTH}
+            min={SIDEBAR_MIN}
+            max={SIDEBAR_MAX}
+            onResize={(width) => useWorkViewStore.getState().setSize('sidebar', width)}
+            onReset={() => useWorkViewStore.getState().setSize('sidebar', null)}
+          />
+        )}
         <main
           ref={canvas}
           id="workspace-content"
@@ -743,6 +774,7 @@ export function Shell({
               {activeTab === 'bots' && <BotsWorkspace />}
               {activeTab === 'connected-apps' && <ConnectedApps />}
               {activeTab === 'swarm' && <SwarmBoard />}
+              {activeTab === 'plans' && <PlanPage key={activeProjectId} />}
               {activeTab === 'schedules' && (
                 <ScheduleManager
                   key={activeProjectId}
@@ -794,7 +826,10 @@ export function Shell({
             onOpenChange={(open) => {
               if (!open) {
                 setRemovingProject(null);
-                requestAnimationFrame(() => projectSwitcher.current?.focus());
+                requestAnimationFrame(() => {
+                  const target = removeReturnFocus.current;
+                  (target?.isConnected ? target : canvas.current)?.focus();
+                });
               }
             }}
           />

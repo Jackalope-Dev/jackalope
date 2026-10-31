@@ -1,6 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { GitBranch } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { TaskRun } from '../../lib/task-runtime';
 import { workSummary } from '../../lib/workbench';
 import { useWorkbenchStore } from '../../stores/workbenchStore';
@@ -16,29 +16,68 @@ export function WorkContext({
   allowNavigation = true,
   onTerminal,
   hideTerminal = false,
-  children,
 }: {
   run: TaskRun;
   allowNavigation?: boolean;
   onTerminal?: () => void;
   /** The host shows its own Terminal tab, so the context row omits the button. */
   hideTerminal?: boolean;
-  children?: ReactNode;
 }) {
-  const summary = useMemo(() => workSummary(run), [run]);
+  const { updated } = useWorkSeen(run);
   const requested = useWorkViewStore((state) =>
     state.request?.id === run.id && state.request.section === 'terminal'
       ? state.request.revision
       : undefined,
   );
-  const seen = useMemo(() => useWorkbenchStore.getState().seen[run.taskId], [run.taskId]);
+  return (
+    <section className="work-toolbar" aria-label="Task workspace">
+      <span
+        className="work-branch"
+        title={`${run.projectName} · ${run.workspace || run.projectPath}`}
+      >
+        <GitBranch size={14} aria-hidden="true" />
+        <span>{run.branch || 'Project checkout'}</span>
+      </span>
+      <div className="work-toolbar-actions">
+        {updated && <span className="work-updated">Updated since last visit</span>}
+        <Dialog.Root>
+          <Dialog.Trigger asChild>
+            <Button variant="ghost">Task context</Button>
+          </Dialog.Trigger>
+          <DialogContent aria-describedby={undefined}>
+            <DialogCloseButton />
+            <DialogHeader title="Task context" />
+            <WorkContextDetails run={run} allowNavigation={allowNavigation} />
+          </DialogContent>
+        </Dialog.Root>
+        <WorkTools
+          run={run}
+          requestRevision={requested}
+          onTerminal={onTerminal}
+          hideTerminal={hideTerminal}
+        />
+      </div>
+    </section>
+  );
+}
+
+/** Records that the person has seen the run's current state once the window has focus. */
+export function useWorkSeen(run?: TaskRun) {
+  const summary = useMemo(() => (run ? workSummary(run) : undefined), [run]);
+  const taskId = run?.taskId;
+  const fingerprint = summary?.fingerprint;
+  const seen = useMemo(
+    () => (taskId ? useWorkbenchStore.getState().seen[taskId] : undefined),
+    [taskId],
+  );
   useEffect(() => {
+    if (!taskId || !fingerprint) return;
     let timeout: ReturnType<typeof setTimeout>;
     const record = () => {
       clearTimeout(timeout);
       if (!document.hidden && document.hasFocus())
         timeout = setTimeout(
-          () => useWorkbenchStore.getState().markSeen(run.taskId, summary.fingerprint),
+          () => useWorkbenchStore.getState().markSeen(taskId, fingerprint),
           2000,
         );
     };
@@ -52,47 +91,29 @@ export function WorkContext({
       window.removeEventListener('blur', record);
       document.removeEventListener('visibilitychange', record);
     };
-  }, [run.taskId, summary.fingerprint]);
+  }, [taskId, fingerprint]);
+  return { updated: !!seen && seen !== fingerprint };
+}
+
+export function WorkContextDetails({
+  run,
+  allowNavigation = true,
+}: {
+  run: TaskRun;
+  allowNavigation?: boolean;
+}) {
+  const summary = useMemo(() => workSummary(run), [run]);
   return (
-    <section className="work-toolbar" aria-label="Task workspace">
-      <span
-        className="work-branch"
-        title={`${run.projectName} · ${run.workspace || run.projectPath}`}
-      >
-        <GitBranch size={14} aria-hidden="true" />
-        <span>{run.branch || 'Project checkout'}</span>
-      </span>
-      <div className="work-toolbar-actions">
-        {seen && seen !== summary.fingerprint && (
-          <span className="work-updated">Updated since last visit</span>
-        )}
-        <Dialog.Root>
-          <Dialog.Trigger asChild>
-            <Button variant="ghost">Task context</Button>
-          </Dialog.Trigger>
-          <DialogContent aria-describedby={undefined}>
-            <DialogCloseButton />
-            <DialogHeader title="Task context" />
-            <div className="work-context-body">
-              <p>
-                <strong>{summary.decision.label}</strong> · {summary.decision.action}
-              </p>
-              {summary.question && <p>{summary.question}</p>}
-              {summary.blocker && <p>{summary.blocker}</p>}
-              <p>{summary.checks}</p>
-              <p className="work-context-path">{run.workspace || run.projectPath}</p>
-              {allowNavigation && <NextWorkAction run={run} />}
-            </div>
-          </DialogContent>
-        </Dialog.Root>
-        {children}
-        <WorkTools
-          run={run}
-          requestRevision={requested}
-          onTerminal={onTerminal}
-          hideTerminal={hideTerminal}
-        />
-      </div>
-    </section>
+    <div className="work-context-body">
+      <p>
+        <strong>{summary.decision.label}</strong> · {summary.decision.action}
+      </p>
+      {summary.question && <p>{summary.question}</p>}
+      {summary.blocker && <p>{summary.blocker}</p>}
+      <p>{summary.checks}</p>
+      {run.branch && <p className="work-context-path">{run.branch}</p>}
+      <p className="work-context-path">{run.workspace || run.projectPath}</p>
+      {allowNavigation && <NextWorkAction run={run} />}
+    </div>
   );
 }

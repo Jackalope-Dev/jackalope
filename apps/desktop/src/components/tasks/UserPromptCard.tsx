@@ -10,10 +10,16 @@ export function UserPromptCard({
   runId,
   prompt,
   active,
+  onContinue,
+  accountShown = false,
 }: {
   runId: string;
   prompt: PendingUserPrompt;
   active: boolean;
+  /** The page already names the account, so the card names only the model. */
+  accountShown?: boolean;
+  /** Answers a question the attempt ended on by continuing the task with it. */
+  onContinue?: (answer: string) => Promise<void>;
 }) {
   const run = useExecutionStore((state) => state.runs.find((entry) => entry.id === runId));
   const customName = useAgentConfigStore(
@@ -26,7 +32,10 @@ export function UserPromptCard({
       ? (customName ?? getAgentMetadata(run.agent)?.name ?? run.agent)
       : undefined;
   const agentDetail = run
-    ? [run.model ?? 'CLI default model', run.accountBinding?.label || run.account]
+    ? [
+        run.model ?? 'CLI default model',
+        !accountShown && (run.accountBinding?.label || run.account),
+      ]
         .filter(Boolean)
         .join(' · ')
     : undefined;
@@ -48,6 +57,7 @@ export function UserPromptCard({
       agentName={agentName}
       agentDetail={agentDetail}
       onAnswer={answer}
+      onContinue={onContinue}
     />
   );
 }

@@ -42,6 +42,15 @@ function AllowanceMeter({
   );
 }
 
+/** Time until a window resets, in its largest whole unit: "in 3h", "in 2d". */
+function resetsIn(ms: number) {
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  if (minutes < 60) return `in ${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `in ${hours}h`;
+  return `in ${Math.round(hours / 24)}d`;
+}
+
 export function StatusBarUsage({ remote }: { remote: boolean }) {
   const { records, loading, error, fetch } = useCapacityStore(
     useShallow((s) => ({ records: s.records, loading: s.loading, error: s.error, fetch: s.fetch })),
@@ -117,7 +126,7 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
           ].join(', ')}
         >
           <Gauge size={15} aria-hidden="true" />
-          <span className="statusbar-usage-label">{label}</span>
+          {!summaries.length && <span className="statusbar-usage-label">{label}</span>}
           {summaries.slice(0, 2).map((summary) => (
             <span
               key={summary.record.agent}
@@ -150,10 +159,7 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
           aria-label={label}
         >
           <header className="statusbar-allowances-heading">
-            <div>
-              <h2>{label}</h2>
-              <p>Remaining account allowances</p>
-            </div>
+            <h2>{label}</h2>
             <Button
               variant="ghost"
               size="icon"
@@ -166,56 +172,70 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
           </header>
           {loading && <p role="status">Checking account allowances…</p>}
           {error && <p role="alert">{error}</p>}
-          {accounts.map((record) => (
-            <section
-              className="statusbar-allowance-account"
-              key={record.agent}
-              aria-label={agentName(record.agent)}
-            >
-              <header>
-                <ProviderMark provider={record.agent} size={20} />
-                <div>
+          {accounts.map((record) => {
+            // The first pool is the plan itself; only further pools (such as one model's
+            // own allowance) need their name to tell windows apart.
+            const mainPool = record.windows[0]?.poolId;
+            return (
+              <section
+                className="statusbar-allowance-account"
+                key={record.agent}
+                aria-label={agentName(record.agent)}
+              >
+                <header>
+                  <ProviderMark provider={record.agent} size={16} />
                   <h3>{agentName(record.agent)}</h3>
-                  <p>{record.account || 'Account unknown'}</p>
-                </div>
-              </header>
-              {record.windows.map((window) => {
-                const { remaining, label, tone } = capacityWindowDisplay(record, window, now);
-                const name = capacityWindowName(window);
-                const resets = window.resetsAt === null ? null : new Date(window.resetsAt * 1000);
-                const expired = resets !== null && resets.getTime() <= now;
-                return (
-                  <div
-                    className="statusbar-allowance-window"
-                    data-tone={tone}
-                    key={`${window.poolId}:${window.window}`}
-                  >
-                    <div className="statusbar-allowance-label">
-                      <span>{name}</span>
-                      <strong>{label}</strong>
-                    </div>
-                    <AllowanceMeter
-                      remaining={remaining}
-                      label={`${agentName(record.agent)} · ${window.poolName} · ${name}`}
-                    />
-                    <div className="statusbar-allowance-caption">
-                      <span>{window.poolName}</span>
-                      <span>
-                        {expired
-                          ? 'Window ended'
-                          : resets
+                  {record.account && (
+                    <span className="statusbar-allowance-login">{record.account}</span>
+                  )}
+                </header>
+                {record.windows.map((window) => {
+                  const { remaining, label, tone } = capacityWindowDisplay(record, window, now);
+                  const name = capacityWindowName(window).replace(/ (window|allowance)$/, '');
+                  const resets = window.resetsAt === null ? null : new Date(window.resetsAt * 1000);
+                  const expired = resets !== null && resets.getTime() <= now;
+                  return (
+                    <div
+                      className="statusbar-allowance-window"
+                      data-tone={tone}
+                      key={`${window.poolId}:${window.window}`}
+                    >
+                      <span className="statusbar-allowance-name">
+                        {window.poolId === mainPool ? name : `${window.poolName} · ${name}`}
+                      </span>
+                      <AllowanceMeter
+                        remaining={remaining}
+                        label={`${agentName(record.agent)} · ${window.poolName} · ${name}`}
+                      />
+                      {/* The column fits a percentage; other states keep their full wording on hover. */}
+                      <strong title={label}>
+                        {remaining !== null
+                          ? `${label.split(' ')[0]} left`
+                          : label === 'Refresh needed'
+                            ? 'Refresh'
+                            : '—'}
+                      </strong>
+                      <span
+                        className="statusbar-allowance-reset"
+                        title={
+                          resets
                             ? `Resets ${resets.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
-                            : 'Reset time not reported'}
+                            : 'Reset time not reported'
+                        }
+                      >
+                        {expired ? 'Ended' : resets ? resetsIn(resets.getTime() - now) : '—'}
                       </span>
                     </div>
-                  </div>
-                );
-              })}
-              {!record.windows.length && (
-                <p className="statusbar-allowance-empty">{record.detail || 'Usage unavailable'}</p>
-              )}
-            </section>
-          ))}
+                  );
+                })}
+                {!record.windows.length && (
+                  <p className="statusbar-allowance-empty">
+                    {record.detail || 'Usage unavailable'}
+                  </p>
+                )}
+              </section>
+            );
+          })}
           {!accounts.length && !loading && (
             <p className="statusbar-allowance-empty">
               No account allowance available. Connect an agent, then refresh.
@@ -224,7 +244,7 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
           <footer>
             <p>Shared with other apps using these accounts.</p>
             <Popover.Close asChild>
-              <Button variant="outline" onClick={() => navigateWorkspace('usage')}>
+              <Button variant="outline" size="sm" onClick={() => navigateWorkspace('usage')}>
                 View usage
               </Button>
             </Popover.Close>

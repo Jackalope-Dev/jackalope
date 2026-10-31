@@ -1,5 +1,6 @@
 import type { TaskDraft } from '../stores/executionStore';
 import type { Project } from '../stores/projectStore';
+import { workspaceModeFor } from './workspace-mode.ts';
 
 export function captureDraftForProject(
   drafts: Record<string, TaskDraft>,
@@ -10,7 +11,7 @@ export function captureDraftForProject(
   return {
     ...existing,
     projectId: project.id,
-    isolated: existing?.isolated ?? project.preferences?.isolatedByDefault ?? true,
+    isolated: existing?.isolated ?? workspaceModeFor(project) === 'worktree',
     ...((existing?.projectId ?? previousProjectId) !== project.id
       ? { model: undefined, connectionIds: undefined, contextSelection: undefined }
       : {}),

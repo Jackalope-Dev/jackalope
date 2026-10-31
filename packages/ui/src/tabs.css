@@ -14,8 +14,8 @@
   }
   .ui-tabs-trigger {
     flex-shrink: 0;
-    min-height: 44px;
-    padding: 10px 16px;
+    min-height: var(--control-height, 36px);
+    padding: 6px 14px;
     border: 0;
     border-radius: 8px;
     background: transparent;

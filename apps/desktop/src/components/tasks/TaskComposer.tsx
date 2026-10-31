@@ -62,6 +62,14 @@ interface Props {
   onChange: (value: Partial<TaskDraft>) => void;
   onLaunch: () => Promise<void>;
   onSave: () => void;
+  /** Plan with me: a read-only interview that drafts a plan to approve. */
+  onPlan?: () => void;
+  /** Write the plan myself: tasks and outcomes become a plan to approve. */
+  onWritePlan?: () => void;
+  /** Draft tools shown at the start of the footer, such as Sharpen. */
+  draftTools?: ReactNode;
+  /** Keeps the draft read-only while a tool rewrites it. */
+  draftLocked?: boolean;
 }
 
 const effortIcons = [Zap, Layers, ShieldCheck];
@@ -98,6 +106,10 @@ export function TaskComposer({
   onChange,
   onLaunch,
   onSave,
+  onPlan,
+  onWritePlan,
+  draftTools,
+  draftLocked = false,
 }: Props) {
   const [panel, setPanel] = useState<string | null>(null);
   const effort = effortFor(current.effort);
@@ -170,6 +182,7 @@ export function TaskComposer({
           id="task-intent"
           className="composer-intent"
           value={current.prompt}
+          readOnly={draftLocked}
           onChange={(event) => onChange({ prompt: event.target.value })}
           placeholder="Describe a change, investigate a problem, or explore an idea…"
           rows={compact ? 1 : inline ? 4 : 3}
@@ -490,6 +503,7 @@ export function TaskComposer({
         </Disclosure>
       </fieldset>
       <div className="task-composer-footer">
+        {draftTools}
         {executionReady && !compact && (
           <span className="composer-dispatch-note">
             {current.isolated ? 'Runs in a separate worktree' : 'Edits your current checkout'}
@@ -504,6 +518,26 @@ export function TaskComposer({
           >
             {editingIdea ? 'Save draft' : 'Save for later'}
           </Button>
+          {executionReady && onWritePlan && (
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={!desktop || submitting}
+              onClick={onWritePlan}
+            >
+              Write the plan myself
+            </Button>
+          )}
+          {executionReady && onPlan && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!desktop || !current.prompt.trim() || !runner?.available || submitting}
+              onClick={onPlan}
+            >
+              Plan with me
+            </Button>
+          )}
           {executionReady && (
             <Button
               type="submit"

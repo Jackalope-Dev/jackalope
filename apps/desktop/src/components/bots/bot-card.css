@@ -27,17 +27,6 @@
   margin-top: 2px;
 }
 
-.bot-card-header > span {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.bot-card-header small {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-}
-
 .bot-card-header strong {
   color: var(--color-text-primary);
   font-size: var(--text-sm);

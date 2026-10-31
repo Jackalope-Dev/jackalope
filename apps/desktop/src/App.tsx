@@ -21,6 +21,7 @@ import { nativeTask } from './lib/task-runtime';
 import { observeCommunity } from './stores/communityStore';
 import { observeExecution, useExecutionStore } from './stores/executionStore';
 import { observeFeedbackActivity } from './stores/feedbackStore';
+import { observeLessonSync } from './stores/lessonSyncStore';
 import { observeNotifications } from './stores/notificationStore';
 import { useOnboardingStore } from './stores/onboardingStore';
 import { useProjectStore } from './stores/projectStore';
@@ -35,6 +36,7 @@ export default function App() {
   useEffect(observeFeedbackActivity, []);
   useEffect(observeNotifications, []);
   useEffect(observeSettingsSync, []);
+  useEffect(observeLessonSync, []);
   const [resetError, setResetError] = useState('');
   const [ready, setReady] = useState(!('__JACKALOPE_RESET__' in window));
   useEffect(() => (ready ? observeCommunity() : undefined), [ready]);

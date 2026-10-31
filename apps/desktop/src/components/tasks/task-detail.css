@@ -24,7 +24,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 8px 12px;
 }
 .task-progress-art {
   width: auto;
@@ -59,8 +59,8 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   border-top: 1px solid var(--color-border-subtle);
-  padding: 16px 20px;
-  gap: 16px;
+  padding: 12px;
+  gap: 12px;
   list-style: none;
 }
 .task-progress-steps[data-count="4"] {
@@ -95,7 +95,7 @@
   justify-content: space-between;
   border-radius: 0;
   border-top: 1px solid var(--color-border-subtle);
-  padding-inline: 20px;
+  padding-inline: 12px;
   text-align: left;
   color: var(--color-text-secondary);
   font-weight: 400;
@@ -112,9 +112,6 @@
 .task-working-area {
   container-type: inline-size;
 }
-.conversation-toggle {
-  align-self: flex-end;
-}
 .task-view-controls {
   display: flex;
   align-items: center;
@@ -123,33 +120,6 @@
   gap: 8px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--color-border);
-}
-.task-view-controls .conversation-toggle {
-  align-self: center;
-}
-.result-canvas[data-alongside="true"] {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1.3fr);
-  gap: 20px;
-}
-.result-canvas[data-alongside="true"] > [data-state] {
-  min-width: 0;
-  overflow: auto;
-}
-.result-canvas[data-alongside="true"] > [data-state]:first-child {
-  border-right: 1px solid var(--color-border-subtle);
-  padding-right: 16px;
-}
-@container (max-width: 760px) {
-  .result-canvas[data-alongside="true"] {
-    display: block;
-  }
-  .result-canvas[data-alongside="true"] > [data-state]:first-child {
-    max-height: 220px;
-    border-right: 0;
-    border-bottom: 1px solid var(--color-border-subtle);
-    margin-bottom: 16px;
-  }
 }
 .task-detail .result-canvas > .ui-tabs-content {
   padding-top: 0;
@@ -192,7 +162,7 @@
   /* One line at rest, growing with the draft so results keep the height. */
   field-sizing: content;
   margin: 0;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   max-height: 160px;
   padding: 10px 12px;
   resize: none;
@@ -221,7 +191,7 @@
   white-space: nowrap;
 }
 .task-detail .ui-disclosure-summary {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }
 .task-detail .result-canvas > [data-state="active"] {
   min-width: 0;
@@ -299,10 +269,24 @@
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
 }
-.task-detail #task-questions,
 .task-detail #task-recovery {
   max-height: min(30vh, 220px);
   overflow-y: auto;
+}
+/* A waiting question is what the task needs next, so it gets most of the page;
+   the handle beneath trades that room with the sections below. */
+.task-detail .task-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: min(60vh, 640px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+/* Tucked into the page gap so the handle adds no height of its own. */
+.task-detail .task-questions-resizer {
+  margin-block: -14px -6px;
 }
 .task-detail-navigation > .workspace-heading {
   flex: 1 1 240px;
@@ -332,7 +316,7 @@
 .task-detail > .task-next {
   margin-block: 0;
 }
-.task-detail > :empty {
+.task-detail > :empty:not(.resize-handle) {
   display: none;
 }
 /* The placeholder already names the field; the visible heading only costs height. */
@@ -364,4 +348,7 @@
 }
 .task-view-tools .work-branch {
   display: none;
+}
+.task-plan-notice {
+  margin-bottom: 16px;
 }

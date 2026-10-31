@@ -1,4 +1,4 @@
-import { Badge, Button, FormField, Input, Select, SelectItem } from '@jackalope/ui';
+import { Badge, Button, FormField, Input, LinkButton, Select, SelectItem } from '@jackalope/ui';
 import { Cloud as CloudIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -18,6 +18,7 @@ import {
 import { openExternalUrl } from '../../lib/tauri-bridge';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Setting, SettingGroup } from './Setting';
+import './artifacts-connection.css';
 
 export function ArtifactsTitle() {
   return (
@@ -116,8 +117,8 @@ export function ArtifactsConnectForm({
     return (
       <div className={className}>
         <p className="settings-row-description">
-          Uses your own Cloudflare account on the Workers Paid plan. Cloudflare bills Artifacts
-          operations and storage to that account.
+          Needs a Cloudflare account on the Workers Paid plan, which Cloudflare bills for Artifacts
+          usage.
         </p>
         {stage.kind === 'waiting' ? (
           <InlineNotice
@@ -135,30 +136,34 @@ export function ArtifactsConnectForm({
             }
           >
             Approve Jackalope in your browser, then return here.{' '}
-            <button type="button" className="artifacts-link" onClick={() => open(stage.url)}>
+            <LinkButton external onClick={() => open(stage.url)}>
               Open the sign-in page again
-            </button>
+            </LinkButton>
           </InlineNotice>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div className="artifacts-connect-actions">
             <Button type="button" disabled={busy || disabled} onClick={() => void signIn()}>
               <CloudIcon size={16} aria-hidden="true" />
               Connect Cloudflare
             </Button>
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               disabled={busy || disabled}
               onClick={() => {
                 setError('');
                 setStage({ kind: 'token' });
               }}
             >
-              Use an API token instead
+              Use an API token
             </Button>
-            <Button type="button" variant="ghost" onClick={() => open(ARTIFACTS_DOCS_URL)}>
+            <LinkButton
+              external
+              className="artifacts-docs-link"
+              onClick={() => open(ARTIFACTS_DOCS_URL)}
+            >
               Artifacts docs
-            </Button>
+            </LinkButton>
           </div>
         )}
         {error && <InlineNotice tone="error">{error}</InlineNotice>}

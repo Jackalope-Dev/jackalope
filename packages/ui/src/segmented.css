@@ -2,8 +2,9 @@
 @import "./motion.css";
 @layer components {
   /* One recessed track shared by filters, view navigation and segmented tab lists.
-     Segments keep the 44px target; the selected one is a raised tile with a border and
-     heavier label, so selection does not rely on colour. */
+     The whole track is one control height, so it lines up with fields and buttons beside it;
+     the selected segment is a raised tile with a border and heavier label, so selection does
+     not rely on colour. */
   .ui-segmented {
     display: inline-flex;
     align-items: center;
@@ -56,8 +57,9 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    min-height: 44px;
-    padding: 0 14px;
+    /* The track's 3px padding and 1px border on each side. */
+    min-height: calc(var(--control-height, 36px) - 8px);
+    padding: 0 12px;
     border: 1px solid transparent;
     border-radius: calc(var(--radius-lg) - 3px);
     background: transparent;
@@ -125,6 +127,12 @@
     :is(.ui-segment, .ui-segmented > .ui-tabs-trigger),
     .ui-segmented[data-indicator="ready"] > .ui-segmented-indicator {
       transition: none;
+    }
+  }
+  /* Touch targets stay full size; the track grows around them. */
+  @media (pointer: coarse) {
+    :is(.ui-segment, .ui-segmented > .ui-tabs-trigger) {
+      min-height: var(--control-height-compact, 44px);
     }
   }
 }

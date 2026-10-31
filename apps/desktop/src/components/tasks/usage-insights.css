@@ -92,7 +92,6 @@
 .usage-chart-scroll {
   flex: 1;
   overflow-x: auto;
-  scrollbar-width: thin;
   padding-bottom: 8px;
 }
 .usage-chart {
@@ -101,7 +100,7 @@
 }
 .usage-chart-point {
   flex: 1;
-  min-width: 44px;
+  min-width: var(--control-height, 36px);
   padding: 5px 3px;
   border-radius: var(--radius-xs);
   cursor: pointer;
@@ -169,7 +168,7 @@
   color: var(--color-text-secondary);
 }
 .usage-chart-details summary {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }
 .usage-attribution-bar {
   display: flex;

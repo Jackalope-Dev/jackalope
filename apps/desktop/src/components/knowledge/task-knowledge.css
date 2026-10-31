@@ -2,7 +2,7 @@
   margin: 0 0 24px;
 }
 .task-knowledge-heading {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 12px 0;
   margin-bottom: 8px;
   font-size: var(--text-sm);

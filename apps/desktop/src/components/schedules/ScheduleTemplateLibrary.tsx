@@ -26,14 +26,9 @@ export function ScheduleTemplateLibrary({
   const visible = showAll ? filtered : filtered.slice(0, 3);
   return (
     <section className="schedule-templates" aria-labelledby="template-library-title">
-      <div className="template-library-heading">
-        <div>
-          <h2 id="template-library-title" className="text-xl font-medium">
-            Start with a useful routine
-          </h2>
-        </div>
-        <span className="task-muted">{scheduleTemplates.length} templates</span>
-      </div>
+      <h2 id="template-library-title" className="text-xl font-medium">
+        Start from a template
+      </h2>
       <div className="template-library-filters">
         <SearchField
           id="schedule-template-search"
@@ -52,7 +47,7 @@ export function ScheduleTemplateLibrary({
         </Select>
       </div>
       {showAll && (
-        <p className="task-muted" role="status">
+        <p className="sr-only" role="status">
           {filtered.length} matching templates
         </p>
       )}
@@ -60,11 +55,8 @@ export function ScheduleTemplateLibrary({
         {visible.map((template) => (
           <article className="template-library-row" key={template.id}>
             <div>
-              <p className="task-muted text-xs">
-                {template.category} · {template.mode} · {template.cadence}
-              </p>
-              <h3 className="text-base font-medium mt-1">{template.name}</h3>
-              <p className="mt-2">{template.summary}</p>
+              <h3 className="text-base font-medium">{template.name}</h3>
+              <p className="task-muted mt-1">{template.summary}</p>
             </div>
             <Button
               variant="outline"

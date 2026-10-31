@@ -25,19 +25,10 @@ export function WorkTools({
   hideTerminal?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState('');
-  const preferredEditor = useSettingsStore((state) => state.preferredEditor);
+  const { groups, error } = useWorkspaceActions(run);
   useEffect(() => {
     if (requestRevision && !onTerminal) setOpen(true);
   }, [requestRevision, onTerminal]);
-  const act = async (action: () => Promise<unknown>) => {
-    setError('');
-    try {
-      await action();
-    } catch (cause) {
-      setError(String(cause));
-    }
-  };
   return (
     <>
       <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -77,43 +68,71 @@ export function WorkTools({
         </Menu.Trigger>
         <Menu.Portal>
           <Menu.Content className="workspace-menu" align="end">
-            {(['result', 'changes', 'preview', 'terminal'] as const).map((pane) => (
-              <Menu.Item
-                key={pane}
-                onSelect={() =>
-                  void act(async () => {
-                    if (run.liveSessionId && ['changes', 'preview'].includes(pane))
-                      await sessionCommand('action', { id: run.liveSessionId, action: 'pause' });
-                    await nativeTask('task_work_window', { id: run.id, pane, action: 'open' });
-                  })
-                }
-              >
-                Pop out {pane === 'changes' ? 'review' : pane}
-              </Menu.Item>
-            ))}
-            <Menu.Separator />
-            {[...(['vscode', 'cursor'] as const)]
-              .sort((a) => (a === preferredEditor ? -1 : 1))
-              .map((editor) => (
-                <Menu.Item
-                  key={editor}
-                  onSelect={() =>
-                    void act(() => nativeTask('task_open_editor', { id: run.id, editor }))
-                  }
-                >
-                  Open in {editor === 'vscode' ? 'VS Code' : 'Cursor'}
-                  {editor === preferredEditor ? ' (preferred)' : ''}
+            {groups.map((group, index) => [
+              index > 0 && <Menu.Separator key={`separator-${group[0]?.id}`} />,
+              ...group.map((action) => (
+                <Menu.Item key={action.id} onSelect={action.onSelect}>
+                  {action.label}
                 </Menu.Item>
-              ))}
-            <Menu.Item
-              onSelect={() => void act(() => navigator.clipboard.writeText(run.workspace))}
-            >
-              Copy workspace path
-            </Menu.Item>
+              )),
+            ])}
           </Menu.Content>
         </Menu.Portal>
       </Menu.Root>
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
     </>
   );
+}
+
+type WorkspaceAction = { id: string; label: string; onSelect: () => void };
+
+/** Pop-out windows, then editors and the workspace path, for a run. */
+export function useWorkspaceActions(run?: TaskRun) {
+  const [error, setError] = useState('');
+  const preferredEditor = useSettingsStore((state) => state.preferredEditor);
+  if (!run) return { groups: [] as WorkspaceAction[][], error };
+  const act = async (action: () => Promise<unknown>) => {
+    setError('');
+    try {
+      await action();
+    } catch (cause) {
+      setError(String(cause));
+    }
+  };
+  const windows: WorkspaceAction[] = (['result', 'changes', 'preview', 'terminal'] as const).map(
+    (pane) => ({
+      id: `pop-${pane}`,
+      label: `Pop out ${pane === 'changes' ? 'review' : pane}`,
+      onSelect: () =>
+        void act(async () => {
+          if (run.liveSessionId && ['changes', 'preview'].includes(pane))
+            await sessionCommand('action', { id: run.liveSessionId, action: 'pause' });
+          await nativeTask('task_work_window', { id: run.id, pane, action: 'open' });
+        }),
+    }),
+  );
+  const workspace: WorkspaceAction[] = [
+    ...[...(['vscode', 'cursor'] as const)]
+      .sort((a) => (a === preferredEditor ? -1 : 1))
+      .map((editor) => ({
+        id: editor,
+        label: `Open in ${editor === 'vscode' ? 'VS Code' : 'Cursor'}${editor === preferredEditor ? ' (preferred)' : ''}`,
+        onSelect: () => void act(() => nativeTask('task_open_editor', { id: run.id, editor })),
+      })),
+    {
+      id: 'copy-path',
+      label: 'Copy workspace path',
+      onSelect: () => void act(() => navigator.clipboard.writeText(run.workspace)),
+    },
+    ...(run.branch
+      ? [
+          {
+            id: 'copy-branch',
+            label: 'Copy branch name',
+            onSelect: () => void act(() => navigator.clipboard.writeText(run.branch)),
+          },
+        ]
+      : []),
+  ];
+  return { groups: [windows, workspace], error };
 }

@@ -1,8 +1,8 @@
 .workspace-page-layout {
-  --workspace-page-padding: 24px;
-  --workspace-heading-gap: 16px;
-  --workspace-section-gap: 28px;
-  --workspace-section-heading-gap: 12px;
+  --workspace-page-padding: 16px;
+  --workspace-heading-gap: 14px;
+  --workspace-section-gap: 24px;
+  --workspace-section-heading-gap: 10px;
   box-sizing: border-box;
   flex: 1;
   min-width: 0;
@@ -10,7 +10,7 @@
   width: 100%;
   max-width: none;
   margin-inline: 0;
-  padding: var(--workspace-page-padding) var(--workspace-gutter, 32px) 48px;
+  padding: var(--workspace-page-padding) var(--workspace-gutter, 20px) 32px;
   overflow-y: auto;
   scrollbar-gutter: stable;
   overflow-wrap: anywhere;
@@ -46,9 +46,9 @@
 .workspace-heading h1 {
   margin: 0;
   color: var(--color-text-primary);
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   font-weight: 600;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.03em;
   line-height: 1.25;
 }
 .workspace-heading h1:focus {
@@ -99,7 +99,7 @@
 .workspace-section-header :is(h2, h3) {
   margin: 0;
   color: var(--color-text-primary);
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.4;

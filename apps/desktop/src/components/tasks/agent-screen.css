@@ -19,14 +19,14 @@
 }
 
 .agent-screen-heading h3 {
-  margin: 0;
+  margin: 0 auto 0 0;
   color: var(--color-text-primary);
   font-size: var(--text-sm);
   font-weight: 600;
 }
 
 .agent-screen-heading .ui-badge {
-  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .agent-screen-frame {
@@ -124,4 +124,50 @@
   width: 100%;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-sm);
+}
+
+.agent-screen-log {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-screen-log li {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+}
+
+.agent-screen-log-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.agent-screen-log-line span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.agent-screen-log-line time {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+}
+
+.agent-screen-log small {
+  font-size: var(--text-xs);
+}
+
+.agent-screen-log img {
+  max-width: 240px;
+  margin-top: 4px;
 }

@@ -23,6 +23,24 @@ pub struct ManagedTask {
     /// The assignment limit the planner was given; older plans were limited to four.
     #[serde(default = "default_max_assignments")]
     pub max_assignments: usize,
+    /// Set when an approved plan started this task instead of a planner run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan: Option<PlanLink>,
+}
+
+/// The approved plan revision a managed task implements. Its assignments go
+/// through the same validation as a planner's, and it always ends with an
+/// independent review against the plan.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanLink {
+    pub plan_id: String,
+    pub revision: u32,
+    pub assignments: String,
+    #[serde(default)]
+    pub reviewer_agent: Option<String>,
+    #[serde(default)]
+    pub review_brief: String,
 }
 
 fn default_max_assignments() -> usize {
@@ -117,6 +135,19 @@ fn planning_prompt(request: &str, limit: usize) -> String {
     format!("Plan this complete request using the repository and its instructions. Read only: do not edit files, install dependencies, commit, launch other agents or implement changes. Return ONLY a JSON array of 1–{limit} assignments with key, title, prompt, scopes (actual relative repository files/folders), dependsOn (other assignment keys), outcomes (reviewable requirements) and briefing. The briefing gives that worker what you learned so it can skip repository discovery: key files and symbols, patterns to follow, contracts it must honor, the commands that check it and pitfalls, as facts under 1500 characters. Preserve the complete request and its constraints. Minimize total implementation, integration and human review effort, not just worker duration. When asked to choose work, prefer a bounded, independently verifiable improvement and check prerequisites before proposing a new integration. Keep tightly coupled work together and tests with implementation. Inspect imports, API contracts, schemas, generated files, manifests and lockfiles: different files do not imply independent work. Give each shared contract and dependency change one owner; put it in a prerequisite and name the contract in consumer instructions. Independent assignments must have non-overlapping ownership. Use parallel investigation or review only when it helps the requested result. Use one assignment when splitting creates more integration work than it saves. Account for each worker repeating repository discovery, dependency setup and required checks. Prefer a small shared-contract prerequisite that unlocks independent consumers; keep the tests for each behavior with its implementation. Do not split a short change just to fill available slots. Jackalope combines finished work, checks dependencies and appends final review and verification; do not add your own integration assignments. No agent names or model changes. Each prompt must be self-contained and identify its exact responsibility.\n\nComplete request:\n{request}")
 }
 
+/// Assignments for an approved plan, with the plan-aware review appended.
+pub(super) fn plan_entries(link: &PlanLink, task: &ManagedTask) -> Result<Vec<PlanEntry>, String> {
+    let mut items =
+        parse_plan_entries(&link.assignments, &task.request, task.max_assignments, true)?;
+    if let Some(review) = items.iter_mut().find(|item| item.key == "combined-review") {
+        review.prompt.push_str(&link.review_brief);
+        if let Some(agent) = &link.reviewer_agent {
+            review.agent = agent.clone();
+        }
+    }
+    Ok(items)
+}
+
 pub(super) fn prepare_followup(
     ledger: &Ledger,
     runs: &[TaskRun],
@@ -176,6 +207,17 @@ pub(super) fn prepare_followup(
 }
 
 fn parse_plan(text: &str, request: &RunRequest, limit: usize) -> Result<Vec<PlanEntry>, String> {
+    parse_plan_entries(text, request, limit, false)
+}
+
+/// `always_review` keeps the combined review for a single assignment, which
+/// plans use for their independent review.
+pub(super) fn parse_plan_entries(
+    text: &str,
+    request: &RunRequest,
+    limit: usize,
+    always_review: bool,
+) -> Result<Vec<PlanEntry>, String> {
     let text = text.trim();
     let text = if text.starts_with("```") {
         text.split_once('\n')
@@ -262,7 +304,7 @@ fn parse_plan(text: &str, request: &RunRequest, limit: usize) -> Result<Vec<Plan
         }
         ancestors.insert(item.key.clone(), all);
     }
-    if items.len() == 1 {
+    if items.len() == 1 && !always_review {
         return Ok(items);
     }
     let mut combined_context = request.context_selection.clone();
@@ -347,6 +389,7 @@ impl Coordinator {
             error: None,
             auto_start,
             max_assignments: assignment_limit(self.inner.lock().unwrap().concurrency),
+            plan: None,
         };
         {
             let mut inner = self.inner.lock().unwrap();
@@ -408,6 +451,9 @@ impl Coordinator {
             .find(|task| task.id == id)
             .cloned()
             .ok_or("Task not found.")?;
+        if let Some(link) = &task.plan {
+            return plan_entries(link, &task);
+        }
         let runs = self.runtime.integration_runs()?;
         let run = latest_planner(&task, &runs)
             .ok_or("The planning attempt is unavailable. Inspect task recovery before retrying.")?;
@@ -429,7 +475,7 @@ impl Coordinator {
         parse_plan(&run.result, &task.request, task.max_assignments)
     }
 
-    fn start_managed(&self, id: &str, planner_run_id: &str) -> Result<(), String> {
+    pub(super) fn start_managed(&self, id: &str, planner_run_id: &str) -> Result<(), String> {
         self.runtime.access.ensure()?;
         let task = self
             .inner
@@ -446,7 +492,9 @@ impl Coordinator {
         }
         task_strategy::validate_source(&task.request, &task.assessment.source_head)?;
         let runs = self.runtime.integration_runs()?;
-        if latest_planner(&task, &runs).is_none_or(|run| run.id != planner_run_id) {
+        if task.plan.is_none()
+            && latest_planner(&task, &runs).is_none_or(|run| run.id != planner_run_id)
+        {
             return Err(
                 "The proposed plan changed. Review its latest assignments before starting.".into(),
             );
@@ -459,6 +507,13 @@ impl Coordinator {
             .map(|account| [(task.request.agent.clone(), account.clone())].into())
             .unwrap_or_default();
         let count = items.len();
+        // Only an approved plan may run without a check; it was told so at approval.
+        let review_only = task.plan.is_some()
+            && task
+                .request
+                .verify_command
+                .as_deref()
+                .is_none_or(|command| command.trim().is_empty());
         let created = self.import(PlanRequest {
             staged_dependencies: true,
             feature: Some(task.title.clone()),
@@ -471,7 +526,8 @@ impl Coordinator {
             verify_command: task.request.verify_command.clone(),
             prepare_command: task.request.prepare_command.clone(),
             setup_files: task.request.setup_files.clone(),
-            auto_verify: true,
+            auto_verify: !review_only,
+            review_only,
             items,
         })?;
         let mut inner = self.inner.lock().unwrap();
@@ -538,7 +594,7 @@ impl Coordinator {
         Ok(())
     }
 
-    fn managed_action(&self, id: &str, action: &str) -> Result<(), String> {
+    pub(super) fn managed_action(&self, id: &str, action: &str) -> Result<(), String> {
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
         let task = inner
@@ -954,6 +1010,43 @@ mod tests {
         )
         .is_err());
     }
+    #[test]
+    fn approved_plans_validate_like_planner_output_and_end_with_a_plan_review() {
+        let mut task = task();
+        assert!(task.plan.is_none(), "saved tasks without a plan still load");
+        let link = PlanLink {
+            plan_id: "plan".into(),
+            revision: 2,
+            assignments: r#"[{"key":"plan","title":"Whole plan","prompt":"Implement it","scopes":["src"],"outcomes":["AC-1: exports work"]}]"#.into(),
+            reviewer_agent: Some("claude".into()),
+            review_brief: "
+
+Independent plan review".into(),
+        };
+        task.plan = Some(link.clone());
+        let items = plan_entries(&link, &task).unwrap();
+        assert_eq!(
+            items.len(),
+            2,
+            "one worker still gets an independent review"
+        );
+        assert_eq!(items[0].agent, "codex");
+        assert_eq!(items[1].key, "combined-review");
+        assert_eq!(items[1].agent, "claude");
+        assert!(items[1].prompt.contains("Independent plan review"));
+        assert_eq!(
+            items[1].context_selection.outcomes,
+            vec!["AC-1: exports work"]
+        );
+        let overlapping = PlanLink {
+            assignments: r#"[{"key":"a","title":"A","prompt":"A","scopes":["src"]},{"key":"b","title":"B","prompt":"B","scopes":["src/x.ts"]}]"#.into(),
+            ..link.clone()
+        };
+        assert!(plan_entries(&overlapping, &task).is_err());
+        let value = serde_json::to_value(&task).unwrap();
+        assert_eq!(value["plan"]["revision"], 2);
+    }
+
     #[test]
     fn dependent_shared_ownership_is_sequential() {
         let plan = parse_plan(r#"[{"key":"a","title":"A","prompt":"A","scopes":["src"]},{"key":"b","title":"B","prompt":"B","scopes":["src/file.ts"],"dependsOn":["a"]}]"#, &request(), 4).unwrap();

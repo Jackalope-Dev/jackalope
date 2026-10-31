@@ -98,8 +98,8 @@
   display: grid;
   flex-shrink: 0;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: var(--control-height, 36px);
+  height: var(--control-height, 36px);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -293,7 +293,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }
 
 /* Every row takes the tallest card's height, so the grid reads as even tiles. */
@@ -398,7 +398,7 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding: 8px 0 0;
   border: 0;
   border-top: 3px solid var(--color-border-subtle);
@@ -524,7 +524,7 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   cursor: pointer;
 }
 
@@ -552,7 +552,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }
 
 .bot-appearance {
@@ -657,37 +657,6 @@
   outline-offset: -2px;
 }
 
-.bots-roster-template {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  justify-self: start;
-  min-height: 44px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--color-accent-ink);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.bots-roster-template:hover:not(:disabled) {
-  background: var(--color-surface-hover);
-}
-
-.bots-roster-template:disabled {
-  color: var(--color-text-muted);
-  cursor: not-allowed;
-}
-
-.bots-roster-template:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: -2px;
-  border-radius: var(--radius-xs);
-}
-
 .bots-template-dialog {
   width: min(40rem, calc(100vw - 32px));
 }
@@ -765,15 +734,6 @@
 .bot-editor-form::after {
   content: "";
   height: 4px;
-}
-
-/* A reply arrived since the person last read the conversation. */
-.bots-roster-unread {
-  flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-accent);
 }
 
 .bots-conversation-row {

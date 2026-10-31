@@ -42,7 +42,14 @@ and `editor` each add one concern, with drawing under `ui/render/`.
 ## Projects and sessions
 
 The command works in the current directory. Inside a Git repository it uses that
-repository's root, and each conversation gets an isolated worktree. When the
+repository's root, and each conversation works where the project's workspace setting
+says: an isolated worktree by default, or a new branch in the checkout, the current
+branch, or a question when the conversation starts. The host's `projects` answer
+carries each project's `autoApprove`, `workspaceMode`, `learnAutomatically`,
+`learningCadence`, `syncLessons`, `agentReflection` and `exportLessons` (newer fields
+are optional, and older hosts omit them), and `set-project-settings` changes them for
+the app and every terminal. `learnings`, `learning` and `set-learning-archived` list a project's
+learned lessons, show one with its recent history, and archive or restore it. When the
 directory is not a repository yet, an interactive session asks before creating
 one. Saying no, or running non-interactively without `--init`, edits files in
 that folder directly. There is no worktree, patch or merge for that folder.
@@ -77,23 +84,52 @@ terminal and the app together. Leaving a terminal does not stop work.
 | `jackalope stop <id>` | Stops the work a conversation is running |
 | `jackalope answer <id> [reply]` | Shows the question a conversation is waiting on, or answers it by text or option number |
 | `jackalope diff <id>` | Prints a conversation's changes since its worktree left the project's commit, uncommitted edits included; `--stat` summarizes them. New untracked files are listed on stderr |
-| `jackalope merge <id>` | Pauses the conversation, prepares a merge of its latest reviewed attempt into the project's target branch through the app's merge review, lists the files and asks before applying. `-m` sets the commit message; conflicts are reported for the app's merge review |
+| `jackalope merge <id>` | Pauses the conversation, prepares a merge of its latest reviewed attempt into the project's target branch through the app's merge review, lists the files and asks before applying. `-m` sets the commit message; conflicts are reported for the app's merge review. Work that ran on a new branch or the current branch in the checkout has nothing to merge, and the command says what to do instead; when nothing is prepared, the pause it added is undone |
 | `jackalope pr <id>` | Commits remaining changes with the project's commit settings, pushes the branch and opens a draft pull request through the GitHub CLI after you confirm. `--title` replaces the conversation title; `--ready` opens it ready for review |
+| `jackalope plan "<goal>"` | Plans before any code changes: a read-only interview whose questions are asked on the terminal (exit status 2 when there is none), then prints the plan. See [plan mode](#plan-mode) |
+| `jackalope plans` | Lists this project's plans; `--json` |
+| `jackalope plan show <id>` | Prints a plan and its progress; `--json` |
+| `jackalope plan approve <id> [single\|subtasks\|swarm]` | Shows the assumptions, asks, and approves the latest revision; `--yes` skips the question |
 | `jackalope status` | Shows the host, its endpoint and profile |
 
-`ls` and `status` accept `--json`. Options take a value as `--agent codex` or
+`ls`, `status`, `plans` and `plan` accept `--json`. Options take a value as `--agent codex` or
 `--agent=codex`; `--` ends options, and an argument containing a space is
 always message text. Unknown or misplaced options are refused with exit status 64.
 
 Inside a conversation, typing `/` opens an interactive command menu, and `/help`
-lists commands: `/new`, `/bg`, `/init`, `/sessions`, `/projects`, `/agents`, `/settings`,
-`/status`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/files`, `/review` (or `/diff`), `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
-`/unpause`, `/copy`, `/history`, `/kill`, `/clear`, `/open` and `/quit`. Pickers
+lists commands: `/new`, `/bg`, `/sharpen`, `/init`, `/sessions`, `/projects`, `/agents`, `/settings`,
+`/status`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/learnings`, `/files`, `/review` (or `/diff`), `/merge`, `/pr`, `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
+`/unpause`, `/unqueue`, `/copy`, `/history`, `/kill`, `/clear`, `/plan`, `/plans`, `/revise`,
+`/approve`, `/replan`, `/export`, `/deviation`, `/browser`, `/computer`, `/open` and `/quit`. Pickers
 filter as you type. `/new <message>` starts
 and shows a conversation; `/bg <message>` starts one and stays on the current one.
+`/status` prints the project and branch, the open work's state, agent and model, the
+conversations that need you and each agent's state, without leaving the conversation.
+`/merge [message]` prepares a merge of the latest attempt as `jackalope merge` does,
+lists its files and asks; the conversation is paused only once you confirm, and a
+failed merge resumes it. `/pr [title]` asks whether to open a draft or ready pull
+request, then commits what is left, pushes and opens it. `/unqueue` takes back your
+newest message that has not reached an agent and puts it in the input to edit.
+`/sharpen <draft>` asks a helper agent, on its own connection so the terminal stays usable,
+to rewrite the draft into a deeper version of the same task and puts the result in the
+input to edit; it never sends. If you typed something meanwhile, the rewrite is printed in
+the feed instead. Clearing the input with Esc and running `/sharpen undo` brings back the
+draft. The call counts toward helper usage like Sharpen in the app.
+What you type in a conversation is its draft, shared with the app's composer: opening the conversation in either place brings it back, and sending clears it. Clickable parts of the header and status line highlight under the pointer.
+`/retry` relaunches work that failed to start; to try finished or stopped work again,
+send a follow-up. Another conversation that starts needing you is announced in the feed.
 `/learn` inspects conversation history since the previous learn command (or session
-start) and saves relevant learnings, preferences and check commands to project
-knowledge. Messages sent while an agent works queue behind it; `/pause` holds
+start) and sends the preferences, corrections, answers and passing check commands it
+finds through the same promotion gate as background learning; it lists what was
+added, already known or skipped. `/learnings` (or `/lessons`) lists the project's
+learned lessons with their status (new, active or archived) and use count; choosing
+one shows its text and recent history in the feed, or archives or restores it.
+`/settings` changes the project's **Auto-approve agent requests**, **Where tasks
+work**, **Learn automatically**, **Reflect with an agent** (uses the default agent's
+quota), **Sync learned lessons** (when lesson sync is on in the app), **Write
+lessons to AGENTS.md**, **Planning questions** (steps through 0, 3, 5, 8, 10 and 12) and **Planning agent** for the
+app and every terminal; editing and
+deleting lessons happen in the app. See [project knowledge](PROJECT-KNOWLEDGE.md#learned-lessons). Messages sent while an agent works queue behind it; `/pause` holds
 the queue and `/unpause` sends it. `/clear` starts a fresh conversation like `/new`,
 `/resume` opens the conversation picker, and Ctrl+L clears notes and finished `!` output.
 `/model` picks from the models configured for the next conversation's agent, or
@@ -102,23 +138,104 @@ windows and resets. `/theme <colour>` takes orange, red, pink, purple, blue,
 teal, green, yellow or any `#rrggbb` and sets the project's accent in every
 terminal and the app: a project with its own app theme changes alone, otherwise
 the app-wide accent changes. `/init` asks an agent to write or refresh `AGENTS.md`.
+`/computer` shows the conversation's [bot or task computer](BOT-COMPUTERS.md) and
+`/computer start` or `/computer stop` changes it; computers are created in the app.
 
 A line starting with `!` runs in the user's shell (`cmd` on Windows) in the
 conversation's worktree, or the project when it has none. Output streams below the
 conversation and never reaches an agent; stdin is closed and pagers are disabled.
 `/kill` stops running commands and their children (the process group on Unix,
-`taskkill /T` on Windows), and leaving the terminal stops them too. `@` opens fuzzy
-completion over the workspace's files that Git does not ignore. Outside a repository
-the list is a walk of the directory, skipping dependency and build folders. The list
-is read in the background and again after 15 seconds, so new files appear.
+`taskkill /T` on Windows), and leaving the terminal stops them too.
 
-While a conversation is open, the header shows the small mark beside the project and
-branch, the conversation's routing, other open conversations (with any that need
-you) and agent readiness. While work runs, a band of accent moves along the rule
-under the header and the status text shimmers; `JACKALOPE_REDUCED_MOTION=1` keeps
-them still. Below the conversation, running work lists its newest steps (tool calls
-and narration) as the host records them, and `jackalope -p` prints the same steps
-to standard error.
+`@` opens completion over the agents that are set up, then the workspace's files that
+Git does not ignore. Outside a repository the file list is a walk of the directory,
+skipping dependency and build folders; it is read in the background and again after
+15 seconds, so new files appear. A message may name any number of files and agents.
+Naming an agent (`@codex fix the flaky test`) starts the message with that agent,
+without the name in the text; naming several starts one conversation per agent and
+shows the first. An agent named while a conversation is open starts a new one, since
+a conversation keeps its agent.
+
+### Plan mode
+
+`/plan <goal>` starts a read-only planning interview for the current project (with the
+agent chosen by `/agent`, or the project's planning agent) and pins the plan panel where
+the changes panel goes; `/plan` alone hides or shows it. Typing `/plan ` or `/revise `
+turns the input green with a plan hint. The planner's questions use the question card,
+which shows a question's header and recommended option; answer by typing, with
+`/answer`, or choose **Use your recommendations for the rest** or **Done, draft the
+plan**. The question picker marks the recommended option `(recommended)` and starts on
+it. A question that takes several answers shows checkboxes: Space ticks an option and
+the send row answers with every ticked option; typing numbers such as `1,3` works too.
+A question answered in the app closes its picker here, and the next waiting question
+replaces it; a plan deviation decided in the app closes its picker the same way. A typed
+answer may be an option's number or name. Questions that take only their options, such
+as a permission request, refuse other text instead of reading it as a denial, and
+confirmations offer **Yes, proceed** and **No, adjust**, as in the app. When the agent
+stopped before you answered, the card says so and your answer continues the
+conversation with the question and your answer, as the app does. The panel shows the status and revision, the recommended shape and its reason,
+highlighted assumptions, the task graph with dependencies and parallel tasks, which tasks
+cover each acceptance criterion, how approval will verify the work (the project's check,
+the plan's test criteria, or "No automatic check: results are reviewed but not
+test-verified" with a hint to add a check command in the app), sections changed since
+the previous revision, pending deviations and progress once the plan runs. `/revise <comments>` asks the planner for a
+new revision, Ctrl+G opens the plan in `$VISUAL` or `$EDITOR` (Notepad or `vi` when
+neither is set) and saves a changed file as a new revision, `/approve [single|subtasks|swarm]`
+approves the revision shown (default: the recommendation), `/export [path]` saves it into
+the repository without committing, `/replan [why]` revises a running plan from what is
+done, and `/deviation` opens a picker to accept and amend, redo or re-plan a pending
+deviation (`/deviation accept|redo|replan` decides directly). While a deviation waits,
+the conversation needs you: its tab dot and window title turn amber, and the banner
+above the input states the deviation and its proposed amendment; Enter on an empty input
+opens the same picker. `/plans` opens a picker of the project's plans with status,
+revision and when each last changed; Enter opens the chosen plan in the panel. `/settings`
+also changes the project's planning question limit and planning agent; approving from a
+terminal uses the project's check as the app mirrors it.
+
+The host answers `plan-start`, `plans`, `plan-detail` and `plan-action` (`keep`, `replan`,
+`approve` with the exact `revision` and `hash`, `save`, `export`, `accept`, `redo`,
+`replan-deviation`) with `plan`, `plans` or `exported` responses. Questions carry optional
+`header`, `recommended`, `multiSelect`, `rationale` and `whyAsk`; plan views carry `verification`
+(`project`, `criteria` or `review`) and `check`; plan summaries carry `needsYou`;
+deviations carry `amendment`; projects carry `verifyCommand`, `autoVerify`,
+`questionCap` and `plannerAgent`; and `set-project-settings` accepts `question_cap` and
+`planner_agent` (empty plans with the task's agent). Older hosts omit them and the
+protocol version is unchanged. See [plan mode](PLAN-MODE.md) for the document format.
+
+A leading `/`, `!` or `@` is the input's mode: the prompt at the left of the input
+shows it (accent, amber or green) and the text hides it. Backspace on the empty
+input leaves the mode; the cursor never moves in front of it.
+
+### Layout
+
+Terminals at least 60 columns wide and 16 rows tall draw a darker shell around one
+rounded content card, following the app's surfaces:
+
+- The header line shows the wordmark, then the conversation's title, or tabs once
+  more than one conversation is open, and on the right the agent and model, project
+  and branch. Tabs cover conversations that need you, the open one and those opened
+  in this terminal; `/sessions` lists the rest. Each tab shows its number, a dot for its state (amber when it needs
+  you, a spinner while working, hollow when idle) and its title; titles shorten to
+  fit, and what still does not fit is counted. Alt+1 to Alt+9 show a tab, and
+  Ctrl+N and Ctrl+P step through the tabs across projects.
+- The card holds the conversation, the changes panel and the input. While work runs,
+  a band of light travels along the card's top edge.
+- The status line shows the state as a coloured dot and label, elapsed time, the
+  current step, a warning once running work has reported nothing new for 45 seconds,
+  queued messages, changed files, running commands and brief confirmations. Key
+  hints sit on its right.
+
+The wordmark, tabs, agent, model, project, open-conversation count and key hints can
+be clicked. A start screen shows the JACKALOPE wordmark (a two-row version in narrow
+windows), which light sweeps across once when the screen appears, and the agents that are set up. When work finishes cleanly, the status line says how long it took and what usually comes next. Smaller terminals drop the shell for a
+compact header, a status line and a rotating tip.
+
+Your messages and pending work read as tinted blocks with a bar down their left edge.
+When a conversation is blocked, an amber "Needs you" banner above the input says why
+and how to carry on; an open question is pinned there instead, and `/answer` reopens
+its options. Running work lists its newest steps (tool calls and narration) as the
+host records them, and `jackalope -p` prints the same steps to standard error.
+`JACKALOPE_REDUCED_MOTION=1` keeps the band, spinners, shimmer and wordmark sweep still.
 
 The changes panel lists files the conversation's checkout changed since it left
 the project's checked-out commit, committed or not, including untracked files, with
@@ -126,11 +243,24 @@ line counts and the selected file's diff. It opens by itself the first time work
 changes a file and stays hidden for that conversation once closed. Ctrl+O or
 `/files` toggles it and Alt+Up/Down (or Shift) selects a file. It sits beside the
 conversation from 100 columns and below it on narrower terminals; with no room the
-status line shows the count. A pending question stays pinned above the input;
-`/answer` reopens its options. Switches such as this one and
-`JACKALOPE_BELL` read `1`, `true`, `yes` or `on` as on and `0`, `false`, `no`
-or `off` as off. The status line shows elapsed time,
-a warning once running work has reported nothing new for 45 seconds, queued messages, running commands and brief confirmations.
+status line shows the count.
+
+### Colour
+
+With 24-bit colour the interface paints the app's surface tones, tinted with the
+project's accent, and checks text and accent contrast against them. Windows consoles,
+Windows Terminal, WezTerm, kitty, iTerm, Ghostty, VS Code and the app's own terminal
+window count as 24-bit even without `COLORTERM=truecolor`. `JACKALOPE_THEME` takes
+`dark`, `light` or `terminal` (keep the terminal's background); otherwise a terminal
+that reports a light background through `COLORFGBG` gets the light surfaces. The
+terminal follows its project's saved accent, including theme changes while it is open
+and the project of an attached conversation. 256-colour terminals use the nearest
+palette match and the terminal's own background. Success, attention and failure use
+fixed green, amber and red tones. `NO_COLOR` disables colour, and `JACKALOPE_ASCII=1`
+replaces Unicode marks and borders with plain characters. Frames are drawn with
+synchronized output where the terminal supports it, so they appear whole.
+
+### Keys
 
 The input soft-wraps and grows to a third of the screen. Shift+Enter (where the
 terminal supports the keyboard protocol), Alt+Enter, Ctrl+J or a trailing `\` adds a
@@ -140,23 +270,19 @@ draft (Ctrl+Y restores it), returns to the latest output when scrolled back, and
 pressed twice stops running work. Readline keys work: Ctrl+A/E, Ctrl+W, Alt or Ctrl
 with Backspace, Left and Right, Ctrl+U/K and Ctrl+Y. A line starting with a space
 is not saved to history. Page Up and Page Down scroll a screen at a time; while
-scrolled back the view stays put as output arrives,
-and Ctrl+N and Ctrl+P step through open conversations across projects. Ctrl+Z
-suspends to the shell on macOS and Linux. The window title shows the conversation's
-state, and the bell rings when work finishes or needs you (`JACKALOPE_BELL=0`
-silences it). Dragging selects and copies text through the platform
-clipboard tool, or OSC 52 over SSH; Shift or Option while dragging uses the
-terminal's own selection. Ctrl+C clears the input, then stops running commands, then
-leaves and prints how to rejoin. A rotating tips bar below the composer highlights
-commands and shortcuts when terminal height permits.
+scrolled back the view stays put as output arrives. Ctrl+L clears notes and finished
+`!` output. Ctrl+Z suspends to the shell on macOS and Linux. The window title shows
+the conversation's state, and the bell rings when work finishes or needs you
+(`JACKALOPE_BELL=0` silences it). Switches such as these read `1`, `true`, `yes` or
+`on` as on and `0`, `false`, `no` or `off` as off. Dragging selects and copies text
+through the platform clipboard tool, or OSC 52 over SSH; Shift or Option while
+dragging uses the terminal's own selection. Ctrl+C clears the input, then stops
+running commands, then leaves and prints how to rejoin.
+
 `--init` creates a Git repository in the current directory when it does not
 have one, so the conversation can use a worktree. Without it, a folder that is
 not a repository is edited directly. `JACKALOPE_PROFILE_DIR` or `--profile=<dir>`
-selects a non-default profile. The terminal follows its project's saved accent,
-including theme changes while it is open and the project of an attached conversation.
-Colour is adjusted for readability; 256-colour terminals use the nearest palette match.
-Success, attention and failure use fixed green, amber and red tones.
-`NO_COLOR` disables colour; without `COLORTERM=truecolor` the banner uses one colour.
+selects a non-default profile.
 
 `jackalope -p "<message>"` (or `jackalope run`) starts a conversation, waits for it
 to settle and prints the reply; piped stdin is appended to the message, `--json`

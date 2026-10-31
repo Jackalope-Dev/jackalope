@@ -1,4 +1,10 @@
-import { Badge, type BadgeProps, IconButton, RefreshIcon } from '@jackalope/ui';
+import {
+  Badge,
+  type BadgeProps,
+  IconButton,
+  DropdownMenu as Menu,
+  RefreshIcon,
+} from '@jackalope/ui';
 import {
   Archive,
   Copy,
@@ -7,13 +13,14 @@ import {
   GitBranch,
   GitCommitHorizontal,
   GitMerge,
-  HardDrive,
   Lock,
+  MoreHorizontal,
   Plus,
   Trash2,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { isRetainedWorkspace, retainedWorkspaces } from '../../lib/compare-judge';
 import { nativeTask } from '../../lib/task-runtime';
 import {
   archiveWorktree,
@@ -26,6 +33,8 @@ import {
   type WorktreeOrphan,
 } from '../../lib/tauri-bridge';
 import { openChanges } from '../../stores/commitReviewStore';
+import { useCompareStore } from '../../stores/compareStore';
+import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
@@ -46,6 +55,18 @@ function discarded(worktrees: WorktreeEntry[]): string[] {
 
 const isReady = (wt: WorktreeEntry) =>
   Boolean((wt.cleanup?.merged || wt.cleanup?.content_merged) && !wt.cleanup.blocked_reason);
+
+/** A combine follow-up still reads this worktree, so neither cleanup nor archiving is offered. */
+function retain(wt: WorktreeEntry): WorktreeEntry {
+  return {
+    ...wt,
+    cleanup: wt.cleanup && {
+      ...wt.cleanup,
+      recoverable: false,
+      blocked_reason: 'Kept until the follow-up that combines it finishes.',
+    },
+  };
+}
 
 /** One plain-language status per worktree, so the row reads at a glance. */
 function worktreeStatus(
@@ -101,12 +122,23 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   const refreshing = loading || checkingWorktrees;
   const projectPath = project?.path ?? '';
   const normalizedRoot = projectPath.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
-  const worktrees = (project?.worktrees ?? []).filter(
-    (wt, index) =>
-      index > 0 &&
-      !['main', 'master'].includes(wt.branch) &&
-      wt.path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase() !== normalizedRoot,
+  const comparisons = useCompareStore((s) => s.comparisons);
+  const { runs, drafts } = useExecutionStore(
+    useShallow((s) => ({ runs: s.runs, drafts: s.drafts })),
   );
+  const retained = useMemo(
+    () =>
+      retainedWorkspaces(comparisons, runs, (taskId) => drafts[`reply:${taskId}`]?.prompt ?? ''),
+    [comparisons, runs, drafts],
+  );
+  const worktrees = (project?.worktrees ?? [])
+    .filter(
+      (wt, index) =>
+        index > 0 &&
+        !['main', 'master'].includes(wt.branch) &&
+        wt.path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase() !== normalizedRoot,
+    )
+    .map((wt) => (isRetainedWorkspace(retained, wt.path) ? retain(wt) : wt));
   const ready = worktrees.filter(isReady);
   const active = worktrees.filter((wt) => !isReady(wt));
   const missing = worktrees.filter((wt) => wt.cleanup?.missing && !wt.is_locked);
@@ -346,9 +378,6 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
             </p>
           )}
           <div className="worktree-meta">
-            <span className="font-mono">
-              {wt.head ? wt.head.slice(0, 7) : 'No resolved commit'}
-            </span>
             {wt.is_locked && !wt.cleanup?.missing && (
               <span>
                 <Lock size={14} aria-hidden="true" />
@@ -448,27 +477,31 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
             <GitCommitHorizontal size={18} aria-hidden="true" />
             Changes
           </Button>
-          <IconButton
-            variant="ghost"
-            label={
-              measuring === wt.path
-                ? 'Measuring…'
-                : `${sizes[wt.path] ? 'Refresh' : 'Check'} disk size of ${wt.branch || wt.path}`
-            }
-            title={sizes[wt.path] ? 'Refresh disk size' : 'Check disk size'}
-            disabled={!!measuring || !desktop || !!wt.cleanup?.missing}
-            onClick={() => void measure(wt.path)}
-          >
-            <HardDrive size={18} />
-          </IconButton>
-          <IconButton
-            variant="ghost"
-            label={`Copy path for ${wt.branch || wt.path}`}
-            title="Copy path"
-            onClick={() => void copy(wt.path)}
-          >
-            <Copy size={18} />
-          </IconButton>
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <IconButton variant="ghost" label={`${wt.branch || wt.path} options`}>
+                <MoreHorizontal size={18} />
+              </IconButton>
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
+                <Menu.Item
+                  className="workspace-menu-item"
+                  disabled={!!measuring || !desktop || !!wt.cleanup?.missing}
+                  onSelect={() => void measure(wt.path)}
+                >
+                  {measuring === wt.path
+                    ? 'Measuring…'
+                    : sizes[wt.path]
+                      ? 'Refresh disk size'
+                      : 'Check disk size'}
+                </Menu.Item>
+                <Menu.Item className="workspace-menu-item" onSelect={() => void copy(wt.path)}>
+                  Copy path
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu.Root>
         </div>
       </article>
     );
@@ -615,10 +648,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
           {active.length > 0 && (
             <section className="worktree-group" aria-labelledby="worktrees-active">
               <header className="worktree-group-heading">
-                <div>
-                  <h2 id="worktrees-active">In progress</h2>
-                  <p className="task-muted">Branches not merged yet, or with work still open.</p>
-                </div>
+                <h2 id="worktrees-active">In progress</h2>
                 {missing.length > 0 && (
                   <Button
                     size="sm"

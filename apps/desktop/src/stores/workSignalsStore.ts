@@ -19,6 +19,9 @@ interface WorkSignalsState {
   /** Work the user explicitly marked unread. */
   unread: Record<string, true>;
   stats: Record<string, { value: ChangeStats; key: string; checkedAt: number }>;
+  /** Work closed from the sidebar, by item, with the state it was closed in. */
+  dismissed: Record<string, string>;
+  dismiss: (id: string, state: string) => void;
   /** Records a visit; opening (the default) also clears an explicit unread mark. */
   markSeen: (key: string, opened?: boolean) => void;
   markUnread: (key: string) => void;
@@ -31,6 +34,16 @@ export const useWorkSignalsStore = create<WorkSignalsState>()(
       seen: {},
       unread: {},
       stats: {},
+      dismissed: {},
+      dismiss: (id, state) =>
+        set((current) => ({
+          // Newest last, bounded so long-lived profiles stay small.
+          dismissed: Object.fromEntries(
+            [...Object.entries(current.dismissed).filter(([key]) => key !== id), [id, state]].slice(
+              -500,
+            ),
+          ),
+        })),
       markSeen: (key, opened = true) =>
         set((state) => {
           const unread = { ...state.unread };
@@ -41,7 +54,12 @@ export const useWorkSignalsStore = create<WorkSignalsState>()(
     }),
     {
       name: 'jackalope-work-signals-v1',
-      partialize: (state) => ({ since: state.since, seen: state.seen, unread: state.unread }),
+      partialize: (state) => ({
+        since: state.since,
+        seen: state.seen,
+        unread: state.unread,
+        dismissed: state.dismissed,
+      }),
       merge: (saved, current) => {
         const value = saved as Partial<WorkSignalsState> | undefined;
         const seen: Record<string, string> = {};
@@ -59,6 +77,11 @@ export const useWorkSignalsStore = create<WorkSignalsState>()(
           seen: bounded,
           unread: Object.fromEntries(
             Object.keys(value?.unread ?? {}).map((key) => [key, true as const]),
+          ),
+          dismissed: Object.fromEntries(
+            Object.entries(value?.dismissed ?? {}).filter(
+              (entry): entry is [string, string] => typeof entry[1] === 'string',
+            ),
           ),
         };
       },

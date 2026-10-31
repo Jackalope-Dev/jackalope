@@ -11,14 +11,22 @@ import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
 import { InlineNotice } from '../ui/InlineNotice';
 
-export function SessionTopics({ session }: { session: LiveSession }) {
+export function SessionTopics({
+  session,
+  open,
+  onOpenChange: setOpen,
+}: {
+  session: LiveSession;
+  /** The host opens the dialog from its conversation menu. */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const [editing, setEditing] = useState<{ topics: SessionTopic[]; revision: number } | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [draftKey, setDraftKey] = useState<string>();
-  const [open, setOpen] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const [editingTopicId, setEditingTopicId] = useState<string>();
   const [activeId, setActiveId] = useState<string>();
@@ -93,12 +101,6 @@ export function SessionTopics({ session }: { session: LiveSession }) {
   return (
     <>
       <Dialog.Root open={open} onOpenChange={setOpen}>
-        <Dialog.Trigger asChild>
-          <Button variant="ghost" aria-label="Topics">
-            Topics{topics.length ? ` · ${topics.length}` : ''}
-            {editing ? ' · Unsaved' : ''}
-          </Button>
-        </Dialog.Trigger>
         <DialogContent className="work-topics-dialog">
           <DialogCloseButton />
           <DialogHeader title="Topics" description="Group messages into separate task drafts." />

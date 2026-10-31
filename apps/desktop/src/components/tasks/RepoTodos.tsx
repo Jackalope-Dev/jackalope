@@ -22,6 +22,7 @@ import {
 } from '../../lib/repo-todos';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { workspaceModeFor } from '../../lib/workspace-mode';
 import { useContextMemoryStore } from '../../stores/contextMemoryStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -430,8 +431,7 @@ export function RepoTodos({
                                               projectId: project.id,
                                               title: item.title,
                                               prompt: `${item.title}\n\nRepository TODO: ${selected}, line ${item.line + 1} (${item.section}).\nRead the current repository document for context before working on this item.`,
-                                              isolated:
-                                                project.preferences?.isolatedByDefault ?? true,
+                                              isolated: workspaceModeFor(project) === 'worktree',
                                             });
                                           onCapture(draftKey);
                                         }}

@@ -88,23 +88,13 @@ export function McpMarketplaceCard({
           </dd>
         </div>
       </dl>
-      <div className="mcp-market-status">
-        {scopes.length > 0 ? (
+      {scopes.length > 0 && (
+        <div className="mcp-market-status">
           <span className="text-[var(--color-success)]">
             <Check size={14} aria-hidden="true" /> Configured: {scopes.map(scopeLabel).join(', ')}
           </span>
-        ) : (
-          <span>
-            {recommendation
-              ? recommendation.authentication === 'oauth'
-                ? 'Codex & Claude'
-                : 'On-demand tools · all agents'
-              : setup.reviewNeeded
-                ? 'Review suggested setup'
-                : 'Setup instructions available'}
-          </span>
-        )}
-      </div>
+        </div>
+      )}
       <div className="mcp-card-footer">
         <Button
           variant={recommendation ? 'primary' : 'ghost'}

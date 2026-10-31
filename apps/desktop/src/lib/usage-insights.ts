@@ -188,6 +188,8 @@ export interface HelperAccountingTurn {
   status: string;
   usage: RunUsage;
   archived?: boolean;
+  /** Set for one-off helper calls outside a conversation, such as `sharpen`. */
+  source?: string | null;
 }
 
 /** Dated, attributed helper turns follow the Usage filters. Undated turns stay

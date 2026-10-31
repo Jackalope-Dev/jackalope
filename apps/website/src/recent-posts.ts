@@ -2,6 +2,101 @@ import type { BlogPost } from './blog-types.ts';
 
 export const recentPosts: BlogPost[] = [
   {
+    slug: 'agents-that-keep-working-and-learn',
+    cover: { kind: 'quality', tone: 'honey', label: 'Ask less. Remember more.' },
+    title: 'Agents that keep working, remember what you taught them, and a new terminal.',
+    seoTitle: 'Coding agents that auto-approve and learn',
+    category: 'Product notes',
+    date: '2026-10-28',
+    readingTime: '5 min read',
+    description:
+      'Jackalope 0.1.26 auto-approves routine agent requests, lets projects choose where tasks run, turns corrections into lessons and redesigns the terminal.',
+    sections: [
+      {
+        id: 'keep-working',
+        title: 'Stop babysitting permission prompts',
+        paragraphs: [
+          'Most of what a coding agent asks permission for is routine: run the tests, read a file, list a directory, install a dependency it just added. Approving each one by hand means the agent waits on you, and you stop reading the prompts carefully. Now Jackalope answers routine requests itself and asks you only when something is genuinely risky.',
+          'A risk check looks at each request, including every part of a chained shell command. Deletes outside the project, force pushes, history rewrites, deploys and publishing, credentials, elevated commands and piping downloads into a shell still ask. Everything Jackalope approves on its own is listed in the task’s activity, so you can see exactly what ran.',
+        ],
+        bullets: [
+          'On by default for Claude Code, Kimi Code and OpenCode. Turn it off per project in its settings.',
+          'Deny rules in your own Claude Code settings still apply.',
+          'Gemini CLI, Grok and Antigravity keep their own approval rules for now.',
+        ],
+      },
+      {
+        id: 'where-tasks-work',
+        title: 'Choose where each project’s tasks run',
+        paragraphs: [
+          'Isolated worktrees keep parallel work apart, but not every project wants them. Each project can now choose: an isolated worktree for every task, a new branch in the project checkout, directly on the current branch, or ask each time a task starts.',
+          'Working in the checkout keeps one task at a time per checkout and never discards your uncommitted changes. New task branches are named after the request, such as jackalope/fix-login-bug-909b03, so the branch list reads like your work.',
+        ],
+      },
+      {
+        id: 'learning',
+        title: 'Teach it once',
+        paragraphs: [
+          'Agents forget. You correct the same habit, repeat the same preference and point at the same check command in every conversation. Jackalope now turns those moments into lessons that every agent receives on later work, whichever agent you use.',
+          'Lessons come from what you write and from checks that pass, not from agent output. A gate refuses anything that looks like a secret, a duplicate, or a contradiction of guidance you wrote yourself. New lessons stay on probation until tasks use them, unused ones are archived rather than deleted, and each keeps a history of why it was learned or changed.',
+        ],
+        bullets: [
+          'Review, edit, archive and restore lessons in Project context, or with /learnings in the terminal.',
+          '/learn saves lessons from the current conversation on request.',
+          'Turn Learn automatically off for any project.',
+        ],
+      },
+      {
+        id: 'terminal',
+        title: 'A terminal that looks like the app',
+        paragraphs: [
+          'The jackalope command was redesigned around the app’s own surfaces: a rounded card on your project’s colours, a header that names the agent, project and branch, and a status line that says what is happening. Frames are drawn whole, so it no longer flickers while it updates.',
+          'Open conversations appear as tabs with a dot for their state, so you can see at a glance which one is working and which one needs you. When a conversation is blocked, a banner above the input says why and how to carry on.',
+        ],
+        bullets: [
+          'Alt+1 to Alt+9, or a click, switches tabs.',
+          '@ names agents as well as files: @codex fix the flaky test starts that message with Codex, and naming two agents starts one conversation each.',
+          'A leading /, ! or @ switches the input into command, shell or mention mode.',
+          'Replies stream in as they are written.',
+        ],
+        code: {
+          label: 'Run jackalope in a repository, then type',
+          language: 'text',
+          value: '@claude @codex compare two fixes for the flaky test\n/learnings\n!pnpm test',
+        },
+      },
+      {
+        id: 'claude-code',
+        title: 'Steadier Claude Code tasks',
+        paragraphs: [
+          'Claude Code now keeps one session warm for each conversation, so a follow-up reuses the running session and its prompt cache instead of starting a new process. Projects can set a quick check that runs after each edit, so problems are fixed while the change is fresh, and Claude Code keeps working when the verification command fails before it finishes. A pinned model falls back to another when it is overloaded.',
+        ],
+      },
+      {
+        id: 'try-it',
+        title: 'Try it in the beta',
+        paragraphs: [
+          'These changes are in Jackalope 0.1.26 on the beta channel for macOS and Linux, with Windows following Microsoft Store certification. Running work requires a Jackalope account and an installed, signed-in agent CLI or a connected provider. Installed testing on each platform is still in progress, and the learning limits are early defaults we expect to tune.',
+        ],
+        links: [
+          { label: 'Download Jackalope', href: '/download/' },
+          { label: 'Terminal command guide', href: '/knowledge/terminal-command/' },
+          { label: 'Follow the changelog', href: '/changelog/' },
+        ],
+      },
+    ],
+    related: [
+      {
+        label: 'Run coding agents from your terminal',
+        href: '/blog/coding-agents-from-the-terminal/',
+      },
+      {
+        label: 'Git worktrees for AI coding agents',
+        href: '/blog/git-worktrees-for-ai-coding-agents/',
+      },
+    ],
+  },
+  {
     slug: 'bots-that-know-their-job',
     cover: { kind: 'agents', tone: 'mint', label: 'Give it a role once.' },
     title: 'Bots: coding agents that keep their role, tools and schedule.',

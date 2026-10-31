@@ -1,8 +1,11 @@
 import type { ThemePalette } from '@jackalope/brand/theme';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { type FeatureMapEntry, featureMapForRegistry } from '../lib/feature-map.ts';
+import { reviewPagesForRegistry } from '../lib/review-captures.ts';
 import { nativeTask } from '../lib/task-runtime.ts';
 import { createWorktree, isTauriEnvironment, type WorktreeEntry } from '../lib/tauri-bridge.ts';
+import { WORKSPACE_MODES, type WorkspaceMode } from '../lib/workspace-mode.ts';
 import { readWorktrees } from '../lib/worktree-reads.ts';
 
 export interface ProjectPreferences {
@@ -34,7 +37,40 @@ export interface ProjectPreferences {
   prepareCommand?: string;
   setupFiles?: string[];
   autoVerify?: boolean;
+  /** Superseded by `workspaceMode`; `false` still means current-branch work. */
   isolatedByDefault?: boolean;
+  /** Undefined means an isolated worktree, or `isolatedByDefault` when that is set. */
+  workspaceMode?: WorkspaceMode;
+  /**
+   * Approve routine agent requests without asking and escalate only high-risk
+   * ones. Undefined means on.
+   */
+  autoApprove?: boolean;
+  /** Reflect on work in the background and tidy learned lessons. Undefined means on. */
+  learnAutomatically?: boolean;
+  /** Reported tool calls between background reflections. Undefined means 50. */
+  learningCadence?: number;
+  /** Include learned lessons in account lesson sync when it is on. Undefined means included. */
+  syncLessons?: boolean;
+  /** Also reflect on finished work with the default agent, using its quota. Undefined means off. */
+  agentReflection?: boolean;
+  /** Mirror active learned lessons into AGENTS.md and a Claude Code skill. Undefined means off. */
+  exportLessons?: boolean;
+  /**
+   * Load the person's own Claude Code settings, plugins, hooks and MCP servers in Claude
+   * Code tasks. `false` limits them to project settings and Jackalope's connections.
+   */
+  personalClaudeSetup?: boolean;
+  /** Fast command Claude Code runs after each file edit; `{file}` is the edited path. */
+  editCheck?: string;
+  /** Before/after screenshots of finished work from the preview command. Undefined means on. */
+  reviewCaptures?: boolean;
+  /** Preview paths always captured for review, one per entry. Empty means `/`. */
+  reviewPages?: string[];
+  /** Screenshot sizes. Undefined means desktop only. */
+  reviewViewports?: ('desktop' | 'narrow')[];
+  /** User-facing features whose pages review screenshots prefer when their sources change. */
+  featureMap?: FeatureMapEntry[];
 }
 
 /**
@@ -68,6 +104,8 @@ export interface Project {
   plainFolder?: boolean;
   worktrees: WorktreeEntry[];
   description?: string;
+  /** Sidebar icon key from ProjectMark's set; the initial shows when unset. */
+  icon?: string;
   preferences?: ProjectPreferences;
   agentProvider: 'codex' | 'grok' | 'claude-code' | 'openhands' | 'ollama' | 'antigravity';
 }
@@ -282,6 +320,25 @@ interface ProjectRecord {
   path: string;
   /** The accent the project shows in, so the terminal can match it. */
   accent?: string;
+  autoApprove?: boolean;
+  workspaceMode?: WorkspaceMode;
+  learnAutomatically?: boolean;
+  learningCadence?: number;
+  syncLessons?: boolean;
+  agentReflection?: boolean;
+  exportLessons?: boolean;
+  personalClaudeSetup?: boolean;
+  editCheck?: string;
+  /** Mirrored one way so a terminal approving a plan uses the app's check. */
+  verifyCommand?: string;
+  autoVerify?: boolean;
+  prepareCommand?: string;
+  setupFiles?: string[];
+  previewCommand?: string;
+  reviewCaptures?: boolean;
+  reviewPages?: string[];
+  reviewViewports?: string[];
+  featureMap?: FeatureMapEntry[];
 }
 
 /**
@@ -302,6 +359,24 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
     name,
     path,
     accent: preferences?.theme?.accentHex ?? appAccent,
+    autoApprove: preferences?.autoApprove,
+    workspaceMode: preferences?.workspaceMode,
+    learnAutomatically: preferences?.learnAutomatically,
+    learningCadence: preferences?.learningCadence,
+    syncLessons: preferences?.syncLessons,
+    agentReflection: preferences?.agentReflection,
+    exportLessons: preferences?.exportLessons,
+    personalClaudeSetup: preferences?.personalClaudeSetup,
+    editCheck: preferences?.editCheck,
+    verifyCommand: preferences?.verifyCommand?.trim() || undefined,
+    autoVerify: preferences?.autoVerify,
+    prepareCommand: preferences?.prepareCommand?.trim() || undefined,
+    setupFiles: preferences?.setupFiles?.length ? preferences.setupFiles : undefined,
+    previewCommand: preferences?.previewCommand?.trim() || undefined,
+    reviewCaptures: preferences?.reviewCaptures,
+    reviewPages: reviewPagesForRegistry(preferences?.reviewPages),
+    reviewViewports: preferences?.reviewViewports?.length ? preferences.reviewViewports : undefined,
+    featureMap: featureMapForRegistry(preferences?.featureMap),
   }));
 }
 
@@ -326,6 +401,53 @@ export async function mergeProjectRegistry() {
       }));
     if (added.length) {
       useProjectStore.setState((current) => ({ projects: [...current.projects, ...added] }));
+    }
+    // A terminal can change these settings while the app is closed or headless.
+    for (const record of records) {
+      const project = useProjectStore
+        .getState()
+        .projects.find((item) => projectPathKey(item.path) === projectPathKey(record.path));
+      if (!project) continue;
+      const changes: Partial<ProjectPreferences> = {};
+      if (
+        record.autoApprove !== undefined &&
+        record.autoApprove !== project.preferences?.autoApprove
+      )
+        changes.autoApprove = record.autoApprove;
+      if (
+        record.workspaceMode &&
+        WORKSPACE_MODES.includes(record.workspaceMode) &&
+        record.workspaceMode !== project.preferences?.workspaceMode
+      )
+        changes.workspaceMode = record.workspaceMode;
+      if (
+        record.learnAutomatically !== undefined &&
+        record.learnAutomatically !== project.preferences?.learnAutomatically
+      )
+        changes.learnAutomatically = record.learnAutomatically;
+      if (
+        record.learningCadence !== undefined &&
+        record.learningCadence !== project.preferences?.learningCadence
+      )
+        changes.learningCadence = record.learningCadence;
+      for (const key of ['syncLessons', 'agentReflection', 'exportLessons'] as const) {
+        if (record[key] !== undefined && record[key] !== project.preferences?.[key])
+          changes[key] = record[key];
+      }
+      if (
+        record.personalClaudeSetup !== undefined &&
+        record.personalClaudeSetup !== project.preferences?.personalClaudeSetup
+      )
+        changes.personalClaudeSetup = record.personalClaudeSetup;
+      if (record.editCheck !== undefined && record.editCheck !== project.preferences?.editCheck)
+        changes.editCheck = record.editCheck;
+      if (
+        record.reviewCaptures !== undefined &&
+        record.reviewCaptures !== project.preferences?.reviewCaptures
+      )
+        changes.reviewCaptures = record.reviewCaptures;
+      if (Object.keys(changes).length)
+        useProjectStore.getState().updateProjectPreferences(project.id, changes);
     }
     mirrorProjects(useProjectStore.getState().projects);
   } catch {

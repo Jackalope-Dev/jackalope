@@ -243,6 +243,13 @@
 .context-knowledge-card .task-muted {
   font-size: var(--text-xs);
 }
+.learned-history {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .context-knowledge-preview {
   display: -webkit-box;
   -webkit-line-clamp: 3;

@@ -1,11 +1,5 @@
-import {
-  CopyButton,
-  DefinitionList,
-  Disclosure,
-  DisclosureSummary,
-  DropdownMenu as Menu,
-} from '@jackalope/ui';
-import { ChevronDown, GitPullRequest } from 'lucide-react';
+import { DefinitionList, Disclosure, DisclosureSummary, DropdownMenu as Menu } from '@jackalope/ui';
+import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { openExternalUrl } from '../../lib/tauri-bridge';
@@ -71,12 +65,10 @@ export function TaskDelivery({
   run,
   integrated = false,
   onHandoff,
-  onReview,
 }: {
   run: TaskRun;
   integrated?: boolean;
   onHandoff: (text: string) => void | Promise<void>;
-  onReview?: () => void;
 }) {
   const [status, setStatus] = useState<DeliveryStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -109,25 +101,59 @@ export function TaskDelivery({
   };
   return (
     <section className="task-delivery space-y-4" aria-label="Delivery">
-      <p>
-        {integrated
-          ? 'Merged locally. Choose what to prepare next.'
-          : 'Review and merge the changes above before publishing.'}
-      </p>
       <div className="flex flex-wrap gap-2">
-        {onReview && !integrated && <Button onClick={onReview}>Review changes</Button>}
-        <Button variant="outline" disabled={busy} onClick={() => void inspect(false)}>
-          Check local status
-        </Button>
-        <Button
-          variant="outline"
-          disabled={busy}
-          loading={busy}
-          loadingLabel="Inspecting…"
-          onClick={() => void inspect(true)}
-        >
-          Check PR and CI
-        </Button>
+        {!status?.pullRequest && (
+          <CreatePullRequest
+            run={run}
+            disabled={busy || isActive(run)}
+            onCreated={(url) => {
+              setCreated(url);
+              void inspect(true);
+            }}
+          />
+        )}
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button variant="outline" disabled={busy} loading={busy} loadingLabel="Inspecting…">
+              More <ChevronDown size={16} aria-hidden="true" />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Content
+              className="workspace-menu"
+              align="start"
+              sideOffset={8}
+              collisionPadding={12}
+            >
+              <Menu.Item className="workspace-menu-item" onSelect={() => void inspect(false)}>
+                Check local status
+              </Menu.Item>
+              <Menu.Item className="workspace-menu-item" onSelect={() => void inspect(true)}>
+                Check pull request and CI
+              </Menu.Item>
+              <Menu.Separator className="menu-separator" />
+              {['a pull request', 'CI verification', 'a deployment'].map((goal) => (
+                <Menu.Item
+                  key={goal}
+                  className="workspace-menu-item"
+                  onSelect={() => void prepare(goal)}
+                >
+                  Ask the agent to prepare {goal}
+                </Menu.Item>
+              ))}
+              <Menu.Item
+                className="workspace-menu-item"
+                onSelect={() =>
+                  void navigator.clipboard
+                    .writeText(deliveryHandoff(run, integrated, 'a delivery handoff'))
+                    .catch((cause) => setError(String(cause)))
+                }
+              >
+                Copy delivery handoff
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Portal>
+        </Menu.Root>
       </div>
       {status && (
         <>
@@ -219,46 +245,6 @@ export function TaskDelivery({
       )}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       <div className="space-y-2">
-        <div className="flex flex-wrap gap-2">
-          {!status?.pullRequest && (
-            <CreatePullRequest
-              run={run}
-              disabled={busy || isActive(run)}
-              onCreated={(url) => {
-                setCreated(url);
-                void inspect(true);
-              }}
-            />
-          )}
-          <Button variant="outline" onClick={() => void prepare('a pull request')}>
-            <GitPullRequest size={16} aria-hidden="true" /> Prepare pull request
-          </Button>
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <Button variant="outline">
-                More delivery actions <ChevronDown size={16} aria-hidden="true" />
-              </Button>
-            </Menu.Trigger>
-            <Menu.Portal>
-              <Menu.Content
-                className="workspace-menu"
-                align="start"
-                sideOffset={8}
-                collisionPadding={12}
-              >
-                {['CI verification', 'a deployment'].map((goal) => (
-                  <Menu.Item
-                    key={goal}
-                    className="workspace-menu-item"
-                    onSelect={() => void prepare(goal)}
-                  >
-                    Prepare {goal}
-                  </Menu.Item>
-                ))}
-              </Menu.Content>
-            </Menu.Portal>
-          </Menu.Root>
-        </div>
         {created && (
           <InlineNotice
             tone="success"
@@ -276,14 +262,6 @@ export function TaskDelivery({
             Pull request opened.
           </InlineNotice>
         )}
-        <p className="task-muted">
-          Prepare actions draft a request for the agent. Create pull request publishes only after
-          you confirm.
-        </p>
-        <CopyButton
-          text={deliveryHandoff(run, integrated, 'a delivery handoff')}
-          label="Copy delivery handoff"
-        />
       </div>
     </section>
   );

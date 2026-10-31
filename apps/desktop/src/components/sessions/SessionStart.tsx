@@ -1,5 +1,5 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { Textarea } from '@jackalope/ui';
+import { Select, SelectItem, Textarea } from '@jackalope/ui';
 import { FolderOpen } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
@@ -12,15 +12,17 @@ import { isQuestionOnly } from '../../lib/question-intent';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
 import type { RunRequest } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { workspaceRequest } from '../../lib/workspace-mode';
 import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
-import { agentAccountFor, type Project } from '../../stores/projectStore';
+import { agentAccountFor, type Project, useProjectStore } from '../../stores/projectStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { AttachButton } from '../tasks/AttachButton';
 import { CodexSpeedSelect } from '../tasks/CodexSpeedSelect';
 import { DictationButton } from '../tasks/DictationButton';
 import { PromptPresets } from '../tasks/PromptPresets';
+import { SharpenButton, SharpenNotice, useSharpen } from '../tasks/SharpenButton';
 import { TaskAssessmentNotice, useTaskAssessment } from '../tasks/useTaskAssessment';
 import { Button } from '../ui/button';
 import { DismissButton } from '../ui/DismissButton';
@@ -135,6 +137,18 @@ export function SessionStart({
     return () => window.removeEventListener(ATTACH_TO_COMPOSER, receive);
   }, []);
   const latest = useRef(text);
+  const sharpen = useSharpen({
+    draft: text,
+    apply: (value) => {
+      assessment.clear();
+      pending.current = null;
+      setText(value);
+      input.current?.focus();
+    },
+    current: () => latest.current,
+    project: project && { id: project.id, name: project.name },
+    maxChars: 12000,
+  });
   const mounted = useRef(true);
   const pending = useRef<{ id: string; messageId: string; text: string } | null>(null);
   const sending = useRef(false);
@@ -214,7 +228,7 @@ export function SessionStart({
         codexSpeed,
         agentProfileId: lead ? agentAccountFor(project, lead.adapter) : undefined,
         prompt: value,
-        isolated: true,
+        ...workspaceRequest(project),
         targetBranch: project.preferences?.baseBranch || project.gitBranch,
         verifyCommand: project.preferences?.verifyCommand,
         // A question needs no installed dependencies; the agent can prepare if it must.
@@ -285,6 +299,7 @@ export function SessionStart({
             rows={3}
             maxLength={12000}
             value={text}
+            readOnly={sharpen.busy}
             onChange={(event) => {
               assessment.clear();
               setText(event.target.value);
@@ -304,6 +319,7 @@ export function SessionStart({
               {error}
             </InlineNotice>
           )}
+          <SharpenNotice state={sharpen} />
           {attachments.error && (
             <InlineNotice
               tone="error"
@@ -344,6 +360,7 @@ export function SessionStart({
                   input.current?.focus();
                 }}
               />
+              <SharpenButton state={sharpen} draft={text} disabled={busy} />
             </div>
             <div className="live-start-buttons">
               <ComposerAgentPicker
@@ -463,12 +480,37 @@ export function SessionStart({
           ))}
         </fieldset>
       )}
-      {project ? null : (
-        <Button variant="outline" onClick={onOpenProject}>
-          <FolderOpen size={16} />
-          Open project
-        </Button>
-      )}
+      {project ? null : <ProjectPick onOpenProject={onOpenProject} />}
+    </div>
+  );
+}
+
+/**
+ * Without a project in focus, new work first needs one: pick an existing project, or
+ * add one when there are none yet.
+ */
+function ProjectPick({ onOpenProject }: { onOpenProject: () => void }) {
+  const projects = useProjectStore((state) => state.projects);
+  if (!projects.length)
+    return (
+      <Button variant="outline" onClick={onOpenProject}>
+        <FolderOpen size={16} />
+        Open project
+      </Button>
+    );
+  return (
+    <div className="live-start-pick">
+      <Select
+        aria-label="Project for new work"
+        placeholder="Choose a project for new work"
+        onValueChange={(id) => useProjectStore.getState().selectProject(id)}
+      >
+        {projects.map((item) => (
+          <SelectItem key={item.id} value={item.id}>
+            {item.name}
+          </SelectItem>
+        ))}
+      </Select>
     </div>
   );
 }

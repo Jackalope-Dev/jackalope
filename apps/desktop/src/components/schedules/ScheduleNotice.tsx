@@ -77,7 +77,7 @@ export function ScheduleNotice() {
       title: notice.name,
       detail: notice.status === 'review' ? 'Ready to review' : notice.status,
       kind: notice.status === 'review' ? 'success' : 'attention',
-      actionLabel: 'View recurring task',
+      actionLabel: 'Open schedule',
       onOpen: () => {
         useProjectStore.getState().selectProject(notice.projectId);
         navigateWorkspace('schedules');
@@ -97,10 +97,10 @@ export function ScheduleNotice() {
       ? [
           {
             id: 'schedule-refresh-error',
-            title: 'Could not check recurring tasks',
+            title: 'Could not check schedules',
             detail: error,
             kind: 'attention',
-            actionLabel: 'Open recurring tasks',
+            actionLabel: 'Open schedules',
             onOpen: () => navigateWorkspace('schedules'),
           },
         ]

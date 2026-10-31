@@ -32,6 +32,14 @@ export const localAiFixture: LocalInspection = {
       recommendedMemoryGb: 48,
       description: 'A coding specialist for high-memory machines. GPU memory matters for speed.',
     },
+    {
+      id: 'flint:40b',
+      name: 'Recursive Flint · 40B',
+      downloadBytes: 23e9,
+      recommendedMemoryGb: 48,
+      description:
+        'A fast coding-agent specialist for high-memory machines. Needs a recent Ollama.',
+    },
   ],
   installedModels: ['qwen3.5:4b', 'qwen3.5:9b'],
   ollamaOnline: true,

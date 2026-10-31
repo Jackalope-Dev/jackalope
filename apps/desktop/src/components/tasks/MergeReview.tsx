@@ -158,7 +158,6 @@ export function MergeReview({
   });
 
   const applied = plan?.status === 'applied';
-  const cleaned = !!plan?.cleanupResults?.some((result) => result.removed);
   const previousPlans = plans.filter(
     (previous) =>
       normalizePath(previous.projectPath) === normalizePath(project.path) &&
@@ -194,25 +193,9 @@ export function MergeReview({
         />
       ) : (
         <div className="queue-section-heading">
-          <div>
-            <h2>{onlyRunId ? `Merge into ${destination}` : 'Review & merge'}</h2>
-            {onlyRunId && (
-              <p className="task-muted mt-2">
-                Review the change, merge it into {destination}, then remove this workspace.
-              </p>
-            )}
-          </div>
-          <GitPullRequest size={26} className="text-[var(--color-accent-ink)]" />
+          <h2>{onlyRunId ? `Merge into ${destination}` : 'Review & merge'}</h2>
+          {!onlyRunId && <GitPullRequest size={26} className="text-[var(--color-accent-ink)]" />}
         </div>
-      )}
-      {onlyRunId && (
-        <ol className="merge-lifecycle">
-          <li data-complete={!!plan || undefined}>Review the change</li>
-          <li data-complete={applied || undefined} data-current={(!applied && !!plan) || undefined}>
-            Merge into {plan?.targetBranch || destination}
-          </li>
-          <li data-complete={cleaned || undefined}>Remove this workspace</li>
-        </ol>
       )}
       {candidates.length > 0 ? (
         <>
@@ -259,27 +242,24 @@ export function MergeReview({
               ))}
             </>
           )}
-          {!managedTitle && (
+          {!managedTitle && !(onlyRunId && plan) && (
             <>
-              <Disclosure open className="mt-4">
-                <DisclosureSummary>Commit details</DisclosureSummary>
-                <label htmlFor={messageId} className="task-label block mt-5">
-                  Commit message
-                  <Input
-                    id={messageId}
-                    value={message}
-                    maxLength={4000}
-                    disabled={busy}
-                    placeholder={
-                      chosen.length === 1 ? titleFor(chosen[0]) : 'Complete selected tasks'
-                    }
-                    onChange={(event) => {
-                      setMessage(event.target.value);
-                      setPlan(null);
-                    }}
-                  />
-                </label>
-              </Disclosure>
+              <label htmlFor={messageId} className="task-label block mt-4">
+                Commit message
+                <Input
+                  id={messageId}
+                  value={message}
+                  maxLength={4000}
+                  disabled={busy}
+                  placeholder={
+                    chosen.length === 1 ? titleFor(chosen[0]) : 'Complete selected tasks'
+                  }
+                  onChange={(event) => {
+                    setMessage(event.target.value);
+                    setPlan(null);
+                  }}
+                />
+              </label>
               <Button
                 className="mt-5"
                 disabled={busy || !chosen.length || !completeSelection}
@@ -288,7 +268,7 @@ export function MergeReview({
                 loadingLabel="Preparing…"
               >
                 {onlyRunId
-                  ? `Preview merge into ${destination}`
+                  ? 'Preview merge'
                   : `Preview ${chosen.length || ''} ${chosen.length === 1 ? 'task' : 'tasks'} together`}
                 <GitMerge size={15} />
               </Button>
@@ -310,7 +290,7 @@ export function MergeReview({
       )}
       {plan && (
         <section className="merge-preview" aria-label="Combined change review">
-          {!managedTitle && (
+          {!managedTitle && !onlyRunId && (
             <div className="queue-section-heading">
               <div>
                 <p className="task-eyebrow">
@@ -339,7 +319,7 @@ export function MergeReview({
               {plan.status === 'applied' && <Check size={24} />}
             </div>
           )}
-          {plan.commitMessage && !managedTitle && (
+          {plan.commitMessage && !managedTitle && !onlyRunId && (
             <div className="my-4">
               <p className="task-label">Commit preview</p>
               <pre className="whitespace-pre-wrap break-words task-muted mt-2">
@@ -398,10 +378,13 @@ export function MergeReview({
             </InlineNotice>
           )}
 
-          <Disclosure open={!changesReviewed || applied || undefined} className="my-4">
-            <DisclosureSummary>Merge preview · {plan.files.length} files</DisclosureSummary>
-            <ChangedFiles files={plan.files} patch={plan.patch} />
-          </Disclosure>
+          {/* A single reviewed task already showed these files under Changes. */}
+          {!(onlyRunId && changesReviewed) && (
+            <Disclosure open={!changesReviewed || applied || undefined} className="my-4">
+              <DisclosureSummary>Merge preview · {plan.files.length} files</DisclosureSummary>
+              <ChangedFiles files={plan.files} patch={plan.patch} />
+            </Disclosure>
+          )}
           {managedTitle && (
             <Disclosure className="managed-commit-details">
               <DisclosureSummary>Commit details</DisclosureSummary>
@@ -440,9 +423,11 @@ export function MergeReview({
           {planEligible && ['ready', 'applying'].includes(plan.status) && (
             <div className="merge-approval">
               <p className="task-muted">
-                {managedTitle
-                  ? `Creates one local commit on ${plan.targetBranch}. Nothing is published.`
-                  : `Creates one commit on ${plan.targetBranch}. That checkout must be clean, and the reviewed files must still match. Publishing remains a separate step.`}
+                {onlyRunId
+                  ? `${plan.files.length} ${plan.files.length === 1 ? 'file' : 'files'} · one local commit on ${plan.targetBranch}. Nothing is published.`
+                  : managedTitle
+                    ? `Creates one local commit on ${plan.targetBranch}. Nothing is published.`
+                    : `Creates one commit on ${plan.targetBranch}. That checkout must be clean, and the reviewed files must still match. Publishing remains a separate step.`}
               </p>
               <label className="flex items-center gap-3 min-h-11">
                 <Checkbox
@@ -471,7 +456,7 @@ export function MergeReview({
           )}
         </section>
       )}
-      {previousPlans.length > 0 && (
+      {previousPlans.length > 0 && !onlyRunId && (
         <Disclosure className="mt-7">
           <DisclosureSummary className="task-summary">
             Previous integration reviews

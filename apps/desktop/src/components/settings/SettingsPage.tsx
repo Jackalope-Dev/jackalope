@@ -1,4 +1,4 @@
-import { DiscordIcon, FormField, Input, SearchField, SegmentedControl } from '@jackalope/ui';
+import { FormField, Input, SearchField, SegmentedControl } from '@jackalope/ui';
 import {
   Cloud,
   Cpu,
@@ -13,6 +13,7 @@ import {
   Palette,
   Plug,
   Radio,
+  Server,
   Settings2,
   Shield,
   UserRound,
@@ -20,9 +21,8 @@ import {
 } from 'lucide-react';
 
 import { useEffect, useRef, useState } from 'react';
-import { DISCORD_URL } from '../../lib/community';
 import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -50,6 +50,7 @@ import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
 import { useShallow } from 'zustand/react/shallow';
 import { ArtifactsConnection } from './ArtifactsConnection';
+import { ComputersSettings } from './ComputersSettings';
 import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
 import { RemoteAccess } from './RemoteAccess';
@@ -70,6 +71,7 @@ const categories = [
   'Saved actions',
   'Decisions',
   'Connected work',
+  'Computers',
   'Cloudflare',
   'Jackalope account',
   'Invitations',
@@ -90,7 +92,7 @@ const navigationGroups: { label: string; categories: SettingsCategory[] }[] = [
     label: 'Workspace',
     categories: ['Project', 'General', 'Appearance', 'Desktop', 'Saved actions'],
   },
-  { label: 'Agents', categories: ['Connected work'] },
+  { label: 'Agents', categories: ['Connected work', 'Computers'] },
   { label: 'Account & access', categories: ['Jackalope account', 'Remote access', 'Privacy'] },
   { label: 'Help & data', categories: ['Updates & support', 'Data & reset'] },
   { label: 'Advanced', categories: ['Decisions', 'Cloudflare', 'Diagnostics', 'System'] },
@@ -103,6 +105,7 @@ const navigationIcons: Partial<Record<SettingsCategory, LucideIcon>> = {
   'Saved actions': Zap,
   Decisions: Gavel,
   'Connected work': Plug,
+  Computers: Server,
   Cloudflare: Cloud,
   Diagnostics: History,
   System: Cpu,
@@ -176,6 +179,7 @@ export function SettingsPage({
         'Saved actions': 'prompt presets commands shortcuts reuse global project',
         Appearance: 'theme color light dark atmosphere picker toolbar companion mascot animations',
         'Connected work': 'GitHub Linear Jira issues pull requests API token',
+        Computers: 'bot computer sandbox Docker Colima cloud machine VM remote desktop VNC hosted',
         Cloudflare: 'Cloudflare Artifacts repository hosted cloud swarm worker forks beta',
         'Remote access': 'hosts phone companion SSH pairing Tailscale device',
         Decisions: 'Jackalope routing Jev TypeSafe API key automatic agent cost tokens capacity',
@@ -274,11 +278,7 @@ export function SettingsPage({
             ))}
           </Select>
         )}
-        <p className="task-muted">
-          {scope === 'app'
-            ? 'Defaults for Jackalope and projects without overrides.'
-            : 'Overrides for this project. App-wide restrictions still apply.'}
-        </p>
+        {scope === 'project' && <p className="task-muted">App-wide restrictions still apply.</p>}
       </div>
       <div className="settings-body">
         <nav className="settings-sidebar" aria-label="Settings categories">
@@ -312,14 +312,6 @@ export function SettingsPage({
               </div>
             );
           })}
-          <button
-            type="button"
-            className="settings-nav-item settings-community-link"
-            onClick={() => void openExternalUrl(DISCORD_URL)}
-          >
-            <DiscordIcon />
-            Join the Discord
-          </button>
         </nav>
         <div className="settings-content" ref={content}>
           {!visible.length && <p>No settings match “{query}”.</p>}
@@ -329,20 +321,12 @@ export function SettingsPage({
               className="settings-section"
               ref={c === category ? selectedSection : undefined}
             >
-              <WorkspaceSectionHeading
-                title={c === 'Project' ? 'Project settings' : c}
-                description={
-                  c === 'Project' && project ? `${project.name} · ${project.path}` : undefined
-                }
-              />
+              <WorkspaceSectionHeading title={c === 'Project' ? 'Project settings' : c} />
               {c === 'Jackalope account' && (
                 <JackalopeAccount onInvitations={() => setCategory('Invitations')} />
               )}
-              {c === 'Connected work' && (
-                <>
-                  <IssueConnections />
-                </>
-              )}
+              {c === 'Connected work' && <IssueConnections />}
+              {c === 'Computers' && <ComputersSettings />}
               {c === 'Cloudflare' && (
                 <>
                   <ArtifactsConnection />
@@ -392,7 +376,7 @@ export function SettingsPage({
                   <SettingGroup>
                     <Setting
                       title="Use MCP marketplace"
-                      description="Allow searches and server details from allmcps.com. Disabling cancels marketplace requests; configured MCP servers remain available."
+                      description="Allow searches and server details from allmcps.com."
                     >
                       <Switch
                         label="Use MCP marketplace"
@@ -403,8 +387,8 @@ export function SettingsPage({
                     <SettingBody>
                       <p className="settings-row-description">
                         Publisher avatars load from GitHub. Marketplace searches go to AllMCPs,
-                        which publicly logs requests, with User-Agent Jackalope/0.1.0. Your
-                        connected agents and MCP servers use their own services.
+                        which publicly logs requests. Your connected agents and MCP servers use
+                        their own services.
                       </p>
                     </SettingBody>
                   </SettingGroup>

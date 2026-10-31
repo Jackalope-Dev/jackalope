@@ -95,6 +95,81 @@
       "values": ["off", "on"],
       "default": "off",
       "environment": "JACKALOPE_WARM_API_HELPERS"
+    },
+    "claude-session": {
+      "values": ["oneshot", "persistent"],
+      "default": "persistent",
+      "environment": "JACKALOPE_CLAUDE_SESSION"
+    },
+    "claude-isolation": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_CLAUDE_ISOLATION"
+    },
+    "claude-partials": {
+      "values": ["on", "off"],
+      "default": "on",
+      "environment": "JACKALOPE_CLAUDE_PARTIALS"
+    },
+    "claude-fallback": {
+      "values": ["off", "auto"],
+      "default": "auto",
+      "environment": "JACKALOPE_CLAUDE_FALLBACK"
+    },
+    "claude-prompt-cache": {
+      "values": ["workspace", "shared"],
+      "default": "workspace",
+      "environment": "JACKALOPE_CLAUDE_PROMPT_CACHE"
+    },
+    "claude-edit-check": {
+      "values": ["off", "on"],
+      "default": "on",
+      "environment": "JACKALOPE_CLAUDE_EDIT_CHECK",
+      "requires": {
+        "on": {
+          "claude-session": "persistent"
+        }
+      }
+    },
+    "claude-stop-check": {
+      "values": ["off", "on"],
+      "default": "on",
+      "environment": "JACKALOPE_CLAUDE_STOP_CHECK",
+      "requires": {
+        "on": {
+          "claude-session": "persistent"
+        }
+      }
+    },
+    "claude-context-hook": {
+      "values": ["off", "on"],
+      "default": "on",
+      "environment": "JACKALOPE_CLAUDE_CONTEXT_HOOK",
+      "requires": {
+        "on": {
+          "claude-session": "persistent"
+        }
+      }
+    },
+    "claude-permission-hook": {
+      "values": ["off", "on"],
+      "default": "on",
+      "environment": "JACKALOPE_CLAUDE_PERMISSION_HOOK",
+      "requires": {
+        "on": {
+          "claude-session": "persistent"
+        }
+      }
+    },
+    "claude-tool-timing": {
+      "values": ["off", "on"],
+      "default": "on",
+      "environment": "JACKALOPE_CLAUDE_TOOL_TIMING",
+      "requires": {
+        "on": {
+          "claude-session": "persistent"
+        }
+      }
     }
   }
 }

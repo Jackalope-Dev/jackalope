@@ -6,6 +6,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { connectionSupport } from '../../lib/agent-capabilities';
 import { useAgentModels } from '../../lib/agent-models';
 import { effectiveConnections } from '../../lib/mcp-connection';
+import { planCommands } from '../../lib/plan-mode';
 import { planningDraft } from '../../lib/planning';
 import { isQuestionOnly } from '../../lib/question-intent';
 import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog';
@@ -13,12 +14,14 @@ import { assemblePrompt, PROMPT_VERSION } from '../../lib/skills/context-assembl
 import { resolveTaskGuidelines } from '../../lib/skills/task-context';
 import { ideaStageLabels } from '../../lib/task-collection';
 import { effortPrompt } from '../../lib/task-effort';
-import type { RunRequest } from '../../lib/task-runtime';
+import { PROMPT_MAX_CHARS, type RunRequest } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
 import { isTauriEnvironment, listMcpServers, type McpServerConfig } from '../../lib/tauri-bridge';
+import { workspaceModeFor, workspaceRequest } from '../../lib/workspace-mode';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
+import { usePlanStore } from '../../stores/planStore';
 import {
   agentAccountFor,
   isAgentAllowedForProject,
@@ -31,7 +34,9 @@ import { ConfirmAction } from '../ui/ConfirmAction';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
+import { FeaturePlanner } from './FeaturePlanner';
 import { ProjectSetup } from './ProjectSetup';
+import { SharpenButton, SharpenNotice, useSharpen } from './SharpenButton';
 import { TaskComposer } from './TaskComposer';
 import { TaskAssessmentNotice, useTaskAssessment } from './useTaskAssessment';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
@@ -101,8 +106,7 @@ export function CaptureTask({
         drafts[key]?.isolated ??
         (idea
           ? initial.isolated
-          : (projects.find((p) => p.id === activeProjectId)?.preferences?.isolatedByDefault ??
-            true)),
+          : workspaceModeFor(projects.find((p) => p.id === activeProjectId)) === 'worktree'),
       projectId,
       agent:
         drafts[key]?.agent ??
@@ -173,6 +177,7 @@ export function CaptureTask({
         : '';
   const [error, setError] = useState('');
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [writingPlan, setWritingPlan] = useState(false);
   const [setup, setSetup] = useState(false);
   const [setupProject, setSetupProject] = useState<string | null>(null);
   const [servers, setServers] = useState<McpServerConfig[]>([]);
@@ -233,6 +238,20 @@ export function CaptureTask({
     assessment.clear();
     draft(key, { ...current, ...value });
   };
+  const sharpen = useSharpen({
+    draft: current.prompt,
+    apply: (prompt) => {
+      // A rewrite lands after an await; change only the prompt so settings chosen meanwhile stay.
+      if (useExecutionStore.getState().drafts[key]) {
+        assessment.clear();
+        draft(key, { prompt });
+      } else update({ prompt });
+      requestAnimationFrame(() => document.getElementById('task-intent')?.focus());
+    },
+    current: () => useExecutionStore.getState().drafts[key]?.prompt ?? current.prompt,
+    project: project && { id: project.id, name: project.name },
+    maxChars: PROMPT_MAX_CHARS,
+  });
   const skills = resolveTaskGuidelines(current.prompt, current.skills, project?.preferences);
   const assembled = assemblePrompt({
     rawPrompt: current.prompt.trim(),
@@ -295,7 +314,7 @@ export function CaptureTask({
       return { drafts: next };
     });
   };
-  const launch = async (choice: 'assess' | 'single' | 'plan' = 'assess') => {
+  const launch = async (choice: 'assess' | 'single' | 'plan' | 'interview' = 'assess') => {
     if (
       !project ||
       !runner?.available ||
@@ -332,10 +351,19 @@ export function CaptureTask({
         prompt: finalPrompt,
         effort: current.effort ?? 'balanced',
         codexSpeed: current.codexSpeed,
-        isolated: current.isolated,
+        ...workspaceRequest(project, current.isolated),
         connectionIds: current.connectionIds,
         contextSelection: current.contextSelection,
       };
+      if (choice === 'interview') {
+        const plan = await planCommands.start(request, current.prompt.trim());
+        clear();
+        selectProject(project.id);
+        usePlanStore.getState().select(plan.id);
+        onStarted();
+        navigateWorkspace('plans');
+        return;
+      }
       let autoStart = false;
       if (choice === 'assess') {
         const result = await assessment.assess(request, current.prompt.trim());
@@ -470,7 +498,17 @@ export function CaptureTask({
           })
         }
         onChange={update}
+        draftLocked={sharpen.busy}
+        draftTools={
+          <SharpenButton
+            state={sharpen}
+            draft={current.prompt}
+            disabled={submitting || launchingPlan}
+          />
+        }
         onLaunch={() => launch()}
+        onPlan={() => void launch('interview')}
+        onWritePlan={project ? () => setWritingPlan(true) : undefined}
         onSave={() => {
           saveIdea();
           clear();
@@ -487,6 +525,7 @@ export function CaptureTask({
         onCancel={() => void assessment.cancel()}
         onSingle={() => void launch('single')}
         onPlan={() => void launch('plan')}
+        onPlanWithMe={() => void launch('interview')}
       />
       {idea && (
         <Disclosure className="mt-4">
@@ -532,6 +571,17 @@ export function CaptureTask({
           />
         </Disclosure>
       )}
+      {writingPlan && project && (
+        <FeaturePlanner
+          project={project}
+          initialGoal={current.prompt.trim()}
+          onClose={() => setWritingPlan(false)}
+          onCreated={() => {
+            clear();
+            onStarted();
+          }}
+        />
+      )}
       {toolsOpen && (
         <Suspense fallback={null}>
           <TaskTools
@@ -565,6 +615,7 @@ export function CaptureTask({
           Retry loading connections
         </Button>
       )}
+      <SharpenNotice state={sharpen} />
       {(error || connectionError || modelError || toolError) && (
         <InlineNotice tone="error" className="mt-4">
           {error || connectionError || modelError || toolError}

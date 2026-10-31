@@ -116,15 +116,9 @@ export function McpServerPage({
             <Button onClick={() => setConfiguring(true)}>
               {scopes.length ? 'Reconfigure' : 'Configure server'}
             </Button>
-            <SourceLink url={server.detailUrl}>View on AllMCPs</SourceLink>
           </div>
         }
       />
-      <div className="mcp-market-labels mb-6">
-        <span>{categoryLabel(server.category)}</span>
-        <span>{setup.remote ? 'Remote server' : 'Local process'}</span>
-        {server.isOfficial && <span>Listed as official</span>}
-      </div>
       <Tabs.Root
         defaultValue="overview"
         key={server.id}
@@ -159,6 +153,10 @@ export function McpServerPage({
               <p className="mcp-detail-note">Configured in {scopes.join(', ')}.</p>
             )}
             <dl className="mcp-detail-facts">
+              <div>
+                <dt>Category</dt>
+                <dd>{categoryLabel(server.category)}</dd>
+              </div>
               <div>
                 <dt>Connection</dt>
                 <dd>{setup.remote ? 'Remote MCP server' : 'Local process (stdio)'}</dd>
@@ -244,6 +242,7 @@ export function McpServerPage({
               <SourceLink url={server.url}>Source repository</SourceLink>
               <SourceLink url={details?.websiteUrl}>Website</SourceLink>
               <SourceLink url={details?.supportUrl}>Support</SourceLink>
+              <SourceLink url={server.detailUrl}>View on AllMCPs</SourceLink>
             </div>
           </Tabs.Content>
           <Tabs.Content value="tools" className="mcp-detail-content">
@@ -338,10 +337,6 @@ export function McpServerPage({
                 </p>
               )}
             </section>
-            <p className="mcp-detail-note">
-              Choose this project or all projects in the next step, then select which agents can use
-              the connection. Saved changes apply to new task attempts.
-            </p>
           </Tabs.Content>
           <Tabs.Content value="docs" className="mcp-detail-content">
             {details?.readme ? (

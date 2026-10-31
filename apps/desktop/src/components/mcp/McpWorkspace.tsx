@@ -1,17 +1,5 @@
-import { Badge, LoadingIcon, RefreshIcon, SearchField, SegmentedNav } from '@jackalope/ui';
-import {
-  Activity,
-  Check,
-  CheckCircle,
-  Copy,
-  Globe,
-  Pencil,
-  Plus,
-  Search,
-  Server,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { Badge, LoadingIcon, DropdownMenu as Menu, SearchField, SegmentedNav } from '@jackalope/ui';
+import { Activity, CheckCircle, Globe, MoreHorizontal, Search, Server, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
@@ -40,14 +28,14 @@ import { McpServerPage } from './McpServerPage';
 import './mcp.css';
 
 const CATEGORIES = [
-  { id: 'all', label: 'All Categories' },
-  { id: 'databases', label: '🗄️ Databases' },
-  { id: 'search-and-data-extraction', label: '🔎 Search & Web' },
-  { id: 'developer-tools', label: '🛠️ Dev Tools' },
-  { id: 'version-control', label: '🔄 Git & PR' },
-  { id: 'cloud-platforms', label: '☁️ Cloud' },
-  { id: 'knowledge-and-memory', label: '🧠 Memory & RAG' },
-  { id: 'communication', label: '💬 Team Chat' },
+  { id: 'all', label: 'All' },
+  { id: 'databases', label: 'Databases' },
+  { id: 'search-and-data-extraction', label: 'Search & web' },
+  { id: 'developer-tools', label: 'Dev tools' },
+  { id: 'version-control', label: 'Git' },
+  { id: 'cloud-platforms', label: 'Cloud' },
+  { id: 'knowledge-and-memory', label: 'Memory' },
+  { id: 'communication', label: 'Team chat' },
 ];
 
 export function McpWorkspace({
@@ -127,6 +115,7 @@ export function McpWorkspace({
   const [inspectingServer, setInspectingServer] = useState<AllMcpsServer | null>(null);
   const [customModalOpen, setCustomModalOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<McpServerConfig | null>(null);
+  const [removing, setRemoving] = useState<McpServerConfig | null>(null);
 
   useEffect(() => {
     void loadServers(activeProjectId);
@@ -184,6 +173,26 @@ export function McpWorkspace({
       );
     }
   };
+
+  const signIn = (server: McpServerConfig, agent: string) =>
+    void nativeTask('mcp_authenticate', {
+      id: server.id,
+      scope: server.scope,
+      agent,
+      profileId: agentAccountFor(project, agent),
+    })
+      .then(() => {
+        setNoticeTone('info');
+        setCopyError(
+          'Sign-in opened in your CLI. Complete authorization and check access there. Connection probes use configured headers or environment tokens.',
+        );
+      })
+      .catch(() => {
+        setNoticeTone('error');
+        setCopyError(
+          'Could not open sign-in. Use the selected agent account’s MCP sign-in flow in a terminal.',
+        );
+      });
 
   const filteredServers = servers.filter((s) => {
     if (scopeFilter !== 'all' && s.scope !== scopeFilter) return false;
@@ -250,11 +259,6 @@ export function McpWorkspace({
         <>
           <WorkspaceHeading
             title={activeTab === 'configured' ? 'Tools' : 'Tool marketplace'}
-            description={
-              activeTab === 'marketplace'
-                ? 'Discover MCP servers and connect them to your agents.'
-                : 'MCP servers your agents can use in this project or every project.'
-            }
             action={
               <div className="workspace-actions">
                 {activeTab === 'configured' && (
@@ -263,29 +267,38 @@ export function McpWorkspace({
                     Add tools
                   </Button>
                 )}
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    void loadServers(undefined, true);
-                    if (useMcpMarketplace && activeTab === 'marketplace' && showDirectory) {
-                      void searchMarketplace(undefined, undefined, true);
-                    }
-                  }}
-                  disabled={loadingServers || loadingMarketplace}
-                >
-                  <RefreshIcon size={16} />
-                  Refresh
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setEditingServer(null);
-                    setCustomModalOpen(true);
-                  }}
-                >
-                  <Plus size={16} />
-                  Custom connection
-                </Button>
+                <Menu.Root>
+                  <Menu.Trigger asChild>
+                    <Button variant="outline" aria-label="Connection options">
+                      <MoreHorizontal size={16} aria-hidden="true" />
+                    </Button>
+                  </Menu.Trigger>
+                  <Menu.Portal>
+                    <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
+                      <Menu.Item
+                        className="workspace-menu-item"
+                        onSelect={() => {
+                          setEditingServer(null);
+                          setCustomModalOpen(true);
+                        }}
+                      >
+                        Custom connection
+                      </Menu.Item>
+                      <Menu.Item
+                        className="workspace-menu-item"
+                        disabled={loadingServers || loadingMarketplace}
+                        onSelect={() => {
+                          void loadServers(undefined, true);
+                          if (useMcpMarketplace && activeTab === 'marketplace' && showDirectory) {
+                            void searchMarketplace(undefined, undefined, true);
+                          }
+                        }}
+                      >
+                        Refresh
+                      </Menu.Item>
+                    </Menu.Content>
+                  </Menu.Portal>
+                </Menu.Root>
               </div>
             }
           />
@@ -295,7 +308,6 @@ export function McpWorkspace({
             </InlineNotice>
           )}
 
-          {/* Main Tabs */}
           {!view && (
             <SegmentedNav
               className="mcp-tabs"
@@ -326,7 +338,6 @@ export function McpWorkspace({
             />
           )}
 
-          {/* Tab 1: Configured MCPs */}
           {activeTab === 'configured' && (
             <section>
               {serversError && (
@@ -335,7 +346,6 @@ export function McpWorkspace({
                 </InlineNotice>
               )}
 
-              {/* Scope Filters & Search */}
               <WorkspaceToolbar className="mb-4">
                 <FilterGroup
                   label="Connection scope"
@@ -377,7 +387,6 @@ export function McpWorkspace({
                 />
               </WorkspaceToolbar>
 
-              {/* Servers Grid */}
               {loadingServers ? (
                 <p role="status" className="task-muted py-8">
                   Reading configured connections…
@@ -389,26 +398,13 @@ export function McpWorkspace({
                     servers.length === 0 ? 'No MCP servers configured' : 'No matching MCP servers'
                   }
                   description={
-                    servers.length === 0
-                      ? 'Add a connection or browse the marketplace.'
-                      : 'Try selecting a different scope or clearing your search query.'
+                    servers.length === 0 ? undefined : 'Choose another scope or clear the filter.'
                   }
                   action={
                     servers.length === 0 ? (
-                      <div className="flex gap-2 mt-4">
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setEditingServer(null);
-                            setCustomModalOpen(true);
-                          }}
-                        >
-                          <Plus size={15} /> Add Custom
-                        </Button>
-                        <Button onClick={() => setActiveTab('marketplace')}>
-                          <Globe size={15} /> Browse marketplace
-                        </Button>
-                      </div>
+                      <Button onClick={() => setActiveTab('marketplace')}>
+                        <Globe size={15} /> Browse marketplace
+                      </Button>
                     ) : undefined
                   }
                 />
@@ -418,7 +414,18 @@ export function McpWorkspace({
                     const key = `${server.scope}:${server.id}`;
                     const probe = probeResults[key];
                     const isProbing = !!probingIds[key];
-                    const envCount = Object.keys(server.env || {}).length;
+                    const signInAgents =
+                      !server.discovery &&
+                      server.transport === 'http' &&
+                      (server.scope === 'codex' ||
+                        server.scope === 'claude' ||
+                        server.scope.startsWith('project:') ||
+                        server.scope === 'global')
+                        ? (server.scope === 'codex' || server.scope === 'claude'
+                            ? [server.scope]
+                            : ['codex', 'claude']
+                          ).filter((agent) => !server.agents || server.agents.includes(agent))
+                        : [];
 
                     return (
                       <article key={key} className="mcp-card">
@@ -439,51 +446,9 @@ export function McpWorkspace({
                                     ? 'Global'
                                     : server.scope}
                               </Badge>
-                              <Badge>{server.transport}</Badge>
                               {server.enabled === false && <Badge>Disabled</Badge>}
                               {server.discovery && <Badge>On demand</Badge>}
                             </div>
-                          </div>
-                          <div className="mcp-card-signin">
-                            {!server.discovery &&
-                              server.transport === 'http' &&
-                              (server.scope === 'codex' ||
-                                server.scope === 'claude' ||
-                                server.scope.startsWith('project:') ||
-                                server.scope === 'global') &&
-                              (server.scope === 'codex' || server.scope === 'claude'
-                                ? [server.scope]
-                                : ['codex', 'claude']
-                              )
-                                .filter((agent) => !server.agents || server.agents.includes(agent))
-                                .map((agent) => (
-                                  <Button
-                                    key={agent}
-                                    variant="ghost"
-                                    onClick={() =>
-                                      void nativeTask('mcp_authenticate', {
-                                        id: server.id,
-                                        scope: server.scope,
-                                        agent,
-                                        profileId: agentAccountFor(project, agent),
-                                      })
-                                        .then(() => {
-                                          setNoticeTone('info');
-                                          setCopyError(
-                                            'Sign-in opened in your CLI. Complete authorization and check access there. Connection probes use configured headers or environment tokens.',
-                                          );
-                                        })
-                                        .catch(() => {
-                                          setNoticeTone('error');
-                                          setCopyError(
-                                            'Could not open sign-in. Use the selected agent account’s MCP sign-in flow in a terminal.',
-                                          );
-                                        })
-                                    }
-                                  >
-                                    Sign in with {agent === 'claude' ? 'Claude' : 'Codex'}
-                                  </Button>
-                                ))}
                           </div>
 
                           {server.managed && (
@@ -502,24 +467,6 @@ export function McpWorkspace({
                             <p className="mcp-card-description">{server.description}</p>
                           )}
 
-                          <div className="mcp-card-meta">
-                            {server.url ? (
-                              <span>{server.url.split('?')[0].replace(/\/\/[^/]*@/, '//')}</span>
-                            ) : (
-                              <span>Local command · {server.args?.length ?? 0} arguments</span>
-                            )}
-                          </div>
-
-                          {envCount > 0 && (
-                            <p className="text-xs text-[var(--color-text-muted)] mb-2">
-                              🔒 {envCount} environment variable{envCount > 1 ? 's' : ''} configured
-                            </p>
-                          )}
-
-                          {!probe && (
-                            <p className="task-muted text-xs mb-2">Not checked by Jackalope</p>
-                          )}
-                          {/* Probe / Status info */}
                           {probe && (
                             <div className="mb-2">
                               {probe.ok ? (
@@ -567,63 +514,67 @@ export function McpWorkspace({
                         </div>
 
                         <div className="mcp-card-footer">
-                          <div className="flex items-center gap-1.5">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => void probeServer(server)}
-                              disabled={isProbing}
-                              title="Check connection and list tools"
-                              loading={isProbing}
-                              loadingLabel="Probing…"
-                            >
-                              <Activity size={13} />
-                              Check
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => void handleCopyJson(server)}
-                              title="Copy redacted configuration"
-                            >
-                              {copiedId === key ? <Check size={13} /> : <Copy size={13} />}
-                              <span className="sr-only">
-                                {copiedId === key
-                                  ? 'Configuration copied'
-                                  : `Copy ${server.name} redacted configuration`}
-                              </span>
-                            </Button>
-                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void probeServer(server)}
+                            disabled={isProbing}
+                            title="Check connection and list tools"
+                            loading={isProbing}
+                            loadingLabel="Probing…"
+                          >
+                            <Activity size={13} />
+                            Check
+                          </Button>
 
-                          <div className="flex items-center gap-1.5">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setEditingServer(server);
-                                setCustomModalOpen(true);
-                              }}
-                              title="Edit server"
-                              aria-label={`Edit ${server.name}`}
-                            >
-                              <Pencil size={13} />
-                            </Button>
-                            <ConfirmAction
-                              title="Remove connection?"
-                              description={`Remove ${server.name} from ${server.scope}? You can configure it again later.`}
-                              label="Remove connection"
-                              onConfirm={() => deleteServer(server.id, server.scope)}
-                              trigger={
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  aria-label={`Remove ${server.name}`}
+                          <Menu.Root>
+                            <Menu.Trigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                aria-label={`${server.name} options`}
+                              >
+                                <MoreHorizontal size={16} aria-hidden="true" />
+                              </Button>
+                            </Menu.Trigger>
+                            <Menu.Portal>
+                              <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
+                                {signInAgents.map((agent) => (
+                                  <Menu.Item
+                                    key={agent}
+                                    className="workspace-menu-item"
+                                    onSelect={() => signIn(server, agent)}
+                                  >
+                                    Sign in with {agent === 'claude' ? 'Claude' : 'Codex'}
+                                  </Menu.Item>
+                                ))}
+                                <Menu.Item
+                                  className="workspace-menu-item"
+                                  onSelect={() => {
+                                    setEditingServer(server);
+                                    setCustomModalOpen(true);
+                                  }}
                                 >
-                                  <Trash2 size={13} />
-                                </Button>
-                              }
-                            />
-                          </div>
+                                  Edit
+                                </Menu.Item>
+                                <Menu.Item
+                                  className="workspace-menu-item"
+                                  onSelect={() => void handleCopyJson(server)}
+                                >
+                                  {copiedId === key
+                                    ? 'Configuration copied'
+                                    : 'Copy redacted configuration'}
+                                </Menu.Item>
+                                <Menu.Separator className="menu-separator" />
+                                <Menu.Item
+                                  className="workspace-menu-item"
+                                  onSelect={() => setRemoving(server)}
+                                >
+                                  Remove…
+                                </Menu.Item>
+                              </Menu.Content>
+                            </Menu.Portal>
+                          </Menu.Root>
                         </div>
                       </article>
                     );
@@ -633,19 +584,14 @@ export function McpWorkspace({
             </section>
           )}
 
-          {/* Tab 2: Marketplace (allmcps.com) */}
           {activeTab === 'marketplace' && (
             <section>
               {!useMcpMarketplace ? (
                 <div className="mcp-privacy-banner">
                   <div>
-                    <h3 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">
+                    <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
                       MCP Marketplace is currently disabled
                     </h3>
-                    <p className="text-xs text-[var(--color-text-muted)] max-w-xl">
-                      Marketplace browsing is off. Configured connections remain available to your
-                      agents.
-                    </p>
                   </div>
                   <Button
                     onClick={() => {
@@ -658,7 +604,6 @@ export function McpWorkspace({
                 </div>
               ) : (
                 <>
-                  {/* Search input */}
                   <div className="mcp-search-bar relative">
                     <SearchField
                       aria-label="Search MCP marketplace"
@@ -682,11 +627,12 @@ export function McpWorkspace({
                         { id: 'directory', label: 'All servers' },
                       ]}
                     />
-                    <p className="task-muted">
-                      {showDirectory
-                        ? 'Search results are supplied by AllMCPs. Review the publisher before connecting.'
-                        : 'A starting collection of publisher-maintained servers, selected by Jackalope.'}
-                    </p>
+                    {showDirectory && (
+                      <p className="task-muted">
+                        Search results are supplied by AllMCPs. Review the publisher before
+                        connecting.
+                      </p>
+                    )}
                   </div>
                   {!showDirectory ? (
                     recommendationGroups.map((group) => (
@@ -702,19 +648,13 @@ export function McpWorkspace({
                   ) : (
                     <>
                       {directory && (
-                        <div className="mcp-category-pills">
-                          {CATEGORIES.map((cat) => (
-                            <button
-                              key={cat.id}
-                              type="button"
-                              onClick={() => setSelectedCategory(cat.id)}
-                              aria-pressed={selectedCategory === cat.id}
-                              className={`mcp-category-btn ${selectedCategory === cat.id ? 'active' : ''}`}
-                            >
-                              {cat.label}
-                            </button>
-                          ))}
-                        </div>
+                        <FilterGroup
+                          className="mcp-category-filter"
+                          label="Category"
+                          value={selectedCategory}
+                          onChange={setSelectedCategory}
+                          items={CATEGORIES}
+                        />
                       )}
                       {selectedCategory === 'all' && matchingRecommendations.length > 0 && (
                         <section
@@ -751,7 +691,7 @@ export function McpWorkspace({
                             <EmptyState
                               icon={Search}
                               title="No additional servers found"
-                              description="Try another search term, select a different category, or add a custom connection."
+                              description="Try another search term or category."
                             />
                           )
                         )}
@@ -763,7 +703,20 @@ export function McpWorkspace({
             </section>
           )}
 
-          {/* Modals */}
+          <ConfirmAction
+            open={!!removing}
+            onOpenChange={(open) => {
+              if (!open) setRemoving(null);
+            }}
+            title="Remove connection?"
+            description={
+              removing
+                ? `Remove ${removing.name} from ${removing.scope}? You can configure it again later.`
+                : ''
+            }
+            label="Remove connection"
+            onConfirm={() => (removing ? deleteServer(removing.id, removing.scope) : undefined)}
+          />
           {customModalOpen && (
             <McpAddCustomModal
               key={editingServer ? `${editingServer.scope}:${editingServer.id}` : 'new'}

@@ -1,5 +1,7 @@
 use super::*;
+mod decision_trail;
 mod workbench;
+mod workspace_modes;
 
 pub(super) fn sample(agent: &str) -> TaskRun {
     TaskRun {
@@ -21,6 +23,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         routing: None,
         quota_failure: None,
         contract: Default::default(),
+        understanding: None,
         monitor_change: None,
         context_receipt: Default::default(),
         id: "test-attempt-123".into(),
@@ -51,6 +54,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         ended_at: None,
         session_id: None,
         result: String::new(),
+        streaming: String::new(),
         details_omitted: false,
         activity: vec![],
         diagnostics: vec![],
@@ -62,7 +66,13 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         usage_observations: vec![],
         prompts: vec![],
         validation_steps: vec![],
+        decisions: vec![],
         screenshots: vec![],
+        desktop_actions: vec![],
+        visited_pages: vec![],
+        review_captures: None,
+        review_capturing: false,
+        challenge_of: None,
     }
 }
 
@@ -411,7 +421,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
         agent_profile_id: None, verify_command: None, target_branch: Some("main".into()),
         account_binding: None, model,
         prompt: "Create a file named receipt.txt containing exactly JACKALOPE_NATIVE_OK. Do not run shell commands or use network tools. Remember the phrase copper-rabbit-731 for our next turn; do not write that phrase to a file. Finish with a short confirmation.".into(),
-        isolated: true, previous_run_id: None, connection_ids: Some(vec![]), coordination: None,
+        isolated: true, workspace_mode: None, previous_run_id: None, connection_ids: Some(vec![]), coordination: None,
         prepare_command: None,
         setup_files: Vec::new(), auto_verify: false, monitor_change: None,
         context_selection: Default::default(), context_receipt: Default::default(),
@@ -437,6 +447,8 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
                     .into(),
                 keywords: vec![],
                 enabled: true,
+                stale: None,
+                enforced: None,
                 source_run_id: None,
                 source_head: None,
                 revision: 0,
@@ -754,6 +766,7 @@ fn saved_user_answers_are_scoped_idempotent_and_not_overwritten_by_a_timeout() {
         answer: None,
         created_at: Utc::now().to_rfc3339(),
         answered_at: None,
+        presentation: Default::default(),
     };
     runtime.record_prompt(&prompt);
     assert!(runtime
@@ -938,6 +951,7 @@ process.stdin.on('end', () => {
         model: None,
         prompt: "Fixture only".into(),
         isolated: false,
+        workspace_mode: None,
         previous_run_id: None,
         coordination: None,
         connection_ids: None,
@@ -1037,6 +1051,8 @@ process.stdin.on('end', () => {
     });
     std::fs::create_dir_all(runtime.policy_path().parent().unwrap()).unwrap();
     std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
+    // The fixture answers one prompt and exits, as a one-shot launch expects.
+    super::claude_session::set_test_settings("fixture", Default::default());
     runtime
         .start(RunRequest {
             retry_of: None,
@@ -1062,6 +1078,7 @@ process.stdin.on('end', () => {
             model: None,
             prompt: "Fixture only".into(),
             isolated: false,
+            workspace_mode: None,
             previous_run_id: None,
             coordination: None,
             connection_ids: None,

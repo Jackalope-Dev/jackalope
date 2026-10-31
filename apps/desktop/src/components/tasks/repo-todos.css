@@ -78,7 +78,7 @@
   min-width: 180px;
 }
 .repo-todos input:not([type="checkbox"]) {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }
 .repo-todo-group {
   padding-top: 24px;
@@ -131,7 +131,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   cursor: pointer;
 }
 .repo-todo-completion input {
@@ -258,7 +258,7 @@
   margin-top: 24px;
 }
 .repo-todo-notes summary {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
   padding-block: 12px;
   cursor: pointer;
   color: var(--color-text-secondary);
@@ -294,7 +294,7 @@
   margin: 16px 0 8px;
 }
 .repo-todo-dialog input {
-  min-height: 44px;
+  min-height: var(--control-height, 36px);
 }
 .repo-todo-dialog-actions {
   display: flex;

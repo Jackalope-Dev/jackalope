@@ -35,12 +35,6 @@ export function TaskIntegration({ run, onApplied }: { run: TaskRun; onApplied: (
     );
   return (
     <div>
-      {run.checkpoint && (
-        <InlineNotice>
-          Checkpoint saved: {run.checkpoint.head.slice(0, 8)} ·{' '}
-          {run.checkpoint.message.split('\n')[0]}
-        </InlineNotice>
-      )}
       {run.checkpointError && (
         <InlineNotice tone="error">
           Automatic checkpoint needs attention: {run.checkpointError}

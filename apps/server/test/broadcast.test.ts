@@ -116,8 +116,8 @@ it('wears the same chrome as an access email', () => {
   for (const shared of ['#faf8f6', '#29241f', 'Jackalope Digital LLC', 'icon-128.png'])
     expect(note.includes(shared) && access.includes(shared)).toBe(true);
   // Broadcasts must offer a way out; access mail is transactional and does not.
-  expect(note).toContain('{{unsubscribe_link}}');
-  expect(access).not.toContain('{{unsubscribe_link}}');
+  expect(note).toContain('href="{{unsubscribeUrl}}"');
+  expect(access).not.toContain('{{unsubscribeUrl}}');
 });
 
 it('hands Sequenzy a draft, never a send, and targets the opted-in audience', async () => {

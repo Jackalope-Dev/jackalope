@@ -117,6 +117,14 @@ export function SessionComposer({
     }, 450);
     return () => clearTimeout(timer);
   }, [key, session.id, text, saving]);
+  // Conversations reopen paused after a restart. With nothing running, nothing to review
+  // and no bot reply limit reached, sending is a clear intent to continue, so it resumes.
+  const resumesOnSend =
+    session.paused &&
+    !active &&
+    !session.error &&
+    !session.persona &&
+    (session.batches.at(-1)?.settled ?? true);
   const send = async (mode: 'queue' | 'interrupt' | 'preview' = 'queue') => {
     const value = text.trim();
     if (!value || sending.current || session.closed) return;
@@ -177,7 +185,7 @@ export function SessionComposer({
         localStorage.removeItem(key);
       }
       await onSent();
-      if (mode !== 'queue') {
+      if (mode !== 'queue' || resumesOnSend) {
         await sessionCommand('action', { id: session.id, action: 'resume' });
         await onSent();
       }
@@ -286,7 +294,7 @@ export function SessionComposer({
           loading={saving}
           loadingLabel="Sending…"
         >
-          {active || session.paused ? 'Queue message' : 'Send'}
+          {active || (session.paused && !resumesOnSend) ? 'Queue message' : 'Send'}
         </Button>
       </div>
     </form>

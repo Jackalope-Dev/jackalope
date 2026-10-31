@@ -127,6 +127,16 @@ pub struct Efficiency {
     pub jev_questions: Option<u64>,
     pub timings: std::collections::BTreeMap<String, Timing>,
     pub first_activity_ms: Option<u64>,
+    /// First streamed text from the model, recorded only when partial messages are on.
+    pub first_token_ms: Option<u64>,
+    /// How Claude Code ran this turn: `oneshot`, `started`, `resumed` or `reused`.
+    pub claude_transport: Option<String>,
+    /// Saved checks the stop hook ran before letting the agent finish.
+    pub stop_check_rounds: u64,
+    pub edit_checks: u64,
+    pub edit_check_failures: u64,
+    /// Outcome of the attempt's first saved check, whichever path ran it.
+    pub first_check_passed: Option<bool>,
     pub routing_calls_avoided: u64,
     pub warm_provider_hits: u64,
     pub repository_map_cache_hits: u64,
@@ -174,6 +184,10 @@ impl Efficiency {
 
     pub fn first_activity(&mut self, elapsed: std::time::Duration) {
         self.first_activity_ms
+            .get_or_insert(elapsed.as_millis().min(u64::MAX as u128) as u64);
+    }
+    pub fn first_token(&mut self, elapsed: std::time::Duration) {
+        self.first_token_ms
             .get_or_insert(elapsed.as_millis().min(u64::MAX as u128) as u64);
     }
     pub fn timing(&mut self, phase: &str, elapsed: std::time::Duration) {

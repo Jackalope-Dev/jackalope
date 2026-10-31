@@ -14,24 +14,22 @@ export function TaskProgress({
   pending,
   action,
   onActivity,
-  verifyCommand,
 }: {
   run: TaskRun;
   integrated: boolean;
   pending: number;
   action?: ReactNode;
   onActivity: () => void;
-  verifyCommand?: string;
 }) {
   const active = isActive(run);
-  const decision = taskDecision(run, integrated, verifyCommand);
+  const decision = taskDecision(run, integrated);
   const agents = taskAgents(run);
   const presence = pending ? 'waiting' : active ? 'working' : 'idle';
   return (
     <section className="task-progress" aria-label="Task progress">
       <div className="task-progress-main">
         <div className="task-progress-art">
-          <AgentStack agents={agents} state={presence} size="md" />
+          <AgentStack agents={agents} state={presence} size="sm" />
         </div>
         <div className="task-progress-identity">
           <div className="task-progress-status" role="status">
@@ -47,8 +45,10 @@ export function TaskProgress({
         </div>
         {action && <div className="task-progress-action">{action}</div>}
       </div>
-      <TaskLiveActivity run={run} omitPhase={decision.label} />
-      {active && !!run.activity.length && (
+      {/* While a question waits, the question below is the next step; elapsed time and
+          activity stay a tab away so the question gets the room. */}
+      {!pending && <TaskLiveActivity run={run} omitPhase={decision.label} />}
+      {active && !pending && !!run.activity.length && (
         <Button variant="outline" className="task-progress-activity" onClick={onActivity}>
           <span>View activity</span>
           <ArrowUpRight size={16} />

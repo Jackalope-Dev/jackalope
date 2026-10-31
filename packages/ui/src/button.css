@@ -6,8 +6,8 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    height: 44px;
-    padding: 0 16px;
+    height: var(--control-height, 36px);
+    padding: 0 14px;
     border: 0;
     border-radius: 8px;
     font: inherit;
@@ -30,6 +30,11 @@
   :where(.ui-button):disabled {
     opacity: 0.5;
     pointer-events: none;
+  }
+  /* Unavailable but still focusable and hoverable, so a tooltip can explain why. */
+  :where(.ui-button)[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   :where(.ui-button[data-variant="primary"]) {
     background: var(--color-action);
@@ -72,6 +77,7 @@
     background: color-mix(in srgb, var(--color-danger) 25%, transparent);
   }
   :where(.ui-button[data-size="sm"]) {
+    height: var(--control-height-compact, 32px);
     padding: 0 12px;
   }
   :where(.ui-button[data-size="lg"]) {
@@ -80,8 +86,8 @@
     font-size: var(--text-base, 1rem);
   }
   :where(.ui-button[data-size="icon"]) {
-    width: 44px;
-    height: 44px;
+    width: var(--control-height, 36px);
+    height: var(--control-height, 36px);
     padding: 0;
   }
   .ui-button-labels {
