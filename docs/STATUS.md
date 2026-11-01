@@ -255,7 +255,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   tasks' live unintegrated files, are told when their work stops merging with another
   task's, and can split off subtasks with the user's consent; planned tasks show
   whether their assignments' current work merges cleanly and how the work was split. Projects can opt into agent reconciliation
-  and verified local merging; source worktrees remain available. See
+  and verified local merging; a committed `.jackalope/autonomy.json` limits which paths
+  and change sizes merge automatically. Source worktrees remain available. See
   [coordination contracts](ORCHESTRATION-CAPABILITIES.md).
 - Repository-aware plans, optional verified predecessor snapshots, dependency-aware
   scheduling, structured coordination reports and workspace verification reservations.
@@ -527,8 +528,9 @@ create a new project backed by an Artifacts repository, and Project settings can
 existing repository there through a new `artifacts` remote, leaving other remotes and local
 `jackalope/*` task branches untouched. Pushes use short-lived repo tokens scoped to the
 Artifacts host and never written to remotes or Git config. A read-only review snapshot
-returns an expiring clone command shown once. Tasks still run in local worktrees; hosted
-Artifacts, per-task forks and push-triggered automation are not implemented. Live
+returns an expiring clone command shown once. Tasks still run in local worktrees; Jackalope
+Swarm mirrors their snapshots to per-attempt forks, but hosted Artifacts, work running in
+those forks and push-triggered automation are not implemented. Live
 Cloudflare account and installed acceptance remain open.
 
 Trusted hosts and a responsive phone companion are implemented for native validation.

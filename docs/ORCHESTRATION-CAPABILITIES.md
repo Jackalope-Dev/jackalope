@@ -242,6 +242,30 @@ It does not push or remove source worktrees. A persisted merge receipt recovers 
 completed application after interruption. Neither mode establishes semantic correctness
 from checks alone; installed acceptance and measured reduction in duplicate work remain open.
 
+A project can limit automatic merging with `.jackalope/autonomy.json`, read from the
+target-branch commit the integration starts from, never from a worktree, so a change
+cannot loosen the policy it is judged by:
+
+```json
+{
+  "version": 1,
+  "default": "review",
+  "rules": [{ "paths": ["docs/**", "apps/website/src/content/**"], "level": "merge" }],
+  "protected": ["package.json", "migrations/**"],
+  "maxFiles": 25,
+  "maxChangedLines": 500
+}
+```
+
+Levels are `review` and `merge`; later rules win and unmatched paths use `default`
+(`review` when omitted). Protected paths, `.jackalope/**` and common CI configuration
+always stay in review. File and line limits default to 25 and 500. A combined result
+that touches any held path, exceeds a limit, or meets a policy that cannot be read
+stays in **Review & merge** with the reason shown under Automatic coordination.
+Without the file, automatic merging behaves as described above. Protect the files that
+define the saved check (such as package scripts and test configuration) so agent work
+cannot weaken the check that verified it.
+
 Use `JACKALOPE_AGREEMENT_TRIAL_REPO` and `JACKALOPE_AGREEMENT_TRIAL_PROFILE` with the
 ignored Rust test `installed_grok_and_claude_negotiate_ownership_and_interfaces` for
 an installed-provider trial in a disposable repository and new profile. The retained

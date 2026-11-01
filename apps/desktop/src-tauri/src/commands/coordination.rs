@@ -1,4 +1,5 @@
 pub(super) mod agreements;
+mod autonomy;
 pub mod cloud;
 pub mod peers;
 mod reconciliation;

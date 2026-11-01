@@ -69,6 +69,11 @@ export function CoordinationAutomation({
           results stay in Review & merge. Pausing the queue stops new automatic actions; running
           agents continue.
         </p>
+        <p className="task-muted">
+          Commit <code>.jackalope/autonomy.json</code> to the target branch to choose which paths
+          can merge automatically and how large a change can be. Everything else stays in Review &
+          merge.
+        </p>
       </Disclosure>
       {jobs
         .slice(-10)
@@ -77,6 +82,7 @@ export function CoordinationAutomation({
           <article key={job.id} className="queue-message">
             <h3>Reconciliation · {job.status === 'review' ? 'Ready for review' : job.status}</h3>
             <p>{job.sourceIds.length} source tasks</p>
+            {job.held && <InlineNotice>{job.held}</InlineNotice>}
             {job.error && <InlineNotice tone="error">{job.error}</InlineNotice>}
             {job.runId && (
               <Button variant="outline" onClick={() => onSelect(job.runId as string)}>

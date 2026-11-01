@@ -78,6 +78,8 @@ interface ReconciliationJob {
   planId: string | null;
   status: string;
   error: string | null;
+  /** Why the project's autonomy policy kept an automatic merge in review. */
+  held?: string | null;
 }
 export interface QueueView {
   managedTasks?: import('./managed-task').ManagedTask[];
