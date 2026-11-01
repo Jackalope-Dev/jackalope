@@ -1,6 +1,6 @@
-agent-browser 0.38.1
+agent-browser 0.40.0
 Copyright 2025 Vercel Inc.
-Source: https://github.com/vercel-labs/agent-browser/tree/v0.38.1
+Source: https://github.com/vercel-labs/agent-browser/tree/v0.40.0
 Source revision: aff6125c023b810ea3f2e5deec5379e9a4270bdc
 Distributed under Apache-2.0; see LICENSE.
 

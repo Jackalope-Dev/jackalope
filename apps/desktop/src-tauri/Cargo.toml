@@ -45,7 +45,7 @@ chrono = { version = "0.4", features = ["serde"] }
 portable-pty = "0.9"
 axum = "0.8"
 uuid = { version = "1", features = ["v4"] }
-rmcp = { version = "=3.4.1", default-features = false, features = ["server", "macros", "transport-streamable-http-server", "client", "transport-child-process", "transport-streamable-http-client-reqwest", "reqwest"] }
+rmcp = { version = "=3.8.0", default-features = false, features = ["server", "macros", "transport-streamable-http-server", "client", "transport-child-process", "transport-streamable-http-client-reqwest", "reqwest"] }
 
 toml_edit = { version = "0.25", features = ["serde"] }
 toml = "1"
@@ -110,7 +110,7 @@ block2 = "0.6"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "=3.6.3", features = ["sync-secret-service", "crypto-rust"] }
-notify-rust = { version = "=4.18.0", default-features = false, features = ["z-with-tokio"] }
+notify-rust = { version = "=4.18.2", default-features = false, features = ["z-with-tokio"] }
 zbus = { version = "5", default-features = false, features = ["tokio"] }
 # Already in the graph through zbus and tray-icon; the XDG portal desktop
 # backend awaits D-Bus signals and crops portal screenshots with them.
