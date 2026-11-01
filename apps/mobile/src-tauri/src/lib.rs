@@ -153,7 +153,10 @@ fn host_label(origin: &str, computer: Option<&str>) -> String {
     if let Some(name) = computer.map(str::trim).filter(|name| !name.is_empty()) {
         return name.chars().take(80).collect();
     }
-    match url::Url::parse(origin).ok().and_then(|url| url.host().map(|host| host.to_owned())) {
+    match url::Url::parse(origin)
+        .ok()
+        .and_then(|url| url.host().map(|host| host.to_owned()))
+    {
         Some(url::Host::Domain(domain)) => domain.split('.').next().unwrap_or(&domain).into(),
         Some(host) => host.to_string(),
         None => origin.into(),
@@ -291,7 +294,10 @@ mod tests {
 
     #[test]
     fn host_labels_prefer_the_computer_name() {
-        assert_eq!(host_label("https://studio.tailnet.ts.net", Some(" DESKTOP-7 ")), "DESKTOP-7");
+        assert_eq!(
+            host_label("https://studio.tailnet.ts.net", Some(" DESKTOP-7 ")),
+            "DESKTOP-7"
+        );
         assert_eq!(host_label("https://studio.tailnet.ts.net", None), "studio");
         assert_eq!(host_label("http://127.0.0.1:9472", Some("")), "127.0.0.1");
     }
