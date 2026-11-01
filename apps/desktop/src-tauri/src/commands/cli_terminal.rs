@@ -181,5 +181,4 @@ mod tests {
             "cd '/Users/o'\\''brien/my repo' && exec '/Applications/Jackalope.app/Contents/MacOS/jackalope' '--profile=/tmp/a b' 'attach' 'abc'"
         );
     }
-
 }
