@@ -281,6 +281,19 @@ pub async fn remote_configure(
     }
     service.status()
 }
+/// The link as QR modules, one string per row with '1' for dark, for the phone to scan.
+fn qr_rows(link: &str) -> Result<Vec<String>, String> {
+    let code = qrcode::QrCode::new(link.as_bytes()).map_err(|e| e.to_string())?;
+    Ok(code
+        .to_colors()
+        .chunks(code.width())
+        .map(|row| {
+            row.iter()
+                .map(|color| if *color == qrcode::Color::Dark { '1' } else { '0' })
+                .collect()
+        })
+        .collect())
+}
 #[tauri::command]
 pub fn remote_pairing(service: State<'_, RemoteAccess>) -> Result<Value, String> {
     let mut inner = service.inner.lock().map_err(|e| e.to_string())?;
@@ -295,7 +308,8 @@ pub fn remote_pairing(service: State<'_, RemoteAccess>) -> Result<Value, String>
     });
     let link = (!inner.config.public_origin.is_empty())
         .then(|| format!("{}/#pair={code}", inner.config.public_origin));
-    Ok(json!({"code":code,"link":link,"expiresIn":300}))
+    let qr = link.as_deref().map(qr_rows).transpose()?;
+    Ok(json!({"code":code,"link":link,"qr":qr,"expiresIn":300}))
 }
 #[tauri::command]
 pub fn remote_revoke(id: String, service: State<'_, RemoteAccess>) -> Result<(), String> {

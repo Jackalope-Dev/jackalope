@@ -10,6 +10,14 @@ use tauri_plugin_updater::UpdaterExt;
 #[cfg(all(windows, feature = "store"))]
 mod store;
 
+/// Lets Windows reopen the Store build after it applies an update.
+pub fn register_update_restart() {
+    #[cfg(all(windows, feature = "store"))]
+    if store::configured() {
+        store::restart_after_updates();
+    }
+}
+
 static INSTALLING: AtomicBool = AtomicBool::new(false);
 pub fn installing() -> bool {
     INSTALLING.load(Ordering::SeqCst)

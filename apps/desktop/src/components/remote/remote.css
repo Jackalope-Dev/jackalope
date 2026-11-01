@@ -9,6 +9,18 @@
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+.remote-pair-qr {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.remote-qr {
+  flex-shrink: 0;
+  width: 168px;
+  height: 168px;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 0 1px var(--color-border-subtle);
+}
 .remote-toolbar > span {
   color: var(--color-text-secondary);
   margin-right: auto;

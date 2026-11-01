@@ -16,6 +16,35 @@ interface Status {
   devices: { id: string; name: string; pairedAt: string }[];
   error: string | null;
 }
+interface PairingCode {
+  code: string;
+  link: string | null;
+  /** The link as QR rows, '1' for a dark module; present when there is a link. */
+  qr: string[] | null;
+  expiresIn: number;
+}
+
+/** Scannable from the companion app. Always dark on white so phone cameras read it in any theme. */
+function PairingQr({ rows }: { rows: string[] }) {
+  const size = rows.length + 8;
+  const path = rows
+    .flatMap((row, y) =>
+      [...row].flatMap((module, x) => (module === '1' ? [`M${x + 4} ${y + 4}h1v1h-1z`] : [])),
+    )
+    .join('');
+  return (
+    <svg
+      className="remote-qr"
+      viewBox={`0 0 ${size} ${size}`}
+      role="img"
+      aria-label="QR code for the pairing link"
+      shapeRendering="crispEdges"
+    >
+      <rect width={size} height={size} fill="#fff" />
+      <path d={path} fill="#000" />
+    </svg>
+  );
+}
 export function RemoteAccess() {
   const projects = useProjectStore((state) => state.projects);
   const [status, setStatus] = useState<Status | null>(null);
@@ -26,9 +55,7 @@ export function RemoteAccess() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [pair, setPair] = useState<{ code: string; link: string | null; expiresIn: number } | null>(
-    null,
-  );
+  const [pair, setPair] = useState<PairingCode | null>(null);
   const [expires, setExpires] = useState(0);
   const pairingDevices = useRef(new Set<string>());
   const apply = useCallback((next: Status) => {
@@ -217,7 +244,7 @@ export function RemoteAccess() {
           title="Pair a device"
           description={
             status.publicOrigin
-              ? 'Open the link on your phone or use the code on another desktop. Links expire after five minutes and work once.'
+              ? 'Scan the code with the Jackalope app on your phone, or use the pairing code on another desktop. Each one expires after five minutes and works once.'
               : 'Use SSH from another desktop, or enable private HTTPS for your phone.'
           }
         >
@@ -242,11 +269,7 @@ export function RemoteAccess() {
               disabled={busy}
               onClick={() =>
                 void perform(async () => {
-                  const result = await nativeTask<{
-                    code: string;
-                    link: string | null;
-                    expiresIn: number;
-                  }>('remote_pairing');
+                  const result = await nativeTask<PairingCode>('remote_pairing');
                   pairingDevices.current = new Set(status.devices.map((device) => device.id));
                   setPair(result);
                   setExpires(Date.now() + result.expiresIn * 1000);
@@ -257,6 +280,14 @@ export function RemoteAccess() {
             </Button>
           </div>
         </Setting>
+      )}
+      {pair?.qr && (
+        <div className="remote-pair-qr px-5 pt-4">
+          <PairingQr rows={pair.qr} />
+          <p className="task-muted">
+            In the Jackalope app on your phone, tap Scan QR code and point the camera here.
+          </p>
+        </div>
       )}
       {pair && (
         <div className="remote-toolbar px-5 py-4">

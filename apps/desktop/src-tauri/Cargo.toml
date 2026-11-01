@@ -77,6 +77,7 @@ ratatui = { version = "0.30.2", default-features = false, features = [
 crossterm = "0.29.0"
 # Already in the graph through ratatui; the CLI measures input columns with it.
 unicode-width = "0.2.2"
+qrcode = { version = "0.14", default-features = false }
 
 [features]
 default = ["custom-protocol"]
@@ -95,7 +96,7 @@ windows = { version = "0.62.2", optional = true, features = ["ApplicationModel",
 windows-collections = { version = "0.3.2", optional = true }
 windows-future = { version = "0.3.2", optional = true }
 tauri-winrt-notification = "0.8.1"
-windows-sys = { version = "0.61", features = ["Win32_Storage_Packaging_Appx", "Win32_System_JobObjects", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_Threading", "Win32_Foundation", "Win32_System_IO", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61", features = ["Win32_Storage_Packaging_Appx", "Win32_System_JobObjects", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_Threading", "Win32_Foundation", "Win32_System_IO", "Win32_System_Recovery", "Win32_UI_WindowsAndMessaging"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

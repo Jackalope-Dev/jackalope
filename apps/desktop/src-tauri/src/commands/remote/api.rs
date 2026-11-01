@@ -113,7 +113,9 @@ async fn pair(State(service): State<RemoteAccess>, Json(pair): Json<Pair>) -> Re
     }
     inner.config = config;
     inner.pairing = None;
-    Json(json!({"id":id,"token":token})).into_response()
+    // The computer's name lets the phone label this host better than its address does.
+    Json(json!({"id":id,"token":token,"computer":crate::commands::system::device_name()}))
+        .into_response()
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

@@ -134,6 +134,7 @@ pub fn run(launch: Launch) {
         .manage(CapacityService::default())
         .manage(commands::agent_models::ModelCatalogService::default())
         .setup(move |app| {
+            commands::release::register_update_restart();
             commands::browser::set_resource_directory(app.path().resource_dir()?);
             commands::desktop_control::platform::set_resource_directory(app.path().resource_dir()?);
             commands::computers::set_resource_directory(app.path().resource_dir()?);
