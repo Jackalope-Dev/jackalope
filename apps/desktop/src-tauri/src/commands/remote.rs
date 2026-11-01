@@ -289,7 +289,13 @@ fn qr_rows(link: &str) -> Result<Vec<String>, String> {
         .chunks(code.width())
         .map(|row| {
             row.iter()
-                .map(|color| if *color == qrcode::Color::Dark { '1' } else { '0' })
+                .map(|color| {
+                    if *color == qrcode::Color::Dark {
+                        '1'
+                    } else {
+                        '0'
+                    }
+                })
                 .collect()
         })
         .collect())
