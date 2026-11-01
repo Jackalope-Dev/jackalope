@@ -182,7 +182,7 @@ export function BranchIndicator() {
                           navigateWorkspace('kanban');
                         }}
                       >
-                        <GitBranch size={14} aria-hidden="true" />
+                        <GitBranch size={14} aria-hidden="true" className="branch-switch-icon" />
                         <span className="branch-switch-label">{target.label}</span>
                         <span className="branch-switch-name">{branchLabel(target.branch)}</span>
                       </button>

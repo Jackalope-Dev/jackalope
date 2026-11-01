@@ -670,7 +670,7 @@ button.project-tree-toggle:hover {
   text-align: left;
   cursor: pointer;
 }
-.branch-switch-item > svg {
+.branch-switch-icon {
   grid-row: 1 / span 2;
 }
 .branch-switch-item:hover {
