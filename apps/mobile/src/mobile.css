@@ -1,10 +1,19 @@
 /* The phone companion. Phones have no OS window material, so the frosted look is drawn
    here: soft brand-colour light behind the page, and panels that blur what scrolls under
    them. Panes stay tinted enough that text keeps 4.5:1 over any part of the backdrop. */
+/* Safe-area insets: the Android shell sets these from the system bars because its WebView
+   reports zero for env(); iOS keeps the env() values. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}
+
 .mobile-body {
   --m-gutter: 16px;
   --m-glass: color-mix(in srgb, var(--color-surface-elevated) 74%, transparent);
-  --m-glass-dense: color-mix(in srgb, var(--color-surface-elevated) 86%, transparent);
+  --m-glass-dense: color-mix(in srgb, var(--color-surface-elevated) 95%, transparent);
   --m-edge: color-mix(in srgb, var(--color-text-primary) 10%, transparent);
   --m-shadow: 0 12px 40px color-mix(in srgb, #000 18%, transparent);
   min-height: 100dvh;
@@ -50,8 +59,8 @@
   flex-direction: column;
   gap: 16px;
   min-height: 100dvh;
-  padding: 0 max(var(--m-gutter), env(safe-area-inset-right))
-    calc(96px + env(safe-area-inset-bottom)) max(var(--m-gutter), env(safe-area-inset-left));
+  padding: 0 max(var(--m-gutter), var(--safe-right)) calc(96px + var(--safe-bottom))
+    max(var(--m-gutter), var(--safe-left));
 }
 
 /* The top bar floats over scrolling content as one frosted capsule. */
@@ -64,7 +73,7 @@
   gap: 8px;
   min-height: 52px;
   margin: 0 calc(-1 * var(--m-gutter));
-  padding: calc(6px + env(safe-area-inset-top)) var(--m-gutter) 6px;
+  padding: calc(6px + var(--safe-top)) var(--m-gutter) 6px;
   border-width: 0 0 1px;
   border-radius: 0;
   background: var(--m-glass-dense);
@@ -228,8 +237,8 @@
 /* New work floats above the home indicator. */
 .mobile-fab {
   position: fixed;
-  right: max(var(--m-gutter), env(safe-area-inset-right));
-  bottom: calc(16px + env(safe-area-inset-bottom));
+  right: max(var(--m-gutter), var(--safe-right));
+  bottom: calc(16px + var(--safe-bottom));
   z-index: 10;
   display: inline-flex;
   align-items: center;
@@ -288,27 +297,30 @@
   min-width: 0;
 }
 
-/* The reply field stays pinned above the keyboard and home indicator. */
+/* The reply bar docks across the bottom like the top bar, above the gesture area, so
+   nothing scrolling underneath shows through the field. */
 .mobile-composer {
   position: fixed;
-  right: max(12px, env(safe-area-inset-right));
-  bottom: calc(12px + env(safe-area-inset-bottom));
-  left: max(12px, env(safe-area-inset-left));
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 10;
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  padding: 6px 6px 6px 14px;
-  border-radius: var(--radius-3xl);
+  padding: 8px max(var(--m-gutter), var(--safe-right)) calc(8px + var(--safe-bottom))
+    max(var(--m-gutter), var(--safe-left));
+  border-width: 1px 0 0;
+  border-radius: 0;
+  background: var(--m-glass-dense);
+  box-shadow: none;
 }
 .mobile-composer textarea {
   flex: 1;
   min-height: 40px;
   max-height: 40dvh;
-  padding: 9px 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
+  padding: 9px 14px;
+  border-radius: var(--radius-2xl);
   resize: none;
   field-sizing: content;
 }
@@ -327,14 +339,45 @@
 }
 
 .mobile-new-work,
-.mobile-pairing-form {
+.mobile-pairing-form,
+.mobile-pairing-fields {
   display: grid;
   gap: 16px;
+}
+.mobile-new-work,
+.mobile-pairing-form {
   padding: 20px;
+}
+.mobile-pairing-intro {
+  display: grid;
+  gap: 6px;
 }
 .mobile-pairing-form h2 {
   font-size: var(--text-lg);
   font-weight: 600;
+}
+/* "or enter it" between the scan button and the typed fallback. */
+.mobile-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.mobile-divider::before,
+.mobile-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.mobile-link-button {
+  justify-self: center;
+  min-height: 44px;
+  margin-top: -8px;
+  padding: 0 12px;
+  color: var(--color-accent-ink);
+  font-size: var(--text-sm);
+  font-weight: 500;
 }
 .mobile-pairing-form p {
   color: var(--color-text-secondary);
@@ -343,7 +386,7 @@
 .mobile-pairing-hero {
   display: grid;
   place-items: center;
-  padding-top: calc(32px + env(safe-area-inset-top));
+  padding-top: calc(32px + var(--safe-top));
 }
 .mobile-pairing-mark {
   width: min(260px, 70vw);

@@ -14,7 +14,7 @@ import { ChangedFiles } from '../../desktop/src/components/tasks/ChangedFiles';
 import { InlineNotice } from '../../desktop/src/components/ui/InlineNotice';
 import { agentProvider } from '../../desktop/src/lib/agent-provider';
 import { type Host, request as nativeRequest } from './native';
-import { sessionStatus, since, taskStatus, type WorkStatus } from './status';
+import { sessionStatus, since, taskStatus, type WorkStatus, workTitle } from './status';
 import '../../desktop/src/components/agents/agent-avatar.css';
 
 type Workspace = ReturnType<typeof useRemoteWorkspace>;
@@ -97,7 +97,7 @@ function WorkList({ host, work, onHosts }: { host: Host; work: Workspace; onHost
     })),
     ...work.latestTasks.map((task) => ({
       id: task.sessionId || task.taskId,
-      title: task.title,
+      title: workTitle(task.title),
       meta: `${task.projectName} · ${since(task.startedAt)}`,
       agent: task.agent,
       status: taskStatus(task),
@@ -247,7 +247,7 @@ function Conversation({ work }: { work: Workspace }) {
   return (
     <main className="mobile-screen mobile-conversation">
       <Bar
-        title={session?.title || task?.title || 'Conversation'}
+        title={session?.title || (task ? workTitle(task.title) : 'Conversation')}
         subtitle={task?.projectName}
         onBack={work.review ? work.closeReview : work.close}
       >
@@ -277,7 +277,7 @@ function Conversation({ work }: { work: Workspace }) {
       ) : (
         <div className="mobile-thread">
           <article className="mobile-bubble" data-from="you">
-            <p>{session?.title || task?.title}</p>
+            <p>{session?.title || (task && workTitle(task.title))}</p>
           </article>
           {session?.error && <InlineNotice tone="error">{session.error}</InlineNotice>}
           {!!session?.pending && (
@@ -296,7 +296,9 @@ function Conversation({ work }: { work: Workspace }) {
                 onAnswer={(text) => work.answer(detail.id, prompt.id, text)}
               />
             ))}
-          {detail?.error && <InlineNotice tone="error">{detail.error}</InlineNotice>}
+          {detail?.error && detail.error !== session?.error && (
+            <InlineNotice tone="error">{detail.error}</InlineNotice>
+          )}
           {(detail?.result || working) && (
             <article className="mobile-bubble" data-from="agent">
               <Avatar agent={task?.agent} working={working} />

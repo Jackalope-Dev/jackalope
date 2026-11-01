@@ -39,8 +39,8 @@ release dates.
   Tailscale Serve coexistence on each platform; validate access boundaries independently.
 - [ ] Finish the Android and iOS companion (apps/mobile): push notifications when work needs
   you (host registration of device tokens, a server relay holding the FCM and APNs
-  credentials, generic notification text), Android and iOS project generation and CI builds,
-  QR pairing, and acceptance on real phones before any store listing.
+  credentials, generic notification text), iOS project generation, CI builds for both
+  platforms, and acceptance on real phones (including QR scanning) before any store listing.
 
 - [ ] Run agent comparisons with installed providers: partial start failures, mixed
   finish times, stopped attempts, keep-one archiving and restore, and later follow-ups on

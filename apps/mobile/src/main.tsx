@@ -14,6 +14,24 @@ import './mobile.css';
 
 document.body.classList.add('mobile-body');
 
+declare global {
+  interface Window {
+    /** Present only in the Android shell; returns the system bar sizes in CSS pixels as JSON. */
+    JackalopeInsets?: { get(): string };
+  }
+}
+
+/** Android's WebView reports zero safe-area insets, so its shell publishes them instead. */
+function applyNativeInsets() {
+  const raw = window.JackalopeInsets?.get();
+  if (!raw) return;
+  const insets = JSON.parse(raw) as Record<'top' | 'right' | 'bottom' | 'left', number>;
+  for (const [side, value] of Object.entries(insets))
+    document.documentElement.style.setProperty(`--safe-${side}`, `${value}px`);
+}
+applyNativeInsets();
+window.addEventListener('jackalope-insets', applyNativeInsets);
+
 /** How long the splash stays at least, so its mark finishes decoding instead of flashing. */
 const SPLASH_MS = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1400;
 

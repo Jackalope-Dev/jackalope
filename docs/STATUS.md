@@ -568,6 +568,6 @@ update acceptance remain platform-specific requirements. Real-model quality and
 lesson/routing improvements require matched trials and independent review. Automated
 checks do not establish service delivery or installed-app acceptance.
 
-Managed remote hosting (including hosted Artifacts), enforced monetary budgets and team collaboration remain future work. An Android and iOS companion app (apps/mobile) pairs with a host and shows the companion screens; push notifications, device builds and store distribution are not implemented. Use
+Managed remote hosting (including hosted Artifacts), enforced monetary budgets and team collaboration remain future work. An Android and iOS companion app (apps/mobile) pairs with a host by scanning the QR code Remote access shows (or a pasted link or address and code) and shows the companion screens; it runs on the Android emulator, while push notifications, iOS builds, CI device builds and store distribution are not implemented. Use
 the [documentation index](README.md), [contribution guide](../CONTRIBUTING.md) and
 [licensing guide](LICENSING.md) for development and redistribution.

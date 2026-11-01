@@ -14,10 +14,12 @@ export interface WorkStatus {
 
 /** One label per state, in the desktop's words, so the phone reads like the sidebar. */
 export function taskStatus(task: RemoteTask): WorkStatus {
-  if (task.prompts.some((prompt) => prompt.status === 'pending'))
+  const active = ['starting', 'running', 'stopping'].includes(task.status);
+  // A question left by an attempt that ended can no longer be answered there; the list
+  // snapshot carries no prompts, so this keeps the list and the conversation in step.
+  if (active && task.prompts.some((prompt) => prompt.status === 'pending'))
     return { label: 'Needs your answer', variant: 'warning', needsYou: true, working: false };
-  if (['starting', 'running', 'stopping'].includes(task.status))
-    return { label: 'Working', variant: 'accent', needsYou: false, working: true };
+  if (active) return { label: 'Working', variant: 'accent', needsYou: false, working: true };
   if (task.status === 'review')
     return { label: 'Ready to review', variant: 'success', needsYou: true, working: false };
   if (task.status === 'reviewed')
@@ -45,4 +47,10 @@ export function since(iso: string, now = Date.now()) {
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours}h`;
   return `${Math.round(hours / 24)}d`;
+}
+
+/** The request's first line, without the prefix live sessions add to their prompts. */
+export function workTitle(prompt: string) {
+  const line = prompt.split(/\r?\n/).find((part) => part.trim()) ?? '';
+  return line.replace(/^\s*Live session:\s*/, '').trim() || 'Untitled work';
 }
