@@ -6,7 +6,7 @@ import {
   mergeFindings,
   reviewerReport,
 } from '../src/lib/challenge-review.ts';
-import { authorOf, modelFamily, rankReviewers } from '../src/lib/reviewer-choice.ts';
+import { authorOf, modelFamily, planReviewer, rankReviewers } from '../src/lib/reviewer-choice.ts';
 
 const step = (title, status, finding) => ({
   id: title,
@@ -160,4 +160,15 @@ test('default reviewers prefer another model family, then unknown, then the same
     }),
     { agent: 'codex', model: 'gpt-5' },
   );
+});
+
+test('plan reviews go to another family, preferring the planner among equals', () => {
+  const runners = [
+    { id: 'claude', name: 'Claude Code', available: true },
+    { id: 'gemini', name: 'Gemini CLI', available: true },
+    { id: 'codex', name: 'Codex', available: true },
+  ];
+  assert.equal(planReviewer(runners, { agent: 'claude' }, 'claude'), 'gemini');
+  assert.equal(planReviewer(runners, { agent: 'claude' }, 'codex'), 'codex');
+  assert.equal(planReviewer(runners.slice(0, 1), { agent: 'claude' }, 'claude'), undefined);
 });

@@ -77,6 +77,9 @@ pub struct PlanView {
     pub changes: Vec<artifact::SectionChange>,
     pub questions: Vec<PendingUserPrompt>,
     pub planner_run_id: Option<String>,
+    /// The agent and model that implement the plan once approved.
+    pub agent: String,
+    pub model: Option<String>,
     pub approval: Option<Approval>,
     pub shape: String,
     pub swarm_connected: bool,
@@ -475,6 +478,21 @@ pub fn create_manual(
     Ok(record)
 }
 
+/// The agent for the plan's combined review: the app's ranked choice (another model
+/// family where one is available), otherwise the planner. The implementer reviews its
+/// own work only when neither differs from it.
+pub(super) fn combined_reviewer(
+    chosen: Option<&str>,
+    planner: Option<&str>,
+    implementer: &str,
+) -> Option<String> {
+    [chosen, planner]
+        .into_iter()
+        .flatten()
+        .find(|agent| !agent.is_empty() && *agent != implementer)
+        .map(str::to_string)
+}
+
 fn planning_run<'a>(record: &PlanRecord, runs: &'a [TaskRun]) -> Option<&'a TaskRun> {
     let id = record.session.run_ids.last()?;
     runs.iter().find(|run| &run.id == id)
@@ -797,6 +815,8 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
             })
             .unwrap_or_default(),
         planner_run_id: planner.map(|run| run.id.clone()),
+        agent: record.request.agent.clone(),
+        model: record.request.model.clone(),
         approval: record.approval.clone(),
         shape: doc
             .as_ref()
@@ -941,6 +961,14 @@ pub struct PlanChecks {
     pub setup_files: Vec<String>,
 }
 
+/// What the app sends with an approval; the terminal sends neither.
+#[derive(Clone, Debug, Default)]
+pub struct ApprovalChoices {
+    pub checks: Option<PlanChecks>,
+    /// The app's ranked reviewer for the combined review.
+    pub reviewer: Option<String>,
+}
+
 /// Approval is always an explicit call naming the exact revision and hash
 /// shown to the person; nothing else, including elapsed time, approves.
 pub fn approve(
@@ -950,8 +978,9 @@ pub fn approve(
     hash: &str,
     shape: &str,
     surface: &str,
-    checks: Option<PlanChecks>,
+    choices: ApprovalChoices,
 ) -> Result<(), String> {
+    let ApprovalChoices { checks, reviewer } = choices;
     if !["single", "subtasks", "swarm"].contains(&shape) {
         return Err("Choose single, subtasks or swarm.".into());
     }
@@ -1015,7 +1044,11 @@ pub fn approve(
         plan_id: record.id.clone(),
         revision,
         assignments,
-        reviewer_agent: planner_agent.filter(|agent| agent != &request.agent),
+        reviewer_agent: combined_reviewer(
+            reviewer.as_deref(),
+            planner_agent.as_deref(),
+            &request.agent,
+        ),
         review_brief: interview::review_brief(&doc),
     };
     store.update(id, |saved| {

@@ -164,8 +164,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Review's **Challenge this change** runs one or two reviewers, preferring a different
   model family, in worktrees at a snapshot of the result. Only findings proven by a
   command count; Checks shows each command, its output, the expected output and dropped
-  counts, with Run again in a disposable worktree and Send to the author into the
-  follow-up draft. Agent review also defaults to a reviewer from another model family.
+  counts, with Run again in a disposable worktree (its latest output per command is kept
+  across reloads) and Send to the author into the follow-up draft. Agent review and a
+  plan's combined review also default to a reviewer from another model family.
 - Compared attempts can start a read-only judge, defaulting to a different agent family,
   that scores them against criteria taken from the request, recommends a base and lists
   parts worth porting. Keep and combine drafts a follow-up on the kept attempt and holds

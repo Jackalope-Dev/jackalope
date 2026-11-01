@@ -64,3 +64,22 @@ export function rankReviewers(
     .sort((a, b) => a.rank - b.rank || a.index - b.index)
     .map(({ runner }) => runner);
 }
+
+/**
+ * The reviewer for a plan's combined review: the best-ranked available agent other than
+ * the implementer, preferring the planner among equally ranked agents.
+ */
+export function planReviewer(
+  runners: Runner[],
+  implementer: { agent: string; model?: string | null },
+  planner: string | undefined,
+  adapterOf?: (agent: string) => string,
+): string | undefined {
+  const ordered = [
+    ...runners.filter((runner) => runner.id === planner),
+    ...runners.filter((runner) => runner.id !== planner),
+  ];
+  return rankReviewers(ordered, implementer, adapterOf).find(
+    (runner) => runner.id !== implementer.agent,
+  )?.id;
+}

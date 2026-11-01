@@ -179,8 +179,10 @@ repository, no overlapping independent ownership and no cycles. Each criterion b
 task requirement titled `AC-n: <text>`. Workers are told to run command and test criteria
 and record them with `record_validation_step` using the criterion ID as the step name.
 
-A plan always ends with an independent review, even for one assignment. The reviewer is
-the planning agent when it differs from the implementing agent, otherwise the same agent.
+A plan always ends with an independent review, even for one assignment. Approving in the
+app picks an available agent from another model family than the implementer, preferring
+the planning agent among equals; the terminal uses the planning agent when it differs
+from the implementing agent. Otherwise the implementer reviews its own work.
 It checks the combined change against each criterion, classifies gaps as Critical, Major
 or Minor, fixes Critical and Major gaps, and records a `Plan review` validation step after
 its last edit: failed while Critical or Major gaps remain, with a `Fixed AC-n:` line for

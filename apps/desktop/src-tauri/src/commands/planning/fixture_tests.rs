@@ -175,11 +175,12 @@ fn a_fixture_planner_drafts_a_plan_that_is_revised_approved_only_exactly_and_exp
     assert_eq!(view.changes[0].section, "Assumptions");
 
     // Approval binds to the exact revision and hash shown.
-    let checks = || {
-        Some(session::PlanChecks {
+    let checks = || session::ApprovalChoices {
+        checks: Some(session::PlanChecks {
             verify_command: Some("node --version".into()),
             ..Default::default()
-        })
+        }),
+        reviewer: None,
     };
     let stale = session::approve(
         &coordinator,

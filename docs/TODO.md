@@ -17,10 +17,8 @@ release dates.
 
 ## Agents and task execution
 
-- [ ] Close the review-evidence gaps: keep Challenge Run again output after a reload,
-  enforce Keep and combine worktree retention in native cleanup and integration (it is
-  enforced only in Project worktrees today), and default the planned task's combined
-  reviewer to another model family.
+- [ ] Enforce Keep and combine worktree retention in native cleanup and integration (it is
+  enforced only in Project worktrees today).
 - [ ] Tighten the merge gate: run the saved check on the combined integration tree in a
   temporary worktree before apply; launch a fresh plan review after the reviewer fixes
   gaps itself instead of continuing the same attempt; with a saved check, require a

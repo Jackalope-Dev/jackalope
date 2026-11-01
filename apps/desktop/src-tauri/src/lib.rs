@@ -497,6 +497,7 @@ pub fn run(launch: Launch) {
             commands::challenge_review::task_start_challenge,
             commands::challenge_review::task_challenge_reply,
             commands::challenge_review::task_challenge_rerun,
+            commands::challenge_review::task_challenge_reruns,
             task_respond_prompt,
             queue_snapshot,
             queue_add,

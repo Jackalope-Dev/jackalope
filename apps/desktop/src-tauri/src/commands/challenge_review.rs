@@ -31,7 +31,7 @@ pub struct ChallengeSource {
 }
 
 /// Result of running a finding's command again.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChallengeRerun {
     pub command: String,
@@ -252,11 +252,45 @@ pub(super) fn rerun(
         let _guard = integration::execution_guard();
         drop(disposable);
     }
-    Ok(ChallengeRerun {
+    let rerun = ChallengeRerun {
         command: command.to_string(),
         preparation,
         result,
-    })
+    };
+    save_rerun(runtime, id, &rerun)?;
+    Ok(rerun)
+}
+
+/// Where a reviewer's latest Run again results are kept, one per command, so they
+/// survive a reload. Ids come from the runtime, which only issues UUID-style ids.
+fn reruns_path(runtime: &TaskRuntime, id: &str) -> Result<PathBuf, String> {
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+        return Err("Unknown reviewer attempt.".into());
+    }
+    Ok(runtime
+        .integration_directory()
+        .join("challenge-reruns")
+        .join(format!("{id}.json")))
+}
+
+fn load_reruns(runtime: &TaskRuntime, id: &str) -> Result<Vec<ChallengeRerun>, String> {
+    match std::fs::read(reruns_path(runtime, id)?) {
+        Ok(bytes) => Ok(serde_json::from_slice(&bytes).unwrap_or_default()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(vec![]),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+fn save_rerun(runtime: &TaskRuntime, id: &str, rerun: &ChallengeRerun) -> Result<(), String> {
+    let path = reruns_path(runtime, id)?;
+    let mut saved = load_reruns(runtime, id)?;
+    saved.retain(|other| other.command != rerun.command);
+    saved.push(rerun.clone());
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let bytes = serde_json::to_vec(&saved).map_err(|e| e.to_string())?;
+    super::history::write_atomic(&path, &bytes)
 }
 
 #[tauri::command]
@@ -273,6 +307,15 @@ pub async fn task_start_challenge(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// The latest Run again result for each of this reviewer's finding commands.
+#[tauri::command]
+pub fn task_challenge_reruns(
+    id: String,
+    runtime: State<'_, TaskRuntime>,
+) -> Result<Vec<ChallengeRerun>, String> {
+    load_reruns(runtime.inner(), &id)
 }
 
 /// The reviewer's full reply, which summaries omit, for reading its findings block.
@@ -387,5 +430,39 @@ mod tests {
             .unwrap()
             .get("challengeOf")
             .is_none());
+    }
+
+    #[test]
+    fn run_again_results_survive_reload_latest_per_command() {
+        let root = std::env::temp_dir().join(format!("jackalope-reruns-{}", uuid::Uuid::new_v4()));
+        let runtime = TaskRuntime::new(root.join("history")).unwrap();
+        let result = |code| CommandResult {
+            exit_code: Some(code),
+            success: code == 0,
+            timed_out: false,
+            stalled: false,
+            stdout: format!("exit {code}"),
+            stderr: String::new(),
+            truncated: false,
+            duration_ms: 5,
+        };
+        let rerun = |command: &str, code| ChallengeRerun {
+            command: command.into(),
+            preparation: None,
+            result: Some(result(code)),
+        };
+        assert!(load_reruns(&runtime, "reviewer-1").unwrap().is_empty());
+        save_rerun(&runtime, "reviewer-1", &rerun("node a.js", 1)).unwrap();
+        save_rerun(&runtime, "reviewer-1", &rerun("node b.js", 1)).unwrap();
+        save_rerun(&runtime, "reviewer-1", &rerun("node a.js", 0)).unwrap();
+        let saved = load_reruns(&runtime, "reviewer-1").unwrap();
+        assert_eq!(saved.len(), 2);
+        let a = saved
+            .iter()
+            .find(|entry| entry.command == "node a.js")
+            .unwrap();
+        assert_eq!(a.result.as_ref().unwrap().exit_code, Some(0));
+        assert!(load_reruns(&runtime, "../escape").is_err());
+        let _ = std::fs::remove_dir_all(root);
     }
 }

@@ -637,3 +637,23 @@ fn written_plans_map_steps_to_tasks_and_outcomes_to_criteria() {
     });
     assert!(cycle.is_err());
 }
+
+#[test]
+fn combined_review_prefers_the_chosen_agent_then_the_planner() {
+    let pick = session::combined_reviewer;
+    assert_eq!(
+        pick(Some("gemini"), Some("codex"), "claude").as_deref(),
+        Some("gemini")
+    );
+    // The app's choice is ignored when it is the implementer itself.
+    assert_eq!(
+        pick(Some("claude"), Some("codex"), "claude").as_deref(),
+        Some("codex")
+    );
+    // The terminal sends no choice and keeps the planner.
+    assert_eq!(
+        pick(None, Some("codex"), "claude").as_deref(),
+        Some("codex")
+    );
+    assert_eq!(pick(Some(""), Some("claude"), "claude"), None);
+}
