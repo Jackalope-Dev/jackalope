@@ -1,38 +1,49 @@
 import { applyThemeTokens, DEFAULT_THEME } from '@jackalope/brand/theme';
-import { Button, FormField, Input } from '@jackalope/ui';
-import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
+import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import {
-  type RemoteAction,
-  RemoteWorkspace,
-} from '../../desktop/src/components/remote/RemoteWorkspace';
 import { InlineNotice } from '../../desktop/src/components/ui/InlineNotice';
-import { forget, request as nativeRequest, pair, pairedHost } from './native';
+import { Hosts } from './Hosts';
+import { HostWork } from './HostWork';
+import { forget, type Host, listHosts } from './native';
+import { Pairing } from './Pairing';
+import { Splash } from './Splash';
 import '../../desktop/src/index.css';
 import '../../desktop/src/components/ui/experience.css';
 import '../../desktop/src/components/tasks/task-workspace.css';
 import './mobile.css';
 
-document.body.classList.add('companion-body', 'mobile-body');
+document.body.classList.add('mobile-body');
+
+/** How long the splash stays at least, so its mark finishes decoding instead of flashing. */
+const SPLASH_MS = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1400;
+
+type Screen = { kind: 'hosts' } | { kind: 'pair' } | { kind: 'host'; host: Host };
 
 /**
- * The installable companion: the same screens as the host's web companion, reached
- * through native requests because the app is not served by the host it talks to.
+ * The installable companion. One paired computer opens straight to its work; with several,
+ * Computers lists them. Requests go through the native layer because the app is not served
+ * by the computer it talks to.
  */
 function MobileCompanion() {
-  // undefined while the saved pairing is read; null when this phone is not paired.
-  const [host, setHost] = useState<string | null | undefined>(undefined);
-  const [name, setName] = useState('My phone');
-  const [link, setLink] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [hosts, setHosts] = useState<Host[] | null>(null);
+  const [screen, setScreen] = useState<Screen>({ kind: 'hosts' });
+  const [splash, setSplash] = useState<'shown' | 'leaving' | 'gone'>('shown');
   const [error, setError] = useState('');
-  const attempt = useRef(0);
   useEffect(() => {
-    void pairedHost()
-      .then(setHost)
+    const started = Date.now();
+    void listHosts()
+      .then((saved) => {
+        setHosts(saved);
+        if (saved.length === 1) setScreen({ kind: 'host', host: saved[0] });
+      })
       .catch((cause) => {
-        setHost(null);
+        setHosts([]);
         setError(String(cause));
+      })
+      .finally(() => {
+        const wait = Math.max(0, SPLASH_MS - (Date.now() - started));
+        setTimeout(() => setSplash('leaving'), wait);
+        setTimeout(() => setSplash('gone'), wait + 320);
       });
   }, []);
   useEffect(() => {
@@ -42,90 +53,50 @@ function MobileCompanion() {
     query.addEventListener('change', theme);
     return () => query.removeEventListener('change', theme);
   }, []);
-  const request = useCallback(<T,>(action: RemoteAction) => nativeRequest<T>(action), []);
-  if (host === undefined) return null;
-  return (
-    <main className="companion-page">
-      <header>
-        <h1>Jackalope</h1>
-        {host && (
-          <Button
-            variant="ghost"
-            onClick={() =>
-              void forget()
-                .then(() => {
-                  setHost(null);
-                  setError('');
-                })
-                .catch((cause) => setError(String(cause)))
-            }
-          >
-            Disconnect
-          </Button>
-        )}
-      </header>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
-      {host ? (
-        <RemoteWorkspace key={host} request={request} storageKey="jackalope-mobile" />
-      ) : (
-        <form
-          className="remote-pairing"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            if (busy) return;
-            setBusy(true);
-            setError('');
-            const current = ++attempt.current;
-            try {
-              const paired = await pair(link.trim(), name.trim());
-              if (current !== attempt.current) return;
-              setLink('');
-              setHost(paired);
-            } catch (cause) {
-              if (current === attempt.current) setError(String(cause));
-            } finally {
-              if (current === attempt.current) setBusy(false);
-            }
+  const remove = (host: Host) =>
+    void forget(host.id)
+      .then(() => setHosts((current) => current?.filter((item) => item.id !== host.id) ?? []))
+      .catch((cause) => setError(String(cause)));
+  let view = null;
+  if (hosts) {
+    if (screen.kind === 'host') {
+      view = (
+        <HostWork
+          key={screen.host.id}
+          host={screen.host}
+          onHosts={() => setScreen({ kind: 'hosts' })}
+        />
+      );
+    } else if (screen.kind === 'pair' || !hosts.length) {
+      view = (
+        <Pairing
+          onBack={hosts.length ? () => setScreen({ kind: 'hosts' }) : undefined}
+          onPaired={(host) => {
+            setHosts((current) => [
+              ...(current ?? []).filter((item) => item.origin !== host.origin),
+              host,
+            ]);
+            setScreen({ kind: 'host', host });
           }}
-        >
-          <h2>Connect to your host</h2>
-          <p>
-            In Jackalope on your computer, open Settings → Remote access, create a pairing link and
-            paste it here.
-          </p>
-          <FormField label="Device name">
-            <Input
-              value={name}
-              disabled={busy}
-              required
-              maxLength={80}
-              onChange={(event) => setName(event.target.value)}
-              autoComplete="off"
-            />
-          </FormField>
-          <FormField label="Pairing link">
-            <Input
-              value={link}
-              disabled={busy}
-              required
-              type="url"
-              inputMode="url"
-              autoComplete="off"
-              placeholder="https://…/companion.html#pair=…"
-              onChange={(event) => setLink(event.target.value)}
-            />
-          </FormField>
-          <Button
-            type="submit"
-            loading={busy}
-            loadingLabel="Connecting…"
-            disabled={busy || !link.trim() || !name.trim()}
-          >
-            Connect
-          </Button>
-        </form>
-      )}
-    </main>
+        />
+      );
+    } else {
+      view = (
+        <Hosts
+          hosts={hosts}
+          onOpen={(host) => setScreen({ kind: 'host', host })}
+          onPair={() => setScreen({ kind: 'pair' })}
+          onRemove={remove}
+        />
+      );
+    }
+  }
+  return (
+    <>
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      {view}
+      {splash !== 'gone' && <Splash leaving={splash === 'leaving'} />}
+    </>
   );
 }
 

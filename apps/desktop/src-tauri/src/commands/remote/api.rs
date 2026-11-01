@@ -138,7 +138,7 @@ fn run<'a>(runs: &'a [TaskRun], config: &Config, id: Option<&str>) -> Result<&'a
         .ok_or_else(|| "Task is unavailable or access was removed.".into())
 }
 fn task(run: &TaskRun, detail: bool) -> Value {
-    json!({"id":run.id,"taskId":run.task_id,"sessionId":run.live_session_id,"projectId":run.project_id,"projectName":run.project_name,"title":run.prompt.chars().take(160).collect::<String>(),"status":run.status,"startedAt":run.started_at,"result":if detail { run.result.chars().take(100_000).collect::<String>() } else { String::new() },"error":run.error,"prompts":if detail { json!(run.prompts) } else { json!([]) },"activity":if detail { json!(run.activity.iter().rev().take(30).rev().collect::<Vec<_>>()) } else { json!([]) }})
+    json!({"id":run.id,"taskId":run.task_id,"sessionId":run.live_session_id,"projectId":run.project_id,"projectName":run.project_name,"agent":run.agent,"title":run.prompt.chars().take(160).collect::<String>(),"status":run.status,"startedAt":run.started_at,"result":if detail { run.result.chars().take(100_000).collect::<String>() } else { String::new() },"error":run.error,"prompts":if detail { json!(run.prompts) } else { json!([]) },"activity":if detail { json!(run.activity.iter().rev().take(30).rev().collect::<Vec<_>>()) } else { json!([]) }})
 }
 async fn request(
     State(service): State<RemoteAccess>,

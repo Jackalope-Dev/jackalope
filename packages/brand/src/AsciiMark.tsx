@@ -1,4 +1,5 @@
-import { characterPaths } from '@jackalope/brand/character';
+import { characterPaths } from './character';
+import './ascii-mark.css';
 import { useEffect, useRef } from 'react';
 
 const RAMP = ' .:-=+*#%@';
@@ -55,7 +56,7 @@ export function AsciiMark({
     const readColors = () => {
       const style = getComputedStyle(canvas);
       ink = style.color;
-      accent = style.getPropertyValue('--lp-ascii-accent').trim() || ink;
+      accent = style.getPropertyValue('--brand-ascii-accent').trim() || ink;
     };
 
     const measure = () => {
@@ -220,8 +221,8 @@ export function AsciiMark({
     };
   }, [echoes, interactive]);
   return (
-    <span className={`lp-ascii-frame ${className}`} aria-hidden="true">
-      <canvas ref={ref} className="lp-ascii" />
+    <span className={`brand-ascii-frame ${className}`} aria-hidden="true">
+      <canvas ref={ref} className="brand-ascii" />
     </span>
   );
 }

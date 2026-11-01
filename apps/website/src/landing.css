@@ -62,25 +62,6 @@
 }
 
 /* ASCII mark */
-.lp-ascii-frame {
-  display: block;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-.lp-ascii {
-  --lp-ascii-accent: var(--color-accent);
-  display: block;
-  width: 100%;
-  height: 100%;
-  color: var(--color-text-primary);
-  opacity: 0;
-  transition: opacity 600ms var(--lp-ease);
-}
-.lp-ascii[data-ready] {
-  opacity: 1;
-}
-
 /* Hero */
 .lp-hero {
   display: grid;
@@ -2040,7 +2021,6 @@
   .lp .lp-stack-layer {
     animation: none;
   }
-  .lp .lp-ascii,
   .lp .lp-tile,
   .lp .lp-download,
   .lp .lp-source {

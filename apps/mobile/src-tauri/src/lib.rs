@@ -7,46 +7,69 @@ use serde_json::{json, Value};
 use std::{path::PathBuf, sync::Mutex, time::Duration};
 use tauri::{Manager, State};
 
-/// What this phone keeps after pairing: where the host is and the token it issued.
+/// A paired host: where it is, the token it issued and how the app names it.
 #[derive(Clone, Deserialize, Serialize)]
-struct Pairing {
+struct Host {
+    id: String,
     origin: String,
     token: String,
+    label: String,
 }
+
+/// What the screens see of a host: never its token.
+#[derive(Serialize)]
+struct PublicHost {
+    id: String,
+    origin: String,
+    label: String,
+}
+
+impl From<&Host> for PublicHost {
+    fn from(host: &Host) -> Self {
+        Self {
+            id: host.id.clone(),
+            origin: host.origin.clone(),
+            label: host.label.clone(),
+        }
+    }
+}
+
+const MAX_HOSTS: usize = 10;
 
 struct Companion {
     path: PathBuf,
-    pairing: Mutex<Option<Pairing>>,
+    hosts: Mutex<Vec<Host>>,
 }
 
 impl Companion {
     fn load(path: PathBuf) -> Self {
-        let pairing = std::fs::read(&path)
+        let hosts = std::fs::read(&path)
             .ok()
-            .and_then(|bytes| serde_json::from_slice::<Pairing>(&bytes).ok());
+            .and_then(|bytes| serde_json::from_slice::<Vec<Host>>(&bytes).ok())
+            .unwrap_or_default();
         Self {
             path,
-            pairing: Mutex::new(pairing),
+            hosts: Mutex::new(hosts),
         }
     }
 
-    fn save(&self, pairing: Option<&Pairing>) -> Result<(), String> {
-        match pairing {
-            Some(pairing) => {
-                if let Some(parent) = self.path.parent() {
-                    std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-                }
-                let bytes = serde_json::to_vec(pairing).map_err(|e| e.to_string())?;
-                // The app's data folder is private to it on Android and iOS.
-                std::fs::write(&self.path, bytes).map_err(|e| e.to_string())
-            }
-            None => match std::fs::remove_file(&self.path) {
-                Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
-                    Err(error.to_string())
-                }
-                _ => Ok(()),
-            },
+    /// Writes the host list. The app's data folder is private to it on Android and iOS.
+    fn save(&self, hosts: &[Host]) -> Result<(), String> {
+        if let Some(parent) = self.path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
+        let bytes = serde_json::to_vec(hosts).map_err(|e| e.to_string())?;
+        std::fs::write(&self.path, bytes).map_err(|e| e.to_string())
+    }
+
+    fn host(&self, id: &str) -> Result<Host, String> {
+        self.hosts
+            .lock()
+            .map_err(|e| e.to_string())?
+            .iter()
+            .find(|host| host.id == id)
+            .cloned()
+            .ok_or_else(|| "This host was removed from the app. Pair it again.".into())
     }
 }
 
@@ -116,9 +139,9 @@ async fn post(
 }
 
 #[tauri::command]
-fn companion_host(state: State<'_, Companion>) -> Result<Option<String>, String> {
-    let pairing = state.pairing.lock().map_err(|e| e.to_string())?;
-    Ok(pairing.as_ref().map(|pairing| pairing.origin.clone()))
+fn companion_hosts(state: State<'_, Companion>) -> Result<Vec<PublicHost>, String> {
+    let hosts = state.hosts.lock().map_err(|e| e.to_string())?;
+    Ok(hosts.iter().map(PublicHost::from).collect())
 }
 
 #[tauri::command]
@@ -126,12 +149,18 @@ async fn companion_pair(
     link: String,
     name: String,
     state: State<'_, Companion>,
-) -> Result<String, String> {
+) -> Result<PublicHost, String> {
     let name = name.trim();
     if name.is_empty() || name.chars().count() > 80 {
         return Err("Use a device name up to 80 characters.".into());
     }
     let (origin, code) = parse_link(&link)?;
+    {
+        let hosts = state.hosts.lock().map_err(|e| e.to_string())?;
+        if hosts.len() >= MAX_HOSTS && !hosts.iter().any(|host| host.origin == origin) {
+            return Err("Remove a host before pairing another.".into());
+        }
+    }
     let response = post(
         &origin,
         "/api/pair",
@@ -143,38 +172,57 @@ async fn companion_pair(
         .as_str()
         .filter(|token| token.len() == 64)
         .ok_or("The host did not return a device token.")?;
-    let pairing = Pairing {
+    let label = url::Url::parse(&origin)
+        .ok()
+        .and_then(|url| {
+            url.host_str()
+                .map(|host| host.split('.').next().unwrap_or(host).into())
+        })
+        .unwrap_or_else(|| origin.clone());
+    let host = Host {
+        id: response["id"]
+            .as_str()
+            .unwrap_or(token)
+            .chars()
+            .take(64)
+            .collect(),
         origin: origin.clone(),
         token: token.into(),
+        label,
     };
-    state.save(Some(&pairing)).map_err(|error| {
+    let mut hosts = state.hosts.lock().map_err(|e| e.to_string())?;
+    let mut next = hosts.clone();
+    // Pairing the same host again replaces its old entry rather than listing it twice.
+    next.retain(|saved| saved.origin != origin);
+    next.push(host.clone());
+    state.save(&next).map_err(|error| {
         format!("{error} Pair again with a new link; remove the unused device on the host.")
     })?;
-    *state.pairing.lock().map_err(|e| e.to_string())? = Some(pairing);
-    Ok(origin)
+    *hosts = next;
+    Ok(PublicHost::from(&host))
 }
 
 #[tauri::command]
-async fn companion_request(action: Value, state: State<'_, Companion>) -> Result<Value, String> {
-    let pairing = state
-        .pairing
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clone()
-        .ok_or("Connect to your host first.")?;
-    post(
-        &pairing.origin,
-        "/api/request",
-        Some(&pairing.token),
-        &action,
-    )
-    .await
+async fn companion_request(
+    host: String,
+    action: Value,
+    state: State<'_, Companion>,
+) -> Result<Value, String> {
+    let host = state.host(&host)?;
+    post(&host.origin, "/api/request", Some(&host.token), &action).await
 }
 
+/// Forgets a host on this phone. The host keeps the device until it is removed there.
 #[tauri::command]
-fn companion_forget(state: State<'_, Companion>) -> Result<(), String> {
-    state.save(None)?;
-    *state.pairing.lock().map_err(|e| e.to_string())? = None;
+fn companion_forget(host: String, state: State<'_, Companion>) -> Result<(), String> {
+    let mut hosts = state.hosts.lock().map_err(|e| e.to_string())?;
+    let next: Vec<Host> = hosts
+        .iter()
+        .filter(|saved| saved.id != host)
+        .cloned()
+        .collect();
+    state.save(&next)?;
+    *hosts = next;
     Ok(())
 }
 
@@ -182,12 +230,12 @@ fn companion_forget(state: State<'_, Companion>) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            let path = app.path().app_data_dir()?.join("pairing.json");
+            let path = app.path().app_data_dir()?.join("hosts.json");
             app.manage(Companion::load(path));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            companion_host,
+            companion_hosts,
             companion_pair,
             companion_request,
             companion_forget

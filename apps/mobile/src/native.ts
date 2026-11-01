@@ -1,15 +1,21 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { RemoteAction } from '../../desktop/src/components/remote/RemoteWorkspace';
+import type { RemoteAction } from '../../desktop/src/components/remote/useRemoteWorkspace';
 
-/** The paired host's origin, or null when this phone is not paired. */
-export const pairedHost = () => invoke<string | null>('companion_host');
+/** A host this phone is paired with. Its token stays in the native layer. */
+export interface Host {
+  id: string;
+  origin: string;
+  label: string;
+}
 
-/** Pairs with a host from the link it showed; resolves to the host's origin. */
-export const pair = (link: string, name: string) =>
-  invoke<string>('companion_pair', { link, name });
+export const listHosts = () => invoke<Host[]>('companion_hosts');
 
-/** Sends one companion action to the paired host with this phone's token. */
-export const request = <T>(action: RemoteAction) => invoke<T>('companion_request', { action });
+/** Pairs with a host from the link it showed. Pairing the same host again replaces it. */
+export const pair = (link: string, name: string) => invoke<Host>('companion_pair', { link, name });
 
-/** Forgets the pairing on this phone. The host keeps the device until it is removed there. */
-export const forget = () => invoke<void>('companion_forget');
+/** Sends one companion action to a paired host with this phone's token for it. */
+export const request = <T>(host: string, action: RemoteAction) =>
+  invoke<T>('companion_request', { host, action });
+
+/** Forgets a host on this phone. The host keeps the device until it is removed there. */
+export const forget = (host: string) => invoke<void>('companion_forget', { host });
