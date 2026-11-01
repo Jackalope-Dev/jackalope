@@ -1,24 +1,6 @@
-//! The `jackalope` command inside the app, and the hand-off to the user's own
-//! terminal.
-//!
-//! Conversations live in this process, not in any terminal, so moving one is
-//! only a matter of attaching another client and closing the first.
+//! Opens the `jackalope` command in the user's own terminal.
 
-use portable_pty::CommandBuilder;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
-
-const PREFIX: &str = "cli-terminal-";
-
-fn valid_key(key: &str) -> Result<(), String> {
-    uuid::Uuid::parse_str(key)
-        .map(|_| ())
-        .map_err(|_| "Invalid terminal identifier.".into())
-}
-
-fn terminal_id(key: &str) -> String {
-    format!("cli::{key}")
-}
 
 fn command_path() -> Result<PathBuf, String> {
     super::cli_install::bundled_command()
@@ -34,91 +16,9 @@ fn repository(directory: &str) -> Result<PathBuf, String> {
     Ok(directory)
 }
 
-/// Opens a window running `jackalope` in `directory`. Each call opens a new
-/// window, so several conversations can run side by side. Async because
-/// building a window from a synchronous command deadlocks WebView2 on Windows.
+/// Opens the user's terminal running `jackalope` in `directory`.
 #[tauri::command]
-pub async fn cli_terminal_window(app: AppHandle, directory: String) -> Result<(), String> {
-    let directory = repository(&directory)?;
-    command_path()?;
-    let key = uuid::Uuid::new_v4().to_string();
-    let query = format!(
-        "index.html?cliTerminal={key}&directory={}",
-        encode(&directory.to_string_lossy())
-    );
-    let name = directory
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let mut builder = WebviewWindowBuilder::new(
-        &app,
-        format!("{PREFIX}{key}"),
-        WebviewUrl::App(query.into()),
-    )
-    .title(format!("{name} · Terminal · Jackalope"))
-    .inner_size(960.0, 640.0)
-    .min_inner_size(520.0, 360.0);
-    if let Some(profile) = std::env::var_os("JACKALOPE_PROFILE_DIR") {
-        builder = builder.data_directory(PathBuf::from(profile).join("webview"));
-    }
-    builder.build().map_err(|error| error.to_string())?;
-    Ok(())
-}
-
-/// Percent-encodes a path for a query string.
-fn encode(value: &str) -> String {
-    value
-        .bytes()
-        .map(|byte| match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
-                (byte as char).to_string()
-            }
-            _ => format!("%{byte:02X}"),
-        })
-        .collect()
-}
-
-/// Starts `jackalope` for the window `key` and returns the terminal id the
-/// shared terminal commands use.
-#[tauri::command]
-pub async fn cli_terminal_start(key: String, directory: String) -> Result<String, String> {
-    valid_key(&key)?;
-    let directory = repository(&directory)?;
-    let mut command = CommandBuilder::new(command_path()?);
-    // The command reports its conversation under this key; see `popout`.
-    command.env("JACKALOPE_TERMINAL", &key);
-    // The window's xterm.js draws 24-bit colour and Unicode but, like many
-    // embedded terminals, says neither.
-    command.env("COLORTERM", "truecolor");
-    command.env("TERM_PROGRAM", "jackalope");
-    let id = terminal_id(&key);
-    let started = id.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        super::work_terminal::start_command(&started, directory, command)
-    })
-    .await
-    .map_err(|error| error.to_string())??;
-    Ok(id)
-}
-
-/// Closes the terminal for window `key`. The conversation keeps running.
-#[tauri::command]
-pub fn cli_terminal_close(key: String) -> Result<(), String> {
-    valid_key(&key)?;
-    super::work_terminal::close(&terminal_id(&key));
-    Ok(())
-}
-
-/// Opens the user's terminal on the conversation the window `key` is showing,
-/// then closes the in-app copy so the conversation has one terminal. Async so
-/// stopping the in-app process does not block the event loop.
-#[tauri::command]
-pub async fn cli_terminal_popout(
-    app: AppHandle,
-    key: String,
-    directory: String,
-) -> Result<(), String> {
-    valid_key(&key)?;
+pub fn cli_terminal_open(directory: String) -> Result<(), String> {
     let directory = repository(&directory)?;
     let command = command_path()?;
     let mut arguments = Vec::new();
@@ -127,19 +27,7 @@ pub async fn cli_terminal_popout(
     if let Some(profile) = std::env::var_os("JACKALOPE_PROFILE_DIR") {
         arguments.push(format!("--profile={}", profile.to_string_lossy()));
     }
-    if let Some(session) = super::cli_host::attached_session(&key) {
-        arguments.push("attach".into());
-        arguments.push(session);
-    }
-    open_system_terminal(&directory, &command, &arguments)?;
-    let id = terminal_id(&key);
-    tauri::async_runtime::spawn_blocking(move || super::work_terminal::close(&id))
-        .await
-        .map_err(|error| error.to_string())?;
-    if let Some(window) = app.get_webview_window(&format!("{PREFIX}{key}")) {
-        let _ = window.close();
-    }
-    Ok(())
+    open_system_terminal(&directory, &command, &arguments)
 }
 
 /// Quotes `value` for a POSIX shell.
@@ -294,18 +182,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn window_queries_encode_paths() {
-        assert_eq!(encode("/a b/c&d=é"), "/a%20b/c%26d%3D%C3%A9");
-    }
-}
-
-/// Ends a window's command when the window goes away, however it was closed.
-/// This runs on the event loop, and stopping the process waits for it to exit,
-/// so the stop happens on a blocking worker.
-pub fn window_destroyed(label: &str) {
-    if let Some(key) = label.strip_prefix(PREFIX) {
-        let id = terminal_id(key);
-        tauri::async_runtime::spawn_blocking(move || super::work_terminal::close(&id));
-    }
 }

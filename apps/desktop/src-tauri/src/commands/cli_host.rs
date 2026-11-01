@@ -669,18 +669,6 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 revision: revision(&runtime, &sessions),
             })
         }
-        Request::Attached {
-            terminal,
-            session_id,
-        } => {
-            if let Ok(mut attached) = attached().lock() {
-                match session_id {
-                    Some(id) => attached.insert(terminal, id),
-                    None => attached.remove(&terminal),
-                };
-            }
-            Ok(Response::Ok)
-        }
         Request::Usage => {
             let records = super::capacity::capacity_snapshot(
                 app.state::<super::capacity::CapacityService>(),
@@ -1260,18 +1248,6 @@ fn commit_policy(policy: super::project_git::CommitPolicy) -> Result<Response, S
         name: policy.name,
         email: policy.email,
     })
-}
-
-/// Conversations shown in terminals the app started, keyed by terminal.
-fn attached() -> &'static std::sync::Mutex<std::collections::HashMap<String, String>> {
-    static ATTACHED: std::sync::OnceLock<
-        std::sync::Mutex<std::collections::HashMap<String, String>>,
-    > = std::sync::OnceLock::new();
-    ATTACHED.get_or_init(Default::default)
-}
-
-pub(super) fn attached_session(terminal: &str) -> Option<String> {
-    attached().lock().ok()?.get(terminal).cloned()
 }
 
 fn show_window(app: &AppHandle) -> Response {

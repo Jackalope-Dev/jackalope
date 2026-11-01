@@ -17,21 +17,8 @@ pub fn event_loop(
     inbox: &Receiver<Event>,
     enhanced: bool,
 ) -> Result<(), String> {
-    // Set when the desktop app started this terminal; it asks which
-    // conversation is showing here when the user moves it elsewhere.
-    let key = std::env::var("JACKALOPE_TERMINAL").ok();
-    let mut reported: Option<Option<String>> = None;
     let mut redraw = true;
     while !app.quit {
-        if let Some(key) = &key {
-            if reported.as_ref() != Some(&app.session) {
-                let _ = app.connection.send(&Request::Attached {
-                    terminal: key.clone(),
-                    session_id: app.session.clone(),
-                });
-                reported = Some(app.session.clone());
-            }
-        }
         #[cfg(unix)]
         if std::mem::take(&mut app.suspend) {
             super::suspend(terminal, enhanced)?;

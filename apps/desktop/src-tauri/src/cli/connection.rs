@@ -157,7 +157,6 @@ fn read_only(request: &Request) -> bool {
             | Request::Learnings { .. }
             | Request::Learning { .. }
             | Request::SetLearningArchived { .. }
-            | Request::Attached { .. }
     )
 }
 
