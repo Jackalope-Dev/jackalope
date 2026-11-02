@@ -1,5 +1,17 @@
 [
   {
+    "id": "see-the-whole-swarm-at-a-glance",
+    "date": "2026-11-02",
+    "status": "In development",
+    "title": "See the whole swarm at a glance",
+    "description": "The Swarm page now opens on a live map of every task working toward the target branch.",
+    "items": [
+      "Tasks orbit the branch by stage: queued, working, checking, ready, needing you or merged, with counts you can click to focus one stage.",
+      "Files more than one agent is changing sit between them, and conflicts glow red while agents are still working.",
+      "Select a task to see what it is doing, the files it changed and why it needs you, then open it in one click."
+    ]
+  },
+  {
     "id": "let-verified-work-merge-on-its-own-within-rules-you-commit",
     "date": "2026-11-02",
     "status": "In development",

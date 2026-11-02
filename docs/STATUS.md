@@ -519,7 +519,9 @@ links. GitHub uses the installed CLI; Linear/Jira credentials use protected nati
 Jackalope Swarm (beta) gives each live attempt on an Artifacts-linked project its own fork
 through the person's own Worker (`apps/swarm`). Every 15 seconds the desktop pushes changed
 snapshots as synthetic commits, and the Worker reports files and overlapping edits across
-forks on Project → Swarm, which appears once a swarm Worker is connected. Forks are deleted when attempts finish; merging stays local.
+forks on Project → Swarm, which appears once a swarm Worker is connected. The page opens on a map
+of the project's tasks by stage, the files several agents share and their conflicts. Forks are
+deleted when attempts finish; merging stays local.
 See [the Worker guide](../apps/swarm/README.md).
 
 Cloudflare Artifacts (beta) connects a user's own Cloudflare account and namespace from
