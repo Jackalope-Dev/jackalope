@@ -1072,7 +1072,8 @@ mod tests {
         assert!(scheduler.ledger.lock().unwrap().schedules[0].history[1]
             .outcome
             .contains("earlier run"));
-        let deadline = std::time::Instant::now() + Duration::from_secs(15);
+        // A cap for a hung run, not a speed check: setup under a loaded machine can take a while.
+        let deadline = std::time::Instant::now() + Duration::from_secs(60);
         loop {
             let runs = scheduler.coordinator.runtime.integration_runs().unwrap();
             assert_eq!(runs.len(), 1);
