@@ -88,7 +88,21 @@ pub(super) fn write_endpoint_key(directory: &Path, value: Option<&str>) -> Resul
 }
 
 #[tauri::command]
-pub fn agent_profile_save_key(
+pub async fn agent_profile_save_key(
+    app: tauri::AppHandle,
+    agent: String,
+    id: String,
+    name: String,
+    value: String,
+) -> Result<(), String> {
+    use tauri::Manager;
+    tauri::async_runtime::spawn_blocking(move || save_key(app.state(), agent, id, name, value))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Waits for the shared execution lock, so commands run it off the main thread.
+pub(in crate::commands) fn save_key(
     runtime: State<'_, TaskRuntime>,
     agent: String,
     id: String,

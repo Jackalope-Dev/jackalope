@@ -330,6 +330,7 @@ impl Helper {
                 // Show who actually answered when a fallback took over.
                 entry.agent = answering.agent.clone();
                 entry.account = answering.binding.label.clone();
+                entry.account_key = Some(account_key_for(&answering.binding));
                 entry.model = answering.model.clone();
                 self.save(&mut inner)?;
             }
@@ -616,8 +617,17 @@ pub fn helper_sync(helper: State<'_, Helper>, context: Option<Value>) -> Result<
     Ok(())
 }
 
+/// Async so waiting for the shared execution lock, which merges, checks and
+/// cleanup can hold for a while, never blocks the window's main thread.
 #[tauri::command]
-pub fn helper_send(helper: State<'_, Helper>, prompt: String) -> Result<View, String> {
+pub async fn helper_send(helper: State<'_, Helper>, prompt: String) -> Result<View, String> {
+    let helper = helper.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || send(&helper, prompt))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn send(helper: &Helper, prompt: String) -> Result<View, String> {
     let _guard = super::integration::execution_guard()?;
     if prompt.trim().is_empty() || prompt.len() > 8_000 {
         return Err("Use a message between 1 and 8,000 bytes.".into());
@@ -652,7 +662,7 @@ pub fn helper_send(helper: State<'_, Helper>, prompt: String) -> Result<View, St
         inner.busy = true;
         inner.canceled = canceled.clone();
     }
-    let service = helper.inner().clone();
+    let service = helper.clone();
     std::thread::spawn(move || {
         let result = service.answer(&id, candidates, canceled.clone());
         let mut inner = service.inner.lock().unwrap();

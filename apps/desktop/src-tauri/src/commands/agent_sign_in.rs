@@ -276,7 +276,23 @@ fn spawn_session(
 }
 
 #[tauri::command]
-pub fn agent_profile_sign_in(
+pub async fn agent_profile_sign_in(
+    app: tauri::AppHandle,
+    agent: String,
+    id: String,
+    cols: Option<u16>,
+    rows: Option<u16>,
+) -> Result<String, String> {
+    use tauri::Manager;
+    tauri::async_runtime::spawn_blocking(move || {
+        start_sign_in(app.state(), app.state(), agent, id, cols, rows)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Waits for the shared execution lock, so the command runs it off the main thread.
+fn start_sign_in(
     runtime: State<'_, super::tasks::TaskRuntime>,
     service: State<'_, SignInService>,
     agent: String,

@@ -10,6 +10,7 @@ use super::tasks::TaskRuntime;
 
 mod credentials;
 pub use credentials::agent_profile_save_key;
+pub(in crate::commands) use credentials::save_key;
 
 pub(super) fn has_api_key(binding: &AccountBinding) -> Result<bool, String> {
     credentials::read(binding).map(|key| key.is_some())
@@ -884,7 +885,21 @@ pub fn agent_profile_rename(
 }
 
 #[tauri::command]
-pub fn agent_profile_delete(
+pub async fn agent_profile_delete(
+    app: tauri::AppHandle,
+    agent: String,
+    id: String,
+) -> Result<(), String> {
+    use tauri::Manager;
+    tauri::async_runtime::spawn_blocking(move || {
+        delete_profile(app.state(), app.state(), agent, id)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Waits for the shared execution lock, so commands run it off the main thread.
+pub(in crate::commands) fn delete_profile(
     runtime: State<'_, TaskRuntime>,
     helper: State<'_, super::helper::Helper>,
     agent: String,
