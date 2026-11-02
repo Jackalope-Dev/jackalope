@@ -1,5 +1,17 @@
 [
   {
+    "id": "ship-merged-work-to-artifacts-and-production",
+    "date": "2026-11-02",
+    "status": "In development",
+    "title": "Ship merged work to Artifacts and production",
+    "description": "Projects that merge verified work automatically now push each merge to Artifacts and can deploy it.",
+    "items": [
+      "Add a deploy section to .jackalope/autonomy.json with your deploy command, an optional health check and a rollback; Jackalope runs them from a clean checkout of each merged commit.",
+      "A failed deploy or check pauses automatic merging until a deploy succeeds, and Deploy again retries the current commit.",
+      "The swarm map's branch shows when it is deploying, deployed or paused, with the output of a failed deploy."
+    ]
+  },
+  {
     "id": "see-the-whole-swarm-at-a-glance",
     "date": "2026-11-02",
     "status": "In development",

@@ -258,7 +258,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   whether their assignments' current work merges cleanly and how the work was split. Projects can opt into agent reconciliation
   and verified local merging; a committed `.jackalope/autonomy.json` limits which paths
   and change sizes merge automatically, can accept outcomes agents proved by running
-  them, and lets ready planned and swarm results merge too. Source worktrees remain
+  them, and lets ready planned and swarm results merge too. Such projects push each
+  merged branch head to their linked Artifacts repository and, when the policy has a
+  `deploy` section, deploy it from a clean checkout with an optional check and rollback;
+  a failed deploy pauses automatic merging. Source worktrees remain
   available. See
   [coordination contracts](ORCHESTRATION-CAPABILITIES.md).
 - Repository-aware plans, optional verified predecessor snapshots, dependency-aware
@@ -521,7 +524,8 @@ through the person's own Worker (`apps/swarm`). Every 15 seconds the desktop pus
 snapshots as synthetic commits, and the Worker reports files and overlapping edits across
 forks on Project → Swarm, which appears once a swarm Worker is connected. The page opens on a map
 of the project's tasks by stage, the files several agents share and their conflicts. Forks are
-deleted when attempts finish; merging stays local.
+deleted when attempts finish; merging is local, and projects that merge automatically push
+the merged branch back to Artifacts. Deploys are not yet accepted against a live Worker.
 See [the Worker guide](../apps/swarm/README.md).
 
 Cloudflare Artifacts (beta) connects a user's own Cloudflare account and namespace from

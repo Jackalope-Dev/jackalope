@@ -1,7 +1,8 @@
 import { Badge } from '@jackalope/ui';
 import { AlertTriangle, GitFork, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { type CloudState, cloudState, conflictSummary, fileStatus } from '../../lib/swarm';
+import { type DeployStatus, deliveryPhase, deployStatus } from '../../lib/deploy';
+import { ago, type CloudState, cloudState, conflictSummary, fileStatus } from '../../lib/swarm';
 import { swarmMap } from '../../lib/swarm-map';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { selectWork } from '../../lib/work-selection';
@@ -16,18 +17,12 @@ import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
+import { SwarmDelivery } from './SwarmDelivery';
 import { SwarmMap } from './SwarmMap';
 import './swarm.css';
 
 const POLL_MS = 5000;
 const FILES_SHOWN = 8;
-
-const ago = (iso: string) => {
-  const seconds = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
-  return new Date(iso).toLocaleTimeString();
-};
 
 /**
  * Every agent attempt on an Artifacts project works in its own fork; the swarm
@@ -35,15 +30,21 @@ const ago = (iso: string) => {
  */
 export function SwarmBoard() {
   const projectId = useProjectStore((state) => state.activeProjectId);
+  const projectPath = useProjectStore(
+    (state) => state.projects.find((project) => project.id === state.activeProjectId)?.path,
+  );
   const runs = useExecutionStore((state) => state.runs);
   const queue = useManagedTaskStore((state) => state.queue);
   const [state, setState] = useState<CloudState | null>(null);
+  const [delivery, setDelivery] = useState<DeployStatus | null>(null);
   const [error, setError] = useState('');
+  const [tick, setTick] = useState(0);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tick re-reads after an action.
   useEffect(() => {
     if (!projectId || !isTauriEnvironment()) return;
     let alive = true;
-    const read = () =>
+    const read = () => {
       cloudState(projectId)
         .then((next) => {
           if (!alive) return;
@@ -51,13 +52,18 @@ export function SwarmBoard() {
           setError('');
         })
         .catch((cause) => alive && setError(String(cause)));
-    void read();
+      if (projectPath)
+        deployStatus(projectPath)
+          .then((next) => alive && setDelivery(next))
+          .catch(() => alive && setDelivery(null));
+    };
+    read();
     const timer = window.setInterval(read, POLL_MS);
     return () => {
       alive = false;
       window.clearInterval(timer);
     };
-  }, [projectId]);
+  }, [projectId, projectPath, tick]);
 
   const runById = useMemo(() => new Map(runs.map((run) => [run.id, run])), [runs]);
   const swarm = state?.swarm;
@@ -106,7 +112,10 @@ export function SwarmBoard() {
           </Button>
         }
       />
-      {model && isTauriEnvironment() && <SwarmMap model={model} target={target} />}
+      {model && isTauriEnvironment() && (
+        <SwarmMap model={model} target={target} delivery={deliveryPhase(delivery)} />
+      )}
+      {delivery && <SwarmDelivery status={delivery} onChange={() => setTick((n) => n + 1)} />}
       {!isTauriEnvironment() && (
         <InlineNotice>The swarm is available in the desktop app.</InlineNotice>
       )}

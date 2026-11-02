@@ -93,6 +93,9 @@ release dates.
 - [ ] Tune swarm assignment and subtask limits from installed swarm trials: how often
   agents use peers, peer_adopt and propose_subtask, duplicate implementations avoided,
   conflicts caught before completion, and whether planner briefings reduce worker discovery.
+- [ ] Accept automatic delivery end to end in the installed app: a swarm goal on a new
+  Artifacts project merges under a committed policy, pushes the branch to Artifacts and
+  deploys to a Workers preview, including a failing check that rolls back and pauses merging.
 - [ ] Explore agent-native Artifacts workflows: a fork per task attempt instead of a local
   worktree, provenance notes on integrated commits, push-event review and check triggers,
   and opening an existing Artifacts repository as a project. Keep the coordinator,

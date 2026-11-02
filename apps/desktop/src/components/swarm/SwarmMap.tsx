@@ -14,7 +14,7 @@ import { Button } from '../ui/button';
 import './swarm-map.css';
 
 const WIDTH = 880;
-const HEIGHT = 440;
+const HEIGHT = 464;
 const CX = WIDTH / 2;
 const CY = HEIGHT / 2;
 const ORBIT = { rx: 360, ry: 168 };
@@ -105,7 +105,16 @@ function layout(model: SwarmMapModel) {
  * work inward, files several agents share sit between them, and conflicts arc
  * from agent to agent. Merged work docks beside the branch.
  */
-export function SwarmMap({ model, target }: { model: SwarmMapModel; target: string | null }) {
+export function SwarmMap({
+  model,
+  target,
+  delivery = null,
+}: {
+  model: SwarmMapModel;
+  target: string | null;
+  /** What the branch is doing after merges, when the project deploys. */
+  delivery?: 'deploying' | 'deployed' | 'paused' | null;
+}) {
   const [selected, setSelected] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [focusPhase, setFocusPhase] = useState<SwarmPhase | null>(null);
@@ -267,19 +276,28 @@ export function SwarmMap({ model, target }: { model: SwarmMapModel; target: stri
                 );
               })}
 
-            <g className="swarm-hub">
+            <g className="swarm-hub" data-delivery={delivery ?? undefined}>
               <circle cx={CX} cy={CY} r={HUB * 1.9} fill="url(#swarm-hub-glow)" />
               <circle className="swarm-hub-core" cx={CX} cy={CY} r={HUB} />
+              {delivery && (
+                <circle className="swarm-hub-deploy" cx={CX} cy={CY} r={HUB + 7} pathLength={100} />
+              )}
               <foreignObject x={CX - 10} y={CY - 24} width={20} height={20}>
                 <GitMerge size={20} className="swarm-hub-icon" />
               </foreignObject>
               <text className="swarm-hub-label" x={CX} y={CY + 14}>
                 {clip(target ?? 'Target', 12)}
               </text>
-              {model.counts.merged > 0 && (
+              {delivery === 'deploying' || delivery === 'paused' ? (
                 <text className="swarm-hub-merged" x={CX} y={CY + 27}>
-                  {model.counts.merged} merged
+                  {delivery === 'deploying' ? 'deploying' : 'paused'}
                 </text>
+              ) : (
+                model.counts.merged > 0 && (
+                  <text className="swarm-hub-merged" x={CX} y={CY + 27}>
+                    {model.counts.merged} merged
+                  </text>
+                )
               )}
             </g>
 

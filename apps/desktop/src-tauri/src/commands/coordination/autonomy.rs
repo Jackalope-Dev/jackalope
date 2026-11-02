@@ -74,6 +74,25 @@ pub struct AutonomyPolicy {
     pub max_changed_lines: Option<usize>,
     #[serde(default)]
     pub accept_outcomes: OutcomeAcceptance,
+    /// Deploys the branch each time it moves, when automatic merging is on.
+    #[serde(default)]
+    pub deploy: Option<DeployPolicy>,
+}
+
+/// How a branch reaches production. Each command runs in a clean checkout of
+/// the commit being deployed, with the person's own environment and tools.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DeployPolicy {
+    /// The only branch that deploys.
+    pub branch: String,
+    pub command: String,
+    /// Run after a deploy; failing it counts as a failed deploy.
+    #[serde(default)]
+    pub check: Option<String>,
+    /// Run when the check fails, to restore the previous release.
+    #[serde(default)]
+    pub rollback: Option<String>,
 }
 
 /// One changed file with added plus removed lines; binary files count as zero lines.
@@ -110,6 +129,31 @@ impl AutonomyPolicy {
             return Err(format!(
                 "{POLICY_PATH} has more than {MAX_PATTERNS} path patterns."
             ));
+        }
+        if let Some(deploy) = &policy.deploy {
+            let branch = deploy.branch.trim();
+            if branch.is_empty()
+                || branch.starts_with('-')
+                || branch
+                    .chars()
+                    .any(|c| c.is_whitespace() || c.is_control() || c == ':')
+            {
+                return Err(format!("{POLICY_PATH} needs a valid deploy branch."));
+            }
+            let commands = [
+                Some(&deploy.command),
+                deploy.check.as_ref(),
+                deploy.rollback.as_ref(),
+            ];
+            if commands.into_iter().flatten().any(|command| {
+                command.trim().is_empty()
+                    || command.chars().count() > 4000
+                    || command.contains('\0')
+            }) {
+                return Err(format!(
+                    "{POLICY_PATH} deploy commands must be 1 to 4,000 characters."
+                ));
+            }
         }
         Ok(policy)
     }
@@ -341,6 +385,9 @@ pub fn accept_before_merge(
     runs: &[TaskRun],
     ids: &[String],
 ) -> Option<String> {
+    if let Some(reason) = super::deploy::halted(directory, project) {
+        return Some(reason);
+    }
     let policy = match load(project, target_head) {
         Ok(None) => return None,
         Ok(Some(policy)) => policy,
