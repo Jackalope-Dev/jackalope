@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { constants, setPriority } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,9 +13,61 @@ const userCargo = process.env.USERPROFILE
   : null;
 const cargo = userCargo && existsSync(userCargo) ? userCargo : 'cargo';
 const args = process.argv.slice(2);
-if (args.length && (args.length !== 1 || args[0] !== '--native-only'))
-  throw new Error('Usage: pnpm verify [--native-only]');
+if (args.length > 1 || args.some((arg) => !['--native-only', '--changed'].includes(arg)))
+  throw new Error('Usage: pnpm verify [--native-only | --changed]');
 const nativeOnly = args.includes('--native-only');
+
+// Keep the machine responsive while checks run; child processes inherit this.
+if (process.env.JACKALOPE_VERIFY_PRIORITY !== 'normal') {
+  try {
+    setPriority(constants.priority.PRIORITY_BELOW_NORMAL);
+  } catch {}
+}
+
+/**
+ * Files the native build or its tests read. Anything else cannot change a Rust
+ * result, and Rust sources cannot change a JavaScript one.
+ */
+const NATIVE_INPUTS = [
+  /^apps\/desktop\/src-tauri\//,
+  /^apps\/desktop\/icons\//,
+  /^apps\/desktop\/src\/lib\/agent-capabilities\.json$/,
+  /^\.cargo\//,
+  /^rust-toolchain/,
+  /^package\.json$/,
+  /^pnpm-(lock|workspace)\.yaml$/,
+  /^scripts\/verify\.mjs$/,
+];
+
+/**
+ * With --changed, which halves of the gate the commits since the upstream
+ * branch can affect. Unknown history runs everything; CI always runs everything.
+ */
+function changedScope() {
+  if (!args.includes('--changed')) return { shared: true, native: true };
+  const git = (...gitArgs) =>
+    spawnSync('git', gitArgs, { cwd: root, encoding: 'utf8', windowsHide: true });
+  const upstream =
+    git('rev-parse', '--verify', '--quiet', '@{upstream}').status === 0
+      ? '@{upstream}'
+      : 'origin/master';
+  const base = git('merge-base', 'HEAD', upstream);
+  const diff = base.status === 0 ? git('diff', '--name-only', base.stdout.trim(), 'HEAD') : null;
+  const files = diff?.status === 0 ? diff.stdout.split('\n').filter(Boolean) : [];
+  if (!files.length) return { shared: true, native: true };
+  const native = files.some((file) => NATIVE_INPUTS.some((input) => input.test(file)));
+  const shared = files.some((file) => !file.startsWith('apps/desktop/src-tauri/'));
+  console.log(
+    `Checking ${files.length} changed files since ${upstream}: ${[
+      shared && 'JavaScript and shared checks',
+      native && 'native checks',
+    ]
+      .filter(Boolean)
+      .join(' and ')}.`,
+  );
+  return { shared, native };
+}
+const scope = changedScope();
 
 const sharedChecks = [
   [process.execPath, ['scripts/evaluation/website.mjs', '--check']],
@@ -52,6 +105,8 @@ const sharedChecks = [
 const nativeChecks = [
   [process.execPath, [pnpm, '--filter', '@jackalope/desktop', 'test']],
   [cargo, ['fmt', '--manifest-path', 'apps/desktop/src-tauri/Cargo.toml', '--check']],
+  // The terminal command is a separate binary; without `--bin` a change that
+  // breaks only it would still pass. One invocation compiles both in parallel.
   [
     cargo,
     [
@@ -60,28 +115,18 @@ const nativeChecks = [
       '--manifest-path',
       'apps/desktop/src-tauri/Cargo.toml',
       '--lib',
-      '--no-default-features',
-    ],
-  ],
-  // The terminal command is a separate binary; without this a change that
-  // breaks only it would still pass.
-  [
-    cargo,
-    [
-      'test',
-      '--locked',
-      '--manifest-path',
-      'apps/desktop/src-tauri/Cargo.toml',
       '--bin',
       'jackalope',
       '--no-default-features',
     ],
   ],
 ];
+const desktopScripts = nativeChecks.shift();
 const checks = [
   [process.execPath, ['scripts/security/dependencies.mjs', '--patch-only']],
-  ...(!nativeOnly ? sharedChecks : []),
-  ...nativeChecks,
+  ...(!nativeOnly && scope.shared ? sharedChecks : []),
+  ...(scope.shared || nativeOnly ? [desktopScripts] : []),
+  ...(scope.native ? nativeChecks : []),
 ];
 // A Git hook exports the repository it runs for, and in a linked worktree that
 // includes GIT_DIR. Checks that build fixture repositories would otherwise commit

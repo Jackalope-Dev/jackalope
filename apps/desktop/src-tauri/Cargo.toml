@@ -116,3 +116,9 @@ zbus = { version = "5", default-features = false, features = ["tokio"] }
 # backend awaits D-Bus signals and crops portal screenshots with them.
 futures-util = { version = "0.3", default-features = false }
 png = "0.18"
+
+# Dependencies are rarely stepped through in a debugger. Leaving out their debug
+# info makes dev and test builds link faster and keeps target/ much smaller;
+# release builds are unaffected.
+[profile.dev.package."*"]
+debug = false
