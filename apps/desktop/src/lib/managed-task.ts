@@ -32,6 +32,8 @@ export interface ManagedTask {
     assignmentCount?: number;
     autoStarted?: boolean;
     spawnedSubtasks?: number;
+    /** Why the project's autonomy policy kept this ready result in review. */
+    held?: string | null;
   } | null;
   id: string;
   title: string;

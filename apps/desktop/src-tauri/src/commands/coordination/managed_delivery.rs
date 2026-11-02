@@ -25,6 +25,10 @@ pub struct Delivery {
     pub auto_started: bool,
     /// Subtasks agents spawned with propose_subtask.
     pub spawned_subtasks: usize,
+    /// Why the autonomy policy kept a ready result in review.
+    pub held: Option<String>,
+    /// Target commit and attempts `held` was decided for; a change to either re-checks.
+    pub held_key: Option<String>,
 }
 
 impl Default for Delivery {
@@ -47,6 +51,8 @@ impl Default for Delivery {
             assignment_count: 0,
             auto_started: false,
             spawned_subtasks: 0,
+            held: None,
+            held_key: None,
         }
     }
 }
@@ -646,6 +652,146 @@ impl Coordinator {
         Ok(false)
     }
 
+    /// Merges a ready planned result into its local target branch when the
+    /// project opted into automatic merging and its committed autonomy policy
+    /// allows every change. Without a policy file, results wait for a person.
+    pub(super) fn apply_managed_locked(
+        &self,
+        inner: &mut Inner,
+        runs: &[TaskRun],
+        merged: &[String],
+    ) -> Result<bool, String> {
+        for task in inner.ledger.managed_tasks.clone() {
+            let Some(delivery) = &task.delivery else {
+                continue;
+            };
+            let project = &task.request.project_id;
+            if delivery.ready_at.is_none()
+                || delivery.applied_at.is_some()
+                || task.error.is_some()
+                || !inner.enabled.contains(project)
+            {
+                continue;
+            }
+            let Some(policy) = inner
+                .ledger
+                .assist_policies
+                .iter()
+                .find(|p| &p.project_id == project && p.merge)
+                .cloned()
+            else {
+                continue;
+            };
+            let items: Vec<_> = inner
+                .ledger
+                .items
+                .iter()
+                .filter(|item| item.feature_id.as_ref() == Some(&task.id))
+                .collect();
+            let ids: Vec<String> = items.iter().filter_map(|i| i.run_id.clone()).collect();
+            if ids.is_empty()
+                || ids.len() != items.len()
+                || ids.iter().any(|id| merged.contains(id))
+            {
+                continue;
+            }
+            let Some(final_run) = items
+                .iter()
+                .find(|item| Some(&item.id) == delivery.final_item.as_ref())
+                .and_then(|item| {
+                    runs.iter()
+                        .find(|run| Some(&run.id) == item.run_id.as_ref())
+                })
+            else {
+                continue;
+            };
+            let Some(target) = final_run.target_branch.clone() else {
+                continue;
+            };
+            let project_path = std::path::PathBuf::from(&final_run.project_path);
+            let Ok(head) = super::autonomy::branch_head(&project_path, &target) else {
+                continue;
+            };
+            let key = format!("{head}:{}", ids.join(","));
+            if delivery.held_key.as_deref() == Some(key.as_str())
+                || matches!(super::autonomy::load(&project_path, &head), Ok(None))
+            {
+                continue;
+            }
+            let directory = self.runtime.integration_directory();
+            let outcome = (|| -> Result<Option<String>, String> {
+                if runs.iter().any(|run| {
+                    ids.contains(&run.id)
+                        && run.verify_command.as_deref() != Some(policy.verify_command.as_str())
+                }) {
+                    return Ok(Some(
+                        "This result was not checked with the project's saved check. Held for review."
+                            .into(),
+                    ));
+                }
+                if let Some(reason) = super::autonomy::accept_before_merge(
+                    &self.runtime,
+                    &directory,
+                    &project_path,
+                    &head,
+                    runs,
+                    &ids,
+                ) {
+                    return Ok(Some(reason));
+                }
+                // Reload: the policy may have just recorded outcome acceptance.
+                let runs = &self.runtime.integration_runs()?;
+                self.refresh_scopes_locked(inner)?;
+                self.validate_integration_locked(&inner.ledger, runs, &ids)?;
+                let plan = crate::commands::integration::prepare_with_message(
+                    &directory,
+                    runs,
+                    &ids,
+                    Some(&task.title),
+                )?;
+                if plan.status != "ready" {
+                    return Ok(Some(
+                        "The combined result does not merge cleanly. Held for review.".into(),
+                    ));
+                }
+                let Some(combined) = plan.integration_head.as_deref() else {
+                    return Ok(Some("The combined result has no commit to check against the autonomy policy. Held for review.".into()));
+                };
+                if let Some(reason) =
+                    super::autonomy::hold_reason(&project_path, &plan.master_head, combined)
+                {
+                    return Ok(Some(reason));
+                }
+                if plan.sources.iter().any(|source| {
+                    inner.ledger.scope_audits.iter().any(|audit| {
+                        audit.run_id == source.run_id && audit.tree.as_ref() != Some(&source.tree)
+                    })
+                }) {
+                    return Err("Files changed during the scope check.".into());
+                }
+                crate::commands::integration::apply(&directory, runs, &plan.id)?;
+                Ok(None)
+            })();
+            let held = match outcome {
+                Ok(held) => held,
+                Err(error) => Some(format!("{error} Held for review.")),
+            };
+            let mut ledger = inner.ledger.clone();
+            let saved = ledger
+                .managed_tasks
+                .iter_mut()
+                .find(|saved| saved.id == task.id)
+                .and_then(|saved| saved.delivery.as_mut())
+                .unwrap();
+            saved.held_key = held.as_ref().map(|_| key);
+            saved.held = held;
+            self.save(&ledger)?;
+            inner.ledger = ledger;
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
     fn delivery_error(&self, inner: &mut Inner, id: &str, error: &str) -> Result<(), String> {
         let mut ledger = inner.ledger.clone();
         ledger
@@ -969,6 +1115,81 @@ mod tests {
         runs[0].validation_steps.push(gap);
         let (_, run) = repair_candidate(&ledger, &ledger.managed_tasks[0], &runs).unwrap();
         assert_eq!(run.id, "a");
+    }
+
+    #[test]
+    fn ready_results_merge_automatically_only_with_opt_in_and_a_committed_policy() {
+        let repo = super::super::agreement_tests::Repo::new();
+        let history = repo.root.join("history");
+        std::fs::create_dir(&history).unwrap();
+        let runtime = TaskRuntime::with_test_access(history).unwrap();
+        let service = Coordinator::new(repo.root.join("queue"), runtime).unwrap();
+        let (mut ledger, mut runs) = fixture();
+        let mut final_run = runs[0].clone();
+        final_run.id = "final".into();
+        runs.push(final_run);
+        for run in &mut runs {
+            run.status = "review".into();
+            run.project_path = repo.root.to_string_lossy().into();
+            run.target_branch = Some("main".into());
+        }
+        ledger.items[3].run_id = Some("final".into());
+        ledger.managed_tasks[0].delivery.as_mut().unwrap().ready_at = Some("now".into());
+        let mut inner = service.inner.lock().unwrap();
+        inner.ledger = ledger;
+        let attempt = |inner: &mut Inner| service.apply_managed_locked(inner, &runs, &[]).unwrap();
+        let held = |inner: &Inner| {
+            inner.ledger.managed_tasks[0]
+                .delivery
+                .as_ref()
+                .unwrap()
+                .held
+                .clone()
+        };
+        // Without opting in, an enabled queue or a committed policy, a person merges.
+        assert!(!attempt(&mut inner));
+        inner.enabled.insert("p".into());
+        inner
+            .ledger
+            .assist_policies
+            .push(super::super::reconciliation::AssistPolicy {
+                project_id: "p".into(),
+                project_name: "Project".into(),
+                project_path: repo.root.to_string_lossy().into(),
+                agent: "auto".into(),
+                verify_command: "check".into(),
+                resolve: false,
+                merge: true,
+            });
+        assert!(!attempt(&mut inner));
+        assert!(held(&inner).is_none());
+        std::fs::create_dir(repo.root.join(".jackalope")).unwrap();
+        std::fs::write(
+            repo.root.join(".jackalope/autonomy.json"),
+            r#"{"version":1,"default":"merge"}"#,
+        )
+        .unwrap();
+        repo.git(&["add", ".jackalope"]);
+        repo.git(&[
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-m",
+            "Autonomy policy",
+        ]);
+        // These fixture attempts have no worktrees, so preparing fails and the
+        // result is held once rather than retried on every pass.
+        assert!(attempt(&mut inner));
+        assert!(held(&inner).unwrap().ends_with("Held for review."));
+        assert!(!attempt(&mut inner));
+        assert!(inner.ledger.managed_tasks[0]
+            .delivery
+            .as_ref()
+            .unwrap()
+            .applied_at
+            .is_none());
     }
 
     #[test]

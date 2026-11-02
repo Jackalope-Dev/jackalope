@@ -1,5 +1,18 @@
 [
   {
+    "id": "let-verified-work-merge-on-its-own-within-rules-you-commit",
+    "date": "2026-11-02",
+    "status": "In development",
+    "title": "Let verified work merge on its own, within rules you commit",
+    "description": "An autonomy policy in your repository decides which checked changes Jackalope can merge locally without waiting for you.",
+    "items": [
+      "Commit .jackalope/autonomy.json to choose which paths can merge automatically and how large a change can be. Protected paths, the policy itself and CI configuration always wait for you.",
+      "Agents can't loosen the rules: Jackalope reads the policy from the branch it merges into, never from their work.",
+      "Planned and swarm results can merge once every assignment and the combined review pass, and outcomes an agent proved by running them can count as accepted.",
+      "Anything held back stays in review with the reason shown."
+    ]
+  },
+  {
     "id": "conversations-that-keep-going",
     "date": "2026-10-31",
     "status": "In development",

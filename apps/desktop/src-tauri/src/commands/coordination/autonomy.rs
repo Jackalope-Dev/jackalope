@@ -7,8 +7,11 @@
 //! larger than the policy allows, stays in review. A policy that cannot be read
 //! holds every change for review.
 
+use crate::commands::evidence::EvidenceLevel;
 use crate::commands::git_command::{self, Policy};
+use crate::commands::outcomes::{AssessmentStatus, OutcomeReceipt};
 use crate::commands::previews::features::glob_matches;
+use crate::commands::tasks::{TaskRun, TaskRuntime};
 use serde::Deserialize;
 use std::path::Path;
 
@@ -36,6 +39,17 @@ pub enum Level {
     Merge,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum OutcomeAcceptance {
+    /// A person accepts each required outcome.
+    #[default]
+    Review,
+    /// An outcome the agent proved by running something counts as accepted
+    /// once the saved check passed on the same files after that report.
+    Evidence,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Rule {
@@ -58,6 +72,8 @@ pub struct AutonomyPolicy {
     pub max_files: Option<usize>,
     #[serde(default)]
     pub max_changed_lines: Option<usize>,
+    #[serde(default)]
+    pub accept_outcomes: OutcomeAcceptance,
 }
 
 /// One changed file with added plus removed lines; binary files count as zero lines.
@@ -152,6 +168,22 @@ fn git(project: &Path, args: &[&str]) -> Result<std::process::Output, String> {
         .map_err(|e| format!("Could not run Git: {e}"))
 }
 
+/// The commit a local branch points at.
+pub fn branch_head(project: &Path, branch: &str) -> Result<String, String> {
+    let output = git(
+        project,
+        &[
+            "rev-parse",
+            "--verify",
+            &format!("refs/heads/{branch}^{{commit}}"),
+        ],
+    )?;
+    if !output.status.success() {
+        return Err(format!("The target branch {branch} could not be read."));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
 /// The policy committed at `commit`, or `None` when that commit has none.
 pub fn load(project: &Path, commit: &str) -> Result<Option<AutonomyPolicy>, String> {
     let spec = format!("{commit}:{POLICY_PATH}");
@@ -166,6 +198,107 @@ pub fn load(project: &Path, commit: &str) -> Result<Option<AutonomyPolicy>, Stri
         ));
     }
     AutonomyPolicy::parse(&output.stdout).map(Some)
+}
+
+fn reported_before(report: &str, check: &str) -> bool {
+    match (
+        chrono::DateTime::parse_from_rfc3339(report),
+        chrono::DateTime::parse_from_rfc3339(check),
+    ) {
+        (Ok(report), Ok(check)) => report <= check,
+        _ => false,
+    }
+}
+
+/// Outcomes the policy may accept for one attempt at `tree`, as requirement
+/// index and the report that proved it, or why a person must review instead.
+/// Workflow checkpoints and anything a person rejected always need a person.
+pub fn provable_outcomes(run: &TaskRun, tree: &str) -> Result<Vec<(usize, String)>, String> {
+    let check = run
+        .verification
+        .as_ref()
+        .filter(|check| check.result.success && check.tree.as_deref() == Some(tree))
+        .ok_or("Checks have not passed on the current files. Held for review.")?;
+    let mut accepted = vec![];
+    for (index, requirement) in run.contract.requirements.iter().enumerate() {
+        match &requirement.receipt {
+            Some(receipt) if receipt.accepted && receipt.tree == tree => continue,
+            Some(receipt) if !receipt.accepted => {
+                return Err(format!(
+                    "A person did not accept ‘{}’. Held for review.",
+                    requirement.title
+                ))
+            }
+            _ => {}
+        }
+        if requirement.checkpoint {
+            return Err(format!(
+                "Workflow step ‘{}’ needs a person. Held for review.",
+                requirement.title
+            ));
+        }
+        let proof = run.validation_steps.iter().rev().find_map(|step| {
+            step.requirements
+                .iter()
+                .find(|a| a.requirement_id == requirement.id)
+                .map(|a| (step, a))
+        });
+        match proof {
+            Some((step, assessment))
+                if matches!(assessment.status, AssessmentStatus::Met)
+                    && assessment
+                        .checked_level
+                        .is_some_and(|level| level >= EvidenceLevel::Ran)
+                    && reported_before(&step.timestamp, &check.checked_at) =>
+            {
+                accepted.push((index, format!("report:{}", step.id)));
+            }
+            _ => {
+                return Err(format!(
+                    "‘{}’ was not shown to be met by a command run or a reproduction before the last passing check. Held for review.",
+                    requirement.title
+                ))
+            }
+        }
+    }
+    Ok(accepted)
+}
+
+/// Records policy acceptance for every proven outcome of the selected
+/// attempts, or returns why a person must review. Nothing is recorded unless
+/// every attempt can be accepted.
+pub fn accept_outcomes(
+    runtime: &TaskRuntime,
+    directory: &Path,
+    runs: &[TaskRun],
+    ids: &[String],
+) -> Result<Option<String>, String> {
+    let mut accepted = vec![];
+    for run in runs.iter().filter(|run| ids.contains(&run.id)) {
+        let tree = crate::commands::integration::workspace_tree(run, directory)?;
+        if run.contract.require_accepted(&tree).is_ok() {
+            continue;
+        }
+        match provable_outcomes(run, &tree) {
+            Ok(items) => accepted.push((run.id.clone(), tree, items)),
+            Err(reason) => return Ok(Some(reason)),
+        }
+    }
+    let now = chrono::Utc::now().to_rfc3339();
+    for (id, tree, items) in accepted {
+        runtime.update_checked(&id, |run| {
+            for (index, evidence) in items {
+                run.contract.requirements[index].receipt = Some(OutcomeReceipt {
+                    accepted: true,
+                    evidence,
+                    note: "Accepted by the project's autonomy policy.".into(),
+                    tree: tree.clone(),
+                    recorded_at: now.clone(),
+                });
+            }
+        })?;
+    }
+    Ok(None)
 }
 
 /// Files and line counts between the target commit and the combined result.
@@ -195,8 +328,42 @@ pub fn changed_files(project: &Path, base: &str, head: &str) -> Result<Vec<Chang
         .collect())
 }
 
-/// Why the prepared integration must wait for a person, or `None` when the
-/// project has no policy or the policy lets it merge.
+/// Lets the policy committed at `target_head` accept the proven outcomes of
+/// the attempts `ids` before their merge is prepared. Returns why a person
+/// must review, or `None` when there is no policy or nothing is left to accept.
+/// Acceptance is recorded per outcome; the path and size check still runs on
+/// the prepared result afterwards.
+pub fn accept_before_merge(
+    runtime: &TaskRuntime,
+    directory: &Path,
+    project: &Path,
+    target_head: &str,
+    runs: &[TaskRun],
+    ids: &[String],
+) -> Option<String> {
+    let policy = match load(project, target_head) {
+        Ok(None) => return None,
+        Ok(Some(policy)) => policy,
+        Err(error) => return Some(format!("{error} Held for review.")),
+    };
+    match policy.accept_outcomes {
+        OutcomeAcceptance::Review => runs
+            .iter()
+            .filter(|run| ids.contains(&run.id))
+            .find_map(
+                |run| match crate::commands::integration::workspace_tree(run, directory) {
+                    Ok(tree) => run.contract.require_accepted(&tree).err(),
+                    Err(error) => Some(error),
+                },
+            )
+            .map(|reason| format!("{reason} Held for review.")),
+        OutcomeAcceptance::Evidence => accept_outcomes(runtime, directory, runs, ids)
+            .unwrap_or_else(|error| Some(format!("{error} Held for review."))),
+    }
+}
+
+/// Why the prepared integration from `base` to `head` must wait for a person,
+/// or `None` when the project has no policy or its paths and size allow it.
 pub fn hold_reason(project: &Path, base: &str, head: &str) -> Option<String> {
     match load(project, base) {
         Ok(None) => None,
@@ -262,6 +429,58 @@ mod tests {
             .contains("11 lines"));
         let defaults = policy(r#"{"version":1,"default":"merge"}"#);
         assert!(defaults.hold_reason(&[file("a", 501)]).is_some());
+    }
+
+    /// An attempt with one required outcome, a check that passed on `tree`
+    /// at 12:00 and a report on that outcome.
+    fn proven(level: &str, status: &str, reported_at: &str) -> TaskRun {
+        let mut run = TaskRun {
+            id: "run".into(),
+            ..Default::default()
+        };
+        run.contract.requirements.push(serde_json::from_value(serde_json::json!({"id":"requirement-0","title":"Saves drafts","checkpoint":false,"receipt":null})).unwrap());
+        run.verification = Some(serde_json::from_value(serde_json::json!({"command":"check","checkedAt":"2026-11-02T12:00:00Z","tree":"tree","result":{"success":true,"exitCode":0,"stdout":"","stderr":"","durationMs":1,"timedOut":false,"truncated":false}})).unwrap());
+        run.validation_steps.push(serde_json::from_value(serde_json::json!({"id":"step","step":"final","status":"passed","timestamp":reported_at,"requirements":[{"requirementId":"requirement-0","status":status,"summary":"Drafts save","checkedLevel":level}]})).unwrap());
+        run
+    }
+
+    #[test]
+    fn outcomes_need_run_or_reproduced_proof_before_a_check_on_the_same_files() {
+        let early = "2026-11-02T11:59:00Z";
+        assert_eq!(
+            provable_outcomes(&proven("ran", "met", early), "tree").unwrap(),
+            vec![(0, "report:step".to_string())]
+        );
+        assert!(provable_outcomes(&proven("reproduced", "met", early), "tree").is_ok());
+        for (run, tree) in [
+            (proven("cited", "met", early), "tree"),
+            (proven("ran", "partial", early), "tree"),
+            (proven("ran", "met", "2026-11-02T12:01:00Z"), "tree"),
+            (proven("ran", "met", "not a time"), "tree"),
+            (proven("ran", "met", early), "edited"),
+        ] {
+            assert!(provable_outcomes(&run, tree).is_err());
+        }
+        let mut step = proven("ran", "met", early);
+        step.contract.requirements[0].checkpoint = true;
+        assert!(provable_outcomes(&step, "tree")
+            .unwrap_err()
+            .contains("needs a person"));
+        let receipt = |accepted: bool| OutcomeReceipt {
+            accepted,
+            evidence: "manual".into(),
+            note: String::new(),
+            tree: "tree".into(),
+            recorded_at: "now".into(),
+        };
+        let mut rejected = proven("ran", "met", early);
+        rejected.contract.requirements[0].receipt = Some(receipt(false));
+        assert!(provable_outcomes(&rejected, "tree")
+            .unwrap_err()
+            .contains("did not accept"));
+        let mut accepted = proven("stated", "met", early);
+        accepted.contract.requirements[0].receipt = Some(receipt(true));
+        assert!(provable_outcomes(&accepted, "tree").unwrap().is_empty());
     }
 
     #[test]

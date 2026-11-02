@@ -257,7 +257,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   task's, and can split off subtasks with the user's consent; planned tasks show
   whether their assignments' current work merges cleanly and how the work was split. Projects can opt into agent reconciliation
   and verified local merging; a committed `.jackalope/autonomy.json` limits which paths
-  and change sizes merge automatically. Source worktrees remain available. See
+  and change sizes merge automatically, can accept outcomes agents proved by running
+  them, and lets ready planned and swarm results merge too. Source worktrees remain
+  available. See
   [coordination contracts](ORCHESTRATION-CAPABILITIES.md).
 - Repository-aware plans, optional verified predecessor snapshots, dependency-aware
   scheduling, structured coordination reports and workspace verification reservations.

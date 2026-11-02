@@ -271,6 +271,9 @@ impl Coordinator {
         if self.deliver_managed_locked(&mut inner, &runs, &merged, &url)? {
             return Ok(());
         }
+        if self.apply_managed_locked(&mut inner, &runs, &merged)? {
+            return Ok(());
+        }
         if self.assist_locked(&mut inner, &runs, &merged, &url)? {
             return Ok(());
         }

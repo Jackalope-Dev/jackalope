@@ -253,7 +253,8 @@ cannot loosen the policy it is judged by:
   "rules": [{ "paths": ["docs/**", "apps/website/src/content/**"], "level": "merge" }],
   "protected": ["package.json", "migrations/**"],
   "maxFiles": 25,
-  "maxChangedLines": 500
+  "maxChangedLines": 500,
+  "acceptOutcomes": "evidence"
 }
 ```
 
@@ -265,6 +266,19 @@ stays in **Review & merge** with the reason shown under Automatic coordination.
 Without the file, automatic merging behaves as described above. Protect the files that
 define the saved check (such as package scripts and test configuration) so agent work
 cannot weaken the check that verified it.
+
+Required outcomes still need a person unless `acceptOutcomes` is `evidence`. Then an
+outcome counts as accepted when the agent's latest report marks it met with evidence
+Jackalope checked at the ran or reproduced level, and the saved check later passed on
+the same files. Jackalope records that acceptance on the outcome, noted as accepted by
+the autonomy policy, before preparing the merge, so it remains even if the path check
+then holds the result. Workflow checkpoints and outcomes a person did not accept always
+need a person.
+
+With a committed policy, a ready planned or swarm result (all assignments plus the
+combined review) also merges automatically when the project merges verified work
+automatically and its queue is running. A held result is not retried until the target
+branch or its attempts change; the task shows why it was not merged.
 
 Use `JACKALOPE_AGREEMENT_TRIAL_REPO` and `JACKALOPE_AGREEMENT_TRIAL_PROFILE` with the
 ignored Rust test `installed_grok_and_claude_negotiate_ownership_and_interfaces` for
