@@ -95,6 +95,8 @@ const sharedChecks = [
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'test']],
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'build']],
   [process.execPath, [pnpm, 'build']],
+  [process.execPath, [pnpm, '--filter', '@jackalope/mobile', 'test']],
+  [process.execPath, [pnpm, '--filter', '@jackalope/mobile', 'build']],
   [
     process.execPath,
     [

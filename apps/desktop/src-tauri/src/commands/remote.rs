@@ -214,6 +214,17 @@ impl RemoteAccess {
 pub fn remote_status(service: State<'_, RemoteAccess>) -> Result<Value, String> {
     service.status()
 }
+/// A project's branch is empty until it has been inspected, so blank means its current
+/// branch. Errors name the project because several are configured at once.
+fn project_branch(request: &RunRequest) -> Result<String, String> {
+    let requested = request
+        .target_branch
+        .as_deref()
+        .map(str::trim)
+        .filter(|branch| !branch.is_empty());
+    super::tasks::resolve_target_branch(&request.project_path, requested)
+        .map_err(|error| format!("{}: {error}", request.project_name))
+}
 #[tauri::command]
 pub async fn remote_configure(
     enabled: bool,
@@ -233,10 +244,7 @@ pub async fn remote_configure(
         if !ids.insert(request.project_id.clone()) {
             return Err("A project was selected twice.".into());
         }
-        request.target_branch = Some(super::tasks::resolve_target_branch(
-            &request.project_path,
-            request.target_branch.as_deref(),
-        )?);
+        request.target_branch = Some(project_branch(request)?);
         request.isolated = true;
         request.previous_run_id = None;
         request.retry_of = None;
@@ -325,4 +333,49 @@ pub fn remote_revoke(id: String, service: State<'_, RemoteAccess>) -> Result<(),
     service.save(&config)?;
     inner.config = config;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn blank_project_branches_use_the_current_branch_and_errors_name_the_project() {
+        let repo = std::env::temp_dir().join(format!("jackalope-remote-branch-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&repo).unwrap();
+        for args in [
+            vec!["init", "-b", "trunk"],
+            vec![
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "commit",
+                "--allow-empty",
+                "-m",
+                "Fixture",
+            ],
+        ] {
+            assert!(std::process::Command::new("git")
+                .current_dir(&repo)
+                .args(args)
+                .output()
+                .unwrap()
+                .status
+                .success());
+        }
+        let request = |branch: Option<&str>| -> RunRequest {
+            serde_json::from_value(json!({"id":"r","projectId":"p","projectName":"Site","projectPath":repo.to_string_lossy(),"agent":"codex","prompt":"","isolated":true,"targetBranch":branch})).unwrap()
+        };
+        assert_eq!(project_branch(&request(None)).unwrap(), "trunk");
+        assert_eq!(project_branch(&request(Some(""))).unwrap(), "trunk");
+        assert_eq!(project_branch(&request(Some("  "))).unwrap(), "trunk");
+        assert_eq!(project_branch(&request(Some(" trunk "))).unwrap(), "trunk");
+        let missing = project_branch(&request(Some("absent"))).unwrap_err();
+        assert!(
+            missing.starts_with("Site: ") && missing.contains("absent"),
+            "unexpected error: {missing}"
+        );
+        std::fs::remove_dir_all(repo).unwrap();
+    }
 }

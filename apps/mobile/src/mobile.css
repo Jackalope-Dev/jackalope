@@ -62,6 +62,16 @@
   padding: 0 max(var(--m-gutter), var(--safe-right)) calc(96px + var(--safe-bottom))
     max(var(--m-gutter), var(--safe-left));
 }
+/* On an iPad or a landscape phone, content keeps a readable column under the full-width
+   bar instead of stretching rows across the screen. */
+.mobile-screen > :not(.mobile-bar, .mobile-fab, .mobile-composer) {
+  width: min(100%, 720px);
+  align-self: center;
+}
+.mobile-app-error {
+  margin: calc(8px + var(--safe-top)) max(var(--m-gutter), var(--safe-right)) 0
+    max(var(--m-gutter), var(--safe-left));
+}
 
 /* The top bar floats over scrolling content as one frosted capsule. */
 .mobile-bar {
@@ -118,18 +128,21 @@
   outline-offset: 2px;
 }
 
-.mobile-connection::before {
-  content: "";
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin-right: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-text-muted);
-  vertical-align: 1px;
+/* A conversation's status leads its second line, then its project and computer. */
+.mobile-bar-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 2px;
 }
-.mobile-connection[data-connected]::before {
-  background: var(--color-success);
+.mobile-bar-meta .ui-badge {
+  flex-shrink: 0;
+}
+.mobile-bar-meta > span:not(.ui-badge) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mobile-card {
@@ -223,6 +236,10 @@
   background: var(--color-accent-subtle, var(--color-surface-sunken));
   color: var(--color-accent-ink);
 }
+.mobile-host-icon[data-unreachable] {
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+}
 
 .mobile-empty,
 .mobile-note {
@@ -257,11 +274,6 @@
 
 /* Conversations put your messages on the right as tinted bubbles and replies on the left
    beside the agent's character, like the desktop. */
-.mobile-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
 .mobile-thread {
   display: grid;
   gap: 12px;
@@ -269,6 +281,7 @@
 .mobile-bubble[data-from="you"] {
   justify-self: end;
   max-width: 85%;
+  min-width: 0;
   padding: 10px 14px;
   border-radius: var(--radius-2xl) var(--radius-2xl) var(--radius-xs) var(--radius-2xl);
   background: var(--color-accent-subtle, var(--color-surface-sunken));
@@ -290,6 +303,63 @@
 }
 .mobile-working {
   color: var(--color-text-secondary);
+}
+.mobile-review-button {
+  justify-self: start;
+}
+
+/* Agent replies: the preflight reset removes block spacing, so Markdown gets it back here. */
+.mobile-markdown {
+  display: grid;
+  gap: 10px;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+.mobile-markdown :is(h1, h2, h3, h4) {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+.mobile-markdown :is(ul, ol) {
+  display: grid;
+  gap: 4px;
+  padding-left: 20px;
+}
+.mobile-markdown ul {
+  list-style: disc;
+}
+.mobile-markdown ol {
+  list-style: decimal;
+}
+.mobile-markdown :not(pre) > code {
+  padding: 1px 4px;
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-sunken);
+  font-size: 0.92em;
+}
+.mobile-markdown pre {
+  overflow-x: auto;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  font-size: var(--text-xs);
+}
+.mobile-markdown table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.mobile-markdown :is(th, td) {
+  padding: 4px 8px;
+  border: 1px solid var(--color-border-subtle);
+}
+.mobile-markdown a {
+  color: var(--color-accent-ink);
+  text-decoration: underline;
+}
+/* Keep the line breaks someone typed; Markdown alone would join them into one line. The
+   grid drops the whitespace between blocks, so only breaks inside text remain. */
+.mobile-bubble[data-from="you"] .mobile-markdown {
+  white-space: pre-line;
 }
 .mobile-review {
   display: grid;

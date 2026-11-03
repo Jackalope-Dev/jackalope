@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { prepareRemoteRequest } from '../../lib/remote-request';
+import { prepareRemoteRequest } from '../../lib/remote-request.ts';
 import type { PendingUserPrompt, Review } from '../../lib/task-runtime';
 
 export interface RemoteAction {
@@ -46,15 +46,36 @@ export function isActive(task: RemoteTask) {
   return ['starting', 'running', 'stopping'].includes(task.status);
 }
 
+/** One row per conversation or task: the latest attempt stands for its thread. */
+export function latestTasks(snapshot: Snapshot | null) {
+  return [
+    ...new Map(
+      [...(snapshot?.tasks ?? [])].reverse().map((task) => [task.sessionId || task.taskId, task]),
+    ).values(),
+  ].reverse();
+}
+
+/** Conversations with nothing run yet have no task row of their own. */
+export function waitingSessions(snapshot: Snapshot | null, latest = latestTasks(snapshot)) {
+  return (
+    snapshot?.sessions.filter((session) => !latest.some((task) => task.sessionId === session.id)) ??
+    []
+  );
+}
+
 /**
  * A paired host's work as the companion screens show it: the polled snapshot, the
  * selected task or conversation with its detail and review, and the actions on them.
  * Drafts are kept per item in local storage, and sends carry a saved request id so a
  * retried send after a lost response is not run twice.
  */
-export function useRemoteWorkspace(request: RemoteRequest, storageKey: string) {
+export function useRemoteWorkspace(
+  request: RemoteRequest,
+  storageKey: string,
+  initial?: { selected?: string; composing?: boolean },
+) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [selected, setSelected] = useState('');
+  const [selected, setSelected] = useState(initial?.selected ?? '');
   const [detail, setDetail] = useState<RemoteTask | null>(null);
   const [projectId, setProjectId] = useState('');
   const [loadedReview, setReview] = useState<{ runId: string; value: Review } | null>(null);
@@ -62,17 +83,12 @@ export function useRemoteWorkspace(request: RemoteRequest, storageKey: string) {
   const [connectionError, setConnectionError] = useState('');
   const [status, setStatus] = useState('Connecting…');
   const [busy, setBusy] = useState(false);
-  const [composing, setComposing] = useState(false);
+  const [composing, setComposing] = useState(initial?.composing ?? false);
   const [draft, setDraft] = useState('');
   const inFlight = useRef(false);
   const revision = useRef(0);
   const selectedSession = snapshot?.sessions.find((s) => s.id === selected);
-  // One row per conversation or task: the latest attempt stands for its thread.
-  const latestTasks = [
-    ...new Map(
-      [...(snapshot?.tasks ?? [])].reverse().map((task) => [task.sessionId || task.taskId, task]),
-    ).values(),
-  ].reverse();
+  const latest = latestTasks(snapshot);
   const selectedTask = snapshot?.tasks.find((task) => (task.sessionId || task.taskId) === selected);
   const review = loadedReview?.runId === selectedTask?.id ? loadedReview?.value : null;
   const draftKey = `${storageKey}:draft:${composing ? 'new' : selected}`;
@@ -245,11 +261,6 @@ export function useRemoteWorkspace(request: RemoteRequest, storageKey: string) {
     setError('');
   };
   const currentDetail = detail && detail.id === selectedTask?.id ? detail : null;
-  // Conversations with nothing run yet have no task row of their own.
-  const waitingSessions =
-    snapshot?.sessions.filter(
-      (session) => !latestTasks.some((task) => task.sessionId === session.id),
-    ) ?? [];
   return {
     snapshot,
     status,
@@ -263,8 +274,8 @@ export function useRemoteWorkspace(request: RemoteRequest, storageKey: string) {
     currentDetail,
     review,
     closeReview: () => setReview(null),
-    latestTasks,
-    waitingSessions,
+    latestTasks: latest,
+    waitingSessions: waitingSessions(snapshot, latest),
     composing,
     projectId,
     setProjectId,

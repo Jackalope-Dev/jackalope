@@ -15,7 +15,7 @@
     "check:write": "biome check --write .",
     "knip": "knip",
     "typecheck": "pnpm --filter @jackalope/ui --filter @jackalope/desktop --filter @jackalope/mobile --filter @jackalope/website typecheck",
-    "test": "pnpm test:release && pnpm --filter @jackalope/desktop --filter @jackalope/server test",
+    "test": "pnpm test:release && pnpm --filter @jackalope/desktop --filter @jackalope/mobile --filter @jackalope/server test",
     "test:release": "node --test \"scripts/release/*.test.mjs\"",
     "release:cut": "node scripts/release/cut-release.mjs",
     "release:prepare": "node scripts/release/prepare-release.mjs",

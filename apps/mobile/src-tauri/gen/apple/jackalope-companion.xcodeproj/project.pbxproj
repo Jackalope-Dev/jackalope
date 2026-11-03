@@ -1,0 +1,478 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0A957F9825180829768604F3 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = A857B09A49679C09287678EA /* assets */; };
+		0C581DF8BEFC33FBE03FCDF9 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B3BE9575B8EA92639EB733C5 /* Metal.framework */; };
+		138B5F269D4EB661A7B94B5E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1043F3C65CEED2A72E231B77 /* Assets.xcassets */; };
+		1A57A6FC1F4677C41D41E731 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7EBC9A0A2A02A93ECA167155 /* CoreGraphics.framework */; };
+		2B218B646CE47BCA7965689F /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 872DC3AE98282779E6DE29D5 /* QuartzCore.framework */; };
+		67A20BCA579B4B315B3AF95F /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A6A0A7CFE54F8DE8AF0B6534 /* UIKit.framework */; };
+		7497842E8F08299F7FB28D94 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 400C585E20EBA983063E496D /* Security.framework */; };
+		AF7325D9CF1E86C6AF5692F6 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 321A0EC9E4ADD4A96696F621 /* PrivacyInfo.xcprivacy */; };
+		B5E303F0B3170E88469A51EF /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 305432ECA2A339E874779BE3 /* main.mm */; };
+		C4F67C1B835B8D86E171976A /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 09D3E9F31B71D91D610DCB95 /* LaunchScreen.storyboard */; };
+		DA589BF35D320BFBEC0811BB /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A92C4F6B8F334463549FC48C /* MetalKit.framework */; };
+		E5A990D3C5AF545B9A5B07C0 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ABE55CCD4601A85527CB6711 /* WebKit.framework */; };
+		F5BEDAA292B23CE9C0C7CA35 /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 165B5A19752EC0403E0D3BB9 /* libapp.a */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		09D3E9F31B71D91D610DCB95 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		1043F3C65CEED2A72E231B77 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		11984939202786B3B389A2AE /* jackalope-companion_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "jackalope-companion_iOS.entitlements"; sourceTree = "<group>"; };
+		165B5A19752EC0403E0D3BB9 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		305432ECA2A339E874779BE3 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		321A0EC9E4ADD4A96696F621 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		400C585E20EBA983063E496D /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		5AFEFAF085113C3B605E07B7 /* jackalope-companion_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "jackalope-companion_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		7EBC9A0A2A02A93ECA167155 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		872DC3AE98282779E6DE29D5 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		8C0FEF2FF8E0324CF2D6D0E7 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		A6A0A7CFE54F8DE8AF0B6534 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		A857B09A49679C09287678EA /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		A92C4F6B8F334463549FC48C /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		ABE55CCD4601A85527CB6711 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		B3BE9575B8EA92639EB733C5 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		DB06CBC9B4F818D1CF9983BA /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		F09B11722325C377D3B9F60A /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		F4EC2548224963615E651A85 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		422E6E505FB77B9830D14AB5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F5BEDAA292B23CE9C0C7CA35 /* libapp.a in Frameworks */,
+				1A57A6FC1F4677C41D41E731 /* CoreGraphics.framework in Frameworks */,
+				0C581DF8BEFC33FBE03FCDF9 /* Metal.framework in Frameworks */,
+				DA589BF35D320BFBEC0811BB /* MetalKit.framework in Frameworks */,
+				2B218B646CE47BCA7965689F /* QuartzCore.framework in Frameworks */,
+				7497842E8F08299F7FB28D94 /* Security.framework in Frameworks */,
+				67A20BCA579B4B315B3AF95F /* UIKit.framework in Frameworks */,
+				E5A990D3C5AF545B9A5B07C0 /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		05086DB620D8CCBB0A4B412B /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				DB06CBC9B4F818D1CF9983BA /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
+		1A3DD7102093E583DCF2EA1D /* src */ = {
+			isa = PBXGroup;
+			children = (
+				F09B11722325C377D3B9F60A /* lib.rs */,
+				8C0FEF2FF8E0324CF2D6D0E7 /* main.rs */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+		48414A9E3B1953EE53C885BE /* jackalope-companion_iOS */ = {
+			isa = PBXGroup;
+			children = (
+				F4EC2548224963615E651A85 /* Info.plist */,
+				11984939202786B3B389A2AE /* jackalope-companion_iOS.entitlements */,
+				321A0EC9E4ADD4A96696F621 /* PrivacyInfo.xcprivacy */,
+			);
+			path = "jackalope-companion_iOS";
+			sourceTree = "<group>";
+		};
+		6162FF7ECA5AF746CCF8D385 /* jackalope-companion */ = {
+			isa = PBXGroup;
+			children = (
+				305432ECA2A339E874779BE3 /* main.mm */,
+				05086DB620D8CCBB0A4B412B /* bindings */,
+			);
+			path = "jackalope-companion";
+			sourceTree = "<group>";
+		};
+		6BFE52C6D9375BDB2619737E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5AFEFAF085113C3B605E07B7 /* jackalope-companion_iOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		8A337228066CF78AFCE1DB4F /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Externals;
+			sourceTree = "<group>";
+		};
+		8BBD0C591527BAC6635B8B42 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				7EBC9A0A2A02A93ECA167155 /* CoreGraphics.framework */,
+				165B5A19752EC0403E0D3BB9 /* libapp.a */,
+				B3BE9575B8EA92639EB733C5 /* Metal.framework */,
+				A92C4F6B8F334463549FC48C /* MetalKit.framework */,
+				872DC3AE98282779E6DE29D5 /* QuartzCore.framework */,
+				400C585E20EBA983063E496D /* Security.framework */,
+				A6A0A7CFE54F8DE8AF0B6534 /* UIKit.framework */,
+				ABE55CCD4601A85527CB6711 /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		E6F1B8672BC0B5398206D0C8 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				6162FF7ECA5AF746CCF8D385 /* jackalope-companion */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		EDA34A142BC7183CFB3F9C3F = {
+			isa = PBXGroup;
+			children = (
+				A857B09A49679C09287678EA /* assets */,
+				1043F3C65CEED2A72E231B77 /* Assets.xcassets */,
+				09D3E9F31B71D91D610DCB95 /* LaunchScreen.storyboard */,
+				8A337228066CF78AFCE1DB4F /* Externals */,
+				48414A9E3B1953EE53C885BE /* jackalope-companion_iOS */,
+				E6F1B8672BC0B5398206D0C8 /* Sources */,
+				1A3DD7102093E583DCF2EA1D /* src */,
+				8BBD0C591527BAC6635B8B42 /* Frameworks */,
+				6BFE52C6D9375BDB2619737E /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		"TEMP_0E56E22D-60C5-49E0-9E7C-688BD30538D1" /* arm64 */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = arm64;
+			sourceTree = "<group>";
+		};
+		"TEMP_D8556DBD-3421-4500-A649-548B5DA47390" /* x86_64 */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = x86_64;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8E4BBA038AD6BD629E23DF3F /* jackalope-companion_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 95593E7AFA582318224F8AC7 /* Build configuration list for PBXNativeTarget "jackalope-companion_iOS" */;
+			buildPhases = (
+				B4A90C8596B291E4F66519A9 /* Build Rust Code */,
+				9CE1E0618B258076A2F2F1DF /* Sources */,
+				AD05ECBB8F835E22E7247BFE /* Resources */,
+				422E6E505FB77B9830D14AB5 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "jackalope-companion_iOS";
+			packageProductDependencies = (
+			);
+			productName = "jackalope-companion_iOS";
+			productReference = 5AFEFAF085113C3B605E07B7 /* jackalope-companion_iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C7A353105E33B3AAC4FCC129 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = D298CE7DCA6104110FED1DCE /* Build configuration list for PBXProject "jackalope-companion" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = EDA34A142BC7183CFB3F9C3F;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 6BFE52C6D9375BDB2619737E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8E4BBA038AD6BD629E23DF3F /* jackalope-companion_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AD05ECBB8F835E22E7247BFE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				138B5F269D4EB661A7B94B5E /* Assets.xcassets in Resources */,
+				C4F67C1B835B8D86E171976A /* LaunchScreen.storyboard in Resources */,
+				AF7325D9CF1E86C6AF5692F6 /* PrivacyInfo.xcprivacy in Resources */,
+				0A957F9825180829768604F3 /* assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		B4A90C8596B291E4F66519A9 /* Build Rust Code */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Code";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a",
+				"$(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "pnpm tauri ios xcode-script -v --platform \"${PLATFORM_DISPLAY_NAME:?}\" --sdk-root \"${SDKROOT:?}\" --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration \"${CONFIGURATION:?}\" ${FORCE_COLOR} ${ARCHS:?}\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		9CE1E0618B258076A2F2F1DF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B5E303F0B3170E88469A51EF /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		49A29092BF9848BF2849A156 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = debug;
+		};
+		932842890AF263E4D6AA32C2 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "jackalope-companion_iOS/jackalope-companion_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "jackalope-companion_iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = dev.jackalope.companion;
+				PRODUCT_NAME = Jackalope;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+		9DAE4F54DBFBC7C2111FBF4A /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = release;
+		};
+		E5428F4084EEDD83713C9B63 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "jackalope-companion_iOS/jackalope-companion_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "jackalope-companion_iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = dev.jackalope.companion;
+				PRODUCT_NAME = Jackalope;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		95593E7AFA582318224F8AC7 /* Build configuration list for PBXNativeTarget "jackalope-companion_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E5428F4084EEDD83713C9B63 /* debug */,
+				932842890AF263E4D6AA32C2 /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		D298CE7DCA6104110FED1DCE /* Build configuration list for PBXProject "jackalope-companion" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				49A29092BF9848BF2849A156 /* debug */,
+				9DAE4F54DBFBC7C2111FBF4A /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C7A353105E33B3AAC4FCC129 /* Project object */;
+}

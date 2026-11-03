@@ -148,9 +148,20 @@ fn companion_hosts(state: State<'_, Companion>) -> Result<Vec<PublicHost>, Strin
 }
 
 /// Names a host after the computer it reports, else its address: an IP stays whole and a
-/// domain keeps its first label, like "studio" for studio.tailnet.ts.net.
+/// domain keeps its first label, like "studio" for studio.tailnet.ts.net. A Mac reports its
+/// Bonjour name, so "Studio.local" reads as "Studio".
 fn host_label(origin: &str, computer: Option<&str>) -> String {
-    if let Some(name) = computer.map(str::trim).filter(|name| !name.is_empty()) {
+    let bonjour = |name: &str| {
+        let cut = name.len().saturating_sub(".local".len());
+        name.get(cut..)
+            .filter(|suffix| suffix.eq_ignore_ascii_case(".local"))
+            .map_or(name.len(), |_| cut)
+    };
+    if let Some(name) = computer
+        .map(str::trim)
+        .map(|name| &name[..bonjour(name)])
+        .filter(|name| !name.is_empty())
+    {
         return name.chars().take(80).collect();
     }
     match url::Url::parse(origin)
@@ -297,6 +308,22 @@ mod tests {
         assert_eq!(
             host_label("https://studio.tailnet.ts.net", Some(" DESKTOP-7 ")),
             "DESKTOP-7"
+        );
+        assert_eq!(
+            host_label("http://127.0.0.1:9473", Some("Reindeer.local")),
+            "Reindeer"
+        );
+        assert_eq!(
+            host_label("http://127.0.0.1:9473", Some("Reindeer.LOCAL")),
+            "Reindeer"
+        );
+        assert_eq!(
+            host_label("http://127.0.0.1:9473", Some("local.example")),
+            "local.example"
+        );
+        assert_eq!(
+            host_label("http://127.0.0.1:9473", Some(".local")),
+            "127.0.0.1"
         );
         assert_eq!(host_label("https://studio.tailnet.ts.net", None), "studio");
         assert_eq!(host_label("http://127.0.0.1:9472", Some("")), "127.0.0.1");

@@ -1,23 +1,37 @@
 import { DropdownMenu as Menu } from '@jackalope/ui';
 import { ChevronRight, Ellipsis, Monitor, Plus, Trash2 } from 'lucide-react';
+import { Bar } from './Bar';
 import type { Host } from './native';
+import { workRows, workSummary } from './status';
+import type { ComputerState } from './useComputers';
 
-/** The computers this phone is paired with; each opens its work. */
+/** What a computer row says under its name: unreachable, what needs you, or its address. */
+function describe(host: Host, state?: ComputerState) {
+  const address = host.origin.replace(/^https?:\/\//, '');
+  if (state?.error) return `Unreachable · ${address}`;
+  const summary = state?.snapshot ? workSummary(workRows(state.snapshot)) : '';
+  return summary ? `${summary} · ${address}` : address;
+}
+
+/** The computers this phone is paired with; each opens its own work. */
 export function Hosts({
   hosts,
+  computers,
+  onBack,
   onOpen,
   onPair,
   onRemove,
 }: {
   hosts: Host[];
+  computers: Record<string, ComputerState>;
+  onBack: () => void;
   onOpen: (host: Host) => void;
   onPair: () => void;
   onRemove: (host: Host) => void;
 }) {
   return (
     <main className="mobile-screen">
-      <header className="mobile-bar mobile-glass">
-        <h1>Computers</h1>
+      <Bar title="Computers" onBack={onBack}>
         <button
           type="button"
           className="mobile-icon-button"
@@ -26,17 +40,21 @@ export function Hosts({
         >
           <Plus size={22} aria-hidden="true" />
         </button>
-      </header>
+      </Bar>
       <ul className="mobile-list mobile-card mobile-glass" aria-label="Paired computers">
         {hosts.map((host) => (
           <li key={host.id} className="mobile-row-wrap">
             <button type="button" className="mobile-row" onClick={() => onOpen(host)}>
-              <span className="mobile-host-icon" aria-hidden="true">
+              <span
+                className="mobile-host-icon"
+                data-unreachable={computers[host.id]?.error ? true : undefined}
+                aria-hidden="true"
+              >
                 <Monitor size={18} />
               </span>
               <span className="mobile-row-body">
                 <strong>{host.label}</strong>
-                <small>{host.origin.replace(/^https?:\/\//, '')}</small>
+                <small>{describe(host, computers[host.id])}</small>
               </span>
               <ChevronRight size={18} aria-hidden="true" className="mobile-row-chevron" />
             </button>
@@ -62,6 +80,9 @@ export function Hosts({
           </li>
         ))}
       </ul>
+      <p className="mobile-note">
+        Each computer runs its own work. Pair every computer you want to check in on.
+      </p>
     </main>
   );
 }

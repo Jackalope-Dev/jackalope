@@ -9,8 +9,12 @@ release dates.
 
 - [ ] Finish the Android and iOS companion (apps/mobile): push notifications when work needs
   you (host registration of device tokens, a server relay holding the FCM and APNs
-  credentials, generic notification text), iOS project generation and CI builds for both
-  platforms before any store listing.
+  credentials, generic notification text), signed device builds and CI builds for both
+  platforms, and on-device checks of the keyboard over the reply bar, camera scanning and
+  Tailscale HTTPS pairing before any store listing.
+- [ ] Decide how a desktop coordinates work across several hosts: a combined view of every
+  paired host's work, and whether new work can be routed to an available host, while each
+  host keeps execution ownership.
 - [ ] Decide whether browser tools should reach cloud machines through an authenticated
   DevTools proxy.
 - [ ] Add AT-SPI accessibility actions and stable refs to the in-sandbox agent.

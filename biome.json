@@ -6,7 +6,8 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignoreUnknown": false
+    "ignoreUnknown": false,
+    "includes": ["**", "!apps/mobile/src-tauri/gen/apple"]
   },
   "css": { "parser": { "tailwindDirectives": true } },
   "markdown": { "formatter": { "enabled": false }, "linter": { "enabled": false } },

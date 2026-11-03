@@ -1,7 +1,14 @@
-import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { Badge, Button, FormField, Select, SelectItem, Textarea } from '@jackalope/ui';
-import { ArrowUp, ChevronLeft, MessageCircle, Plus, RefreshCw } from 'lucide-react';
-import { type ReactNode, useCallback } from 'react';
+import {
+  Badge,
+  Button,
+  FormField,
+  DropdownMenu as Menu,
+  Select,
+  SelectItem,
+  Textarea,
+} from '@jackalope/ui';
+import { ArrowUp, Ellipsis, Pause, Play, Square } from 'lucide-react';
+import { useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -12,51 +19,19 @@ import {
 import { AgentQuestion } from '../../desktop/src/components/tasks/AgentQuestion';
 import { ChangedFiles } from '../../desktop/src/components/tasks/ChangedFiles';
 import { InlineNotice } from '../../desktop/src/components/ui/InlineNotice';
-import { agentProvider } from '../../desktop/src/lib/agent-provider';
+import { Avatar, Bar } from './Bar';
+import { workspaceKey } from './drafts';
 import { type Host, request as nativeRequest } from './native';
-import { sessionStatus, since, taskStatus, type WorkStatus, workTitle } from './status';
-import '../../desktop/src/components/agents/agent-avatar.css';
+import { requestText, sessionStatus, taskStatus, workTitle } from './status';
 
 type Workspace = ReturnType<typeof useRemoteWorkspace>;
 
-function Avatar({ agent, working }: { agent?: string; working?: boolean }) {
-  return (
-    <span className="agent-avatar" data-size="sm" aria-hidden="true">
-      <AgentCharacter provider={agentProvider(agent)} state={working ? 'working' : 'idle'} />
-    </span>
-  );
-}
-
-function Bar({
-  title,
-  subtitle,
-  onBack,
-  children,
-}: {
-  title: string;
-  subtitle?: ReactNode;
-  onBack?: () => void;
-  children?: ReactNode;
-}) {
-  return (
-    <header className="mobile-bar mobile-glass">
-      {onBack && (
-        <button type="button" className="mobile-icon-button" aria-label="Back" onClick={onBack}>
-          <ChevronLeft size={22} aria-hidden="true" />
-        </button>
-      )}
-      <div className="mobile-bar-title">
-        <h1>{title}</h1>
-        {subtitle && <span>{subtitle}</span>}
-      </div>
-      {children}
-    </header>
-  );
-}
+/** What a computer's screen opens to: one item of its work, or the new-work form. */
+export type Opening = { selected: string } | { composing: true };
 
 function Markdown({ children }: { children: string }) {
   return (
-    <div className="task-markdown">
+    <div className="task-markdown mobile-markdown">
       <ReactMarkdown
         skipHtml
         remarkPlugins={[remarkGfm]}
@@ -76,113 +51,6 @@ function Markdown({ children }: { children: string }) {
         {children}
       </ReactMarkdown>
     </div>
-  );
-}
-
-interface Row {
-  id: string;
-  title: string;
-  meta: string;
-  agent?: string;
-  status: WorkStatus;
-}
-
-function WorkList({ host, work, onHosts }: { host: Host; work: Workspace; onHosts: () => void }) {
-  const rows: Row[] = [
-    ...work.waitingSessions.map((session) => ({
-      id: session.id,
-      title: session.title,
-      meta: work.snapshot?.projects.find((p) => p.id === session.projectId)?.name ?? '',
-      status: sessionStatus(session),
-    })),
-    ...work.latestTasks.map((task) => ({
-      id: task.sessionId || task.taskId,
-      title: workTitle(task.title),
-      meta: `${task.projectName} · ${since(task.startedAt)}`,
-      agent: task.agent,
-      status: taskStatus(task),
-    })),
-  ];
-  const groups: [string, Row[]][] = [
-    ['Needs you', rows.filter((row) => row.status.needsYou)],
-    ['Working', rows.filter((row) => row.status.working)],
-    ['Recent', rows.filter((row) => !row.status.needsYou && !row.status.working)],
-  ];
-  const connected = work.status === 'Connected';
-  return (
-    <main className="mobile-screen">
-      <Bar
-        title={host.label}
-        subtitle={
-          <span className="mobile-connection" data-connected={connected || undefined}>
-            {work.status}
-          </span>
-        }
-        onBack={onHosts}
-      >
-        <button
-          type="button"
-          className="mobile-icon-button"
-          aria-label="Refresh"
-          onClick={() => {
-            work.setError('');
-            void work.refresh();
-          }}
-        >
-          <RefreshCw size={18} aria-hidden="true" />
-        </button>
-      </Bar>
-      {work.error && <InlineNotice tone="error">{work.error}</InlineNotice>}
-      {work.connectionError && <InlineNotice tone="error">{work.connectionError}</InlineNotice>}
-      {groups.map(
-        ([label, items]) =>
-          items.length > 0 && (
-            <section key={label} className="mobile-section" aria-label={label}>
-              <h2>
-                {label} <span>{items.length}</span>
-              </h2>
-              <ul className="mobile-list mobile-card mobile-glass">
-                {items.map((row) => (
-                  <li key={row.id}>
-                    <button
-                      type="button"
-                      className="mobile-row"
-                      onClick={() => work.choose(row.id)}
-                    >
-                      {row.agent ? (
-                        <Avatar agent={row.agent} working={row.status.working} />
-                      ) : (
-                        <span className="mobile-host-icon" aria-hidden="true">
-                          <MessageCircle size={18} />
-                        </span>
-                      )}
-                      <span className="mobile-row-body">
-                        <strong>{row.title}</strong>
-                        <span className="mobile-row-meta">
-                          <Badge variant={row.status.variant}>{row.status.label}</Badge>
-                          <small>{row.meta}</small>
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ),
-      )}
-      {work.snapshot && !rows.length && (
-        <p className="mobile-empty">No work on this computer yet.</p>
-      )}
-      <button
-        type="button"
-        className="mobile-fab"
-        disabled={!work.snapshot?.projects.length || work.busy}
-        onClick={work.compose}
-      >
-        <Plus size={20} aria-hidden="true" />
-        New work
-      </button>
-    </main>
   );
 }
 
@@ -216,7 +84,17 @@ function Composer({ work, label }: { work: Workspace; label: string }) {
   );
 }
 
-function Conversation({ work }: { work: Workspace }) {
+function Conversation({
+  work,
+  host,
+  showComputer,
+  onBack,
+}: {
+  work: Workspace;
+  host: Host;
+  showComputer: boolean;
+  onBack: () => void;
+}) {
   const task = work.selectedTask;
   const session = work.selectedSession;
   const detail = work.currentDetail;
@@ -227,58 +105,86 @@ function Conversation({ work }: { work: Workspace }) {
       : session && sessionStatus(session);
   const working = Boolean(task && isActive(task));
   const canSend = Boolean(session || (task && !task.sessionId));
-  const actions: { label: string; action: () => void }[] = [];
-  if (task && !working)
-    actions.push({ label: 'Review changes', action: () => void work.loadReview() });
+  // Review is the next step once work stops; stop, pause and resume wait in the menu.
+  const canReview = Boolean(task && !working);
+  const options: { label: string; icon: typeof Pause; action: RemoteAction }[] = [];
   if (task && working)
-    actions.push({
-      label: 'Stop',
-      action: () => void work.act({ action: 'stop', runId: task.id }),
-    });
+    options.push({ label: 'Stop', icon: Square, action: { action: 'stop', runId: task.id } });
   if (session)
-    actions.push({
-      label: session.paused ? 'Resume' : 'Pause queue',
-      action: () =>
-        void work.act({
-          action: session.paused ? 'resume' : 'pause',
-          sessionId: session.id,
-        } satisfies RemoteAction),
-    });
+    options.push(
+      session.paused
+        ? {
+            label: 'Resume conversation',
+            icon: Play,
+            action: { action: 'resume', sessionId: session.id },
+          }
+        : {
+            label: 'Pause conversation',
+            icon: Pause,
+            action: { action: 'pause', sessionId: session.id },
+          },
+    );
+  const context = [task?.projectName, showComputer && host.label].filter(Boolean).join(' · ');
+  // Detail carries the whole request; until it loads, or from hosts that send only the
+  // list's short title, the bubble shows that title.
+  const asked = requestText(detail?.title ?? task?.title ?? session?.title ?? '');
   return (
     <main className="mobile-screen mobile-conversation">
       <Bar
-        title={session?.title || (task ? workTitle(task.title) : 'Conversation')}
-        subtitle={task?.projectName}
-        onBack={work.review ? work.closeReview : work.close}
+        title={task ? workTitle(task.title) : session?.title || 'Conversation'}
+        subtitle={
+          (status || context) && (
+            <span className="mobile-bar-meta">
+              {status && <Badge variant={status.variant}>{status.label}</Badge>}
+              {context && <span>{context}</span>}
+            </span>
+          )
+        }
+        onBack={work.review ? work.closeReview : onBack}
       >
-        {status && <Badge variant={status.variant}>{status.label}</Badge>}
+        {options.length > 0 && !work.review && (
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <button
+                type="button"
+                className="mobile-icon-button"
+                aria-label="Conversation options"
+                disabled={work.busy}
+              >
+                <Ellipsis size={20} aria-hidden="true" />
+              </button>
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content className="workspace-menu" align="end">
+                {options.map((item) => (
+                  <Menu.Item
+                    key={item.label}
+                    className="workspace-menu-item"
+                    onSelect={() => void work.act(item.action)}
+                  >
+                    <item.icon size={16} aria-hidden="true" />
+                    {item.label}
+                  </Menu.Item>
+                ))}
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu.Root>
+        )}
       </Bar>
-      {actions.length > 0 && !work.review && (
-        <div className="mobile-actions">
-          {actions.map((item) => (
-            <Button
-              key={item.label}
-              variant="outline"
-              size="sm"
-              disabled={work.busy}
-              onClick={item.action}
-            >
-              {item.label}
-            </Button>
-          ))}
-        </div>
-      )}
       {work.error && <InlineNotice tone="error">{work.error}</InlineNotice>}
+      {work.connectionError && <InlineNotice tone="warning">{work.connectionError}</InlineNotice>}
       {work.review ? (
         <div className="mobile-review">
           <ChangedFiles files={work.review.files} patch={work.review.diff} />
-          <p className="mobile-note">{work.review.note}</p>
+          {work.review.note && <p className="mobile-note">{work.review.note}</p>}
         </div>
       ) : (
         <div className="mobile-thread">
-          <article className="mobile-bubble" data-from="you">
-            <p>{session?.title || (task && workTitle(task.title))}</p>
-          </article>
+          {asked && (
+            <article className="mobile-bubble" data-from="you">
+              <Markdown>{asked}</Markdown>
+            </article>
+          )}
           {session?.error && <InlineNotice tone="error">{session.error}</InlineNotice>}
           {!!session?.pending && (
             <p className="mobile-note" role="status">
@@ -311,6 +217,18 @@ function Conversation({ work }: { work: Workspace }) {
               </div>
             </article>
           )}
+          {canReview && (
+            <Button
+              variant="outline"
+              className="mobile-review-button"
+              disabled={work.busy}
+              loading={work.busy}
+              loadingLabel="Loading changes…"
+              onClick={() => void work.loadReview()}
+            >
+              Review changes
+            </Button>
+          )}
           {task?.sessionId && !session && (
             <p className="mobile-note">This conversation is closed. Start new work to continue.</p>
           )}
@@ -321,11 +239,25 @@ function Conversation({ work }: { work: Workspace }) {
   );
 }
 
-function NewWork({ work }: { work: Workspace }) {
+function NewWork({
+  work,
+  host,
+  hosts,
+  onBack,
+  onSwitch,
+}: {
+  work: Workspace;
+  host: Host;
+  hosts: Host[];
+  onBack: () => void;
+  onSwitch: (host: Host) => void;
+}) {
+  const projects = work.snapshot?.projects ?? [];
   return (
     <main className="mobile-screen">
-      <Bar title="New work" onBack={work.close} />
+      <Bar title="New work" onBack={onBack} />
       {work.error && <InlineNotice tone="error">{work.error}</InlineNotice>}
+      {work.connectionError && <InlineNotice tone="warning">{work.connectionError}</InlineNotice>}
       <form
         className="mobile-card mobile-glass mobile-new-work"
         onSubmit={(event) => {
@@ -333,13 +265,32 @@ function NewWork({ work }: { work: Workspace }) {
           void work.submit();
         }}
       >
+        {hosts.length > 1 && (
+          <FormField label="Computer">
+            <Select
+              value={host.id}
+              onValueChange={(id) => {
+                const next = hosts.find((item) => item.id === id);
+                if (next && next.id !== host.id) onSwitch(next);
+              }}
+              disabled={work.busy}
+            >
+              {hosts.map((item) => (
+                <SelectItem value={item.id} key={item.id}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </Select>
+          </FormField>
+        )}
         <FormField label="Project">
           <Select
-            value={work.projectId || work.snapshot?.projects[0]?.id || ''}
+            value={work.projectId || projects[0]?.id || ''}
             onValueChange={work.setProjectId}
-            disabled={work.busy}
+            disabled={work.busy || !projects.length}
+            placeholder={work.snapshot ? 'No projects shared' : 'Loading…'}
           >
-            {work.snapshot?.projects.map((project) => (
+            {projects.map((project) => (
               <SelectItem value={project.id} key={project.id}>
                 {project.name}
               </SelectItem>
@@ -357,7 +308,7 @@ function NewWork({ work }: { work: Workspace }) {
         </FormField>
         <Button
           type="submit"
-          disabled={work.busy || !work.draft.trim()}
+          disabled={work.busy || !work.draft.trim() || !projects.length}
           loading={work.busy}
           loadingLabel="Starting…"
         >
@@ -368,14 +319,26 @@ function NewWork({ work }: { work: Workspace }) {
   );
 }
 
-/** One computer's work: its list, an open conversation or task, or new work. */
-export function HostWork({ host, onHosts }: { host: Host; onHosts: () => void }) {
+/** One computer's open conversation or task, or the form that starts work on it. */
+export function HostWork({
+  host,
+  hosts,
+  opening,
+  onBack,
+  onSwitch,
+}: {
+  host: Host;
+  hosts: Host[];
+  opening: Opening;
+  onBack: () => void;
+  onSwitch: (host: Host) => void;
+}) {
   const request = useCallback(
     <T,>(action: RemoteAction) => nativeRequest<T>(host.id, action),
     [host.id],
   );
-  const work = useRemoteWorkspace(request, `jackalope-mobile:${host.id}`);
-  if (work.composing) return <NewWork work={work} />;
-  if (work.selected) return <Conversation work={work} />;
-  return <WorkList host={host} work={work} onHosts={onHosts} />;
+  const work = useRemoteWorkspace(request, workspaceKey(host.id), opening);
+  if (work.composing)
+    return <NewWork work={work} host={host} hosts={hosts} onBack={onBack} onSwitch={onSwitch} />;
+  return <Conversation work={work} host={host} showComputer={hosts.length > 1} onBack={onBack} />;
 }
