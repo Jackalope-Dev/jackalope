@@ -218,7 +218,7 @@ with tempfile.TemporaryDirectory(prefix="jackalope-wayland-control-") as tempora
         operation("press", bounds=snapshot["bounds"], key="Control+a")
         operation("type", bounds=operation("snapshot")["bounds"], text="replacement")
         wait(lambda: (d / "text").read_text() == "replacement", "replacement")
-        (d / "command").write_text("password")
+        common.publish(d / "command", "password")
         time.sleep(0.2)
         call(
             {
@@ -230,7 +230,7 @@ with tempfile.TemporaryDirectory(prefix="jackalope-wayland-control-") as tempora
             },
             error="password",
         )
-        (d / "command").write_text("text")
+        common.publish(d / "command", "text")
         time.sleep(0.2)
         snapshot = operation("snapshot")
         button = next(
@@ -285,9 +285,9 @@ with tempfile.TemporaryDirectory(prefix="jackalope-wayland-control-") as tempora
         wait(resume, "Resume after releasing Control")
         wait(lambda: state()[0] == "active", "active after held modifier")
         guard["epoch"] = int(state()[1])
-        (d / "command").write_text("other")
+        common.publish(d / "command", "other")
         wait(lambda: state()[0] == "paused", "focus loss pauses")
-        (d / "command").write_text("text")
+        common.publish(d / "command", "text")
         time.sleep(0.2)
         wait(resume, "Resume after focus loss")
         wait(lambda: state()[0] == "active", "active after focus loss")
