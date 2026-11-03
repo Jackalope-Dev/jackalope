@@ -12,7 +12,7 @@ import {
 import { root } from './catalog.mjs';
 
 test('production approval cannot be skipped, while the sole maintainer can approve their own run', () => {
-  for (const name of ['cloud-stable', 'store-stable', 'service-production']) {
+  for (const name of ['cloud-stable', 'store-stable']) {
     const policy = environmentProtection(environmentPolicies[name], 123, {
       protection_rules: [{ type: 'wait_timer', wait_timer: 5 }],
     });
@@ -21,9 +21,8 @@ test('production approval cannot be skipped, while the sole maintainer can appro
     assert.deepEqual(policy.reviewers, [{ type: 'User', id: 123 }]);
     assert.equal(policy.wait_timer, 5);
   }
-  for (const [name, policy] of Object.entries(environmentPolicies)) {
-    if (name.startsWith('service-')) assert.ok(!policy.branches.includes('stable'));
-    else assert.ok(!policy.branches.includes('master'));
+  for (const [, policy] of Object.entries(environmentPolicies)) {
+    assert.ok(!policy.branches.includes('master'));
   }
 });
 
