@@ -15,6 +15,15 @@ export interface ThemePalette {
 
 export const PRESET_THEMES: ThemePalette[] = [
   {
+    id: 'jackalope-violet',
+    name: 'Jackalope Violet',
+    accentHue: 258,
+    accentSat: 90,
+    accentLight: 66,
+    accentHex: '#8b5cf6',
+    isDark: true,
+  },
+  {
     id: 'mojave-sunset',
     name: 'Mojave Sunset',
     accentHue: 24,
@@ -70,7 +79,7 @@ export const PRESET_THEMES: ThemePalette[] = [
   },
 ];
 
-export const DEFAULT_THEME = PRESET_THEMES[2];
+export const DEFAULT_THEME = PRESET_THEMES[0];
 
 export function paletteColors(theme: ThemePalette) {
   const offsets =
