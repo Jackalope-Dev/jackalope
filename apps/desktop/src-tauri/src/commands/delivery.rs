@@ -343,6 +343,8 @@ mod tests {
         // machines without a global one, such as CI runners.
         change(path, &["config", "user.name", "Test"]).unwrap();
         change(path, &["config", "user.email", "test@example.invalid"]).unwrap();
+        // Windows runners check files out with CRLF, which would change the contents read back.
+        change(path, &["config", "core.autocrlf", "false"]).unwrap();
         std::fs::write(path.join("a.txt"), "base\n").unwrap();
         change(path, &["add", "a.txt"]).unwrap();
         commit("Base");
