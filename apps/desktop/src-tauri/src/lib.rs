@@ -492,6 +492,7 @@ pub fn run(launch: Launch) {
             commands::remote::remote_pairing,
             commands::remote::remote_revoke,
             commands::remote::remote_private_https,
+            commands::remote::remote_tailscale_status,
             commands::remote::remote_hosts,
             commands::remote::remote_host_pair,
             commands::remote::remote_host_request,

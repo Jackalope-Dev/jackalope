@@ -21,7 +21,6 @@ test('Jev and its agent fallback are counted separately, preserving partial cove
   const summary = summarizeUsage(decisionUsageEntries(decision));
   assert.equal(summary.calls, 2);
   assert.equal(summary.tokens, 103);
-  assert.equal(summary.costUsd, 0.01);
   assert.equal(summary.missing, 1);
   assert.deepEqual(decisionUsageEntries({ requestedMode: 'jev', usage }), [
     { provider: 'jev', usage },

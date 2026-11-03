@@ -31,8 +31,11 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 480px) minmax(0, 1fr);
   gap: 12px;
 }
+/* The name capsule lines up with the sidebar's left edge, as the window controls do on the
+   right; on macOS it follows the traffic lights, which tauri.macos.conf.json places on the
+   bar's centre line in line with the sidebar's first button. */
 .app-titlebar-workspace .app-titlebar-left {
-  padding-inline-start: 16px;
+  padding-inline-start: 8px;
 }
 .app-titlebar-mac .app-titlebar-left {
   min-width: 78px;

@@ -63,3 +63,12 @@ stops with "Xcode Simulator SDK … is not installed" otherwise. Debug builds ac
 host, so pair a simulator or `adb reverse tcp:<port> tcp:<port>` emulator with
 `http://127.0.0.1:<port>` and the pairing code from Settings → Remote access. Give a test
 desktop its own remote access port so it does not collide with an everyday instance.
+
+TestFlight builds sign with the team in tauri.conf.json and an App Store Connect API key kept
+outside the repository: export `APPLE_API_KEY`, `APPLE_API_ISSUER` and `APPLE_API_KEY_PATH`
+from a private file, then run `pnpm tauri ios build --export-method app-store-connect
+--build-number <n>` with a build number higher than the last upload. If `xcode-select -p`
+names the Command Line Tools, select Xcode or put `/Applications/Xcode.app/Contents/Developer/usr/bin`
+first on `PATH`. Upload the resulting `gen/apple/build/arm64/Jackalope.ipa` with
+`xcrun altool --upload-app -t ios -f <ipa> --apiKey <key id> --apiIssuer <issuer id>`.
+Release builds pair only over HTTPS, such as Remote access's Tailscale Serve address.

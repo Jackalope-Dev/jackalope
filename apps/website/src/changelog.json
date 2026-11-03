@@ -1,5 +1,30 @@
 [
   {
+    "id": "a-clearer-frosted-window",
+    "date": "2026-11-03",
+    "status": "In development",
+    "title": "A clearer frosted window",
+    "description": "The frosted window now shows your desktop through it on both macOS and Windows.",
+    "items": [
+      "On macOS the window uses the translucent sidebar material, so your desktop shows through instead of a near-solid grey.",
+      "On Windows 11 the window is now transparent, which the frosted effect needs to show.",
+      "The macOS window buttons sit on the title bar's centre line, in line with the sidebar, and the Jackalope name on Windows lines up with the sidebar's edge."
+    ]
+  },
+  {
+    "id": "easier-phone-pairing",
+    "date": "2026-11-03",
+    "status": "In development",
+    "title": "Easier phone pairing",
+    "description": "Pair a phone by typing a short code, with Tailscale setup walked through step by step.",
+    "items": [
+      "Pairing leads with a QR code to scan on both the computer and the phone; typing a code and advanced connection settings are one tap away when you need them.",
+      "Pairing codes are ten characters, shown large on screen next to the QR code, and still work once and expire after five minutes.",
+      "Remote access checks each Tailscale step for you and links straight to the setting Tailscale asks you to turn on.",
+      "Phones pair under your name, such as Alex's iPhone, instead of a generic iPhone."
+    ]
+  },
+  {
     "id": "land-work-your-way",
     "date": "2026-11-03",
     "status": "In development",
@@ -20,7 +45,9 @@
       "Agent review on the Review tab starts right away with a reviewer from another model family and shows each step as it reads your changes.",
       "Suggestions arrive as a short list with severity, file and line, and a fix plan for each one.",
       "Make these changes continues the same task with the fixes you keep, plus an optional note and one final check run.",
-      "Reviews stay with their task instead of appearing as separate work."
+      "Reviews stay with their task instead of appearing as separate work.",
+      "Reviewers see the task's recorded checks, decisions and screenshots, so they don't flag proven work as unchecked.",
+      "Reviewing uncommitted changes from Changes no longer runs the project's saved check in the wrong folder."
     ]
   },
   {
@@ -33,7 +60,9 @@
       "Commit messages and pull request bodies written with heredocs no longer trip the safety check.",
       "Pushing an existing working branch to your remote runs without asking; pushes to main, release branches, tags, other remotes and force pushes still ask.",
       "Code that reads process.env or import.meta.env is no longer mistaken for opening a secrets file.",
-      "Always allow now works for chained commands such as git add && git commit && git push, saving a rule for each part."
+      "Always allow now works for chained commands such as git add && git commit && git push, saving a rule for each part.",
+      "Saving a command's output in a variable, such as CODE=$(pbpaste), no longer asks.",
+      "Installing software beyond the project, such as Homebrew packages, Rust toolchains or global npm tools, now asks first."
     ]
   },
   {

@@ -563,7 +563,6 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
                   <th>Agent / model</th>
                   <th>Input</th>
                   <th>Output</th>
-                  <th>Cost estimate</th>
                 </tr>
               </thead>
               <tbody>
@@ -593,11 +592,6 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
                     </td>
                     <td>{run.usage.reported ? run.usage.input.toLocaleString() : '—'}</td>
                     <td>{run.usage.reported ? run.usage.output.toLocaleString() : '—'}</td>
-                    <td>
-                      {run.usage.estimatedCostUsd != null
-                        ? `$${run.usage.estimatedCostUsd.toFixed(4)}`
-                        : 'Unavailable'}
-                    </td>
                   </tr>
                 ))}
               </tbody>
