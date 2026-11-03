@@ -132,8 +132,13 @@ mod tests {
     fn reads_a_real_repository_and_reports_missing_ones() {
         let root = std::env::temp_dir().join(format!("jackalope-graph-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
+        // Agent shells export a Git identity, which would override the commit's own author.
         let run = |args: &[&str]| {
             assert!(command(&root, args, Policy::Isolated)
+                .env_remove("GIT_AUTHOR_NAME")
+                .env_remove("GIT_AUTHOR_EMAIL")
+                .env_remove("GIT_COMMITTER_NAME")
+                .env_remove("GIT_COMMITTER_EMAIL")
                 .output()
                 .unwrap()
                 .status
