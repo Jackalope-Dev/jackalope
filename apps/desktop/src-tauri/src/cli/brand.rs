@@ -8,9 +8,10 @@
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
-/// The default accent from `packages/brand` (Mojave Sunset), drawn until the
-/// project's own colour is known and for projects the app has not themed.
-const DEFAULT_ACCENT: (u8, u8, u8) = (0xf9, 0x73, 0x16);
+/// The default accent from `packages/brand` (`DEFAULT_THEME`, Electric
+/// Indigo), drawn until the project's own colour is known and for projects the
+/// app has not themed.
+const DEFAULT_ACCENT: (u8, u8, u8) = (0x63, 0x66, 0xf1);
 
 /// The accent in use: the project's colour, adjusted to read on this terminal.
 static ACCENT: std::sync::RwLock<Option<(u8, u8, u8)>> = std::sync::RwLock::new(None);
