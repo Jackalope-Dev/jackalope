@@ -20,7 +20,9 @@
       "Agent review on the Review tab starts right away with a reviewer from another model family and shows each step as it reads your changes.",
       "Suggestions arrive as a short list with severity, file and line, and a fix plan for each one.",
       "Make these changes continues the same task with the fixes you keep, plus an optional note and one final check run.",
-      "Reviews stay with their task instead of appearing as separate work."
+      "Reviews stay with their task instead of appearing as separate work.",
+      "Reviewers see the task's recorded checks, decisions and screenshots, so they don't flag proven work as unchecked.",
+      "Reviewing uncommitted changes from Changes no longer runs the project's saved check in the wrong folder."
     ]
   },
   {
@@ -33,7 +35,9 @@
       "Commit messages and pull request bodies written with heredocs no longer trip the safety check.",
       "Pushing an existing working branch to your remote runs without asking; pushes to main, release branches, tags, other remotes and force pushes still ask.",
       "Code that reads process.env or import.meta.env is no longer mistaken for opening a secrets file.",
-      "Always allow now works for chained commands such as git add && git commit && git push, saving a rule for each part."
+      "Always allow now works for chained commands such as git add && git commit && git push, saving a rule for each part.",
+      "Saving a command's output in a variable, such as CODE=$(pbpaste), no longer asks.",
+      "Installing software beyond the project, such as Homebrew packages, Rust toolchains or global npm tools, now asks first."
     ]
   },
   {

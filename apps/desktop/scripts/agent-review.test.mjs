@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { fixFollowUp, reviewBlock, reviewState, taskReviews } from '../src/lib/agent-review.ts';
+import {
+  authorEvidence,
+  fixFollowUp,
+  reviewBlock,
+  reviewState,
+  taskReviews,
+} from '../src/lib/agent-review.ts';
 
 const reply = (body) => `I read the change.\n\n\`\`\`jackalope-review\n${body}\n\`\`\``;
 
@@ -99,4 +105,29 @@ test('a task’s agent reviews include reviews of any attempt, newest first', ()
   assert.equal(reviewState(runs[3]), 'running');
   assert.equal(reviewState(runs[2]), 'finished');
   assert.equal(reviewState({ ...runs[2], status: 'failed' }), 'failed');
+});
+
+test("a reviewer sees the author's recorded checks, decisions and screenshots", () => {
+  assert.equal(authorEvidence({}), '');
+  const text = authorEvidence({
+    understanding: { goal: 'Pair the phone with the desktop' },
+    validationSteps: [
+      {
+        step: 'Simulator pairs',
+        status: 'passed',
+        notes: 'Over loopback.',
+        evidence: ['/tmp/a.png'],
+      },
+    ],
+    decisions: [{ phase: 'scope', decision: 'Phone only', result: 'open' }],
+    screenshots: [{ filePath: '/tmp/b.png' }],
+  });
+  assert.match(text, /do not report a claim as unbacked/);
+  assert.match(text, /Goal: Pair the phone with the desktop/);
+  assert.match(
+    text,
+    /- Check \(passed\): Simulator pairs\. Over loopback\. Evidence: \/tmp\/a\.png/,
+  );
+  assert.match(text, /- Decision \(scope\): Phone only\. Result: open/);
+  assert.match(text, /- Screenshot: \/tmp\/b\.png/);
 });
