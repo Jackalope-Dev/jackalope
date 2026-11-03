@@ -48,6 +48,9 @@ Quick facts that trip people up:
 - pnpm only (pinned in package.json); never npm or bun here. Lockfile patches and
   overrides live in pnpm-workspace.yaml.
 - src-tauri/build.rs reads node_modules/agent-browser; the desktop bundles that binary.
+  A fresh worktree therefore needs `pnpm install --frozen-lockfile --prefer-offline`
+  (seconds, from the shared store) before any cargo command. Debug builds create an
+  empty apps/desktop/dist when the frontend has not been built.
 - apps/server/admin is a separate SPA built by admin:build, not part of the Worker.
 - Browser verification scripts import /src/... inside the Vite dev server, so those
   paths only resolve at runtime.
