@@ -18,6 +18,7 @@
     "title": "Easier phone pairing",
     "description": "Pair a phone by typing a short code, with Tailscale setup walked through step by step.",
     "items": [
+      "Pairing leads with a QR code to scan on both the computer and the phone; typing a code and advanced connection settings are one tap away when you need them.",
       "Pairing codes are ten characters, shown large on screen next to the QR code, and still work once and expire after five minutes.",
       "Remote access checks each Tailscale step for you and links straight to the setting Tailscale asks you to turn on.",
       "Phones pair under your name, such as Alex's iPhone, instead of a generic iPhone."

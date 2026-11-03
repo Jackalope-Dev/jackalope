@@ -15,6 +15,15 @@
   gap: 1.25rem;
   flex-wrap: wrap;
 }
+.remote-pair-hero {
+  flex-direction: column;
+  text-align: center;
+  gap: 0.5rem;
+}
+.remote-pair-manual {
+  align-self: stretch;
+  text-align: left;
+}
 .remote-pair-code {
   display: grid;
   gap: 0.5rem;
@@ -90,8 +99,10 @@
 }
 .remote-qr {
   flex-shrink: 0;
-  width: 168px;
-  height: 168px;
+  width: min(240px, 70vw);
+  height: auto;
+  aspect-ratio: 1;
+  margin-bottom: 0.5rem;
   border-radius: var(--radius-lg);
   box-shadow: 0 0 0 1px var(--color-border-subtle);
 }

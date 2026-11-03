@@ -1,5 +1,12 @@
 import { AsciiMark } from '@jackalope/brand/ascii-mark';
-import { Button, FormField, Input } from '@jackalope/ui';
+import {
+  Button,
+  Disclosure,
+  DisclosureBody,
+  DisclosureSummary,
+  FormField,
+  Input,
+} from '@jackalope/ui';
 import { ChevronLeft, QrCode } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { InlineNotice } from '../../desktop/src/components/ui/InlineNotice';
@@ -14,9 +21,9 @@ function defaultName() {
 }
 
 /**
- * Pairs this phone with a computer. Scanning the QR code Remote access shows is the quick
- * path; a pasted link, or an address and code when the computer has no HTTPS address, is
- * the fallback.
+ * Pairs this phone with a computer. Scanning the QR code Remote access shows is the path;
+ * typing the computer's address and code, or pasting a pairing link, waits in a collapsed
+ * section with the phone's name, which the computer fills in from its owner when generic.
  */
 export function Pairing({
   onPaired,
@@ -27,8 +34,9 @@ export function Pairing({
 }) {
   const [name, setName] = useState(defaultName);
   const [link, setLink] = useState('');
-  const [withCode, setWithCode] = useState(false);
   const [code, setCode] = useState('');
+  // A pasted pairing link carries its own code.
+  const linked = /#pair=/.test(link);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const attempt = useRef(0);
@@ -77,7 +85,8 @@ export function Pairing({
         <div className="mobile-pairing-intro">
           <h2 id="pair-title">Connect to your computer</h2>
           <p>
-            In Jackalope on your computer, open Settings → Remote access and create a pairing code.
+            On your computer, open Jackalope → Settings → Remote access, create a pairing code and
+            scan it.
           </p>
         </div>
         {error && <InlineNotice tone="error">{error}</InlineNotice>}
@@ -91,71 +100,65 @@ export function Pairing({
           <QrCode size={18} aria-hidden="true" />
           Scan QR code
         </Button>
-        <div className="mobile-divider">
-          <span>or enter it</span>
-        </div>
-        <form
-          className="mobile-pairing-fields"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void connect(link, withCode ? code.trim() : undefined);
-          }}
-        >
-          <FormField label={withCode ? "Computer's address" : 'Pairing link'}>
-            <Input
-              value={link}
-              disabled={busy}
-              required
-              type="url"
-              inputMode="url"
-              autoComplete="off"
-              autoCapitalize="none"
-              placeholder={withCode ? 'https://your-computer.example' : 'https://…/#pair=…'}
-              onChange={(event) => setLink(event.target.value)}
-            />
-          </FormField>
-          {withCode && (
-            <FormField label="Pairing code">
-              <Input
-                value={code}
-                disabled={busy}
-                required
-                type="password"
-                autoComplete="off"
-                autoCapitalize="none"
-                onChange={(event) => setCode(event.target.value)}
-              />
-            </FormField>
-          )}
-          <FormField label="This phone's name">
-            <Input
-              value={name}
-              disabled={busy}
-              required
-              maxLength={80}
-              autoComplete="off"
-              onChange={(event) => setName(event.target.value)}
-            />
-          </FormField>
-          <Button
-            type="submit"
-            variant="outline"
-            disabled={busy || !link.trim() || !name.trim() || (withCode && !code.trim())}
-          >
-            Connect
-          </Button>
-        </form>
-        <button
-          type="button"
-          className="mobile-link-button"
-          disabled={busy}
-          onClick={() => {
-            setWithCode((value) => !value);
-            setError('');
-          }}
-        >
-          {withCode ? 'Use a pairing link instead' : 'Use an address and code instead'}
-        </button>
+        <Disclosure className="mobile-pairing-manual">
+          <DisclosureSummary>Enter a code instead</DisclosureSummary>
+          <DisclosureBody>
+            <form
+              className="mobile-pairing-fields"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void connect(link, linked ? undefined : code.trim());
+              }}
+            >
+              <FormField label="Computer's address" description="Or paste a pairing link.">
+                <Input
+                  value={link}
+                  disabled={busy}
+                  required
+                  type="url"
+                  inputMode="url"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  placeholder="https://your-computer.example"
+                  onChange={(event) => setLink(event.target.value)}
+                />
+              </FormField>
+              {!linked && (
+                <FormField label="Pairing code">
+                  <Input
+                    className="mobile-pairing-code"
+                    value={code}
+                    disabled={busy}
+                    required
+                    autoComplete="one-time-code"
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    placeholder="ABCDE-FGHJK"
+                    onChange={(event) => setCode(event.target.value)}
+                  />
+                </FormField>
+              )}
+              <FormField label="This phone's name">
+                <Input
+                  value={name}
+                  disabled={busy}
+                  required
+                  maxLength={80}
+                  autoComplete="off"
+                  onChange={(event) => setName(event.target.value)}
+                />
+              </FormField>
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={busy || !link.trim() || !name.trim() || (!linked && !code.trim())}
+              >
+                Connect
+              </Button>
+            </form>
+          </DisclosureBody>
+        </Disclosure>
       </section>
     </main>
   );

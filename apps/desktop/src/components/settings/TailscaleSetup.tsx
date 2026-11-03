@@ -168,7 +168,7 @@ export function TailscaleSetup({ turnOn }: { turnOn: () => Promise<void> }) {
         >
           Check again
         </Button>
-        <span>Already have an HTTPS address? Enter it under Connection settings.</span>
+        <span>Already have an HTTPS address? Enter it under Advanced.</span>
       </div>
     </div>
   );
