@@ -239,9 +239,9 @@ require 2FA, and grant each integration only the repositories it needs.
 
 Desktop publication does not deploy the server or automatically advertise unaccepted
 platforms. Cloudflare Workers Builds deploys the server and website, not GitHub
-Actions: every push to `master` builds and deploys `jackalope-service-production`,
-`jackalope-service-staging` (staging currently builds from `master` too, not a
-separate branch), and `jackalope-website`, each as its own Cloudflare Worker. These
+Actions: every push to `master` builds and deploys `jackalope-service-production`
+and `jackalope-website`, and every push to `beta` deploys `jackalope-service-staging`,
+each as its own Cloudflare Worker. These
 Workers' build settings in Cloudflare, not GitHub environments, hold their build
 variables and deploy credentials; see [server operations](SERVER-LAUNCH.md#cloudflare-workers-builds-deployment).
 The main verification workflow covers server and website checks on PRs, but GitHub
