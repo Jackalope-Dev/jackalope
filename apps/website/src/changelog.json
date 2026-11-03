@@ -1,5 +1,37 @@
 [
   {
+    "id": "jackalope-violet",
+    "date": "2026-11-03",
+    "status": "In development",
+    "title": "Jackalope Violet",
+    "description": "New installs start in Jackalope Violet, in the app, the terminal and the website.",
+    "items": ["Themes you have already chosen stay as they are."]
+  },
+  {
+    "id": "routing-that-never-holds-up-work",
+    "date": "2026-11-03",
+    "status": "In development",
+    "title": "Routing that never holds up work",
+    "description": "Choosing an agent for a task is quicker and can no longer stall it.",
+    "items": [
+      "Agent-powered routing sends a shorter request and answers on a fast model at low effort.",
+      "If the routing agent takes longer than six seconds or fails, local rules choose an eligible worker and the task starts."
+    ]
+  },
+  {
+    "id": "run-cards-and-a-board-in-the-terminal",
+    "date": "2026-11-03",
+    "status": "In development",
+    "title": "Run cards and a board in the terminal",
+    "description": "The terminal shows each run as one card with what the agent did, and a board of everything that is open.",
+    "items": [
+      "The latest run's reply sits in a card with its stages, step counts, check result and changed files, and the commands that move it on along the bottom edge.",
+      "While work runs, the newest steps resolve into place as they arrive; a finished result decodes in once.",
+      "/board lists every open conversation, those that need you first, with each one's agent and current step.",
+      "Menus, pickers, board rows, card commands, changed files and tips can be clicked, and switching tabs no longer flashes the start screen."
+    ]
+  },
+  {
     "id": "a-clearer-frosted-window",
     "date": "2026-11-03",
     "status": "In development",

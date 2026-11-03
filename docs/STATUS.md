@@ -28,7 +28,7 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - The window is frosted on Windows 11 (Acrylic) and macOS (vibrancy) by default, keeping
   text on tinted panes; Settings → Appearance → Frosted window turns it off, and Windows 10,
   Linux and reduced-transparency settings keep the opaque look. New installs use the Auto
-  theme, which follows the system's light or dark setting. Native macOS acceptance remains
+  theme in Jackalope Violet, which follows the system's light or dark setting. Native macOS acceptance remains
   open.
 - Desktop preferences include interface zoom, editor and shell selection, terminal
   font size, HTTP links and editable search, new-work and settings shortcuts. Saved
@@ -76,7 +76,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   place of the input, a pinned banner says what a blocked conversation needs, `@` names agents as
   well as files, a leading `/`, `!` or `@` sets the input's mode, the input wraps and
   grows, and dragging copies text. With 24-bit colour it paints the app's surfaces in a
-  rounded card with clickable header and status lines. `/learn` sends session learnings through
+  rounded card with clickable header and status lines. The latest run reads as a run card:
+  its reply, a gauge of its recorded stages, counts of its steps, its check and changed
+  files, and the commands that move it on; `/board` lists every open conversation, those
+  that need you first. Menu, picker and board rows, card commands and tips can be clicked. `/learn` sends session learnings through
   the learning gate, `/learnings` lists, shows, archives and restores learned lessons, `/model` and `/usage` choose a model and show account quota,
   `/init` writes `AGENTS.md`, and `--resume` picks or rejoins a conversation.
   The status bar, command search and Cmd/Ctrl+J open it in an app window that can
@@ -236,7 +239,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Capacity discovery shares bounded concurrent refreshes. Equivalent explicit
   agent/model choices select an account without an extra model call.
   Jackalope Decisions offers local rules, agent-powered or optional Jev-assisted
-  routing, with project overrides and protected device keys. Jev fallback defaults to
+  routing, with project overrides and protected device keys. Agent-powered routing sends a
+  scoped request answered without tools at low effort on a fast model; a router that takes
+  over six seconds or fails leaves the choice to local rules. Jev fallback defaults to
   local rules, with an optional agent attempt; both providers retain usage reports.
   Jev selection uses shared repository context, sourced model evidence, individual
   suitability gates and optional cost-aware objectives. Opt-in context selection,
