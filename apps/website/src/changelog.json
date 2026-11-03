@@ -15,7 +15,7 @@
     "description": "Choosing an agent for a task is quicker and can no longer stall it.",
     "items": [
       "Agent-powered routing sends a shorter request and answers on a fast model at low effort.",
-      "If the routing agent takes longer than six seconds or fails, local rules choose an eligible worker and the task starts."
+      "If the routing agent takes longer than eight seconds or fails, local rules choose an eligible worker and the task starts."
     ]
   },
   {

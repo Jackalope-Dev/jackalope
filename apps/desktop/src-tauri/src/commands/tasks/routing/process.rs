@@ -1,9 +1,10 @@
 use super::*;
 use crate::commands::process_control::{read_bounded, ProcessTree};
 
-/// How long the routing agent has to answer before local rules choose instead.
-/// A scoped request on a fast model answers in two to four seconds.
-pub(in crate::commands::tasks) const ROUTING_BUDGET: Duration = Duration::from_secs(6);
+/// How long the routing agent has to answer before local rules choose instead,
+/// matching Jev's timeout. Sonnet answered a real routing request in about six
+/// seconds, including the CLI's start-up.
+pub(in crate::commands::tasks) const ROUTING_BUDGET: Duration = Duration::from_secs(8);
 
 /// The model a routing agent answers with. Choosing a worker is a short
 /// structured judgement, so Claude routes on Sonnet rather than its default

@@ -241,7 +241,7 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Jackalope Decisions offers local rules, agent-powered or optional Jev-assisted
   routing, with project overrides and protected device keys. Agent-powered routing sends a
   scoped request answered without tools at low effort on a fast model; a router that takes
-  over six seconds or fails leaves the choice to local rules. Jev fallback defaults to
+  over eight seconds or fails leaves the choice to local rules. Jev fallback defaults to
   local rules, with an optional agent attempt; both providers retain usage reports.
   Jev selection uses shared repository context, sourced model evidence, individual
   suitability gates and optional cost-aware objectives. Opt-in context selection,

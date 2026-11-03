@@ -611,7 +611,7 @@ fn main() {
         .and_then(|receipt| receipt.fallback_reason.clone())
         .unwrap_or_default();
     assert!(
-        reason.contains("did not answer within 6 seconds"),
+        reason.contains("did not answer within 8 seconds"),
         "{reason}"
     );
     assert!(routing
@@ -624,6 +624,6 @@ fn main() {
         .find(|stage| stage.stage == "routing")
         .and_then(|stage| stage.duration_ms)
         .unwrap();
-    assert!(routed < 10_000, "routing took {routed} ms");
+    assert!(routed < 12_000, "routing took {routed} ms");
     assert!(runtime.inner.lock().unwrap().processes.is_empty());
 }

@@ -157,7 +157,7 @@ provider windows; context saved for the worker is left out. It answers without t
 its lowest effort (Claude on Sonnet rather than its default or Opus, Codex at minimal
 reasoning) and returns a validated option ID, a short reason, an optional quota
 estimate and up to three ordered alternatives. A routing agent that does not answer
-within six seconds, or fails without a quota error, leaves the choice to local rules
+within eight seconds, or fails without a quota error, leaves the choice to local rules
 and the receipt says why, so routing never holds up or blocks the work. Provider identifiers, task text and progress
 are untrusted input, not executable routing instructions.
 
