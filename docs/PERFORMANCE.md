@@ -110,3 +110,5 @@ after repeated task switching, IPC bytes, and p50/p95 input latency under sustai
 parallel execution. Repeat on supported native platforms. The Codex disposable
 lifecycle trial covers editing, usage, continuation, account binding, cancellation
 and restart; it does not replace installed-window or cross-platform acceptance.
+
+Throwaway CI proof edit; this pull request is closed without merging.

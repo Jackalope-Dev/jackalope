@@ -1,3 +1,4 @@
+// Throwaway CI proof edit; this pull request is closed without merging.
 const configured = import.meta.env.VITE_ACCESS_API?.trim() || '';
 export const accessOrigin = configured ? new URL(configured).origin : '';
 if (configured && (accessOrigin !== configured || !/^https:\/\//.test(configured))) {
