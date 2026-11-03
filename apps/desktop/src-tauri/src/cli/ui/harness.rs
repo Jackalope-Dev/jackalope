@@ -886,4 +886,65 @@ mod tests {
         harness.click(Click::Type("/board"));
         assert_eq!(harness.app.editor.text(), "/board");
     }
+
+    /// The session actions the host received, in order.
+    fn actions(harness: &Harness) -> Vec<String> {
+        harness
+            .requests()
+            .into_iter()
+            .filter_map(|request| match request {
+                Request::SessionAction { action, .. } => Some(action),
+                Request::MergePrepare { .. } => Some("prepare".into()),
+                Request::MergeApply { .. } => Some("apply".into()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn merge_pauses_before_preparing_and_resumes_when_it_does_not_go_ahead() {
+        let mut harness = Harness::new();
+        finished_login_fix(&mut harness);
+        let plan = |status: &str| {
+            serde_json::from_value(serde_json::json!({
+                "id": "plan-1", "status": status, "targetBranch": "main",
+                "files": ["src/auth/session.ts"], "conflicts": [],
+                "commitMessage": "Fix login", "cleanup": false
+            }))
+            .unwrap()
+        };
+        harness.host.lock().unwrap().reply = Some(Box::new(move |request| match request {
+            Request::MergePrepare { .. } => Some(Response::Merge {
+                plan: plan("ready"),
+            }),
+            Request::MergeApply { .. } => Some(Response::Merge {
+                plan: plan("applied"),
+            }),
+            _ => None,
+        }));
+        harness.submit("/merge");
+        assert_eq!(actions(&harness), ["pause", "prepare"]);
+        // "Not now" declines and resumes the conversation.
+        harness.key(KeyCode::Down);
+        harness.key(KeyCode::Enter);
+        assert_eq!(actions(&harness), ["pause", "prepare", "resume"]);
+
+        harness.submit("/merge");
+        harness.key(KeyCode::Enter);
+        assert_eq!(
+            actions(&harness)[3..],
+            ["pause", "prepare", "apply"],
+            "a confirmed merge keeps the conversation paused"
+        );
+
+        // A merge the host refuses to prepare resumes too.
+        harness.host.lock().unwrap().reply = Some(Box::new(|request| match request {
+            Request::MergePrepare { .. } => Some(Response::Error {
+                message: "Nothing to merge".into(),
+            }),
+            _ => None,
+        }));
+        harness.submit("/merge");
+        assert_eq!(actions(&harness)[6..], ["pause", "prepare", "resume"]);
+    }
 }

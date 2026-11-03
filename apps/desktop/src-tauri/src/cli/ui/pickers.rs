@@ -59,6 +59,8 @@ pub enum Action {
     TypeAnswer,
     /// Put an earlier input back in the composer.
     Recall(String),
+    /// Decline a prepared merge, resuming what preparing it paused.
+    CancelMerge,
     /// Apply a prepared merge.
     ApplyMerge {
         plan_id: String,
@@ -277,7 +279,15 @@ impl App {
                 picker.filter.clear();
                 picker.selected = 0;
             }
-            KeyCode::Esc => self.picker = None,
+            KeyCode::Esc => {
+                // Closing the merge question declines the merge.
+                if picker.kind == PickerKind::Delivery {
+                    self.picker = None;
+                    self.release_merge_pause();
+                } else {
+                    self.picker = None;
+                }
+            }
             KeyCode::Up => picker.step(false),
             KeyCode::Down | KeyCode::Tab => picker.step(true),
             KeyCode::Char('p') if control => picker.step(false),
@@ -349,6 +359,7 @@ impl App {
                 if picker.subject != self.view.as_ref().and_then(|view| view.run_id.clone()) =>
             {
                 self.picker = None;
+                self.release_merge_pause();
             }
             PickerKind::Deviation if picker.subject != self.picker_subject(kind) => {
                 self.picker = None;
@@ -591,6 +602,7 @@ impl App {
             }
             Action::OpenApp => self.open_app(),
             Action::ApplyMerge { plan_id, cleanup } => self.apply_merge(plan_id, cleanup),
+            Action::CancelMerge => self.release_merge_pause(),
             Action::OpenPullRequest { title, draft } => self.open_pull_request(title, draft),
             Action::Dismiss => {}
         }

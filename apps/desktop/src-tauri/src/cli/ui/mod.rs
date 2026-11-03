@@ -226,6 +226,9 @@ struct App {
     draft_sync: Option<drafts::DraftSync>,
     /// How long the work that just stopped ran, for the done message.
     last_run_took: Option<std::time::Duration>,
+    /// The conversation `/merge` paused while its merge is prepared and asked
+    /// about, resumed if the merge does not go ahead.
+    merge_paused: Option<String>,
     /// The run whose result just arrived and when, so its card decodes into
     /// place once.
     reveal: Option<(String, Instant)>,
@@ -353,6 +356,7 @@ impl App {
             flash: None,
             work_started: None,
             last_progress: None,
+            merge_paused: None,
             reveal: None,
             newest_step: RefCell::new(None),
             changes: Vec::new(),

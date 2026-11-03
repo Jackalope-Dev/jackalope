@@ -114,8 +114,8 @@ typing filters it, Enter opens the chosen one and Esc returns.
 `/status` prints the project and branch, the open work's state, agent and model, the
 conversations that need you and each agent's state, without leaving the conversation.
 `/merge [message]` prepares a merge of the latest attempt as `jackalope merge` does,
-lists its files and asks; the conversation is paused only once you confirm, and a
-failed merge resumes it. `/pr [title]` asks whether to open a draft or ready pull
+lists its files and asks. It pauses the conversation first, since the host prepares
+merges only for paused conversations; declining, or a merge that fails, resumes it. `/pr [title]` asks whether to open a draft or ready pull
 request, then commits what is left, pushes and opens it. `/unqueue` takes back your
 newest message that has not reached an agent and puts it in the input to edit.
 `/sharpen <draft>` asks a helper agent, on its own connection so the terminal stays usable,

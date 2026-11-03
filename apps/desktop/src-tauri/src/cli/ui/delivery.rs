@@ -7,8 +7,10 @@ use super::App;
 use crate::protocol::{self, Request, Response};
 
 impl App {
-    /// `/merge [message]`: prepares the merge of this conversation's latest
-    /// attempt and asks before applying it, as the app's merge review does.
+    /// `/merge [message]`: pauses the conversation, which the host requires
+    /// before it prepares a merge, prepares the merge of its latest attempt and
+    /// asks before applying it, as the app's merge review does. A merge that
+    /// does not go ahead resumes what this paused.
     pub(super) fn merge(&mut self, message: &str) {
         let (Some(session_id), Some(view)) = (self.session.clone(), self.view.clone()) else {
             self.flash("Open a conversation to merge its work", Tone::Muted);
@@ -21,12 +23,26 @@ impl App {
             );
             return;
         }
+        if !view.paused {
+            let paused = self.request(Request::SessionAction {
+                session_id: session_id.clone(),
+                action: "pause".into(),
+                message_id: None,
+            });
+            if paused.is_none() {
+                return;
+            }
+            self.merge_paused = Some(session_id.clone());
+        }
         let plan = match self.request(Request::MergePrepare {
             session_id,
             message: Some(message.trim().to_string()).filter(|text| !text.is_empty()),
         }) {
             Some(Response::Merge { plan }) => plan,
-            _ => return,
+            _ => {
+                self.release_merge_pause();
+                return;
+            }
         };
         if !plan.conflicts.is_empty() {
             self.note(format!(
@@ -34,10 +50,12 @@ impl App {
                 plan.target_branch,
                 plan.conflicts.join(", ")
             ));
+            self.release_merge_pause();
             return;
         }
         if plan.files.is_empty() {
             self.flash("There are no changes to merge", Tone::Muted);
+            self.release_merge_pause();
             return;
         }
         let count = plan.files.len();
@@ -74,7 +92,7 @@ impl App {
                 Item {
                     label: "Not now".into(),
                     detail: "nothing changes".into(),
-                    action: Action::Dismiss,
+                    action: Action::CancelMerge,
                 },
             ],
             filter: String::new(),
@@ -84,21 +102,21 @@ impl App {
         });
     }
 
-    /// Pauses the conversation so no new message starts mid-merge, then
-    /// merges. A merge that fails resumes what this paused.
-    pub(super) fn apply_merge(&mut self, plan_id: String, cleanup: bool) {
-        let Some((session_id, view)) = self.session.clone().zip(self.view.clone()) else {
-            return;
-        };
-        let pause = |app: &mut Self, action: &str| {
-            app.request(Request::SessionAction {
-                session_id: session_id.clone(),
-                action: action.into(),
+    /// Resumes a conversation `/merge` paused, when the merge does not go ahead.
+    pub(super) fn release_merge_pause(&mut self) {
+        if let Some(session_id) = self.merge_paused.take() {
+            self.request(Request::SessionAction {
+                session_id,
+                action: "resume".into(),
                 message_id: None,
-            })
-            .is_some()
-        };
-        if !view.paused && !pause(self, "pause") {
+            });
+        }
+    }
+
+    /// Merges a prepared plan; `/merge` already paused the conversation so no
+    /// new message starts mid-merge. A merge that fails resumes what it paused.
+    pub(super) fn apply_merge(&mut self, plan_id: String, cleanup: bool) {
+        if self.session.is_none() {
             return;
         }
         match self.request(Request::MergeApply { plan_id, cleanup }) {
@@ -113,11 +131,9 @@ impl App {
                 for error in plan.cleanup_errors {
                     self.note(format!("Could not remove the worktree: {error}"));
                 }
+                self.merge_paused = None;
             }
-            _ if !view.paused => {
-                pause(self, "resume");
-            }
-            _ => {}
+            _ => self.release_merge_pause(),
         }
         self.refresh();
     }
