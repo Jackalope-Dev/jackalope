@@ -352,3 +352,13 @@
 .task-plan-notice {
   margin-bottom: 16px;
 }
+.task-detail-status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.task-detail-status .work-signal-diff {
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}

@@ -117,7 +117,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   starter requests.
   Work rows show elapsed time while an attempt runs, changed lines from a bounded native
   Git count, and an unread marker for finished work not yet opened; work can be marked
-  unread again. Recently opened tasks, chats and plans stay as up to eight tabs with
+  unread again. Sidebar rows keep their width for the title: they mark finished work whose
+  changes have not landed with an icon, and show the changed lines on hover and in the task
+  header. Recently opened tasks, chats and plans stay as up to eight tabs with
   Mod+1–9 and Ctrl+Tab switching; closing a tab never stops or archives work. Changes shows
   recent commits across local branches with Git's graph, and ? lists keyboard shortcuts.
   Returning users with current access open directly to their work.

@@ -1,3 +1,4 @@
+import { FileDiff } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { WorkItem } from '../../lib/task-collection';
@@ -48,24 +49,44 @@ export function useWorkSignals() {
   );
 }
 
+export const changeSummary = (stats: ChangeStats) =>
+  `+${stats.added} −${stats.removed} in ${stats.files} ${stats.files === 1 ? 'file' : 'files'}`;
+
+/** The size of a change, for headers with room for it. */
+export function ChangeSize({ stats }: { stats: ChangeStats }) {
+  return (
+    <span className="work-signal-diff" title={changeSummary(stats)}>
+      <span className="work-signal-added">+{stats.added}</span>
+      <span className="work-signal-removed">−{stats.removed}</span>
+      <span className="work-signal-files">
+        {stats.files} {stats.files === 1 ? 'file' : 'files'}
+      </span>
+    </span>
+  );
+}
+
 /**
- * Compact status for a work row: an unread dot, elapsed time while running and
- * the size of the change once there is one.
+ * Status for a work row: an unread dot, elapsed time while running and the size of the
+ * change once there is one. `compact` rows keep their width for the title: they show
+ * only a mark for finished work whose changes have not landed, with the size in its label.
  */
 export function WorkSignals({
   item,
   stats,
   unread,
+  compact = false,
 }: {
   item: WorkItem;
   stats?: ChangeStats;
   unread: boolean;
+  compact?: boolean;
 }) {
   const running = item.run ? isActive(item.run) : false;
-  const now = useNow(running);
-  const elapsed = running && item.run ? compactElapsed(item.run.startedAt, now) : '';
-  const changed = stats && stats.files > 0;
-  if (!unread && !elapsed && !changed) return null;
+  const now = useNow(running && !compact);
+  const elapsed = running && !compact && item.run ? compactElapsed(item.run.startedAt, now) : '';
+  const changed = !!stats && stats.files > 0;
+  const unlanded = compact && changed && !running && item.stage !== 'finished';
+  if (!unread && !elapsed && !(compact ? unlanded : changed)) return null;
   return (
     <span className="work-signals">
       {elapsed && (
@@ -73,11 +94,17 @@ export function WorkSignals({
           {elapsed}
         </span>
       )}
-      {changed && (
+      {stats && unlanded && (
         <span
-          className="work-signal-diff"
-          title={`${stats.files} ${stats.files === 1 ? 'file' : 'files'} changed`}
+          className="work-signal-unlanded"
+          role="img"
+          aria-label={`Changes not merged yet, ${changeSummary(stats)}`}
         >
+          <FileDiff size={13} aria-hidden="true" />
+        </span>
+      )}
+      {stats && changed && !compact && (
+        <span className="work-signal-diff" title={changeSummary(stats)}>
           <span className="work-signal-added">+{stats.added}</span>
           <span className="work-signal-removed">−{stats.removed}</span>
         </span>

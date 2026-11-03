@@ -72,6 +72,7 @@ import { useTaskFollowUps } from './useTaskFollowUps';
 import { ValidationJourney } from './ValidationJourney';
 import { useWorkSeen, WorkContextDetails } from './WorkContext';
 import { WorkFeedbackInbox } from './WorkFeedbackInbox';
+import { ChangeSize } from './WorkSignals';
 import { WorkSourceLink } from './WorkSourceLink';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
 import { useWorkspaceActions } from './WorkTools';
@@ -204,7 +205,8 @@ export function TaskDetail({
       run.projectPath.replaceAll('\\', '/').toLowerCase();
   const finished = !active && ['review', 'reviewed'].includes(run.status);
   const canContinue = isLatest && !!run.sessionId && run.status !== 'interrupted' && !integrated;
-  const changedFiles = useChangeStats([run])[run.id]?.value.files;
+  const changes = useChangeStats([run])[run.id]?.value;
+  const changedFiles = changes?.files;
   useEffect(() => {
     useWorkViewStore.getState().setViewing(run.id);
     return () => {
@@ -432,10 +434,15 @@ export function TaskDetail({
           title={title}
           titleRef={heading}
           description={
-            active ? undefined : (
-              <Badge appearance="plain" variant={decision.tone}>
-                {decision.label}
-              </Badge>
+            active && !changedFiles ? undefined : (
+              <span className="task-detail-status">
+                {!active && (
+                  <Badge appearance="plain" variant={decision.tone}>
+                    {decision.label}
+                  </Badge>
+                )}
+                {changes && changes.files > 0 && <ChangeSize stats={changes} />}
+              </span>
             )
           }
         />
