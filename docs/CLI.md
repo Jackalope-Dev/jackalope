@@ -103,11 +103,14 @@ always message text. Unknown or misplaced options are refused with exit status 6
 
 Inside a conversation, typing `/` opens an interactive command menu, and `/help`
 lists commands: `/new`, `/bg`, `/sharpen`, `/init`, `/sessions`, `/close`, `/tabs`, `/projects`, `/agents`, `/settings`,
-`/status`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/learnings`, `/files`, `/review` (or `/diff`), `/merge`, `/pr`, `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
+`/status`, `/board`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/learnings`, `/files`, `/review` (or `/diff`), `/merge`, `/pr`, `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
 `/unpause`, `/unqueue`, `/copy`, `/history`, `/kill`, `/clear`, `/plan`, `/plans`, `/revise`,
 `/approve`, `/replan`, `/export`, `/deviation`, `/browser`, `/computer`, `/open` and `/quit`. Pickers
 filter as you type. `/new <message>` starts
 and shows a conversation; `/bg <message>` starts one and stays on the current one.
+`/board` replaces the conversation with one row per open conversation, those that
+need you first, then working ones, each with its state, agent and current step;
+typing filters it, Enter opens the chosen one and Esc returns.
 `/status` prints the project and branch, the open work's state, agent and model, the
 conversations that need you and each agent's state, without leaving the conversation.
 `/merge [message]` prepares a merge of the latest attempt as `jackalope merge` does,
@@ -212,7 +215,9 @@ The host answers `plan-start`, `plans`, `plan-detail` and `plan-action` (`keep`,
 (`project`, `criteria` or `review`) and `check`; plan summaries carry `needsYou`;
 deviations carry `amendment`; projects carry `verifyCommand`, `autoVerify`,
 `questionCap` and `plannerAgent`; and `set-project-settings` accepts `question_cap` and
-`planner_agent` (empty plans with the task's agent). Older hosts omit them and the
+`planner_agent` (empty plans with the task's agent). Session views carry `run` (stages,
+duration, step counts, the check and the newest typed steps) and session summaries carry
+`agent` and `step`. Older hosts omit them and the
 protocol version is unchanged. See [plan mode](PLAN-MODE.md) for the document format.
 
 A leading `/`, `!` or `@` is the input's mode: the prompt at the left of the input
@@ -250,9 +255,21 @@ and how to carry on. A question with options docks in the input's place with its
 text, the reason it matters and its options, so the conversation above stays readable;
 the mouse wheel, Page Up/Down and dragging still act on the conversation. Esc leaves the
 dock to type an answer instead, the question stays pinned above the input, and
-`/answer` brings the options back. Running work lists its newest steps (tool calls and narration) as the
-host records them, and `jackalope -p` prints the same steps to standard error.
-`JACKALOPE_REDUCED_MOTION=1` keeps the band, spinners, shimmer and wordmark sweep still.
+`/answer` brings the options back.
+
+The latest run is a run card: its state, agent, model and duration on the top edge,
+the reply, then what the host recorded about the work and, along the bottom edge, the
+commands that move it on (`/review`, `/merge` and `/pr` once it is ready, `/retry`
+after a failure). The record is a gauge of the run's stages (route, prepare, work and
+check), each as long as it took; counts of reads, searches, commands and failures; the
+check's result; and the changed files with their line counts, unless the changes
+panel already shows them. Counts come from the run's recorded activity, which keeps
+its newest entries, so a long run marks them with `+`. While work runs the card lists
+its newest steps by kind, the running stage shimmers and each new step resolves out of
+noise as it arrives; a result decodes into place once when it arrives. Older hosts
+send no run summary and keep the plain transcript. `jackalope -p` prints the steps
+to standard error. `JACKALOPE_REDUCED_MOTION=1` keeps the band, spinners, shimmer,
+decoding and wordmark sweep still.
 
 The changes panel lists files the conversation's checkout changed since it left
 the project's checked-out commit, committed or not, including untracked files, with

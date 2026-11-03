@@ -126,7 +126,18 @@ impl App {
 
     /// Whether anything on screen moves: agent work or a running command.
     pub(super) fn animating(&self) -> bool {
-        self.working() || self.shells_running() > 0 || super::render::intro_sweep(self).is_some()
+        self.working()
+            || self.shells_running() > 0
+            || super::render::intro_sweep(self).is_some()
+            || super::render::card_revealing(self)
+            || (self
+                .picker
+                .as_ref()
+                .is_some_and(|picker| picker.kind == super::pickers::PickerKind::Board)
+                && self
+                    .sessions
+                    .iter()
+                    .any(|session| crate::protocol::working(session.status.as_deref())))
     }
 
     pub(super) fn run_shell(&mut self, command: &str) {

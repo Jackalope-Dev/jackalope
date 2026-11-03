@@ -14,8 +14,8 @@ use super::refresh;
 use super::{App, Click, Event, NextStart, Overview};
 use crate::connection::Connection;
 use crate::protocol::{
-    AgentStatus, Handshake, Message, Project, Question, Request, Response, SessionSummary,
-    SessionView, VERSION,
+    AgentStatus, Handshake, Message, Project, Question, Request, Response, RunCheck, RunStage,
+    RunStep, RunSummary, SessionSummary, SessionView, VERSION,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::backend::TestBackend;
@@ -161,7 +161,62 @@ pub fn conversation(id: &str, title: &str, messages: &[(&str, &str)]) -> Session
         merged: false,
         draft: String::new(),
         draft_revision: 0,
+        run: None,
     }
+}
+
+/// What a run that read, searched, ran commands and passed its check
+/// reports, through `work` (`None` while it runs).
+pub fn run_summary(work: Option<u64>) -> RunSummary {
+    let stage = |name: &str, duration_ms: Option<u64>| RunStage {
+        name: name.into(),
+        duration_ms,
+    };
+    let step = |kind: &str, text: &str| RunStep {
+        kind: kind.into(),
+        text: text.into(),
+    };
+    let mut stages = vec![stage("route", Some(300)), stage("prepare", Some(4_100))];
+    stages.push(stage("work", work));
+    if work.is_some() {
+        stages.push(stage("check", Some(8_200)));
+    }
+    RunSummary {
+        stages,
+        duration_ms: work.map(|work| work + 12_600),
+        reads: 14,
+        searches: 3,
+        commands: 2,
+        failures: 0,
+        trimmed: false,
+        check: work.map(|_| RunCheck {
+            command: "pnpm test".into(),
+            passed: true,
+            duration_ms: 8_200,
+        }),
+        steps: vec![
+            step("search", "Searching the project"),
+            step("read", "Reading src/auth/session.ts"),
+            step("read", "Reading src/auth/redirect.ts"),
+            step("edit", "Editing src/auth/session.ts"),
+            step("command", "Running pnpm"),
+        ],
+    }
+}
+
+/// Files a run changed, as the workspace's Git state reports them.
+pub fn changes() -> Vec<crate::git::FileChange> {
+    let change = |path: &str, status: char, added: usize, removed: usize| crate::git::FileChange {
+        path: path.into(),
+        status,
+        added: Some(added),
+        removed: Some(removed),
+    };
+    vec![
+        change("src/auth/session.ts", 'M', 31, 12),
+        change("src/auth/redirect.ts", 'M', 12, 7),
+        change("src/auth/session.test.ts", 'A', 5, 0),
+    ]
 }
 
 /// A question with options that the agent of `view` is waiting on.
@@ -249,6 +304,8 @@ impl Harness {
                 updated_at: "2026-01-01T00:00:00Z".into(),
                 status: view.status.clone(),
                 asking: !view.questions.is_empty(),
+                agent: view.agent.clone(),
+                step: view.step.clone(),
             },
         );
         host.views.insert(view.id.clone(), view);
@@ -528,5 +585,171 @@ mod tests {
             !screen.contains("Project  demo-app"),
             "notes stay in their conversation"
         );
+    }
+
+    fn finished_login_fix(harness: &mut Harness) {
+        let mut view = conversation(
+            "c1",
+            "Fix login",
+            &[
+                ("you", "Fix the login redirect loop on expired sessions"),
+                (
+                    "agent",
+                    "Expired sessions now clear the cookie before redirecting, so `/login` \
+                     no longer bounces back to `/app`. Added a regression test.",
+                ),
+            ],
+        );
+        view.model = Some("opus".into());
+        view.run = Some(run_summary(Some(220_000)));
+        harness.add(view);
+        harness.open("c1");
+        harness.app.changes = changes();
+    }
+
+    #[test]
+    fn a_finished_run_reads_as_one_card_with_its_evidence_and_next_steps() {
+        let mut harness = Harness::new();
+        finished_login_fix(&mut harness);
+        let screen = harness.render(100, 34);
+        for expected in [
+            "READY",
+            "Claude Code · opus",
+            "3m 52s",
+            "Expired sessions now clear the cookie",
+            "prepare 4.1s",
+            "work 3m 40s",
+            "14 reads",
+            "3 files +48 −19",
+            "pnpm test passed in 8.2s",
+            "src/auth/session.test.ts",
+            "/review",
+            "/merge",
+        ] {
+            assert!(screen.contains(expected), "missing {expected}: {screen}");
+        }
+        assert!(
+            screen.contains("check 8.2s"),
+            "the last stage keeps its label: {screen}"
+        );
+        assert_card_whole(&screen);
+    }
+
+    /// Every row inside the run card reaches its right edge, so nothing
+    /// wrapped past it.
+    fn assert_card_whole(screen: &str) {
+        for line in screen.lines().filter(|line| line.starts_with(" │ │")) {
+            assert!(
+                line.ends_with("│ │"),
+                "row overflows the card: {line}\n{screen}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_result_that_just_arrived_decodes_into_place_once() {
+        let mut harness = Harness::new();
+        finished_login_fix(&mut harness);
+        let settled = harness.render(100, 34);
+        let run = harness.app.view.as_ref().unwrap().run_id.clone().unwrap();
+        let ago = |ms| std::time::Instant::now() - std::time::Duration::from_millis(ms);
+        harness.app.reveal = Some((run.clone(), ago(250)));
+        let decoding = harness.render(100, 34);
+        assert_ne!(decoding, settled, "{decoding}");
+        assert!(super::super::render::card_revealing(&harness.app));
+        harness.app.reveal = Some((run, ago(2_000)));
+        assert_eq!(harness.render(100, 34), settled);
+    }
+
+    #[test]
+    fn running_work_shows_its_stages_and_newest_steps_live() {
+        let mut harness = Harness::new();
+        let mut view = conversation("c1", "Fix login", &[("you", "Fix the login redirect loop")]);
+        view.status = Some("running".into());
+        view.partial = "The redirect check runs before the session is cleared".into();
+        view.run = Some(run_summary(None));
+        harness.add(view);
+        harness.open("c1");
+        let settled = std::time::Instant::now() - std::time::Duration::from_secs(1);
+        *harness.app.newest_step.borrow_mut() = Some(("Running pnpm".into(), settled));
+        let screen = harness.render(100, 34);
+        for expected in [
+            "WORKING",
+            "The redirect check runs before",
+            "prepare 4.1s",
+            "Reading src/auth/redirect.ts",
+            "Running pnpm",
+            "Esc Esc stop",
+        ] {
+            assert!(screen.contains(expected), "missing {expected}: {screen}");
+        }
+        assert_card_whole(&screen);
+    }
+
+    #[test]
+    fn narrow_terminals_keep_the_card_whole() {
+        let mut harness = Harness::new();
+        finished_login_fix(&mut harness);
+        let screen = harness.render(62, 30);
+        assert!(screen.contains("READY"), "{screen}");
+        assert!(screen.contains("pnpm test passed"), "{screen}");
+        assert_card_whole(&screen);
+    }
+
+    #[test]
+    fn the_board_lists_what_needs_you_first_and_opens_the_chosen_conversation() {
+        let mut harness = Harness::new();
+        let mut done = conversation(
+            "c1",
+            "Fix login",
+            &[("you", "Fix login"), ("agent", "Fixed.")],
+        );
+        done.run = Some(run_summary(Some(220_000)));
+        harness.add(done);
+        let mut busy = conversation("c2", "Add search", &[("you", "Add search")]);
+        busy.status = Some("running".into());
+        busy.agent = Some("Codex".into());
+        busy.step = Some("Running checks".into());
+        harness.add(busy);
+        let mut asking = conversation("c3", "Pick a database", &[("you", "Set up reporting")]);
+        asking.status = Some("running".into());
+        asking.questions = vec![question(
+            &asking,
+            "Postgres or SQLite?",
+            &["Postgres", "SQLite"],
+        )];
+        harness.add(asking);
+        harness.open("c1");
+        harness.submit("/board");
+
+        let screen = harness.render(100, 24);
+        // Board rows, not the tabs above them, which show titles too.
+        let row = |title: &str| {
+            screen
+                .lines()
+                .position(|line| line.contains(title) && !line.contains('×'))
+                .unwrap_or_else(|| panic!("no {title}: {screen}"))
+        };
+        assert!(row("Pick a database") < row("Add search"), "{screen}");
+        assert!(row("Add search") < row("Fix login"), "{screen}");
+        for expected in [
+            "NEEDS YOU",
+            "asking a question",
+            "WORKING",
+            "Running checks",
+            "READY",
+        ] {
+            assert!(screen.contains(expected), "missing {expected}: {screen}");
+        }
+        assert!(screen.contains("1 need you · 1 working"), "{screen}");
+
+        harness.key(KeyCode::Enter);
+        assert_eq!(harness.app.session.as_deref(), Some("c3"));
+        // The board closes; the conversation's own question docks instead.
+        assert!(harness
+            .app
+            .picker
+            .as_ref()
+            .is_none_or(|picker| picker.kind != super::super::pickers::PickerKind::Board));
     }
 }

@@ -82,6 +82,8 @@ pub struct Item {
 #[derive(Clone, Copy, PartialEq)]
 pub enum PickerKind {
     Sessions,
+    /// Every open conversation at a glance, drawn in place of the transcript.
+    Board,
     Projects,
     Agents,
     Settings,
@@ -317,7 +319,9 @@ impl App {
         };
         let kind = picker.kind;
         match kind {
-            PickerKind::Sessions | PickerKind::Settings => self.open_picker(kind),
+            PickerKind::Sessions | PickerKind::Board | PickerKind::Settings => {
+                self.open_picker(kind)
+            }
             // The work it would deliver changed, so the prepared merge is stale.
             PickerKind::Delivery
                 if picker.subject != self.view.as_ref().and_then(|view| view.run_id.clone()) =>
@@ -1040,6 +1044,31 @@ impl App {
                     }
                 }
                 ("Conversations · Ctrl+N/P to step".to_string(), items)
+            }
+            PickerKind::Board => {
+                if !rebuilding {
+                    self.refresh();
+                }
+                let mut sessions: Vec<&SessionSummary> = self.sessions.iter().collect();
+                // Needs you, then working, then the rest, newest first within each.
+                sessions.sort_by_key(|session| {
+                    if super::conversation::needs_you(session) {
+                        0
+                    } else if protocol::working(session.status.as_deref()) {
+                        1
+                    } else {
+                        2
+                    }
+                });
+                let items = sessions
+                    .into_iter()
+                    .map(|session| Item {
+                        label: session.title.clone(),
+                        detail: session.agent.clone().unwrap_or_default(),
+                        action: Action::Session(session.id.clone()),
+                    })
+                    .collect();
+                ("Board".to_string(), items)
             }
             PickerKind::Projects => {
                 let projects = match self.request(Request::Projects) {

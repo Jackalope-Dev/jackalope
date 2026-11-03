@@ -218,6 +218,12 @@ struct App {
     draft_sync: Option<drafts::DraftSync>,
     /// How long the work that just stopped ran, for the done message.
     last_run_took: Option<std::time::Duration>,
+    /// The run whose result just arrived and when, so its card decodes into
+    /// place once.
+    reveal: Option<(String, Instant)>,
+    /// The newest step the run card shows and when it appeared, so it
+    /// resolves as it arrives.
+    newest_step: RefCell<Option<(String, Instant)>>,
     /// When the start screen was first drawn, for the wordmark's light sweep.
     intro: Cell<Option<Instant>>,
     /// Animation frame for the working indicator.
@@ -333,6 +339,8 @@ impl App {
             flash: None,
             work_started: None,
             last_progress: None,
+            reveal: None,
+            newest_step: RefCell::new(None),
             changes: Vec::new(),
             changes_version: 0,
             panel: changes::Panel::default(),

@@ -1,5 +1,7 @@
 //! Drawing a frame: header, transcript, status line, input, tips and popups.
 
+mod board;
+mod card;
 mod chrome;
 mod markdown;
 mod menus;
@@ -296,7 +298,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
     highlight_selection(frame, app);
 
     if let Some(picker) = &app.picker {
-        menus::picker(frame, picker, area);
+        if picker.kind == PickerKind::Board {
+            board::draw(frame, app, picker, area);
+        } else {
+            menus::picker(frame, picker, area);
+        }
         return;
     }
     let matches = slash_matches(text);
@@ -411,6 +417,11 @@ fn draw_tip(frame: &mut Frame, app: &App, area: Rect) {
     let mut spans = vec![Span::styled("  Tip: ", accent.add_modifier(Modifier::BOLD))];
     spans.extend(inline(tip));
     frame.render_widget(Paragraph::new(Line::from(spans)), area);
+}
+
+/// A run card's result is still decoding into place.
+pub fn card_revealing(app: &App) -> bool {
+    card::revealing(app)
 }
 
 pub fn duration(elapsed: Duration) -> String {

@@ -194,6 +194,8 @@ mod tests {
             updated_at: String::new(),
             status: None,
             asking: false,
+            agent: None,
+            step: None,
         }
     }
 

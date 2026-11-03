@@ -26,7 +26,7 @@ mod storage;
 #[cfg(test)]
 mod tests;
 pub(super) mod timing;
-mod tool_activity;
+pub(in crate::commands) mod tool_activity;
 mod warm_opencode;
 
 pub(in crate::commands) use claude_session::bridge_token;

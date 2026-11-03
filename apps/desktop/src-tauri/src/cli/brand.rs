@@ -861,6 +861,63 @@ pub fn shimmer(text: &str, tick: usize, base: Style) -> Vec<Span<'static>> {
         .collect()
 }
 
+/// Glyphs text resolves out of, the same noise the ASCII mark decodes from in
+/// the app and on the website.
+const NOISE: &[char] = &[
+    '0', '1', '<', '>', '/', '\\', '{', '}', '[', ']', '#', '$', '%', '&', '*', '+', '=', '?',
+];
+
+/// A cheap, stable scramble of two numbers, so noise and settle order are
+/// the same on every frame and in tests.
+fn scatter(a: usize, b: usize) -> u32 {
+    let mut x = (a as u32).wrapping_mul(0x9e37_79b1) ^ (b as u32).wrapping_mul(0x85eb_ca77);
+    x ^= x >> 15;
+    x = x.wrapping_mul(0x2c1b_3c6d);
+    x ^= x >> 12;
+    x
+}
+
+/// `line` resolving out of noise as `progress` runs from 0 to 1, the way the
+/// ASCII mark decodes: characters settle roughly left to right, each at its
+/// own moment, the ones settling flash in the accent and the rest flicker as
+/// noise. Spaces stay put so words keep their shape. The line is unchanged
+/// from 1 on, and always under reduced motion.
+pub fn decode(line: Line<'static>, progress: f32, tick: usize, seed: usize) -> Line<'static> {
+    if progress >= 1.0 || !motion() {
+        return line;
+    }
+    let total = line
+        .spans
+        .iter()
+        .map(|span| span.content.chars().count())
+        .sum::<usize>()
+        .max(1);
+    let noise = Style::default().fg(muted());
+    let hot = Style::default().fg(lifted(0.35));
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let mut push = |text: char, style: Style| match spans.last_mut() {
+        Some(last) if last.style == style => last.content.to_mut().push(text),
+        _ => spans.push(Span::styled(text.to_string(), style)),
+    };
+    let mut column = 0;
+    for span in &line.spans {
+        for character in span.content.chars() {
+            let order = 0.65 * column as f32 / total as f32
+                + 0.35 * (scatter(column, seed) % 1000) as f32 / 1000.0;
+            if character == ' ' || progress >= order + 0.08 {
+                push(character, span.style);
+            } else if progress >= order {
+                push(character, span.style.patch(hot));
+            } else {
+                let glyph = NOISE[scatter(column + seed, tick) as usize % NOISE.len()];
+                push(glyph, span.style.patch(noise));
+            }
+            column += 1;
+        }
+    }
+    Line::from(spans).style(line.style)
+}
+
 /// The conversation header: the small mark beside up to four lines of
 /// context. The mark catches a sweeping highlight only while `working`.
 pub fn header(info: Vec<Line<'static>>, working: bool, tick: usize) -> Vec<Line<'static>> {

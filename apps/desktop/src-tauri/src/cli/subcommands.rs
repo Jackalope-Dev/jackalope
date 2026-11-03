@@ -532,6 +532,8 @@ mod tests {
             updated_at: String::new(),
             status: None,
             asking: false,
+            agent: None,
+            step: None,
         };
         assert_eq!(state(&session), "open");
         session.pending = 2;
