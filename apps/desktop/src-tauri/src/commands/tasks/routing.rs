@@ -756,6 +756,9 @@ impl TaskRuntime {
                 .total_cmp(&a.remaining_percent.unwrap_or(50.0))
         });
         let router = routers.first();
+        // A routing agent that is slow or fails must not hold up the work:
+        // local rules choose an eligible worker instead.
+        let mut router_failure: Option<String> = None;
         let output = if used_jev {
             jev_output
         } else {
@@ -775,6 +778,10 @@ impl TaskRuntime {
             {
                 Ok(output) => output,
                 Err(_) if mode == DecisionMode::Jev && self.is_running(&req.id) => None,
+                Err(error) if self.is_running(&req.id) => {
+                    router_failure = Some(error);
+                    None
+                }
                 Err(error) => return Err(error),
             }
         };
@@ -808,15 +815,24 @@ impl TaskRuntime {
         let deterministic = equivalent
             || (!single
                 && !used_jev
-                && ((mode == DecisionMode::Jev && fallback)
+                && (router_failure.is_some()
+                    || (mode == DecisionMode::Jev && fallback)
                     || (router.is_none()
                         && (mode != DecisionMode::Agent || history.fallbacks.is_empty()))));
+        let router_fallback = router_failure.as_ref().map(|error| {
+            format!(
+                "{}. Local rules selected an eligible worker using project preference, current capacity and active workload.",
+                error.trim_end_matches('.')
+            )
+        });
         let (_, mut choice) = if single {
             (&candidates[0], Choice { assessment:None, candidate_id: candidates[0].id.clone(), reason: "Only one eligible agent, model and account; no routing model call was needed.".into(), expected_usage_percent: None, alternatives: vec![] })
         } else if deterministic {
             rank_by_capacity(
                 &candidates,
-                if equivalent {
+                if let Some(reason) = router_fallback.as_deref().filter(|_| !equivalent) {
+                    reason
+                } else if equivalent {
                     "All eligible accounts use the same agent and explicit model. Local rules selected an account using current capacity and workload; no routing model call was needed."
                 } else if mode == DecisionMode::Deterministic {
                     "Local rules selected an eligible worker using project preference, current capacity and active workload. No routing model was consulted."
@@ -937,7 +953,7 @@ impl TaskRuntime {
                 policy_revision: decision_policy.revision,
                 model_call_attempted: !attempts.is_empty(),
                 concentration: None,
-                fallback_reason: policy_error.or_else(|| {
+                fallback_reason: policy_error.or_else(|| router_fallback.clone()).or_else(|| {
                     (mode == DecisionMode::Jev && !used_jev && !no_model_choice).then(|| {
                         if router.is_some() && !fallback {
                             "Jev did not provide a usable assessment; the configured agent fallback selected the worker."

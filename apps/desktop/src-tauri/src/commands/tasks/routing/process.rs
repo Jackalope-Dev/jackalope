@@ -1,6 +1,39 @@
 use super::*;
 use crate::commands::process_control::{read_bounded, ProcessTree};
 
+/// How long the routing agent has to answer before local rules choose instead.
+/// A scoped request on a fast model answers in two to four seconds.
+pub(in crate::commands::tasks) const ROUTING_BUDGET: Duration = Duration::from_secs(6);
+
+/// The model a routing agent answers with. Choosing a worker is a short
+/// structured judgement, so Claude routes on Sonnet rather than its default
+/// or Opus; other agents keep the router's configured model.
+pub(in crate::commands::tasks) fn routing_model(
+    adapter: &str,
+    model: Option<&str>,
+) -> Option<String> {
+    match (adapter, model) {
+        ("claude", None) => Some("sonnet".into()),
+        ("claude", Some(model)) if model.to_ascii_lowercase().contains("opus") => {
+            Some("sonnet".into())
+        }
+        (_, model) => model.map(str::to_string),
+    }
+}
+
+/// The lowest reasoning effort each agent offers for a routing answer.
+pub(in crate::commands::tasks) fn routing_effort(cmd: &mut Command, adapter: &str) {
+    match adapter {
+        "codex" => {
+            cmd.args(["-c", "model_reasoning_effort=\"minimal\""]);
+        }
+        "claude" => {
+            cmd.args(["--effort", "low"]);
+        }
+        _ => {}
+    }
+}
+
 pub(in crate::commands::tasks) struct Configuration(Option<PathBuf>);
 
 impl Drop for Configuration {
@@ -103,9 +136,11 @@ impl TaskRuntime {
         let _configuration = configure(&mut cmd, &router.adapter, &prompt_path, prompt)?;
         agent_profiles::validate_binding(&self.profiles_root(), &router.binding)?;
         agent_profiles::apply_binding(&mut cmd, &router.binding)?;
-        if let Some(model) = &router.model {
+        let model = routing_model(&router.adapter, router.model.as_deref());
+        if let Some(model) = &model {
             cmd.args(["--model", model]);
         }
+        routing_effort(&mut cmd, &router.adapter);
         if router.adapter == "grok" {
             std::fs::write(&prompt_path, prompt).map_err(|e| e.to_string())?;
         }
@@ -181,9 +216,11 @@ impl TaskRuntime {
                 failure = Some("Routing was stopped.".into());
                 break None;
             }
-            if started.elapsed() > Duration::from_secs(120) {
-                failure =
-                    Some("The default agent's routing request timed out. Retry the task.".into());
+            if started.elapsed() > ROUTING_BUDGET {
+                failure = Some(format!(
+                    "The routing agent did not answer within {} seconds.",
+                    ROUTING_BUDGET.as_secs()
+                ));
                 break None;
             }
             std::thread::sleep(Duration::from_millis(50));
@@ -209,7 +246,7 @@ impl TaskRuntime {
         if router.adapter == "grok" {
             let _ = std::fs::remove_file(prompt_path);
         }
-        output.model = router.model.clone();
+        output.model = model;
         output.result.clear();
         output.error = None;
         output.session_id = None;
@@ -248,7 +285,10 @@ impl TaskRuntime {
         if output.quota_failure.is_none()
             && (!exit.is_some_and(|status| status.success()) || output.error.is_some())
         {
-            return Err("The default agent could not complete routing. Check its account, model and quota, then retry. No worker was launched.".into());
+            return Err(output
+                .error
+                .clone()
+                .unwrap_or_else(|| "The routing agent could not complete routing.".into()));
         }
         if output.error.is_none() && output.quota_failure.is_none() {
             if let Some(lease) = &mut warm {

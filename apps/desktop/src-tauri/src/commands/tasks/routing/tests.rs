@@ -472,3 +472,158 @@ fn routing_fallback_keeps_the_remaining_rank_for_admission_changes() {
         "second"
     );
 }
+
+#[test]
+fn a_routing_agent_routes_on_a_fast_model_at_its_lowest_effort() {
+    use super::process::{routing_effort, routing_model};
+    assert_eq!(routing_model("claude", None).as_deref(), Some("sonnet"));
+    assert_eq!(
+        routing_model("claude", Some("claude-opus-5-5")).as_deref(),
+        Some("sonnet")
+    );
+    assert_eq!(
+        routing_model("claude", Some("claude-sonnet-5")).as_deref(),
+        Some("claude-sonnet-5")
+    );
+    assert_eq!(
+        routing_model("codex", Some("gpt-5")).as_deref(),
+        Some("gpt-5")
+    );
+    assert_eq!(routing_model("codex", None), None);
+    let args = |adapter: &str| {
+        let mut command = Command::new("fixture");
+        routing_effort(&mut command, adapter);
+        command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(args("claude"), ["--effort", "low"]);
+    assert_eq!(args("codex"), ["-c", "model_reasoning_effort=\"minimal\""]);
+    assert!(args("opencode").is_empty());
+}
+
+#[test]
+fn a_routing_agent_that_does_not_answer_in_time_leaves_the_choice_to_local_rules() {
+    let root =
+        std::env::temp_dir().join(format!("jackalope-routing-budget-{}", uuid::Uuid::new_v4()));
+    let repo = root.join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    let source = root.join("fixture.rs");
+    std::fs::write(&source, r##"
+use std::io::Read;
+fn main() {
+  let mut input=String::new(); std::io::stdin().read_to_string(&mut input).unwrap();
+  if input.starts_with("You are Jackalope's routing coordinator.") {
+    std::thread::sleep(std::time::Duration::from_secs(30));
+    return;
+  }
+  println!(r#"{{"type":"result","is_error":false,"result":"Completed the fixture.","usage":{{"input_tokens":4,"output_tokens":5}}}}"#);
+}
+"##).unwrap();
+    let executable = root.join(if cfg!(windows) {
+        "fixture.exe"
+    } else {
+        "fixture"
+    });
+    let built = command("rustc")
+        .arg(&source)
+        .arg("-o")
+        .arg(&executable)
+        .output()
+        .unwrap();
+    assert!(
+        built.status.success(),
+        "{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let repo = repo.to_str().unwrap();
+    git(repo, &["init", "-b", "main"]).unwrap();
+    std::fs::write(Path::new(repo).join("README.md"), "Routing fixture").unwrap();
+    git(repo, &["add", "README.md"]).unwrap();
+    git(
+        repo,
+        &[
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-m",
+            "Fixture",
+        ],
+    )
+    .unwrap();
+    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let mut policy = AgentPolicy::default();
+    for id in BUILTIN_AGENTS {
+        policy.enabled_agents.insert((*id).into(), false);
+    }
+    policy.default_meta_agent = "fixture-a".into();
+    for id in ["fixture-a", "fixture-b"] {
+        policy
+            .custom_agents
+            .push(crate::commands::agent_policy::CustomAgent {
+                id: id.into(),
+                name: id.into(),
+                command: executable.to_string_lossy().into_owned(),
+                adapter: Some("claude".into()),
+                args: Vec::new(),
+            });
+    }
+    let policy_path = runtime.policy_path();
+    std::fs::create_dir_all(policy_path.parent().unwrap()).unwrap();
+    std::fs::write(policy_path, serde_json::to_vec(&policy).unwrap()).unwrap();
+    crate::commands::tasks::claude_session::set_test_settings(
+        "routing-budget-fixture",
+        Default::default(),
+    );
+    let id = uuid::Uuid::new_v4().to_string();
+    let request: RunRequest = serde_json::from_value(serde_json::json!({"id":id,"projectId":"routing-budget-fixture","projectName":"Routing budget","projectPath":repo,"agent":"auto","prompt":"Complete the fixture.","isolated":true,"connectionIds":[]})).unwrap();
+    let started = std::time::Instant::now();
+    runtime.start(request).unwrap();
+    let deadline = started + Duration::from_secs(25);
+    let settled = loop {
+        let run = runtime.inner.lock().unwrap().runs[&id].clone();
+        if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+            break run;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the run never settled at {}",
+            root.display()
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    assert_eq!(
+        settled.status, "review",
+        "{:?} / {:?}",
+        settled.error, settled.activity
+    );
+    let routing = settled.routing.as_ref().unwrap();
+    let decision = routing.decisions.last().unwrap();
+    assert_eq!(decision.orchestrator, "local rules");
+    let reason = decision
+        .assessment
+        .as_ref()
+        .and_then(|receipt| receipt.fallback_reason.clone())
+        .unwrap_or_default();
+    assert!(
+        reason.contains("did not answer within 6 seconds"),
+        "{reason}"
+    );
+    assert!(routing
+        .attempts
+        .iter()
+        .any(|attempt| attempt.error.is_some()));
+    let routed = settled
+        .stages
+        .iter()
+        .find(|stage| stage.stage == "routing")
+        .and_then(|stage| stage.duration_ms)
+        .unwrap();
+    assert!(routed < 10_000, "routing took {routed} ms");
+    assert!(runtime.inner.lock().unwrap().processes.is_empty());
+}
