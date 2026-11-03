@@ -21,8 +21,6 @@ export const environmentPolicies = {
   'cloud-stable': { branches: ['stable'], approval: true },
   'store-beta': { branches: ['beta'], approval: false },
   'store-stable': { branches: ['stable'], approval: true },
-  'service-staging': { branches: ['beta'], approval: false },
-  'service-production': { branches: ['master'], approval: true },
 };
 
 export function branchProtection(reviewer) {
