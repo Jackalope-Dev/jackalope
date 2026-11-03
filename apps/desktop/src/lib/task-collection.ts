@@ -1,5 +1,6 @@
 import type { TaskTicket } from '../stores/taskStore.ts';
 import { taskAgents } from './agent-provider.ts';
+import { isAgentReview } from './agent-review.ts';
 import { type LiveSession, sessionWork } from './live-session.ts';
 import { type ManagedTask, managedTaskWork } from './managed-task.ts';
 import type { QueueView } from './queue.ts';
@@ -203,7 +204,10 @@ export function collectWork(
   integratedRunIds: string[] = [],
   archived = false,
 ): WorkItem[] {
-  const projectRuns = runs.filter((run) => projectId === null || run.projectId === projectId);
+  // Agent reviews belong to the task they review and open from its Review tab.
+  const projectRuns = runs.filter(
+    (run) => (projectId === null || run.projectId === projectId) && !isAgentReview(run),
+  );
   const byId = new Map(projectRuns.map((run) => [run.id, run]));
   const latest = new Map<string, TaskRun>();
   const original = new Map<string, TaskRun>();

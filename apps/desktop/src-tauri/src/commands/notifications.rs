@@ -50,6 +50,8 @@ pub struct Snapshot {
     pub started_at: String,
     pub status: String,
     pub questions: Vec<String>,
+    /// The attempt an agent reviewer reviewed; its notice opens that attempt.
+    pub review_of: Option<String>,
 }
 
 #[derive(Clone)]
@@ -62,7 +64,19 @@ struct Notice {
 
 fn notices(runs: &[Snapshot]) -> Vec<Notice> {
     let mut latest = HashMap::<(&str, &str), &Snapshot>::new();
+    let mut reviews = Vec::new();
     for run in runs {
+        if let Some(author) = &run.review_of {
+            if run.status == "review" {
+                reviews.push(Notice {
+                    key: format!("{}:review", run.id),
+                    run_id: author.clone(),
+                    title: "An agent review is ready",
+                    attention: false,
+                });
+            }
+            continue;
+        }
         let value = latest.entry((&run.project_id, &run.task_id)).or_insert(run);
         if run.started_at > value.started_at {
             *value = run;
@@ -96,6 +110,7 @@ fn notices(runs: &[Snapshot]) -> Vec<Notice> {
                 attention: run.status != "review",
             }]
         })
+        .chain(reviews)
         .collect()
 }
 
@@ -359,7 +374,21 @@ mod tests {
             started_at: id.into(),
             status: status.into(),
             questions: vec![],
+            review_of: None,
         }
+    }
+    #[test]
+    fn agent_reviews_notify_on_the_reviewed_attempt() {
+        let reviewer = Snapshot {
+            task_id: "reviewer".into(),
+            review_of: Some("1".into()),
+            ..run("2", "review")
+        };
+        let current = notices(&[run("1", "reviewed"), reviewer]);
+        assert_eq!(current.len(), 1);
+        assert_eq!(current[0].run_id, "1");
+        assert_eq!(current[0].title, "An agent review is ready");
+        assert!(!current[0].attention);
     }
     #[test]
     fn latest_attempt_and_question_identity_drive_attention() {

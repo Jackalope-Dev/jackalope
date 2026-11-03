@@ -352,6 +352,9 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
       {hasResult && !work.active.length && work.interfaceIssue && (
         <InlineNotice>{work.interfaceIssue}</InlineNotice>
       )}
+      {task.delivery?.held && !task.delivery.appliedAt && (
+        <InlineNotice>Not merged automatically. {task.delivery.held}</InlineNotice>
+      )}
       {notice && (
         <InlineNotice
           tone="success"

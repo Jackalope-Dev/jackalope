@@ -3,6 +3,10 @@
 // added workflow guidance slowing native agents without improving outcomes.
 const CORE: &str = "Jackalope task context: Use the assigned workspace; preserve user intent, existing work and repository instructions. Leave changes uncommitted; do not merge, push or delete the workspace. Permission denials prohibit retries or bypasses; continue independent authorized work. Use the supplied question tool for blocking decisions and retrieve the answer. Do not weaken tests to fit a change. Report the outcome, changed files, checks actually performed and unresolved issues. If files changed, end with: Commit message: <imperative summary of actual changes>.\n";
 
+/// Shell-scripted edits bypass the per-file permission check and edit tracking, and a
+/// captured screenshot is evidence only once it has been compared with the request.
+const EVIDENCE: &str = "Change files with the edit and write tools, not shell scripts or heredocs, so Jackalope can check and track each edit. Before reporting visual work as done, compare your screenshots with the request.\n";
+
 const WORKFLOW_GUIDANCE: &str = "Use supplied context, batch independent reads, and expand investigation when needed. Complete implementation before batching required checks, except when repository instructions or a necessary diagnostic require an earlier check. Recheck changed code or failed checks; preserve successful unchanged evidence. Keep small or coupled tasks with one agent; delegate only permitted independent work whose benefit exceeds coordination and duplicate context costs.\n";
 
 /// `JACKALOPE_SCOPE_GUARD=on` restores the workflow and scope guidance for comparison runs.
@@ -12,21 +16,31 @@ pub(super) fn workflow_guidance() -> bool {
 
 pub(super) const SCOPE_GUIDANCE: &str = "\nSeparate required outcomes from suggested implementation options. Choose the smallest complete change that meets the requirements and preserves existing contracts. Add persistence, new abstractions, dependency changes or unrelated defaults only when the task requires them. Inspect existing regression coverage; do not weaken tests to fit a patch. Read relevant symbols/ranges first, expanding to callers and full files when needed. Select checks that cover the changed behavior and its dependents, plus every user/repository-required check. A necessary early reproduction is useful; repeated unchanged full builds are not. Before finishing, inspect the final diff for scope and compatibility regressions and state any unverified requirements.\n";
 
+/// One line: Claude receives this as a command-line argument, and Windows refuses to pass
+/// an argument containing a line break to a `.cmd` shim.
 pub(super) fn lean_preamble() -> String {
+    let core = format!("{} {EVIDENCE}", CORE.trim_end());
     if workflow_guidance() {
-        format!("{CORE}{WORKFLOW_GUIDANCE}")
+        format!("{core}{WORKFLOW_GUIDANCE}")
     } else {
-        CORE.to_owned()
+        core
     }
 }
 
 pub(super) fn preamble() -> String {
-    format!("Jackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. For clarification use the supplied Jackalope question tool and retrieve the answer. Respect permission denials: do not repeat or bypass the denied action. Continue independent authorized work when useful and report what remains blocked.\n{}{}\nJackalope manages commits and attribution. Leave changes uncommitted. If files changed, end your result with: Commit message: <imperative summary of the actual changes>.\n", super::efficiency::INSTRUCTIONS, super::delegation::INSTRUCTIONS)
+    format!("Jackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. For clarification use the supplied Jackalope question tool and retrieve the answer. Respect permission denials: do not repeat or bypass the denied action. Continue independent authorized work when useful and report what remains blocked.\n{EVIDENCE}{}{}\nJackalope manages commits and attribution. Leave changes uncommitted. If files changed, end your result with: Commit message: <imperative summary of the actual changes>.\n", super::efficiency::INSTRUCTIONS, super::delegation::INSTRUCTIONS)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_default_preamble_is_one_line_for_windows_cmd_shims() {
+        let preamble = lean_preamble();
+        assert!(!preamble.trim_end().contains(['\n', '\r']), "{preamble}");
+        assert!(preamble.contains("edit and write tools"));
+    }
 
     #[test]
     fn initial_tools_require_a_complete_small_successful_catalog() {

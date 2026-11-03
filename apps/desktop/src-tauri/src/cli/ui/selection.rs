@@ -63,7 +63,7 @@ fn selected_text(screen: &Buffer, selection: &Selection) -> String {
 impl App {
     /// Selection by dragging, the way a terminal would, then copying on release.
     pub(super) fn select(&mut self, mouse: MouseEvent) {
-        if self.picker.is_some() {
+        if self.picker.is_some() && !self.picker_docked() {
             return;
         }
         let at = (mouse.column, mouse.row);
@@ -132,6 +132,7 @@ impl App {
                 self.slash = 0;
             }
             Some(Click::Tab(index)) => self.jump_session(index),
+            Some(Click::CloseTab(index)) => self.close_tab(index),
             None => {}
         }
     }

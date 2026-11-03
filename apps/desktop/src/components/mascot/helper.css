@@ -139,7 +139,11 @@
 }
 /* Shared controls keep their own focus styles. */
 .companion-panel
-:is(button, textarea, input, summary):not(.ui-button, .ui-segment, .ui-tabs-trigger):focus-visible {
+  :is(button, textarea, input, summary):not(
+    .ui-button,
+    .ui-segment,
+    .ui-tabs-trigger
+  ):focus-visible {
   outline: 2px solid var(--color-accent-ink);
   outline-offset: 2px;
 }

@@ -1,0 +1,35 @@
+{
+  "name": "@jackalope/mobile",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"scripts/*.test.mjs\"",
+    "tauri": "tauri",
+    "icon:generate": "node scripts/generate-icon.mjs && tauri icon src-tauri/icons/source-icon.png"
+  },
+  "dependencies": {
+    "@jackalope/brand": "workspace:*",
+    "@jackalope/ui": "workspace:*",
+    "@tauri-apps/api": "~2.12.4",
+    "@tauri-apps/plugin-barcode-scanner": "~2.5.3",
+    "lucide-react": "^1.46.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@tailwindcss/vite": "^4.0.9",
+    "@tauri-apps/cli": "~2.12.4",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^6.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3"
+  }
+}

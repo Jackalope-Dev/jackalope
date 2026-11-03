@@ -29,7 +29,9 @@ patterns=(
 )
 
 for p in "${patterns[@]}"; do
-  if printf '%s' "$cmd" | grep -qiE "$p"; then
+  # A key starts a token, so identifiers that merely contain a prefix, such as
+  # `here_documents_...` or `task-...`, are not mistaken for one.
+  if printf '%s' "$cmd" | grep -qiE "(^|[^A-Za-z0-9_])$p"; then
     echo "BLOCKED: this command appears to contain a live credential (matched /$p/)." >&2
     echo "Do not pass secrets on the command line. Put it in .env.local or the deploy" >&2
     echo "dashboard and reference it by variable. If this is a false positive, run the" >&2

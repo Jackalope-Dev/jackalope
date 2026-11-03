@@ -19,6 +19,121 @@ mod tests {
     use super::super::agreement_tests::Repo;
     use super::*;
 
+    /// Commits `policy` to the target branch, verifies one task that writes
+    /// `file`, and runs automatic merging once.
+    fn merge_under_policy(
+        policy: &str,
+        file: &str,
+        prepare: fn(&mut TaskRun),
+    ) -> (ReconciliationJob, bool, TaskRun) {
+        let repo = Repo::new();
+        repo.git(&["config", "user.name", "Fixture"]);
+        repo.git(&["config", "user.email", "fixture@example.invalid"]);
+        std::fs::write(
+            repo.root.join(".git/info/exclude"),
+            "/source/\n/history/\n/queue/\n/snapshots/\n",
+        )
+        .unwrap();
+        std::fs::create_dir(repo.root.join(".jackalope")).unwrap();
+        std::fs::write(repo.root.join(".jackalope/autonomy.json"), policy).unwrap();
+        repo.git(&["add", ".jackalope"]);
+        repo.git(&["commit", "-m", "Autonomy policy"]);
+        let mut run = repo.run("source");
+        run.target_branch = Some("main".into());
+        let path = PathBuf::from(&run.workspace).join(file);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, "verified change\n").unwrap();
+        let directory = repo.root.join("snapshots");
+        std::fs::create_dir(&directory).unwrap();
+        let tree = integration::workspace_tree(&run, &directory).unwrap();
+        run.verify_command = Some("fixture check".into());
+        run.verification = Some(serde_json::from_value(serde_json::json!({"command":"fixture check","checkedAt":"2026-11-02T12:00:00Z","tree":tree,"result":{"success":true,"exitCode":0,"stdout":"","stderr":"","durationMs":1,"timedOut":false,"truncated":false}})).unwrap());
+        prepare(&mut run);
+        let history = repo.root.join("history");
+        std::fs::create_dir(&history).unwrap();
+        std::fs::write(
+            history.join(format!("{}.json", run.id)),
+            serde_json::to_vec(&run).unwrap(),
+        )
+        .unwrap();
+        let runtime = TaskRuntime::with_test_access(history).unwrap();
+        let service = Coordinator::new(repo.root.join("queue"), runtime).unwrap();
+        let mut inner = service.inner.lock().unwrap();
+        let _guard = integration::execution_guard().unwrap();
+        inner.ledger.assist_policies.push(AssistPolicy {
+            project_id: "p".into(),
+            project_name: "Fixture".into(),
+            project_path: repo.root.to_string_lossy().into(),
+            agent: "auto".into(),
+            verify_command: "fixture check".into(),
+            resolve: false,
+            merge: true,
+        });
+        inner.enabled.insert("p".into());
+        assert!(service
+            .assist_locked(&mut inner, &[run.clone()], &[], "http://fixture")
+            .unwrap());
+        let saved = service
+            .runtime
+            .integration_runs()
+            .unwrap()
+            .into_iter()
+            .find(|saved| saved.id == run.id)
+            .unwrap();
+        (
+            inner.ledger.reconciliations[0].clone(),
+            repo.root.join(file).exists(),
+            saved,
+        )
+    }
+
+    #[test]
+    fn the_autonomy_policy_decides_which_verified_work_merges_automatically() {
+        let none = |_: &mut TaskRun| {};
+        let policy = r#"{"version":1,"rules":[{"paths":["docs/**"],"level":"merge"}]}"#;
+        let (job, merged, _) = merge_under_policy(policy, "docs/guide.md", none);
+        assert_eq!(job.status, "merged");
+        assert!(job.held.is_none());
+        assert!(merged);
+        let (job, merged, _) = merge_under_policy(policy, "src/app.rs", none);
+        assert_eq!(job.status, "review");
+        assert!(job.held.as_deref().unwrap().contains("src/app.rs"));
+        assert!(!merged);
+        let (job, merged, _) = merge_under_policy("{", "docs/guide.md", none);
+        assert_eq!(job.status, "review");
+        assert!(job.held.as_deref().unwrap().contains("Held for review"));
+        assert!(!merged);
+    }
+
+    #[test]
+    fn the_autonomy_policy_can_accept_outcomes_an_agent_proved() {
+        let proven = |run: &mut TaskRun| {
+            run.contract.requirements.push(serde_json::from_value(serde_json::json!({"id":"requirement-0","title":"Saves drafts","checkpoint":false,"receipt":null})).unwrap());
+            run.validation_steps.push(serde_json::from_value(serde_json::json!({"id":"step","step":"final","status":"passed","timestamp":"2026-11-02T11:59:00Z","requirements":[{"requirementId":"requirement-0","status":"met","summary":"Drafts save","checkedLevel":"ran"}]})).unwrap());
+        };
+        // Without outcome acceptance in the policy, a person still accepts it.
+        let (job, merged, run) = merge_under_policy(
+            r#"{"version":1,"default":"merge"}"#,
+            "docs/guide.md",
+            proven,
+        );
+        assert_eq!(job.status, "review");
+        assert!(job.held.as_deref().unwrap().contains("Saves drafts"));
+        assert!(!merged);
+        assert!(run.contract.requirements[0].receipt.is_none());
+        let (job, merged, run) = merge_under_policy(
+            r#"{"version":1,"default":"merge","acceptOutcomes":"evidence"}"#,
+            "docs/guide.md",
+            proven,
+        );
+        assert_eq!(job.status, "merged", "{:?}", job.held);
+        assert!(merged);
+        let receipt = run.contract.requirements[0].receipt.as_ref().unwrap();
+        assert!(receipt.accepted);
+        assert_eq!(receipt.evidence, "report:step");
+        assert!(receipt.note.contains("autonomy policy"));
+    }
+
     #[test]
     fn automatic_merge_requires_opt_in_current_checks_and_fresh_scope_audit() {
         let repo = Repo::new();
@@ -123,6 +238,9 @@ pub struct ReconciliationJob {
     pub plan_id: Option<String>,
     pub status: String,
     pub error: Option<String>,
+    /// Why the project's autonomy policy kept an automatic merge in review.
+    #[serde(default)]
+    pub held: Option<String>,
 }
 
 #[tauri::command]
@@ -317,6 +435,7 @@ impl Coordinator {
                 plan_id: None,
                 status: "reserved".into(),
                 error: None,
+                held: None,
             };
             let directory = self.runtime.integration_directory();
             std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
@@ -326,6 +445,35 @@ impl Coordinator {
                 })
             }) {
                 continue;
+            }
+            let fresh;
+            let mut runs = runs;
+            if policy.merge && !needs_resolution {
+                let project = std::path::Path::new(&policy.project_path);
+                if let Some(head) = selected[0]
+                    .target_branch
+                    .as_deref()
+                    .and_then(|branch| super::autonomy::branch_head(project, branch).ok())
+                {
+                    if let Some(reason) = super::autonomy::accept_before_merge(
+                        &self.runtime,
+                        &directory,
+                        project,
+                        &head,
+                        runs,
+                        &ids,
+                    ) {
+                        job.status = "review".into();
+                        job.held = Some(reason);
+                        let mut ledger = inner.ledger.clone();
+                        ledger.reconciliations.push(job);
+                        self.save_assist(inner, ledger)?;
+                        return Ok(true);
+                    }
+                    // Reload: the policy may have just recorded outcome acceptance.
+                    fresh = self.runtime.integration_runs()?;
+                    runs = &fresh;
+                }
             }
             let prepared = if !needs_resolution {
                 Some(integration::prepare_with_message(
@@ -492,6 +640,39 @@ impl Coordinator {
         }) {
             return Err("A new interface decision needs reconciliation. Review and retry.".into());
         }
+        let fresh;
+        let mut runs = runs;
+        if policy.merge && job.plan_id.is_none() {
+            let project = std::path::Path::new(&policy.project_path);
+            if let Some(head) = runs
+                .iter()
+                .find(|run| ids.contains(&run.id))
+                .and_then(|run| run.target_branch.as_deref())
+                .and_then(|branch| super::autonomy::branch_head(project, branch).ok())
+            {
+                if let Some(reason) = super::autonomy::accept_before_merge(
+                    &self.runtime,
+                    &directory,
+                    project,
+                    &head,
+                    runs,
+                    &ids,
+                ) {
+                    let mut ledger = inner.ledger.clone();
+                    let saved = ledger
+                        .reconciliations
+                        .iter_mut()
+                        .find(|j| j.id == job.id)
+                        .unwrap();
+                    saved.status = "review".into();
+                    saved.held = Some(reason);
+                    return self.save_assist(inner, ledger);
+                }
+                // Reload: the policy may have just recorded outcome acceptance.
+                fresh = self.runtime.integration_runs()?;
+                runs = &fresh;
+            }
+        }
         let plan = if let Some(id) = &job.plan_id {
             integration::load(&directory, id)?
         } else {
@@ -521,8 +702,23 @@ impl Coordinator {
             .iter_mut()
             .find(|j| j.id == job.id)
             .unwrap();
+        // A plan already being applied was cleared by the policy before it started.
+        let held = if policy.merge && plan.status == "ready" {
+            match plan.integration_head.as_deref() {
+                Some(head) => super::autonomy::hold_reason(
+                    std::path::Path::new(&plan.project_path),
+                    &plan.master_head,
+                    head,
+                ),
+                None => Some("The combined result has no commit to check against the autonomy policy. Held for review.".into()),
+            }
+        } else {
+            None
+        };
+        let merge = policy.merge && held.is_none();
         saved.plan_id = Some(plan.id.clone());
-        saved.status = if policy.merge { "applying" } else { "review" }.into();
+        saved.status = if merge { "applying" } else { "review" }.into();
+        saved.held = held;
         // Save the revised decision versions together with the merge receipt for restart.
         saved.agreement_revisions = job
             .agreement_revisions
@@ -552,7 +748,7 @@ impl Coordinator {
             }
         }
         self.save_assist(inner, ledger)?;
-        if policy.merge {
+        if merge {
             integration::apply(&directory, runs, &plan.id)?;
             let mut ledger = inner.ledger.clone();
             ledger

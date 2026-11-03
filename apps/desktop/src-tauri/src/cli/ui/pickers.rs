@@ -225,7 +225,24 @@ pub fn usable(agent: &AgentStatus) -> bool {
 }
 
 impl App {
+    /// Whether the open picker is docked in the input's place, leaving the
+    /// conversation to scroll and select as usual.
+    pub(super) fn picker_docked(&self) -> bool {
+        self.picker
+            .as_ref()
+            .is_some_and(|picker| picker.kind == PickerKind::Question)
+    }
+
     pub(super) fn picker_key(&mut self, key: KeyEvent) {
+        if self.picker_docked() && matches!(key.code, KeyCode::PageUp | KeyCode::PageDown) {
+            let page = super::keys::page(self.body_area.get().height);
+            self.scroll(if key.code == KeyCode::PageUp {
+                page
+            } else {
+                -page
+            });
+            return;
+        }
         let Some(picker) = self.picker.as_mut() else {
             return;
         };
@@ -312,7 +329,7 @@ impl App {
                 if self.pending_deviation().is_some() {
                     self.open_picker(kind);
                 } else {
-                    self.note("The deviation was decided elsewhere.");
+                    self.flash("The deviation was decided elsewhere", Tone::Muted);
                 }
             }
             _ => {}
@@ -465,7 +482,7 @@ impl App {
                 if subject == self.picker_subject(PickerKind::Deviation) {
                     self.resolve_deviation(action);
                 } else {
-                    self.note("That deviation was already decided.");
+                    self.flash("That deviation was already decided", Tone::Muted);
                 }
             }
             Action::Learning(learning) => self.open_learning_actions(learning),
@@ -529,16 +546,19 @@ impl App {
                         .cloned()
                         .collect();
                     if chosen.is_empty() {
-                        self.note("Tick at least one option with Space, then send.");
+                        self.flash(
+                            "Tick at least one option with Space, then send",
+                            Tone::Warning,
+                        );
                         self.open_picker(PickerKind::Question);
                     } else {
                         let text = serde_json::to_string(&chosen).unwrap_or_default();
                         self.answer_to(&prompt, text);
                     }
                 }
-                _ => self.note("That question was already answered."),
+                _ => self.flash("That question was already answered", Tone::Muted),
             },
-            Action::TypeAnswer => self.note("Type your answer and press Enter."),
+            Action::TypeAnswer => self.flash("Type your answer and press Enter", Tone::Muted),
             Action::Recall(entry) => {
                 self.editor.set(entry);
                 self.history_index = None;
@@ -1146,14 +1166,30 @@ impl App {
                         action: Action::TypeAnswer,
                     });
                 }
+                let stopped = question
+                    .as_ref()
+                    .is_some_and(|question| self.ended_on(question).is_some());
                 (
                     question
                         .map(|question| {
-                            if question.multi_select {
+                            let mut title = if question.multi_select {
                                 format!("{} · Space ticks, Enter sends", question.question)
                             } else {
                                 question.question
+                            };
+                            // Why the answer matters, beneath the question.
+                            for line in question.rationale.into_iter().chain(
+                                question.why_ask.map(|why| format!("Why ask: {why}")),
+                            ) {
+                                title.push('\n');
+                                title.push_str(&line);
                             }
+                            if stopped {
+                                title.push_str(
+                                    "\nThe agent stopped first · your answer continues the conversation",
+                                );
+                            }
+                            title
                         })
                         .unwrap_or_else(|| "Question".into()),
                     items,

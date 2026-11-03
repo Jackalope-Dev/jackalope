@@ -1,10 +1,18 @@
 fn main() {
     let root = std::path::PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap());
+    // Tauri embeds `frontendDist` at compile time. Debug checks and tests of a
+    // fresh worktree do not need the built frontend, so an empty one stands in;
+    // release builds still require `pnpm build` (tauri build runs it).
+    let frontend = root.join("../dist");
+    if std::env::var("PROFILE").as_deref() == Ok("debug") && !frontend.exists() {
+        std::fs::create_dir_all(&frontend).unwrap();
+        println!("cargo:warning=apps/desktop/dist was missing; created it empty. Run pnpm build for a working window.");
+    }
     let package = root.join("../../../node_modules/agent-browser");
     let metadata = std::fs::read_to_string(package.join("package.json"))
         .expect("Run pnpm install --frozen-lockfile before building Jackalope");
     assert!(
-        metadata.contains("\"version\": \"0.38.1\""),
+        metadata.contains("\"version\": \"0.40.0\""),
         "Unexpected agent-browser version"
     );
     let target = std::env::var("TARGET").unwrap();

@@ -1,0 +1,35 @@
+[package]
+name = "jackalope-companion"
+version = "0.1.0"
+description = "Jackalope companion for Android and iOS"
+authors = ["Jackalope Contributors"]
+edition = "2021"
+license = "Apache-2.0"
+rust-version = "1.98"
+
+[lib]
+name = "jackalope_companion_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "~2.12", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "2"
+# Mozilla's roots instead of the platform verifier, which needs extra Java setup on Android.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-webpki-roots"] }
+
+# Phone debug builds ship every native library inside the APK; full debug info makes it
+# hundreds of megabytes, too large for an emulator's default storage.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+# Pairing scans the QR code the desktop shows. Phones only; the 2.5 line matches Tauri 2.12.
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+tauri-plugin-barcode-scanner = "~2.5"

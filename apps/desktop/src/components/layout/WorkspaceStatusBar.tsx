@@ -77,7 +77,7 @@ export function WorkspaceStatusBar({
           type="button"
           onClick={() => {
             setTerminalError('');
-            void openCliTerminal(project.path).catch((cause) =>
+            void openCliTerminal(checkout).catch((cause) =>
               setTerminalError(typeof cause === 'string' ? cause : String(cause)),
             );
           }}

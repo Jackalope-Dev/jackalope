@@ -9,7 +9,7 @@ use crate::ui::pickers::{Picker, PickerKind};
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::widgets::{Block, Borders, Clear, Padding, Paragraph, Wrap};
 use ratatui::Frame;
 
 /// The first row to show so `selected` stays in a window of `rows`.
@@ -133,7 +133,7 @@ pub fn mention_menu(frame: &mut Frame, mentions: &[Mention], selected: usize, in
 
 /// The command menu, floating just above the input like an editor's completions.
 pub fn slash_menu(frame: &mut Frame, matches: &[(&str, &str)], selected: usize, input: Rect) {
-    let accent = Style::default().fg(brand::accent());
+    let accent = Style::default().fg(brand::command());
     let muted = Style::default().fg(brand::muted());
     let rows = matches.len().min(8);
     let selected = selected.min(matches.len() - 1);
@@ -185,7 +185,7 @@ pub fn slash_menu(frame: &mut Frame, matches: &[(&str, &str)], selected: usize, 
     frame.render_widget(
         Paragraph::new(lines).block(frame_block(
             Span::styled(" ↑↓ choose · Tab complete · Enter run ", muted),
-            muted,
+            Style::default().fg(brand::command()),
             position,
         )),
         area,
@@ -193,9 +193,6 @@ pub fn slash_menu(frame: &mut Frame, matches: &[(&str, &str)], selected: usize, 
 }
 
 pub fn picker(frame: &mut Frame, picker: &Picker, area: Rect) {
-    let accent = Style::default().fg(brand::accent());
-    let muted = Style::default().fg(brand::muted());
-    let shown = picker.shown();
     let width = area
         .width
         .saturating_sub(4)
@@ -209,10 +206,15 @@ pub fn picker(frame: &mut Frame, picker: &Picker, area: Rect) {
     // the rows so nothing the user is deciding on is cut off.
     let mut title_lines = picker.title.lines();
     let heading = title_lines.next().unwrap_or_default().to_string();
-    let context: Vec<String> = title_lines
+    let context: Vec<Line<'static>> = title_lines
         .filter(|line| !line.trim().is_empty())
         .take(6)
-        .map(|line| brand::ellipsize(line, (width as usize).saturating_sub(6)))
+        .map(|line| {
+            Line::raw(format!(
+                "  {}",
+                brand::ellipsize(line, (width as usize).saturating_sub(6))
+            ))
+        })
         .collect();
     let context_rows = if context.is_empty() {
         0
@@ -220,7 +222,7 @@ pub fn picker(frame: &mut Frame, picker: &Picker, area: Rect) {
         context.len() as u16 + 1
     };
     let visible = (area.height.saturating_sub(10 + context_rows) as usize).clamp(3, 14);
-    let rows = shown.len().clamp(1, visible) as u16 + context_rows;
+    let rows = picker.shown().len().clamp(1, visible) as u16 + context_rows;
     let popup = Rect {
         x: area.x + (area.width.saturating_sub(width)) / 2,
         // Borders, the filter line and a spacer around the rows.
@@ -228,6 +230,126 @@ pub fn picker(frame: &mut Frame, picker: &Picker, area: Rect) {
         width,
         height: (rows + 4).min(area.height),
     };
+    let title = Span::styled(
+        format!(
+            " {} ",
+            brand::ellipsize(&heading, (width as usize).saturating_sub(6))
+        ),
+        Style::default()
+            .fg(brand::accent())
+            .add_modifier(Modifier::BOLD),
+    );
+    let lines = picker_lines(picker, context, width, visible);
+    frame.render_widget(Clear, popup);
+    frame.render_widget(
+        Paragraph::new(lines).block(picker_block(picker, title, visible)),
+        popup,
+    );
+}
+
+/// The question picker docked where the input sits, across its full width,
+/// so the conversation above stays in view while you choose. Its whole title
+/// wraps inside rather than being cut to fit the border.
+pub struct Docked {
+    context: Vec<Line<'static>>,
+    context_rows: u16,
+    visible: usize,
+}
+
+impl Docked {
+    /// Lays the picker out `width` columns wide in at most `most` rows.
+    pub fn new(picker: &Picker, width: u16, most: u16) -> Self {
+        // Borders and a column of padding each side, so wrapped lines align.
+        let inner = width.saturating_sub(4);
+        let mut lines = picker.title.lines().filter(|line| !line.trim().is_empty());
+        let mut context = Vec::new();
+        if let Some(heading) = lines.next() {
+            context.push(Line::styled(
+                heading.to_string(),
+                Style::default().add_modifier(Modifier::BOLD),
+            ));
+        }
+        context.extend(
+            lines
+                .take(6)
+                .map(|line| Line::styled(line.to_string(), Style::default().fg(brand::muted()))),
+        );
+        // At most half the room for the question, so its options still show.
+        let mut context_rows = 0;
+        let mut kept = 0;
+        for line in &context {
+            let rows = super::transcript::rows(line, inner) as u16;
+            if kept > 0 && context_rows + rows > most / 2 {
+                break;
+            }
+            context_rows += rows;
+            kept += 1;
+        }
+        context.truncate(kept);
+        if !context.is_empty() {
+            context.push(Line::raw(""));
+            context_rows += 1;
+        }
+        let room = most.saturating_sub(context_rows + 4) as usize;
+        let visible = picker.shown().len().clamp(1, room.clamp(3, 14));
+        Self {
+            context,
+            context_rows,
+            visible,
+        }
+    }
+
+    /// Rows the dock takes: borders, the question, the filter line, a spacer
+    /// and the options.
+    pub fn height(&self) -> u16 {
+        self.context_rows + self.visible as u16 + 4
+    }
+
+    pub fn draw(self, frame: &mut Frame, picker: &Picker, area: Rect) {
+        let warning = Style::default().fg(brand::warning());
+        let title = Span::styled(" ? Question ", warning.add_modifier(Modifier::BOLD));
+        let lines = picker_lines(
+            picker,
+            self.context,
+            area.width.saturating_sub(2),
+            self.visible,
+        );
+        frame.render_widget(Clear, area);
+        frame.render_widget(
+            Paragraph::new(lines).wrap(Wrap { trim: false }).block(
+                picker_block(picker, title, self.visible)
+                    .border_style(warning)
+                    .padding(Padding::horizontal(1)),
+            ),
+            area,
+        );
+    }
+}
+
+fn picker_block(picker: &Picker, title: Span<'static>, visible: usize) -> Block<'static> {
+    let muted = Style::default().fg(brand::muted());
+    let shown = picker.shown().len();
+    let position = (shown > visible).then_some((picker.selected, shown));
+    let hint = match picker.kind {
+        PickerKind::Settings => " ↑↓ choose · Enter change · Esc close ",
+        PickerKind::Question => " ↑↓ choose · Enter answer · Esc type instead ",
+        _ => " ↑↓ choose · Enter select · Esc close ",
+    };
+    frame_block(title, Style::default().fg(brand::accent()), position)
+        .title_bottom(Line::styled(hint, muted))
+}
+
+/// A picker's lines inside its border, `width` columns wide: the context, the
+/// filter, then up to `visible` rows around the highlight.
+fn picker_lines(
+    picker: &Picker,
+    context: Vec<Line<'static>>,
+    width: u16,
+    visible: usize,
+) -> Vec<Line<'static>> {
+    let accent = Style::default().fg(brand::accent());
+    let muted = Style::default().fg(brand::muted());
+    let shown = picker.shown();
     let inner = width.saturating_sub(2) as usize;
     let first = window_start(picker.selected, visible);
     // Rows without details use the whole width; otherwise labels take up to
@@ -239,11 +361,8 @@ pub fn picker(frame: &mut Frame, picker: &Picker, area: Rect) {
         inner.saturating_sub(4)
     };
     let detail_width = inner.saturating_sub(label_width + 4);
-    let mut lines: Vec<Line> = context
-        .iter()
-        .map(|line| Line::raw(format!("  {line}")))
-        .collect();
-    if !lines.is_empty() {
+    let mut lines = context;
+    if !lines.is_empty() && lines.last().is_some_and(|line| line.width() > 0) {
         lines.push(Line::raw(""));
     }
     lines.push(Line::from(if picker.filter.is_empty() {
@@ -309,26 +428,7 @@ pub fn picker(frame: &mut Frame, picker: &Picker, area: Rect) {
             muted,
         ));
     }
-    let position = (shown.len() > visible).then_some((picker.selected, shown.len()));
-    let hint = if picker.kind == PickerKind::Settings {
-        " ↑↓ choose · Enter change · Esc close "
-    } else {
-        " ↑↓ choose · Enter select · Esc close "
-    };
-    let mut block = frame_block(
-        Span::styled(
-            format!(
-                " {} ",
-                brand::ellipsize(&heading, (width as usize).saturating_sub(6))
-            ),
-            accent.add_modifier(Modifier::BOLD),
-        ),
-        accent,
-        position,
-    );
-    block = block.title_bottom(Line::styled(hint, muted));
-    frame.render_widget(Clear, popup);
-    frame.render_widget(Paragraph::new(lines).block(block), popup);
+    lines
 }
 
 #[cfg(test)]
@@ -346,5 +446,56 @@ mod tests {
         assert_eq!(width, 10);
         assert_eq!(window_start(2, 8), 0);
         assert_eq!(window_start(12, 8), 5);
+    }
+
+    #[test]
+    fn a_docked_question_wraps_in_full_and_shows_every_option() {
+        use crate::ui::pickers::{Action, Item};
+        let question = "Which database should the new reporting service use for its \
+                        nightly aggregates, given the existing Postgres cluster?";
+        let picker = Picker {
+            kind: PickerKind::Question,
+            title: format!("{question}\nIt decides the migration plan."),
+            items: ["Postgres", "SQLite", "DuckDB"]
+                .iter()
+                .map(|label| Item {
+                    label: (*label).into(),
+                    detail: String::new(),
+                    action: Action::Dismiss,
+                })
+                .collect(),
+            filter: String::new(),
+            selected: 0,
+            subject: None,
+            checked: Vec::new(),
+        };
+        let area = Rect::new(0, 0, 50, 40);
+        let dock = Docked::new(&picker, area.width, area.height / 2);
+        let height = dock.height();
+        assert!(height <= area.height / 2, "{height}");
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(area.width, height)).unwrap();
+        terminal
+            .draw(|frame| dock.draw(frame, &picker, frame.area()))
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        let screen: String = (0..height)
+            .map(|y| {
+                (0..area.width)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let words: String = screen
+            .split(|c: char| c.is_whitespace() || c == '│')
+            .filter(|word| !word.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(words.contains("Postgres cluster?"), "{screen}");
+        assert!(words.contains("It decides the migration plan."), "{screen}");
+        for option in ["Postgres", "SQLite", "DuckDB"] {
+            assert!(screen.contains(option), "{screen}");
+        }
     }
 }

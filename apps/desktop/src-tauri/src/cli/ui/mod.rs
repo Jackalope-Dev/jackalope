@@ -19,6 +19,8 @@ mod drafts;
 mod editor;
 mod events;
 mod feed;
+#[cfg(all(test, unix))]
+mod harness;
 mod keys;
 mod pickers;
 mod plan;
@@ -37,7 +39,7 @@ use crossterm::event::{
 };
 use crossterm::terminal::SetTitle;
 use editor::Editor;
-use feed::{Entry, Tone};
+use feed::{Placed, Tone};
 use pickers::{Picker, PickerKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -82,6 +84,8 @@ enum Click {
     Type(&'static str),
     /// Shows the open conversation at this position in the tabs.
     Tab(usize),
+    /// Closes the tab at this position.
+    CloseTab(usize),
 }
 
 /// Something an `@` can name: an agent to hand the message to, or a file.
@@ -155,6 +159,11 @@ struct App {
     offered: HashSet<String>,
     /// Conversations opened in this terminal, kept as tabs once visited.
     opened: HashSet<String>,
+    /// The top bar with the project and tabs is hidden (`/tabs`, Ctrl+T).
+    top_bar_hidden: bool,
+    /// Conversations whose tab was closed, kept out of the tabs until opened
+    /// again or until they start needing you.
+    closed: HashSet<String>,
     history: Vec<String>,
     history_index: Option<usize>,
     files: Option<FileIndex>,
@@ -175,8 +184,8 @@ struct App {
     /// What the window title and bell last reflected.
     signalled: Option<Signal>,
     /// Jackalope's own lines — help, errors, confirmations and `!` output —
-    /// shown under the conversation and never sent to an agent.
-    feed: Vec<Entry>,
+    /// shown in the conversation they were added in and never sent to an agent.
+    feed: Vec<Placed>,
     shells: Vec<shell::Run>,
     /// A short confirmation in the status line, such as "Copied".
     flash: Option<(String, Tone, Instant)>,
@@ -244,69 +253,7 @@ pub fn run(
     events::spawn_ticker(events.clone());
     let refresher = refresh::spawn(handshake.clone(), events.clone());
 
-    let mut app = App {
-        connection,
-        events,
-        refresher,
-        branch: git::branch(&project.path),
-        handshake,
-        project,
-        session,
-        context: 0,
-        view: None,
-        view_version: 0,
-        sessions: Vec::new(),
-        projects: Vec::new(),
-        overview: None,
-        overview_asked: (Instant::now(), true),
-        offline: None,
-        problem: None,
-        attribution: None,
-        picker: None,
-        slash: 0,
-        editor: Editor::default(),
-        next_agent: next.agent,
-        next_model: next.model,
-        offered: HashSet::new(),
-        opened: HashSet::new(),
-        history: history::load(),
-        history_index: None,
-        files: None,
-        indexing: None,
-        sharpening: false,
-        sharpen_undo: None,
-        mention_cache: RefCell::new(None),
-        mention_closed: false,
-        stop_armed: None,
-        suspend: false,
-        signalled: None,
-        feed: Vec::new(),
-        shells: Vec::new(),
-        flash: None,
-        work_started: None,
-        last_progress: None,
-        changes: Vec::new(),
-        changes_version: 0,
-        panel: changes::Panel::default(),
-        selection: None,
-        screen: None,
-        body_area: Cell::new(Rect::default()),
-        input_width: Cell::new(1),
-        scroll_top: None,
-        max_scroll: Cell::new(0),
-        transcript: RefCell::new(None),
-        hits: RefCell::new(Vec::new()),
-        hover: None,
-        draft_sync: None,
-        intro: Cell::new(None),
-        last_run_took: None,
-        tick: 0,
-        tip_index: 0,
-        last_tip_change: Instant::now(),
-        plan: None,
-        plan_edit: false,
-        quit: false,
-    };
+    let mut app = App::new(connection, project, session, next, events, refresher);
     // The first read happens here rather than on the refresher, so the
     // conversation is on screen from the first frame.
     app.refresh_now();
@@ -329,6 +276,86 @@ pub fn run(
         println!("Conversation continues in Jackalope. Rejoin with: jackalope attach {id}");
     }
     result
+}
+
+impl App {
+    /// The view's state before its first read, sending what it starts to
+    /// `events` and refreshes to `refresher`.
+    fn new(
+        connection: Connection,
+        project: Project,
+        session: Option<String>,
+        next: NextStart,
+        events: Sender<Event>,
+        refresher: Sender<refresh::Request>,
+    ) -> Self {
+        let handshake = connection.handshake().clone();
+        App {
+            connection,
+            events,
+            refresher,
+            branch: git::branch(&project.path),
+            handshake,
+            project,
+            session,
+            context: 0,
+            view: None,
+            view_version: 0,
+            sessions: Vec::new(),
+            projects: Vec::new(),
+            overview: None,
+            overview_asked: (Instant::now(), true),
+            offline: None,
+            problem: None,
+            attribution: None,
+            picker: None,
+            slash: 0,
+            editor: Editor::default(),
+            next_agent: next.agent,
+            next_model: next.model,
+            offered: HashSet::new(),
+            opened: HashSet::new(),
+            closed: HashSet::new(),
+            top_bar_hidden: feed::top_bar_hidden(),
+            history: history::load(),
+            history_index: None,
+            files: None,
+            indexing: None,
+            sharpening: false,
+            sharpen_undo: None,
+            mention_cache: RefCell::new(None),
+            mention_closed: false,
+            stop_armed: None,
+            suspend: false,
+            signalled: None,
+            feed: Vec::new(),
+            shells: Vec::new(),
+            flash: None,
+            work_started: None,
+            last_progress: None,
+            changes: Vec::new(),
+            changes_version: 0,
+            panel: changes::Panel::default(),
+            selection: None,
+            screen: None,
+            body_area: Cell::new(Rect::default()),
+            input_width: Cell::new(1),
+            scroll_top: None,
+            max_scroll: Cell::new(0),
+            transcript: RefCell::new(None),
+            hits: RefCell::new(Vec::new()),
+            hover: None,
+            draft_sync: None,
+            intro: Cell::new(None),
+            last_run_took: None,
+            tick: 0,
+            tip_index: 0,
+            last_tip_change: Instant::now(),
+            plan: None,
+            plan_edit: false,
+            quit: false,
+        }
+    }
 }
 
 /// Turns on what the interface relies on beyond raw mode, returning whether
@@ -387,7 +414,10 @@ impl App {
         }
         // Coming back to the start screen plays the wordmark's sweep again.
         self.intro.set(None);
-        self.opened.extend(session.clone());
+        if let Some(id) = &session {
+            self.opened.insert(id.clone());
+            self.closed.remove(id);
+        }
         self.session = session;
         self.set_view(None);
         self.context += 1;
@@ -419,6 +449,7 @@ impl App {
         if !unchanged {
             self.view_version += 1;
         }
+        self.settle_feed();
     }
 
     /// Switches to another project with no conversation open.

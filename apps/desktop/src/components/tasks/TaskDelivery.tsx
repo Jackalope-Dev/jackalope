@@ -2,10 +2,13 @@ import { DefinitionList, Disclosure, DisclosureSummary, DropdownMenu as Menu } f
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { mergeDestination } from '../../lib/task-workflow';
 import { openExternalUrl } from '../../lib/tauri-bridge';
+import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { CreatePullRequest } from './CreatePullRequest';
+import { LocalDelivery } from './LocalDelivery';
 
 interface DeliveryStatus {
   head: string;
@@ -74,6 +77,15 @@ export function TaskDelivery({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [created, setCreated] = useState('');
+  const [landed, setLanded] = useState('');
+  const project = useProjectStore((state) => state.projects.find((p) => p.id === run.projectId));
+  const target = run.targetBranch?.trim() || mergeDestination(run, project);
+  const path = (value: string) => value.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
+  // Worktree tasks merge through the integration above; these worked in the project checkout.
+  const inCheckout = !!run.workspace && path(run.workspace) === path(run.projectPath);
+  const onTarget = inCheckout && run.branch === target;
+  const mergeable =
+    inCheckout && !integrated && !!run.branch && !onTarget && target !== mergeDestination({});
   const inspect = async (remote: boolean) => {
     setBusy(true);
     setError('');
@@ -102,7 +114,31 @@ export function TaskDelivery({
   return (
     <section className="task-delivery space-y-4" aria-label="Delivery">
       <div className="flex flex-wrap gap-2">
-        {!status?.pullRequest && (
+        {onTarget && !integrated && (
+          <LocalDelivery
+            run={run}
+            target={target}
+            mode="commit"
+            disabled={busy || isActive(run)}
+            onDone={(summary) => {
+              setLanded(summary);
+              void inspect(false);
+            }}
+          />
+        )}
+        {mergeable && (
+          <LocalDelivery
+            run={run}
+            target={target}
+            mode="merge"
+            disabled={busy || isActive(run)}
+            onDone={(summary) => {
+              setLanded(summary);
+              void inspect(false);
+            }}
+          />
+        )}
+        {!status?.pullRequest && !onTarget && (
           <CreatePullRequest
             run={run}
             disabled={busy || isActive(run)}
@@ -245,6 +281,7 @@ export function TaskDelivery({
       )}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       <div className="space-y-2">
+        {landed && <InlineNotice tone="success">{landed}</InlineNotice>}
         {created && (
           <InlineNotice
             tone="success"

@@ -111,6 +111,9 @@ export interface PlanView {
   changes: SectionChange[];
   questions: PendingUserPrompt[];
   plannerRunId: string | null;
+  /** The agent and model that implement the plan once approved. */
+  agent: string;
+  model: string | null;
   approval: {
     revision: number;
     hash: string;
@@ -185,7 +188,8 @@ export const planCommands = {
     hash: string,
     shape: PlanShape,
     checks?: { verifyCommand?: string; prepareCommand?: string; setupFiles?: string[] },
-  ) => nativeTask<void>('plan_approve', { id, revision, hash, shape, checks }),
+    reviewer?: string,
+  ) => nativeTask<void>('plan_approve', { id, revision, hash, shape, checks, reviewer }),
   replan: (id: string, comments: string) => nativeTask<void>('plan_replan', { id, comments }),
   resolveDeviation: (id: string, deviationId: string, action: 'accept' | 'redo' | 'replan') =>
     nativeTask<void>('plan_resolve_deviation', { id, deviationId, action }),

@@ -1,0 +1,636 @@
+.swarm-map {
+  --swarm-queued: var(--color-text-muted);
+  --swarm-working: var(--color-accent);
+  --swarm-checking: var(--color-warning);
+  --swarm-ready: var(--color-success);
+  --swarm-attention: var(--color-danger);
+  --swarm-merged: var(--color-text-secondary);
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.swarm-map [data-phase="queued"] {
+  --swarm-phase: var(--swarm-queued);
+}
+.swarm-map [data-phase="working"] {
+  --swarm-phase: var(--swarm-working);
+}
+.swarm-map [data-phase="checking"] {
+  --swarm-phase: var(--swarm-checking);
+}
+.swarm-map [data-phase="ready"] {
+  --swarm-phase: var(--swarm-ready);
+}
+.swarm-map [data-phase="attention"] {
+  --swarm-phase: var(--swarm-attention);
+}
+.swarm-map [data-phase="merged"] {
+  --swarm-phase: var(--swarm-merged);
+}
+
+/* Stage counts: one joined card, each stage filters the map. */
+.swarm-stream {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+}
+
+.swarm-stage {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 0;
+  border-left: 1px solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+.swarm-stage:first-child {
+  border-left: 0;
+}
+
+.swarm-stage:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.swarm-stage[aria-pressed="true"] {
+  background: var(--color-accent-subtle);
+}
+
+.swarm-stage:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
+.swarm-stage:disabled {
+  cursor: default;
+}
+
+.swarm-stage strong {
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.swarm-stage:disabled strong {
+  color: var(--color-text-muted);
+}
+
+.swarm-stage span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swarm-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--swarm-phase);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--swarm-phase) 20%, transparent);
+}
+
+.swarm-map-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.swarm-map-body[data-selected] {
+  grid-template-columns: minmax(0, 1fr) 17rem;
+}
+
+.swarm-canvas {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-2xl);
+  background:
+    radial-gradient(
+      ellipse at 50% 50%,
+      color-mix(in srgb, var(--color-accent) 12%, transparent) 0%,
+      transparent 60%
+    ),
+    radial-gradient(circle, var(--color-border-subtle) 1px, transparent 1.4px) 0 0 / 22px 22px,
+    var(--color-surface-sunken);
+}
+
+.swarm-canvas svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.swarm-orbit {
+  fill: none;
+  stroke: var(--color-border);
+  stroke-dasharray: 2 7;
+  stroke-width: 1;
+}
+
+.swarm-orbit-inner {
+  stroke: color-mix(in srgb, var(--color-accent) 30%, var(--color-border-subtle));
+}
+
+.swarm-hub-halo {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  stroke-width: 1;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.swarm-glow-core {
+  stop-color: var(--color-accent);
+  stop-opacity: 0.4;
+}
+
+.swarm-glow-edge {
+  stop-color: var(--color-accent);
+  stop-opacity: 0;
+}
+
+.swarm-hub-core {
+  fill: var(--color-surface-elevated);
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
+
+.swarm-hub-icon {
+  display: block;
+  color: var(--color-accent-ink);
+}
+
+.swarm-hub-label {
+  fill: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.swarm-hub-merged {
+  fill: var(--color-text-muted);
+  font-size: 10px;
+  text-anchor: middle;
+}
+
+.swarm-flow {
+  fill: none;
+  stroke: var(--swarm-phase);
+  stroke-linecap: round;
+  stroke-opacity: 0.55;
+  stroke-width: 1.5;
+}
+
+.swarm-flow[data-quiet] {
+  stroke-opacity: 0.18;
+}
+
+.swarm-flow[data-phase="working"],
+.swarm-flow[data-phase="checking"] {
+  stroke-dasharray: 4 6;
+}
+
+.swarm-flow[data-phase="queued"] {
+  stroke-dasharray: 1 6;
+  stroke-opacity: 0.4;
+}
+
+.swarm-flow[data-phase="attention"] {
+  stroke-dasharray: 2 4;
+  stroke-opacity: 0.35;
+}
+
+.swarm-share {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
+  stroke-width: 1;
+}
+
+.swarm-share-hub {
+  stroke-dasharray: 3 5;
+}
+
+.swarm-share[data-conflicted] {
+  stroke: var(--swarm-attention);
+}
+
+.swarm-conflict-arc {
+  fill: none;
+  stroke: var(--swarm-attention);
+  stroke-linecap: round;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--color-danger) 60%, transparent));
+}
+
+.swarm-spark {
+  fill: var(--swarm-ready);
+  filter: drop-shadow(0 0 4px var(--swarm-ready));
+}
+
+.swarm-map [data-dim] {
+  opacity: 0.22;
+}
+
+.swarm-flow[data-dim],
+.swarm-share[data-dim],
+.swarm-conflict-arc[data-dim] {
+  opacity: 0.12;
+}
+
+.swarm-node,
+.swarm-docked,
+.swarm-file,
+.swarm-flow,
+.swarm-share {
+  transition: opacity 200ms ease;
+}
+
+.swarm-node,
+.swarm-docked {
+  cursor: pointer;
+  outline: none;
+}
+
+.swarm-node-halo {
+  fill: color-mix(in srgb, var(--swarm-phase) 14%, transparent);
+  transition: fill 200ms ease;
+}
+
+.swarm-node:hover .swarm-node-halo,
+.swarm-node[data-selected] .swarm-node-halo {
+  fill: color-mix(in srgb, var(--swarm-phase) 30%, transparent);
+}
+
+.swarm-node-core {
+  fill: var(--color-surface-elevated);
+}
+
+.swarm-node-ring {
+  fill: none;
+  stroke: var(--swarm-phase);
+  stroke-width: 2.5;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.swarm-node[data-phase="working"] .swarm-node-ring,
+.swarm-node[data-phase="checking"] .swarm-node-ring {
+  stroke-dasharray: 62 38;
+  stroke-linecap: round;
+}
+
+.swarm-node[data-phase="queued"] .swarm-node-ring {
+  stroke-dasharray: 3 5;
+}
+
+.swarm-focus {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 2;
+}
+
+.swarm-node:focus-visible .swarm-focus,
+.swarm-docked:focus-visible .swarm-focus {
+  stroke: var(--color-border-focus);
+}
+
+.swarm-node foreignObject,
+.swarm-hub foreignObject {
+  pointer-events: none;
+}
+
+.swarm-node-badge circle {
+  fill: var(--color-danger);
+}
+
+.swarm-node-badge text {
+  fill: var(--color-on-action);
+  font-size: 10px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.swarm-node-title {
+  fill: var(--color-text-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.swarm-node-phase {
+  fill: var(--color-text-muted);
+  font-size: 10px;
+  text-anchor: middle;
+}
+
+.swarm-docked circle:not(.swarm-focus) {
+  fill: var(--swarm-merged);
+  stroke: var(--color-surface-elevated);
+  stroke-width: 2;
+}
+
+.swarm-docked[data-selected] circle:not(.swarm-focus) {
+  stroke: var(--color-text-primary);
+}
+
+.swarm-file rect {
+  fill: var(--color-surface-elevated);
+  stroke: color-mix(in srgb, var(--color-accent) 60%, var(--color-border));
+  stroke-width: 1.5;
+}
+
+.swarm-file[data-conflicted] rect {
+  stroke: var(--swarm-attention);
+}
+
+.swarm-file text {
+  fill: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-anchor: middle;
+}
+
+.swarm-empty {
+  position: absolute;
+  inset: auto 0 18px;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 0 16px;
+  text-align: center;
+}
+
+.swarm-empty-title {
+  font-size: var(--text-sm);
+}
+
+.swarm-empty span,
+.swarm-overflow {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.swarm-overflow {
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  margin: 0;
+}
+
+.swarm-detail {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface);
+}
+
+.swarm-detail header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.swarm-detail header > div {
+  display: grid;
+  min-width: 0;
+}
+
+.swarm-detail-title {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swarm-detail small {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.swarm-detail-phase {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.swarm-detail-files {
+  display: grid;
+  gap: 4px;
+}
+
+.swarm-detail-files ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.swarm-detail-files code {
+  display: block;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes swarm-stream {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+@keyframes swarm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes swarm-pulse {
+  50% {
+    stroke-opacity: 0.45;
+  }
+}
+
+@keyframes swarm-breathe {
+  50% {
+    opacity: 0.4;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes swarm-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (max-width: 1100px) {
+  .swarm-map-body[data-selected] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .swarm-stream {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .swarm-stage:nth-child(4) {
+    border-left: 0;
+  }
+
+  .swarm-stage:nth-child(n + 4) {
+    border-top: 1px solid var(--color-border-subtle);
+  }
+}
+
+.swarm-hub-deploy {
+  fill: none;
+  stroke-width: 2.5;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+[data-delivery="deployed"] .swarm-hub-deploy {
+  stroke: var(--color-success);
+}
+
+[data-delivery="deploying"] .swarm-hub-deploy {
+  stroke: var(--color-warning);
+  stroke-dasharray: 30 20;
+  stroke-linecap: round;
+}
+
+[data-delivery="paused"] .swarm-hub-deploy {
+  stroke: var(--color-danger);
+  stroke-dasharray: 4 4;
+}
+
+.swarm-delivery {
+  display: grid;
+  gap: 8px;
+}
+
+.swarm-delivery-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+}
+
+.swarm-delivery-row p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.swarm-delivery-row p > svg {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.swarm-delivery-row p[data-tone="success"] > svg {
+  color: var(--color-success);
+}
+
+.swarm-delivery-row p[data-tone="active"] > svg {
+  color: var(--color-warning);
+}
+
+.swarm-delivery-row p[data-tone="danger"] > svg {
+  color: var(--color-danger);
+}
+
+.swarm-delivery-row code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.swarm-delivery-output {
+  max-height: 16rem;
+  margin: 8px 0 0;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .swarm-hub-halo {
+    animation: swarm-breathe 4s ease-in-out infinite;
+  }
+
+  [data-delivery="deploying"] .swarm-hub-deploy {
+    animation: swarm-spin 1.6s linear infinite;
+  }
+
+  .swarm-flow[data-phase="working"],
+  .swarm-flow[data-phase="checking"] {
+    animation: swarm-stream 900ms linear infinite;
+  }
+
+  .swarm-share-hub {
+    animation: swarm-stream 1.4s linear infinite;
+  }
+
+  .swarm-conflict-arc {
+    animation: swarm-pulse 1.8s ease-in-out infinite;
+  }
+
+  .swarm-node[data-phase="working"] .swarm-node-ring,
+  .swarm-node[data-phase="checking"] .swarm-node-ring {
+    animation: swarm-spin 2.2s linear infinite;
+  }
+
+  .swarm-file[data-conflicted] rect {
+    animation: swarm-pulse 1.8s ease-in-out infinite;
+  }
+
+  .swarm-detail {
+    animation: swarm-enter 180ms ease-out;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swarm-spark {
+    display: none;
+  }
+}

@@ -49,6 +49,13 @@ export const removeSwarmConnection = () => nativeTask<void>('swarm_connection_re
 export const cloudState = (projectId: string) =>
   nativeTask<CloudState>('swarm_cloud_state', { projectId });
 
+export const ago = (iso: string) => {
+  const seconds = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
+  return new Date(iso).toLocaleTimeString();
+};
+
 export function fileStatus(file: SwarmFile) {
   if (file.base === null) return 'added';
   if (file.head === null) return 'deleted';

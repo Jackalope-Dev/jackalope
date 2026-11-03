@@ -36,7 +36,9 @@ export function ResizeHandle({
     const actions: Record<string, () => void> = {
       [vertical ? 'ArrowLeft' : 'ArrowUp']: () => resize(value - STEP),
       [vertical ? 'ArrowRight' : 'ArrowDown']: () => resize(value + STEP),
+      // biome-ignore lint/correctness/noComponentHookFactories: Home and End name keyboard keys, not components.
       Home: () => resize(min),
+      // biome-ignore lint/correctness/noComponentHookFactories: Home and End name keyboard keys, not components.
       End: () => resize(max),
       Enter: onReset,
     };

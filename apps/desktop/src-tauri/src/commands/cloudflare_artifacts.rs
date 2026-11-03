@@ -874,6 +874,53 @@ pub async fn cloudflare_artifacts_push(
     })
 }
 
+/// Pushes one local branch to the project's linked Artifacts repository without
+/// forcing it. `None` when Artifacts is not connected or the project is not linked.
+pub(in crate::commands) async fn push_branch(
+    runtime: &TaskRuntime,
+    project_path: &str,
+    branch: &str,
+) -> Result<Option<String>, String> {
+    if branch.is_empty()
+        || branch.starts_with('-')
+        || branch
+            .chars()
+            .any(|c| c.is_whitespace() || c.is_control() || c == ':')
+    {
+        return Err(format!("{branch} is not a branch Jackalope can push."));
+    }
+    if saved(runtime)?.is_none() {
+        return Ok(None);
+    }
+    let checked = project_path.to_string();
+    let linked = tauri::async_runtime::spawn_blocking(move || {
+        let path = PathBuf::from(&checked);
+        linked_remote(&path).map(|remote| (path, remote))
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    let Some((path, remote)) = linked else {
+        return Ok(None);
+    };
+    let connection = current(runtime).await?;
+    let (namespace, repo) = remote_identity(&remote).ok_or("Invalid Artifacts remote.")?;
+    if namespace != connection.namespace
+        || !remote.contains(&format!("//{}.", connection.account_id))
+    {
+        return Err("This project uses an Artifacts repository outside the connected account and namespace.".into());
+    }
+    let remote = repo_remote(&connection, &repo).await?;
+    let (token, id, _) = mint_token(&connection, &repo, "write", PUSH_TOKEN_TTL_SECONDS).await?;
+    let refspec = format!("refs/heads/{branch}:refs/heads/{branch}");
+    let summary = tauri::async_runtime::spawn_blocking(move || {
+        push(&path, &remote, &token, &[refspec.as_str()])
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    revoke_token(&connection, &id).await;
+    summary.map(Some)
+}
+
 #[tauri::command]
 pub async fn cloudflare_artifacts_share(
     project_path: String,

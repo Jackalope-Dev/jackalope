@@ -550,6 +550,20 @@ pub fn info() -> Color {
     tone((0x3b, 0x82, 0xf6), Color::Blue)
 }
 
+/// Slash commands in the input: violet, or teal when the project's accent is
+/// already violet, so a command never looks like a plain message.
+pub fn command() -> Color {
+    if !colored() {
+        return Color::Reset;
+    }
+    let (hue, _, _) = to_hsl(current_accent());
+    if (hue - 258.0).abs() < 35.0 {
+        tone((0x14, 0xb8, 0xa6), Color::Cyan)
+    } else {
+        tone((0x8b, 0x5c, 0xf6), Color::Magenta)
+    }
+}
+
 /// Work that needs attention: an open question, a sign-in, a stalled action.
 pub fn warning() -> Color {
     if !colored() {
@@ -874,16 +888,16 @@ pub fn header(info: Vec<Line<'static>>, working: bool, tick: usize) -> Vec<Line<
         .collect()
 }
 
-/// A single-line version for short terminals and once a conversation is under
-/// way, where eight lines of banner would crowd out the conversation.
-pub fn compact() -> Line<'static> {
+/// The mark and the project's name in one line, for terminals too small for
+/// the framed header, where a banner would crowd out the conversation.
+pub fn compact(project: &str) -> Line<'static> {
     let glyph = if unicode() { "⣼⡿" } else { "#" };
     Line::from(vec![
         Span::raw(" "),
         Span::styled(glyph, Style::default().fg(accent())),
         Span::raw(" "),
         Span::styled(
-            "jackalope",
+            project.to_string(),
             Style::default().fg(accent()).add_modifier(Modifier::BOLD),
         ),
     ])

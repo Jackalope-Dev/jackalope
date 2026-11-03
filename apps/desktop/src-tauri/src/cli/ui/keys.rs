@@ -74,6 +74,7 @@ impl App {
             KeyCode::Char('r') if control => self.open_picker(PickerKind::History),
             KeyCode::Char('z') if control => self.suspend = cfg!(unix),
             KeyCode::Char('o') if control => self.toggle_panel(),
+            KeyCode::Char('t') if control => self.toggle_top_bar(),
             KeyCode::Char('g') if control => self.request_plan_edit(),
             KeyCode::Up if (alt || shift) && panel => self.step_change(-1),
             KeyCode::Down if (alt || shift) && panel => self.step_change(1),
@@ -192,7 +193,8 @@ impl App {
     /// Scrolls back (positive) or forward (negative) by `lines`. Reaching the
     /// newest output follows it again.
     pub(super) fn scroll(&mut self, lines: i16) {
-        if let Some(picker) = self.picker.as_mut() {
+        let docked = self.picker_docked();
+        if let Some(picker) = self.picker.as_mut().filter(|_| !docked) {
             picker.step(lines < 0);
             return;
         }
@@ -342,6 +344,6 @@ impl App {
 }
 
 /// Page Up and Page Down move most of a screen, keeping a line of context.
-fn page(height: u16) -> i16 {
+pub(super) fn page(height: u16) -> i16 {
     height.saturating_sub(1).clamp(1, i16::MAX as u16) as i16
 }

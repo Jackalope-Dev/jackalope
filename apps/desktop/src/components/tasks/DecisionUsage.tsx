@@ -79,10 +79,6 @@ export function DecisionUsage({
               ? 'Tokens unavailable'
               : `${summary.tokens.toLocaleString()} reported tokens`}
             {summary.missing ? ` · ${summary.missing} usage reports unavailable` : ''}
-            {summary.costUsd === null
-              ? ' · Cost unavailable'
-              : ` · $${summary.costUsd.toFixed(6)} estimated`}
-            {summary.costMissing || summary.missing ? ' · Cost coverage is incomplete' : ''}
           </p>
           <Disclosure>
             <DisclosureSummary>Assessment details</DisclosureSummary>
@@ -94,7 +90,6 @@ export function DecisionUsage({
                     <th scope="col">Provider</th>
                     <th scope="col">Decision</th>
                     <th scope="col">Tokens</th>
-                    <th scope="col">Estimated cost</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -116,15 +111,6 @@ export function DecisionUsage({
                               entry.attempt.usage.input + entry.attempt.usage.output
                             ).toLocaleString()
                           : 'Unavailable'}
-                      </td>
-                      <td>
-                        {entry.attempt.usage.estimatedCostUsd == null
-                          ? 'Unavailable'
-                          : new Intl.NumberFormat(undefined, {
-                              style: 'currency',
-                              currency: 'USD',
-                              maximumFractionDigits: 6,
-                            }).format(entry.attempt.usage.estimatedCostUsd)}
                       </td>
                     </tr>
                   ))}

@@ -88,20 +88,29 @@ native bounded evidence reader and cannot claim current visual acceptance.
 
 ## Agent and Challenge review
 
-Review's actions menu offers two optional reviews by another agent. Neither starts
-until you submit it, and both suggest an available reviewer from a model family
-different from the author's (then an agent of unknown family, then the same family);
-you can choose any connected agent. Families come from the model when it names one,
-otherwise from the agent (`src/lib/reviewer-choice.ts`).
+Review offers two optional reviews by another agent. Both suggest an available
+reviewer from a model family different from the author's (then an agent of unknown
+family, then the same family); you can choose any connected agent. Families come from
+the model when it names one, otherwise from the agent (`src/lib/reviewer-choice.ts`).
+Both commit the author's current files, uncommitted work included, onto the task base
+and start each reviewer in its own worktree at that commit (recorded as `challengeOf`
+on the reviewer's attempt, with `kind` `review` or `challenge`), so reviewers never
+touch the author's workspace. The author must be idle.
 
-- **Ask another agent to review** opens an editable read-only review request in the
-  task composer.
-- **Challenge this change** starts one or two reviewers, each told to break the
-  change. The intent it must hold to is the original request plus the author's
-  result. `task_start_challenge` commits the author's current files, uncommitted
-  work included, onto the task base and starts each reviewer in its own worktree at
-  that commit (recorded as `challengeOf` on the reviewer's attempt), so reviewers
-  never touch the author's workspace. The author must be idle.
+- **Agent review** in Review's toolbar starts one reviewer with
+  `task_start_agent_review` on click. It skips the project's preparation command and
+  is told to read the change without building, installing or running it. A dialog
+  follows its steps and live activity; agent reviews stay out of the work list and
+  notify on the reviewed attempt. The reviewer ends with a `jackalope-review` JSON
+  block: a summary and findings with severity, file, line, problem and fix plan
+  (`src/lib/agent-review.ts`). **Make these changes** continues the task with the
+  selected findings, an optional note and, when the project has a verification
+  command, a request to run it once at the end. Where the attempt can't continue
+  directly, the same text is added to the reply instead. A reply without a readable
+  block is shown in full and can be sent as is.
+- **Challenge this change** in the actions menu starts one or two reviewers, each
+  told to break the change. The intent it must hold to is the original request plus
+  the author's result.
 
 A Challenge reviewer reports each finding with `record_validation_step`: status
 `failed`, the title as `step`, and a `finding` with the exact command, the output it

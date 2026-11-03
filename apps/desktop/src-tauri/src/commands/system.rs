@@ -30,6 +30,53 @@ pub(super) fn device_name() -> String {
         .unwrap_or_else(|| "localhost".into())
 }
 
+/// The first name of the person using this computer, for naming the devices they pair: the
+/// account's full name when the system records one, else the login name capitalized.
+pub(super) fn owner_first_name() -> Option<String> {
+    let login = std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .ok();
+    first_name(account_full_name().as_deref(), login.as_deref())
+}
+
+fn first_name(full: Option<&str>, login: Option<&str>) -> Option<String> {
+    let from_full = full
+        .and_then(|full| full.split(',').next())
+        .and_then(|full| full.split_whitespace().next());
+    if let Some(first) = from_full {
+        return Some(first.chars().take(40).collect());
+    }
+    let mut login = login?.trim().chars();
+    let initial = login.next()?;
+    Some(initial.to_uppercase().chain(login).take(40).collect())
+}
+
+#[cfg(unix)]
+fn account_full_name() -> Option<String> {
+    let mut entry: libc::passwd = unsafe { std::mem::zeroed() };
+    let mut found: *mut libc::passwd = std::ptr::null_mut();
+    let mut buffer = vec![0 as libc::c_char; 4096];
+    let status = unsafe {
+        libc::getpwuid_r(
+            libc::getuid(),
+            &mut entry,
+            buffer.as_mut_ptr(),
+            buffer.len(),
+            &mut found,
+        )
+    };
+    if status != 0 || found.is_null() || entry.pw_gecos.is_null() {
+        return None;
+    }
+    let gecos = unsafe { std::ffi::CStr::from_ptr(entry.pw_gecos) };
+    Some(gecos.to_string_lossy().into_owned()).filter(|name| !name.trim().is_empty())
+}
+
+#[cfg(not(unix))]
+fn account_full_name() -> Option<String> {
+    None
+}
+
 #[tauri::command]
 pub async fn system_get_info() -> Result<SystemInfo, String> {
     let (git_available, desktop_control) = tauri::async_runtime::spawn_blocking(|| {
@@ -49,4 +96,22 @@ pub async fn system_get_info() -> Result<SystemInfo, String> {
         git_available,
         desktop_control,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::first_name;
+
+    #[test]
+    fn owner_names_use_the_first_word_of_the_full_name_else_the_login() {
+        assert_eq!(
+            first_name(Some("Caden Sumner"), Some("caden")).unwrap(),
+            "Caden"
+        );
+        assert_eq!(first_name(Some("Ada Lovelace,,,"), None).unwrap(), "Ada");
+        assert_eq!(first_name(Some("  "), Some("caden")).unwrap(), "Caden");
+        assert_eq!(first_name(None, Some("ada")).unwrap(), "Ada");
+        assert_eq!(first_name(None, None), None);
+        assert_eq!(first_name(Some(""), Some("")), None);
+    }
 }

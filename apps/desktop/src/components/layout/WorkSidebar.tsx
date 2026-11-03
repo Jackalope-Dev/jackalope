@@ -17,7 +17,13 @@ import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsSto
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AgentStack } from '../agents/AgentAvatar';
 import { ProjectIconDialog, ProjectMark } from '../projects/ProjectMark';
-import { isUnread, useOpenSignalKey, useWorkSignals, WorkSignals } from '../tasks/WorkSignals';
+import {
+  changeSummary,
+  isUnread,
+  useOpenSignalKey,
+  useWorkSignals,
+  WorkSignals,
+} from '../tasks/WorkSignals';
 import { Tooltip } from '../ui/Tooltip';
 import { type ActiveTab, viewLabel, WORKSPACE_VIEWS } from './navigation';
 
@@ -381,6 +387,10 @@ export function WorkSidebar({
                       : undefined) ??
                     item.statusLabel ??
                     presence.action;
+                  const change = item.run ? stats[item.run.id]?.value : undefined;
+                  const tooltip = [item.title, status, change?.files ? changeSummary(change) : '']
+                    .filter(Boolean)
+                    .join('\n');
                   return (
                     <li key={item.id} className="work-sidebar-row">
                       <button
@@ -389,7 +399,7 @@ export function WorkSidebar({
                         className="work-sidebar-item"
                         data-stage={item.stage}
                         data-unread={unread || undefined}
-                        title={status ? `${item.title}\n${status}` : item.title}
+                        title={tooltip}
                         onClick={() => open(item)}
                       >
                         <AgentStack agents={presence.agents} state={presence.state} size="xs" />
@@ -397,11 +407,7 @@ export function WorkSidebar({
                           {item.title}
                           {status && <span className="sr-only">, {status}</span>}
                         </span>
-                        <WorkSignals
-                          item={item}
-                          unread={unread}
-                          stats={item.run ? stats[item.run.id]?.value : undefined}
-                        />
+                        <WorkSignals item={item} unread={unread} stats={change} compact />
                         {needsYou && (
                           <span
                             className="work-sidebar-state"

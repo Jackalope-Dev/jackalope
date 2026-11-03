@@ -24,7 +24,6 @@ export function summarizeUsage(items: { usage: RunUsage }[]) {
   const output = reported.reduce((sum, r) => sum + r.usage.output, 0);
   const cacheRead = reported.reduce((sum, r) => sum + r.usage.cacheRead, 0);
   const cacheWrite = reported.reduce((sum, r) => sum + r.usage.cacheWrite, 0);
-  const priced = reported.filter((r) => typeof r.usage.estimatedCostUsd === 'number');
   return {
     calls: items.length,
     reported: reported.length,
@@ -41,10 +40,6 @@ export function summarizeUsage(items: { usage: RunUsage }[]) {
       : items.length
         ? null
         : 0,
-    costUsd: priced.length
-      ? priced.reduce((sum, r) => sum + (r.usage.estimatedCostUsd ?? 0), 0)
-      : null,
-    costMissing: reported.length - priced.length,
   };
 }
 
@@ -57,9 +52,6 @@ export function describeRunUsage(run: TaskRun) {
   const cacheless = run.accountBinding?.adapter === 'kimi' || run.agent === 'kimi';
   const calls = run.usageObservations?.length ?? 0;
   const parts: string[] = [];
-  if (typeof usage.estimatedCostUsd === 'number') {
-    parts.push(`$${usage.estimatedCostUsd.toFixed(2)} reported cost`);
-  }
   parts.push(
     cacheless
       ? `${usage.input.toLocaleString()} input · cache breakdown unavailable`

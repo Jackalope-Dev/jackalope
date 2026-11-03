@@ -134,6 +134,7 @@ pub fn run(launch: Launch) {
         .manage(CapacityService::default())
         .manage(commands::agent_models::ModelCatalogService::default())
         .setup(move |app| {
+            commands::release::register_update_restart();
             commands::browser::set_resource_directory(app.path().resource_dir()?);
             commands::desktop_control::platform::set_resource_directory(app.path().resource_dir()?);
             commands::computers::set_resource_directory(app.path().resource_dir()?);
@@ -174,6 +175,7 @@ pub fn run(launch: Launch) {
             let coordinator = Coordinator::new(directory.join("coordination"), runtime.clone())?;
             coordinator.launch();
             commands::coordination::cloud::launch(coordinator.clone());
+            commands::coordination::deploy::launch(coordinator.clone());
             let sessions = commands::live_sessions::LiveSessions::new(
                 directory.join("live-sessions/sessions.json"),
                 runtime.clone(),
@@ -234,9 +236,6 @@ pub fn run(launch: Launch) {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::Destroyed = event {
-                commands::cli_terminal::window_destroyed(window.label());
-            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main"
                     && window.state::<WindowBehavior>().should_hide()
@@ -402,10 +401,7 @@ pub fn run(launch: Launch) {
             commands::repo_todos::repo_todos_read,
             commands::repo_todos::repo_todos_save,
             commands::cli_install::cli_install_status,
-            commands::cli_terminal::cli_terminal_window,
-            commands::cli_terminal::cli_terminal_start,
-            commands::cli_terminal::cli_terminal_close,
-            commands::cli_terminal::cli_terminal_popout,
+            commands::cli_terminal::cli_terminal_open,
             commands::cli_install::cli_install_system,
             commands::project_registry::project_registry_list,
             commands::project_registry::project_registry_save,
@@ -453,6 +449,7 @@ pub fn run(launch: Launch) {
             commands::previews::design::task_preview_design_capture,
             commands::delivery::task_delivery_status,
             commands::delivery::task_pull_request_create,
+            commands::delivery::task_merge_locally,
             commands::outcomes::task_outcome_review,
             task_review,
             commands::live_sessions::live_session_limits,
@@ -483,6 +480,8 @@ pub fn run(launch: Launch) {
             commands::coordination::cloud::swarm_connection_save,
             commands::coordination::cloud::swarm_connection_remove,
             commands::coordination::cloud::swarm_cloud_state,
+            commands::coordination::deploy::deploy_status,
+            commands::coordination::deploy::deploy_again,
             commands::cloudflare_artifacts::cloudflare_artifacts_project,
             commands::cloudflare_artifacts::cloudflare_artifacts_create_project,
             commands::cloudflare_artifacts::cloudflare_artifacts_convert,
@@ -493,6 +492,7 @@ pub fn run(launch: Launch) {
             commands::remote::remote_pairing,
             commands::remote::remote_revoke,
             commands::remote::remote_private_https,
+            commands::remote::remote_tailscale_status,
             commands::remote::remote_hosts,
             commands::remote::remote_host_pair,
             commands::remote::remote_host_request,
@@ -500,8 +500,10 @@ pub fn run(launch: Launch) {
             commands::review_progress::task_review_progress,
             commands::verification::task_verify,
             commands::challenge_review::task_start_challenge,
+            commands::challenge_review::task_start_agent_review,
             commands::challenge_review::task_challenge_reply,
             commands::challenge_review::task_challenge_rerun,
+            commands::challenge_review::task_challenge_reruns,
             task_respond_prompt,
             queue_snapshot,
             queue_add,

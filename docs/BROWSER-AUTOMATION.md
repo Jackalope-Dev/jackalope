@@ -1,6 +1,6 @@
 # Native browser automation
 
-Jackalope bundles [agent-browser 0.38.1](https://github.com/vercel-labs/agent-browser/tree/v0.38.1)
+Jackalope bundles [agent-browser 0.40.0](https://github.com/vercel-labs/agent-browser/tree/v0.40.0)
 as its local browser engine. It launches installed
 Edge, Chrome or Chromium in a fresh task profile. Users do not need npm, Node, a Vercel
 account, a browser service subscription or a separate agent-browser installation.

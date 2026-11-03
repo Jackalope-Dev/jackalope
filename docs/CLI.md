@@ -38,6 +38,11 @@ it. `subcommands.rs` and `once.rs` hold the commands that print and exit. The
 interactive view lives in `ui/`: `mod.rs` holds its state, and `events`,
 `refresh`, `keys`, `commands`, `pickers`, `conversation`, `feed`, `selection`
 and `editor` each add one concern, with drawing under `ui/render/`.
+`ui/harness.rs` tests the view without a terminal or the app: a fake host on a
+private socket serves fixture conversations and records requests, tests press keys,
+type commands and click, and frames render to text. Run
+`JACKALOPE_TUI_PRINT=1 cargo test --bin jackalope ui::harness -- --nocapture` to see
+the frames; add a case there when changing the layout or interaction.
 
 ## Projects and sessions
 
@@ -97,7 +102,7 @@ terminal and the app together. Leaving a terminal does not stop work.
 always message text. Unknown or misplaced options are refused with exit status 64.
 
 Inside a conversation, typing `/` opens an interactive command menu, and `/help`
-lists commands: `/new`, `/bg`, `/sharpen`, `/init`, `/sessions`, `/projects`, `/agents`, `/settings`,
+lists commands: `/new`, `/bg`, `/sharpen`, `/init`, `/sessions`, `/close`, `/tabs`, `/projects`, `/agents`, `/settings`,
 `/status`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/learnings`, `/files`, `/review` (or `/diff`), `/merge`, `/pr`, `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
 `/unpause`, `/unqueue`, `/copy`, `/history`, `/kill`, `/clear`, `/plan`, `/plans`, `/revise`,
 `/approve`, `/replan`, `/export`, `/deviation`, `/browser`, `/computer`, `/open` and `/quit`. Pickers
@@ -132,6 +137,14 @@ app and every terminal; editing and
 deleting lessons happen in the app. See [project knowledge](PROJECT-KNOWLEDGE.md#learned-lessons). Messages sent while an agent works queue behind it; `/pause` holds
 the queue and `/unpause` sends it. `/clear` starts a fresh conversation like `/new`,
 `/resume` opens the conversation picker, and Ctrl+L clears notes and finished `!` output.
+`/close` closes the open conversation's tab and shows its neighbour; `/close <n>`,
+`/close others` and `/close all` close tabs by number or in bulk. Closing only hides a
+tab: the work keeps running, `/sessions` reopens it, and it returns when it starts
+needing you. `/tabs` or Ctrl+T hides the top bar for more room and remembers that for
+later sessions; while it is hidden, the status line counts other conversations that
+need you. Notes and `!` output belong to the conversation they were added in and stay
+at that point in its history; short hints, such as how to use a command, show briefly in
+the status line instead.
 `/model` picks from the models configured for the next conversation's agent, or
 `/model <name>` sets one directly. `/usage` (or `/cost`) lists account quota
 windows and resets. `/theme <colour>` takes orange, red, pink, purple, blue,
@@ -203,7 +216,8 @@ deviations carry `amendment`; projects carry `verifyCommand`, `autoVerify`,
 protocol version is unchanged. See [plan mode](PLAN-MODE.md) for the document format.
 
 A leading `/`, `!` or `@` is the input's mode: the prompt at the left of the input
-shows it (accent, amber or green) and the text hides it. Backspace on the empty
+shows it (violet for commands, or teal when the project's accent is violet; amber for
+`!`; blue for `@`; green for `/plan`) and the text hides it. Backspace on the empty
 input leaves the mode; the cursor never moves in front of it.
 
 ### Layout
@@ -211,12 +225,12 @@ input leaves the mode; the cursor never moves in front of it.
 Terminals at least 60 columns wide and 16 rows tall draw a darker shell around one
 rounded content card, following the app's surfaces:
 
-- The header line shows the wordmark, then the conversation's title, or tabs once
-  more than one conversation is open, and on the right the agent and model, project
-  and branch. Tabs cover conversations that need you, the open one and those opened
+- The header line shows the project's name, then the conversation's title, or tabs
+  once more than one conversation is open, and on the right the agent and model and
+  the branch. Tabs cover conversations that need you, the open one and those opened
   in this terminal; `/sessions` lists the rest. Each tab shows its number, a dot for its state (amber when it needs
-  you, a spinner while working, hollow when idle) and its title; titles shorten to
-  fit, and what still does not fit is counted. Alt+1 to Alt+9 show a tab, and
+  you, a spinner while working, hollow when idle), its title and `×` to close it;
+  titles shorten to fit, and what still does not fit is counted. Alt+1 to Alt+9 show a tab, and
   Ctrl+N and Ctrl+P step through the tabs across projects.
 - The card holds the conversation, the changes panel and the input. While work runs,
   a band of light travels along the card's top edge.
@@ -225,15 +239,18 @@ rounded content card, following the app's surfaces:
   queued messages, changed files, running commands and brief confirmations. Key
   hints sit on its right.
 
-The wordmark, tabs, agent, model, project, open-conversation count and key hints can
-be clicked. A start screen shows the JACKALOPE wordmark (a two-row version in narrow
+The project name (which opens `/projects`), tabs, agent, model, open-conversation
+count and key hints can be clicked. A start screen shows the JACKALOPE wordmark (a two-row version in narrow
 windows), which light sweeps across once when the screen appears, and the agents that are set up. When work finishes cleanly, the status line says how long it took and what usually comes next. Smaller terminals drop the shell for a
 compact header, a status line and a rotating tip.
 
 Your messages and pending work read as tinted blocks with a bar down their left edge.
 When a conversation is blocked, an amber "Needs you" banner above the input says why
-and how to carry on; an open question is pinned there instead, and `/answer` reopens
-its options. Running work lists its newest steps (tool calls and narration) as the
+and how to carry on. A question with options docks in the input's place with its full
+text, the reason it matters and its options, so the conversation above stays readable;
+the mouse wheel, Page Up/Down and dragging still act on the conversation. Esc leaves the
+dock to type an answer instead, the question stays pinned above the input, and
+`/answer` brings the options back. Running work lists its newest steps (tool calls and narration) as the
 host records them, and `jackalope -p` prints the same steps to standard error.
 `JACKALOPE_REDUCED_MOTION=1` keeps the band, spinners, shimmer and wordmark sweep still.
 

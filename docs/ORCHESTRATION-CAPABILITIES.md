@@ -242,6 +242,73 @@ It does not push or remove source worktrees. A persisted merge receipt recovers 
 completed application after interruption. Neither mode establishes semantic correctness
 from checks alone; installed acceptance and measured reduction in duplicate work remain open.
 
+A project can limit automatic merging with `.jackalope/autonomy.json`, read from the
+target-branch commit the integration starts from, never from a worktree, so a change
+cannot loosen the policy it is judged by:
+
+```json
+{
+  "version": 1,
+  "default": "review",
+  "rules": [{ "paths": ["docs/**", "apps/website/src/content/**"], "level": "merge" }],
+  "protected": ["package.json", "migrations/**"],
+  "maxFiles": 25,
+  "maxChangedLines": 500,
+  "acceptOutcomes": "evidence"
+}
+```
+
+Levels are `review` and `merge`; later rules win and unmatched paths use `default`
+(`review` when omitted). Protected paths, `.jackalope/**` and common CI configuration
+always stay in review. File and line limits default to 25 and 500. A combined result
+that touches any held path, exceeds a limit, or meets a policy that cannot be read
+stays in **Review & merge** with the reason shown under Automatic coordination.
+Without the file, automatic merging behaves as described above. Protect the files that
+define the saved check (such as package scripts and test configuration) so agent work
+cannot weaken the check that verified it.
+
+Required outcomes still need a person unless `acceptOutcomes` is `evidence`. Then an
+outcome counts as accepted when the agent's latest report marks it met with evidence
+Jackalope checked at the ran or reproduced level, and the saved check later passed on
+the same files. Jackalope records that acceptance on the outcome, noted as accepted by
+the autonomy policy, before preparing the merge, so it remains even if the path check
+then holds the result. Workflow checkpoints and outcomes a person did not accept always
+need a person.
+
+With a committed policy, a ready planned or swarm result (all assignments plus the
+combined review) also merges automatically when the project merges verified work
+automatically and its queue is running. A held result is not retried until the target
+branch or its attempts change; the task shows why it was not merged.
+
+While a project merges verified work automatically, Jackalope also delivers its branch.
+Every 20 seconds it reads the branch head; when the head changes it pushes the branch
+to the project's linked Artifacts repository without forcing it, using a short-lived
+write token. When the policy committed on that head has a `deploy` section for that
+branch, Jackalope deploys the head:
+
+```json
+{
+  "version": 1,
+  "deploy": {
+    "branch": "main",
+    "command": "pnpm install --frozen-lockfile && pnpm wrangler deploy",
+    "check": "curl -fsS https://example.com/health",
+    "rollback": "pnpm wrangler rollback --yes"
+  }
+}
+```
+
+Each command runs in a clean detached checkout of the deployed commit, with the
+person's environment and tools (such as their Wrangler login or Cloudflare API token),
+under the same time and stall limits as a project check; the checkout is removed
+afterwards. `check` runs up to three times, 15 seconds apart. When it still fails,
+`rollback` runs. A failed deploy, failed check or rollback pauses automatic merging for
+the project. Merges a person makes still deploy, and a successful deploy resumes
+automatic merging. Project → Swarm shows the Artifacts copy of the branch, the latest
+deploy and its output, and offers **Deploy again** for the current head. Each head
+deploys once, whatever the outcome. Files the deploy needs that are not committed, such
+as local secrets, are not copied into the checkout.
+
 Use `JACKALOPE_AGREEMENT_TRIAL_REPO` and `JACKALOPE_AGREEMENT_TRIAL_PROFILE` with the
 ignored Rust test `installed_grok_and_claude_negotiate_ownership_and_interfaces` for
 an installed-provider trial in a disposable repository and new profile. The retained

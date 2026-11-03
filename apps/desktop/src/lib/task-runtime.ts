@@ -185,8 +185,14 @@ export interface TaskRun {
   reviewCaptures?: import('./review-captures.ts').ReviewCaptures | null;
   /** Review screenshots are still being captured after the result was recorded. */
   reviewCapturing?: boolean;
-  /** The result this attempt challenges, when it is a Challenge reviewer. */
-  challengeOf?: { runId: string; tree: string; base: string } | null;
+  /** The result this attempt reviews, when it is an agent or Challenge reviewer. */
+  challengeOf?: {
+    runId: string;
+    tree: string;
+    base: string;
+    /** Absent on reviewers saved before agent reviews existed, which are Challenges. */
+    kind?: 'challenge' | 'review';
+  } | null;
 }
 /** @public Named in the return types of usage-entries.ts and usage-insights.ts exports. */
 export interface DesktopActionRecord {

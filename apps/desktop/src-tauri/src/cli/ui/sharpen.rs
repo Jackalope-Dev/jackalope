@@ -19,7 +19,10 @@ impl App {
             return;
         }
         if argument.is_empty() {
-            self.note("Add the draft: /sharpen <what to do>. The rewrite comes back here to edit.");
+            self.flash(
+                "Add the draft: /sharpen <what to do>. The rewrite comes back here to edit",
+                Tone::Warning,
+            );
             return;
         }
         if self.sharpening {
@@ -27,7 +30,6 @@ impl App {
             return;
         }
         self.sharpening = true;
-        self.note("Sharpening your draft…");
         let original = argument.to_string();
         let request = Request::Sharpen {
             text: original.clone(),

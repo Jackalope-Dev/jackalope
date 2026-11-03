@@ -95,9 +95,9 @@ export const roadmapStages = [
     items: [
       {
         title: 'Continue from another device.',
-        summary: 'Trusted hosts and a responsive phone companion, in validation.',
+        summary: 'Trusted hosts, a phone companion and Android and iOS apps, in development.',
         detail:
-          'Pair a device, choose shared projects, and check tasks, answer questions, send follow-ups or review changes. Desktop hosts connect over SSH or HTTPS; phones use HTTPS with optional private Tailscale setup. Work stays on its host when a client disconnects. Native multi-device and platform acceptance remain in progress; this is not a released hosting service.',
+          'Pair a device, choose shared projects, and check tasks, answer questions, send follow-ups or review changes. Desktop hosts connect over SSH or HTTPS; phones use HTTPS with optional private Tailscale setup. Work stays on its host when a client disconnects. Android and iOS companion apps that show work from all your paired computers in one list, with notifications when work needs you, are in development. Native multi-device and platform acceptance remain in progress; this is not a released hosting service.',
       },
       {
         title: 'Your agents, from the terminal.',

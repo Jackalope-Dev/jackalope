@@ -545,27 +545,3 @@ mod tests {
         assert!(output.text.ends_with("next"));
     }
 }
-
-/// Runs `command` in the terminal `id` unless one is already running there.
-/// Used for terminals that host a client rather than owning a task workspace,
-/// so the task terminal's workspace checks do not apply.
-pub(super) fn start_command(
-    id: &str,
-    workspace: std::path::PathBuf,
-    command: CommandBuilder,
-) -> Result<(), String> {
-    let mut sessions = terminals().lock().map_err(|e| e.to_string())?;
-    if let Some(terminal) = sessions.get_mut(id) {
-        if running(terminal)? {
-            return Ok(());
-        }
-    }
-    spawn_terminal(sessions, id.into(), workspace, command, None)
-}
-
-/// Ends the terminal `id`; dropping it stops its process tree.
-pub(super) fn close(id: &str) {
-    if let Ok(mut sessions) = terminals().lock() {
-        sessions.remove(id);
-    }
-}

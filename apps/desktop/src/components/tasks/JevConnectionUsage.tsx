@@ -42,11 +42,7 @@ export function JevConnectionUsage() {
               {totals.calls.toLocaleString()} calls ·{' '}
               {totals.usage.reported
                 ? `${totals.usage.input.toLocaleString()} input + ${totals.usage.output.toLocaleString()} output tokens reported`
-                : 'Token usage unavailable'}{' '}
-              ·{' '}
-              {totals.usage.estimatedCostUsd == null
-                ? 'Cost unavailable'
-                : `$${totals.usage.estimatedCostUsd.toFixed(6)} estimated`}
+                : 'Token usage unavailable'}
               {totals.unreportedCalls > 0 &&
                 ` · ${totals.unreportedCalls.toLocaleString()} missing ${totals.unreportedCalls === 1 ? 'report' : 'reports'}`}
             </p>

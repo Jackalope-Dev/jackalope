@@ -18,6 +18,6 @@ pre-push:
       run: node scripts/git-hooks.mjs push "{1}" "{2}"
       use_stdin: true
     - name: verify
-      run: pnpm verify
+      run: pnpm verify --changed
     - name: secrets
       run: pnpm check:secrets

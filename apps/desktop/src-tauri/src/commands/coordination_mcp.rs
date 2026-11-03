@@ -1132,9 +1132,9 @@ impl CoordinationTools {
             .await;
             self.service.runtime.record_prompt(&prompt);
             match (prompt.answer, &always, &standing) {
-                (Some(answer), Some(always), Some((rule, _))) if &answer == always => {
+                (Some(answer), Some(always), Some((standing, _))) if &answer == always => {
                     if let Err(error) =
-                        super::permission_rules::remember(&rules, &run.project_id, rule)
+                        super::permission_rules::remember(&rules, &run.project_id, standing)
                     {
                         self.service.runtime.update(&run.id, |r| {
                             r.activity
@@ -1255,7 +1255,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Add one entry to this attempt's decision trail at a real fork, pivot, revert, blocker or completed unit, with its check result. Evidence is pointers such as a commit, path:line, check:<name> or screenshot:<name>, never prose. Entries are append-only: correct a wrong call with a new entry whose supersedes is the old id. Jackalope checks each pointer when the attempt ends.",
+        description = "Add one entry to this attempt's decision trail at a real fork, pivot, revert, blocker or completed unit, with its check result. Evidence is pointers such as a commit, path:line, check:<name> or screenshot:<name>, never prose. Entries are append-only: correct a wrong call with a new entry whose supersedes is the old id. The reply checks each pointer now (fix any marked missing); Jackalope checks them again when the attempt ends.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,

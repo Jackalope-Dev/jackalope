@@ -19,6 +19,7 @@ import {
   taskStateLabels,
   taskWaves,
 } from '../../lib/plan-mode';
+import { planReviewer } from '../../lib/reviewer-choice';
 import { respondToPrompt } from '../../lib/task-runtime';
 import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -26,6 +27,7 @@ import { usePlanStore } from '../../stores/planStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { navigateWorkspace, openProjectSettings } from '../layout/navigation';
 import { AgentQuestion } from '../tasks/AgentQuestion';
+import { agentAdapter } from '../tasks/CrossModelReviewPanel';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -343,6 +345,14 @@ function PlanReview({
     (state) => state.projects.find((project) => project.id === view.projectId)?.preferences,
   );
   const verification = approvalVerification(view, preferences?.verifyCommand);
+  const runners = useExecutionStore((state) => state.runners);
+  const planner = useExecutionStore(
+    (state) => state.runs.find((candidate) => candidate.id === view.plannerRunId)?.agent,
+  );
+  const reviewer = useMemo(
+    () => planReviewer(runners, { agent: view.agent, model: view.model }, planner, agentAdapter),
+    [runners, view.agent, view.model, planner],
+  );
   const [shape, setShape] = useState<PlanShape>(view.shape);
   const [comments, setComments] = useState('');
   const [editing, setEditing] = useState(false);
@@ -422,11 +432,18 @@ function PlanReview({
                 view.revision &&
                 view.hash &&
                 void run(() =>
-                  planCommands.approve(view.id, view.revision ?? 0, view.hash ?? '', shape, {
-                    verifyCommand: preferences?.verifyCommand,
-                    prepareCommand: preferences?.prepareCommand,
-                    setupFiles: preferences?.setupFiles,
-                  }),
+                  planCommands.approve(
+                    view.id,
+                    view.revision ?? 0,
+                    view.hash ?? '',
+                    shape,
+                    {
+                      verifyCommand: preferences?.verifyCommand,
+                      prepareCommand: preferences?.prepareCommand,
+                      setupFiles: preferences?.setupFiles,
+                    },
+                    reviewer,
+                  ),
                 )
               }
             >

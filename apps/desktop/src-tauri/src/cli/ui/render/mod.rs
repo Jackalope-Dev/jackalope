@@ -9,7 +9,7 @@ pub mod transcript;
 
 use super::commands::slash_matches;
 use super::editor::Layout as InputLayout;
-use super::pickers::{agent_glyph, usable};
+use super::pickers::{agent_glyph, usable, PickerKind};
 use super::App;
 use crate::brand::{self, Surface};
 use crate::protocol::{self, SessionSummary};
@@ -42,6 +42,7 @@ pub const TIPS: &[&str] = &[
     "Keep typing while an agent works: messages queue and run in order.",
     "`/bg fix the flaky test` starts a parallel conversation without leaving this one.",
     "`Ctrl+N` and `Ctrl+P` step through open conversations.",
+    "`Ctrl+T` or `/tabs` hides the top bar for more room.",
     "`Ctrl+C` clears the input, then stops running `!` commands, then leaves.",
     "Type `@` to mention a file; matching is fuzzy and `Tab` inserts it.",
     "`Ctrl+R` searches everything you have typed, across sessions.",
@@ -69,12 +70,14 @@ pub fn draw(frame: &mut Frame, app: &App) {
     );
     let area = if framed {
         let [top, middle, bottom] = Layout::vertical([
-            Constraint::Length(1),
+            Constraint::Length(u16::from(!app.top_bar_hidden)),
             Constraint::Min(1),
             Constraint::Length(1),
         ])
         .areas(full);
-        chrome::header(frame, app, top);
+        if !app.top_bar_hidden {
+            chrome::header(frame, app, top);
+        }
         chrome::status(frame, app, bottom);
         let card = Rect {
             x: middle.x + 1,
@@ -95,17 +98,21 @@ pub fn draw(frame: &mut Frame, app: &App) {
         full
     };
 
-    let header: Vec<Line> = if framed {
+    let header: Vec<Line> = if framed || app.top_bar_hidden {
         Vec::new()
     } else if area.height >= 22 && app.view.is_some() {
         brand::header(header_info(app), false, app.tick)
     } else {
-        vec![brand::compact()]
+        vec![brand::compact(&app.project.name)]
     };
     let show_tip = !framed && area.height >= 18;
     let tip_height = if show_tip { 1 } else { 0 };
     let status_height = if framed { 0 } else { 1 };
-    let header_height = if framed { 0 } else { header.len() as u16 + 1 };
+    let header_height = if framed || app.top_bar_hidden {
+        0
+    } else {
+        header.len() as u16 + 1
+    };
 
     // The draft grows with what is typed, up to a third of the screen, then
     // scrolls to keep the cursor in view.
@@ -120,12 +127,27 @@ pub fn draw(frame: &mut Frame, app: &App) {
     let visible_rows = layout.rows.len().clamp(1, most_rows);
     let input_rows = visible_rows as u16 + 2;
 
+    // A question with options takes the input's place, leaving the
+    // conversation above it readable.
+    let docked = app
+        .picker
+        .as_ref()
+        .filter(|picker| picker.kind == PickerKind::Question && area.height >= 16)
+        .map(|picker| {
+            (
+                picker,
+                menus::Docked::new(picker, area.width, area.height / 2),
+            )
+        });
+    let input_rows = docked
+        .as_ref()
+        .map_or(input_rows, |(_, dock)| dock.height());
     let mut card = if app.picker.is_none() && area.height >= 16 {
         panel::question_card(app, area.width)
     } else {
         Vec::new()
     };
-    if card.is_empty() {
+    if card.is_empty() && docked.is_none() {
         card = needs_you(app, area.width);
     }
 
@@ -141,7 +163,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
     let (body, panel_area) = panel::split(app, body);
     app.body_area.set(body);
 
-    if !framed {
+    if header_height > 0 {
         let mut header_lines = header;
         header_lines.push(if app.working() {
             brand::divider_active(header_area.width, app.tick)
@@ -172,6 +194,15 @@ pub fn draw(frame: &mut Frame, app: &App) {
     }
     frame.render_widget(Paragraph::new(card), card_area);
 
+    if let Some((picker, dock)) = docked {
+        dock.draw(frame, picker, input_area);
+        if show_tip {
+            draw_tip(frame, app, tip_area);
+        }
+        highlight_selection(frame, app);
+        return;
+    }
+
     // The bar and prompt say what Enter will do: a shell command, a slash
     // command, or a message for the agent.
     let text = app.editor.text();
@@ -189,7 +220,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
             "plan · explores read-only, asks, then drafts a plan to approve",
         )
     } else if text.starts_with('/') {
-        (brand::accent(), "/", "command")
+        (brand::command(), "/", "command")
     } else if text.starts_with('@') || mentioning {
         (brand::info(), "@", "mention an agent or file")
     } else if app.working() && !text.is_empty() {
@@ -262,19 +293,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
         draw_tip(frame, app, tip_area);
     }
 
-    if let Some(selection) = &app.selection {
-        let buffer = frame.buffer_mut();
-        let area = buffer.area;
-        for row in area.top()..area.bottom() {
-            for column in area.left()..area.right() {
-                if selection.contains(column, row) {
-                    if let Some(cell) = buffer.cell_mut((column, row)) {
-                        cell.modifier.insert(Modifier::REVERSED);
-                    }
-                }
-            }
-        }
-    }
+    highlight_selection(frame, app);
 
     if let Some(picker) = &app.picker {
         menus::picker(frame, picker, area);
@@ -293,6 +312,24 @@ pub fn draw(frame: &mut Frame, app: &App) {
         inner.x + (cursor_column as u16).min(inner.width.saturating_sub(1)),
         inner.y + ((cursor_row - first_row) as u16).min(inner.height.saturating_sub(1)),
     ));
+}
+
+/// Shows text being dragged over as selected.
+fn highlight_selection(frame: &mut Frame, app: &App) {
+    let Some(selection) = &app.selection else {
+        return;
+    };
+    let buffer = frame.buffer_mut();
+    let area = buffer.area;
+    for row in area.top()..area.bottom() {
+        for column in area.left()..area.right() {
+            if selection.contains(column, row) {
+                if let Some(cell) = buffer.cell_mut((column, row)) {
+                    cell.modifier.insert(Modifier::REVERSED);
+                }
+            }
+        }
+    }
 }
 
 /// What the open conversation is waiting on, pinned above the input in
@@ -471,6 +508,28 @@ pub(super) fn status_parts(app: &App) -> (String, Color, Vec<Span<'static>>) {
             ),
             accent,
         ));
+    }
+    if app.top_bar_hidden {
+        // The tabs that would show it are hidden.
+        let waiting = app
+            .sessions
+            .iter()
+            .filter(|session| {
+                app.session.as_ref() != Some(&session.id) && super::conversation::needs_you(session)
+            })
+            .count();
+        if waiting > 0 {
+            parts.push(Span::styled(
+                format!(
+                    "  {waiting} other {} you · Ctrl+T",
+                    if waiting == 1 { "needs" } else { "need" }
+                ),
+                Style::default().fg(brand::warning()),
+            ));
+        }
+    }
+    if app.sharpening {
+        parts.push(Span::styled("  sharpening your draft…", accent));
     }
     if app.scroll_top.is_some() {
         parts.push(Span::styled("  scrolled back, Esc to return", muted));

@@ -1,8 +1,9 @@
-//! Challenge reviews: a reviewer tries to break a finished result and reports only
-//! findings it proved by running something. The reviewer works in its own worktree,
-//! started from a commit of the author's files, so it never touches the author's
-//! workspace. A finding's command can be run again on request in a disposable copy of
-//! the reviewer's workspace.
+//! Reviews of a finished result by another agent. An agent review reads the change
+//! and returns suggested fixes; a Challenge tries to break it and reports only findings
+//! it proved by running something. Either reviewer works in its own worktree, started
+//! from a commit of the author's files, so it never touches the author's workspace. A
+//! Challenge finding's command can be run again on request in a disposable copy of the
+//! reviewer's workspace.
 
 use super::{
     coordination::Coordinator,
@@ -28,10 +29,22 @@ pub struct ChallengeSource {
     /// The commit the reviewer's worktree started from.
     #[serde(default)]
     pub base: String,
+    /// Reviewers saved before agent reviews existed are Challenges.
+    #[serde(default)]
+    pub kind: ReviewKind,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ReviewKind {
+    #[default]
+    Challenge,
+    /// Reads the change and suggests fixes without running checks.
+    Review,
 }
 
 /// Result of running a finding's command again.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChallengeRerun {
     pub command: String,
@@ -84,6 +97,81 @@ End your reply with the same findings as a JSON array in a fenced block tagged j
     )
 }
 
+/// What the author recorded as proof, so the reviewer does not call a recorded check
+/// unbacked. Empty when nothing was recorded.
+fn author_evidence(author: &TaskRun) -> String {
+    let mut lines = Vec::new();
+    if let Some(goal) = author.understanding.as_ref().map(|u| u.goal.trim()) {
+        if !goal.is_empty() {
+            lines.push(format!("Goal: {goal}"));
+        }
+    }
+    for step in &author.validation_steps {
+        let notes = step.notes.as_deref().map(str::trim).unwrap_or_default();
+        let evidence = if step.evidence.is_empty() {
+            String::new()
+        } else {
+            format!(" Evidence: {}", step.evidence.join(", "))
+        };
+        lines.push(format!(
+            "- Check ({}): {}. {notes}{evidence}",
+            step.status, step.step
+        ));
+    }
+    for entry in &author.decisions {
+        lines.push(format!(
+            "- Decision ({}): {}. Result: {}",
+            entry.phase, entry.decision, entry.result
+        ));
+    }
+    for shot in &author.screenshots {
+        lines.push(format!("- Screenshot: {}", shot.file_path));
+    }
+    if lines.is_empty() {
+        return String::new();
+    }
+    format!(
+        "\nAuthor's recorded evidence (verify it rather than trusting it; do not report a claim as unbacked when it is listed here):\n{}\n",
+        excerpt(&lines.join("\n"), 6_000)
+    )
+}
+
+/// Instructions for an agent review: read the change and plan fixes, without running it.
+pub(super) fn review_brief(author: &TaskRun, base: &str) -> String {
+    let result = if author.result.trim().is_empty() {
+        "(The author did not leave a result summary.)".to_string()
+    } else {
+        excerpt(&author.result, 4_000)
+    };
+    format!(
+        r#"Review the change below and suggest fixes the author can apply. This is a quick read-only review: read the diff and the code around it, and do not build, install, run tests or start servers.
+
+Your workspace is an isolated copy of the author's files at the reviewed snapshot (commit {base}); `git diff HEAD~1` shows the change. Do not edit files, commit, or open the author's workspace.
+
+Intent
+Original request:
+{request}
+
+Author's result:
+{result}
+{evidence}
+Look for real problems: bugs, missed requirements, regressions, security issues, broken edge cases and clearly risky or confusing code. Skip style preferences and anything you are not confident about. No findings is a valid result.
+
+For each finding, give the file and line, what is wrong, and a short, concrete fix plan the author can follow without asking you.
+
+End your reply with a fenced block tagged jackalope-review holding JSON in this shape, with an empty findings array when you found nothing:
+
+```jackalope-review
+{{"summary": "One or two sentences on the change and its overall state.",
+  "findings": [{{"severity": "high", "title": "Short title", "file": "src/example.ts", "line": 42, "problem": "What is wrong and why it matters.", "fix": "The steps to fix it."}}]}}
+```
+
+severity is high (breaks the intent or loses data), medium (a real bug or gap in some cases) or low (worth fixing, not blocking)."#,
+        request = excerpt(&author.prompt, 6_000),
+        evidence = author_evidence(author),
+    )
+}
+
 /// Whether `command` is one the reviewer reported, through the tool or its reply.
 fn reported(run: &TaskRun, command: &str) -> bool {
     let command = command.trim();
@@ -118,13 +206,14 @@ fn git(path: &Path, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
-/// Starts one Challenge reviewer for a finished attempt. `request` carries the reviewer's
-/// agent, account and project settings; its prompt and workspace are replaced here.
+/// Starts one reviewer for a finished attempt. `request` carries the reviewer's agent,
+/// account and project settings; its prompt and workspace are replaced here.
 pub(super) fn start(
     coordinator: &Coordinator,
     runtime: &TaskRuntime,
     mut request: RunRequest,
     source_run_id: &str,
+    kind: ReviewKind,
 ) -> Result<String, String> {
     // Lock order: the execution guard is released before the coordinator lock is taken.
     let source = {
@@ -133,21 +222,24 @@ pub(super) fn start(
         let author = runs
             .iter()
             .find(|run| run.id == source_run_id)
-            .ok_or("The result to challenge no longer exists.")?;
+            .ok_or("The result to review no longer exists.")?;
         if runs
             .iter()
             .any(|run| run.workspace == author.workspace && ACTIVE.contains(&run.status.as_str()))
         {
-            return Err("Wait for this work to finish before challenging it.".into());
+            return Err("Wait for this work to finish before reviewing it.".into());
         }
         if author.workspace.is_empty() {
-            return Err("This result has no workspace to challenge.".into());
+            return Err("This result has no workspace to review.".into());
         }
         let directory = runtime.integration_directory();
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         let (tree, base) =
-            integration::snapshot_commit(author, &directory, "Jackalope challenge snapshot")?;
-        request.prompt = brief(author, &base);
+            integration::snapshot_commit(author, &directory, "Jackalope review snapshot")?;
+        request.prompt = match kind {
+            ReviewKind::Challenge => brief(author, &base),
+            ReviewKind::Review => review_brief(author, &base),
+        };
         request.project_id = author.project_id.clone();
         request.project_name = author.project_name.clone();
         request.project_path = author.project_path.clone();
@@ -156,8 +248,13 @@ pub(super) fn start(
             run_id: author.id.clone(),
             tree,
             base,
+            kind,
         }
     };
+    if kind == ReviewKind::Review {
+        // Reading the change needs no installed dependencies, so the review starts at once.
+        request.prepare_command = None;
+    }
     request.isolated = true;
     request.workspace_mode = Some(WorkspaceMode::Worktree);
     request.previous_run_id = None;
@@ -252,11 +349,45 @@ pub(super) fn rerun(
         let _guard = integration::execution_guard();
         drop(disposable);
     }
-    Ok(ChallengeRerun {
+    let rerun = ChallengeRerun {
         command: command.to_string(),
         preparation,
         result,
-    })
+    };
+    save_rerun(runtime, id, &rerun)?;
+    Ok(rerun)
+}
+
+/// Where a reviewer's latest Run again results are kept, one per command, so they
+/// survive a reload. Ids come from the runtime, which only issues UUID-style ids.
+fn reruns_path(runtime: &TaskRuntime, id: &str) -> Result<PathBuf, String> {
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+        return Err("Unknown reviewer attempt.".into());
+    }
+    Ok(runtime
+        .integration_directory()
+        .join("challenge-reruns")
+        .join(format!("{id}.json")))
+}
+
+fn load_reruns(runtime: &TaskRuntime, id: &str) -> Result<Vec<ChallengeRerun>, String> {
+    match std::fs::read(reruns_path(runtime, id)?) {
+        Ok(bytes) => Ok(serde_json::from_slice(&bytes).unwrap_or_default()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(vec![]),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+fn save_rerun(runtime: &TaskRuntime, id: &str, rerun: &ChallengeRerun) -> Result<(), String> {
+    let path = reruns_path(runtime, id)?;
+    let mut saved = load_reruns(runtime, id)?;
+    saved.retain(|other| other.command != rerun.command);
+    saved.push(rerun.clone());
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let bytes = serde_json::to_vec(&saved).map_err(|e| e.to_string())?;
+    super::history::write_atomic(&path, &bytes)
 }
 
 #[tauri::command]
@@ -269,10 +400,47 @@ pub async fn task_start_challenge(
     let coordinator = coordinator.inner().clone();
     let runtime = runtime.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        start(&coordinator, &runtime, request, &source_run_id)
+        start(
+            &coordinator,
+            &runtime,
+            request,
+            &source_run_id,
+            ReviewKind::Challenge,
+        )
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn task_start_agent_review(
+    request: RunRequest,
+    source_run_id: String,
+    coordinator: State<'_, Coordinator>,
+    runtime: State<'_, TaskRuntime>,
+) -> Result<String, String> {
+    let coordinator = coordinator.inner().clone();
+    let runtime = runtime.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        start(
+            &coordinator,
+            &runtime,
+            request,
+            &source_run_id,
+            ReviewKind::Review,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// The latest Run again result for each of this reviewer's finding commands.
+#[tauri::command]
+pub fn task_challenge_reruns(
+    id: String,
+    runtime: State<'_, TaskRuntime>,
+) -> Result<Vec<ChallengeRerun>, String> {
+    load_reruns(runtime.inner(), &id)
 }
 
 /// The reviewer's full reply, which summaries omit, for reading its findings block.
@@ -282,7 +450,7 @@ pub fn task_challenge_reply(id: String, runtime: State<'_, TaskRuntime>) -> Resu
         .run_snapshot(&id)
         .ok_or("The reviewer's attempt no longer exists.")?;
     if run.challenge_of.is_none() {
-        return Err("This attempt is not a Challenge reviewer.".into());
+        return Err("This attempt is not a reviewer.".into());
     }
     Ok(run.result)
 }
@@ -332,6 +500,43 @@ mod tests {
             ..author()
         };
         assert!(brief(&silent, "abc").contains("did not leave a result summary"));
+    }
+
+    #[test]
+    fn review_brief_is_read_only_and_asks_for_fix_plans() {
+        let text = review_brief(&author(), "abc123");
+        for expected in [
+            "Reject empty names when saving a profile.",
+            "Saving now trims the name and refuses blank input.",
+            "commit abc123",
+            "do not build, install, run tests",
+            "Do not edit files",
+            "```jackalope-review",
+            "\"fix\"",
+        ] {
+            assert!(text.contains(expected), "brief is missing {expected:?}");
+        }
+        assert!(!text.contains("recorded evidence"));
+        let mut proven = author();
+        proven.validation_steps.push(ValidationStep {
+            id: "1".into(),
+            step: "Paired the simulator with a dev host".into(),
+            status: "passed".into(),
+            notes: None,
+            evidence: vec!["/tmp/pair.png".into()],
+            timestamp: "now".into(),
+            requirements: vec![],
+            finding: None,
+            safety_fact: None,
+        });
+        let text = review_brief(&proven, "abc123");
+        assert!(text.contains("recorded evidence"));
+        assert!(text.contains("- Check (passed): Paired the simulator with a dev host."));
+        assert!(text.contains("Evidence: /tmp/pair.png"));
+        let source: ChallengeSource =
+            serde_json::from_value(serde_json::json!({"runId": "a", "tree": "t", "base": "b"}))
+                .unwrap();
+        assert_eq!(source.kind, ReviewKind::Challenge);
     }
 
     #[test]
@@ -387,5 +592,39 @@ mod tests {
             .unwrap()
             .get("challengeOf")
             .is_none());
+    }
+
+    #[test]
+    fn run_again_results_survive_reload_latest_per_command() {
+        let root = std::env::temp_dir().join(format!("jackalope-reruns-{}", uuid::Uuid::new_v4()));
+        let runtime = TaskRuntime::new(root.join("history")).unwrap();
+        let result = |code| CommandResult {
+            exit_code: Some(code),
+            success: code == 0,
+            timed_out: false,
+            stalled: false,
+            stdout: format!("exit {code}"),
+            stderr: String::new(),
+            truncated: false,
+            duration_ms: 5,
+        };
+        let rerun = |command: &str, code| ChallengeRerun {
+            command: command.into(),
+            preparation: None,
+            result: Some(result(code)),
+        };
+        assert!(load_reruns(&runtime, "reviewer-1").unwrap().is_empty());
+        save_rerun(&runtime, "reviewer-1", &rerun("node a.js", 1)).unwrap();
+        save_rerun(&runtime, "reviewer-1", &rerun("node b.js", 1)).unwrap();
+        save_rerun(&runtime, "reviewer-1", &rerun("node a.js", 0)).unwrap();
+        let saved = load_reruns(&runtime, "reviewer-1").unwrap();
+        assert_eq!(saved.len(), 2);
+        let a = saved
+            .iter()
+            .find(|entry| entry.command == "node a.js")
+            .unwrap();
+        assert_eq!(a.result.as_ref().unwrap().exit_code, Some(0));
+        assert!(load_reruns(&runtime, "../escape").is_err());
+        let _ = std::fs::remove_dir_all(root);
     }
 }

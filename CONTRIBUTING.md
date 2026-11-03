@@ -106,10 +106,28 @@ An existing `core.hooksPath` requires manual integration instead of being overwr
 Pre-commit checks staged whitespace and runs Biome on staged JavaScript, TypeScript,
 JSON, CSS and GraphQL content. It reads the index, preserves partial staging, and
 does not format, stage or stash files. This gate is intended to take seconds.
-Pre-push runs `pnpm verify` followed by `pnpm check:secrets`; allow minutes for the
-full gate, especially after native changes or a cold Cargo build. TypeScript runs
-early so type failures stop before native compilation. Check timings are printed.
-Use `pnpm exec lefthook run pre-push` to exercise the checks without publishing.
+Pre-push runs `pnpm verify --changed` followed by `pnpm check:secrets`. `--changed`
+compares the commits being pushed with their upstream (or `origin/master`): native
+formatting and Rust tests run only when files the native build reads changed
+(`apps/desktop/src-tauri/**`, its icons, `agent-capabilities.json`, Cargo settings
+and the JavaScript lockfiles), and the JavaScript and shared checks run only when
+something outside `src-tauri` changed. When the comparison is unavailable it runs
+everything; CI always runs the full gate. Allow many minutes when Rust tests run.
+TypeScript runs early so type failures stop before native compilation. Check timings
+are printed. Use `pnpm exec lefthook run pre-push` to exercise the checks without
+publishing.
+
+Verification runs at below-normal CPU priority so the machine stays usable; set
+`JACKALOPE_VERIFY_PRIORITY=normal` to opt out. Run ad-hoc Rust tests with
+`--no-default-features`, as `pnpm verify` does, so they reuse its build instead of
+rebuilding Tauri with a different feature set. Dependencies build without debug info in
+dev and test profiles to keep linking fast and `target/` small.
+
+Each worktree has its own `target/`, so a first build compiles every dependency again.
+Install [sccache](https://github.com/mozilla/sccache) to share those builds:
+`pnpm verify` uses it whenever it is on `PATH`, and exporting
+`RUSTC_WRAPPER=sccache` in your shell profile covers plain `cargo` commands too.
+`sccache --show-stats` shows how much it saved.
 
 Actual pushes require a clean checkout and refs pointing to its current commit,
 so unstaged fixes cannot make a broken commit appear verified. No automatic stash

@@ -244,10 +244,12 @@ pub async fn plan_approve(
     hash: String,
     shape: String,
     checks: Option<session::PlanChecks>,
+    reviewer: Option<String>,
     state: State<'_, Coordinator>,
 ) -> Result<(), String> {
     let service = state.inner().clone();
-    blocking(move || session::approve(&service, &id, revision, &hash, &shape, "app", checks)).await
+    let choices = session::ApprovalChoices { checks, reviewer };
+    blocking(move || session::approve(&service, &id, revision, &hash, &shape, "app", choices)).await
 }
 
 #[tauri::command]

@@ -73,7 +73,23 @@ struct Pair {
     code: String,
     name: String,
 }
+/// Phones can only report a generic model name, so the host names them after the person
+/// who owns this computer. A name the person typed is kept as typed.
+fn device_label(name: &str, owner: Option<&str>) -> String {
+    let generic = matches!(
+        name.to_lowercase().as_str(),
+        "iphone" | "ipad" | "android phone" | "android tablet" | "my phone" | "phone"
+    );
+    match owner
+        .map(str::trim)
+        .filter(|owner| generic && !owner.is_empty())
+    {
+        Some(owner) => format!("{owner}'s {name}").chars().take(80).collect(),
+        None => name.to_owned(),
+    }
+}
 async fn pair(State(service): State<RemoteAccess>, Json(pair): Json<Pair>) -> Response {
+    let owner = crate::commands::system::owner_first_name();
     let mut inner = service.inner.lock().unwrap();
     let Some(pending) = inner.pairing.as_mut() else {
         return failure(
@@ -81,12 +97,7 @@ async fn pair(State(service): State<RemoteAccess>, Json(pair): Json<Pair>) -> Re
             "Create a new pairing link on the host.",
         );
     };
-    pending.attempts = pending.attempts.saturating_add(1);
-    if pending.expires <= Instant::now()
-        || pending.attempts > 20
-        || pair.code.len() != 64
-        || hash(&pair.code) != pending.hash
-    {
+    if !pending.admit(&pair.code, Instant::now()) {
         return failure(
             StatusCode::FORBIDDEN,
             "Pairing expired or was declined. Create a new link on the host.",
@@ -99,12 +110,13 @@ async fn pair(State(service): State<RemoteAccess>, Json(pair): Json<Pair>) -> Re
             "Use a device name up to 80 characters. At most 20 devices may be paired.",
         );
     }
+    let name = device_label(name, owner.as_deref());
     let token = secret();
     let id = Uuid::new_v4().to_string();
     let mut config = inner.config.clone();
     config.devices.push(Device {
         id: id.clone(),
-        name: name.into(),
+        name,
         token_hash: hash(&token),
         paired_at: chrono::Utc::now().to_rfc3339(),
     });
@@ -113,7 +125,9 @@ async fn pair(State(service): State<RemoteAccess>, Json(pair): Json<Pair>) -> Re
     }
     inner.config = config;
     inner.pairing = None;
-    Json(json!({"id":id,"token":token})).into_response()
+    // The computer's name lets the phone label this host better than its address does.
+    Json(json!({"id":id,"token":token,"computer":crate::commands::system::device_name()}))
+        .into_response()
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -137,8 +151,18 @@ fn run<'a>(runs: &'a [TaskRun], config: &Config, id: Option<&str>) -> Result<&'a
         .find(|r| Some(r.id.as_str()) == id && allowed(config, &r.project_id, &r.project_path))
         .ok_or_else(|| "Task is unavailable or access was removed.".into())
 }
+const LISTED_PROMPTS: usize = 5;
+/// Lists carry a short title and only unanswered questions, so a companion can show work
+/// waiting on the person without loading each task's detail; detail carries the request.
+/// A few questions are enough to mark a list row, which is polled every few seconds.
 fn task(run: &TaskRun, detail: bool) -> Value {
-    json!({"id":run.id,"taskId":run.task_id,"sessionId":run.live_session_id,"projectId":run.project_id,"projectName":run.project_name,"title":run.prompt.chars().take(160).collect::<String>(),"status":run.status,"startedAt":run.started_at,"result":if detail { run.result.chars().take(100_000).collect::<String>() } else { String::new() },"error":run.error,"prompts":if detail { json!(run.prompts) } else { json!([]) },"activity":if detail { json!(run.activity.iter().rev().take(30).rev().collect::<Vec<_>>()) } else { json!([]) }})
+    let prompts: Vec<_> = run
+        .prompts
+        .iter()
+        .filter(|prompt| detail || prompt.status == "pending")
+        .take(if detail { usize::MAX } else { LISTED_PROMPTS })
+        .collect();
+    json!({"id":run.id,"taskId":run.task_id,"sessionId":run.live_session_id,"projectId":run.project_id,"projectName":run.project_name,"agent":run.agent,"title":run.prompt.chars().take(if detail { 12_000 } else { 160 }).collect::<String>(),"status":run.status,"startedAt":run.started_at,"result":if detail { run.result.chars().take(100_000).collect::<String>() } else { String::new() },"error":run.error,"prompts":prompts,"activity":if detail { json!(run.activity.iter().rev().take(30).rev().collect::<Vec<_>>()) } else { json!([]) }})
 }
 async fn request(
     State(service): State<RemoteAccess>,
@@ -327,6 +351,24 @@ async fn asset(State(service): State<RemoteAccess>, req: Request) -> Response {
 mod tests {
     use super::*;
     #[test]
+    fn generic_phone_names_take_the_owner_name_and_typed_names_stay() {
+        assert_eq!(device_label("iPhone", Some("Caden")), "Caden's iPhone");
+        assert_eq!(device_label("iPad", Some(" Ada ")), "Ada's iPad");
+        assert_eq!(
+            device_label("Android phone", Some("Ada")),
+            "Ada's Android phone"
+        );
+        assert_eq!(device_label("Work phone", Some("Ada")), "Work phone");
+        assert_eq!(device_label("iPhone", None), "iPhone");
+        assert_eq!(device_label("iPhone", Some("  ")), "iPhone");
+        assert!(
+            device_label("iPhone", Some(&"x".repeat(200)))
+                .chars()
+                .count()
+                <= 80
+        );
+    }
+    #[test]
     fn remote_start_and_followup_are_durable_idempotent_and_project_scoped() {
         let directory =
             std::env::temp_dir().join(format!("jackalope-remote-test-{}", Uuid::new_v4()));
@@ -454,6 +496,7 @@ mod tests {
                 config,
                 pairing: Some(Pairing {
                     hash: hash(&code),
+                    short: String::new(),
                     expires: Instant::now() + Duration::from_secs(300),
                     attempts: 0,
                 }),
@@ -601,6 +644,7 @@ mod tests {
         assert!(run(&[private], &saved, Some("private")).is_err());
         service.inner.lock().unwrap().pairing = Some(Pairing {
             hash: hash(&code),
+            short: String::new(),
             expires: Instant::now() - Duration::from_secs(1),
             attempts: 0,
         });
@@ -624,6 +668,43 @@ mod tests {
             .to_string_lossy()
             .starts_with("jackalope-remote-test-"));
         std::fs::remove_dir_all(directory).unwrap();
+    }
+    #[test]
+    fn task_lists_carry_short_titles_and_only_unanswered_questions() {
+        let prompt = |id: &str, status: &str| {
+            serde_json::from_value(json!({"id":id,"runId":"run","question":"Which?","status":status,"answer":null,"createdAt":"2026-01-01T00:00:00Z","answeredAt":null})).unwrap()
+        };
+        let run = TaskRun {
+            id: "run".into(),
+            prompts: vec![prompt("asked", "pending"), prompt("done", "answered")],
+            result: "Finished".into(),
+            ..Default::default()
+        };
+        let listed = task(&run, false);
+        assert_eq!(listed["prompts"].as_array().unwrap().len(), 1);
+        assert_eq!(listed["prompts"][0]["id"], "asked");
+        assert_eq!(listed["result"], "");
+        let long = TaskRun {
+            prompt: "x".repeat(500),
+            ..Default::default()
+        };
+        assert_eq!(task(&long, false)["title"].as_str().unwrap().len(), 160);
+        assert_eq!(task(&long, true)["title"].as_str().unwrap().len(), 500);
+        assert_eq!(task(&run, true)["prompts"].as_array().unwrap().len(), 2);
+        let crowded = TaskRun {
+            prompts: (0..LISTED_PROMPTS + 3)
+                .map(|index| prompt(&format!("q{index}"), "pending"))
+                .collect(),
+            ..Default::default()
+        };
+        assert_eq!(
+            task(&crowded, false)["prompts"].as_array().unwrap().len(),
+            LISTED_PROMPTS
+        );
+        assert_eq!(
+            task(&crowded, true)["prompts"].as_array().unwrap().len(),
+            LISTED_PROMPTS + 3
+        );
     }
     #[test]
     fn rejects_rebinding_and_cross_origin_requests() {

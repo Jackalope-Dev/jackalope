@@ -198,13 +198,26 @@ function FindingCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [rerun, setRerun] = useState<Rerun | null>(null);
+  const reviewerRunId = finding.sources[0].runId;
+  useEffect(() => {
+    let current = true;
+    nativeTask<Rerun[]>('task_challenge_reruns', { id: reviewerRunId })
+      .then((saved) => {
+        const latest = saved.find((entry) => entry.command === finding.command.trim());
+        if (current && latest) setRerun((shown) => shown ?? latest);
+      })
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [reviewerRunId, finding.command]);
   const runAgain = async () => {
     setBusy(true);
     setError('');
     try {
       setRerun(
         await nativeTask<Rerun>('task_challenge_rerun', {
-          id: finding.sources[0].runId,
+          id: reviewerRunId,
           command: finding.command,
         }),
       );

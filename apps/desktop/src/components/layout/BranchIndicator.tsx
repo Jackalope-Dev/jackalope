@@ -117,6 +117,8 @@ export function BranchIndicator() {
       : project.plainFolder
         ? 'No Git'
         : project.gitBranch || 'Branch unknown';
+  const copyableBranch = run ? run.branch : !managed ? project.gitBranch : '';
+  const location = run ? run.workspace : project.path;
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
@@ -134,19 +136,39 @@ export function BranchIndicator() {
           sideOffset={6}
           collisionPadding={12}
         >
-          <strong>
+          <h2 className="branch-details-title">
             {run ? 'Task workspace' : managed ? 'Plan workspaces' : 'Project checkout'}
-          </strong>
-          <p className="work-context-path">
-            {run
-              ? run.workspace || 'Workspace is being prepared.'
-              : managed
-                ? 'Assignments use separate workspaces. Select an assignment to inspect its branch.'
-                : project.path}
-          </p>
+          </h2>
+          {managed && !run ? (
+            <p className="branch-details-note">
+              Assignments use separate workspaces. Select an assignment to inspect its branch.
+            </p>
+          ) : (
+            <dl className="branch-facts">
+              <div>
+                <dt>Branch</dt>
+                <dd>{branch}</dd>
+                {copyableBranch && (
+                  <CopyButton
+                    size="sm"
+                    text={copyableBranch}
+                    label="Copy"
+                    aria-label="Copy branch"
+                  />
+                )}
+              </div>
+              <div>
+                <dt>Path</dt>
+                <dd>{location || 'Workspace is being prepared.'}</dd>
+                {location && (
+                  <CopyButton size="sm" text={location} label="Copy" aria-label="Copy path" />
+                )}
+              </div>
+            </dl>
+          )}
           {targets.length > 0 && (
             <section className="branch-switch" aria-labelledby="branch-switch-heading">
-              <h2 id="branch-switch-heading">Switch to</h2>
+              <h3 id="branch-switch-heading">Switch to</h3>
               <ul>
                 {targets.map((target) => (
                   <li key={target.key}>
@@ -160,9 +182,9 @@ export function BranchIndicator() {
                           navigateWorkspace('kanban');
                         }}
                       >
-                        <GitBranch size={14} aria-hidden="true" />
-                        <span className="branch-switch-name">{branchLabel(target.branch)}</span>
+                        <GitBranch size={14} aria-hidden="true" className="branch-switch-icon" />
                         <span className="branch-switch-label">{target.label}</span>
+                        <span className="branch-switch-name">{branchLabel(target.branch)}</span>
                       </button>
                     </Popover.Close>
                   </li>
@@ -173,7 +195,9 @@ export function BranchIndicator() {
           <div className="branch-actions">
             {!managed && (
               <Popover.Close asChild>
-                <Button onClick={() => openChanges(checkout)}>Review changes</Button>
+                <Button variant="secondary" onClick={() => openChanges(checkout)}>
+                  Review changes
+                </Button>
               </Popover.Close>
             )}
             <Popover.Close asChild>
@@ -181,20 +205,6 @@ export function BranchIndicator() {
                 Manage worktrees
               </Button>
             </Popover.Close>
-            {run?.branch || (!run && !managed && project.gitBranch) ? (
-              <CopyButton
-                variant="outline"
-                text={run ? run.branch : project.gitBranch}
-                label="Copy branch"
-              />
-            ) : null}
-            {(run ? run.workspace : !managed && project.path) ? (
-              <CopyButton
-                variant="outline"
-                text={run ? run.workspace : project.path}
-                label="Copy path"
-              />
-            ) : null}
           </div>
         </Popover.Content>
       </Popover.Portal>

@@ -190,7 +190,7 @@ pub fn action(
                 .ok_or("Approve the revision you reviewed.")?,
             &text,
             "terminal",
-            None,
+            session::ApprovalChoices::default(),
         )?,
         "save" => {
             session::save_edit(

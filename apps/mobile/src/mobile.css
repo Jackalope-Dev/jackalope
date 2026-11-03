@@ -1,0 +1,491 @@
+/* The phone companion. Phones have no OS window material, so the frosted look is drawn
+   here: soft brand-colour light behind the page, and panels that blur what scrolls under
+   them. Panes stay tinted enough that text keeps 4.5:1 over any part of the backdrop. */
+/* Safe-area insets: the Android shell sets these from the system bars because its WebView
+   reports zero for env(); iOS keeps the env() values. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}
+
+.mobile-body {
+  --m-gutter: 16px;
+  --m-glass: color-mix(in srgb, var(--color-surface-elevated) 74%, transparent);
+  --m-glass-dense: color-mix(in srgb, var(--color-surface-elevated) 95%, transparent);
+  --m-edge: color-mix(in srgb, var(--color-text-primary) 10%, transparent);
+  --m-shadow: 0 12px 40px color-mix(in srgb, #000 18%, transparent);
+  min-height: 100dvh;
+  /* The desktop stylesheet locks the body because its shell scrolls inside panes; phone
+     screens scroll the page itself. */
+  overflow: hidden auto;
+  background:
+    radial-gradient(
+      90% 55% at 0% 0%,
+      color-mix(in srgb, var(--color-accent) 26%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      80% 50% at 100% 30%,
+      color-mix(in srgb, var(--color-accent-secondary) 20%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      90% 60% at 50% 110%,
+      color-mix(in srgb, var(--color-accent-tertiary) 18%, transparent),
+      transparent 70%
+    ),
+    var(--color-bg);
+  background-attachment: fixed;
+  color: var(--color-text-primary);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-glass {
+  border: 1px solid var(--m-edge);
+  background: var(--m-glass);
+  box-shadow: var(--m-shadow);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .mobile-body {
+    --m-glass: var(--color-surface-elevated);
+    --m-glass-dense: var(--color-surface-elevated);
+  }
+}
+
+/* Screens keep clear of the notch, home indicator and rounded corners. */
+.mobile-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 100dvh;
+  padding: 0 max(var(--m-gutter), var(--safe-right)) calc(96px + var(--safe-bottom))
+    max(var(--m-gutter), var(--safe-left));
+}
+/* On an iPad or a landscape phone, content keeps a readable column under the full-width
+   bar instead of stretching rows across the screen. */
+.mobile-screen > :not(.mobile-bar, .mobile-fab, .mobile-composer) {
+  width: min(100%, 720px);
+  align-self: center;
+}
+.mobile-app-error {
+  margin: calc(8px + var(--safe-top)) max(var(--m-gutter), var(--safe-right)) 0
+    max(var(--m-gutter), var(--safe-left));
+}
+
+/* The top bar floats over scrolling content as one frosted capsule. */
+.mobile-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  margin: 0 calc(-1 * var(--m-gutter));
+  padding: calc(6px + var(--safe-top)) var(--m-gutter) 6px;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  background: var(--m-glass-dense);
+}
+.mobile-bar h1 {
+  overflow: hidden;
+  font-size: var(--text-base);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mobile-bar > h1,
+.mobile-bar-title {
+  flex: 1;
+  min-width: 0;
+}
+.mobile-bar-title > span {
+  display: block;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mobile-icon-button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+}
+.mobile-icon-button:active {
+  background: var(--color-surface-hover);
+}
+.mobile-icon-button:focus-visible,
+.mobile-row:focus-visible,
+.mobile-fab:focus-visible,
+.mobile-send:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+/* A conversation's status leads its second line, then its project and computer. */
+.mobile-bar-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 2px;
+}
+.mobile-bar-meta .ui-badge {
+  flex-shrink: 0;
+}
+.mobile-bar-meta > span:not(.ui-badge) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-card {
+  border-radius: var(--radius-2xl);
+}
+.mobile-section {
+  display: grid;
+  gap: 8px;
+}
+.mobile-section h2 {
+  padding: 0 4px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.mobile-section h2 > span {
+  margin-left: 4px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+/* List rows keep one height with single-line titles, joined in one card. */
+.mobile-list {
+  display: grid;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+.mobile-list > li + li {
+  border-top: 1px solid var(--color-border-subtle);
+}
+.mobile-row-wrap {
+  display: flex;
+  align-items: center;
+}
+.mobile-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  min-height: 64px;
+  padding: 10px 12px;
+  border-radius: var(--radius-xl);
+  text-align: left;
+}
+.mobile-row:active {
+  background: var(--color-surface-hover);
+}
+.mobile-row-body {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.mobile-row-body strong,
+.mobile-row-body small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mobile-row-body strong {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.mobile-row-body small {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+/* The status leads the second line, so titles keep the row's full width. */
+.mobile-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.mobile-row-meta .ui-badge {
+  flex-shrink: 0;
+}
+.mobile-row-chevron {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+.mobile-host-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-lg);
+  background: var(--color-accent-subtle, var(--color-surface-sunken));
+  color: var(--color-accent-ink);
+}
+.mobile-host-icon[data-unreachable] {
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+}
+
+.mobile-empty,
+.mobile-note {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.mobile-empty {
+  padding: 32px 0;
+  text-align: center;
+}
+
+/* New work floats above the home indicator. */
+.mobile-fab {
+  position: fixed;
+  right: max(var(--m-gutter), var(--safe-right));
+  bottom: calc(16px + var(--safe-bottom));
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 20px;
+  border-radius: var(--radius-full);
+  background: var(--color-action);
+  box-shadow: var(--m-shadow);
+  color: var(--color-on-action);
+  font-weight: 600;
+}
+.mobile-fab:disabled {
+  opacity: 0.5;
+}
+
+/* Conversations put your messages on the right as tinted bubbles and replies on the left
+   beside the agent's character, like the desktop. */
+.mobile-thread {
+  display: grid;
+  gap: 12px;
+}
+.mobile-bubble[data-from="you"] {
+  justify-self: end;
+  max-width: 85%;
+  min-width: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-2xl) var(--radius-2xl) var(--radius-xs) var(--radius-2xl);
+  background: var(--color-accent-subtle, var(--color-surface-sunken));
+  overflow-wrap: anywhere;
+}
+.mobile-bubble[data-from="agent"] {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.mobile-bubble-body {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--m-edge);
+  border-radius: var(--radius-xs) var(--radius-2xl) var(--radius-2xl) var(--radius-2xl);
+  background: var(--m-glass);
+  overflow-wrap: anywhere;
+}
+.mobile-working {
+  color: var(--color-text-secondary);
+}
+.mobile-review-button {
+  justify-self: start;
+}
+
+/* Agent replies: the preflight reset removes block spacing, so Markdown gets it back here. */
+.mobile-markdown {
+  display: grid;
+  gap: 10px;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+.mobile-markdown :is(h1, h2, h3, h4) {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+.mobile-markdown :is(ul, ol) {
+  display: grid;
+  gap: 4px;
+  padding-left: 20px;
+}
+.mobile-markdown ul {
+  list-style: disc;
+}
+.mobile-markdown ol {
+  list-style: decimal;
+}
+.mobile-markdown :not(pre) > code {
+  padding: 1px 4px;
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-sunken);
+  font-size: 0.92em;
+}
+.mobile-markdown pre {
+  overflow-x: auto;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  font-size: var(--text-xs);
+}
+.mobile-markdown table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.mobile-markdown :is(th, td) {
+  padding: 4px 8px;
+  border: 1px solid var(--color-border-subtle);
+}
+.mobile-markdown a {
+  color: var(--color-accent-ink);
+  text-decoration: underline;
+}
+/* Keep the line breaks someone typed; Markdown alone would join them into one line. The
+   grid drops the whitespace between blocks, so only breaks inside text remain. */
+.mobile-bubble[data-from="you"] .mobile-markdown {
+  white-space: pre-line;
+}
+.mobile-review {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* The reply bar docks across the bottom like the top bar, above the gesture area, so
+   nothing scrolling underneath shows through the field. */
+.mobile-composer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px max(var(--m-gutter), var(--safe-right)) calc(8px + var(--safe-bottom))
+    max(var(--m-gutter), var(--safe-left));
+  border-width: 1px 0 0;
+  border-radius: 0;
+  background: var(--m-glass-dense);
+  box-shadow: none;
+}
+.mobile-composer textarea {
+  flex: 1;
+  min-height: 40px;
+  max-height: 40dvh;
+  padding: 9px 14px;
+  border-radius: var(--radius-2xl);
+  resize: none;
+  field-sizing: content;
+}
+.mobile-send {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--color-action);
+  color: var(--color-on-action);
+}
+.mobile-send:disabled {
+  opacity: 0.4;
+}
+
+.mobile-new-work,
+.mobile-pairing-form,
+.mobile-pairing-fields {
+  display: grid;
+  gap: 16px;
+}
+.mobile-new-work,
+.mobile-pairing-form {
+  padding: 20px;
+}
+.mobile-pairing-intro {
+  display: grid;
+  gap: 6px;
+}
+.mobile-pairing-form h2 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.mobile-pairing-manual summary {
+  min-height: 44px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.mobile-pairing-manual .mobile-pairing-fields {
+  padding-top: 8px;
+}
+.mobile-pairing-code {
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+}
+.mobile-pairing-form p {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.mobile-pairing-hero {
+  display: grid;
+  place-items: center;
+  padding-top: calc(32px + var(--safe-top));
+}
+.mobile-pairing-mark {
+  width: min(260px, 70vw);
+  height: auto;
+  aspect-ratio: 1;
+}
+
+/* Launch: the ASCII mark decodes over the backdrop, then the splash fades. */
+.mobile-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 16px;
+  background: inherit;
+  background-color: var(--color-bg);
+  transition: opacity 300ms var(--ease-out, ease);
+}
+.mobile-splash[data-leaving] {
+  opacity: 0;
+}
+.mobile-splash-mark {
+  width: min(300px, 76vw);
+  height: auto;
+  aspect-ratio: 1;
+}
+.mobile-splash-name {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-sm);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mobile-splash {
+    transition: none;
+  }
+}

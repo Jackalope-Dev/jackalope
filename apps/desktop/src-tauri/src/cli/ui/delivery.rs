@@ -11,11 +11,14 @@ impl App {
     /// attempt and asks before applying it, as the app's merge review does.
     pub(super) fn merge(&mut self, message: &str) {
         let (Some(session_id), Some(view)) = (self.session.clone(), self.view.clone()) else {
-            self.note("Open a conversation to merge its work.");
+            self.flash("Open a conversation to merge its work", Tone::Muted);
             return;
         };
         if self.working() {
-            self.note("The agent is still working. Merge once it finishes.");
+            self.flash(
+                "The agent is still working. Merge once it finishes",
+                Tone::Muted,
+            );
             return;
         }
         let plan = match self.request(Request::MergePrepare {
@@ -34,7 +37,7 @@ impl App {
             return;
         }
         if plan.files.is_empty() {
-            self.note("There are no changes to merge.");
+            self.flash("There are no changes to merge", Tone::Muted);
             return;
         }
         let count = plan.files.len();
@@ -123,11 +126,17 @@ impl App {
     /// pushes the branch and opens a draft pull request after asking.
     pub(super) fn pull_request(&mut self, title: &str) {
         let Some(view) = self.view.clone().filter(|_| self.session.is_some()) else {
-            self.note("Open a conversation to open a pull request for its work.");
+            self.flash(
+                "Open a conversation to open a pull request for its work",
+                Tone::Muted,
+            );
             return;
         };
         if self.working() {
-            self.note("The agent is still working. Open a pull request once it finishes.");
+            self.flash(
+                "The agent is still working. Open a pull request once it finishes",
+                Tone::Muted,
+            );
             return;
         }
         let title = Some(title.trim())

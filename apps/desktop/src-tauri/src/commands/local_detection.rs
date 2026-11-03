@@ -211,7 +211,22 @@ fn is_key_configured(profiles_root: &Path, agent: &str, key_name: &str) -> bool 
 }
 
 #[tauri::command]
-pub fn agent_import_detected_key(
+pub async fn agent_import_detected_key(
+    app: tauri::AppHandle,
+    key_name: String,
+    profile_name: Option<String>,
+) -> Result<AgentProfile, String> {
+    use tauri::Manager;
+    tauri::async_runtime::spawn_blocking(move || {
+        import_detected_key(app.state(), app.state(), key_name, profile_name)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Saving a key waits for the shared execution lock, so the command runs this
+/// off the main thread.
+fn import_detected_key(
     runtime: State<'_, TaskRuntime>,
     helper: State<'_, super::helper::Helper>,
     key_name: String,
@@ -251,14 +266,14 @@ pub fn agent_import_detected_key(
     );
 
     if target_agent == "opencode" {
-        if let Err(error) = agent_profiles::agent_profile_save_key(
+        if let Err(error) = agent_profiles::save_key(
             runtime.clone(),
             target_agent.into(),
             profile.id.clone(),
             key_name,
             val.into(),
         ) {
-            let _ = agent_profiles::agent_profile_delete(
+            let _ = agent_profiles::delete_profile(
                 runtime,
                 helper,
                 target_agent.into(),

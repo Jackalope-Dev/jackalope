@@ -72,7 +72,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   launch raises the running host. Inside conversations, `!` runs shell commands with
   streamed output, follow-ups queue behind running work, `/bg` starts parallel
   conversations, open conversations appear as tabs with their state (Alt+1–9 or a click
-  switches), a pinned banner says what a blocked conversation needs, `@` names agents as
+  switches; `×` or `/close` hides one while its work continues), agent questions dock in
+  place of the input, a pinned banner says what a blocked conversation needs, `@` names agents as
   well as files, a leading `/`, `!` or `@` sets the input's mode, the input wraps and
   grows, and dragging copies text. With 24-bit colour it paints the app's surfaces in a
   rounded card with clickable header and status lines. `/learn` sends session learnings through
@@ -116,7 +117,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   starter requests.
   Work rows show elapsed time while an attempt runs, changed lines from a bounded native
   Git count, and an unread marker for finished work not yet opened; work can be marked
-  unread again. Recently opened tasks, chats and plans stay as up to eight tabs with
+  unread again. Sidebar rows keep their width for the title: they mark finished work whose
+  changes have not landed with an icon, and show the changed lines on hover and in the task
+  header. Recently opened tasks, chats and plans stay as up to eight tabs with
   Mod+1–9 and Ctrl+Tab switching; closing a tab never stops or archives work. Changes shows
   recent commits across local branches with Git's graph, and ? lists keyboard shortcuts.
   Returning users with current access open directly to their work.
@@ -164,8 +167,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Review's **Challenge this change** runs one or two reviewers, preferring a different
   model family, in worktrees at a snapshot of the result. Only findings proven by a
   command count; Checks shows each command, its output, the expected output and dropped
-  counts, with Run again in a disposable worktree and Send to the author into the
-  follow-up draft. Agent review also defaults to a reviewer from another model family.
+  counts, with Run again in a disposable worktree (its latest output per command is kept
+  across reloads) and Send to the author into the follow-up draft. Agent review and a
+  plan's combined review also default to a reviewer from another model family.
 - Compared attempts can start a read-only judge, defaulting to a different agent family,
   that scores them against criteria taken from the request, recommends a base and lists
   parts worth porting. Keep and combine drafts a follow-up on the kept attempt and holds
@@ -193,8 +197,14 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Create pull request drafts an editable title and description from the branch's diff alone
   (never the request or conversation), asks for the draft choice, then commits any
   remaining task changes with the project's commit policy, pushes the task branch and
-  opens the PR through the GitHub CLI; nothing is published before that confirmation. Publishing and
-  deployment remain explicit user-approved steps; a local merge does not establish either.
+  opens the PR through the GitHub CLI; nothing is published before that confirmation. Write
+  with AI redrafts the title and description on request.
+  Work done in the project checkout lands locally instead: a task on the target branch offers
+  Commit to the branch in place of a pull request, and a task on its own branch offers Merge
+  into the target (`task_merge_locally`), which undoes a failed or conflicting merge and
+  restores the task branch. Both draft the commit message from the changes and push only
+  when chosen. Worktree tasks keep their guarded integration. Publishing and deployment
+  remain explicit user-approved steps; a local merge does not establish either.
 - Live sessions capture short messages while work runs, batch them in order in one
   isolated workspace, and retain drafts, results and cumulative patch exports. Chat
   starts a session from the first message and groups history automatically.
@@ -255,7 +265,13 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   tasks' live unintegrated files, are told when their work stops merging with another
   task's, and can split off subtasks with the user's consent; planned tasks show
   whether their assignments' current work merges cleanly and how the work was split. Projects can opt into agent reconciliation
-  and verified local merging; source worktrees remain available. See
+  and verified local merging; a committed `.jackalope/autonomy.json` limits which paths
+  and change sizes merge automatically, can accept outcomes agents proved by running
+  them, and lets ready planned and swarm results merge too. Such projects push each
+  merged branch head to their linked Artifacts repository and, when the policy has a
+  `deploy` section, deploy it from a clean checkout with an optional check and rollback;
+  a failed deploy pauses automatic merging. Source worktrees remain
+  available. See
   [coordination contracts](ORCHESTRATION-CAPABILITIES.md).
 - Repository-aware plans, optional verified predecessor snapshots, dependency-aware
   scheduling, structured coordination reports and workspace verification reservations.
@@ -435,11 +451,18 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   payload targets Linux x86_64/OpenCode; broader provider and benchmark acceptance remain open.
   Projects auto-approve agent requests by default: Claude Code, Kimi Code/ACP and
   OpenCode permission requests pass a native risk check that approves routine tool
-  use and asks only for recursive or out-of-workspace deletes, Git pushes and history
-  or working-tree loss, piped or encoded code, elevated or system changes, credential
-  files, publishing and deploys, process kills and writes outside the workspace.
-  Each automatic approval and escalation is recorded in the task's activity. Saved
-  always-allow rules still apply. Codex keeps its workspace-write sandbox; Gemini
+  use and asks only for recursive or out-of-workspace deletes, Git pushes other than
+  a plain push of an existing non-protected local branch to a configured remote,
+  history or working-tree loss, piped or encoded code, elevated or system changes,
+  software installs beyond the project (system packages, toolchains, global tools),
+  credential files, publishing and deploys, process kills and writes outside the
+  workspace. Here-document bodies read as data, such as commit messages, and command
+  output assigned to a variable are not parsed as commands. Agents are asked to edit
+  files with their edit tools so each edit is checked, and `record_decision` replies
+  flag evidence pointers that resolve to nothing. Each automatic approval and escalation is recorded in the
+  task's activity. Saved always-allow rules still apply; a chained command (`&&`,
+  `;`, `|`) is allowed when every command in it has a rule, and choosing always
+  allow saves one for each, except chains through shells, interpreters or `sudo`. Codex keeps its workspace-write sandbox; Gemini
   CLI, Grok and Antigravity follow their own CLI approval policies.
   OpenCode tasks use an authenticated owned server for recoverable permission prompts,
   structured questions, exact-session continuation and child-session usage. Scope,
@@ -515,7 +538,10 @@ links. GitHub uses the installed CLI; Linear/Jira credentials use protected nati
 Jackalope Swarm (beta) gives each live attempt on an Artifacts-linked project its own fork
 through the person's own Worker (`apps/swarm`). Every 15 seconds the desktop pushes changed
 snapshots as synthetic commits, and the Worker reports files and overlapping edits across
-forks on Project → Swarm, which appears once a swarm Worker is connected. Forks are deleted when attempts finish; merging stays local.
+forks on Project → Swarm, which appears once a swarm Worker is connected. The page opens on a map
+of the project's tasks by stage, the files several agents share and their conflicts. Forks are
+deleted when attempts finish; merging is local, and projects that merge automatically push
+the merged branch back to Artifacts. Deploys are not yet accepted against a live Worker.
 See [the Worker guide](../apps/swarm/README.md).
 
 Cloudflare Artifacts (beta) connects a user's own Cloudflare account and namespace from
@@ -527,15 +553,19 @@ create a new project backed by an Artifacts repository, and Project settings can
 existing repository there through a new `artifacts` remote, leaving other remotes and local
 `jackalope/*` task branches untouched. Pushes use short-lived repo tokens scoped to the
 Artifacts host and never written to remotes or Git config. A read-only review snapshot
-returns an expiring clone command shown once. Tasks still run in local worktrees; hosted
-Artifacts, per-task forks and push-triggered automation are not implemented. Live
+returns an expiring clone command shown once. Tasks still run in local worktrees; Jackalope
+Swarm mirrors their snapshots to per-attempt forks, but hosted Artifacts, work running in
+those forks and push-triggered automation are not implemented. Live
 Cloudflare account and installed acceptance remain open.
 
 Trusted hosts and a responsive phone companion are implemented for native validation.
 Settings → Remote access scopes paired devices to selected projects. A separate loopback
 API supports task status, questions, follow-ups, new isolated sessions and change review.
-Desktop connections use verified SSH forwarding or HTTPS; phones use HTTPS, with optional
-private Tailscale Serve setup. Work continues through client disconnection. Live multi-device,
+Desktop connections use verified SSH forwarding or HTTPS; phones use HTTPS, from any HTTPS
+address or private Tailscale Serve, which Remote access sets up through detected steps.
+Pairing shows a ten-character code (or a QR link for phones) that works once, expires after
+five minutes and allows ten attempts; a phone paired under a generic model name takes the
+computer owner's first name. Work continues through client disconnection. Live multi-device,
 provider, Tailscale and cross-platform acceptance remain open.
 
 ## Known limits
@@ -568,6 +598,6 @@ update acceptance remain platform-specific requirements. Real-model quality and
 lesson/routing improvements require matched trials and independent review. Automated
 checks do not establish service delivery or installed-app acceptance.
 
-Managed remote hosting (including hosted Artifacts), native mobile apps, enforced monetary budgets and team collaboration remain future work. Use
+Managed remote hosting (including hosted Artifacts), enforced monetary budgets and team collaboration remain future work. An Android and iOS companion app (apps/mobile) pairs with each host by scanning the QR code Remote access shows (or a pasted link or address and code). It lists work from every paired computer together, grouped by what needs the person, opens each conversation on the computer that runs it and starts new work on a chosen computer; hosts do not relay work to each other. It runs on the Android emulator and has paired with a desktop host in the iOS simulator through the tracked Xcode project. iOS device runs still need acceptance, and push notifications, signed device builds, CI builds and store distribution are not implemented. Use
 the [documentation index](README.md), [contribution guide](../CONTRIBUTING.md) and
 [licensing guide](LICENSING.md) for development and redistribution.
