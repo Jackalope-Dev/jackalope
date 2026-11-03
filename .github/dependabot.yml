@@ -14,6 +14,9 @@ updates:
     groups:
       npm-minor-patch:
         patterns: ['*']
+        # build.rs pins the bundled agent-browser binary, so its bump needs a code
+        # change and fails CI alone instead of holding back the whole group.
+        exclude-patterns: [agent-browser]
         update-types: [minor, patch]
   - package-ecosystem: cargo
     directory: /apps/desktop/src-tauri
