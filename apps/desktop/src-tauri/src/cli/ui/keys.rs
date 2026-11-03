@@ -192,7 +192,8 @@ impl App {
     /// Scrolls back (positive) or forward (negative) by `lines`. Reaching the
     /// newest output follows it again.
     pub(super) fn scroll(&mut self, lines: i16) {
-        if let Some(picker) = self.picker.as_mut() {
+        let docked = self.picker_docked();
+        if let Some(picker) = self.picker.as_mut().filter(|_| !docked) {
             picker.step(lines < 0);
             return;
         }
@@ -342,6 +343,6 @@ impl App {
 }
 
 /// Page Up and Page Down move most of a screen, keeping a line of context.
-fn page(height: u16) -> i16 {
+pub(super) fn page(height: u16) -> i16 {
     height.saturating_sub(1).clamp(1, i16::MAX as u16) as i16
 }

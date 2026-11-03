@@ -27,20 +27,59 @@ impl Tone {
     }
 }
 
-/// One item of the feed, oldest first.
+/// One item of the feed.
 pub enum Entry {
     Note(String, Tone),
     /// An index into `App::shells`.
     Shell(usize),
 }
 
+/// A feed item and where it belongs: the conversation open when it was added
+/// and how many of that conversation's messages came before it, so it stays
+/// at that point in the history instead of trailing whatever arrives later.
+pub struct Placed {
+    pub entry: Entry,
+    pub session: Option<String>,
+    /// `None` until the conversation's messages have been read.
+    pub after: Option<usize>,
+}
+
 impl App {
     pub(super) fn note(&mut self, text: impl Into<String>) {
-        self.feed.push(Entry::Note(text.into(), Tone::Muted));
+        self.place(Entry::Note(text.into(), Tone::Muted));
     }
 
     pub(super) fn note_tone(&mut self, text: impl Into<String>, tone: Tone) {
-        self.feed.push(Entry::Note(text.into(), tone));
+        self.place(Entry::Note(text.into(), tone));
+    }
+
+    fn place(&mut self, entry: Entry) {
+        let after = self
+            .view
+            .as_ref()
+            .filter(|view| self.session.as_ref() == Some(&view.id))
+            .map(|view| view.messages.len());
+        self.feed.push(Placed {
+            entry,
+            session: self.session.clone(),
+            after,
+        });
+    }
+
+    /// Places items added before the open conversation was read at its end.
+    pub(super) fn settle_feed(&mut self) {
+        let Some(view) = self
+            .view
+            .as_ref()
+            .filter(|view| self.session.as_ref() == Some(&view.id))
+        else {
+            return;
+        };
+        for placed in &mut self.feed {
+            if placed.after.is_none() && placed.session == self.session {
+                placed.after = Some(view.messages.len());
+            }
+        }
     }
 
     pub(super) fn flash(&mut self, text: impl Into<String>, tone: Tone) {
@@ -51,7 +90,7 @@ impl App {
     pub(super) fn clear_feed(&mut self) {
         let shells = &self.shells;
         self.feed
-            .retain(|entry| matches!(entry, Entry::Shell(run) if shells[*run].running()));
+            .retain(|placed| matches!(placed.entry, Entry::Shell(run) if shells[run].running()));
     }
 
     pub(super) fn shells_running(&self) -> usize {
@@ -70,7 +109,7 @@ impl App {
             let _ = events.send(Event::Shell(update));
         });
         self.shells.push(run);
-        self.feed.push(Entry::Shell(index));
+        self.place(Entry::Shell(index));
     }
 
     pub(super) fn shell_update(&mut self, update: Update) {

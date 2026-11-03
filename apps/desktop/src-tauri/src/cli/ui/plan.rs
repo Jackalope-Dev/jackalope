@@ -164,7 +164,10 @@ impl App {
     fn current_plan(&mut self) -> Option<PlanView> {
         let view = self.plan_view().cloned();
         if view.is_none() {
-            self.note("No plan is open. Start one with /plan <goal> or open one with /plans.");
+            self.flash(
+                "No plan is open. Start one with /plan <goal> or open one with /plans",
+                Tone::Muted,
+            );
         }
         view
     }
@@ -174,7 +177,10 @@ impl App {
         match command {
             "plan" if argument.is_empty() => match &mut self.plan {
                 Some(pane) => pane.open = !pane.open,
-                None => self.note("Plan before changing code: /plan <what you want>."),
+                None => self.flash(
+                    "Plan before changing code: /plan <what you want>",
+                    Tone::Muted,
+                ),
             },
             "plan" => {
                 if let Some(view) = self.plan_request(Request::PlanStart {
@@ -193,7 +199,7 @@ impl App {
             }
             "plans" => self.open_picker(PickerKind::Plans),
             "revise" if argument.is_empty() => {
-                self.note("Add your comments: /revise <what to change>")
+                self.flash("Add your comments: /revise <what to change>", Tone::Muted)
             }
             "revise" => self.plan_action("keep", argument, "Planning again with your comments"),
             "replan" => self.plan_action("replan", argument, "Re-planning from what is done"),
@@ -243,11 +249,14 @@ impl App {
             argument.to_ascii_lowercase()
         };
         if !["single", "subtasks", "swarm"].contains(&shape.as_str()) {
-            self.note("Approve as single, subtasks or swarm: /approve subtasks");
+            self.flash(
+                "Approve as single, subtasks or swarm: /approve subtasks",
+                Tone::Muted,
+            );
             return;
         }
         if view.planning || view.revision.is_none() {
-            self.note("There is no draft to approve yet.");
+            self.flash("There is no draft to approve yet", Tone::Muted);
             return;
         }
         let unchecked = view.verification.as_deref() == Some("review");
@@ -278,7 +287,7 @@ impl App {
             return;
         }
         if self.pending_deviation().is_none() {
-            self.note("No deviation is waiting on you.");
+            self.flash("No deviation is waiting on you", Tone::Muted);
             return;
         }
         match argument {
@@ -290,7 +299,7 @@ impl App {
     /// Decides the oldest pending deviation: `accept`, `redo` or `replan`.
     pub(super) fn resolve_deviation(&mut self, action: &str) {
         let (Some(view), Some(deviation)) = (self.plan_view(), self.pending_deviation()) else {
-            self.note("No deviation is waiting on you.");
+            self.flash("No deviation is waiting on you", Tone::Muted);
             return;
         };
         let (plan_id, deviation_id) = (view.id.clone(), deviation.id.clone());

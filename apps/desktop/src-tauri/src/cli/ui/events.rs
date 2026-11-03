@@ -9,7 +9,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
 /// How long a status-line confirmation stays.
-const FLASH: Duration = Duration::from_millis(2500);
+const FLASH: Duration = Duration::from_millis(4000);
 
 pub fn event_loop(
     terminal: &mut ratatui::DefaultTerminal,

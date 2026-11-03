@@ -1,5 +1,18 @@
 [
   {
+    "id": "a-calmer-terminal-conversation",
+    "date": "2026-11-03",
+    "status": "In development",
+    "title": "A calmer terminal conversation",
+    "description": "The jackalope command keeps the conversation readable while it asks you things, and is easier to tidy up.",
+    "items": [
+      "Agent questions dock where you type, with the full question and why it matters, so the reply above stays in view.",
+      "Close tabs with their × or /close, /close others and /close all. Work keeps running and /sessions brings a tab back.",
+      "Notes stay where they happened in each conversation, and one-off hints show briefly in the status line instead of piling up.",
+      "The header leads with the project's name, and / commands get their own colour like \\! and @."
+    ]
+  },
+  {
     "id": "ship-merged-work-to-artifacts-and-production",
     "date": "2026-11-02",
     "status": "In development",

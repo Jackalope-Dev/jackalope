@@ -9,7 +9,7 @@ pub mod transcript;
 
 use super::commands::slash_matches;
 use super::editor::Layout as InputLayout;
-use super::pickers::{agent_glyph, usable};
+use super::pickers::{agent_glyph, usable, PickerKind};
 use super::App;
 use crate::brand::{self, Surface};
 use crate::protocol::{self, SessionSummary};
@@ -100,7 +100,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
     } else if area.height >= 22 && app.view.is_some() {
         brand::header(header_info(app), false, app.tick)
     } else {
-        vec![brand::compact()]
+        vec![brand::compact(&app.project.name)]
     };
     let show_tip = !framed && area.height >= 18;
     let tip_height = if show_tip { 1 } else { 0 };
@@ -120,12 +120,27 @@ pub fn draw(frame: &mut Frame, app: &App) {
     let visible_rows = layout.rows.len().clamp(1, most_rows);
     let input_rows = visible_rows as u16 + 2;
 
+    // A question with options takes the input's place, leaving the
+    // conversation above it readable.
+    let docked = app
+        .picker
+        .as_ref()
+        .filter(|picker| picker.kind == PickerKind::Question && area.height >= 16)
+        .map(|picker| {
+            (
+                picker,
+                menus::Docked::new(picker, area.width, area.height / 2),
+            )
+        });
+    let input_rows = docked
+        .as_ref()
+        .map_or(input_rows, |(_, dock)| dock.height());
     let mut card = if app.picker.is_none() && area.height >= 16 {
         panel::question_card(app, area.width)
     } else {
         Vec::new()
     };
-    if card.is_empty() {
+    if card.is_empty() && docked.is_none() {
         card = needs_you(app, area.width);
     }
 
@@ -172,6 +187,15 @@ pub fn draw(frame: &mut Frame, app: &App) {
     }
     frame.render_widget(Paragraph::new(card), card_area);
 
+    if let Some((picker, dock)) = docked {
+        dock.draw(frame, picker, input_area);
+        if show_tip {
+            draw_tip(frame, app, tip_area);
+        }
+        highlight_selection(frame, app);
+        return;
+    }
+
     // The bar and prompt say what Enter will do: a shell command, a slash
     // command, or a message for the agent.
     let text = app.editor.text();
@@ -189,7 +213,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
             "plan · explores read-only, asks, then drafts a plan to approve",
         )
     } else if text.starts_with('/') {
-        (brand::accent(), "/", "command")
+        (brand::command(), "/", "command")
     } else if text.starts_with('@') || mentioning {
         (brand::info(), "@", "mention an agent or file")
     } else if app.working() && !text.is_empty() {
@@ -262,19 +286,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
         draw_tip(frame, app, tip_area);
     }
 
-    if let Some(selection) = &app.selection {
-        let buffer = frame.buffer_mut();
-        let area = buffer.area;
-        for row in area.top()..area.bottom() {
-            for column in area.left()..area.right() {
-                if selection.contains(column, row) {
-                    if let Some(cell) = buffer.cell_mut((column, row)) {
-                        cell.modifier.insert(Modifier::REVERSED);
-                    }
-                }
-            }
-        }
-    }
+    highlight_selection(frame, app);
 
     if let Some(picker) = &app.picker {
         menus::picker(frame, picker, area);
@@ -293,6 +305,24 @@ pub fn draw(frame: &mut Frame, app: &App) {
         inner.x + (cursor_column as u16).min(inner.width.saturating_sub(1)),
         inner.y + ((cursor_row - first_row) as u16).min(inner.height.saturating_sub(1)),
     ));
+}
+
+/// Shows text being dragged over as selected.
+fn highlight_selection(frame: &mut Frame, app: &App) {
+    let Some(selection) = &app.selection else {
+        return;
+    };
+    let buffer = frame.buffer_mut();
+    let area = buffer.area;
+    for row in area.top()..area.bottom() {
+        for column in area.left()..area.right() {
+            if selection.contains(column, row) {
+                if let Some(cell) = buffer.cell_mut((column, row)) {
+                    cell.modifier.insert(Modifier::REVERSED);
+                }
+            }
+        }
+    }
 }
 
 /// What the open conversation is waiting on, pinned above the input in
@@ -471,6 +501,9 @@ pub(super) fn status_parts(app: &App) -> (String, Color, Vec<Span<'static>>) {
             ),
             accent,
         ));
+    }
+    if app.sharpening {
+        parts.push(Span::styled("  sharpening your draft…", accent));
     }
     if app.scroll_top.is_some() {
         parts.push(Span::styled("  scrolled back, Esc to return", muted));

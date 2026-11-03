@@ -72,7 +72,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   launch raises the running host. Inside conversations, `!` runs shell commands with
   streamed output, follow-ups queue behind running work, `/bg` starts parallel
   conversations, open conversations appear as tabs with their state (Alt+1–9 or a click
-  switches), a pinned banner says what a blocked conversation needs, `@` names agents as
+  switches; `×` or `/close` hides one while its work continues), agent questions dock in
+  place of the input, a pinned banner says what a blocked conversation needs, `@` names agents as
   well as files, a leading `/`, `!` or `@` sets the input's mode, the input wraps and
   grows, and dragging copies text. With 24-bit colour it paints the app's surfaces in a
   rounded card with clickable header and status lines. `/learn` sends session learnings through

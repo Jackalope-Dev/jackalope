@@ -205,7 +205,7 @@ impl App {
             // Say when another conversation starts needing you, since only its
             // tab shows it otherwise. The first read only sets the baseline.
             let first = self.sessions.is_empty();
-            let newly: Vec<String> = sessions
+            let newly: Vec<(String, String)> = sessions
                 .iter()
                 .filter(|session| {
                     self.session.as_ref() != Some(&session.id)
@@ -214,11 +214,13 @@ impl App {
                             before.id == session.id && super::conversation::needs_you(before)
                         })
                 })
-                .map(|session| session.title.clone())
+                .map(|session| (session.id.clone(), session.title.clone()))
                 .collect();
             self.sessions = sessions;
             if !first {
-                for title in newly {
+                for (id, title) in newly {
+                    // A closed tab comes back when its conversation needs you.
+                    self.closed.remove(&id);
                     self.note_tone(
                         format!("{title} needs you · /sessions or its tab"),
                         Tone::Warning,

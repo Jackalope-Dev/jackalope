@@ -37,7 +37,7 @@ use crossterm::event::{
 };
 use crossterm::terminal::SetTitle;
 use editor::Editor;
-use feed::{Entry, Tone};
+use feed::{Placed, Tone};
 use pickers::{Picker, PickerKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -82,6 +82,8 @@ enum Click {
     Type(&'static str),
     /// Shows the open conversation at this position in the tabs.
     Tab(usize),
+    /// Closes the tab at this position.
+    CloseTab(usize),
 }
 
 /// Something an `@` can name: an agent to hand the message to, or a file.
@@ -155,6 +157,9 @@ struct App {
     offered: HashSet<String>,
     /// Conversations opened in this terminal, kept as tabs once visited.
     opened: HashSet<String>,
+    /// Conversations whose tab was closed, kept out of the tabs until opened
+    /// again or until they start needing you.
+    closed: HashSet<String>,
     history: Vec<String>,
     history_index: Option<usize>,
     files: Option<FileIndex>,
@@ -175,8 +180,8 @@ struct App {
     /// What the window title and bell last reflected.
     signalled: Option<Signal>,
     /// Jackalope's own lines — help, errors, confirmations and `!` output —
-    /// shown under the conversation and never sent to an agent.
-    feed: Vec<Entry>,
+    /// shown in the conversation they were added in and never sent to an agent.
+    feed: Vec<Placed>,
     shells: Vec<shell::Run>,
     /// A short confirmation in the status line, such as "Copied".
     flash: Option<(String, Tone, Instant)>,
@@ -269,6 +274,7 @@ pub fn run(
         next_model: next.model,
         offered: HashSet::new(),
         opened: HashSet::new(),
+        closed: HashSet::new(),
         history: history::load(),
         history_index: None,
         files: None,
@@ -387,7 +393,10 @@ impl App {
         }
         // Coming back to the start screen plays the wordmark's sweep again.
         self.intro.set(None);
-        self.opened.extend(session.clone());
+        if let Some(id) = &session {
+            self.opened.insert(id.clone());
+            self.closed.remove(id);
+        }
         self.session = session;
         self.set_view(None);
         self.context += 1;
@@ -419,6 +428,7 @@ impl App {
         if !unchanged {
             self.view_version += 1;
         }
+        self.settle_feed();
     }
 
     /// Switches to another project with no conversation open.

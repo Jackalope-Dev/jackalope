@@ -60,17 +60,21 @@ fn separator() -> Piece {
     (text("   ".into(), brand::muted()), None)
 }
 
-/// The header: the wordmark and conversation on the left; the agent, project,
-/// branch and other conversations on the right.
+/// The header: the project and conversation on the left; the agent, branch
+/// and other conversations on the right.
 pub fn header(frame: &mut Frame, app: &App, area: Rect) {
     let mut left: Vec<Piece> = vec![(
         Span::styled(
-            format!("{} jackalope", if brand::unicode() { "◆" } else { "*" }),
+            format!(
+                "{} {}",
+                if brand::unicode() { "◆" } else { "*" },
+                brand::ellipsize(&app.project.name, 32)
+            ),
             Style::default()
                 .fg(brand::accent())
                 .add_modifier(Modifier::BOLD),
         ),
-        Some(Click::Command("new")),
+        Some(Click::Command("projects")),
     )];
     let title = match &app.view {
         Some(view) => Some(view.title.clone()),
@@ -117,10 +121,6 @@ pub fn header(frame: &mut Frame, app: &App, area: Rect) {
         }
         right.push(separator());
     }
-    right.push((
-        text(app.project.name.clone(), brand::muted()),
-        Some(Click::Command("projects")),
-    ));
     let branch = app
         .view
         .as_ref()
@@ -131,7 +131,7 @@ pub fn header(frame: &mut Frame, app: &App, area: Rect) {
         right.push((
             text(
                 format!(
-                    "  {} {}",
+                    "{} {}",
                     if brand::unicode() { "⎇" } else { "@" },
                     brand::short_branch(&branch)
                 ),
@@ -139,6 +139,9 @@ pub fn header(frame: &mut Frame, app: &App, area: Rect) {
             ),
             None,
         ));
+    } else if right.last().is_some_and(|(_, click)| click.is_none()) {
+        // Nothing follows the last separator.
+        right.pop();
     }
 
     let right_start = area.right().saturating_sub(width(&right) + 2);
@@ -218,8 +221,8 @@ fn tab_state(app: &App, session: &protocol::SessionSummary) -> (&'static str, Co
 }
 
 /// The open conversations as tabs between `x` and `limit`: a number for
-/// Alt+number, a dot for how each is doing, and its title. Titles shorten to
-/// fit; what still does not fit is counted at the end.
+/// Alt+number, a dot for how each is doing, its title and a close button.
+/// Titles shorten to fit; what still does not fit is counted at the end.
 fn tabs(frame: &mut Frame, app: &App, x: u16, y: u16, limit: u16) {
     let order = app.tab_order();
     let room = limit.saturating_sub(x) as usize;
@@ -273,6 +276,13 @@ fn tabs(frame: &mut Frame, app: &App, x: u16, y: u16, limit: u16) {
         pieces.push((Span::styled(number.to_string(), base), click));
         pieces.push((Span::styled(dot.to_string(), base.fg(color)), click));
         pieces.push((Span::styled(title.to_string(), base), click));
+        pieces.push((
+            Span::styled(
+                if brand::unicode() { "× " } else { "x " },
+                base.fg(brand::muted()).remove_modifier(Modifier::BOLD),
+            ),
+            Some(Click::CloseTab(index)),
+        ));
         pieces.push((Span::raw(" "), None));
     }
     if shown < order.len() {
@@ -300,12 +310,12 @@ fn tabs(frame: &mut Frame, app: &App, x: u16, y: u16, limit: u16) {
 /// each title's length: titles narrow to eight columns before tabs drop from
 /// the end, leaving room for a `+N` count and, while composing, `+ new`.
 fn fit_tabs(titles: &[usize], room: usize, composing: bool) -> (usize, usize) {
-    // A tab is " N  title " plus a gap: seven columns around the title.
+    // A tab is " N  title × " plus a gap: nine columns around the title.
     let total = |shown: usize, width: usize| -> usize {
         titles[..shown]
             .iter()
             .enumerate()
-            .map(|(index, title)| title.min(&width) + if index < 9 { 7 } else { 5 })
+            .map(|(index, title)| title.min(&width) + if index < 9 { 9 } else { 7 })
             .sum::<usize>()
             + if shown < titles.len() { 6 } else { 0 }
             + if composing { 8 } else { 0 }

@@ -180,7 +180,7 @@ impl App {
         {
             self.answer(text);
         } else {
-            self.note("That question was already answered.");
+            self.flash("That question was already answered", Tone::Muted);
             self.refresh();
         }
     }
@@ -252,21 +252,95 @@ impl App {
     }
 
     /// The conversations shown as tabs, in `session_order`: those that need
-    /// you, the open one and any opened in this terminal. The rest stay in
-    /// `/sessions`, so a new terminal does not fill with past conversations.
+    /// you, the open one and any opened in this terminal, less any closed.
+    /// The rest stay in `/sessions`, so a new terminal does not fill with past
+    /// conversations.
     pub(super) fn tab_order(&self) -> Vec<String> {
         self.session_order()
             .into_iter()
             .filter(|id| {
                 self.session.as_ref() == Some(id)
-                    || self.opened.contains(id)
-                    || self
-                        .sessions
-                        .iter()
-                        .find(|session| &session.id == id)
-                        .is_some_and(needs_you)
+                    || (!self.closed.contains(id)
+                        && (self.opened.contains(id)
+                            || self
+                                .sessions
+                                .iter()
+                                .find(|session| &session.id == id)
+                                .is_some_and(needs_you)))
             })
             .collect()
+    }
+
+    /// `/close`: the open tab with no argument, a tab by its number, `others`
+    /// or `all`. Closing only hides a tab; its work keeps running.
+    pub(super) fn close_tabs(&mut self, argument: &str) {
+        let order = self.tab_order();
+        let current = self
+            .session
+            .as_ref()
+            .and_then(|id| order.iter().position(|candidate| candidate == id));
+        match argument {
+            "" => match current {
+                Some(index) => self.close_tab(index),
+                None => self.flash("No conversation is open", Tone::Muted),
+            },
+            "others" | "all" => {
+                let keep = if argument == "others" { current } else { None };
+                let closing: Vec<String> = order
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, _)| Some(*index) != keep)
+                    .map(|(_, id)| id.clone())
+                    .collect();
+                if closing.is_empty() {
+                    self.flash("No other tabs to close", Tone::Muted);
+                    return;
+                }
+                for id in &closing {
+                    self.opened.remove(id);
+                    self.closed.insert(id.clone());
+                }
+                if keep.is_none() && self.session.is_some() {
+                    self.show(None);
+                }
+                self.flash(
+                    format!(
+                        "Closed {} {} · work keeps running · /sessions reopens",
+                        closing.len(),
+                        if closing.len() == 1 { "tab" } else { "tabs" }
+                    ),
+                    Tone::Muted,
+                );
+            }
+            number => match number.parse::<usize>() {
+                Ok(number) if (1..=order.len()).contains(&number) => self.close_tab(number - 1),
+                _ => self.flash(
+                    "Use /close, /close <tab number>, /close others or /close all",
+                    Tone::Warning,
+                ),
+            },
+        }
+    }
+
+    /// Closes the tab at `index`, showing its neighbour when it was open.
+    pub(super) fn close_tab(&mut self, index: usize) {
+        let order = self.tab_order();
+        let Some(id) = order.get(index).cloned() else {
+            return;
+        };
+        self.opened.remove(&id);
+        self.closed.insert(id.clone());
+        if self.session.as_ref() == Some(&id) {
+            let next = order
+                .get(index + 1)
+                .or_else(|| index.checked_sub(1).and_then(|before| order.get(before)))
+                .cloned();
+            self.show(next);
+        }
+        self.flash(
+            "Closed tab · work keeps running · /sessions reopens it",
+            Tone::Muted,
+        );
     }
 
     /// Shows the conversation at `index` in the tabs (Alt+1 to Alt+9).
