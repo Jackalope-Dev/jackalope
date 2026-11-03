@@ -1,5 +1,18 @@
 [
   {
+    "id": "fewer-permission-questions",
+    "date": "2026-11-03",
+    "status": "In development",
+    "title": "Fewer permission questions",
+    "description": "Auto-approved projects now ask only when an agent does something that really needs you.",
+    "items": [
+      "Commit messages and pull request bodies written with heredocs no longer trip the safety check.",
+      "Pushing an existing working branch to your remote runs without asking; pushes to main, release branches, tags, other remotes and force pushes still ask.",
+      "Code that reads process.env or import.meta.env is no longer mistaken for opening a secrets file.",
+      "Always allow now works for chained commands such as git add && git commit && git push, saving a rule for each part."
+    ]
+  },
+  {
     "id": "a-calmer-terminal-conversation",
     "date": "2026-11-03",
     "status": "In development",
