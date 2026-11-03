@@ -201,8 +201,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@lopebase/adapter':
-        specifier: ^0.4.1
-        version: 0.4.1
+        specifier: ^0.4.2
+        version: 0.4.2
       jose:
         specifier: ^6.2.12
         version: 6.2.12
@@ -872,8 +872,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
 
-  '@lopebase/adapter@0.4.1':
-    resolution: {integrity: sha512-Hsy64Ou7IRiRazjLR1hCFsCoSwOOmzoIfTS73cSE1Vpk7NxhxSB62YOFgWHcUxZbLtovJeiem7VnBrKgqpIhJw==}
+  '@lopebase/adapter@0.4.2':
+    resolution: {integrity: sha512-kEjFuzrnEWV0UVsssTDx2FsFckBTZDO5qI6GAnYki+xAeC6A/lNbHuxh0cj8lHypx1bGPqmEIm2g1pr2GDvCxQ==}
     engines: {node: '>=18'}
 
   '@napi-rs/wasm-runtime@1.2.5':
@@ -3636,7 +3636,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@lopebase/adapter@0.4.1': {}
+  '@lopebase/adapter@0.4.2': {}
 
   '@napi-rs/wasm-runtime@1.2.5(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)':
     dependencies:
