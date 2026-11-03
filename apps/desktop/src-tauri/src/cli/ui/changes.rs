@@ -61,6 +61,15 @@ impl App {
             .unwrap_or(0)
     }
 
+    /// Opens the panel on the changed file at `index`.
+    pub(super) fn show_file(&mut self, index: usize) {
+        let Some(change) = self.changes.get(index) else {
+            return;
+        };
+        self.panel.selected = Some(change.path.clone());
+        self.panel.open = true;
+    }
+
     /// Moves the selection `delta` rows, stopping at either end.
     pub(super) fn step_change(&mut self, delta: isize) {
         if self.changes.is_empty() {

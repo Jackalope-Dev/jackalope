@@ -7,7 +7,8 @@
 
 use super::super::conversation::needs_you;
 use super::super::pickers::{Action, Picker};
-use super::super::App;
+use super::super::{App, Click};
+use super::hit;
 use crate::brand::{self, Surface};
 use crate::protocol::{self, SessionSummary};
 use ratatui::layout::Rect;
@@ -185,6 +186,12 @@ pub fn draw(frame: &mut Frame, app: &App, picker: &Picker, area: Rect) {
         let used: usize = spans.iter().map(Span::width).sum();
         spans.push(Span::raw(" ".repeat(width.saturating_sub(used))));
         let line = Line::from(spans);
+        let y = area.y + lines.len() as u16;
+        hit(
+            app,
+            Rect::new(area.x, y, area.width, 1),
+            Click::Row(position),
+        );
         lines.push(if chosen {
             line.patch_style(brand::selection())
         } else {

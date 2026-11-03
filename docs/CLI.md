@@ -245,8 +245,11 @@ rounded content card, following the app's surfaces:
   hints sit on its right.
 
 The project name (which opens `/projects`), tabs, agent, model, open-conversation
-count and key hints can be clicked. A start screen shows the JACKALOPE wordmark (a two-row version in narrow
-windows), which light sweeps across once when the screen appears and which breaks into noise and resolves back a few seconds later, then every half minute or so while the terminal has focus, and the agents that are set up. When work finishes cleanly, the status line says how long it took and what usually comes next. An empty input has a tip beneath it,
+count and key hints can be clicked, as can menu and picker rows, `/board` rows, the run
+card's commands and files, changed files in the panel, the start screen's agents and
+`/sessions`, a pinned question, a failure's `/retry` and a tip's command. What would
+be clicked is tinted under the pointer. A start screen shows the JACKALOPE wordmark (a two-row version in narrow
+windows), which light sweeps across once when the screen appears and which breaks into noise and resolves back a few seconds later, then every 12 to 18 seconds while the terminal has focus, and the agents that are set up. When work finishes cleanly, the status line says how long it took and what usually comes next. An empty input has a tip beneath it,
 which changes each time you send something and gives way to typing and menus. Smaller
 terminals drop the shell for a compact header, a status line and a tip that rotates.
 

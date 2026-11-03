@@ -235,6 +235,28 @@ impl App {
             .is_some_and(|picker| picker.kind == PickerKind::Question)
     }
 
+    /// A click on the open picker's row at `position`: it ticks an option of a
+    /// question that takes several, and otherwise chooses the row.
+    pub(super) fn choose_row(&mut self, position: usize) {
+        let Some(picker) = self.picker.as_mut() else {
+            return;
+        };
+        if position >= picker.shown().len() {
+            return;
+        }
+        picker.selected = position;
+        let toggles = matches!(
+            picker.chosen().map(|item| &item.action),
+            Some(Action::Toggle(_))
+        );
+        let key = if toggles {
+            KeyCode::Char(' ')
+        } else {
+            KeyCode::Enter
+        };
+        self.picker_key(KeyEvent::new(key, KeyModifiers::NONE));
+    }
+
     pub(super) fn picker_key(&mut self, key: KeyEvent) {
         if self.picker_docked() && matches!(key.code, KeyCode::PageUp | KeyCode::PageDown) {
             let page = super::keys::page(self.body_area.get().height);

@@ -88,6 +88,12 @@ enum Click {
     Tab(usize),
     /// Closes the tab at this position.
     CloseTab(usize),
+    /// Chooses the open picker's row at this position, as Enter would.
+    Row(usize),
+    /// Chooses the command or mention menu's row at this position.
+    Menu(usize),
+    /// Shows this changed file in the changes panel.
+    File(usize),
 }
 
 /// Something an `@` can name: an agent to hand the message to, or a file.

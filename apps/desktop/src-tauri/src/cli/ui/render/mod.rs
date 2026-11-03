@@ -12,7 +12,7 @@ pub mod transcript;
 use super::commands::slash_matches;
 use super::editor::Layout as InputLayout;
 use super::pickers::{agent_glyph, usable, PickerKind};
-use super::App;
+use super::{App, Click};
 use crate::brand::{self, Surface};
 use crate::protocol::{self, SessionSummary};
 use markdown::inline;
@@ -158,8 +158,14 @@ pub fn draw(frame: &mut Frame, app: &App) {
     } else {
         Vec::new()
     };
+    // A pinned question brings its options back when clicked.
+    let mut card_click = (!card.is_empty()).then_some(Click::Command("answer"));
     if card.is_empty() && docked.is_none() {
         card = needs_you(app, area.width);
+        card_click = app
+            .pending_deviation()
+            .is_some()
+            .then_some(Click::Command("deviation"));
     }
 
     let [header_area, body, status_area, card_area, input_area, tip_area] = Layout::vertical([
@@ -184,8 +190,12 @@ pub fn draw(frame: &mut Frame, app: &App) {
         frame.render_widget(Paragraph::new(header_lines), header_area);
     }
 
-    let (lines, offset, bottom) = transcript::visible(app, body.width, body.height);
+    let (lines, offset, bottom, hits) = transcript::visible(app, body.width, body.height);
     app.max_scroll.set(bottom);
+    for (row, x, width, click) in hits {
+        let width = width.min(body.width.saturating_sub(x));
+        hit(app, Rect::new(body.x + x, body.y + row, width, 1), click);
+    }
     frame.render_widget(
         Paragraph::new(lines)
             .wrap(Wrap { trim: false })
@@ -203,14 +213,39 @@ pub fn draw(frame: &mut Frame, app: &App) {
     if !framed {
         frame.render_widget(Paragraph::new(status(app)), status_area);
     }
+    match card_click {
+        Some(click) => hit(app, card_area, click),
+        // The failure banner's `/retry` is clickable on its own.
+        None => {
+            let retry = |span: &Span| span.content.starts_with("/retry");
+            if let Some((row, line)) = card
+                .iter()
+                .enumerate()
+                .find(|(_, line)| line.spans.iter().any(retry))
+            {
+                let before: usize = line
+                    .spans
+                    .iter()
+                    .take_while(|span| !retry(span))
+                    .map(Span::width)
+                    .sum();
+                hit(
+                    app,
+                    Rect::new(card_area.x + before as u16, card_area.y + row as u16, 6, 1),
+                    Click::Command("retry"),
+                );
+            }
+        }
+    }
     frame.render_widget(Paragraph::new(card), card_area);
 
     if let Some((picker, dock)) = docked {
-        dock.draw(frame, picker, input_area);
+        dock.draw(frame, &app.hits, picker, input_area);
         if show_tip {
             draw_tip(frame, app, tip_area);
         }
         highlight_selection(frame, app);
+        highlight_hover(frame, app);
         return;
     }
 
@@ -310,23 +345,44 @@ pub fn draw(frame: &mut Frame, app: &App) {
         if picker.kind == PickerKind::Board {
             board::draw(frame, app, picker, area);
         } else {
-            menus::picker(frame, picker, area);
+            menus::picker(frame, &app.hits, picker, area);
         }
+        highlight_hover(frame, app);
         return;
     }
     let matches = slash_matches(text);
     if !matches.is_empty() {
-        menus::slash_menu(frame, &matches, app.slash, input_area);
+        menus::slash_menu(frame, &app.hits, &matches, app.slash, input_area);
     } else {
         let mentions = app.mention_matches();
         if !mentions.is_empty() {
-            menus::mention_menu(frame, &mentions, app.slash, input_area);
+            menus::mention_menu(frame, &app.hits, &mentions, app.slash, input_area);
         }
     }
     frame.set_cursor_position((
         inner.x + (cursor_column as u16).min(inner.width.saturating_sub(1)),
         inner.y + ((cursor_row - first_row) as u16).min(inner.height.saturating_sub(1)),
     ));
+    highlight_hover(frame, app);
+}
+
+/// Records that clicking `area` of the frame being drawn does `click`.
+pub(super) fn hit(app: &App, area: Rect, click: Click) {
+    app.hits.borrow_mut().push((area, click));
+}
+
+/// Tints whatever is clickable under the pointer, and every other piece that
+/// does the same, so a target reads as one before it is clicked.
+fn highlight_hover(frame: &mut Frame, app: &App) {
+    let Some(hovered) = app.hovered() else {
+        return;
+    };
+    let buffer = frame.buffer_mut();
+    for (area, click) in app.hits.borrow().iter() {
+        if *click == hovered {
+            buffer.set_style(area.intersection(buffer.area), brand::selection());
+        }
+    }
 }
 
 /// Shows text being dragged over as selected.
@@ -425,7 +481,24 @@ fn draw_tip(frame: &mut Frame, app: &App, area: Rect) {
     let tip = TIPS[app.tip_index % TIPS.len()];
     let mut spans = vec![Span::styled("  Tip: ", accent.add_modifier(Modifier::BOLD))];
     spans.extend(inline(tip));
-    frame.render_widget(Paragraph::new(Line::from(spans)), area);
+    let line = Line::from(spans);
+    // A tip that names a command puts it in the input when clicked.
+    if let Some(command) = tip_command(tip) {
+        hit(
+            app,
+            Rect::new(area.x, area.y, (line.width() as u16).min(area.width), 1),
+            Click::Type(command),
+        );
+    }
+    frame.render_widget(Paragraph::new(line), area);
+}
+
+/// The first slash command a tip names, such as `/board`, without arguments.
+fn tip_command(tip: &'static str) -> Option<&'static str> {
+    let start = tip.find("`/")? + 1;
+    let rest = &tip[start..];
+    let end = rest.find(['`', ' ']).unwrap_or(rest.len());
+    Some(&rest[..end])
 }
 
 /// A run card's result is still decoding into place.
@@ -699,10 +772,10 @@ fn header_info(app: &App) -> Vec<Line<'static>> {
 /// How far the wordmark's light sweep has crossed (0 to 1), from when the
 /// start screen was first drawn; `None` before and after it runs.
 /// How far through its glitch the start screen's wordmark is, if one is
-/// playing: a few seconds after the screen appears, then every 25 to 40
+/// playing: a few seconds after the screen appears, then every 12 to 18
 /// seconds, and never while the terminal is in the background.
 pub(super) fn wordmark_glitch(app: &App) -> Option<f32> {
-    const FIRST: f32 = 4.0;
+    const FIRST: f32 = 3.0;
     const LENGTH: f32 = 0.9;
     if app.view.is_some() || app.session.is_some() || !app.focused || !brand::motion() {
         return None;
@@ -714,7 +787,7 @@ pub(super) fn wordmark_glitch(app: &App) -> Option<f32> {
             return Some(since / LENGTH);
         }
         // The gaps vary so the glitch reads as a flicker, not a metronome.
-        let gap = 25.0 + (cycle * 7919 % 16) as f32;
+        let gap = 12.0 + (cycle * 7919 % 7) as f32;
         since -= gap;
         cycle += 1;
     }
@@ -734,9 +807,12 @@ pub(super) fn intro_sweep(app: &App) -> Option<f32> {
 /// The start screen, centred in `height` rows: the wordmark, then who can
 /// take the work as chips. Where you are already sits on the frame, and key
 /// hints beneath it.
-fn welcome(app: &App, width: u16, height: u16) -> Vec<Line<'static>> {
+fn welcome(app: &App, width: u16, height: u16) -> (Vec<Line<'static>>, Vec<transcript::LineHit>) {
     let muted = Style::default().fg(brand::muted());
     let mut group: Vec<Line<'static>> = Vec::new();
+    // Clickable spans as (line in `group`, span index, what it does), placed
+    // once the lines are centred.
+    let mut marks: Vec<(usize, usize, Click)> = Vec::new();
     if app.intro.get().is_none() {
         app.intro.set(Some(std::time::Instant::now()));
     }
@@ -789,8 +865,15 @@ fn welcome(app: &App, width: u16, height: u16) -> Vec<Line<'static>> {
                 chips.push(brand::chip(&format!("{dot} {}", agent.name), color));
             }
             if chips.is_empty() {
+                marks.push((group.len(), 0, Click::Command("agents")));
                 group.push(Line::styled("No agents set up yet  ·  /agents", muted).centered());
             } else {
+                // A chip chooses the agent for the next conversation.
+                for (index, chip) in chips.iter().enumerate() {
+                    if !chip.content.trim().is_empty() {
+                        marks.push((group.len(), index, Click::Command("agent")));
+                    }
+                }
                 group.push(Line::from(chips).centered());
             }
         }
@@ -812,16 +895,31 @@ fn welcome(app: &App, width: u16, height: u16) -> Vec<Line<'static>> {
         }
         spans.push(Span::styled("  /sessions", muted));
         group.push(Line::raw(""));
+        marks.push((group.len(), spans.len() - 1, Click::Command("sessions")));
         group.push(Line::from(spans).centered());
     }
 
     // Centred, with the space below filled so the bottom-anchored view keeps
     // it in the middle.
     let spare = (height as usize).saturating_sub(group.len());
+    let hits = marks
+        .into_iter()
+        .filter_map(|(line, span, click)| {
+            let spans = &group[line].spans;
+            let indent = usize::from(width).saturating_sub(group[line].width()) / 2;
+            let before: usize = spans[..span].iter().map(Span::width).sum();
+            Some(transcript::LineHit {
+                line: spare / 2 + line,
+                x: (indent + before) as u16,
+                width: spans.get(span)?.width() as u16,
+                click,
+            })
+        })
+        .collect();
     let mut lines = vec![Line::raw(""); spare / 2];
     lines.extend(group);
     lines.extend(std::iter::repeat_n(Line::raw(""), spare - spare / 2));
-    lines
+    (lines, hits)
 }
 
 #[cfg(test)]

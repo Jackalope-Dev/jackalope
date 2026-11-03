@@ -810,7 +810,7 @@ mod tests {
         let settled = harness.render(100, 30);
         let ago =
             |seconds: f32| std::time::Instant::now() - std::time::Duration::from_secs_f32(seconds);
-        harness.app.intro.set(Some(ago(4.3)));
+        harness.app.intro.set(Some(ago(3.3)));
         assert!(super::super::render::wordmark_glitch(&harness.app).is_some());
         let glitching = harness.render(100, 30);
         assert_ne!(glitching, settled, "{glitching}");
@@ -818,7 +818,72 @@ mod tests {
         harness.app.focused = false;
         assert!(super::super::render::wordmark_glitch(&harness.app).is_none());
         harness.app.focused = true;
-        harness.app.intro.set(Some(ago(12.0)));
+        harness.app.intro.set(Some(ago(10.0)));
         assert!(super::super::render::wordmark_glitch(&harness.app).is_none());
+    }
+
+    #[test]
+    fn the_run_card_s_commands_and_files_are_clickable() {
+        let mut harness = Harness::new();
+        finished_login_fix(&mut harness);
+        harness.render(100, 34);
+        harness.click(Click::File(1));
+        assert!(harness.app.panel_shown());
+        assert_eq!(harness.app.selected_index(), 1);
+
+        harness.app.toggle_panel();
+        harness.render(100, 34);
+        harness.click(Click::Command("merge"));
+        assert!(
+            harness
+                .requests()
+                .iter()
+                .any(|request| matches!(request, Request::MergePrepare { .. })),
+            "clicking /merge prepares the merge"
+        );
+    }
+
+    #[test]
+    fn menus_pickers_and_the_board_choose_the_clicked_row() {
+        let mut harness = Harness::new();
+        harness.add(conversation("c1", "Fix login", &[("you", "Fix login")]));
+        harness.add(conversation("c2", "Add search", &[("you", "Add search")]));
+        harness.open("c1");
+        harness.submit("/board");
+        harness.render(100, 30);
+        let row = harness
+            .app
+            .picker
+            .as_ref()
+            .unwrap()
+            .shown()
+            .iter()
+            .position(|index| {
+                harness.app.picker.as_ref().unwrap().items[*index].label == "Add search"
+            })
+            .unwrap();
+        harness.click(Click::Row(row));
+        assert_eq!(harness.app.session.as_deref(), Some("c2"));
+
+        harness.type_text("/boa");
+        harness.render(100, 30);
+        harness.click(Click::Menu(0));
+        assert!(harness
+            .app
+            .picker
+            .as_ref()
+            .is_some_and(|picker| picker.kind == super::super::pickers::PickerKind::Board));
+    }
+
+    #[test]
+    fn a_tip_that_names_a_command_puts_it_in_the_input() {
+        let mut harness = Harness::new();
+        harness.app.tip_index = super::super::render::TIPS
+            .iter()
+            .position(|tip| tip.contains("`/board`"))
+            .unwrap();
+        harness.render(100, 30);
+        harness.click(Click::Type("/board"));
+        assert_eq!(harness.app.editor.text(), "/board");
     }
 }

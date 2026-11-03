@@ -9,10 +9,11 @@
 //! recorded.
 
 use super::duration;
-use super::transcript::wrap;
+use super::transcript::{wrap, LineHit};
 use crate::brand;
 use crate::protocol::{self, RunStage, RunSummary, SessionView};
 use crate::ui::App;
+use crate::ui::Click;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use std::time::Duration;
@@ -53,10 +54,11 @@ pub fn card(
     reply: &[Line<'static>],
     phase: Phase,
     width: u16,
-) -> Vec<Line<'static>> {
+) -> (Vec<Line<'static>>, Vec<LineHit>) {
     if width < MIN_WIDTH {
-        return reply.to_vec();
+        return (reply.to_vec(), Vec::new());
     }
+    let mut hits = Vec::new();
     let room = usize::from(width) - 4;
     let tone = tone(view, run, phase);
     let mut body: Vec<Line<'static>> = Vec::new();
@@ -90,7 +92,18 @@ pub fn card(
         body.extend(rows(check_line(check), room));
     }
     if !app.panel_shown() {
-        body.extend(files(app, room));
+        // Each file row opens that file in the changes panel. The card's
+        // blank line and top edge come before the body.
+        let listed = files(app, room);
+        for index in 0..app.changes.len().min(FILES_SHOWN) {
+            hits.push(LineHit {
+                line: 2 + body.len() + 1 + index,
+                x: 0,
+                width,
+                click: Click::File(index),
+            });
+        }
+        body.extend(listed);
     }
 
     // A result that just arrived decodes into place, top to bottom.
@@ -123,8 +136,17 @@ pub fn card(
         spans.push(Span::styled(format!(" {side}"), edge));
         lines.push(Line::from(spans));
     }
-    lines.push(bottom(view, phase, width));
-    lines
+    let (edge_line, actions) = bottom(view, phase, width);
+    for (x, length, command) in actions {
+        hits.push(LineHit {
+            line: lines.len(),
+            x,
+            width: length,
+            click: Click::Command(command),
+        });
+    }
+    lines.push(edge_line);
+    (lines, hits)
 }
 
 /// The card's colour: what the person should take from it at a glance.
@@ -259,7 +281,13 @@ fn top(
 }
 
 /// The bottom edge carries what moves the work on.
-fn bottom(view: &SessionView, phase: Phase, width: u16) -> Line<'static> {
+/// The bottom edge, and where each command on it sits: its column, width and
+/// the command it runs.
+fn bottom(
+    view: &SessionView,
+    phase: Phase,
+    width: u16,
+) -> (Line<'static>, Vec<(u16, u16, &'static str)>) {
     let edge = Style::default().fg(brand::hairline());
     let key = Style::default().fg(brand::command());
     let muted = Style::default().fg(brand::muted());
@@ -268,7 +296,7 @@ fn bottom(view: &SessionView, phase: Phase, width: u16) -> Line<'static> {
     } else {
         ("+-", "-", "-+")
     };
-    let actions: Vec<(&str, &str)> = if !view.questions.is_empty() {
+    let actions: Vec<(&'static str, &'static str)> = if !view.questions.is_empty() {
         vec![("/answer", "choose"), ("", "or type a reply")]
     } else if phase == Phase::Live {
         vec![("Esc Esc", "stop"), ("", "typing queues a follow-up")]
@@ -288,9 +316,20 @@ fn bottom(view: &SessionView, phase: Phase, width: u16) -> Line<'static> {
         ]
     };
     let mut spans = vec![Span::styled(corner, edge)];
+    let mut places = Vec::new();
     for (command, label) in actions {
         spans.push(Span::raw(" "));
         if !command.is_empty() {
+            let at: usize = spans.iter().map(Span::width).sum();
+            // `Esc Esc` stops the work, as `/stop` does.
+            let runs = command.strip_prefix('/').unwrap_or("stop");
+            let length = command.chars().count()
+                + if label.is_empty() {
+                    0
+                } else {
+                    1 + label.chars().count()
+                };
+            places.push((at as u16, length as u16, runs));
             spans.push(Span::styled(command.to_string(), key));
             if !label.is_empty() {
                 spans.push(Span::raw(" "));
@@ -304,18 +343,19 @@ fn bottom(view: &SessionView, phase: Phase, width: u16) -> Line<'static> {
     let used: usize = spans.iter().map(Span::width).sum::<usize>() + 2;
     if used > usize::from(width) {
         let fill = usize::from(width).saturating_sub(4);
-        return Line::from(vec![
+        let line = Line::from(vec![
             Span::styled(corner, edge),
             Span::styled(dash.repeat(fill), edge),
             Span::styled(end, edge),
         ]);
+        return (line, Vec::new());
     }
     spans.push(Span::styled(
         dash.repeat(usize::from(width).saturating_sub(used)),
         edge,
     ));
     spans.push(Span::styled(end, edge));
-    Line::from(spans)
+    (Line::from(spans), places)
 }
 
 /// A dotted divider between the reply and the record of the work.
