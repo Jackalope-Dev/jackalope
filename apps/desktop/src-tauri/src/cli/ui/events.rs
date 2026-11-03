@@ -107,6 +107,7 @@ fn handle(app: &mut App, event: Event) -> bool {
         Event::Files { directory, files } => app.files_listed(directory, files),
         Event::Sharpened { original, result } => app.sharpened(original, result),
         Event::Resize => {}
+        Event::Focus(focused) => app.focused = focused,
         Event::Scroll(lines) => app.scroll(lines),
         Event::Paste(text) => {
             if app.picker.is_none() {
@@ -147,6 +148,8 @@ pub fn spawn_input(events: Sender<Event>) {
             }
             Ok(TermEvent::Resize(_, _)) => events.send(Event::Resize),
             Ok(TermEvent::Paste(text)) => events.send(Event::Paste(text)),
+            Ok(TermEvent::FocusGained) => events.send(Event::Focus(true)),
+            Ok(TermEvent::FocusLost) => events.send(Event::Focus(false)),
             Ok(TermEvent::Mouse(mouse)) => match mouse.kind {
                 MouseEventKind::ScrollUp => events.send(Event::Scroll(3)),
                 MouseEventKind::ScrollDown => events.send(Event::Scroll(-3)),

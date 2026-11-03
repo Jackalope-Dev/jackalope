@@ -33,9 +33,9 @@ use crate::connection::Connection;
 use crate::protocol::{AgentStatus, Handshake, Project, SessionSummary, SessionView};
 use crate::{brand, git, history, shell};
 use crossterm::event::{
-    DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, KeyEvent,
-    KeyboardEnhancementFlags, MouseEvent, PopKeyboardEnhancementFlags,
-    PushKeyboardEnhancementFlags,
+    DisableBracketedPaste, DisableFocusChange, DisableMouseCapture, EnableBracketedPaste,
+    EnableFocusChange, EnableMouseCapture, KeyEvent, KeyboardEnhancementFlags, MouseEvent,
+    PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
 };
 use crossterm::terminal::SetTitle;
 use editor::Editor;
@@ -58,6 +58,8 @@ enum Event {
     /// The pointer moved to this column and row, for hover highlights.
     Hover(u16, u16),
     Paste(String),
+    /// The terminal window gained (`true`) or lost focus, where it reports it.
+    Focus(bool),
     Shell(shell::Update),
     Resize,
     Changed,
@@ -228,6 +230,9 @@ struct App {
     intro: Cell<Option<Instant>>,
     /// Animation frame for the working indicator.
     tick: usize,
+    /// The terminal window has focus, as far as it reports; idle motion such
+    /// as the wordmark's glitch waits while it is in the background.
+    focused: bool,
     /// Currently displayed rotating tip.
     tip_index: usize,
     /// The last frame drew the framed layout, whose tip changes only when
@@ -360,6 +365,7 @@ impl App {
             intro: Cell::new(None),
             last_run_took: None,
             tick: 0,
+            focused: true,
             tip_index: 0,
             framed: Cell::new(false),
             last_tip_change: Instant::now(),
@@ -380,7 +386,12 @@ impl App {
 /// still reaches the terminal's own selection.
 fn enter_modes() -> bool {
     let mut stdout = std::io::stdout();
-    let _ = crossterm::execute!(stdout, EnableMouseCapture, EnableBracketedPaste);
+    let _ = crossterm::execute!(
+        stdout,
+        EnableMouseCapture,
+        EnableBracketedPaste,
+        EnableFocusChange
+    );
     // Windows consoles report modifiers natively and reject the escape.
     let enhanced =
         cfg!(not(windows)) && crossterm::terminal::supports_keyboard_enhancement().unwrap_or(false);
@@ -398,7 +409,12 @@ fn leave_modes(enhanced: bool) {
     if enhanced {
         let _ = crossterm::execute!(stdout, PopKeyboardEnhancementFlags);
     }
-    let _ = crossterm::execute!(stdout, DisableBracketedPaste, DisableMouseCapture);
+    let _ = crossterm::execute!(
+        stdout,
+        DisableFocusChange,
+        DisableBracketedPaste,
+        DisableMouseCapture
+    );
 }
 
 /// Ctrl+Z: restores the terminal, stops this process as a shell's job, and

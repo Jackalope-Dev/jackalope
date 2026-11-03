@@ -129,6 +129,7 @@ impl App {
         self.working()
             || self.shells_running() > 0
             || super::render::intro_sweep(self).is_some()
+            || super::render::wordmark_glitch(self).is_some()
             || super::render::card_revealing(self)
             || (self
                 .picker

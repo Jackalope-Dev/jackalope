@@ -803,4 +803,22 @@ mod tests {
             .unwrap_or("");
         assert_ne!(next, tip, "sending moves to the next tip: {after}");
     }
+
+    #[test]
+    fn the_start_screen_wordmark_glitches_now_and_then_and_waits_while_unfocused() {
+        let mut harness = Harness::new();
+        let settled = harness.render(100, 30);
+        let ago =
+            |seconds: f32| std::time::Instant::now() - std::time::Duration::from_secs_f32(seconds);
+        harness.app.intro.set(Some(ago(4.3)));
+        assert!(super::super::render::wordmark_glitch(&harness.app).is_some());
+        let glitching = harness.render(100, 30);
+        assert_ne!(glitching, settled, "{glitching}");
+
+        harness.app.focused = false;
+        assert!(super::super::render::wordmark_glitch(&harness.app).is_none());
+        harness.app.focused = true;
+        harness.app.intro.set(Some(ago(12.0)));
+        assert!(super::super::render::wordmark_glitch(&harness.app).is_none());
+    }
 }

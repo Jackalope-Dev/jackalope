@@ -703,10 +703,56 @@ pub const SMALL_WORDMARK_WIDTH: usize = 9 * 5 - 1;
 /// windows narrower than `WORDMARK_WIDTH`), swept by the accent gradient. Half
 /// blocks give each row two pixels, so the letters keep round shoulders
 /// without box-drawing. Light crosses it once while `sweep` (0 to 1) runs on
-/// the start screen; it stays still without motion.
-pub fn wordmark_sweeping(small: bool, sweep: Option<f32>) -> Vec<Line<'static>> {
+/// the start screen. While `glitch` (0 to 1, and the animation frame) runs,
+/// its letters break into noise and resolve back left to right the way the
+/// ASCII mark decodes; only the letters' own cells change, so the word keeps
+/// its shape. Both stay still without motion.
+pub fn wordmark(
+    small: bool,
+    sweep: Option<f32>,
+    glitch: Option<(f32, usize)>,
+) -> Vec<Line<'static>> {
     let sweep = sweep.filter(|_| motion() && colored());
-    block_letters(if small { &SMALL_LETTERS } else { &LETTERS }, sweep)
+    let glitch = glitch.filter(|_| motion());
+    block_letters(if small { &SMALL_LETTERS } else { &LETTERS }, sweep, glitch)
+}
+
+/// What a lettered cell shows partway through a glitch: its own block, the
+/// block lit as it settles, or noise.
+enum Glitched {
+    Settled,
+    Settling,
+    Noise(&'static str),
+}
+
+/// The share of a glitch spent breaking up; the rest resolves.
+const BREAK: f32 = 0.25;
+
+fn glitched(cell: usize, position: f32, progress: f32, tick: usize) -> Glitched {
+    let chance = (scatter(cell, 7) % 1000) as f32 / 1000.0;
+    let noisy = if progress < BREAK {
+        chance < progress / BREAK
+    } else {
+        // Stretched a little so the last cells settle before the glitch ends.
+        let resolving = 1.1 * (progress - BREAK) / (1.0 - BREAK);
+        let order = 0.65 * position + 0.35 * chance;
+        if resolving >= order + 0.06 {
+            return Glitched::Settled;
+        }
+        if resolving >= order {
+            return Glitched::Settling;
+        }
+        true
+    };
+    if noisy {
+        const GLYPHS: [&str; 18] = [
+            "0", "1", "<", ">", "/", "\\", "{", "}", "[", "]", "#", "$", "%", "&", "*", "+", "=",
+            "?",
+        ];
+        Glitched::Noise(GLYPHS[scatter(cell, tick) as usize % GLYPHS.len()])
+    } else {
+        Glitched::Settled
+    }
 }
 
 /// How brightly a column at `position` (0 to 1) catches a sweep at `sweep`,
@@ -717,7 +763,11 @@ fn sweep_light(position: f32, sweep: f32) -> f32 {
     (1.0 - ((position - center).abs() / BAND)).max(0.0)
 }
 
-fn block_letters(letters: &[(char, &[&str]); 8], sweep: Option<f32>) -> Vec<Line<'static>> {
+fn block_letters(
+    letters: &[(char, &[&str]); 8],
+    sweep: Option<f32>,
+    glitch: Option<(f32, usize)>,
+) -> Vec<Line<'static>> {
     let glyphs: Vec<&[&str]> = "JACKALOPE"
         .chars()
         .filter_map(|letter| {
@@ -750,13 +800,22 @@ fn block_letters(letters: &[(char, &[&str]); 8], sweep: Option<f32>) -> Vec<Line
                             (false, true) => "▄",
                             (false, false) => " ",
                         };
-                    let position = (index * (width + 1) + column) as f32 / total as f32;
+                    let offset = index * (width + 1) + column;
+                    let position = offset as f32 / total as f32;
                     let light = sweep.map_or(0.0, |sweep| sweep_light(position, sweep));
-                    let color = if light > 0.0 {
+                    let mut color = if light > 0.0 {
                         mix(gradient(position), lifted(0.85), light)
                     } else {
                         gradient(position)
                     };
+                    let mut symbol = symbol;
+                    if let Some((progress, tick)) = glitch.filter(|_| symbol != " ") {
+                        match glitched(cell * total + offset, position, progress, tick) {
+                            Glitched::Settled => {}
+                            Glitched::Settling => color = lifted(0.6),
+                            Glitched::Noise(glyph) => symbol = glyph,
+                        }
+                    }
                     spans.push(Span::styled(symbol, Style::default().fg(color)));
                 }
             }
@@ -1004,7 +1063,7 @@ mod tests {
 
     #[test]
     fn the_wordmark_spells_jackalope_at_its_declared_width() {
-        let lines = wordmark_sweeping(false, None);
+        let lines = wordmark(false, None, None);
         assert_eq!(lines.len(), 3);
         for line in &lines {
             assert_eq!(line.width(), WORDMARK_WIDTH);
@@ -1012,7 +1071,7 @@ mod tests {
         for (_, rows) in LETTERS {
             assert!(rows.iter().all(|row| row.len() == 6), "{rows:?}");
         }
-        let small = wordmark_sweeping(true, None);
+        let small = wordmark(true, None, None);
         assert_eq!(small.len(), 2);
         for line in &small {
             assert_eq!(line.width(), SMALL_WORDMARK_WIDTH);
@@ -1087,5 +1146,29 @@ mod tests {
         if motion() && colored() {
             assert_ne!(colors(5), colors(15), "the band advances between frames");
         }
+    }
+
+    #[test]
+    fn a_glitch_breaks_only_the_letters_and_resolves_back_to_the_wordmark() {
+        let plain = wordmark(false, None, None);
+        let text = |lines: &[Line]| -> Vec<String> {
+            lines
+                .iter()
+                .map(|line| {
+                    line.spans
+                        .iter()
+                        .map(|span| span.content.as_ref())
+                        .collect()
+                })
+                .collect()
+        };
+        let middle = wordmark(false, None, Some((0.3, 4)));
+        assert_ne!(text(&middle), text(&plain), "mid-glitch shows noise");
+        for (glitched, clean) in text(&middle).iter().zip(text(&plain)) {
+            for (a, b) in glitched.chars().zip(clean.chars()) {
+                assert_eq!(a == ' ', b == ' ', "the word keeps its shape");
+            }
+        }
+        assert_eq!(text(&wordmark(false, None, Some((1.0, 4)))), text(&plain));
     }
 }

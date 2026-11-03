@@ -698,6 +698,29 @@ fn header_info(app: &App) -> Vec<Line<'static>> {
 
 /// How far the wordmark's light sweep has crossed (0 to 1), from when the
 /// start screen was first drawn; `None` before and after it runs.
+/// How far through its glitch the start screen's wordmark is, if one is
+/// playing: a few seconds after the screen appears, then every 25 to 40
+/// seconds, and never while the terminal is in the background.
+pub(super) fn wordmark_glitch(app: &App) -> Option<f32> {
+    const FIRST: f32 = 4.0;
+    const LENGTH: f32 = 0.9;
+    if app.view.is_some() || app.session.is_some() || !app.focused || !brand::motion() {
+        return None;
+    }
+    let mut since = app.intro.get()?.elapsed().as_secs_f32() - FIRST;
+    let mut cycle = 0;
+    while since >= 0.0 {
+        if since < LENGTH {
+            return Some(since / LENGTH);
+        }
+        // The gaps vary so the glitch reads as a flicker, not a metronome.
+        let gap = 25.0 + (cycle * 7919 % 16) as f32;
+        since -= gap;
+        cycle += 1;
+    }
+    None
+}
+
 pub(super) fn intro_sweep(app: &App) -> Option<f32> {
     const DELAY: f32 = 0.2;
     const SWEEP: f32 = 1.0;
@@ -718,15 +741,16 @@ fn welcome(app: &App, width: u16, height: u16) -> Vec<Line<'static>> {
         app.intro.set(Some(std::time::Instant::now()));
     }
     let sweep = intro_sweep(app);
+    let glitch = wordmark_glitch(app).map(|progress| (progress, app.tick));
     if usize::from(width) >= brand::WORDMARK_WIDTH + 4 && height >= 12 {
         group.extend(
-            brand::wordmark_sweeping(false, sweep)
+            brand::wordmark(false, sweep, glitch)
                 .into_iter()
                 .map(Line::centered),
         );
     } else if usize::from(width) >= brand::SMALL_WORDMARK_WIDTH + 2 && height >= 9 {
         group.extend(
-            brand::wordmark_sweeping(true, sweep)
+            brand::wordmark(true, sweep, glitch)
                 .into_iter()
                 .map(Line::centered),
         );

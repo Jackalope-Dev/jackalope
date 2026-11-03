@@ -246,7 +246,7 @@ rounded content card, following the app's surfaces:
 
 The project name (which opens `/projects`), tabs, agent, model, open-conversation
 count and key hints can be clicked. A start screen shows the JACKALOPE wordmark (a two-row version in narrow
-windows), which light sweeps across once when the screen appears, and the agents that are set up. When work finishes cleanly, the status line says how long it took and what usually comes next. An empty input has a tip beneath it,
+windows), which light sweeps across once when the screen appears and which breaks into noise and resolves back a few seconds later, then every half minute or so while the terminal has focus, and the agents that are set up. When work finishes cleanly, the status line says how long it took and what usually comes next. An empty input has a tip beneath it,
 which changes each time you send something and gives way to typing and menus. Smaller
 terminals drop the shell for a compact header, a status line and a tip that rotates.
 
@@ -270,7 +270,7 @@ its newest steps by kind, the running stage shimmers and each new step resolves 
 noise as it arrives; a result decodes into place once when it arrives. Older hosts
 send no run summary and keep the plain transcript. `jackalope -p` prints the steps
 to standard error. `JACKALOPE_REDUCED_MOTION=1` keeps the band, spinners, shimmer,
-decoding and wordmark sweep still.
+decoding and wordmark sweep and glitch still.
 
 The changes panel lists files the conversation's checkout changed since it left
 the project's checked-out commit, committed or not, including untracked files, with
