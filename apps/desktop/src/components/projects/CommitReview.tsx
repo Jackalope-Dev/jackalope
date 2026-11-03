@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { authorEvidence } from '../../lib/agent-review';
 import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
 import { isActive, nativeTask, type RunRequest } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -410,18 +411,26 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     const list = (chosenFiles.length ? chosenFiles : files)
       .map((file) => `- ${file.path} (${STATUS[file.status].label.toLowerCase()})`)
       .join('\n');
+    const same = (path: string) => path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
+    const author = runs
+      .filter((run) => run.workspace && same(run.workspace) === same(checkout))
+      .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
+    const evidence = author ? authorEvidence(author) : '';
     useExecutionStore.getState().draft(key, {
       title: `Review uncommitted work${branch ? ` on ${branch}` : ''}`,
       prompt: [
         `Review the uncommitted changes in ${checkout}${branch ? ` (branch ${branch})` : ''}.`,
         'Read them with `git status` and `git diff HEAD` in that folder. Do not edit, stage or commit anything.',
         'Report correctness bugs, risky changes, missing tests and anything unfinished, most severe first, with file and line references.',
+        `If you are later asked to apply fixes, edit only files in ${checkout} and run checks from inside it; your own folder holds other work.`,
         '',
         'Files:',
         list,
+        ...(evidence ? ['', evidence] : []),
       ].join('\n'),
       projectId: project.id,
       isolated: false,
+      readOnly: true,
       agent: '',
     });
     window.dispatchEvent(new CustomEvent('jackalope:helper-draft', { detail: key }));

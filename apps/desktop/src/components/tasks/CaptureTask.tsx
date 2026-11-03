@@ -342,12 +342,15 @@ export function CaptureTask({
         model: current.agent ? current.model : undefined,
         agentProfileId: current.agent ? agentAccountFor(project, adapter) : undefined,
         targetBranch: project.preferences?.baseBranch || project.gitBranch,
-        verifyCommand: project.preferences?.verifyCommand,
-        prepareCommand: isQuestionOnly(current.prompt)
-          ? undefined
-          : project.preferences?.prepareCommand,
+        // A read-only helper's workspace is not the one it reads, so the saved check there
+        // would describe other work.
+        verifyCommand: current.readOnly ? undefined : project.preferences?.verifyCommand,
+        prepareCommand:
+          current.readOnly || isQuestionOnly(current.prompt)
+            ? undefined
+            : project.preferences?.prepareCommand,
         setupFiles: project.preferences?.setupFiles,
-        autoVerify: project.preferences?.autoVerify === true,
+        autoVerify: !current.readOnly && project.preferences?.autoVerify === true,
         prompt: finalPrompt,
         effort: current.effort ?? 'balanced',
         codexSpeed: current.codexSpeed,

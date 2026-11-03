@@ -97,6 +97,45 @@ End your reply with the same findings as a JSON array in a fenced block tagged j
     )
 }
 
+/// What the author recorded as proof, so the reviewer does not call a recorded check
+/// unbacked. Empty when nothing was recorded.
+fn author_evidence(author: &TaskRun) -> String {
+    let mut lines = Vec::new();
+    if let Some(goal) = author.understanding.as_ref().map(|u| u.goal.trim()) {
+        if !goal.is_empty() {
+            lines.push(format!("Goal: {goal}"));
+        }
+    }
+    for step in &author.validation_steps {
+        let notes = step.notes.as_deref().map(str::trim).unwrap_or_default();
+        let evidence = if step.evidence.is_empty() {
+            String::new()
+        } else {
+            format!(" Evidence: {}", step.evidence.join(", "))
+        };
+        lines.push(format!(
+            "- Check ({}): {}. {notes}{evidence}",
+            step.status, step.step
+        ));
+    }
+    for entry in &author.decisions {
+        lines.push(format!(
+            "- Decision ({}): {}. Result: {}",
+            entry.phase, entry.decision, entry.result
+        ));
+    }
+    for shot in &author.screenshots {
+        lines.push(format!("- Screenshot: {}", shot.file_path));
+    }
+    if lines.is_empty() {
+        return String::new();
+    }
+    format!(
+        "\nAuthor's recorded evidence (verify it rather than trusting it; do not report a claim as unbacked when it is listed here):\n{}\n",
+        excerpt(&lines.join("\n"), 6_000)
+    )
+}
+
 /// Instructions for an agent review: read the change and plan fixes, without running it.
 pub(super) fn review_brief(author: &TaskRun, base: &str) -> String {
     let result = if author.result.trim().is_empty() {
@@ -115,7 +154,7 @@ Original request:
 
 Author's result:
 {result}
-
+{evidence}
 Look for real problems: bugs, missed requirements, regressions, security issues, broken edge cases and clearly risky or confusing code. Skip style preferences and anything you are not confident about. No findings is a valid result.
 
 For each finding, give the file and line, what is wrong, and a short, concrete fix plan the author can follow without asking you.
@@ -129,6 +168,7 @@ End your reply with a fenced block tagged jackalope-review holding JSON in this 
 
 severity is high (breaks the intent or loses data), medium (a real bug or gap in some cases) or low (worth fixing, not blocking)."#,
         request = excerpt(&author.prompt, 6_000),
+        evidence = author_evidence(author),
     )
 }
 
@@ -476,6 +516,23 @@ mod tests {
         ] {
             assert!(text.contains(expected), "brief is missing {expected:?}");
         }
+        assert!(!text.contains("recorded evidence"));
+        let mut proven = author();
+        proven.validation_steps.push(ValidationStep {
+            id: "1".into(),
+            step: "Paired the simulator with a dev host".into(),
+            status: "passed".into(),
+            notes: None,
+            evidence: vec!["/tmp/pair.png".into()],
+            timestamp: "now".into(),
+            requirements: vec![],
+            finding: None,
+            safety_fact: None,
+        });
+        let text = review_brief(&proven, "abc123");
+        assert!(text.contains("recorded evidence"));
+        assert!(text.contains("- Check (passed): Paired the simulator with a dev host."));
+        assert!(text.contains("Evidence: /tmp/pair.png"));
         let source: ChallengeSource =
             serde_json::from_value(serde_json::json!({"runId": "a", "tree": "t", "base": "b"}))
                 .unwrap();

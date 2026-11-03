@@ -17,6 +17,9 @@
   --m-edge: color-mix(in srgb, var(--color-text-primary) 10%, transparent);
   --m-shadow: 0 12px 40px color-mix(in srgb, #000 18%, transparent);
   min-height: 100dvh;
+  /* The desktop stylesheet locks the body because its shell scrolls inside panes; phone
+     screens scroll the page itself. */
+  overflow: hidden auto;
   background:
     radial-gradient(
       90% 55% at 0% 0%,
@@ -426,28 +429,17 @@
   font-size: var(--text-lg);
   font-weight: 600;
 }
-/* "or enter it" between the scan button and the typed fallback. */
-.mobile-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-}
-.mobile-divider::before,
-.mobile-divider::after {
-  content: "";
-  flex: 1;
-  border-top: 1px solid var(--color-border-subtle);
-}
-.mobile-link-button {
-  justify-self: center;
+.mobile-pairing-manual summary {
   min-height: 44px;
-  margin-top: -8px;
-  padding: 0 12px;
-  color: var(--color-accent-ink);
+  color: var(--color-text-secondary);
   font-size: var(--text-sm);
-  font-weight: 500;
+}
+.mobile-pairing-manual .mobile-pairing-fields {
+  padding-top: 8px;
+}
+.mobile-pairing-code {
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
 }
 .mobile-pairing-form p {
   color: var(--color-text-secondary);

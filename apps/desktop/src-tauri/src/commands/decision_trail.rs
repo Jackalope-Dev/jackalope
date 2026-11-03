@@ -90,7 +90,8 @@ pub struct DecisionEntry {
     pub result: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub supersedes: Option<String>,
-    /// One result per evidence pointer, filled when the attempt ends. Empty until then.
+    /// One result per evidence pointer, saved when the attempt ends. The reply to recording
+    /// an entry carries an early check so a pointer that resolves to nothing can be fixed.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub checks: Vec<PointerCheck>,
 }
@@ -161,6 +162,7 @@ pub(in crate::commands) fn record(
         }
     }
     let mut outcome = Err("Attempt not found".to_owned());
+    let mut recorded = None;
     runtime.update_checked(&run.id, |current| {
         outcome = if !["starting", "running"].contains(&current.status.as_str()) {
             Err("This attempt has ended; its decision trail is closed.".into())
@@ -173,10 +175,28 @@ pub(in crate::commands) fn record(
                 .activity
                 .push(format!("[Decision: {}] {}", entry.phase, entry.decision));
             current.decisions.push(entry.clone());
+            recorded = Some(current.clone());
             Ok(())
         };
     })?;
-    outcome.map(|_| entry)
+    outcome?;
+    let mut entry = entry;
+    if let Some(run) = recorded {
+        entry.checks = early_checks(&run, &entry);
+    }
+    Ok(entry)
+}
+
+/// This entry's pointers checked against the attempt as it stands, so the agent learns about
+/// a misspelled or not-yet-recorded check while it can still fix it. Not saved: the final
+/// check runs when the attempt ends.
+fn early_checks(run: &TaskRun, entry: &DecisionEntry) -> Vec<PointerCheck> {
+    if entry.evidence.is_empty() {
+        return vec![];
+    }
+    let mut probe = run.clone();
+    probe.decisions = vec![entry.clone()];
+    review(&probe).remove(&entry.id).unwrap_or_default()
 }
 
 /// POST /v1/decisions: the HTTP form of the record_decision tool.
