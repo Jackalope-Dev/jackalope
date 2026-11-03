@@ -7,7 +7,8 @@ import { type Host, pair, scanPairingCode } from './native';
 
 /** A starting name the person can keep: phones rarely need telling apart beyond their kind. */
 function defaultName() {
-  if (/iPhone|iPad/.test(navigator.userAgent)) return 'iPhone';
+  if (/iPad/.test(navigator.userAgent)) return 'iPad';
+  if (/iPhone/.test(navigator.userAgent)) return 'iPhone';
   if (/Android/.test(navigator.userAgent)) return 'Android phone';
   return 'My phone';
 }
