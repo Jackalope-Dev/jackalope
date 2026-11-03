@@ -328,9 +328,11 @@ mod tests {
         };
         change(path, &["init", "-q", "-b", "main"]).unwrap();
         // merge_into makes its own merge commit, so the repository needs an identity of
-        // its own; CI runners have no global one.
+        // its own; CI runners have no global one. Windows runners also set
+        // core.autocrlf, which would turn the checked-out "task\n" into "task\r\n".
         change(path, &["config", "user.name", "Test"]).unwrap();
         change(path, &["config", "user.email", "test@example.invalid"]).unwrap();
+        change(path, &["config", "core.autocrlf", "false"]).unwrap();
         std::fs::write(path.join("a.txt"), "base\n").unwrap();
         change(path, &["add", "a.txt"]).unwrap();
         commit("Base");
