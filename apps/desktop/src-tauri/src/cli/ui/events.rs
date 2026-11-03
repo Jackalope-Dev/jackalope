@@ -235,8 +235,8 @@ impl App {
     }
 
     /// Rotates to the next tip every 8 seconds, returning true when changed.
-    fn rotate_tip_if_elapsed(&mut self) -> bool {
-        if self.last_tip_change.elapsed() >= Duration::from_secs(8) {
+    pub(super) fn rotate_tip_if_elapsed(&mut self) -> bool {
+        if !self.framed.get() && self.last_tip_change.elapsed() >= Duration::from_secs(8) {
             self.tip_index = (self.tip_index + 1) % render::TIPS.len();
             self.last_tip_change = std::time::Instant::now();
             true

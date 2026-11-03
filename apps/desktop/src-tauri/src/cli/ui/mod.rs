@@ -230,6 +230,9 @@ struct App {
     tick: usize,
     /// Currently displayed rotating tip.
     tip_index: usize,
+    /// The last frame drew the framed layout, whose tip changes only when
+    /// something is sent rather than on a timer.
+    framed: Cell<bool>,
     last_tip_change: Instant,
     /// The plan open in this terminal, from `/plan` or `/plans`.
     plan: Option<plan::PlanPane>,
@@ -358,6 +361,7 @@ impl App {
             last_run_took: None,
             tick: 0,
             tip_index: 0,
+            framed: Cell::new(false),
             last_tip_change: Instant::now(),
             plan: None,
             plan_edit: false,

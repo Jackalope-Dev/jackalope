@@ -210,6 +210,7 @@ impl App {
         if text.is_empty() {
             return;
         }
+        self.tip_index = (self.tip_index + 1) % super::render::TIPS.len();
         if history::keep(&raw) {
             history::remember(&mut self.history, &text);
             history::append(&text);

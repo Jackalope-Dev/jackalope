@@ -29,6 +29,8 @@ pub const TIPS: &[&str] = &[
     "`Ctrl+O` shows changed files here; `/review` opens them in the app.",
     "Use `/agent` to choose which AI coding agent handles your next conversation.",
     "Switch between active conversations in this directory with `/sessions`.",
+    "`/board` shows every open conversation at a glance, those that need you first.",
+    "The card's bottom edge lists what moves finished work on: `/review`, `/merge` or `/pr`.",
     "Start a fresh conversation anytime with `/new`.",
     "Press `Shift+Enter`, `Alt+Enter` or `Ctrl+J` to insert a newline without submitting.",
     "Use `/stop` to halt running agent execution immediately.",
@@ -107,7 +109,14 @@ pub fn draw(frame: &mut Frame, app: &App) {
     } else {
         vec![brand::compact(&app.project.name)]
     };
-    let show_tip = !framed && area.height >= 18;
+    app.framed.set(framed);
+    // Framed, a tip sits under an empty input; it gives way to typing and
+    // menus, which carry their own hints.
+    let show_tip = if framed {
+        area.height >= 24 && app.editor.text().is_empty() && app.picker.is_none()
+    } else {
+        area.height >= 18
+    };
     let tip_height = if show_tip { 1 } else { 0 };
     let status_height = if framed { 0 } else { 1 };
     let header_height = if framed || app.top_bar_hidden {

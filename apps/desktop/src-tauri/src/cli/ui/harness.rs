@@ -767,4 +767,40 @@ mod tests {
             .as_ref()
             .is_none_or(|picker| picker.kind != super::super::pickers::PickerKind::Board));
     }
+
+    #[test]
+    fn a_tip_sits_under_an_empty_input_and_changes_only_when_something_is_sent() {
+        let mut harness = Harness::new();
+        finished_login_fix(&mut harness);
+        let screen = harness.render(100, 34);
+        let tip = screen
+            .lines()
+            .find(|line| line.contains("Tip:"))
+            .unwrap_or_else(|| panic!("no tip: {screen}"))
+            .to_string();
+        let input = screen.lines().position(|line| line.contains("❯")).unwrap();
+        let tip_row = screen
+            .lines()
+            .position(|line| line.contains("Tip:"))
+            .unwrap();
+        assert!(tip_row > input, "the tip is under the input: {screen}");
+        harness.app.last_tip_change =
+            std::time::Instant::now() - std::time::Duration::from_secs(30);
+        assert!(
+            harness.app.framed.get() && !harness.app.rotate_tip_if_elapsed(),
+            "a framed tip does not change on a timer"
+        );
+
+        harness.type_text("hel");
+        let typing = harness.render(100, 34);
+        assert!(!typing.contains("Tip:"), "typing hides the tip: {typing}");
+
+        harness.key(KeyCode::Enter);
+        let after = harness.render(100, 34);
+        let next = after
+            .lines()
+            .find(|line| line.contains("Tip:"))
+            .unwrap_or("");
+        assert_ne!(next, tip, "sending moves to the next tip: {after}");
+    }
 }

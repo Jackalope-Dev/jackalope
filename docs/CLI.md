@@ -246,8 +246,9 @@ rounded content card, following the app's surfaces:
 
 The project name (which opens `/projects`), tabs, agent, model, open-conversation
 count and key hints can be clicked. A start screen shows the JACKALOPE wordmark (a two-row version in narrow
-windows), which light sweeps across once when the screen appears, and the agents that are set up. When work finishes cleanly, the status line says how long it took and what usually comes next. Smaller terminals drop the shell for a
-compact header, a status line and a rotating tip.
+windows), which light sweeps across once when the screen appears, and the agents that are set up. When work finishes cleanly, the status line says how long it took and what usually comes next. An empty input has a tip beneath it,
+which changes each time you send something and gives way to typing and menus. Smaller
+terminals drop the shell for a compact header, a status line and a tip that rotates.
 
 Your messages and pending work read as tinted blocks with a bar down their left edge.
 When a conversation is blocked, an amber "Needs you" banner above the input says why
