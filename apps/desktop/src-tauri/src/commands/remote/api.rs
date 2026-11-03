@@ -73,7 +73,23 @@ struct Pair {
     code: String,
     name: String,
 }
+/// Phones can only report a generic model name, so the host names them after the person
+/// who owns this computer. A name the person typed is kept as typed.
+fn device_label(name: &str, owner: Option<&str>) -> String {
+    let generic = matches!(
+        name.to_lowercase().as_str(),
+        "iphone" | "ipad" | "android phone" | "android tablet" | "my phone" | "phone"
+    );
+    match owner
+        .map(str::trim)
+        .filter(|owner| generic && !owner.is_empty())
+    {
+        Some(owner) => format!("{owner}'s {name}").chars().take(80).collect(),
+        None => name.to_owned(),
+    }
+}
 async fn pair(State(service): State<RemoteAccess>, Json(pair): Json<Pair>) -> Response {
+    let owner = crate::commands::system::owner_first_name();
     let mut inner = service.inner.lock().unwrap();
     let Some(pending) = inner.pairing.as_mut() else {
         return failure(
@@ -81,12 +97,7 @@ async fn pair(State(service): State<RemoteAccess>, Json(pair): Json<Pair>) -> Re
             "Create a new pairing link on the host.",
         );
     };
-    pending.attempts = pending.attempts.saturating_add(1);
-    if pending.expires <= Instant::now()
-        || pending.attempts > 20
-        || pair.code.len() != 64
-        || hash(&pair.code) != pending.hash
-    {
+    if !pending.admit(&pair.code, Instant::now()) {
         return failure(
             StatusCode::FORBIDDEN,
             "Pairing expired or was declined. Create a new link on the host.",
@@ -99,12 +110,13 @@ async fn pair(State(service): State<RemoteAccess>, Json(pair): Json<Pair>) -> Re
             "Use a device name up to 80 characters. At most 20 devices may be paired.",
         );
     }
+    let name = device_label(name, owner.as_deref());
     let token = secret();
     let id = Uuid::new_v4().to_string();
     let mut config = inner.config.clone();
     config.devices.push(Device {
         id: id.clone(),
-        name: name.into(),
+        name,
         token_hash: hash(&token),
         paired_at: chrono::Utc::now().to_rfc3339(),
     });
@@ -339,6 +351,24 @@ async fn asset(State(service): State<RemoteAccess>, req: Request) -> Response {
 mod tests {
     use super::*;
     #[test]
+    fn generic_phone_names_take_the_owner_name_and_typed_names_stay() {
+        assert_eq!(device_label("iPhone", Some("Caden")), "Caden's iPhone");
+        assert_eq!(device_label("iPad", Some(" Ada ")), "Ada's iPad");
+        assert_eq!(
+            device_label("Android phone", Some("Ada")),
+            "Ada's Android phone"
+        );
+        assert_eq!(device_label("Work phone", Some("Ada")), "Work phone");
+        assert_eq!(device_label("iPhone", None), "iPhone");
+        assert_eq!(device_label("iPhone", Some("  ")), "iPhone");
+        assert!(
+            device_label("iPhone", Some(&"x".repeat(200)))
+                .chars()
+                .count()
+                <= 80
+        );
+    }
+    #[test]
     fn remote_start_and_followup_are_durable_idempotent_and_project_scoped() {
         let directory =
             std::env::temp_dir().join(format!("jackalope-remote-test-{}", Uuid::new_v4()));
@@ -466,6 +496,7 @@ mod tests {
                 config,
                 pairing: Some(Pairing {
                     hash: hash(&code),
+                    short: String::new(),
                     expires: Instant::now() + Duration::from_secs(300),
                     attempts: 0,
                 }),
@@ -613,6 +644,7 @@ mod tests {
         assert!(run(&[private], &saved, Some("private")).is_err());
         service.inner.lock().unwrap().pairing = Some(Pairing {
             hash: hash(&code),
+            short: String::new(),
             expires: Instant::now() - Duration::from_secs(1),
             attempts: 0,
         });

@@ -44,11 +44,36 @@ struct Device {
     token_hash: String,
     paired_at: String,
 }
+/// One pending pairing: the long code in its link and QR, and the short code shown for
+/// typing. Either pairs once; both share the expiry and the attempt limit.
 struct Pairing {
     hash: String,
+    short: String,
     expires: Instant,
     attempts: u16,
 }
+impl Pairing {
+    /// Counts this attempt, then accepts a current code: the link's long code or the short
+    /// one, before expiry and within [`PAIRING_ATTEMPTS`].
+    fn admit(&mut self, code: &str, now: Instant) -> bool {
+        self.attempts = self.attempts.saturating_add(1);
+        let matches = pairing_code(code).is_some_and(|code| {
+            let wanted = if code.len() == 64 {
+                &self.hash
+            } else {
+                &self.short
+            };
+            &hash(&code) == wanted
+        });
+        now < self.expires && self.attempts <= PAIRING_ATTEMPTS && matches
+    }
+}
+/// Every request to pair counts, so a short code gets at most this many guesses before
+/// the person has to create a new one.
+const PAIRING_ATTEMPTS: u16 = 10;
+/// Crockford base32: no I, L, O or U, so a typed code cannot be misread.
+const SHORT_ALPHABET: &[u8] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const SHORT_LENGTH: usize = 10;
 struct Inner {
     config: Config,
     pairing: Option<Pairing>,
@@ -78,6 +103,39 @@ fn hash(value: &str) -> String {
 }
 fn secret() -> String {
     format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple())
+}
+/// A 50-bit code for typing, grouped as `ABCDE-FGHJK`. With five minutes, one use and
+/// [`PAIRING_ATTEMPTS`] guesses, a guess succeeds about once in 10^14 tries.
+fn short_code() -> String {
+    // Bytes 6 and 8 of a v4 UUID carry its version and variant; the rest are random.
+    let random = Uuid::new_v4().into_bytes();
+    let code: String = [0, 1, 2, 3, 4, 5, 7, 9, 10, 11]
+        .iter()
+        .map(|&index| SHORT_ALPHABET[usize::from(random[index] % 32)] as char)
+        .collect();
+    format!("{}-{}", &code[..5], &code[5..])
+}
+/// The code as the host compares it: a link's 64-hex code, or a short code with its
+/// dashes, spaces and case removed and look-alike letters read as digits.
+pub(super) fn pairing_code(value: &str) -> Option<String> {
+    let compact: String = value
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '-')
+        .collect();
+    if compact.len() == 64 && compact.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Some(compact.to_ascii_lowercase());
+    }
+    let short: String = compact
+        .to_ascii_uppercase()
+        .chars()
+        .map(|c| match c {
+            'O' => '0',
+            'I' | 'L' => '1',
+            other => other,
+        })
+        .collect();
+    (short.len() == SHORT_LENGTH && short.bytes().all(|b| SHORT_ALPHABET.contains(&b)))
+        .then_some(short)
 }
 fn origin(value: &str) -> Result<String, String> {
     if value.is_empty() {
@@ -314,14 +372,16 @@ pub fn remote_pairing(service: State<'_, RemoteAccess>) -> Result<Value, String>
     if !inner.config.enabled || inner.stop.is_none() || inner.config.projects.is_empty() {
         return Err("Enable remote access and select a project first.".into());
     }
-    let code = secret();
+    let long = secret();
+    let code = short_code();
     inner.pairing = Some(Pairing {
-        hash: hash(&code),
+        hash: hash(&long),
+        short: hash(&pairing_code(&code).unwrap_or_default()),
         expires: Instant::now() + Duration::from_secs(300),
         attempts: 0,
     });
     let link = (!inner.config.public_origin.is_empty())
-        .then(|| format!("{}/#pair={code}", inner.config.public_origin));
+        .then(|| format!("{}/#pair={long}", inner.config.public_origin));
     let qr = link.as_deref().map(qr_rows).transpose()?;
     Ok(json!({"code":code,"link":link,"qr":qr,"expiresIn":300}))
 }
@@ -377,5 +437,66 @@ mod tests {
             "unexpected error: {missing}"
         );
         std::fs::remove_dir_all(repo).unwrap();
+    }
+
+    #[test]
+    fn short_codes_are_typable_and_read_forgivingly() {
+        for _ in 0..50 {
+            let code = short_code();
+            assert_eq!(code.len(), SHORT_LENGTH + 1);
+            assert_eq!(&code[5..6], "-");
+            assert!(code
+                .bytes()
+                .filter(|b| *b != b'-')
+                .all(|b| SHORT_ALPHABET.contains(&b)));
+            assert_eq!(pairing_code(&code).unwrap(), code.replace('-', ""));
+        }
+        assert_eq!(pairing_code(" abcde fghjk ").unwrap(), "ABCDEFGHJK");
+        assert_eq!(pairing_code("O1LI2-ABCDE").unwrap(), "01112ABCDE");
+        let long = secret();
+        assert_eq!(pairing_code(&long.to_uppercase()).unwrap(), long);
+        for bad in [
+            "",
+            "ABCDE-FGHJ",
+            "ABCDE-FGHJKM",
+            "ABCDE-FGHJU",
+            "ABCDE_FGHJK",
+        ] {
+            assert!(pairing_code(bad).is_none(), "{bad:?} should be refused");
+        }
+    }
+
+    #[test]
+    fn pairing_accepts_either_code_once_before_expiry_within_the_attempt_limit() {
+        let long = secret();
+        let short = short_code();
+        let now = Instant::now();
+        let pending = || Pairing {
+            hash: hash(&long),
+            short: hash(&pairing_code(&short).unwrap()),
+            expires: now + Duration::from_secs(300),
+            attempts: 0,
+        };
+        assert!(pending().admit(&short.to_lowercase(), now));
+        assert!(pending().admit(&long, now));
+        assert!(!pending().admit("ABCDE-FGHJK", now));
+        let mut expired = pending();
+        assert!(!expired.admit(&short, now + Duration::from_secs(300)));
+        let mut guessed = pending();
+        for _ in 1..PAIRING_ATTEMPTS {
+            assert!(!guessed.admit("00000-00000", now));
+        }
+        assert!(
+            guessed.admit(&short, now),
+            "the last allowed attempt still pairs"
+        );
+        let mut locked = pending();
+        for _ in 0..PAIRING_ATTEMPTS {
+            assert!(!locked.admit("00000-00000", now));
+        }
+        assert!(
+            !locked.admit(&short, now),
+            "after the limit even the right code is refused"
+        );
     }
 }

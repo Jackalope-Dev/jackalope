@@ -561,8 +561,11 @@ Cloudflare account and installed acceptance remain open.
 Trusted hosts and a responsive phone companion are implemented for native validation.
 Settings → Remote access scopes paired devices to selected projects. A separate loopback
 API supports task status, questions, follow-ups, new isolated sessions and change review.
-Desktop connections use verified SSH forwarding or HTTPS; phones use HTTPS, with optional
-private Tailscale Serve setup. Work continues through client disconnection. Live multi-device,
+Desktop connections use verified SSH forwarding or HTTPS; phones use HTTPS, from any HTTPS
+address or private Tailscale Serve, which Remote access sets up through detected steps.
+Pairing shows a ten-character code (or a QR link for phones) that works once, expires after
+five minutes and allows ten attempts; a phone paired under a generic model name takes the
+computer owner's first name. Work continues through client disconnection. Live multi-device,
 provider, Tailscale and cross-platform acceptance remain open.
 
 ## Known limits

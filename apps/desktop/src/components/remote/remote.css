@@ -9,10 +9,84 @@
   gap: 0.5rem;
   flex-wrap: wrap;
 }
-.remote-pair-qr {
+.remote-pair {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+.remote-pair-code {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+.remote-code {
+  font-family: var(--font-mono);
+  font-size: clamp(1.75rem, 6vw, 2.5rem);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  color: var(--color-text-primary);
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+.remote-setup-steps {
+  display: grid;
+  gap: 0.75rem;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.remote-setup-steps h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.remote-steps {
+  display: grid;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.remote-steps li {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+.remote-step-mark {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+.remote-steps li[data-done] .remote-step-mark {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  box-shadow: none;
+}
+.remote-step-body {
+  display: grid;
+  gap: 0.375rem;
+  min-width: 0;
+}
+.remote-step-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.remote-steps li[data-done] .remote-step-title {
+  color: var(--color-text-secondary);
+}
+.remote-step-error {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
 }
 .remote-qr {
   flex-shrink: 0;
