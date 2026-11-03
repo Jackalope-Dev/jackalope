@@ -1,5 +1,17 @@
 [
   {
+    "id": "a-clearer-frosted-window",
+    "date": "2026-11-03",
+    "status": "In development",
+    "title": "A clearer frosted window",
+    "description": "The frosted window now shows your desktop through it on both macOS and Windows.",
+    "items": [
+      "On macOS the window uses the translucent sidebar material, so your desktop shows through instead of a near-solid grey.",
+      "On Windows 11 the window is now transparent, which the frosted effect needs to show.",
+      "The macOS window buttons sit on the title bar's centre line, in line with the sidebar, and the Jackalope name on Windows lines up with the sidebar's edge."
+    ]
+  },
+  {
     "id": "easier-phone-pairing",
     "date": "2026-11-03",
     "status": "In development",

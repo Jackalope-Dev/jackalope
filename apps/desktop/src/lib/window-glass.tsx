@@ -10,9 +10,11 @@ type ClientHints = {
 };
 
 /**
- * macOS vibrancy works on every supported version. Windows uses Acrylic, the see-through
- * frosted material, only on Windows 11 (it lags while dragging on Windows 10); WebView2
- * reports Windows 11 as platform version 13 or later through client hints.
+ * macOS vibrancy works on every supported version; the sidebar material lets the desktop
+ * show through, where the window background material is nearly opaque. Windows uses
+ * Acrylic, the see-through frosted material, only on Windows 11 (it lags while dragging on
+ * Windows 10); WebView2 reports Windows 11 as platform version 13 or later through client
+ * hints.
  */
 async function supportsGlass() {
   if (matchMedia('(prefers-reduced-transparency: reduce)').matches) return false;
@@ -48,7 +50,8 @@ function appIsDark() {
 
 /**
  * Shows the desktop through a frosted window while the calling screen is mounted.
- * The window is transparent on Windows and macOS, so pages paint an opaque background
+ * The window is transparent on Windows and macOS (tauri.windows.conf.json and
+ * tauri.macos.conf.json; effects need it), so pages paint an opaque background
  * unless `data-window-glass` is set; it is set only once the OS effect is applied,
  * which keeps unsupported systems on the normal opaque look. The window's theme follows
  * the app's appearance so the OS material matches it, and returns to the system's after.
@@ -76,7 +79,7 @@ function useWindowGlass() {
       await window.setEffects(
         isMacPlatform()
           ? {
-              effects: [Effect.UnderWindowBackground],
+              effects: [Effect.Sidebar],
               state: EffectState.FollowsWindowActiveState,
             }
           : { effects: [Effect.Acrylic] },
