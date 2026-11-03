@@ -12,6 +12,13 @@ import tempfile
 import time
 
 
+def publish(path, text):
+    """Replace a file the other process polls in one step, so it never reads a half-written value."""
+    staging = path.with_name(f'.{path.name}.tmp')
+    staging.write_text(text)
+    os.replace(staging, path)
+
+
 def fixture(directory, title='Jackalope X11 fixture'):
     import gi
     gi.require_version('Gtk', '3.0')
@@ -44,8 +51,8 @@ def fixture(directory, title='Jackalope X11 fixture'):
     entry.grab_focus()
 
     def tick():
-        (directory / 'text').write_text(entry.get_text())
-        (directory / 'scroll').write_text(str(scroll.get_vadjustment().get_value()))
+        publish(directory / 'text', entry.get_text())
+        publish(directory / 'scroll', str(scroll.get_vadjustment().get_value()))
         command = directory / 'command'
         if command.exists():
             action = command.read_text()
@@ -89,6 +96,23 @@ def wait(check, description, timeout=12):
     raise AssertionError(f'Timed out: {description}; {last}')
 
 
+def hold_accessibility_client():
+    """Stay an AT-SPI client of the fixture until the trial ends.
+
+    The fixture's atk-bridge removes its key listener when its last AT-SPI client goes away,
+    and GTK 3.24.41 (Ubuntu 24.04) can free that listener while it is still dispatching a key
+    event, which segfaults the fixture (fixed upstream in GTK commit e6372d29). Each helper
+    call is a short-lived client, so a key press could land just as one exits. A listener
+    held here keeps the bridge's key listener in place for every press. Keep the result.
+    """
+    import gi
+    gi.require_version('Atspi', '2.0')
+    from gi.repository import Atspi
+    listener = Atspi.EventListener.new(lambda _event: None)
+    listener.register('object:state-changed:focused')
+    return listener
+
+
 def trial(helper):
     children = []
     with tempfile.TemporaryDirectory(prefix='jackalope-x11-trial-') as temporary:
@@ -109,6 +133,7 @@ def trial(helper):
             return json.loads(result.stdout)
 
         try:
+            accessibility_client = hold_accessibility_client()
             app = launch([sys.executable, __file__, '--fixture', temporary])
             wait(lambda: (directory / 'ready').exists(), 'fixture startup')
             window = wait(lambda: next((item for item in call({'action': 'list'})['windows']
@@ -187,19 +212,19 @@ def trial(helper):
             colors = pixels.get_pixels()
             assert len({colors[index:index + 3] for index in range(0, len(colors) - 3, 3)}) > 20, 'Capture is blank'
             call({'action': 'click', 'window': window, 'guard': guard, 'bounds': snapshot['bounds'], 'x': -1, 'y': 0}, error='outside')
-            (directory / 'command').write_text('password')
+            publish(directory / 'command', 'password')
             time.sleep(.2)
             call({'action': 'type', 'window': window, 'guard': guard, 'bounds': snapshot['bounds'], 'text': 'must fail'}, error='password')
-            (directory / 'command').write_text('other')
+            publish(directory / 'command', 'other')
             wait(lambda: state()[0] == 'paused', 'focus loss pauses access')
             call({'action': 'snapshot', 'window': window, 'guard': guard}, error='paused')
-            (directory / 'command').write_text('text')
+            publish(directory / 'command', 'text')
             time.sleep(.2)
             activate()
             call({'action': 'snapshot', 'window': window, 'guard': guard}, error='changed')
             guard['epoch'] = int(state()[1])
             snapshot = operation('snapshot')
-            (directory / 'command').write_text('move')
+            publish(directory / 'command', 'move')
             wait(lambda: state()[0] == 'paused', 'window movement pauses access')
             activate()
             guard['epoch'] = int(state()[1])
