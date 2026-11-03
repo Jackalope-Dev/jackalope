@@ -42,6 +42,7 @@ pub const TIPS: &[&str] = &[
     "Keep typing while an agent works: messages queue and run in order.",
     "`/bg fix the flaky test` starts a parallel conversation without leaving this one.",
     "`Ctrl+N` and `Ctrl+P` step through open conversations.",
+    "`Ctrl+T` or `/tabs` hides the top bar for more room.",
     "`Ctrl+C` clears the input, then stops running `!` commands, then leaves.",
     "Type `@` to mention a file; matching is fuzzy and `Tab` inserts it.",
     "`Ctrl+R` searches everything you have typed, across sessions.",
@@ -69,12 +70,14 @@ pub fn draw(frame: &mut Frame, app: &App) {
     );
     let area = if framed {
         let [top, middle, bottom] = Layout::vertical([
-            Constraint::Length(1),
+            Constraint::Length(u16::from(!app.top_bar_hidden)),
             Constraint::Min(1),
             Constraint::Length(1),
         ])
         .areas(full);
-        chrome::header(frame, app, top);
+        if !app.top_bar_hidden {
+            chrome::header(frame, app, top);
+        }
         chrome::status(frame, app, bottom);
         let card = Rect {
             x: middle.x + 1,
@@ -95,7 +98,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
         full
     };
 
-    let header: Vec<Line> = if framed {
+    let header: Vec<Line> = if framed || app.top_bar_hidden {
         Vec::new()
     } else if area.height >= 22 && app.view.is_some() {
         brand::header(header_info(app), false, app.tick)
@@ -105,7 +108,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
     let show_tip = !framed && area.height >= 18;
     let tip_height = if show_tip { 1 } else { 0 };
     let status_height = if framed { 0 } else { 1 };
-    let header_height = if framed { 0 } else { header.len() as u16 + 1 };
+    let header_height = if framed || app.top_bar_hidden {
+        0
+    } else {
+        header.len() as u16 + 1
+    };
 
     // The draft grows with what is typed, up to a third of the screen, then
     // scrolls to keep the cursor in view.
@@ -156,7 +163,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
     let (body, panel_area) = panel::split(app, body);
     app.body_area.set(body);
 
-    if !framed {
+    if header_height > 0 {
         let mut header_lines = header;
         header_lines.push(if app.working() {
             brand::divider_active(header_area.width, app.tick)
@@ -501,6 +508,25 @@ pub(super) fn status_parts(app: &App) -> (String, Color, Vec<Span<'static>>) {
             ),
             accent,
         ));
+    }
+    if app.top_bar_hidden {
+        // The tabs that would show it are hidden.
+        let waiting = app
+            .sessions
+            .iter()
+            .filter(|session| {
+                app.session.as_ref() != Some(&session.id) && super::conversation::needs_you(session)
+            })
+            .count();
+        if waiting > 0 {
+            parts.push(Span::styled(
+                format!(
+                    "  {waiting} other {} you · Ctrl+T",
+                    if waiting == 1 { "needs" } else { "need" }
+                ),
+                Style::default().fg(brand::warning()),
+            ));
+        }
     }
     if app.sharpening {
         parts.push(Span::styled("  sharpening your draft…", accent));

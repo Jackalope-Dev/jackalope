@@ -44,7 +44,34 @@ pub struct Placed {
     pub after: Option<usize>,
 }
 
+/// Where the terminal's own view choices are kept, apart from `cli.json`,
+/// which is rewritten whole when the start choice is remembered.
+const VIEW: &str = "cli-view.json";
+
+pub(super) fn top_bar_hidden() -> bool {
+    crate::prefs::read_json::<serde_json::Value>(VIEW)
+        .and_then(|value| value["hideTopBar"].as_bool())
+        .unwrap_or(false)
+}
+
 impl App {
+    /// Hides or shows the top bar, and remembers it for later sessions.
+    pub(super) fn toggle_top_bar(&mut self) {
+        self.top_bar_hidden = !self.top_bar_hidden;
+        let _ = crate::prefs::write_json(
+            VIEW,
+            &serde_json::json!({ "hideTopBar": self.top_bar_hidden }),
+        );
+        self.flash(
+            if self.top_bar_hidden {
+                "Top bar hidden · Ctrl+T or /tabs shows it"
+            } else {
+                "Top bar shown"
+            },
+            Tone::Muted,
+        );
+    }
+
     pub(super) fn note(&mut self, text: impl Into<String>) {
         self.place(Entry::Note(text.into(), Tone::Muted));
     }

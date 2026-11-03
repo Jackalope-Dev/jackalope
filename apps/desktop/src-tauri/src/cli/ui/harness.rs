@@ -222,6 +222,8 @@ impl Harness {
             }],
             default_agent: "claude".into(),
         }));
+        // Tests share one profile, so a choice saved by another starts over.
+        app.top_bar_hidden = false;
         app.refresh_now();
         Self {
             app,
@@ -428,6 +430,40 @@ mod tests {
             )),
             "Enter answers with the highlighted option"
         );
+    }
+
+    #[test]
+    fn the_top_bar_hides_and_returns_with_ctrl_t_or_tabs() {
+        let mut harness = Harness::new();
+        harness.add(conversation("c1", "Fix login", &[("you", "Fix login")]));
+        harness.add(conversation("c2", "Add search", &[("you", "Add search")]));
+        harness.open("c1");
+        harness.open("c2");
+        let mut asking = conversation("c3", "Pick a database", &[("you", "Set up reporting")]);
+        asking.questions = vec![question(&asking, "Which database?", &["Postgres"])];
+        harness.add(asking);
+        harness.sync();
+        let shown = harness.render(120, 30);
+        assert!(
+            shown.lines().next().unwrap().contains("Fix login"),
+            "{shown}"
+        );
+
+        harness.key_with(KeyCode::Char('t'), KeyModifiers::CONTROL);
+        let hidden = harness.render(120, 30);
+        assert!(
+            !hidden.lines().next().unwrap().contains("Fix login"),
+            "{hidden}"
+        );
+        assert!(!hidden.contains("demo-app"), "{hidden}");
+        assert!(
+            hidden.lines().last().unwrap().contains("1 other needs you"),
+            "the status line still says what needs you: {hidden}"
+        );
+
+        harness.submit("/tabs");
+        let back = harness.render(120, 30);
+        assert!(back.lines().next().unwrap().contains("demo-app"), "{back}");
     }
 
     #[test]

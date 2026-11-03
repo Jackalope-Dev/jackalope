@@ -102,7 +102,7 @@ terminal and the app together. Leaving a terminal does not stop work.
 always message text. Unknown or misplaced options are refused with exit status 64.
 
 Inside a conversation, typing `/` opens an interactive command menu, and `/help`
-lists commands: `/new`, `/bg`, `/sharpen`, `/init`, `/sessions`, `/close`, `/projects`, `/agents`, `/settings`,
+lists commands: `/new`, `/bg`, `/sharpen`, `/init`, `/sessions`, `/close`, `/tabs`, `/projects`, `/agents`, `/settings`,
 `/status`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/learnings`, `/files`, `/review` (or `/diff`), `/merge`, `/pr`, `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
 `/unpause`, `/unqueue`, `/copy`, `/history`, `/kill`, `/clear`, `/plan`, `/plans`, `/revise`,
 `/approve`, `/replan`, `/export`, `/deviation`, `/browser`, `/computer`, `/open` and `/quit`. Pickers
@@ -140,7 +140,9 @@ the queue and `/unpause` sends it. `/clear` starts a fresh conversation like `/n
 `/close` closes the open conversation's tab and shows its neighbour; `/close <n>`,
 `/close others` and `/close all` close tabs by number or in bulk. Closing only hides a
 tab: the work keeps running, `/sessions` reopens it, and it returns when it starts
-needing you. Notes and `!` output belong to the conversation they were added in and stay
+needing you. `/tabs` or Ctrl+T hides the top bar for more room and remembers that for
+later sessions; while it is hidden, the status line counts other conversations that
+need you. Notes and `!` output belong to the conversation they were added in and stay
 at that point in its history; short hints, such as how to use a command, show briefly in
 the status line instead.
 `/model` picks from the models configured for the next conversation's agent, or

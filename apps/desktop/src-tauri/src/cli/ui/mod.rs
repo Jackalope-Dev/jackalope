@@ -159,6 +159,8 @@ struct App {
     offered: HashSet<String>,
     /// Conversations opened in this terminal, kept as tabs once visited.
     opened: HashSet<String>,
+    /// The top bar with the project and tabs is hidden (`/tabs`, Ctrl+T).
+    top_bar_hidden: bool,
     /// Conversations whose tab was closed, kept out of the tabs until opened
     /// again or until they start needing you.
     closed: HashSet<String>,
@@ -314,6 +316,7 @@ impl App {
             offered: HashSet::new(),
             opened: HashSet::new(),
             closed: HashSet::new(),
+            top_bar_hidden: feed::top_bar_hidden(),
             history: history::load(),
             history_index: None,
             files: None,
