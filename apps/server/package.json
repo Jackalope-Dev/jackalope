@@ -17,7 +17,7 @@
     "jose": "^6.2.12",
     "zod": "4.6.7",
     "@jackalope/ui": "workspace:*",
-    "@lopebase/adapter": "^0.4.1",
+    "@lopebase/adapter": "^0.4.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "lucide-react": "^1.46.0"
