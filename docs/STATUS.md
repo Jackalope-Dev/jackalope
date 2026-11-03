@@ -454,9 +454,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   use and asks only for recursive or out-of-workspace deletes, Git pushes other than
   a plain push of an existing non-protected local branch to a configured remote,
   history or working-tree loss, piped or encoded code, elevated or system changes,
+  software installs beyond the project (system packages, toolchains, global tools),
   credential files, publishing and deploys, process kills and writes outside the
-  workspace. Here-document bodies read as data, such as commit messages, are not
-  parsed as commands. Each automatic approval and escalation is recorded in the
+  workspace. Here-document bodies read as data, such as commit messages, and command
+  output assigned to a variable are not parsed as commands. Agents are asked to edit
+  files with their edit tools so each edit is checked, and `record_decision` replies
+  flag evidence pointers that resolve to nothing. Each automatic approval and escalation is recorded in the
   task's activity. Saved always-allow rules still apply; a chained command (`&&`,
   `;`, `|`) is allowed when every command in it has a rule, and choosing always
   allow saves one for each, except chains through shells, interpreters or `sudo`. Codex keeps its workspace-write sandbox; Gemini
@@ -558,8 +561,11 @@ Cloudflare account and installed acceptance remain open.
 Trusted hosts and a responsive phone companion are implemented for native validation.
 Settings → Remote access scopes paired devices to selected projects. A separate loopback
 API supports task status, questions, follow-ups, new isolated sessions and change review.
-Desktop connections use verified SSH forwarding or HTTPS; phones use HTTPS, with optional
-private Tailscale Serve setup. Work continues through client disconnection. Live multi-device,
+Desktop connections use verified SSH forwarding or HTTPS; phones use HTTPS, from any HTTPS
+address or private Tailscale Serve, which Remote access sets up through detected steps.
+Pairing shows a ten-character code (or a QR link for phones) that works once, expires after
+five minutes and allows ten attempts; a phone paired under a generic model name takes the
+computer owner's first name. Work continues through client disconnection. Live multi-device,
 provider, Tailscale and cross-platform acceptance remain open.
 
 ## Known limits

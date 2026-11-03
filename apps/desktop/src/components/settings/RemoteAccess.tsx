@@ -1,10 +1,19 @@
-import { Button, Checkbox, Disclosure, DisclosureSummary, FormField, Input } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  CopyButton,
+  Disclosure,
+  DisclosureSummary,
+  FormField,
+  Input,
+} from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { nativeTask, type RunRequest } from '../../lib/task-runtime';
 import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Setting, SettingGroup } from './Setting';
+import { TailscaleSetup } from './TailscaleSetup';
 import '../remote/remote.css';
 
 interface Status {
@@ -17,6 +26,7 @@ interface Status {
   error: string | null;
 }
 interface PairingCode {
+  /** The short code for typing, grouped as ABCDE-FGHJK. */
   code: string;
   link: string | null;
   /** The link as QR rows, '1' for a dark module; present when there is a link. */
@@ -43,6 +53,38 @@ function PairingQr({ rows }: { rows: string[] }) {
       <rect width={size} height={size} fill="#fff" />
       <path d={path} fill="#000" />
     </svg>
+  );
+}
+/** The pairing code large enough to type from across a desk, with time left and copy. */
+function PairingCodeView({ pair, expires }: { pair: PairingCode; expires: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const left = Math.max(0, Math.ceil((expires - now) / 1000));
+  return (
+    <div className="remote-pair px-5 py-4">
+      {pair.qr && <PairingQr rows={pair.qr} />}
+      <div className="remote-pair-code">
+        <span className="task-muted">Pairing code</span>
+        <output className="remote-code" aria-label={`Pairing code ${[...pair.code].join(' ')}`}>
+          {pair.code}
+        </output>
+        <p className="task-muted">
+          {pair.qr
+            ? "Scan the QR code with the Jackalope app, or type the code with this computer's address."
+            : 'Type the code where you connect this computer.'}{' '}
+          It works once and expires in {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}.
+        </p>
+        <div className="remote-toolbar">
+          <CopyButton size="sm" variant="outline" text={pair.code} label="Copy code" />
+          {pair.link && (
+            <CopyButton size="sm" variant="outline" text={pair.link} label="Copy phone link" />
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 export function RemoteAccess() {
@@ -244,27 +286,11 @@ export function RemoteAccess() {
           title="Pair a device"
           description={
             status.publicOrigin
-              ? 'Scan the code with the Jackalope app on your phone, or use the pairing code on another desktop. Each one expires after five minutes and works once.'
-              : 'Use SSH from another desktop, or enable private HTTPS for your phone.'
+              ? `Phones and other computers connect at ${status.publicOrigin}.`
+              : 'Other computers can pair over SSH now. Phones need private HTTPS, set up below.'
           }
         >
           <div className="flex flex-wrap gap-2">
-            {!status.publicOrigin && (
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() =>
-                  void perform(async () => {
-                    apply(await nativeTask<Status>('remote_private_https'));
-                    setNotice(
-                      'Private HTTPS is ready. Both devices must be signed in to Tailscale.',
-                    );
-                  })
-                }
-              >
-                Set up with Tailscale
-              </Button>
-            )}
             <Button
               disabled={busy}
               onClick={() =>
@@ -276,50 +302,20 @@ export function RemoteAccess() {
                 })
               }
             >
-              {status.publicOrigin ? 'Create pairing link' : 'Create pairing code'}
+              Create pairing code
             </Button>
           </div>
         </Setting>
       )}
-      {pair?.qr && (
-        <div className="remote-pair-qr px-5 pt-4">
-          <PairingQr rows={pair.qr} />
-          <p className="task-muted">
-            In the Jackalope app on your phone, tap Scan QR code and point the camera here.
-          </p>
-        </div>
-      )}
-      {pair && (
-        <div className="remote-toolbar px-5 py-4">
-          <Button
-            onClick={() =>
-              void perform(async () => {
-                await navigator.clipboard.writeText(pair.link || pair.code);
-                setNotice(
-                  pair.link
-                    ? 'Pairing link copied. Open it on your phone.'
-                    : 'Pairing code copied. Paste it when connecting this host.',
-                );
-              })
-            }
-          >
-            {pair.link ? 'Copy phone link' : 'Copy pairing code'}
-          </Button>
-          {pair.link && (
-            <Button
-              variant="outline"
-              onClick={() =>
-                void perform(async () => {
-                  await navigator.clipboard.writeText(pair.code);
-                  setNotice('Pairing code copied.');
-                })
-              }
-            >
-              Copy desktop code
-            </Button>
-          )}
-          <span>Expires in five minutes</span>
-        </div>
+      {pair && <PairingCodeView key={pair.code} pair={pair} expires={expires} />}
+      {status?.listening && !status.publicOrigin && (
+        <TailscaleSetup
+          turnOn={async () => {
+            apply(await nativeTask<Status>('remote_private_https'));
+            setPair(null);
+            setNotice('Private HTTPS is on. Create a pairing code for your phone.');
+          }}
+        />
       )}
       {!!status?.devices.length && (
         <div>

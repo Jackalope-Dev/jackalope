@@ -28,6 +28,8 @@ export interface TaskDraft {
   planningStatus?: TaskStatus;
   agent: string;
   isolated: boolean;
+  /** A read-only helper such as a review: no prepare command and no saved check. */
+  readOnly?: boolean;
   skills?: string[];
   connectionIds?: string[];
 }

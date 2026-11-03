@@ -27,9 +27,29 @@ fn decision_trail_is_append_only_checked_at_the_end_and_survives_restart_and_exp
         .insert(run.id.clone(), run.clone());
 
     let first = record(&runtime, &run, decision(None, &["src/missing.rs:3"])).unwrap();
+    assert_eq!(
+        first.checks[0].state, MISSING,
+        "the reply flags a pointer that resolves to nothing"
+    );
+    assert!(
+        runtime.run_snapshot(&run.id).unwrap().decisions[0]
+            .checks
+            .is_empty(),
+        "the saved entry is checked when the attempt ends"
+    );
+    let named = record(
+        &runtime,
+        &run,
+        decision(None, &["check:mobile-status-tests"]),
+    );
+    assert_eq!(
+        named.unwrap().checks[0].note.as_deref(),
+        Some("No recorded check by that name")
+    );
     assert!(record(&runtime, &run, decision(Some("invented"), &[])).is_err());
     let second = record(&runtime, &run, decision(Some(&first.id), &[])).unwrap();
     assert_eq!(second.supersedes.as_deref(), Some(first.id.as_str()));
+    assert!(second.checks.is_empty());
 
     check_evidence(&runtime, &run.id);
     runtime
@@ -41,19 +61,19 @@ fn decision_trail_is_append_only_checked_at_the_end_and_survives_restart_and_exp
     );
 
     let saved = runtime.run_snapshot(&run.id).unwrap();
-    assert_eq!(saved.decisions.len(), 2);
+    assert_eq!(saved.decisions.len(), 3);
     assert_eq!(saved.decisions[0].checks[0].state, MISSING);
     assert!(saved
         .activity
         .iter()
         .any(|line| line == "[Decision: api] Kept the existing route"));
-    assert_eq!(saved.summary().decisions.len(), 2);
+    assert_eq!(saved.summary().decisions.len(), 3);
 
     let exported = folder.join("recovery.json");
     runtime.export_recovery(&run.id, &exported).unwrap();
     let recovery: Value = serde_json::from_slice(&std::fs::read(&exported).unwrap()).unwrap();
     assert_eq!(
-        recovery["task"]["decisions"][1]["supersedes"],
+        recovery["task"]["decisions"][2]["supersedes"],
         json!(first.id)
     );
     assert_eq!(

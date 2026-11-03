@@ -95,9 +95,33 @@ fn pairing_target(address: &str, code: Option<&str>) -> Result<(String, String),
                 .map(|(_, value)| value.into_owned())
         }),
     }
-    .filter(|code| code.len() == 64 && code.chars().all(|c| c.is_ascii_hexdigit()))
-    .ok_or("Use the whole 64-character pairing code from Settings → Remote access.")?;
+    .and_then(|code| pairing_code(&code))
+    .ok_or("Enter the pairing code from Settings → Remote access, such as ABCDE-FGHJK.")?;
     Ok((url.origin().ascii_serialization(), code))
+}
+
+/// A link's 64-hex code, or the short code a computer shows for typing (Crockford base32,
+/// grouped as ABCDE-FGHJK), read without dashes, spaces or case and with look-alike
+/// letters as digits. The computer applies the same reading.
+fn pairing_code(value: &str) -> Option<String> {
+    const ALPHABET: &str = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+    let compact: String = value
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '-')
+        .collect();
+    if compact.len() == 64 && compact.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Some(compact.to_ascii_lowercase());
+    }
+    let short: String = compact
+        .to_ascii_uppercase()
+        .chars()
+        .map(|c| match c {
+            'O' => '0',
+            'I' | 'L' => '1',
+            other => other,
+        })
+        .collect();
+    (short.len() == 10 && short.chars().all(|c| ALPHABET.contains(c))).then_some(short)
 }
 
 async fn post(
@@ -291,10 +315,16 @@ mod tests {
         let (origin, code) = pairing_target("https://host.example/", Some(CODE)).unwrap();
         assert_eq!(origin, "https://host.example");
         assert_eq!(code, CODE);
+        let (_, short) = pairing_target("https://host.example/", Some(" abcde-fghjk ")).unwrap();
+        assert_eq!(short, "ABCDEFGHJK");
+        let (_, misread) = pairing_target("https://host.example/", Some("O1LI2 ABCDE")).unwrap();
+        assert_eq!(misread, "01112ABCDE");
     }
 
     #[test]
     fn pairing_needs_https_and_a_whole_code() {
+        assert!(pairing_target("https://host.example/", Some("ABCDE-FGHJ")).is_err());
+        assert!(pairing_target("https://host.example/", Some("ABCDE-FGHJU")).is_err());
         assert!(pairing_target(&format!("http://host.example/#pair={CODE}"), None).is_err());
         assert!(pairing_target("https://host.example/#pair=short", None).is_err());
         assert!(pairing_target("https://host.example/", None).is_err());

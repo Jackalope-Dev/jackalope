@@ -104,9 +104,11 @@ pub async fn remote_host_pair(
     code: String,
     state: State<'_, TaskRuntime>,
 ) -> Result<Value, String> {
-    if name.trim().is_empty() || name.chars().count() > 80 || port < 1024 || code.len() != 64 {
+    let Some(code) = super::pairing_code(&code)
+        .filter(|_| !name.trim().is_empty() && name.chars().count() <= 80 && port >= 1024)
+    else {
         return Err("Enter a name, host and current pairing code.".into());
-    }
+    };
     let wsl = wsl.unwrap_or(false);
     if wsl && ssh {
         return Err("Choose one host connection method.".into());

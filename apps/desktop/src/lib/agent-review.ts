@@ -114,3 +114,32 @@ export function fixFollowUp(
   parts.push(closing);
   return parts.join('\n\n');
 }
+
+/**
+ * What the author recorded as proof, for a reviewer that cannot see the author's run: its
+ * goal, validation steps, decisions and screenshots. Without it a reviewer reads claims
+ * about checks it was never shown as unbacked. Empty when nothing was recorded.
+ */
+export function authorEvidence(
+  run: Pick<TaskRun, 'understanding' | 'validationSteps' | 'decisions' | 'screenshots'>,
+) {
+  const lines: string[] = [];
+  if (run.understanding?.goal) lines.push(`Goal: ${run.understanding.goal}`);
+  for (const step of run.validationSteps ?? []) {
+    const evidence = step.evidence.length ? ` Evidence: ${step.evidence.join(', ')}` : '';
+    lines.push(
+      `- Check (${step.status}): ${step.step}.${step.notes ? ` ${step.notes}` : ''}${evidence}`,
+    );
+  }
+  for (const entry of run.decisions ?? []) {
+    lines.push(`- Decision (${entry.phase}): ${entry.decision}. Result: ${entry.result}`);
+  }
+  for (const shot of run.screenshots ?? []) lines.push(`- Screenshot: ${shot.filePath}`);
+  if (!lines.length) return '';
+  return [
+    "The author's recorded evidence (verify it rather than trusting it; do not report a claim as unbacked when it is listed here):",
+    ...lines,
+  ]
+    .join('\n')
+    .slice(0, 6000);
+}
