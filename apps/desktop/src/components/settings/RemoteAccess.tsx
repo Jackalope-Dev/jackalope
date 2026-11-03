@@ -3,6 +3,7 @@ import {
   Checkbox,
   CopyButton,
   Disclosure,
+  DisclosureBody,
   DisclosureSummary,
   FormField,
   Input,
@@ -55,35 +56,68 @@ function PairingQr({ rows }: { rows: string[] }) {
     </svg>
   );
 }
-/** The pairing code large enough to type from across a desk, with time left and copy. */
-function PairingCodeView({ pair, expires }: { pair: PairingCode; expires: number }) {
+/** The typed code, large enough to read across a desk, with copy and the address. */
+function TypedCode({ pair, origin }: { pair: PairingCode; origin: string }) {
+  return (
+    <div className="remote-pair-code">
+      <output className="remote-code" aria-label={`Pairing code ${[...pair.code].join(' ')}`}>
+        {pair.code}
+      </output>
+      {origin && (
+        <p className="task-muted">
+          Address: <span className="font-mono">{origin}</span>
+        </p>
+      )}
+      <div className="remote-toolbar">
+        <CopyButton size="sm" variant="outline" text={pair.code} label="Copy code" />
+        {pair.link && (
+          <CopyButton size="sm" variant="outline" text={pair.link} label="Copy phone link" />
+        )}
+      </div>
+    </div>
+  );
+}
+/**
+ * A new pairing: the QR code to scan with the phone app, with the typed code folded away
+ * for when the camera can't be used. Without an HTTPS address there is no QR code, and the
+ * typed code is for connecting another computer over SSH.
+ */
+function PairingView({
+  pair,
+  expires,
+  origin,
+}: {
+  pair: PairingCode;
+  expires: number;
+  origin: string;
+}) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
   const left = Math.max(0, Math.ceil((expires - now) / 1000));
-  return (
-    <div className="remote-pair px-5 py-4">
-      {pair.qr && <PairingQr rows={pair.qr} />}
-      <div className="remote-pair-code">
-        <span className="task-muted">Pairing code</span>
-        <output className="remote-code" aria-label={`Pairing code ${[...pair.code].join(' ')}`}>
-          {pair.code}
-        </output>
+  const remaining = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  if (!pair.qr)
+    return (
+      <div className="remote-pair px-5 py-4">
+        <TypedCode pair={pair} origin={origin} />
         <p className="task-muted">
-          {pair.qr
-            ? "Scan the QR code with the Jackalope app, or type the code with this computer's address."
-            : 'Type the code where you connect this computer.'}{' '}
-          It works once and expires in {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}.
+          Enter it where you connect this computer. It works once and expires in {remaining}.
         </p>
-        <div className="remote-toolbar">
-          <CopyButton size="sm" variant="outline" text={pair.code} label="Copy code" />
-          {pair.link && (
-            <CopyButton size="sm" variant="outline" text={pair.link} label="Copy phone link" />
-          )}
-        </div>
       </div>
+    );
+  return (
+    <div className="remote-pair remote-pair-hero px-5 py-4">
+      <PairingQr rows={pair.qr} />
+      <p>Scan this with the Jackalope app on your phone.</p>
+      <p className="task-muted">Works once · expires in {remaining}</p>
+      <Disclosure className="remote-pair-manual">
+        <DisclosureSummary>Can't scan? Enter a code</DisclosureSummary>
+        <DisclosureBody>
+          <TypedCode pair={pair} origin={origin} />
+        </DisclosureBody>
+      </Disclosure>
     </div>
   );
 }
@@ -244,7 +278,7 @@ export function RemoteAccess() {
           {!projects.length && <p>Add a project before enabling remote access.</p>}
         </fieldset>
         <Disclosure>
-          <DisclosureSummary>Connection settings</DisclosureSummary>
+          <DisclosureSummary>Advanced</DisclosureSummary>
           <div className="space-y-3 pt-3">
             <FormField label="Local port">
               <Input
@@ -259,7 +293,7 @@ export function RemoteAccess() {
             </FormField>
             <FormField
               label="HTTPS address"
-              description="For an existing Tailscale Serve or HTTPS reverse proxy. SSH connections use the local port."
+              description="Your own HTTPS address, such as a reverse proxy. Leave blank to set up Tailscale below. SSH connections use the local port."
             >
               <Input
                 type="url"
@@ -281,33 +315,6 @@ export function RemoteAccess() {
         </Button>
       </form>
       {status?.error && <InlineNotice tone="error">{status.error}</InlineNotice>}
-      {status?.listening && (
-        <Setting
-          title="Pair a device"
-          description={
-            status.publicOrigin
-              ? `Phones and other computers connect at ${status.publicOrigin}.`
-              : 'Other computers can pair over SSH now. Phones need private HTTPS, set up below.'
-          }
-        >
-          <div className="flex flex-wrap gap-2">
-            <Button
-              disabled={busy}
-              onClick={() =>
-                void perform(async () => {
-                  const result = await nativeTask<PairingCode>('remote_pairing');
-                  pairingDevices.current = new Set(status.devices.map((device) => device.id));
-                  setPair(result);
-                  setExpires(Date.now() + result.expiresIn * 1000);
-                })
-              }
-            >
-              Create pairing code
-            </Button>
-          </div>
-        </Setting>
-      )}
-      {pair && <PairingCodeView key={pair.code} pair={pair} expires={expires} />}
       {status?.listening && !status.publicOrigin && (
         <TailscaleSetup
           turnOn={async () => {
@@ -315,6 +322,39 @@ export function RemoteAccess() {
             setPair(null);
             setNotice('Private HTTPS is on. Create a pairing code for your phone.');
           }}
+        />
+      )}
+      {status?.listening && (
+        <Setting
+          title="Pair a device"
+          description={
+            status.publicOrigin
+              ? `Ready for phones at ${status.publicOrigin}.`
+              : 'Other computers can pair over SSH now. Phones need the setup above first.'
+          }
+        >
+          <Button
+            variant={pair ? 'outline' : 'primary'}
+            disabled={busy}
+            onClick={() =>
+              void perform(async () => {
+                const result = await nativeTask<PairingCode>('remote_pairing');
+                pairingDevices.current = new Set(status.devices.map((device) => device.id));
+                setPair(result);
+                setExpires(Date.now() + result.expiresIn * 1000);
+              })
+            }
+          >
+            {pair ? 'New code' : status.publicOrigin ? 'Pair a phone' : 'Create pairing code'}
+          </Button>
+        </Setting>
+      )}
+      {pair && (
+        <PairingView
+          key={pair.code}
+          pair={pair}
+          expires={expires}
+          origin={status?.publicOrigin ?? ''}
         />
       )}
       {!!status?.devices.length && (
