@@ -477,6 +477,13 @@ impl Context {
         if let Some(reason) = text_risk(&lower) {
             return Risky(reason.into());
         }
+        let stripped;
+        let command = if powershell {
+            command
+        } else {
+            stripped = strip_data_heredocs(command);
+            stripped.as_str()
+        };
         let Some((parts, nested)) = split(command, powershell) else {
             return risky("the command could not be parsed reliably");
         };
@@ -1148,7 +1155,7 @@ impl Context {
                 }) {
                     risky("it force-pushes or deletes remote history")
                 } else {
-                    risky("it pushes commits to a remote")
+                    self.push(original)
                 }
             }
             "reset" if has("--hard") || has("--merge") || has("--keep") => {
@@ -1234,6 +1241,156 @@ impl Context {
             "send-email" => risky("it sends email"),
             _ => Routine,
         }
+    }
+}
+
+impl Context {
+    /// A push without force: routine when it sends existing local branches,
+    /// other than a protected or default one, to a configured remote.
+    fn push(&self, args: &[String]) -> Verdict {
+        let pushes = || risky("it pushes to a shared branch or an unchecked target");
+        let Some(repository) = Repository::open(Path::new(&self.workspace)) else {
+            return pushes();
+        };
+        let mut positional = Vec::new();
+        let mut index = 0;
+        while let Some(arg) = args.get(index) {
+            index += 1;
+            match arg.as_str() {
+                "-o" | "--push-option" => index += 1,
+                "-u" | "--set-upstream" | "-v" | "--verbose" | "-q" | "--quiet" | "--progress"
+                | "--no-progress" | "--follow-tags" | "--no-follow-tags" | "--atomic"
+                | "--no-atomic" | "--porcelain" | "-n" | "--dry-run" | "--no-verify"
+                | "--verify" => {}
+                _ if arg.starts_with("--push-option=") || arg.starts_with("--signed") => {}
+                _ if arg.starts_with('-') => return pushes(),
+                _ => positional.push(arg.as_str()),
+            }
+        }
+        let mut targets = positional.iter().skip(1).map(|refspec| {
+            let destination = refspec.rsplit(':').next().unwrap_or(refspec);
+            let destination = destination
+                .strip_prefix("refs/heads/")
+                .unwrap_or(destination);
+            if destination == "HEAD" {
+                repository.branch.clone()
+            } else {
+                Some(destination.to_string())
+            }
+        });
+        let named = positional.len() > 1;
+        let remote = positional.first().copied();
+        let remote_ok = remote.is_none_or(|remote| repository.has_remote(remote));
+        let branches: Option<Vec<String>> = if named {
+            targets.by_ref().collect()
+        } else {
+            repository.branch.clone().map(|branch| vec![branch])
+        };
+        match branches {
+            Some(branches)
+                if remote_ok
+                    && branches.iter().all(|branch| {
+                        repository.has_branch(branch)
+                            && !repository.protected(branch, remote.unwrap_or("origin"))
+                    }) =>
+            {
+                Routine
+            }
+            _ => pushes(),
+        }
+    }
+}
+
+/// What a push needs to know about the workspace's repository, read from its
+/// files so classifying never runs Git.
+struct Repository {
+    /// Where shared refs and configuration live; a worktree's main `.git`.
+    common: std::path::PathBuf,
+    /// The checked-out branch; `None` when detached.
+    branch: Option<String>,
+}
+
+impl Repository {
+    fn open(workspace: &Path) -> Option<Self> {
+        let dot = workspace.join(".git");
+        let git = if dot.is_dir() {
+            dot
+        } else {
+            let text = std::fs::read_to_string(&dot).ok()?;
+            let target = text.trim().strip_prefix("gitdir:")?.trim();
+            workspace.join(target)
+        };
+        let common = match std::fs::read_to_string(git.join("commondir")) {
+            Ok(relative) => git.join(relative.trim()),
+            Err(_) => git.clone(),
+        };
+        let head = std::fs::read_to_string(git.join("HEAD")).ok()?;
+        let branch = head
+            .trim()
+            .strip_prefix("ref: refs/heads/")
+            .map(str::to_string);
+        Some(Self { common, branch })
+    }
+
+    fn has_ref(&self, name: &str) -> bool {
+        self.common.join(name).is_file()
+            || std::fs::read_to_string(self.common.join("packed-refs")).is_ok_and(|packed| {
+                packed
+                    .lines()
+                    .any(|line| line.split_whitespace().nth(1) == Some(name))
+            })
+    }
+
+    /// A local branch, so a tag push that can start a release still asks.
+    fn has_branch(&self, branch: &str) -> bool {
+        !branch.is_empty()
+            && !branch.contains(['*', ':', '^', '~', '\\'])
+            && !branch
+                .split('/')
+                .any(|part| part.is_empty() || part.starts_with('.'))
+            && self.has_ref(&format!("refs/heads/{branch}"))
+    }
+
+    /// A remote named in the repository's configuration, not a URL or path.
+    fn has_remote(&self, remote: &str) -> bool {
+        let section = format!("[remote \"{remote}\"]");
+        !remote.contains(['/', ':', '@', '\\'])
+            && std::fs::read_to_string(self.common.join("config"))
+                .is_ok_and(|config| config.lines().any(|line| line.trim() == section))
+    }
+
+    /// Branches a push should not reach unasked: the remote's default and
+    /// the usual names for shared, release and deploy branches.
+    fn protected(&self, branch: &str, remote: &str) -> bool {
+        let default =
+            std::fs::read_to_string(self.common.join(format!("refs/remotes/{remote}/HEAD")))
+                .ok()
+                .and_then(|head| {
+                    head.trim()
+                        .strip_prefix(&format!("ref: refs/remotes/{remote}/"))
+                        .map(str::to_string)
+                });
+        let lower = branch.to_ascii_lowercase();
+        default.as_deref() == Some(branch)
+            || matches!(
+                lower.as_str(),
+                "main"
+                    | "master"
+                    | "trunk"
+                    | "develop"
+                    | "development"
+                    | "dev"
+                    | "staging"
+                    | "production"
+                    | "prod"
+                    | "release"
+                    | "live"
+                    | "stable"
+                    | "gh-pages"
+            )
+            || ["release/", "releases/", "hotfix/", "deploy/"]
+                .iter()
+                .any(|prefix| lower.starts_with(prefix))
     }
 }
 
@@ -1418,8 +1575,28 @@ fn secret(raw: &str) -> Option<&'static str> {
     ]
     .iter()
     .any(|suffix| name.ends_with(suffix));
+    // `process.env` and `import.meta.env` are code reading the environment,
+    // not files.
+    let code = name.strip_suffix(".env").is_some_and(|stem| {
+        stem.ends_with("import.meta")
+            || matches!(
+                stem.rsplit(|c: char| !(c.is_alphanumeric() || c == '_' || c == '$'))
+                    .next()
+                    .unwrap_or(stem),
+                "process"
+                    | "deno"
+                    | "bun"
+                    | "this"
+                    | "self"
+                    | "ctx"
+                    | "context"
+                    | "globalthis"
+                    | "window"
+            )
+    });
     if (name == ".env" || name.starts_with(".env.") || name.ends_with(".env"))
         && !template
+        && !code
         && name != "venv.env"
     {
         return Some("environment secrets");
@@ -1637,6 +1814,212 @@ fn strip_wrappers(words: &[String]) -> (Option<String>, Vec<String>, bool) {
         }
     }
     (None, vec![], dynamic)
+}
+
+/// Programs that read a here-document only as data, such as a commit message
+/// or a pull request body, never as commands to run.
+const HEREDOC_READERS: [&str; 12] = [
+    "cat", "tee", "git", "gh", "wc", "head", "tail", "sort", "uniq", "grep", "rg", "jq",
+];
+
+/// The command with the bodies of here-documents read by `HEREDOC_READERS`
+/// removed, since their text is data that the splitter would otherwise read as
+/// commands or quoting. A body is kept, and checked as before, when its
+/// program could run it or when an unquoted delimiter lets it substitute
+/// commands. Anything not followed exactly is returned unchanged.
+fn strip_data_heredocs(command: &str) -> String {
+    struct Pending {
+        delimiter: String,
+        tabs: bool,
+        reader: bool,
+        quoted: bool,
+    }
+    let chars: Vec<char> = command.chars().collect();
+    let mut out = String::with_capacity(command.len());
+    // What closes each open context: `)` for subshells and substitutions,
+    // a backtick, or `"` for a double-quoted string.
+    let mut stack: Vec<char> = Vec::new();
+    // Where the simple command being read starts in `out`.
+    let mut segment = 0;
+    let mut pending: Vec<Pending> = Vec::new();
+    let mut index = 0;
+    while index < chars.len() {
+        let c = chars[index];
+        let next = chars.get(index + 1).copied();
+        if c == '\\' {
+            out.push(c);
+            out.extend(next);
+            index += 2;
+            continue;
+        }
+        if stack.last() == Some(&'"') {
+            match c {
+                '"' => {
+                    stack.pop();
+                }
+                '$' if next == Some('(') => {
+                    stack.push(')');
+                    out.push_str("$(");
+                    index += 2;
+                    segment = out.len();
+                    continue;
+                }
+                '`' => {
+                    stack.push('`');
+                    out.push(c);
+                    index += 1;
+                    segment = out.len();
+                    continue;
+                }
+                _ => {}
+            }
+            out.push(c);
+            index += 1;
+            continue;
+        }
+        match c {
+            '\'' => {
+                let Some(end) = chars[index + 1..].iter().position(|&ch| ch == '\'') else {
+                    return command.to_string();
+                };
+                out.extend(&chars[index..=index + 1 + end]);
+                index += end + 2;
+                continue;
+            }
+            '"' => stack.push('"'),
+            '`' if stack.last() == Some(&'`') => {
+                stack.pop();
+            }
+            '`' | '(' | ';' | '|' | '&' => {
+                match c {
+                    '`' => stack.push('`'),
+                    '(' => stack.push(')'),
+                    _ => {}
+                }
+                out.push(c);
+                index += 1;
+                segment = out.len();
+                continue;
+            }
+            ')' if stack.last() == Some(&')') => {
+                stack.pop();
+            }
+            '<' if next == Some('<')
+                && chars.get(index + 2) != Some(&'<')
+                && (index == 0 || chars[index - 1] != '<') =>
+            {
+                let mut end = index + 2;
+                let tabs = chars.get(end) == Some(&'-');
+                if tabs {
+                    end += 1;
+                }
+                while matches!(chars.get(end), Some(' ' | '\t')) {
+                    end += 1;
+                }
+                let start = end;
+                while chars
+                    .get(end)
+                    .is_some_and(|ch| !ch.is_whitespace() && !";|&<>()".contains(*ch))
+                {
+                    if matches!(chars[end], '\'' | '"') {
+                        let quote = chars[end];
+                        let Some(close) = chars[end + 1..].iter().position(|&ch| ch == quote)
+                        else {
+                            return command.to_string();
+                        };
+                        end += close + 1;
+                    }
+                    end += 1;
+                }
+                let word: String = chars[start..end].iter().collect();
+                let quoted = word.contains(['\'', '"', '\\']);
+                let delimiter: String = word
+                    .chars()
+                    .filter(|ch| !matches!(ch, '\'' | '"' | '\\'))
+                    .collect();
+                if delimiter.is_empty() {
+                    return command.to_string();
+                }
+                let program = out[segment..]
+                    .split_whitespace()
+                    .find(|word| !word.contains('='))
+                    .map(basename)
+                    .unwrap_or_default();
+                pending.push(Pending {
+                    delimiter,
+                    tabs,
+                    reader: HEREDOC_READERS.contains(&program.as_str()),
+                    quoted,
+                });
+                out.extend(&chars[index..end]);
+                index = end;
+                continue;
+            }
+            '\n' => {
+                out.push(c);
+                index += 1;
+                segment = out.len();
+                for (number, heredoc) in std::mem::take(&mut pending).into_iter().enumerate() {
+                    if number > 0 {
+                        // The previous body's terminator line ends here.
+                        if chars.get(index) != Some(&'\n') {
+                            return command.to_string();
+                        }
+                        out.push('\n');
+                        index += 1;
+                    }
+                    // The body runs to a line holding only the delimiter.
+                    let mut line = index;
+                    let terminator = loop {
+                        if line > chars.len() {
+                            return command.to_string();
+                        }
+                        let line_end = chars[line..]
+                            .iter()
+                            .position(|&ch| ch == '\n')
+                            .map_or(chars.len(), |offset| line + offset);
+                        let text: String = chars[line..line_end].iter().collect();
+                        let text = if heredoc.tabs {
+                            text.trim_start_matches('\t')
+                        } else {
+                            text.as_str()
+                        };
+                        if text == heredoc.delimiter {
+                            break line_end;
+                        }
+                        if line_end == chars.len() {
+                            return command.to_string();
+                        }
+                        line = line_end + 1;
+                    };
+                    let body: String = chars[index..line].iter().collect();
+                    let data = heredoc.reader
+                        && (heredoc.quoted || !(body.contains("$(") || body.contains('`')));
+                    if !data {
+                        out.extend(&chars[index..terminator]);
+                    }
+                    index = terminator;
+                }
+                continue;
+            }
+            _ => {}
+        }
+        out.push(c);
+        index += 1;
+    }
+    out
+}
+
+/// The simple commands a shell line chains, for standing permission rules;
+/// `None` when it substitutes commands or its quoting cannot be followed.
+pub(super) fn chained_commands(command: &str) -> Option<Vec<String>> {
+    let (parts, nested) = split(command, false)?;
+    nested.is_empty().then(|| {
+        parts
+            .into_iter()
+            .map(|part| part.text.trim().to_string())
+            .collect()
+    })
 }
 
 /// Splits a command line into simple commands at `&&`, `||`, `;`, `|`, `&`,
@@ -2303,5 +2686,116 @@ mod tests {
         assert!(split("echo $(unclosed", false).is_none());
         let (parts, _) = split("cmd > out.txt 2>&1", false).unwrap();
         assert_eq!(parts.len(), 1);
+    }
+
+    #[test]
+    fn heredoc_bodies_fed_to_data_readers_stay_data() {
+        for command in [
+            "git commit -m \"$(cat <<'EOF'\nFix the user's parser\n\nKill the flaky .env check; rm -rf is not run\nEOF\n)\"",
+            "gh pr create --title \"Fix it\" --body \"$(cat <<'EOF'\n## Summary\n- Don't ask so often\nEOF\n)\"",
+            "cat <<EOF > notes/plan.md\nIt's ready\nEOF",
+            "cat <<-'EOF' | wc -l\n\tisn't code\n\tEOF\ngit status",
+        ] {
+            routine(bash(command), command);
+        }
+        for command in [
+            // Bodies fed to a shell or interpreter are still checked.
+            "bash <<'EOF'\nrm -rf src\nEOF",
+            "sh <<EOF\ngit push --force\nEOF",
+            "python3 <<'EOF'\nopen('.env').read()\nEOF",
+            // An unquoted delimiter substitutes commands inside the body.
+            "cat <<EOF\n$(rm -rf src)\nEOF",
+            // A body that never ends is not followed.
+            "cat <<'EOF'\nIt's open\n",
+            // Text after the terminator still runs.
+            "cat <<'EOF'\nok\nEOF\nrm -rf src",
+            // A quoted `<<` is not a here-document.
+            "echo \"<<X\"\nrm -rf src\nX",
+        ] {
+            asks(bash(command), command);
+        }
+    }
+
+    #[test]
+    fn code_reading_the_environment_is_not_a_secrets_file() {
+        for command in [
+            "rg -n \"process.env\" src",
+            "grep -rn 'import.meta.env' apps/website/src",
+            "node -e \"console.log(Object.keys(process.env))\"",
+        ] {
+            routine(bash(command), command);
+        }
+        for command in ["cat .env", "cat config/production.env", "cp app.env /tmp/x"] {
+            asks(bash(command), command);
+        }
+    }
+
+    #[test]
+    fn pushing_a_working_branch_is_routine_and_shared_branches_still_ask() {
+        let root = std::env::temp_dir().join(format!("jackalope-push-{}", uuid::Uuid::new_v4()));
+        let git = root.join("repo/.git");
+        for directory in ["refs/heads/feature", "refs/remotes/origin", "refs/tags"] {
+            std::fs::create_dir_all(git.join(directory)).unwrap();
+        }
+        let write = |path: &str, text: &str| std::fs::write(git.join(path), text).unwrap();
+        write("HEAD", "ref: refs/heads/feature/parser\n");
+        write("refs/heads/feature/parser", "0\n");
+        write("refs/heads/main", "0\n");
+        write("refs/heads/trunk-work", "0\n");
+        write("refs/tags/v1.0.0", "0\n");
+        write(
+            "refs/remotes/origin/HEAD",
+            "ref: refs/remotes/origin/trunk-work\n",
+        );
+        write(
+            "config",
+            "[core]\n\tbare = false\n[remote \"origin\"]\n\turl = git@example.com:a/b.git\n",
+        );
+        let context = Context::new(&root.join("repo"));
+        let push = |command: &str| context.tool("Bash", &json!({ "command": command }));
+        for command in [
+            "git push",
+            "git push -u origin HEAD",
+            "git push origin feature/parser",
+            "git push --set-upstream origin feature/parser:feature/parser",
+            "git add -A && git commit -m \"Fix\" && git push",
+        ] {
+            routine(push(command), command);
+        }
+        for command in [
+            "git push origin main",
+            "git push origin feature/parser:main",
+            "git push origin trunk-work",
+            "git push origin v1.0.0",
+            "git push --tags",
+            "git push --all origin",
+            "git push git@evil.example:x/y.git feature/parser",
+            "git push upstream feature/parser",
+            "git push --force",
+            "git push origin +feature/parser",
+            "git push origin :feature/parser",
+        ] {
+            asks(push(command), command);
+        }
+        write("HEAD", "ref: refs/heads/main\n");
+        asks(push("git push"), "git push from main");
+        // A worktree reads shared refs through its `commondir`.
+        let worktree = root.join("worktree");
+        let private = git.join("worktrees/parser");
+        std::fs::create_dir_all(&private).unwrap();
+        std::fs::create_dir_all(&worktree).unwrap();
+        std::fs::write(private.join("HEAD"), "ref: refs/heads/feature/parser\n").unwrap();
+        std::fs::write(private.join("commondir"), "../..\n").unwrap();
+        std::fs::write(
+            worktree.join(".git"),
+            format!("gitdir: {}\n", private.display()),
+        )
+        .unwrap();
+        let context = Context::new(&worktree);
+        routine(
+            context.tool("Bash", &json!({ "command": "git push -u origin HEAD" })),
+            "worktree push",
+        );
+        let _ = std::fs::remove_dir_all(root);
     }
 }

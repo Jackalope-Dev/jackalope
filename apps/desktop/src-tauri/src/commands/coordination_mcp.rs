@@ -1132,9 +1132,9 @@ impl CoordinationTools {
             .await;
             self.service.runtime.record_prompt(&prompt);
             match (prompt.answer, &always, &standing) {
-                (Some(answer), Some(always), Some((rule, _))) if &answer == always => {
+                (Some(answer), Some(always), Some((standing, _))) if &answer == always => {
                     if let Err(error) =
-                        super::permission_rules::remember(&rules, &run.project_id, rule)
+                        super::permission_rules::remember(&rules, &run.project_id, standing)
                     {
                         self.service.runtime.update(&run.id, |r| {
                             r.activity

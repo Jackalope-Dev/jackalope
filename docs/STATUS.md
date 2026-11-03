@@ -443,11 +443,15 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   payload targets Linux x86_64/OpenCode; broader provider and benchmark acceptance remain open.
   Projects auto-approve agent requests by default: Claude Code, Kimi Code/ACP and
   OpenCode permission requests pass a native risk check that approves routine tool
-  use and asks only for recursive or out-of-workspace deletes, Git pushes and history
-  or working-tree loss, piped or encoded code, elevated or system changes, credential
-  files, publishing and deploys, process kills and writes outside the workspace.
-  Each automatic approval and escalation is recorded in the task's activity. Saved
-  always-allow rules still apply. Codex keeps its workspace-write sandbox; Gemini
+  use and asks only for recursive or out-of-workspace deletes, Git pushes other than
+  a plain push of an existing non-protected local branch to a configured remote,
+  history or working-tree loss, piped or encoded code, elevated or system changes,
+  credential files, publishing and deploys, process kills and writes outside the
+  workspace. Here-document bodies read as data, such as commit messages, are not
+  parsed as commands. Each automatic approval and escalation is recorded in the
+  task's activity. Saved always-allow rules still apply; a chained command (`&&`,
+  `;`, `|`) is allowed when every command in it has a rule, and choosing always
+  allow saves one for each, except chains through shells, interpreters or `sudo`. Codex keeps its workspace-write sandbox; Gemini
   CLI, Grok and Antigravity follow their own CLI approval policies.
   OpenCode tasks use an authenticated owned server for recoverable permission prompts,
   structured questions, exact-session continuation and child-session usage. Scope,
