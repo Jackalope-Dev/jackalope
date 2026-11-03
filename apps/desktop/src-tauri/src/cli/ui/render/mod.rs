@@ -783,8 +783,8 @@ pub(super) fn wordmark_glitch(app: &App) -> Option<f32> {
     let mut since = app.intro.get()?.elapsed().as_secs_f32() - FIRST;
     let mut cycle = 0;
     while since >= 0.0 {
-        if since < LENGTH {
-            return Some(since / LENGTH);
+        if since < LENGTH + SETTLE {
+            return Some((since / LENGTH).min(1.0));
         }
         // The gaps vary so the glitch reads as a flicker, not a metronome.
         let gap = 12.0 + (cycle * 7919 % 7) as f32;
@@ -801,8 +801,13 @@ pub(super) fn intro_sweep(app: &App) -> Option<f32> {
         return None;
     }
     let elapsed = app.intro.get()?.elapsed().as_secs_f32() - DELAY;
-    (elapsed < SWEEP).then(|| (elapsed / SWEEP).max(0.0))
+    // It runs a moment past its end so the last frame drawn is a clean one.
+    (elapsed < SWEEP + SETTLE).then(|| (elapsed / SWEEP).clamp(0.0, 1.0))
 }
+
+/// How long an animation keeps drawing after it ends, so frames stop on a
+/// settled one rather than whichever frame happened to come last.
+pub(super) const SETTLE: f32 = 0.25;
 
 /// The start screen, centred in `height` rows: the wordmark, then who can
 /// take the work as chips. Where you are already sits on the frame, and key

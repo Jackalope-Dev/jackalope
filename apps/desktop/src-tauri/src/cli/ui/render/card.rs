@@ -32,10 +32,9 @@ const MIN_WIDTH: u16 = 36;
 /// A finished result is still decoding, so frames must keep coming.
 pub fn revealing(app: &App) -> bool {
     brand::motion()
-        && app
-            .reveal
-            .as_ref()
-            .is_some_and(|(_, at)| at.elapsed() < REVEAL)
+        && app.reveal.as_ref().is_some_and(|(_, at)| {
+            at.elapsed().as_secs_f32() < REVEAL.as_secs_f32() + super::SETTLE
+        })
 }
 
 /// What the card is showing.
