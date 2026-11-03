@@ -13,10 +13,9 @@ installed-app acceptance, and [BACKEND.md](BACKEND.md) for the later remote back
 ## Cloudflare Workers Builds deployment
 
 Cloudflare Workers Builds, not GitHub Actions, deploys this service. Every push to
-`master` triggers three Cloudflare builds: `jackalope-service-production` (this
-app, production), `jackalope-service-staging` (this app, staging; staging
-currently builds from `master` too, not a separate branch), and
-`jackalope-website` (the marketing site). There is no GitHub Actions deploy
+`master` deploys `jackalope-service-production` (this app, production) and
+`jackalope-website` (the marketing site). Every push to `beta` deploys
+`jackalope-service-staging` (this app, staging). There is no GitHub Actions deploy
 workflow; Actions only runs verification checks on pushes and pull requests.
 
 Each Worker's own build settings in the Cloudflare dashboard hold its build

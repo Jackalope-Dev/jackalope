@@ -57,8 +57,9 @@ Quick facts that trip people up:
 - apps/server/admin is a separate SPA built by admin:build, not part of the Worker.
 - Browser verification scripts import /src/... inside the Vite dev server, so those
   paths only resolve at runtime.
-- Pushing to master deploys the API (production and staging) and the website
-  through Cloudflare Workers Builds; there is no GitHub Actions deploy.
+- Pushing to master deploys the production API and the website, and pushing to
+  beta deploys the staging API, through Cloudflare Workers Builds; there is no
+  GitHub Actions deploy.
 
 Read docs/PARALLEL-WORKFLOWS.md for integration rules and docs/SELF-DEVELOPMENT.md for
 native testing. Repository skills point to these shared guides.
