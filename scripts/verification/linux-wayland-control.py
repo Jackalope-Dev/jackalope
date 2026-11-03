@@ -141,6 +141,7 @@ with tempfile.TemporaryDirectory(prefix="jackalope-wayland-control-") as tempora
         return json.loads(result.stdout)
 
     try:
+        accessibility_client = common.hold_accessibility_client()
         app = launch([sys.executable, __file__, "--fixture", temporary])
         wait(lambda: (d / "ready").exists(), "app ready")
         time.sleep(0.5)

@@ -96,6 +96,23 @@ def wait(check, description, timeout=12):
     raise AssertionError(f'Timed out: {description}; {last}')
 
 
+def hold_accessibility_client():
+    """Stay an AT-SPI client of the fixture until the trial ends.
+
+    The fixture's atk-bridge removes its key listener when its last AT-SPI client goes away,
+    and GTK 3.24.41 (Ubuntu 24.04) can free that listener while it is still dispatching a key
+    event, which segfaults the fixture (fixed upstream in GTK commit e6372d29). Each helper
+    call is a short-lived client, so a key press could land just as one exits. A listener
+    held here keeps the bridge's key listener in place for every press. Keep the result.
+    """
+    import gi
+    gi.require_version('Atspi', '2.0')
+    from gi.repository import Atspi
+    listener = Atspi.EventListener.new(lambda _event: None)
+    listener.register('object:state-changed:focused')
+    return listener
+
+
 def trial(helper):
     children = []
     with tempfile.TemporaryDirectory(prefix='jackalope-x11-trial-') as temporary:
@@ -116,6 +133,7 @@ def trial(helper):
             return json.loads(result.stdout)
 
         try:
+            accessibility_client = hold_accessibility_client()
             app = launch([sys.executable, __file__, '--fixture', temporary])
             wait(lambda: (directory / 'ready').exists(), 'fixture startup')
             window = wait(lambda: next((item for item in call({'action': 'list'})['windows']
