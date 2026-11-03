@@ -123,6 +123,12 @@ Verification runs at below-normal CPU priority so the machine stays usable; set
 rebuilding Tauri with a different feature set. Dependencies build without debug info in
 dev and test profiles to keep linking fast and `target/` small.
 
+Each worktree has its own `target/`, so a first build compiles every dependency again.
+Install [sccache](https://github.com/mozilla/sccache) to share those builds:
+`pnpm verify` uses it whenever it is on `PATH`, and exporting
+`RUSTC_WRAPPER=sccache` in your shell profile covers plain `cargo` commands too.
+`sccache --show-stats` shows how much it saved.
+
 Actual pushes require a clean checkout and refs pointing to its current commit,
 so unstaged fixes cannot make a broken commit appear verified. No automatic stash
 or commit is performed. The manual hook command can check work in progress.

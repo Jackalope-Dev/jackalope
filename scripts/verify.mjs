@@ -12,6 +12,14 @@ const userCargo = process.env.USERPROFILE
   ? join(process.env.USERPROFILE, '.cargo', 'bin', 'cargo.exe')
   : null;
 const cargo = userCargo && existsSync(userCargo) ? userCargo : 'cargo';
+// sccache shares compiled dependencies between worktrees; use it when it is
+// installed and nothing else wraps rustc. Without it, cargo runs as usual.
+if (
+  !process.env.RUSTC_WRAPPER &&
+  spawnSync('sccache', ['--version'], { stdio: 'ignore', windowsHide: true }).status === 0
+) {
+  process.env.RUSTC_WRAPPER = 'sccache';
+}
 const args = process.argv.slice(2);
 if (args.length > 1 || args.some((arg) => !['--native-only', '--changed'].includes(arg)))
   throw new Error('Usage: pnpm verify [--native-only | --changed]');

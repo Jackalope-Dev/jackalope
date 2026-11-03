@@ -38,6 +38,11 @@ it. `subcommands.rs` and `once.rs` hold the commands that print and exit. The
 interactive view lives in `ui/`: `mod.rs` holds its state, and `events`,
 `refresh`, `keys`, `commands`, `pickers`, `conversation`, `feed`, `selection`
 and `editor` each add one concern, with drawing under `ui/render/`.
+`ui/harness.rs` tests the view without a terminal or the app: a fake host on a
+private socket serves fixture conversations and records requests, tests press keys,
+type commands and click, and frames render to text. Run
+`JACKALOPE_TUI_PRINT=1 cargo test --bin jackalope ui::harness -- --nocapture` to see
+the frames; add a case there when changing the layout or interaction.
 
 ## Projects and sessions
 

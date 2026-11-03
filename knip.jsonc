@@ -36,6 +36,7 @@
     // TODO: verify-waitlist.mjs still imports the pre-SPA admin page, which was removed.
     "admin-page\\.ts$"
   ],
-  // Platform tools invoked by release and evaluation scripts, not npm packages.
-  "ignoreBinaries": ["tiffutil", "codex", "opencode", "pwsh", "ffmpeg"]
+  // Platform tools invoked by release, evaluation and verification scripts, not
+  // npm packages. sccache is optional and used only when installed.
+  "ignoreBinaries": ["tiffutil", "codex", "opencode", "pwsh", "ffmpeg", "sccache"]
 }

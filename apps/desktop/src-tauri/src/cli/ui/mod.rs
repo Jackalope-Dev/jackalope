@@ -19,6 +19,8 @@ mod drafts;
 mod editor;
 mod events;
 mod feed;
+#[cfg(all(test, unix))]
+mod harness;
 mod keys;
 mod pickers;
 mod plan;
@@ -249,70 +251,7 @@ pub fn run(
     events::spawn_ticker(events.clone());
     let refresher = refresh::spawn(handshake.clone(), events.clone());
 
-    let mut app = App {
-        connection,
-        events,
-        refresher,
-        branch: git::branch(&project.path),
-        handshake,
-        project,
-        session,
-        context: 0,
-        view: None,
-        view_version: 0,
-        sessions: Vec::new(),
-        projects: Vec::new(),
-        overview: None,
-        overview_asked: (Instant::now(), true),
-        offline: None,
-        problem: None,
-        attribution: None,
-        picker: None,
-        slash: 0,
-        editor: Editor::default(),
-        next_agent: next.agent,
-        next_model: next.model,
-        offered: HashSet::new(),
-        opened: HashSet::new(),
-        closed: HashSet::new(),
-        history: history::load(),
-        history_index: None,
-        files: None,
-        indexing: None,
-        sharpening: false,
-        sharpen_undo: None,
-        mention_cache: RefCell::new(None),
-        mention_closed: false,
-        stop_armed: None,
-        suspend: false,
-        signalled: None,
-        feed: Vec::new(),
-        shells: Vec::new(),
-        flash: None,
-        work_started: None,
-        last_progress: None,
-        changes: Vec::new(),
-        changes_version: 0,
-        panel: changes::Panel::default(),
-        selection: None,
-        screen: None,
-        body_area: Cell::new(Rect::default()),
-        input_width: Cell::new(1),
-        scroll_top: None,
-        max_scroll: Cell::new(0),
-        transcript: RefCell::new(None),
-        hits: RefCell::new(Vec::new()),
-        hover: None,
-        draft_sync: None,
-        intro: Cell::new(None),
-        last_run_took: None,
-        tick: 0,
-        tip_index: 0,
-        last_tip_change: Instant::now(),
-        plan: None,
-        plan_edit: false,
-        quit: false,
-    };
+    let mut app = App::new(connection, project, session, next, events, refresher);
     // The first read happens here rather than on the refresher, so the
     // conversation is on screen from the first frame.
     app.refresh_now();
@@ -335,6 +274,85 @@ pub fn run(
         println!("Conversation continues in Jackalope. Rejoin with: jackalope attach {id}");
     }
     result
+}
+
+impl App {
+    /// The view's state before its first read, sending what it starts to
+    /// `events` and refreshes to `refresher`.
+    fn new(
+        connection: Connection,
+        project: Project,
+        session: Option<String>,
+        next: NextStart,
+        events: Sender<Event>,
+        refresher: Sender<refresh::Request>,
+    ) -> Self {
+        let handshake = connection.handshake().clone();
+        App {
+            connection,
+            events,
+            refresher,
+            branch: git::branch(&project.path),
+            handshake,
+            project,
+            session,
+            context: 0,
+            view: None,
+            view_version: 0,
+            sessions: Vec::new(),
+            projects: Vec::new(),
+            overview: None,
+            overview_asked: (Instant::now(), true),
+            offline: None,
+            problem: None,
+            attribution: None,
+            picker: None,
+            slash: 0,
+            editor: Editor::default(),
+            next_agent: next.agent,
+            next_model: next.model,
+            offered: HashSet::new(),
+            opened: HashSet::new(),
+            closed: HashSet::new(),
+            history: history::load(),
+            history_index: None,
+            files: None,
+            indexing: None,
+            sharpening: false,
+            sharpen_undo: None,
+            mention_cache: RefCell::new(None),
+            mention_closed: false,
+            stop_armed: None,
+            suspend: false,
+            signalled: None,
+            feed: Vec::new(),
+            shells: Vec::new(),
+            flash: None,
+            work_started: None,
+            last_progress: None,
+            changes: Vec::new(),
+            changes_version: 0,
+            panel: changes::Panel::default(),
+            selection: None,
+            screen: None,
+            body_area: Cell::new(Rect::default()),
+            input_width: Cell::new(1),
+            scroll_top: None,
+            max_scroll: Cell::new(0),
+            transcript: RefCell::new(None),
+            hits: RefCell::new(Vec::new()),
+            hover: None,
+            draft_sync: None,
+            intro: Cell::new(None),
+            last_run_took: None,
+            tick: 0,
+            tip_index: 0,
+            last_tip_change: Instant::now(),
+            plan: None,
+            plan_edit: false,
+            quit: false,
+        }
+    }
 }
 
 /// Turns on what the interface relies on beyond raw mode, returning whether

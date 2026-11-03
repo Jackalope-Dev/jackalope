@@ -50,7 +50,10 @@ Quick facts that trip people up:
 - src-tauri/build.rs reads node_modules/agent-browser; the desktop bundles that binary.
   A fresh worktree therefore needs `pnpm install --frozen-lockfile --prefer-offline`
   (seconds, from the shared store) before any cargo command. Debug builds create an
-  empty apps/desktop/dist when the frontend has not been built.
+  empty apps/desktop/dist when the frontend has not been built. With sccache
+  installed, `RUSTC_WRAPPER=sccache` reuses dependency builds across worktrees.
+- Check terminal UI changes with the harness in apps/desktop/src-tauri/src/cli/ui/harness.rs
+  (see docs/CLI.md); it renders frames as text and never touches a running app.
 - apps/server/admin is a separate SPA built by admin:build, not part of the Worker.
 - Browser verification scripts import /src/... inside the Vite dev server, so those
   paths only resolve at runtime.
