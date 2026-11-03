@@ -536,6 +536,21 @@ mod tests {
             "{screen}"
         );
 
+        // The close button's hover highlight is centred on its `×`.
+        let close = harness
+            .app
+            .hits
+            .borrow()
+            .iter()
+            .find(|(_, click)| *click == Click::CloseTab(1))
+            .map(|(area, _)| *area)
+            .expect("a close button");
+        let top = screen.lines().next().unwrap();
+        let cells: Vec<char> = top.chars().collect();
+        let start = usize::from(close.x);
+        assert_eq!(close.width, 3, "{top}");
+        assert_eq!(&cells[start..start + 3], [' ', '×', ' '], "{top}");
+
         harness.click(Click::CloseTab(1));
         let screen = harness.render(120, 30);
         assert_eq!(harness.app.tab_order(), ["c2"], "{screen}");
