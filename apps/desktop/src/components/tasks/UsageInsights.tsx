@@ -64,7 +64,7 @@ export function UsageInsights({
           <Stat
             label="New context tokens"
             value={tokenLabel(data.total.freshInput)}
-            description={`${tokenLabel(data.total.cacheRead)} cached re-reads · ${tokenLabel(data.total.tokens)} cumulative · ${data.total.reported} of ${data.total.calls} calls reported${data.total.costUsd === null ? '' : ` · $${data.total.costUsd.toFixed(2)} reported cost`}`}
+            description={`${tokenLabel(data.total.cacheRead)} cached re-reads · ${tokenLabel(data.total.tokens)} cumulative · ${data.total.reported} of ${data.total.calls} calls reported`}
           />
           <Stat
             label="Tasks with activity"
