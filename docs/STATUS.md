@@ -195,8 +195,14 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Create pull request drafts an editable title and description from the branch's diff alone
   (never the request or conversation), asks for the draft choice, then commits any
   remaining task changes with the project's commit policy, pushes the task branch and
-  opens the PR through the GitHub CLI; nothing is published before that confirmation. Publishing and
-  deployment remain explicit user-approved steps; a local merge does not establish either.
+  opens the PR through the GitHub CLI; nothing is published before that confirmation. Write
+  with AI redrafts the title and description on request.
+  Work done in the project checkout lands locally instead: a task on the target branch offers
+  Commit to the branch in place of a pull request, and a task on its own branch offers Merge
+  into the target (`task_merge_locally`), which undoes a failed or conflicting merge and
+  restores the task branch. Both draft the commit message from the changes and push only
+  when chosen. Worktree tasks keep their guarded integration. Publishing and deployment
+  remain explicit user-approved steps; a local merge does not establish either.
 - Live sessions capture short messages while work runs, batch them in order in one
   isolated workspace, and retain drafts, results and cumulative patch exports. Chat
   starts a session from the first message and groups history automatically.

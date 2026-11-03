@@ -1,4 +1,9 @@
-use super::{process_control, tasks::TaskRuntime, worktree_cleanup};
+use super::{
+    git_command::{command as git_command, Policy},
+    integration, process_control,
+    tasks::TaskRuntime,
+    worktree_cleanup,
+};
 use serde::Serialize;
 use serde_json::Value;
 use std::{path::Path, process::Command, time::Duration};
@@ -213,6 +218,87 @@ pub async fn task_pull_request_create(
     .map_err(|error| error.to_string())?
 }
 
+/// Runs a Git command that changes the checkout, reporting Git's own message on failure.
+fn change(path: &Path, args: &[&str]) -> Result<String, String> {
+    let mut command = git_command(path, args, Policy::Isolated);
+    command
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_MERGE_AUTOEDIT", "no");
+    let result = process_control::run(command, Duration::from_secs(120))?;
+    if result.timed_out {
+        return Err(format!("git {} took too long and was stopped.", args[0]));
+    }
+    if !result.success {
+        let detail = format!("{}\n{}", result.stderr.trim(), result.stdout.trim());
+        return Err(detail.trim().chars().take(2000).collect());
+    }
+    Ok(result.stdout.trim().into())
+}
+
+/// Merges `branch` into `target` in a checkout that has `branch` checked out, leaving
+/// `target` checked out. A conflicting or failed merge is undone and `branch` is checked
+/// out again, so the checkout ends where it started.
+fn merge_into(path: &Path, branch: &str, target: &str) -> Result<String, String> {
+    if git(path, &["branch", "--show-current"])? != branch {
+        return Err(format!(
+            "Check out {branch} in the project before merging it."
+        ));
+    }
+    if !git(path, &["status", "--porcelain", "--untracked-files=normal"])?.is_empty() {
+        return Err("Commit or discard the remaining changes before merging.".into());
+    }
+    let target_ref = format!("refs/heads/{target}");
+    if git(path, &["rev-parse", "--verify", "--quiet", &target_ref]).is_err() {
+        return Err(format!("There is no local {target} branch to merge into."));
+    }
+    change(path, &["switch", target])?;
+    if let Err(error) = change(path, &["merge", "--no-ff", "--no-edit", branch]) {
+        let _ = change(path, &["merge", "--abort"]);
+        let _ = change(path, &["switch", branch]);
+        return Err(format!(
+            "{branch} could not be merged into {target}, so nothing changed. {error}"
+        ));
+    }
+    git(path, &["rev-parse", "--verify", "HEAD"])
+}
+
+/// Merges a task that worked on its own branch in the project checkout into the project's
+/// target branch locally. Nothing is pushed.
+#[tauri::command]
+pub async fn task_merge_locally(
+    id: String,
+    target: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<String, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let target = target.trim();
+        if target.is_empty() || target.starts_with('-') {
+            return Err("Choose a branch to merge into.".into());
+        }
+        let _guard = integration::execution_guard()?;
+        let runs = runtime.integration_runs()?;
+        let run = runs
+            .iter()
+            .find(|run| run.id == id)
+            .ok_or("Task not found")?;
+        if runs.iter().any(|other| {
+            other.workspace == run.workspace
+                && ["starting", "running", "stopping"].contains(&other.status.as_str())
+        }) {
+            return Err("Wait for work in this checkout to finish before merging.".into());
+        }
+        if run.workspace.is_empty() || run.branch.is_empty() || run.branch == target {
+            return Err(format!(
+                "This task has no separate branch to merge into {target}."
+            ));
+        }
+        merge_into(Path::new(&run.workspace), &run.branch, target)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -229,6 +315,66 @@ mod tests {
             Some("https://github.com/o/r/pull/7")
         );
         assert_eq!(created_url("warning only"), None);
+    }
+
+    #[test]
+    fn local_merge_lands_on_the_target_or_leaves_the_checkout_as_it_was() {
+        let temp =
+            std::env::temp_dir().join(format!("jackalope-local-merge-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&temp).unwrap();
+        let path = temp.as_path();
+        let commit = |message: &str| {
+            change(
+                path,
+                &[
+                    "-c",
+                    "user.name=Test",
+                    "-c",
+                    "user.email=test@example.invalid",
+                    "commit",
+                    "-qam",
+                    message,
+                ],
+            )
+            .unwrap();
+        };
+        change(path, &["init", "-q", "-b", "main"]).unwrap();
+        std::fs::write(path.join("a.txt"), "base\n").unwrap();
+        change(path, &["add", "a.txt"]).unwrap();
+        commit("Base");
+        change(path, &["switch", "-q", "-c", "task"]).unwrap();
+        std::fs::write(path.join("a.txt"), "task\n").unwrap();
+        commit("Task");
+
+        std::fs::write(path.join("a.txt"), "dirty\n").unwrap();
+        assert!(merge_into(path, "task", "main")
+            .unwrap_err()
+            .contains("remaining changes"));
+        change(path, &["checkout", "--", "a.txt"]).unwrap();
+        assert!(merge_into(path, "task", "missing")
+            .unwrap_err()
+            .contains("no local missing"));
+
+        change(path, &["switch", "-q", "main"]).unwrap();
+        std::fs::write(path.join("a.txt"), "main\n").unwrap();
+        commit("Main");
+        change(path, &["switch", "-q", "task"]).unwrap();
+        let error = merge_into(path, "task", "main").unwrap_err();
+        assert!(error.contains("nothing changed"), "{error}");
+        assert_eq!(git(path, &["branch", "--show-current"]).unwrap(), "task");
+        assert!(git(path, &["status", "--porcelain"]).unwrap().is_empty());
+
+        change(path, &["switch", "-q", "main"]).unwrap();
+        change(path, &["reset", "-q", "--hard", "HEAD~1"]).unwrap();
+        change(path, &["switch", "-q", "task"]).unwrap();
+        let head = merge_into(path, "task", "main").unwrap();
+        assert_eq!(git(path, &["branch", "--show-current"]).unwrap(), "main");
+        assert_eq!(git(path, &["rev-parse", "main"]).unwrap(), head);
+        assert_eq!(
+            std::fs::read_to_string(path.join("a.txt")).unwrap(),
+            "task\n"
+        );
+        let _ = std::fs::remove_dir_all(temp);
     }
 
     #[test]

@@ -1,5 +1,16 @@
 [
   {
+    "id": "land-work-your-way",
+    "date": "2026-11-03",
+    "status": "In development",
+    "title": "Land work your way",
+    "description": "Finish a task with a pull request or keep it local, with AI-written messages.",
+    "items": [
+      "Write with AI redrafts a pull request's title and description from the changes whenever you want a fresh take.",
+      "Work done in your project checkout can be committed to its branch or merged into main locally in one step, with an optional push."
+    ]
+  },
+  {
     "id": "agent-review-in-place",
     "date": "2026-11-03",
     "status": "In development",
