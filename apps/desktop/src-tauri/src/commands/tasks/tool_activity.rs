@@ -186,11 +186,29 @@ pub(super) fn label(name: &str, input: &Value, workspace: &str) -> String {
             .find_map(|raw| workspace_path(raw, workspace));
         return path.map_or_else(|| format!("{verb} a file"), |path| format!("{verb} {path}"));
     }
+    match name {
+        "mcp__jackalope__ask_user" | "ask_user" | "AskUserQuestion" => {
+            return "Asking you a question".into()
+        }
+        "ToolSearch" => return "Finding tools".into(),
+        "TodoWrite" | "update_plan" => return "Updating its plan".into(),
+        "WebSearch" | "web_search" => return "Searching the web".into(),
+        "WebFetch" => return "Reading a web page".into(),
+        "Task" | "Agent" => return "Starting a helper agent".into(),
+        _ => {}
+    }
     let name: String = name
         .chars()
         .filter(|ch| !ch.is_control())
         .take(80)
         .collect();
+    // An MCP tool reads as its own name and the server it came from.
+    if let Some((server, tool)) = name
+        .strip_prefix("mcp__")
+        .and_then(|rest| rest.split_once("__"))
+    {
+        return format!("Using {} ({server})", tool.replace('_', " "));
+    }
     format!("Using {name}")
 }
 
@@ -290,6 +308,15 @@ mod tests {
         assert_eq!(
             label("Read", &json!({"file_path":"/private/secret"}), "/work"),
             "Reading a file"
+        );
+        assert_eq!(
+            label("mcp__jackalope__ask_user", &json!({}), ""),
+            "Asking you a question"
+        );
+        assert_eq!(label("ToolSearch", &json!({}), ""), "Finding tools");
+        assert_eq!(
+            label("mcp__linear__create_issue", &json!({}), ""),
+            "Using create issue (linear)"
         );
     }
 }

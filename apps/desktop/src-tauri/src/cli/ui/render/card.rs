@@ -246,7 +246,10 @@ fn top(
             Style::default().fg(tone).add_modifier(Modifier::BOLD),
         ),
     ];
-    let mut who = view.agent.clone().unwrap_or_else(|| "agent".into());
+    let mut who = view
+        .agent
+        .as_deref()
+        .map_or_else(|| "agent".into(), |agent| app.agent_name(agent));
     if let Some(model) = view.model.as_deref().filter(|model| !model.is_empty()) {
         who = format!("{who} · {model}");
     }

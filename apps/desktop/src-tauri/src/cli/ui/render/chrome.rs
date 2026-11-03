@@ -109,8 +109,9 @@ pub fn header(frame: &mut Frame, app: &App, area: Rect) {
     let agent = app
         .view
         .as_ref()
-        .and_then(|view| view.agent.clone())
-        .or_else(|| app.next_agent.as_ref().map(|agent| app.agent_name(agent)));
+        .and_then(|view| view.agent.as_deref())
+        .or(app.next_agent.as_deref())
+        .map(|agent| app.agent_name(agent));
     if let Some(agent) = agent {
         right.push((text(agent, brand::text()), Some(Click::Command("agent"))));
         if let Some(model) = app.view.as_ref().and_then(|view| view.model.clone()) {

@@ -154,7 +154,12 @@ pub fn draw(frame: &mut Frame, app: &App, picker: &Picker, area: Rect) {
         let chosen = position == picker.selected;
         let showing = app.session.as_deref() == Some(session.id.as_str());
         let title = brand::ellipsize(&session.title, title_width);
-        let agent = brand::ellipsize(session.agent.as_deref().unwrap_or(""), AGENT_WIDTH);
+        let agent = session
+            .agent
+            .as_deref()
+            .map(|agent| app.agent_name(agent))
+            .unwrap_or_default();
+        let agent = brand::ellipsize(&agent, AGENT_WIDTH);
         let doing = brand::ellipsize(&doing(app, session), doing_width);
         let mut spans = vec![
             Span::styled(

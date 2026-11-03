@@ -394,7 +394,12 @@ impl App {
             .unwrap_or_else(|| "another project".into())
     }
 
+    /// An agent's display name, such as `Claude Code` for `claude`; `auto` is
+    /// the placeholder a run has until routing picks an agent.
     pub(super) fn agent_name(&self, id: &str) -> String {
+        if id == "auto" {
+            return "Automatic".into();
+        }
         self.overview
             .as_ref()
             .and_then(|overview| overview.as_ref().ok())
