@@ -1,14 +1,17 @@
 name: Verify platforms
 on:
   pull_request:
+  merge_group:
   push:
     branches: [master, main, beta, stable]
   workflow_dispatch:
 permissions:
   contents: read
+# A new push to a pull request cancels its older run. Every other event, including
+# each push to master, gets its own group and always runs to completion.
 concurrency:
-  group: verify-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: verify-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   workflows:
     runs-on: ubuntu-latest
@@ -29,10 +32,18 @@ jobs:
     timeout-minutes: 40
     env:
       RUST_TEST_THREADS: '2'
+      # Each run builds from a clean checkout, so incremental data only enlarges the cache.
+      CARGO_INCREMENTAL: '0'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 1 }}
+      # Pull requests whose files nothing in the desktop app reads skip the Rust
+      # and packaging steps; anything else, and every push, runs all of them.
+      - name: Decide which suites the change affects
+        id: scope
+        run: node scripts/change-scope.mjs ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
@@ -40,28 +51,52 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt
+        if: steps.scope.outputs.desktop != 'false'
       - run: rustup override set 1.98.1
+        if: steps.scope.outputs.desktop != 'false'
+      # Keyed by the lockfile the build starts from (the base branch's for a pull
+      # request), so a pull request restores master's cache exactly instead of
+      # uploading its own copy, and master uploads only when its lockfile changes.
+      # Cargo still rebuilds whatever the change touched.
+      - name: Pick the Rust cache key
+        id: rust-key
+        if: steps.scope.outputs.desktop != 'false'
+        shell: bash
+        run: echo "lock=$(git rev-parse ${{ github.event_name == 'pull_request' && 'HEAD^1' || 'HEAD' }}:apps/desktop/src-tauri/Cargo.lock)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        id: rust-cache
+        if: steps.scope.outputs.desktop != 'false'
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             apps/desktop/src-tauri/target
-          key: verify-windows-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-${{ github.sha }}
-          restore-keys: |
-            verify-windows-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-
-            verify-windows-rust-1.98.1-
+          key: rust-windows-1.98.1-${{ steps.rust-key.outputs.lock }}
+          restore-keys: rust-windows-1.98.1-
       - run: pnpm verify
+        if: steps.scope.outputs.desktop != 'false'
+      - run: pnpm verify --shared-only
+        if: steps.scope.outputs.desktop == 'false'
       - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features --features store
+        if: steps.scope.outputs.desktop != 'false'
       - run: pnpm tauri build --bundles nsis
-        if: vars.RELEASE_DISTRIBUTION != 'store'
+        if: steps.scope.outputs.desktop != 'false' && vars.RELEASE_DISTRIBUTION != 'store'
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        if: vars.RELEASE_DISTRIBUTION != 'store'
+        if: steps.scope.outputs.desktop != 'false' && vars.RELEASE_DISTRIBUTION != 'store'
         with:
           name: windows-trial-installer
           path: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
           retention-days: 14
+      - name: Keep only dependency builds in the Rust cache
+        if: steps.scope.outputs.desktop != 'false' && steps.rust-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          cd apps/desktop/src-tauri/target
+          rm -rf release/bundle
+          for profile in debug release; do
+            if [ -d "$profile" ]; then find "$profile" -maxdepth 2 -name '*jackalope*' -prune -exec rm -rf {} +; fi
+          done
   unix:
     name: Verify ${{ matrix.os }}
     strategy:
@@ -72,73 +107,97 @@ jobs:
     timeout-minutes: 60
     env:
       RUST_TEST_THREADS: '2'
+      # Each run builds from a clean checkout, so incremental data only enlarges the cache.
+      CARGO_INCREMENTAL: '0'
+    # Each job runs and reports even when its suites are skipped: a matrix job
+    # skipped at job level never reports the per-platform required check names.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 1 }}
+      - name: Decide which suites the change affects
+        id: scope
+        run: node scripts/change-scope.mjs ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+        if: steps.scope.outputs.desktop != 'false'
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        if: steps.scope.outputs.desktop != 'false'
         with:
           node-version-file: '.node-version'
           cache: pnpm
       - name: Install Linux native dependencies
-        if: runner.os == 'Linux'
+        if: steps.scope.outputs.desktop != 'false' && runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev libdbus-1-dev patchelf gnome-keyring at-spi2-core libatspi2.0-dev libjson-glib-dev libxi-dev libxtst-dev libxcomposite-dev python3-gi gir1.2-atspi-2.0 xvfb openbox xcompmgr xdotool
       - run: pnpm install --frozen-lockfile
+        if: steps.scope.outputs.desktop != 'false'
       - run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt
+        if: steps.scope.outputs.desktop != 'false'
       - run: rustup override set 1.98.1
+        if: steps.scope.outputs.desktop != 'false'
+      # Keyed by the lockfile the build starts from (the base branch's for a pull
+      # request), so a pull request restores master's cache exactly instead of
+      # uploading its own copy, and master uploads only when its lockfile changes.
+      # Cargo still rebuilds whatever the change touched.
+      - name: Pick the Rust cache key
+        id: rust-key
+        if: steps.scope.outputs.desktop != 'false'
+        run: echo "lock=$(git rev-parse ${{ github.event_name == 'pull_request' && 'HEAD^1' || 'HEAD' }}:apps/desktop/src-tauri/Cargo.lock)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        id: rust-cache
+        if: steps.scope.outputs.desktop != 'false'
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             apps/desktop/src-tauri/target
-          key: verify-${{ matrix.os }}-${{ runner.arch }}-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-${{ github.sha }}
-          restore-keys: |
-            verify-${{ matrix.os }}-${{ runner.arch }}-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-
-            verify-${{ matrix.os }}-${{ runner.arch }}-rust-1.98.1-
+          key: rust-${{ matrix.os }}-${{ runner.arch }}-1.98.1-${{ steps.rust-key.outputs.lock }}
+          restore-keys: rust-${{ matrix.os }}-${{ runner.arch }}-1.98.1-
       - run: pnpm verify --native-only
+        if: steps.scope.outputs.desktop != 'false'
       # A runner's first Chrome launch can spend over 30 s building caches, past the product's startup bound.
       - name: Warm the installed browser
-        if: runner.os == 'Linux'
+        if: steps.scope.outputs.desktop != 'false' && runner.os == 'Linux'
         run: timeout 120 google-chrome --headless=new --no-first-run --user-data-dir="$(mktemp -d)" --dump-dom about:blank > /dev/null || true
       - name: Exercise bundled browser
+        if: steps.scope.outputs.desktop != 'false'
         run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features real_agent_browser_ -- --ignored --test-threads=1
       - name: Exercise isolated Linux credential storage
-        if: runner.os == 'Linux'
+        if: steps.scope.outputs.desktop != 'false' && runner.os == 'Linux'
         run: bash scripts/verification/linux-keyring.sh
       - name: Exercise isolated X11 desktop control
-        if: runner.os == 'Linux'
+        if: steps.scope.outputs.desktop != 'false' && runner.os == 'Linux'
         run: bash scripts/verification/linux-desktop-control.sh
       - name: Exercise isolated GNOME Wayland desktop control
-        if: matrix.os == 'ubuntu-24.04'
+        if: steps.scope.outputs.desktop != 'false' && matrix.os == 'ubuntu-24.04'
         run: |
           sudo apt-get install -y --no-install-recommends gnome-shell gnome-session-bin gjs
           bash scripts/verification/linux-wayland-control.sh
       - name: Check macOS desktop helper guards without granting access
-        if: runner.os == 'macOS'
+        if: steps.scope.outputs.desktop != 'false' && runner.os == 'macOS'
         env:
           JACKALOPE_DESKTOP_REQUEST: '{"action":"self_test"}'
         run: apps/desktop/src-tauri/resources/desktop-control/jackalope-desktop-control
       - name: Build macOS trial bundle
-        if: runner.os == 'macOS'
+        if: steps.scope.outputs.desktop != 'false' && runner.os == 'macOS'
         run: pnpm tauri build --bundles app
       - name: Ad-hoc sign macOS trial for local permission checks
-        if: runner.os == 'macOS'
+        if: steps.scope.outputs.desktop != 'false' && runner.os == 'macOS'
         run: |
           bundle=apps/desktop/src-tauri/target/release/bundle/macos/Jackalope.app
           codesign --force --sign - "$bundle/Contents/Resources/resources/agent-browser/agent-browser"
           codesign --force --deep --sign - "$bundle"
           codesign --verify --deep --strict "$bundle"
       - name: Build Linux trial package
-        if: runner.os == 'Linux'
+        if: steps.scope.outputs.desktop != 'false' && runner.os == 'Linux'
         run: pnpm tauri build --bundles deb
       - name: Preserve macOS executable permissions
-        if: runner.os == 'macOS'
+        if: steps.scope.outputs.desktop != 'false' && runner.os == 'macOS'
         run: tar -czf apps/desktop/src-tauri/target/release/bundle/macos-trial.tar.gz -C apps/desktop/src-tauri/target/release/bundle/macos Jackalope.app
       - name: Preserve trial packages
+        if: steps.scope.outputs.desktop != 'false'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: trial-${{ matrix.os }}-${{ runner.arch }}
@@ -147,6 +206,15 @@ jobs:
             apps/desktop/src-tauri/target/release/bundle/deb/*.deb
           if-no-files-found: error
           retention-days: 14
+      - name: Keep only dependency builds in the Rust cache
+        if: steps.scope.outputs.desktop != 'false' && steps.rust-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          cd apps/desktop/src-tauri/target
+          rm -rf release/bundle
+          for profile in debug release; do
+            if [ -d "$profile" ]; then find "$profile" -maxdepth 2 -name '*jackalope*' -prune -exec rm -rf {} +; fi
+          done
   secrets:
     timeout-minutes: 10
     runs-on: ubuntu-latest
