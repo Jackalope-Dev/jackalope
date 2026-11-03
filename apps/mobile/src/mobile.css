@@ -17,6 +17,9 @@
   --m-edge: color-mix(in srgb, var(--color-text-primary) 10%, transparent);
   --m-shadow: 0 12px 40px color-mix(in srgb, #000 18%, transparent);
   min-height: 100dvh;
+  /* The desktop stylesheet locks the body because its shell scrolls inside panes; phone
+     screens scroll the page itself. */
+  overflow: hidden auto;
   background:
     radial-gradient(
       90% 55% at 0% 0%,

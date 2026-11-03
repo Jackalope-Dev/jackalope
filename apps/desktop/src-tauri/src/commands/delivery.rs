@@ -324,14 +324,26 @@ mod tests {
         std::fs::create_dir(&temp).unwrap();
         let path = temp.as_path();
         let commit = |message: &str| {
-            change(path, &["commit", "-qam", message]).unwrap();
+            change(
+                path,
+                &[
+                    "-c",
+                    "user.name=Test",
+                    "-c",
+                    "user.email=test@example.invalid",
+                    "commit",
+                    "-qam",
+                    message,
+                ],
+            )
+            .unwrap();
         };
         change(path, &["init", "-q", "-b", "main"]).unwrap();
-        // merge_into makes its own merge commit, so the repository needs an identity of
-        // its own; CI runners have no global one. Windows runners also set
-        // core.autocrlf, which would turn the checked-out "task\n" into "task\r\n".
+        // merge_into makes its own merge commit, so the repository needs an identity on
+        // machines without a global one, such as CI runners.
         change(path, &["config", "user.name", "Test"]).unwrap();
         change(path, &["config", "user.email", "test@example.invalid"]).unwrap();
+        // Windows runners check files out with CRLF, which would change the contents read back.
         change(path, &["config", "core.autocrlf", "false"]).unwrap();
         std::fs::write(path.join("a.txt"), "base\n").unwrap();
         change(path, &["add", "a.txt"]).unwrap();
