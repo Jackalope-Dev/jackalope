@@ -20,6 +20,9 @@ pub struct Panel {
 
 impl App {
     pub(super) fn set_changes(&mut self, changes: Vec<FileChange>) {
+        if let Some(id) = &self.session {
+            self.seen_changes.insert(id.clone(), changes.clone());
+        }
         if changes == self.changes {
             return;
         }

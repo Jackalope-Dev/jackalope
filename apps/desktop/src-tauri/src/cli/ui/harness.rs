@@ -947,4 +947,31 @@ mod tests {
         harness.submit("/merge");
         assert_eq!(actions(&harness)[6..], ["pause", "prepare", "resume"]);
     }
+
+    #[test]
+    fn switching_tabs_never_flashes_the_start_screen() {
+        let mut harness = Harness::new();
+        harness.add(conversation(
+            "c1",
+            "Fix login",
+            &[("you", "Fix login"), ("agent", "Login is fixed.")],
+        ));
+        harness.add(conversation("c2", "Add search", &[("you", "Add search")]));
+        harness.open("c1");
+        harness.open("c2");
+        // Before the host answers, the switch shows the conversation as last seen.
+        harness.app.show(Some("c1".into()));
+        let screen = harness.render(100, 30);
+        assert!(!screen.contains("orchestrated"), "{screen}");
+        assert!(screen.contains("Login is fixed."), "{screen}");
+        // One never read shows nothing until it is, not the start screen.
+        harness.add(conversation(
+            "c3",
+            "Pick a database",
+            &[("you", "Set up reporting")],
+        ));
+        harness.app.show(Some("c3".into()));
+        let screen = harness.render(100, 30);
+        assert!(!screen.contains("orchestrated"), "{screen}");
+    }
 }

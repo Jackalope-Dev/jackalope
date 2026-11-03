@@ -167,6 +167,10 @@ struct App {
     offered: HashSet<String>,
     /// Conversations opened in this terminal, kept as tabs once visited.
     opened: HashSet<String>,
+    /// Each conversation as last read, shown at once when switching back to it.
+    seen_views: std::collections::HashMap<String, SessionView>,
+    /// Each conversation's changed files as last read, for the same reason.
+    seen_changes: std::collections::HashMap<String, Vec<crate::git::FileChange>>,
     /// The top bar with the project and tabs is hidden (`/tabs`, Ctrl+T).
     top_bar_hidden: bool,
     /// Conversations whose tab was closed, kept out of the tabs until opened
@@ -338,6 +342,8 @@ impl App {
             next_model: next.model,
             offered: HashSet::new(),
             opened: HashSet::new(),
+            seen_views: std::collections::HashMap::new(),
+            seen_changes: std::collections::HashMap::new(),
             closed: HashSet::new(),
             top_bar_hidden: feed::top_bar_hidden(),
             history: history::load(),
@@ -456,8 +462,13 @@ impl App {
             self.opened.insert(id.clone());
             self.closed.remove(id);
         }
+        // The conversation as last seen shows at once; the read that follows
+        // brings it up to date, so switching never flashes the start screen.
+        let seen = session
+            .as_ref()
+            .and_then(|id| self.seen_views.get(id).cloned());
         self.session = session;
-        self.set_view(None);
+        self.set_view(seen);
         self.context += 1;
         self.scroll_top = None;
         self.selection = None;
@@ -465,6 +476,13 @@ impl App {
         self.last_run_took = None;
         self.last_progress = None;
         self.reset_panel();
+        if let Some(changes) = self
+            .session
+            .as_ref()
+            .and_then(|id| self.seen_changes.get(id).cloned())
+        {
+            self.set_changes(changes);
+        }
         self.refresh();
     }
 
@@ -483,6 +501,9 @@ impl App {
             (None, None) => true,
             _ => false,
         };
+        if let Some(view) = &view {
+            self.seen_views.insert(view.id.clone(), view.clone());
+        }
         self.view = view;
         if !unchanged {
             self.view_version += 1;

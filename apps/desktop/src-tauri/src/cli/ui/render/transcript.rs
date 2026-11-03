@@ -165,6 +165,11 @@ pub fn visible(
         let (lines, offset) = window(parts, top, height);
         (lines, offset, bottom, top)
     };
+    // A conversation that is still being read shows nothing yet, rather than
+    // the start screen it is not.
+    if app.view.is_none() && app.session.is_some() {
+        return (Vec::new(), 0, 0, Vec::new());
+    }
     let Some(view) = &app.view else {
         let (lines, hits) = welcome(app, width, height as u16);
         let start = Measured::new(lines, width);
