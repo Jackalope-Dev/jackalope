@@ -403,11 +403,12 @@ const STEPS_SHOWN: usize = 6;
 /// Entries `events::activity` keeps; a run holding this many has dropped older ones.
 const ACTIVITY_KEPT: usize = 150;
 
-/// The stage a recorded execution stage belongs to on a run card.
+/// The stage a recorded execution stage belongs to on a run card. The
+/// checkpoint saved after the work is bookkeeping and stays off the card.
 fn card_stage(stage: &str) -> Option<&'static str> {
     match stage {
         "routing" => Some("route"),
-        "preparation" | "checkpoint" => Some("prepare"),
+        "preparation" => Some("prepare"),
         "execution" => Some("work"),
         "verification_wait" | "verification" => Some("check"),
         _ => None,
@@ -1394,8 +1395,8 @@ mod tests {
         task.stages = serde_json::from_value(serde_json::json!([
             {"stage": "routing", "startedAt": "", "endedAt": "x", "durationMs": 200},
             {"stage": "preparation", "startedAt": "", "endedAt": "x", "durationMs": 3000},
-            {"stage": "checkpoint", "startedAt": "", "endedAt": "x", "durationMs": 1000},
             {"stage": "execution", "startedAt": "", "endedAt": "x", "durationMs": 160000},
+            {"stage": "checkpoint", "startedAt": "", "endedAt": "x", "durationMs": 1000},
             {"stage": "verification", "startedAt": "", "endedAt": null, "durationMs": null},
         ]))
         .expect("stages");
@@ -1420,7 +1421,7 @@ mod tests {
             stages,
             [
                 ("route", Some(200)),
-                ("prepare", Some(4000)),
+                ("prepare", Some(3000)),
                 ("work", Some(160_000)),
                 ("check", None)
             ]

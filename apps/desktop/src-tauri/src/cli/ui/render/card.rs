@@ -86,7 +86,9 @@ pub fn card(
     if phase == Phase::Live {
         body.extend(steps(app, run, room));
     }
-    body.extend(rows(tally(app, run), room));
+    if let Some(tally) = tally(app, run) {
+        body.extend(rows(tally, room));
+    }
     if let Some(check) = &run.check {
         body.extend(rows(check_line(check), room));
     }
@@ -555,7 +557,8 @@ fn steps(app: &App, run: &RunSummary, room: usize) -> Vec<Line<'static>> {
 }
 
 /// `◇ 14 reads   ⌕ 3 searches   ▸ 2 commands   ✎ 3 files +48 −19`
-fn tally(app: &App, run: &RunSummary) -> Line<'static> {
+/// Nothing when no step has been counted yet, rather than a line saying so.
+fn tally(app: &App, run: &RunSummary) -> Option<Line<'static>> {
     let muted = Style::default().fg(brand::muted());
     let text = Style::default().fg(brand::text());
     let more = if run.trimmed { "+" } else { "" };
@@ -634,10 +637,7 @@ fn tally(app: &App, run: &RunSummary) -> Line<'static> {
             Style::default().fg(brand::danger()),
         ));
     }
-    if spans.is_empty() {
-        spans.push(Span::styled("No steps recorded yet", muted));
-    }
-    Line::from(spans)
+    (!spans.is_empty()).then(|| Line::from(spans))
 }
 
 /// `✓ pnpm test passed in 8.2s`
