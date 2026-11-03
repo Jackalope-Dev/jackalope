@@ -498,6 +498,7 @@ pub fn run(launch: Launch) {
             commands::review_progress::task_review_progress,
             commands::verification::task_verify,
             commands::challenge_review::task_start_challenge,
+            commands::challenge_review::task_start_agent_review,
             commands::challenge_review::task_challenge_reply,
             commands::challenge_review::task_challenge_rerun,
             commands::challenge_review::task_challenge_reruns,

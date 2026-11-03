@@ -4,9 +4,7 @@ import { MoreHorizontal } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { Review, TaskRun } from '../../lib/task-runtime';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { CaptureTask } from './CaptureTask';
 import { ChallengeDialog } from './ChallengeReview';
-import { prepareCrossModelReview } from './CrossModelReviewPanel';
 import { ReviewProgress } from './ReviewProgress';
 import { TaskImpact } from './TaskImpact';
 import { TaskUsefulness } from './TaskUsefulness';
@@ -28,7 +26,6 @@ export function ReviewActions({
   onChallengeStarted?: () => void;
 }) {
   const [tool, setTool] = useState<keyof typeof titles | null>(null);
-  const [peerDraft, setPeerDraft] = useState<string>();
   const [challenging, setChallenging] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   return (
@@ -41,16 +38,6 @@ export function ReviewActions({
         </Menu.Trigger>
         <Menu.Portal>
           <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
-            {!!review.diff && (
-              <Menu.Item
-                className="workspace-menu-item"
-                onSelect={() =>
-                  setPeerDraft(prepareCrossModelReview(run, review.files, review.diff))
-                }
-              >
-                Ask another agent to review
-              </Menu.Item>
-            )}
             {!!review.diff && (
               <Menu.Item className="workspace-menu-item" onSelect={() => setChallenging(true)}>
                 Challenge this change
@@ -102,13 +89,6 @@ export function ReviewActions({
             setChallenging(false);
             onChallengeStarted?.();
           }}
-        />
-      )}
-      {peerDraft && (
-        <CaptureTask
-          draftKey={peerDraft}
-          onClose={() => setPeerDraft(undefined)}
-          onStarted={() => setPeerDraft(undefined)}
         />
       )}
     </>

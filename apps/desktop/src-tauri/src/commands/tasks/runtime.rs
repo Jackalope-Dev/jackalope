@@ -1679,6 +1679,13 @@ impl TaskRuntime {
                     .filter(|prompt| prompt.status == "pending")
                     .map(|prompt| prompt.id.clone())
                     .collect(),
+                review_of: run
+                    .challenge_of
+                    .as_ref()
+                    .filter(|source| {
+                        source.kind == crate::commands::challenge_review::ReviewKind::Review
+                    })
+                    .map(|source| source.run_id.clone()),
             })
             .collect()
     }

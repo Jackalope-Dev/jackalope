@@ -1,8 +1,9 @@
-//! Challenge reviews: a reviewer tries to break a finished result and reports only
-//! findings it proved by running something. The reviewer works in its own worktree,
-//! started from a commit of the author's files, so it never touches the author's
-//! workspace. A finding's command can be run again on request in a disposable copy of
-//! the reviewer's workspace.
+//! Reviews of a finished result by another agent. An agent review reads the change
+//! and returns suggested fixes; a Challenge tries to break it and reports only findings
+//! it proved by running something. Either reviewer works in its own worktree, started
+//! from a commit of the author's files, so it never touches the author's workspace. A
+//! Challenge finding's command can be run again on request in a disposable copy of the
+//! reviewer's workspace.
 
 use super::{
     coordination::Coordinator,
@@ -28,6 +29,18 @@ pub struct ChallengeSource {
     /// The commit the reviewer's worktree started from.
     #[serde(default)]
     pub base: String,
+    /// Reviewers saved before agent reviews existed are Challenges.
+    #[serde(default)]
+    pub kind: ReviewKind,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ReviewKind {
+    #[default]
+    Challenge,
+    /// Reads the change and suggests fixes without running checks.
+    Review,
 }
 
 /// Result of running a finding's command again.
@@ -84,6 +97,41 @@ End your reply with the same findings as a JSON array in a fenced block tagged j
     )
 }
 
+/// Instructions for an agent review: read the change and plan fixes, without running it.
+pub(super) fn review_brief(author: &TaskRun, base: &str) -> String {
+    let result = if author.result.trim().is_empty() {
+        "(The author did not leave a result summary.)".to_string()
+    } else {
+        excerpt(&author.result, 4_000)
+    };
+    format!(
+        r#"Review the change below and suggest fixes the author can apply. This is a quick read-only review: read the diff and the code around it, and do not build, install, run tests or start servers.
+
+Your workspace is an isolated copy of the author's files at the reviewed snapshot (commit {base}); `git diff HEAD~1` shows the change. Do not edit files, commit, or open the author's workspace.
+
+Intent
+Original request:
+{request}
+
+Author's result:
+{result}
+
+Look for real problems: bugs, missed requirements, regressions, security issues, broken edge cases and clearly risky or confusing code. Skip style preferences and anything you are not confident about. No findings is a valid result.
+
+For each finding, give the file and line, what is wrong, and a short, concrete fix plan the author can follow without asking you.
+
+End your reply with a fenced block tagged jackalope-review holding JSON in this shape, with an empty findings array when you found nothing:
+
+```jackalope-review
+{{"summary": "One or two sentences on the change and its overall state.",
+  "findings": [{{"severity": "high", "title": "Short title", "file": "src/example.ts", "line": 42, "problem": "What is wrong and why it matters.", "fix": "The steps to fix it."}}]}}
+```
+
+severity is high (breaks the intent or loses data), medium (a real bug or gap in some cases) or low (worth fixing, not blocking)."#,
+        request = excerpt(&author.prompt, 6_000),
+    )
+}
+
 /// Whether `command` is one the reviewer reported, through the tool or its reply.
 fn reported(run: &TaskRun, command: &str) -> bool {
     let command = command.trim();
@@ -118,13 +166,14 @@ fn git(path: &Path, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
-/// Starts one Challenge reviewer for a finished attempt. `request` carries the reviewer's
-/// agent, account and project settings; its prompt and workspace are replaced here.
+/// Starts one reviewer for a finished attempt. `request` carries the reviewer's agent,
+/// account and project settings; its prompt and workspace are replaced here.
 pub(super) fn start(
     coordinator: &Coordinator,
     runtime: &TaskRuntime,
     mut request: RunRequest,
     source_run_id: &str,
+    kind: ReviewKind,
 ) -> Result<String, String> {
     // Lock order: the execution guard is released before the coordinator lock is taken.
     let source = {
@@ -133,21 +182,24 @@ pub(super) fn start(
         let author = runs
             .iter()
             .find(|run| run.id == source_run_id)
-            .ok_or("The result to challenge no longer exists.")?;
+            .ok_or("The result to review no longer exists.")?;
         if runs
             .iter()
             .any(|run| run.workspace == author.workspace && ACTIVE.contains(&run.status.as_str()))
         {
-            return Err("Wait for this work to finish before challenging it.".into());
+            return Err("Wait for this work to finish before reviewing it.".into());
         }
         if author.workspace.is_empty() {
-            return Err("This result has no workspace to challenge.".into());
+            return Err("This result has no workspace to review.".into());
         }
         let directory = runtime.integration_directory();
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         let (tree, base) =
-            integration::snapshot_commit(author, &directory, "Jackalope challenge snapshot")?;
-        request.prompt = brief(author, &base);
+            integration::snapshot_commit(author, &directory, "Jackalope review snapshot")?;
+        request.prompt = match kind {
+            ReviewKind::Challenge => brief(author, &base),
+            ReviewKind::Review => review_brief(author, &base),
+        };
         request.project_id = author.project_id.clone();
         request.project_name = author.project_name.clone();
         request.project_path = author.project_path.clone();
@@ -156,8 +208,13 @@ pub(super) fn start(
             run_id: author.id.clone(),
             tree,
             base,
+            kind,
         }
     };
+    if kind == ReviewKind::Review {
+        // Reading the change needs no installed dependencies, so the review starts at once.
+        request.prepare_command = None;
+    }
     request.isolated = true;
     request.workspace_mode = Some(WorkspaceMode::Worktree);
     request.previous_run_id = None;
@@ -303,7 +360,35 @@ pub async fn task_start_challenge(
     let coordinator = coordinator.inner().clone();
     let runtime = runtime.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        start(&coordinator, &runtime, request, &source_run_id)
+        start(
+            &coordinator,
+            &runtime,
+            request,
+            &source_run_id,
+            ReviewKind::Challenge,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn task_start_agent_review(
+    request: RunRequest,
+    source_run_id: String,
+    coordinator: State<'_, Coordinator>,
+    runtime: State<'_, TaskRuntime>,
+) -> Result<String, String> {
+    let coordinator = coordinator.inner().clone();
+    let runtime = runtime.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        start(
+            &coordinator,
+            &runtime,
+            request,
+            &source_run_id,
+            ReviewKind::Review,
+        )
     })
     .await
     .map_err(|e| e.to_string())?
@@ -325,7 +410,7 @@ pub fn task_challenge_reply(id: String, runtime: State<'_, TaskRuntime>) -> Resu
         .run_snapshot(&id)
         .ok_or("The reviewer's attempt no longer exists.")?;
     if run.challenge_of.is_none() {
-        return Err("This attempt is not a Challenge reviewer.".into());
+        return Err("This attempt is not a reviewer.".into());
     }
     Ok(run.result)
 }
@@ -375,6 +460,26 @@ mod tests {
             ..author()
         };
         assert!(brief(&silent, "abc").contains("did not leave a result summary"));
+    }
+
+    #[test]
+    fn review_brief_is_read_only_and_asks_for_fix_plans() {
+        let text = review_brief(&author(), "abc123");
+        for expected in [
+            "Reject empty names when saving a profile.",
+            "Saving now trims the name and refuses blank input.",
+            "commit abc123",
+            "do not build, install, run tests",
+            "Do not edit files",
+            "```jackalope-review",
+            "\"fix\"",
+        ] {
+            assert!(text.contains(expected), "brief is missing {expected:?}");
+        }
+        let source: ChallengeSource =
+            serde_json::from_value(serde_json::json!({"runId": "a", "tree": "t", "base": "b"}))
+                .unwrap();
+        assert_eq!(source.kind, ReviewKind::Challenge);
     }
 
     #[test]

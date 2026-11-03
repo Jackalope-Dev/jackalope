@@ -1,5 +1,18 @@
 [
   {
+    "id": "agent-review-in-place",
+    "date": "2026-11-03",
+    "status": "In development",
+    "title": "Agent review in place",
+    "description": "Ask another agent to review finished work without leaving the task, then hand its fixes back in one click.",
+    "items": [
+      "Agent review on the Review tab starts right away with a reviewer from another model family and shows each step as it reads your changes.",
+      "Suggestions arrive as a short list with severity, file and line, and a fix plan for each one.",
+      "Make these changes continues the same task with the fixes you keep, plus an optional note and one final check run.",
+      "Reviews stay with their task instead of appearing as separate work."
+    ]
+  },
+  {
     "id": "fewer-permission-questions",
     "date": "2026-11-03",
     "status": "In development",
