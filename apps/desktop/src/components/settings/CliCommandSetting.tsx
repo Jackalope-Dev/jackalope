@@ -12,6 +12,7 @@ interface CommandStatus {
   skipped: string | null;
   error: string | null;
   systemAvailable: boolean;
+  profile?: string | null;
 }
 
 /** Whether `jackalope` works in a terminal, and the one step to make it work when not. */
@@ -42,11 +43,13 @@ export function CliCommandSetting() {
   const ready = !!status?.command && status.onPath !== false;
   const description = !status
     ? 'Checking…'
-    : ready
-      ? 'Run jackalope in any repository to talk to your agents from the terminal.'
-      : status.command
-        ? 'The command is installed, but its folder is not on your terminal’s PATH yet.'
-        : (status.skipped ?? 'The jackalope command is not installed.');
+    : ready && status.profile
+      ? `Added to your PATH in ${status.profile}. Open a new terminal to run jackalope.`
+      : ready
+        ? 'Run jackalope in any repository to talk to your agents from the terminal.'
+        : status.command
+          ? 'The command is installed, but its folder is not on your terminal’s PATH yet.'
+          : (status.skipped ?? 'The jackalope command is not installed.');
   return (
     <Setting title="Command line tool" description={description}>
       <div className="flex flex-col items-end gap-2">

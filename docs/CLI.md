@@ -378,9 +378,17 @@ Both binaries ship in each package, and the command finds the app beside itself.
   command to `~/.local/share/jackalope/` because its mount point changes, and
   records how to relaunch itself in `preferences/host-launcher`. Development
   builds and isolated profiles skip this step.
-- macOS: the default shell PATH does not include `~/.local/bin`. The terminal
-  window offers Install command, which links `/usr/local/bin/jackalope` after an
-  administrator prompt.
+- macOS: the default shell PATH does not include `~/.local/bin`, so when the
+  login shell's PATH lacks it the same launch also links
+  `/usr/local/bin/jackalope` if that folder is on PATH and writable without a
+  password (Homebrew on Intel Macs). Otherwise it appends a marked
+  `export PATH="$HOME/.local/bin:$PATH"` line to the zsh `.zprofile` (under
+  `ZDOTDIR` when set) or the bash login profile bash already reads, creating
+  `.bash_profile` only when none exists. Other shells are left alone. The edit
+  happens only once, recorded in `preferences/cli-login-profile`, so a
+  removed line stays removed; new terminals find the command, already-open ones
+  do not. Settings and the terminal window still offer Install command, which
+  links `/usr/local/bin/jackalope` after an administrator prompt.
 - Windows: the EXE installer adds its folder to the user's PATH and the
   uninstaller removes it; see `apps/desktop/src-tauri/installer/README.md`. The
   Store package declares a console `jackalope.exe` execution alias.

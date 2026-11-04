@@ -2,8 +2,9 @@
 //!
 //! macOS and Linux packages have no install step Jackalope can hook, so the app
 //! re-asserts a link to its bundled command on every launch; that also repairs
-//! it after an update moves or replaces the bundle. Windows installers and the
-//! Store package put the command on PATH themselves.
+//! it after an update moves or replaces the bundle. macOS shells leave the link's
+//! folder off PATH, so the app also makes it reachable there. Windows installers
+//! and the Store package put the command on PATH themselves.
 
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -23,9 +24,23 @@ pub struct CommandStatus {
     /// macOS can also link the command into /usr/local/bin, which is on the
     /// default PATH, after an administrator prompt.
     pub system_available: bool,
+    /// The login profile this launch added `~/.local/bin` to. Terminals opened
+    /// before that edit do not see it.
+    pub profile: Option<String>,
 }
 
-static OUTCOME: Mutex<(Option<String>, Option<String>)> = Mutex::new((None, None));
+#[derive(Default)]
+struct Outcome {
+    skipped: Option<String>,
+    error: Option<String>,
+    profile: Option<PathBuf>,
+}
+
+static OUTCOME: Mutex<Outcome> = Mutex::new(Outcome {
+    skipped: None,
+    error: None,
+    profile: None,
+});
 
 const NAME: &str = if cfg!(windows) {
     "jackalope.exe"
@@ -59,55 +74,170 @@ fn write_launcher(preferences: &Path) {
 pub fn launch(preferences: PathBuf) {
     std::thread::spawn(move || {
         write_launcher(&preferences);
-        let outcome = install();
+        let outcome = install(&preferences);
         if let Ok(mut stored) = OUTCOME.lock() {
             *stored = outcome;
         }
     });
 }
 
-/// Returns `(skipped, error)`.
 #[cfg(unix)]
-fn install() -> (Option<String>, Option<String>) {
+fn install(preferences: &Path) -> Outcome {
+    let failed = |error: String| Outcome {
+        error: Some(error),
+        ..Outcome::default()
+    };
     if cfg!(debug_assertions) {
-        return (
-            Some("Development builds do not install the jackalope command, so they never replace the one an installed app provides.".into()),
-            None,
-        );
+        return Outcome {
+            skipped: Some("Development builds do not install the jackalope command, so they never replace the one an installed app provides.".into()),
+            ..Outcome::default()
+        };
     }
     if std::env::var_os("JACKALOPE_PROFILE_DIR").is_some() {
-        return (
-            Some("This app uses an isolated profile; the jackalope command follows the default profile.".into()),
-            None,
-        );
+        return Outcome {
+            skipped: Some("This app uses an isolated profile; the jackalope command follows the default profile.".into()),
+            ..Outcome::default()
+        };
     }
     let Some(command) = bundled_command() else {
-        return (
-            None,
-            Some("This installation does not include the jackalope command.".into()),
-        );
+        return failed("This installation does not include the jackalope command.".into());
     };
     let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
-        return (None, Some("Could not find your home folder.".into()));
+        return failed("Could not find your home folder.".into());
     };
     let source = match std::env::var_os("APPIMAGE") {
         // The image's mount point changes on every run, so link to a stable
         // copy of the command instead.
         Some(_) => match copy_out(&command, &home.join(".local/share/jackalope").join(NAME)) {
             Ok(copy) => copy,
-            Err(error) => return (None, Some(error)),
+            Err(error) => return failed(error),
         },
         None => command,
     };
-    match link(&source, &home.join(".local/bin").join(NAME)) {
-        Ok(()) => (None, None),
-        Err(error) => (None, Some(error)),
+    if let Err(error) = link(&source, &home.join(".local/bin").join(NAME)) {
+        return failed(error);
+    }
+    #[cfg(target_os = "macos")]
+    let profile = match reach_from_terminals(&source, &home, preferences) {
+        Ok(profile) => profile,
+        Err(error) => return failed(error),
+    };
+    #[cfg(not(target_os = "macos"))]
+    let profile = {
+        let _ = preferences;
+        None
+    };
+    Outcome {
+        profile,
+        ..Outcome::default()
     }
 }
 
 #[cfg(windows)]
-fn install() -> (Option<String>, Option<String>) {
-    (None, None)
+fn install(_preferences: &Path) -> Outcome {
+    Outcome::default()
+}
+
+/// Makes the linked command reachable from a new terminal, since macOS shells
+/// leave `~/.local/bin` off PATH. Uses /usr/local/bin when it is writable
+/// without a password (Homebrew makes it so on Intel Macs), otherwise adds
+/// `~/.local/bin` to the login profile. The profile is edited at most once, so a
+/// user who removes the line keeps it removed. Returns the profile it edited.
+#[cfg(target_os = "macos")]
+fn reach_from_terminals(
+    source: &Path,
+    home: &Path,
+    preferences: &Path,
+) -> Result<Option<PathBuf>, String> {
+    use super::platform::on_login_path;
+    // An unknown login PATH leaves things as they are rather than guess.
+    if on_login_path(&home.join(".local/bin")) != Some(false) {
+        return Ok(None);
+    }
+    let system = Path::new("/usr/local/bin");
+    if system.is_dir() && on_login_path(system) == Some(true) {
+        let target = system.join(NAME);
+        let resolves_here =
+            std::fs::canonicalize(&target).ok() == std::fs::canonicalize(source).ok();
+        if resolves_here || link(source, &target).is_ok() {
+            return Ok(None);
+        }
+    }
+    let record = preferences.join("cli-login-profile");
+    if record.exists() {
+        return Ok(None);
+    }
+    let shell = std::env::var_os("SHELL")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/bin/zsh"));
+    let zdotdir = std::env::var_os("ZDOTDIR").map(PathBuf::from);
+    let Some(profile) = login_profile(&shell, home, zdotdir.as_deref()) else {
+        return Ok(None);
+    };
+    add_to_profile(&profile)?;
+    super::history::write_atomic(&record, profile.to_string_lossy().as_bytes())?;
+    Ok(Some(profile))
+}
+
+/// Heads the lines `add_to_profile` appends, and tells it the edit is present.
+#[cfg(unix)]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+const PROFILE_MARKER: &str = "# Added by Jackalope so terminals can run `jackalope`";
+
+/// The profile a new login shell of `shell` reads, for the shells that read a
+/// predictable one. bash reads only the first of these that exists, so creating
+/// .bash_profile would hide an existing .profile.
+#[cfg(unix)]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn login_profile(shell: &Path, home: &Path, zdotdir: Option<&Path>) -> Option<PathBuf> {
+    match shell.file_name()?.to_str()? {
+        "zsh" => Some(zdotdir.unwrap_or(home).join(".zprofile")),
+        "bash" => Some(
+            [".bash_profile", ".bash_login", ".profile"]
+                .iter()
+                .map(|name| home.join(name))
+                .find(|path| path.exists())
+                .unwrap_or_else(|| home.join(".bash_profile")),
+        ),
+        _ => None,
+    }
+}
+
+/// Appends `~/.local/bin` to PATH in `profile` unless Jackalope already did.
+/// Appending keeps a profile that a dotfile manager links as a link.
+#[cfg(unix)]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn add_to_profile(profile: &Path) -> Result<(), String> {
+    use std::io::Write;
+    let existing = match std::fs::read_to_string(profile) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(error) => return Err(format!("Could not read {}: {error}", profile.display())),
+    };
+    if existing.contains(PROFILE_MARKER) {
+        return Ok(());
+    }
+    let gap = match existing.as_str() {
+        "" => "",
+        text if text.ends_with('\n') => "\n",
+        _ => "\n\n",
+    };
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(profile)
+        .and_then(|mut file| {
+            write!(
+                file,
+                "{gap}{PROFILE_MARKER}\nexport PATH=\"$HOME/.local/bin:$PATH\"\n"
+            )
+        })
+        .map_err(|error| {
+            format!(
+                "Could not add the jackalope command to {}: {error}",
+                profile.display()
+            )
+        })
 }
 
 #[cfg(unix)]
@@ -205,8 +335,13 @@ fn inspect() -> CommandStatus {
 pub fn cli_install_status() -> CommandStatus {
     let mut status = inspect();
     if let Ok(stored) = OUTCOME.lock() {
-        status.skipped = stored.0.clone();
-        status.error = stored.1.clone();
+        status.skipped = stored.skipped.clone();
+        status.error = stored.error.clone();
+        if let Some(profile) = &stored.profile {
+            // The login PATH was read before the edit; new terminals see it.
+            status.on_path = Some(true);
+            status.profile = Some(profile.to_string_lossy().into_owned());
+        }
     }
     status
 }
@@ -273,6 +408,58 @@ mod tests {
         assert_eq!(std::fs::read(&target).unwrap(), b"user's own");
 
         std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    #[test]
+    fn login_profiles_follow_the_shell_and_never_hide_an_existing_one() {
+        let home = std::env::temp_dir().join(format!("jl-home-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&home).unwrap();
+        let zsh = Path::new("/bin/zsh");
+        let bash = Path::new("/bin/bash");
+        assert_eq!(
+            login_profile(zsh, &home, None),
+            Some(home.join(".zprofile"))
+        );
+        assert_eq!(
+            login_profile(zsh, &home, Some(Path::new("/z"))),
+            Some(PathBuf::from("/z/.zprofile"))
+        );
+        assert_eq!(
+            login_profile(bash, &home, None),
+            Some(home.join(".bash_profile"))
+        );
+        std::fs::write(home.join(".profile"), "").unwrap();
+        assert_eq!(
+            login_profile(bash, &home, None),
+            Some(home.join(".profile"))
+        );
+        assert_eq!(
+            login_profile(Path::new("/opt/homebrew/bin/fish"), &home, None),
+            None
+        );
+        std::fs::remove_dir_all(&home).unwrap();
+    }
+
+    #[test]
+    fn profile_edits_append_once_and_keep_existing_lines() {
+        let home = std::env::temp_dir().join(format!("jl-profile-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&home).unwrap();
+        let profile = home.join(".zprofile");
+        std::fs::write(&profile, "eval \"$(brew shellenv)\"").unwrap();
+        add_to_profile(&profile).unwrap();
+        add_to_profile(&profile).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&profile).unwrap(),
+            format!(
+                "eval \"$(brew shellenv)\"\n\n{PROFILE_MARKER}\nexport PATH=\"$HOME/.local/bin:$PATH\"\n"
+            )
+        );
+        let fresh = home.join(".bash_profile");
+        add_to_profile(&fresh).unwrap();
+        assert!(std::fs::read_to_string(&fresh)
+            .unwrap()
+            .starts_with(PROFILE_MARKER));
+        std::fs::remove_dir_all(&home).unwrap();
     }
 
     #[cfg(target_os = "macos")]
