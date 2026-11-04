@@ -26,14 +26,6 @@ export function matchesWorkFilter(item: WorkItem, filter: string) {
   return filter === 'all' || workGroup(item.stage) === workGroup(filter);
 }
 
-export const ideaStageLabels: Record<TaskTicket['status'], string> = {
-  backlog: 'Idea',
-  refinement: 'Ready to shape',
-  in_progress: 'Planned: in motion',
-  verification: 'Planned: for review',
-  done: 'Marked done',
-};
-
 export interface WorkItem {
   id: string;
   title: string;

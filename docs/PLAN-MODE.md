@@ -10,9 +10,9 @@ terminal commands are in [terminal command](CLI.md#plan-mode).
 
 ## Starting a plan
 
-- App: **Plan with me** beside **Start task** in the composer, and beside the choices
+- App: **Plan with me** in the Work composer's Options menu, and beside the choices
   when a task assessment suggests a plan or investigation, starts the interview.
-  **Write the plan myself**, in the composer or on Feature work, opens a form instead.
+  **Write the plan myself** on Feature work opens a form instead.
 - Terminal: `/plan <goal>` in a conversation, or `jackalope plan "<goal>"`.
 
 A written plan skips the interview. Its tasks (title, instructions, files or folders and

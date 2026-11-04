@@ -10,7 +10,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { RunnerConnections } from '/src/components/tasks/RunnerConnections.tsx';
 import { AgentManager } from '/src/components/agents/AgentManager.tsx';
-import { CaptureTask } from '/src/components/tasks/CaptureTask.tsx';
+import { SessionStart } from '/src/components/sessions/SessionStart.tsx';
 import { useProjectStore } from '/src/stores/projectStore.ts';
 import { useAgentConfigStore } from '/src/stores/agentConfigStore.ts';
 import { useExecutionStore } from '/src/stores/executionStore.ts';
@@ -23,7 +23,8 @@ const f = window.projectFixture = { calls: [], failSave: false,
  theme: dark => useThemeStore.getState().setAppTheme({ ...useThemeStore.getState().appTheme, isDark: dark, appearance: 'manual' }),
 };
 const profiles = [{id:'work-login',name:'Work login',group:'work'},{id:'personal-login',name:'Personal login',group:'personal'}];
-window.__TAURI_INTERNALS__ = { transformCallback: () => 0, unregisterCallback: () => {}, invoke: async (command,args={}) => {
+window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
+window.__TAURI_INTERNALS__ = { metadata: { currentWindow: { label: 'main' }, currentWebview: { label: 'main' } }, transformCallback: () => 0, unregisterCallback: () => {}, invoke: async (command,args={}) => {
  f.calls.push({command,...args});
  switch(command) {
  case 'agent_save_policy': if(f.failSave)throw new Error('Fixture save failed'); return;
@@ -45,6 +46,7 @@ function App(){
  const [screen,setScreen]=React.useState('roster');
  const [agent,setAgent]=React.useState('claude');
  const active=useProjectStore(s=>s.activeProjectId);
+ const project=useProjectStore(s=>s.projects.find(p=>p.id===s.activeProjectId));
  React.useEffect(()=>{const onAgent=e=>{setAgent(e.detail);setScreen('manager')};const onNav=()=>setScreen('roster');window.addEventListener('jackalope:configure-agent',onAgent);window.addEventListener('jackalope:navigate',onNav);return()=>{window.removeEventListener('jackalope:configure-agent',onAgent);window.removeEventListener('jackalope:navigate',onNav)}},[]);
  return React.createElement('main',{style:{height:'100vh',overflow:'auto'}},
  React.createElement('nav',{style:{display:'flex',gap:16,padding:16}},
@@ -52,7 +54,7 @@ function App(){
  ...['roster','manager','capture'].map(id=>React.createElement('button',{key:id,onClick:()=>setScreen(id)},'View '+id))),
  screen==='roster'?React.createElement(RunnerConnections,{onNewTask:id=>{setAgent(id);setScreen('capture')},onRun:()=>{}}):
  screen==='manager'?React.createElement(AgentManager,{key:active,initialAgentId:agent}):
- React.createElement(CaptureTask,{key:active,draftKey:'fixture:'+active,inline:true,onClose:()=>{},onStarted:()=>{}}));
+ React.createElement(SessionStart,{key:active,embedded:true,project,onOpenProject:()=>{}}));
 }
 f.theme(true);
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
@@ -152,13 +154,17 @@ try {
     'false',
   );
   await page.getByRole('button', { name: 'View capture', exact: true }).click();
+  // The composer's agent picker reads models for the project's account when opened.
+  await page.getByRole('button', { name: /^Agent: / }).click();
   await page.waitForFunction(() =>
     window.projectFixture.calls.some(
       (c) =>
         c.command === 'agent_models' && c.agent === 'claude' && c.agentProfileId === 'work-login',
     ),
   );
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Project personal', exact: true }).click();
+  await page.getByRole('button', { name: /^Agent: / }).click();
   await page.waitForFunction(() =>
     window.projectFixture.calls.some((c) => c.command === 'agent_models' && c.agent === 'codex'),
   );

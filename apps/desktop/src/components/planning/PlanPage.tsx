@@ -175,7 +175,7 @@ export function PlanPage() {
         <EmptyState
           icon={ClipboardList}
           title="No plans yet"
-          description="Write a request in the composer, then choose Plan with me or Write the plan myself."
+          description="Write a request in the Work composer and choose Options → Plan with me, or choose Plan feature work from the Work menu to write the plan yourself."
           action={
             <Button
               onClick={() => {

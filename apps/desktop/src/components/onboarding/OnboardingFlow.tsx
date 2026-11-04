@@ -209,6 +209,12 @@ export function OnboardingFlow({
   useEffect(() => {
     if (error) errorMessage.current?.focus();
   }, [error]);
+  // Rendered above each step's sticky actions; after them it would slide under the footer.
+  const errorNotice = error ? (
+    <InlineNotice tone="error" className="mt-4" ref={errorMessage} tabIndex={-1}>
+      {error}
+    </InlineNotice>
+  ) : null;
   const advance = (action: () => void) => {
     if (pendingAdvance.current) return;
     pendingAdvance.current = action;
@@ -331,6 +337,7 @@ export function OnboardingFlow({
               busy={busy}
               attempt={attempt}
               clearError={() => setError('')}
+              errorNotice={errorNotice}
               onOpened={async (opened, created) => {
                 onboarding.stageProject(
                   opened,
@@ -495,6 +502,7 @@ export function OnboardingFlow({
                   )}
                 </div>
               )}
+              {errorNotice}
 
               <div className="onboarding-actions">
                 <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('project')}>
@@ -578,6 +586,7 @@ export function OnboardingFlow({
                   ))}
                 </fieldset>
               )}
+              {errorNotice}
               <div className="onboarding-actions">
                 <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('agent')}>
                   <ArrowLeft size={16} />
@@ -599,11 +608,6 @@ export function OnboardingFlow({
                 </Button>
               </div>
             </>
-          )}
-          {error && (
-            <InlineNotice tone="error" className="mt-4" ref={errorMessage} tabIndex={-1}>
-              {error}
-            </InlineNotice>
           )}
         </section>
       </main>

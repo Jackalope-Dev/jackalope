@@ -256,21 +256,30 @@ fn client() -> Result<reqwest::Client, String> {
 
 fn api_message(status: u16, body: &Value) -> String {
     let code = body["errors"][0]["code"].as_u64().unwrap_or_default();
+    let detail: String = body["errors"][0]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(200)
+        .collect();
     match (status, code) {
-        (401 | 403, _) => "Cloudflare refused this API token. Use a token with Account → Artifacts → Edit for this account, on the Workers Paid plan.".into(),
+        // The connect check only reads the namespace, so a read-only grant
+        // passes it and is refused here on the first write.
+        (401 | 403, _) => {
+            let reason = if detail.is_empty() {
+                String::new()
+            } else {
+                format!(" ({detail})")
+            };
+            format!("Cloudflare refused this request{reason}. The connection needs Account → Artifacts → Edit for this account, on the Workers Paid plan. Reconnect in Settings → Connected work.")
+        }
         (_, 10201) => "A repository with that name already exists in this namespace. Choose another name.".into(),
         (_, 10200) => "Cloudflare could not find that repository or namespace.".into(),
         (_, 10101) => "Cloudflare rejected the repository name. Use letters, digits, dots, underscores or hyphens.".into(),
         (_, 10302 | 10303) => "The repository is still being prepared. Retry in a moment.".into(),
         (429, _) => "Cloudflare is rate limiting Artifacts requests. Retry shortly.".into(),
         _ => {
-            let detail: String = body["errors"][0]["message"]
-                .as_str()
-                .unwrap_or_default()
-                .chars()
-                .filter(|c| !c.is_control())
-                .take(200)
-                .collect();
             if detail.is_empty() {
                 format!("Cloudflare Artifacts returned {status}. Retry, or check the Artifacts dashboard.")
             } else {
@@ -1114,6 +1123,11 @@ mod tests {
     #[test]
     fn auth_errors_explain_the_required_token_permission() {
         assert!(api_message(403, &Value::Null).contains("Artifacts → Edit"));
+        let refused = api_message(
+            403,
+            &json!({"errors":[{"code":10000,"message":"Authentication error"}]}),
+        );
+        assert!(refused.contains("(Authentication error)"));
         assert!(api_message(409, &json!({"errors":[{"code":10201}]})).contains("already exists"));
         let message = api_message(500, &json!({"errors":[{"code":1,"message":"boom\u{7}"}]}));
         assert!(message.ends_with("boom"));

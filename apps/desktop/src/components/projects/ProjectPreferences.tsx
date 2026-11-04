@@ -147,7 +147,7 @@ export function ProjectPreferences({
             </Setting>
             <Setting
               title="Choose guidelines automatically"
-              description="Match testing, security, onboarding and other guidance to each new task. Fine-tune the selection under Customize task → Context."
+              description="Match testing, security, onboarding and other guidance to each new task. Fine-tune the selection under Options → Saved project context in the Work composer."
             >
               <Switch
                 label="Choose guidelines automatically"

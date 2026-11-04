@@ -103,7 +103,7 @@ After reviewing a result, use Use this process again to save an editable workflo
 
 ## Write the plan myself
 
-Choose **Write the plan myself** in the composer or on Feature work to write tasks
+Choose **Write the plan myself** on Feature work (Work menu → Plan feature work) to write tasks
 directly: a title, instructions, files or folders, the earlier tasks each starts after,
 and the outcomes each must meet. Drafts are kept on this device across dialog closure and
 restart. **Review the plan** saves it as a plan-mode draft (up to 8 tasks; outcomes

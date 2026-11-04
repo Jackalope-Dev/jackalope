@@ -1,4 +1,4 @@
-export const taskEfforts = [
+const taskEfforts = [
   {
     id: 'quick',
     name: 'Quick',

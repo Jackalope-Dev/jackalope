@@ -6,8 +6,9 @@ verification, integration and schedule services.
 
 ## Capture and context
 
-New work and the configurable Ctrl/Cmd+Shift+N shortcut open the conversation composer. Saved-draft and issue-intake actions retain the task capture dialog. Guided
-setup also offers capture before project setup. Ideas can have an empty project
+New work and the configurable Ctrl/Cmd+Shift+N shortcut open the conversation composer on
+Work. Saved drafts, ideas, repo TODOs, helper drafts and the setup's first task open there
+too, with their text and agent filled in; starting the work replaces the idea it came from. Ideas can have an empty project
 identifier; they do not create fictitious projects or authorize execution.
 A draft's suggested project is frozen when captured, editable, and preserved
 across navigation/reload. Existing project drafts and saved planning records remain

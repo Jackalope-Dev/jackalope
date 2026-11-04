@@ -369,7 +369,7 @@
 }
 
 /* Contained dialogs pad their own body and footer to line up with the header. */
-.bot-editor-form {
+.bot-editor-body {
   display: grid;
   flex: 1;
   align-content: start;
@@ -377,6 +377,12 @@
   min-height: 0;
   padding: 0 32px 20px;
   overflow-y: auto;
+}
+
+.bot-editor-form {
+  display: grid;
+  align-content: start;
+  gap: 20px;
 }
 
 .bot-editor-steps {
@@ -731,7 +737,7 @@
 }
 
 /* Scrolling grid containers drop bottom padding in some WebViews; this keeps space above the footer. */
-.bot-editor-form::after {
+.bot-editor-body::after {
   content: "";
   height: 4px;
 }

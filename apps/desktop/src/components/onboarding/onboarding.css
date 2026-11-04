@@ -95,16 +95,26 @@
 }
 /* A slim thumb that stays inside the card: it starts below the rounded top corner and stops
    above the footer. The scrollbar column carries the footer's surface and divider so the
-   footer still spans the card while content scrolls. */
+   footer still spans the card while content scrolls. Scrollbars are not clipped by
+   border-radius, so the bottom row paints the card's rounded corner itself. */
 .onboarding-content::-webkit-scrollbar {
+  --corner: var(--radius-3xl);
   width: 14px;
-  background: linear-gradient(
-    to top,
-    var(--onboarding-footer-background) calc(var(--onboarding-footer-height) - 1px),
-    var(--color-border-subtle) calc(var(--onboarding-footer-height) - 1px)
-      var(--onboarding-footer-height),
-    transparent var(--onboarding-footer-height)
-  );
+  background:
+    radial-gradient(
+      circle at calc(100% - var(--corner)) 0,
+      var(--onboarding-footer-background) calc(var(--corner) - 0.5px),
+      transparent var(--corner)
+    )
+    bottom / 100% var(--corner) no-repeat,
+    linear-gradient(
+      to top,
+      transparent var(--corner),
+      var(--onboarding-footer-background) var(--corner) calc(var(--onboarding-footer-height) - 1px),
+      var(--color-border-subtle) calc(var(--onboarding-footer-height) - 1px)
+        var(--onboarding-footer-height),
+      transparent var(--onboarding-footer-height)
+    );
 }
 .onboarding-content::-webkit-scrollbar-track {
   margin-top: 20px;

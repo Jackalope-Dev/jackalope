@@ -131,8 +131,16 @@ interface ProjectState {
 
 let worktreeRequest = 0;
 
+/**
+ * Drops the Windows verbatim prefix (`\\?\C:\...`) that earlier project creation saved;
+ * Git cannot add worktrees under such a path. UNC verbatim paths are left alone.
+ */
+function ordinaryProjectPath(path: string) {
+  return /^\\\\\?\\[A-Za-z]:\\/.test(path) ? path.slice(4) : path;
+}
+
 export function projectPathKey(path: string) {
-  const normalized = path.replaceAll('\\', '/').replace(/\/$/, '');
+  const normalized = ordinaryProjectPath(path).replaceAll('\\', '/').replace(/\/$/, '');
   return typeof navigator !== 'undefined' && navigator.platform.includes('Win')
     ? normalized.toLowerCase()
     : normalized;
@@ -295,11 +303,15 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: 'jackalope-projects',
-      version: 1,
+      version: 2,
       migrate: (persisted) => {
         const state = persisted as { projects?: Project[]; activeProjectId?: string | null };
         return {
-          projects: (state.projects ?? []).map((project) => ({ ...project, worktrees: [] })),
+          projects: (state.projects ?? []).map((project) => ({
+            ...project,
+            path: ordinaryProjectPath(project.path),
+            worktrees: [],
+          })),
           activeProjectId: state.activeProjectId ?? null,
         };
       },
@@ -394,7 +406,7 @@ export async function mergeProjectRegistry() {
       .map<Project>((record) => ({
         id: record.id,
         name: record.name,
-        path: record.path,
+        path: ordinaryProjectPath(record.path),
         gitBranch: '',
         worktrees: [],
         agentProvider: 'codex',

@@ -6,7 +6,6 @@ import { suggestTopics, topicDraft } from '../../lib/session-topics';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { CaptureTask } from '../tasks/CaptureTask';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -26,7 +25,6 @@ export function SessionTopics({
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [draftKey, setDraftKey] = useState<string>();
   const [choosing, setChoosing] = useState(false);
   const [editingTopicId, setEditingTopicId] = useState<string>();
   const [activeId, setActiveId] = useState<string>();
@@ -93,248 +91,233 @@ export function SessionTopics({
         });
       useProjectStore.getState().selectProject(session.request.projectId);
       setOpen(false);
-      setDraftKey(key);
+      window.dispatchEvent(new CustomEvent('jackalope:helper-draft', { detail: key }));
     } catch (cause) {
       setError(String(cause));
     }
   };
   return (
-    <>
-      <Dialog.Root open={open} onOpenChange={setOpen}>
-        <DialogContent className="work-topics-dialog">
-          <DialogCloseButton />
-          <DialogHeader title="Topics" description="Group messages into separate task drafts." />
-          <div className="work-topics-actions">
-            <Button
-              variant="outline"
-              disabled={busy || choosing || !messages.length || topics.length >= 100}
-              onClick={() => {
-                const used = new Set(topics.flatMap((topic) => topic.messageIds));
-                const suggestions = suggestTopics(
-                  messages.filter((message) => !used.has(message.id)),
-                  () => crypto.randomUUID(),
-                );
-                update([...topics, ...suggestions].slice(0, 100));
-              }}
-            >
-              Suggest topics
-            </Button>
-            <Button
-              variant="outline"
-              disabled={busy || choosing || topics.length >= 100}
-              onClick={() => {
-                resetPicker();
-                setChoosing(true);
-              }}
-            >
-              New topic
-            </Button>
-          </div>
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
-          <div className="work-topics-layout">
-            <nav className="work-topic-list" aria-label="Saved and suggested topics">
-              {topics.map((topic) => (
-                <button
-                  key={topic.id}
-                  type="button"
-                  disabled={busy || choosing}
-                  aria-pressed={active?.id === topic.id && !choosing}
-                  onClick={() => {
-                    setActiveId(topic.id);
-                    resetPicker();
-                  }}
-                >
-                  <strong>{topic.title || 'Untitled topic'}</strong>
-                  <span>
-                    {topic.messageIds.length}{' '}
-                    {topic.messageIds.length === 1 ? 'message' : 'messages'}
-                  </span>
-                </button>
-              ))}
-              {!topics.length && (
-                <p className="task-muted">
-                  No topics yet. Suggest topics or select messages for a new one.
-                </p>
-              )}
-            </nav>
-            <div className="work-topic-editor">
-              {choosing ? (
-                <>
-                  <label>
-                    Topic name
-                    <Input
-                      aria-label="New topic title"
-                      placeholder="Topic name"
-                      maxLength={80}
-                      value={title}
-                      disabled={busy}
-                      onChange={(event) => setTitle(event.target.value)}
-                    />
-                  </label>
-                  <SearchField
-                    aria-label="Find topic messages"
-                    placeholder="Find a message…"
-                    value={query}
-                    onValueChange={(value) => {
-                      setQuery(value);
-                      setLimit(100);
-                    }}
-                  />
-                  <p className="task-muted">
-                    {selected.length} selected · Choose up to 500 messages.
-                  </p>
-                  <div className="topic-message-picker">
-                    {matches.slice(0, limit).map((message) => (
-                      <label key={message.id}>
-                        <Checkbox
-                          checked={selectedIds.has(message.id)}
-                          disabled={
-                            busy || (selected.length >= 500 && !selectedIds.has(message.id))
-                          }
-                          onChange={(event) =>
-                            setSelected((ids) =>
-                              event.target.checked
-                                ? [...ids, message.id]
-                                : ids.filter((id) => id !== message.id),
-                            )
-                          }
-                        />
-                        <span>{message.text}</span>
-                      </label>
-                    ))}
-                    {!matches.length && <p className="task-muted">No matching messages.</p>}
-                    {matches.length > limit && (
-                      <Button variant="ghost" onClick={() => setLimit((value) => value + 100)}>
-                        Show more messages
-                      </Button>
-                    )}
-                  </div>
-                  <div className="work-topics-actions">
-                    <Button
-                      disabled={busy || !title.trim() || !selected.length}
-                      onClick={() => {
-                        const topic = {
-                          id: editingTopicId ?? crypto.randomUUID(),
-                          title: title.trim(),
-                          messageIds: selected,
-                        };
-                        update(
-                          editingTopicId
-                            ? topics.map((item) => (item.id === editingTopicId ? topic : item))
-                            : [...topics, topic],
-                        );
-                        setActiveId(topic.id);
-                        resetPicker();
-                      }}
-                    >
-                      {editingTopicId ? 'Update topic' : 'Add topic'}
-                    </Button>
-                    <Button variant="ghost" disabled={busy} onClick={resetPicker}>
-                      Cancel message selection
-                    </Button>
-                  </div>
-                </>
-              ) : active ? (
-                <>
-                  <label>
-                    Topic name
-                    <Input
-                      aria-label="Topic title"
-                      maxLength={80}
-                      value={active.title}
-                      disabled={busy}
-                      onChange={(event) =>
-                        update(
-                          topics.map((item) =>
-                            item.id === active.id ? { ...item, title: event.target.value } : item,
-                          ),
-                        )
-                      }
-                    />
-                  </label>
-                  <div className="work-topics-actions">
-                    <Button disabled={busy || !!editing} onClick={() => prepare(active)}>
-                      Prepare task draft
-                    </Button>
-                    <Button
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() => {
-                        resetPicker();
-                        setSelected(
-                          messages
-                            .filter((message) => sourceIds.has(message.id))
-                            .map((message) => message.id),
-                        );
-                        setTitle(active.title);
-                        setEditingTopicId(active.id);
-                        setChoosing(true);
-                      }}
-                    >
-                      Change messages
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() => update(topics.filter((item) => item.id !== active.id))}
-                    >
-                      Ungroup
-                    </Button>
-                  </div>
-                  <Disclosure key={active.id}>
-                    <DisclosureSummary>
-                      Source messages · {active.messageIds.length}
-                    </DisclosureSummary>
-                    <div className="work-topic-sources">
-                      {sourceMessages.map((message) => (
-                        <p key={message.id} className="topic-source">
-                          {message.text}
-                          {message.canceled && <small> · Canceled</small>}
-                        </p>
-                      ))}
-                    </div>
-                  </Disclosure>
-                </>
-              ) : (
-                <p className="task-muted">
-                  Choose a topic to review its messages and prepare a draft.
-                </p>
-              )}
-            </div>
-          </div>
-          {editing && (
-            <DialogFooter>
-              <Button
-                variant="ghost"
-                disabled={busy}
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <DialogContent className="work-topics-dialog">
+        <DialogCloseButton />
+        <DialogHeader title="Topics" description="Group messages into separate task drafts." />
+        <div className="work-topics-actions">
+          <Button
+            variant="outline"
+            disabled={busy || choosing || !messages.length || topics.length >= 100}
+            onClick={() => {
+              const used = new Set(topics.flatMap((topic) => topic.messageIds));
+              const suggestions = suggestTopics(
+                messages.filter((message) => !used.has(message.id)),
+                () => crypto.randomUUID(),
+              );
+              update([...topics, ...suggestions].slice(0, 100));
+            }}
+          >
+            Suggest topics
+          </Button>
+          <Button
+            variant="outline"
+            disabled={busy || choosing || topics.length >= 100}
+            onClick={() => {
+              resetPicker();
+              setChoosing(true);
+            }}
+          >
+            New topic
+          </Button>
+        </div>
+        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <div className="work-topics-layout">
+          <nav className="work-topic-list" aria-label="Saved and suggested topics">
+            {topics.map((topic) => (
+              <button
+                key={topic.id}
+                type="button"
+                disabled={busy || choosing}
+                aria-pressed={active?.id === topic.id && !choosing}
                 onClick={() => {
-                  setEditing(null);
-                  setError('');
+                  setActiveId(topic.id);
                   resetPicker();
                 }}
               >
-                Discard grouping changes
-              </Button>
-              <Button
-                disabled={busy || choosing || topics.some((topic) => !topic.title.trim())}
-                onClick={() => void save()}
-              >
-                Save grouping
-              </Button>
-            </DialogFooter>
-          )}
-        </DialogContent>
-      </Dialog.Root>
-      {draftKey && (
-        <CaptureTask
-          draftKey={draftKey}
-          onClose={() => {
-            setDraftKey(undefined);
-            setOpen(true);
-          }}
-          onStarted={() => setDraftKey(undefined)}
-        />
-      )}
-    </>
+                <strong>{topic.title || 'Untitled topic'}</strong>
+                <span>
+                  {topic.messageIds.length} {topic.messageIds.length === 1 ? 'message' : 'messages'}
+                </span>
+              </button>
+            ))}
+            {!topics.length && (
+              <p className="task-muted">
+                No topics yet. Suggest topics or select messages for a new one.
+              </p>
+            )}
+          </nav>
+          <div className="work-topic-editor">
+            {choosing ? (
+              <>
+                <label>
+                  Topic name
+                  <Input
+                    aria-label="New topic title"
+                    placeholder="Topic name"
+                    maxLength={80}
+                    value={title}
+                    disabled={busy}
+                    onChange={(event) => setTitle(event.target.value)}
+                  />
+                </label>
+                <SearchField
+                  aria-label="Find topic messages"
+                  placeholder="Find a message…"
+                  value={query}
+                  onValueChange={(value) => {
+                    setQuery(value);
+                    setLimit(100);
+                  }}
+                />
+                <p className="task-muted">
+                  {selected.length} selected · Choose up to 500 messages.
+                </p>
+                <div className="topic-message-picker">
+                  {matches.slice(0, limit).map((message) => (
+                    <label key={message.id}>
+                      <Checkbox
+                        checked={selectedIds.has(message.id)}
+                        disabled={busy || (selected.length >= 500 && !selectedIds.has(message.id))}
+                        onChange={(event) =>
+                          setSelected((ids) =>
+                            event.target.checked
+                              ? [...ids, message.id]
+                              : ids.filter((id) => id !== message.id),
+                          )
+                        }
+                      />
+                      <span>{message.text}</span>
+                    </label>
+                  ))}
+                  {!matches.length && <p className="task-muted">No matching messages.</p>}
+                  {matches.length > limit && (
+                    <Button variant="ghost" onClick={() => setLimit((value) => value + 100)}>
+                      Show more messages
+                    </Button>
+                  )}
+                </div>
+                <div className="work-topics-actions">
+                  <Button
+                    disabled={busy || !title.trim() || !selected.length}
+                    onClick={() => {
+                      const topic = {
+                        id: editingTopicId ?? crypto.randomUUID(),
+                        title: title.trim(),
+                        messageIds: selected,
+                      };
+                      update(
+                        editingTopicId
+                          ? topics.map((item) => (item.id === editingTopicId ? topic : item))
+                          : [...topics, topic],
+                      );
+                      setActiveId(topic.id);
+                      resetPicker();
+                    }}
+                  >
+                    {editingTopicId ? 'Update topic' : 'Add topic'}
+                  </Button>
+                  <Button variant="ghost" disabled={busy} onClick={resetPicker}>
+                    Cancel message selection
+                  </Button>
+                </div>
+              </>
+            ) : active ? (
+              <>
+                <label>
+                  Topic name
+                  <Input
+                    aria-label="Topic title"
+                    maxLength={80}
+                    value={active.title}
+                    disabled={busy}
+                    onChange={(event) =>
+                      update(
+                        topics.map((item) =>
+                          item.id === active.id ? { ...item, title: event.target.value } : item,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <div className="work-topics-actions">
+                  <Button disabled={busy || !!editing} onClick={() => prepare(active)}>
+                    Prepare task draft
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => {
+                      resetPicker();
+                      setSelected(
+                        messages
+                          .filter((message) => sourceIds.has(message.id))
+                          .map((message) => message.id),
+                      );
+                      setTitle(active.title);
+                      setEditingTopicId(active.id);
+                      setChoosing(true);
+                    }}
+                  >
+                    Change messages
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => update(topics.filter((item) => item.id !== active.id))}
+                  >
+                    Ungroup
+                  </Button>
+                </div>
+                <Disclosure key={active.id}>
+                  <DisclosureSummary>
+                    Source messages · {active.messageIds.length}
+                  </DisclosureSummary>
+                  <div className="work-topic-sources">
+                    {sourceMessages.map((message) => (
+                      <p key={message.id} className="topic-source">
+                        {message.text}
+                        {message.canceled && <small> · Canceled</small>}
+                      </p>
+                    ))}
+                  </div>
+                </Disclosure>
+              </>
+            ) : (
+              <p className="task-muted">
+                Choose a topic to review its messages and prepare a draft.
+              </p>
+            )}
+          </div>
+        </div>
+        {editing && (
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => {
+                setEditing(null);
+                setError('');
+                resetPicker();
+              }}
+            >
+              Discard grouping changes
+            </Button>
+            <Button
+              disabled={busy || choosing || topics.some((topic) => !topic.title.trim())}
+              onClick={() => void save()}
+            >
+              Save grouping
+            </Button>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog.Root>
   );
 }
