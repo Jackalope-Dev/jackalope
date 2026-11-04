@@ -32,6 +32,8 @@ export type BlogPost = {
   title: string;
   seoTitle?: string;
   category: string;
+  /** Slug from authors.ts; omit for the company byline. */
+  author?: string;
   date: string;
   updated?: string;
   readingTime: string;

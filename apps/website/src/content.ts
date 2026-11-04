@@ -1,3 +1,4 @@
+import { authorPath, authors } from './authors.ts';
 import { practicalPosts } from './blog-content.ts';
 import type { BlogPost } from './blog-types.ts';
 import updates from './changelog.json' with { type: 'json' };
@@ -163,6 +164,8 @@ export const posts: BlogPost[] = [
     ],
   },
 ];
+// Newest first: the blog index, feed and sitemap list posts in this order.
+posts.sort((a, b) => b.date.localeCompare(a.date));
 
 export { updates };
 
@@ -248,6 +251,11 @@ export const pages: SitePage[] = [
     path: page.path,
     title: page.title,
     description: page.description,
+  })),
+  ...authors.map((author) => ({
+    path: authorPath(author),
+    title: `${author.name}, ${author.jobTitle} | Jackalope`,
+    description: author.summary,
   })),
   ...posts.map((post) => ({
     path: `/blog/${post.slug}/`,

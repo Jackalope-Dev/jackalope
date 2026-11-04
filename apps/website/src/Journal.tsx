@@ -1,7 +1,8 @@
 import { MailIcon } from '@jackalope/ui';
 import { ArrowRight } from 'lucide-react';
 import { useEffect, useRef } from 'react';
-import type { BlogSection } from './blog-types';
+import { type Author, authorPath, authors, findAuthor } from './authors';
+import type { BlogPost, BlogSection } from './blog-types';
 import { posts, updates } from './content';
 import { EditorialArt } from './EditorialArt';
 import { PublishedReleases } from './PublishedReleases';
@@ -21,7 +22,13 @@ const dateLabel = (date: string) =>
 
 const sectionId = (section: BlogSection, index: number) => section.id || `section-${index + 1}`;
 
-function JournalIndex() {
+function JournalIndex({
+  items = posts,
+  heading = 'Guides and field notes',
+}: {
+  items?: BlogPost[];
+  heading?: string;
+}) {
   const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -84,11 +91,11 @@ function JournalIndex() {
     <section className="journal-teaser page-width journal-index" aria-labelledby="notes-title">
       <div className="journal-section-heading">
         <div>
-          <h2 id="notes-title">Guides and field notes</h2>
+          <h2 id="notes-title">{heading}</h2>
         </div>
       </div>
       <div className="notes-grid" ref={gridRef}>
-        {posts.map((post) => (
+        {items.map((post) => (
           <a
             className="note-preview"
             href={`/blog/${post.slug}/`}
@@ -132,7 +139,7 @@ export function JournalPage({ path }: { path: string }) {
           <h1>{post.title}</h1>
           <p className="article-deck">{post.description}</p>
           <div className="article-byline">
-            Jackalope Digital LLC <span>·</span>{' '}
+            <Byline author={findAuthor(post.author)} /> <span>·</span>{' '}
             <time dateTime={post.date}>{dateLabel(post.date)}</time>
             {post.updated && (
               <>
@@ -257,6 +264,8 @@ export function JournalPage({ path }: { path: string }) {
         </div>
       </main>
     );
+  const author = authors.find((item) => path === authorPath(item));
+  if (author) return <AuthorPage author={author} />;
   if (path === '/changelog/')
     return (
       <main id="main" className="journal-page page-width">
@@ -318,6 +327,49 @@ export function JournalPage({ path }: { path: string }) {
           Back home <ArrowRight size={16} />
         </a>
       </header>
+    </main>
+  );
+}
+
+function Byline({ author }: { author?: Author }) {
+  if (!author) return <>Jackalope Digital LLC</>;
+  return (
+    <a className="article-author" href={authorPath(author)} rel="author">
+      <img src={author.image} alt="" width={20} height={20} />
+      {author.name}
+    </a>
+  );
+}
+
+function AuthorPage({ author }: { author: Author }) {
+  const written = posts.filter((post) => post.author === author.slug);
+  return (
+    <main id="main" className="journal-page page-width">
+      <nav className="article-breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Jackalope</a>
+        <span aria-hidden="true">/</span>
+        <a href="/blog/">Field notes</a>
+      </nav>
+      <header className="author-profile">
+        <img src={author.image} alt={author.name} width={128} height={128} />
+        <div>
+          <h1 className="author-name">{author.name}</h1>
+          <p className="author-role">{author.jobTitle}</p>
+          <p>{author.bio}</p>
+          <ul className="author-links" aria-label={`${author.name} elsewhere`}>
+            {author.profiles.map((profile) => (
+              <li key={profile.url}>
+                <a href={profile.url} rel="me noopener" target="_blank">
+                  {profile.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </header>
+      {written.length > 0 && (
+        <JournalIndex items={written} heading={`Articles by ${author.name}`} />
+      )}
     </main>
   );
 }
