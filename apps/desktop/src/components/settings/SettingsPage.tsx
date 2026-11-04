@@ -55,7 +55,6 @@ import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
 import { RemoteAccess } from './RemoteAccess';
 import { SavedActions } from './SavedActions';
-import { SwarmConnection } from './SwarmConnection';
 
 interface SettingsPageProps {
   onClose: () => void;
@@ -85,17 +84,17 @@ const categories = [
 export type SettingsCategory = (typeof categories)[number];
 /**
  * Sidebar sections; categories keep the order above within each. Advanced holds
- * routing, beta integrations and diagnostics that most people never change.
+ * routing and diagnostics that most people never change.
  */
 const navigationGroups: { label: string; categories: SettingsCategory[] }[] = [
   {
     label: 'Workspace',
     categories: ['Project', 'General', 'Appearance', 'Desktop', 'Saved actions'],
   },
-  { label: 'Agents', categories: ['Connected work', 'Computers'] },
+  { label: 'Connections', categories: ['Connected work', 'Computers', 'Cloudflare'] },
   { label: 'Account & access', categories: ['Jackalope account', 'Remote access', 'Privacy'] },
   { label: 'Help & data', categories: ['Updates & support', 'Data & reset'] },
-  { label: 'Advanced', categories: ['Decisions', 'Cloudflare', 'Diagnostics', 'System'] },
+  { label: 'Advanced', categories: ['Decisions', 'Diagnostics', 'System'] },
 ];
 const navigationIcons: Partial<Record<SettingsCategory, LucideIcon>> = {
   Project: FolderCog,
@@ -327,12 +326,7 @@ export function SettingsPage({
               )}
               {c === 'Connected work' && <IssueConnections />}
               {c === 'Computers' && <ComputersSettings />}
-              {c === 'Cloudflare' && (
-                <>
-                  <ArtifactsConnection />
-                  <SwarmConnection />
-                </>
-              )}
+              {c === 'Cloudflare' && <ArtifactsConnection />}
               {c === 'Desktop' && <DesktopPreferences />}
               {c === 'Saved actions' && <SavedActions />}
               {c === 'Remote access' && <RemoteAccess />}

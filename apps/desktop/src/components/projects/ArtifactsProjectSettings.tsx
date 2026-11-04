@@ -12,8 +12,7 @@ import {
   suggestRepoName,
   validRepoName,
 } from '../../lib/cloudflare-artifacts';
-import { openSettings } from '../layout/navigation';
-import { ArtifactsTitle } from '../settings/ArtifactsConnection';
+import { ArtifactsConnectForm, ArtifactsTitle } from '../settings/ArtifactsConnection';
 import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -64,19 +63,28 @@ export function ArtifactsProjectSettings({
   return (
     <SettingGroup title={<ArtifactsTitle />}>
       {status && !status.connected && (
-        <Setting
-          title="Connect Cloudflare"
-          description="Connect your own Cloudflare account before moving projects to Artifacts."
-        >
-          <Button variant="outline" onClick={() => openSettings('Cloudflare')}>
-            Connect account
-          </Button>
-        </Setting>
+        <ArtifactsConnectForm
+          className="settings-block"
+          onConnected={(next) => {
+            setStatus(next);
+            void refresh().catch((cause) => setError(String(cause)));
+          }}
+        />
       )}
       {status?.connected && link && !link.repository && (
         <SettingBody>
-          <InlineNotice>
-            Artifacts needs this project to be a Git repository with at least one commit.
+          <InlineNotice
+            action={
+              <Button
+                variant="outline"
+                onClick={() => void refresh().catch((cause) => setError(String(cause)))}
+              >
+                Check again
+              </Button>
+            }
+          >
+            Artifacts needs a Git repository with at least one commit. Make a first commit in this
+            folder, then check again.
           </InlineNotice>
         </SettingBody>
       )}
@@ -94,7 +102,7 @@ export function ArtifactsProjectSettings({
         >
           <FormField
             label="Artifacts repository"
-            description={`Created in the ${status.namespace} namespace. Pushes your branches and tags to a new remote named “artifacts”; existing remotes stay unchanged and Jackalope task branches stay local.`}
+            description="Pushes your branches and tags to a new “artifacts” remote. Task branches stay local."
           >
             <Input
               value={repoName}
