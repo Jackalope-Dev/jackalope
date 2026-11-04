@@ -102,3 +102,30 @@ test('audience list survives deployment with scoped overrides and can be explici
   });
   assert.equal(settings.vars.ACCESS_AUDIENCE_LIST, '');
 });
+
+test('product notes stay off by default and require their key and sender when on', () => {
+  const off = defaults();
+  applyCommunityConfig(off, 'production', {});
+  assert.equal(off.vars.PRODUCT_NOTES_ENABLED, undefined);
+  assert.ok(!off.secrets.required.includes('ANTHROPIC_API_KEY'));
+
+  const on = defaults();
+  applyCommunityConfig(on, 'production', {
+    PRODUCTION_PRODUCT_NOTES_ENABLED: 'true',
+    PRODUCTION_ADMIN_EMAIL: 'owner@example.com',
+    PRODUCTION_ACCESS_ISSUER: 'https://fixture.cloudflareaccess.com',
+    PRODUCTION_ACCESS_AUD: 'fixture',
+    PRODUCTION_ACCESS_EMAIL_FROM: 'Jackalope <hello@hello.jackalope.dev>',
+  });
+  assert.equal(on.vars.PRODUCT_NOTES_ENABLED, 'true');
+  assert.ok(on.secrets.required.includes('ANTHROPIC_API_KEY'));
+  assert.ok(on.secrets.required.includes('SEQUENZY_API_KEY'));
+
+  for (const changed of [
+    { PRODUCTION_PRODUCT_NOTES_ENABLED: 'yes' },
+    { PRODUCTION_PRODUCT_NOTES_ENABLED: 'true' },
+    { PRODUCTION_PRODUCT_NOTES_AUTOSEND: 'true' },
+    { PRODUCTION_PRODUCT_NOTES_ADMIN_URL: 'http://api.jackalope.dev/admin/access#notes' },
+  ])
+    assert.throws(() => applyCommunityConfig(defaults(), 'production', changed));
+});

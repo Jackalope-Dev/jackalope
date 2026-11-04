@@ -19,6 +19,11 @@ export function applyCommunityConfig(settings, environment, source = process.env
     'FEEDBACK_EMAIL_ENABLED',
     'FEEDBACK_EMAIL_FROM',
     'FEEDBACK_EMAIL_TO',
+    'PRODUCT_NOTES_ENABLED',
+    'PRODUCT_NOTES_AUTOSEND',
+    'PRODUCT_NOTES_MODEL',
+    'PRODUCT_NOTES_PROMPT',
+    'PRODUCT_NOTES_ADMIN_URL',
   ];
   const encoded = source[`${prefix}COMMUNITY_CONFIG`];
   const bundled = encoded ? JSON.parse(encoded) : {};
@@ -84,20 +89,33 @@ export function applyCommunityConfig(settings, environment, source = process.env
     if (vars.ACCESS_NEWSLETTER_FORM && !/^[a-z0-9]{20,32}$/.test(vars.ACCESS_NEWSLETTER_FORM))
       throw new Error('Newsletter form ID is invalid');
   }
+  const productNotes = vars.PRODUCT_NOTES_ENABLED === 'true';
   settings.secrets = {
-    required:
-      vars.EARLY_ACCESS_ENABLED === 'true'
+    required: [
+      ...(vars.EARLY_ACCESS_ENABLED === 'true'
         ? ['RATE_SECRET', 'ACCESS_SECRET', 'SEQUENZY_API_KEY']
-        : vars.FEEDBACK_EMAIL_ENABLED === 'true'
+        : vars.FEEDBACK_EMAIL_ENABLED === 'true' || productNotes
           ? ['RATE_SECRET', 'SEQUENZY_API_KEY']
-          : ['RATE_SECRET'],
+          : ['RATE_SECRET']),
+      ...(productNotes ? ['ANTHROPIC_API_KEY'] : []),
+    ],
   };
   if (
     (vars.OPEN_SIGNUP !== undefined && !['true', 'false'].includes(vars.OPEN_SIGNUP)) ||
     !['true', 'false'].includes(vars.INGESTION_ENABLED) ||
-    !['true', 'false'].includes(vars.FEEDBACK_EMAIL_ENABLED)
+    !['true', 'false'].includes(vars.FEEDBACK_EMAIL_ENABLED) ||
+    (vars.PRODUCT_NOTES_ENABLED !== undefined &&
+      !['true', 'false'].includes(vars.PRODUCT_NOTES_ENABLED)) ||
+    (vars.PRODUCT_NOTES_AUTOSEND !== undefined &&
+      !['true', 'false'].includes(vars.PRODUCT_NOTES_AUTOSEND))
   )
     throw new Error('Service flags must be true or false');
+  if (productNotes && (!vars.ADMIN_EMAIL || !vars.ACCESS_EMAIL_FROM))
+    throw new Error('Product notes require the administrator email and a verified sender');
+  if (vars.PRODUCT_NOTES_AUTOSEND === 'true' && (!productNotes || !vars.ACCESS_AUDIENCE_LIST))
+    throw new Error('Product notes autosend requires product notes and an audience list');
+  if (vars.PRODUCT_NOTES_ADMIN_URL && !vars.PRODUCT_NOTES_ADMIN_URL.startsWith('https://'))
+    throw new Error('Product notes admin link must be an HTTPS URL');
   if (
     vars.ADMIN_EMAIL &&
     (!/^https:\/\/[a-z0-9-]+\.cloudflareaccess\.com$/.test(vars.ACCESS_ISSUER) || !vars.ACCESS_AUD)
