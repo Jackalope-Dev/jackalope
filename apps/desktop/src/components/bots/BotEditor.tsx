@@ -377,9 +377,8 @@ export function BotEditor({
                   <div className="bot-editor-field">
                     <span className="bot-editor-label">Wake-ups</span>
                     <p className="form-field-description">
-                      A wake-up continues its latest open conversation or starts a new one, and you
-                      can follow it on the Bots page. Conversations a bot starts pause after 20
-                      replies until you resume them.
+                      Wake-ups continue the bot’s latest open conversation. Conversations a bot
+                      starts pause after 20 replies until you resume them.
                     </p>
                     <BotWakes
                       wakes={draft.wakes}

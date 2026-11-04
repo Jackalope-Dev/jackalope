@@ -14,6 +14,7 @@ import { DialogFooter } from '../ui/Dialog';
 import { FormField } from '../ui/FormField';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
+import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { Textarea } from '../ui/Textarea';
 import type { SavedMcpConnection } from './McpConnectionResult';
@@ -296,11 +297,9 @@ export function McpConnectionForm({
           {transport !== 'stdio' && (
             <>
               <FormField label="Authentication">
-                <select
-                  className="task-input"
+                <Select
                   value={authentication}
-                  onChange={(event) => {
-                    const next = event.target.value;
+                  onValueChange={(next) => {
                     let options: Record<string, unknown>;
                     try {
                       const parsed: unknown = JSON.parse(extra || '{}');
@@ -332,14 +331,14 @@ export function McpConnectionForm({
                   }}
                 >
                   {!Object.keys(initial?.extra ?? {}).length && (
-                    <option value="none">No authentication</option>
+                    <SelectItem value="none">None</SelectItem>
                   )}
-                  <option value="token">Bearer token / API key</option>
+                  <SelectItem value="token">Bearer token or API key</SelectItem>
                   {transport === 'http' && !legacy && (
-                    <option value="oauth">Sign in through Codex or Claude</option>
+                    <SelectItem value="oauth">Sign in through Codex or Claude</SelectItem>
                   )}
-                  <option value="advanced">Use headers or client options</option>
-                </select>
+                  <SelectItem value="advanced">Headers or client options</SelectItem>
+                </Select>
               </FormField>
               {authentication === 'token' && (
                 <FormField label="Bearer token">
@@ -355,8 +354,7 @@ export function McpConnectionForm({
               )}
               {authentication === 'oauth' && (
                 <InlineNotice>
-                  After saving, sign in separately through each selected agent. This connection is
-                  available to those agents through their own accounts.
+                  After saving, sign in through each selected agent. Each uses its own account.
                 </InlineNotice>
               )}
             </>

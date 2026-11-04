@@ -177,17 +177,14 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
             <h1 id="access-verified-heading" ref={successHeading} tabIndex={-1}>
               You’re in.
             </h1>
-            <p role="status">
-              Access confirmed.{' '}
-              {needsSetup ? 'Let’s set up your project.' : 'Welcome back to Jackalope.'}
-            </p>
+            <p role="status">{needsSetup ? 'Let’s set up your project.' : 'Welcome back.'}</p>
           </section>
         ) : (
           <section className="access-welcome" aria-labelledby="access-heading">
             <header className="access-intro">
               <EchoMark animated={false} className="access-mark" />
               <h1 id="access-heading">Welcome to Jackalope.</h1>
-              <p>Sign in, or create a free account, to start working with your agents.</p>
+              <p>Sign in or create a free account to get started.</p>
             </header>
             <Disclosure className="access-privacy">
               <DisclosureSummary>

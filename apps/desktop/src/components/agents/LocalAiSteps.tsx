@@ -322,9 +322,8 @@ export function LocalAiSteps({
               ))}
             </fieldset>
             <p className="local-ai-caption">
-              Download sizes are estimates checked {inspection.catalogCheckedAt}. Working memory
-              also includes the 64K coding context and other apps. Memory guidance is conservative,
-              not a speed guarantee.
+              Sizes are estimates as of {inspection.catalogCheckedAt}. Memory needs include a 64K
+              coding context.
             </p>
           </>
         )}
