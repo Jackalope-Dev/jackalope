@@ -8,6 +8,7 @@ import {
   BOT_NAME_MAX,
   type Bot,
   type BotDraft,
+  botProjectIds,
   validateBot,
 } from '../../stores/botStore';
 import { useMcpStore } from '../../stores/mcpStore';
@@ -196,12 +197,21 @@ export function BotEditor({
               {show(1) && (
                 <>
                   {heading(1)}
-                  <FormField label="Project">
+                  <FormField
+                    label="Home project"
+                    description="Its chosen connections and wake-ups start here unless a wake-up picks another project."
+                  >
                     <Select
                       value={draft.projectId}
                       placeholder="Choose a project"
                       onValueChange={(projectId) =>
-                        patch({ projectId, connectionIds: null, agent: 'auto', model: null })
+                        patch({
+                          projectId,
+                          projectIds: draft.projectIds?.filter((id) => id !== projectId),
+                          connectionIds: null,
+                          agent: 'auto',
+                          model: null,
+                        })
                       }
                     >
                       {projects.map((item) => (
@@ -211,6 +221,41 @@ export function BotEditor({
                       ))}
                     </Select>
                   </FormField>
+                  {draft.projectId && projects.length > 1 && (
+                    <fieldset className="bot-editor-field">
+                      <legend className="bot-editor-label">Also works in</legend>
+                      <p className="form-field-description">
+                        Start conversations with it from these projects too; each runs in the
+                        project it started from.
+                      </p>
+                      <div className="bot-editor-connections">
+                        {projects
+                          .filter((item) => item.id !== draft.projectId)
+                          .map((item) => (
+                            <label key={item.id} className="bot-editor-connection">
+                              <Checkbox
+                                checked={draft.projectIds?.includes(item.id) ?? false}
+                                onChange={(event) => {
+                                  const projectIds = event.target.checked
+                                    ? [...(draft.projectIds ?? []), item.id]
+                                    : (draft.projectIds ?? []).filter((id) => id !== item.id);
+                                  patch({
+                                    projectIds,
+                                    // Wake-ups in a project it no longer works in move home.
+                                    wakes: draft.wakes.map((wake) =>
+                                      wake.projectId && !projectIds.includes(wake.projectId)
+                                        ? { ...wake, projectId: undefined }
+                                        : wake,
+                                    ),
+                                  });
+                                }}
+                              />
+                              {item.name}
+                            </label>
+                          ))}
+                      </div>
+                    </fieldset>
+                  )}
                   <div className="bot-editor-field">
                     <span className="bot-editor-label">Agent and model</span>
                     {project ? (
@@ -339,6 +384,10 @@ export function BotEditor({
                     <BotWakes
                       wakes={draft.wakes}
                       projectId={draft.projectId}
+                      projects={botProjectIds(draft).flatMap((id) => {
+                        const item = projects.find((candidate) => candidate.id === id);
+                        return item ? [{ id: item.id, name: item.name }] : [];
+                      })}
                       connectionIds={draft.connectionIds}
                       connections={connections.map((server) => ({
                         id: server.id,

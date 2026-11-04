@@ -375,8 +375,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   desktop grant state without opening a browser, requesting access or saving an
   artifact. They list recent desktop actions with small after-action captures. People
   can stop the browser, revoke desktop control or always allow the granted app there.
-- Saved bots keep a name, role, standing instructions, agent and model, project,
-  connection scope and a chosen character and colour locally. Messaging a bot starts a
+- Saved bots keep a name, role, standing instructions, agent and model, a home project
+  plus any other projects they work in, connection scope and a chosen character and
+  colour locally. The Bots page starts with a card per project showing its bots and
+  their activity, then lists one project's bots. Messaging a bot starts a
   chat inside the Bots page, or continues its latest open one, whose native persona is
   repeated in every batch prompt and follows later edits; those chats skip workspace
   preparation and automatic checks and open only on the Bots page. Bots keep up to 30

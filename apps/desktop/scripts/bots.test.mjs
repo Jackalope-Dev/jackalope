@@ -130,6 +130,33 @@ test('the hub directory carries conversation requests for bots with a project', 
   assert.equal(directory[0].request.projectPath, '/repo');
 });
 
+test('a shared bot carries a request per extra project and keeps wake-ups on available ones', () => {
+  const home = { id: 'home', name: 'Home', path: '/home', gitBranch: 'main' };
+  const other = { id: 'other', name: 'Other', path: '/other', gitBranch: 'main' };
+  const wake = (projectId) => ({
+    id: projectId ?? 'home-wake',
+    name: 'Check',
+    prompt: 'Look',
+    enabled: true,
+    trigger: { kind: 'schedule', expression: '0 9 * * *', timezone: 'UTC' },
+    projectId,
+  });
+  const bot = {
+    ...draft({ projectId: 'home', projectIds: ['other', 'gone', 'home'] }),
+    id: 'b',
+    wakes: [wake('other'), wake('gone')],
+  };
+  const [entry] = hubDirectory([bot], [home, other], () => undefined);
+  assert.deepEqual(
+    entry.projects.map((request) => request.projectPath),
+    ['/other'],
+  );
+  assert.deepEqual(
+    entry.wakes.map((item) => item.projectId),
+    ['other', undefined],
+  );
+});
+
 test('only cards with choices and open suggestions wait on the person', () => {
   const card = (extra) => ({
     botId: 'a',
