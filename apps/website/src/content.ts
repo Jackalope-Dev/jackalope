@@ -1,5 +1,6 @@
 import { authorPath, authors } from './authors.ts';
 import { practicalPosts } from './blog-content.ts';
+import { markdownPosts } from './blog-markdown.ts';
 import type { BlogPost } from './blog-types.ts';
 import updates from './changelog.json' with { type: 'json' };
 import { growthPost } from './growth-content.ts';
@@ -24,6 +25,7 @@ export const tour = {
 };
 
 export const posts: BlogPost[] = [
+  ...markdownPosts,
   ...recentPosts,
   ...practicalPosts,
   growthPost,
@@ -175,6 +177,12 @@ export type SitePage = {
   description: string;
   noindex?: boolean;
 };
+
+// A published Markdown post must not take over a hand-written post's URL.
+const duplicateSlug = posts.find(
+  (post, index) => posts.findIndex((other) => other.slug === post.slug) !== index,
+);
+if (duplicateSlug) throw new Error(`Two blog posts use the slug ${duplicateSlug.slug}.`);
 
 export const pages: SitePage[] = [
   {
