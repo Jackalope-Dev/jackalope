@@ -144,7 +144,7 @@ website, UI gallery and repository checks are covered by the required Windows jo
 A pull request whose files nothing in the desktop app reads (documentation, root
 Markdown, the website, the swarm Worker, mobile, and the server outside `admin/`)
 skips the Rust, desktop and packaging steps: Windows runs `pnpm verify --shared-only`
-and the other platform jobs report success without building. Any other file,
+and the other platform checks report from a short Linux job without building. Any other file,
 including workflows, lockfiles and shared packages, runs everything, and pushes
 always run everything. The Rust cache is keyed by the base branch's lockfile, so
 pull requests restore master's dependency builds instead of uploading their own. A
