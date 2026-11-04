@@ -4,7 +4,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
     ignore:
       - dependency-name: '@pierre/diffs'
         update-types:
@@ -22,10 +22,15 @@ updates:
     directory: /apps/desktop/src-tauri
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
     ignore:
       - dependency-name: keyring
         update-types: [version-update:semver-major]
+      # windows-collections and windows-future 0.100 require windows_core from the
+      # windows 0.100 line, but windows itself is pinned at 0.62.2, so bumping just
+      # these two always fails to compile. Wait for a manual windows upgrade.
+      - dependency-name: windows-collections
+      - dependency-name: windows-future
     groups:
       windows-bindings:
         patterns: [windows, windows-collections, windows-future]
@@ -37,7 +42,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 1
     groups:
       actions-minor-patch:
         patterns: ['*']
