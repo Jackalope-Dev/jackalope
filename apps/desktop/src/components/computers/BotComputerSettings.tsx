@@ -28,6 +28,7 @@ import { ComputerViewer } from './ComputerViewer';
 import { IdleStopSelect } from './IdleStopSelect';
 import '../settings/settings.css';
 import './computers.css';
+import { PairMachineForm } from './PairMachineForm';
 
 type Kind = 'none' | 'local-docker' | 'remote-machine';
 
@@ -96,7 +97,7 @@ function Resources({
 
 /**
  * A bot's own computer: none, a local Linux sandbox in Docker, or a cloud
- * machine the person paired in Settings → Computers.
+ * machine the person pairs here or in Settings → Computers.
  */
 export function BotComputerSettings({ bot }: { bot: { id: string; name: string } }) {
   const [status, setStatus] = useState<ComputerStatus | null>(null);
@@ -105,6 +106,7 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
   const [loaded, setLoaded] = useState(false);
   const [kind, setKind] = useState<Kind>('none');
   const [machineId, setMachineId] = useState('');
+  const [pairing, setPairing] = useState(false);
   const [settings, setSettings] = useState<ComputerSettings>(DEFAULT_COMPUTER_SETTINGS);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -387,10 +389,20 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
                     Use this machine
                   </Button>
                 </>
+              ) : pairing ? (
+                <PairMachineForm
+                  defaultName={`${bot.name} computer`}
+                  onCancel={() => setPairing(false)}
+                  onPaired={(machine) => {
+                    setPairing(false);
+                    setMachines((current) => [...current, machine]);
+                    setMachineId(machine.id);
+                  }}
+                />
               ) : (
-                <p className="form-field-description">
-                  Pair a machine you run in Settings → Computers first.
-                </p>
+                <Button variant="outline" disabled={!!busy} onClick={() => setPairing(true)}>
+                  Pair a machine
+                </Button>
               )}
             </div>
           )}
