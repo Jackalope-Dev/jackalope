@@ -103,7 +103,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Project setup asks for the project, its agents and an optional first task;
   decisions, Git behavior and appearance start from defaults edited in Project settings.
   When no agent is detected, the agents step offers API-key and local-server
-  connections through the private runner, applied app-wide. Background command detection fills unset preferences without running
+  connections through the private runner, applied app-wide. It re-scans agents when the
+  window regains focus, signs a signed-out account in through the in-app sign-in, and
+  offers an environment API key for an installed agent without a working account; the key
+  is imported only when chosen. Background command detection fills unset preferences without running
   commands or replacing explicit choices; inspection failure does not block setup.
 - Work combines a new-conversation composer and the project-scoped work list,
   with remembered filters, compact capture and keyboard row navigation. Work rows show
@@ -545,7 +548,8 @@ links. GitHub uses the installed CLI; Linear/Jira credentials use protected nati
 Jackalope Swarm (beta) gives each live attempt on an Artifacts-linked project its own fork
 through the person's own Worker (`apps/swarm`). Every 15 seconds the desktop pushes changed
 snapshots as synthetic commits, and the Worker reports files and overlapping edits across
-forks on Project → Swarm, which appears once a swarm Worker is connected. The page opens on a map
+forks on Project → Swarm, which appears once a swarm Worker is connected. Its Settings card
+appears once Artifacts is connected, or while a Worker is saved. The page opens on a map
 of the project's tasks by stage, the files several agents share and their conflicts. Forks are
 deleted when attempts finish; merging is local, and projects that merge automatically push
 the merged branch back to Artifacts. Deploys are not yet accepted against a live Worker.
@@ -554,7 +558,10 @@ See [the Worker guide](../apps/swarm/README.md).
 Cloudflare Artifacts (beta) connects a user's own Cloudflare account and namespace from
 Settings → Cloudflare. Connect Cloudflare signs in through the browser with Jackalope's
 public OAuth client (PKCE, loopback redirect on 127.0.0.1 ports 47851–47853) and lists the
-accounts the person shared; an API token remains an alternative. Tokens stay in protected
+accounts the person shared, finishing on its own when only one account was shared. Namespace
+(default `jackalope`) and data location sit under one optional disclosure. An API token
+remains an alternative, and its Account ID field accepts a pasted dashboard link. Project
+settings connect inline. Tokens stay in protected
 native storage, OAuth access refreshes before expiry and disconnecting revokes it. Setup can
 create a new project backed by an Artifacts repository, and Project settings can move an
 existing repository there through a new `artifacts` remote, leaving other remotes and local
@@ -566,7 +573,8 @@ those forks and push-triggered automation are not implemented. Live
 Cloudflare account and installed acceptance remain open.
 
 Trusted hosts and a responsive phone companion are implemented for native validation.
-Settings → Remote access scopes paired devices to selected projects. A separate loopback
+Settings → Remote access scopes paired devices to selected projects. Before it is on, every
+project starts selected and Pair a phone turns access on and creates the code in one step. A separate loopback
 API supports task status, questions, follow-ups, new isolated sessions and change review.
 Desktop connections use verified SSH forwarding or HTTPS; phones use HTTPS, from any HTTPS
 address or private Tailscale Serve, which Remote access sets up through detected steps.

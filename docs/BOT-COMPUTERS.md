@@ -148,9 +148,12 @@ internet. The agent answers only `GET /v1/health` and `POST /v1/call` (one JSON-
 request per body, at most 1 MB) with `Authorization: Bearer <token>`, compared in
 constant time.
 
-In Settings → Computers, **Pair machine** takes a name, the HTTPS address (plain HTTP
-only for a `127.0.0.1` tunnel), the secret and an optional noVNC page address. Pairing
-checks the agent first. The secret is stored in protected storage
+In Settings → Computers, or from a bot's Computer settings when nothing is paired yet,
+**Pair machine** generates a 64-character secret in the app and shows the `docker run`
+command above with it filled in (`PairMachineForm` keeps that command in step with this
+guide). It takes the HTTPS address (plain HTTP only for a `127.0.0.1` tunnel), a name that
+defaults to one the app picks, the secret, which can be replaced, and an optional noVNC
+page address. Pairing checks the agent first. The secret is stored in protected storage
 (`computers/machines/<id>.bin`), never in `machines.json`. **Test connection** repeats the
 check. A paired machine belongs to at most one bot, and cannot be removed while a bot
 uses it. Its viewer opens in the person's browser and asks for its VNC password. Browser
