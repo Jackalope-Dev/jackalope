@@ -873,7 +873,11 @@ html[data-window-glass] :is(.onboarding-intro, .onboarding-content) {
   outline-offset: -1px;
   border-radius: var(--radius-3xl);
   background: var(--onboarding-pane);
-  box-shadow: var(--glass-shadow);
+  /* Tighter than --glass-shadow: these cards float apart over the wallpaper, where a
+     wide blur reads as a haze around them rather than as elevation. */
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--color-text-primary) 8%, transparent),
+    0 8px 24px color-mix(in srgb, var(--color-text-primary) 8%, transparent);
 }
 /* The card can be taller than its step, so its actions sit on its bottom edge. The card's
    tint stops where the footer starts and the footer paints the same tint, so the footer
