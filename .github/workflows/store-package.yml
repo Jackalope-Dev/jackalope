@@ -61,16 +61,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt
       - run: rustup override set 1.98.1
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            apps/desktop/src-tauri/target
-          key: store-${{ github.ref_name }}-windows-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-${{ github.sha }}
-          restore-keys: |
-            store-${{ github.ref_name }}-windows-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-
-            store-${{ github.ref_name }}-windows-rust-1.98.1-
+      # Each release commit is new, so a Rust cache almost never matched here, while
+      # saving one per build evicted master's verification caches. Signed builds start
+      # from a clean target directory.
       - run: pnpm verify
       - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features --features store
       - id: package
