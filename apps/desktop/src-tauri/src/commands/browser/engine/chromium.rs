@@ -254,14 +254,23 @@ mod tests {
 
     impl StartupFixture {
         fn new(script: &str) -> Self {
-            use std::os::unix::fs::PermissionsExt;
-
             let directory =
                 std::env::temp_dir().join(format!("jl-chromium-startup-{}", uuid::Uuid::new_v4()));
             std::fs::create_dir(&directory).unwrap();
-            let executable = directory.join("browser");
-            std::fs::write(&executable, format!("#!/bin/sh\n{script}\n")).unwrap();
-            std::fs::set_permissions(executable, std::fs::Permissions::from_mode(0o700)).unwrap();
+            // A child shell writes the script so this process never holds a write
+            // descriptor for it. Otherwise a test thread forking at that moment could
+            // inherit the descriptor, and launching the script would fail with
+            // "Text file busy" (ETXTBSY).
+            let written = Command::new("/bin/sh")
+                .args([
+                    "-c",
+                    "printf '#!/bin/sh\\n%s\\n' \"$1\" > \"$0\" && chmod 700 \"$0\"",
+                ])
+                .arg(directory.join("browser"))
+                .arg(script)
+                .status()
+                .unwrap();
+            assert!(written.success(), "Could not write the browser fixture");
             Self(directory)
         }
 
