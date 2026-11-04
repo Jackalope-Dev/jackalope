@@ -32,6 +32,9 @@ export function AgentInstallCatalog({
           ? 'Install a supported agent'
           : `Install other supported agents (${agents.length} available)`}
       </DisclosureSummary>
+      <p className="onboarding-note">
+        Run an install command in a terminal. Jackalope finds the agent when you return.
+      </p>
       <div className="onboarding-catalog-grid">
         {agents.map((agent) => (
           <div key={agent.id} className="onboarding-catalog-card">

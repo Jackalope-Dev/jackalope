@@ -376,8 +376,7 @@ export function ProviderConnections({ setup = false }: { setup?: boolean } = {})
           {setup ? 'No agent installed? Use an API key' : 'Connect an API provider'}
         </h2>
         <p className="task-muted">
-          Bring your own key for DeepSeek and other providers, or a local OpenAI-compatible server.
-          No separate OpenCode installation or account is needed.
+          Use your own provider key or a local OpenAI-compatible server. Nothing else to install.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">

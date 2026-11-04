@@ -27,6 +27,7 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
 import { AgentInstallCatalog, CommandCopy } from './AgentInstallCatalog';
 import { OnboardingAgentAccount } from './OnboardingAgentAccount';
+import { OnboardingDetectedKeys } from './OnboardingDetectedKeys';
 import { OnboardingProjectStep } from './OnboardingProjectStep';
 import './onboarding.css';
 
@@ -251,6 +252,22 @@ export function OnboardingFlow({
       await syncAgentConfig();
       await execution.discover();
     });
+  // Agents are usually installed or signed in from a terminal, so returning to the window re-scans.
+  const discover = execution.discover;
+  useEffect(() => {
+    if (!desktop || step !== 'agent') return;
+    let last = 0;
+    const rescan = () => {
+      if (Date.now() - last < 5_000) return;
+      last = Date.now();
+      void discover().then(() => {
+        const accounts = useAgentAccountsStore.getState();
+        for (const id of Object.keys(accounts.agents)) void accounts.load(id, true);
+      });
+    };
+    window.addEventListener('focus', rescan);
+    return () => window.removeEventListener('focus', rescan);
+  }, [desktop, step, discover]);
   const completeSetup = (action: () => void) => advance(action);
   const finish = () => {
     if (!project || !runner?.available || !available(agent) || !projectEnabled(agent)) {
@@ -357,8 +374,7 @@ export function OnboardingFlow({
           {step === 'agent' && (
             <>
               <p className="onboarding-description">
-                Start with one available agent. You can add agents and change project defaults
-                later.
+                Pick an agent to start with. You can add more later.
               </p>
               {(() => {
                 const renderAgentCard = (item: (typeof detectedAgents)[number]) => {
@@ -420,6 +436,16 @@ export function OnboardingFlow({
                               preferences: { ...project.preferences, agentAccounts },
                             });
                           }}
+                          onUnblock={() => {
+                            if (!project?.preferences?.disabledAccounts?.[adapter]) return;
+                            const { [adapter]: _, ...disabledAccounts } =
+                              project.preferences.disabledAccounts;
+                            onboarding.stageProject({
+                              ...project,
+                              preferences: { ...project.preferences, disabledAccounts },
+                            });
+                          }}
+                          onSignedIn={() => void execution.discover()}
                         />
                       )}
                     </div>
@@ -468,10 +494,37 @@ export function OnboardingFlow({
                         <p className="task-muted" role="status">
                           {execution.discovering
                             ? 'Looking for installed agents…'
-                            : 'No agents found yet. Install one below and sign in to it, then re-scan. You can also connect an API key.'}
+                            : 'No agents found. Install one below, or connect an API key.'}
                         </p>
                       )}
                     </fieldset>
+                    {desktop && (
+                      <OnboardingDetectedKeys
+                        disabled={busy}
+                        agents={detectedAgents
+                          .filter((item) => projectEnabled(item.id))
+                          .map((item) => ({
+                            adapter:
+                              config.customAgents.find((custom) => custom.id === item.id)
+                                ?.adapter ?? item.id,
+                            name: item.name,
+                          }))}
+                        onUse={(adapter, profileId) => {
+                          if (!project) return;
+                          onboarding.stageProject({
+                            ...project,
+                            preferences: {
+                              ...project.preferences,
+                              agentAccounts: {
+                                ...project.preferences?.agentAccounts,
+                                [adapter]: profileId,
+                              },
+                            },
+                          });
+                          void execution.discover();
+                        }}
+                      />
+                    )}
                     {!detectedAgents.length && !execution.discovering && (
                       <ProviderConnections setup />
                     )}
