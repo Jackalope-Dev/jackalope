@@ -124,7 +124,10 @@ The default Cloud matrix builds macOS Apple Silicon and Intel DMGs plus app
 updater archives, and Linux x64 AppImage. Windows x64 NSIS remains available only
 for separately configured direct distribution with `RELEASE_DISTRIBUTION=cloud`. AppImage is the supported Linux
 in-app update path; OS-managed package upgrades and Store updates are separate.
-Every candidate runs repository verification and native account-access tests.
+Every candidate runs the native account-access tests. Repository and platform checks
+run once per commit in **Verify platforms**, not again in each Cloud or Store build;
+publication and Store submission wait up to 45 minutes for those checks on the exact
+source commit and stop if any failed. Release builds start without a Rust cache.
 Signing credentials are passed only to signing/build steps, not dependency installation
 or test steps. Every platform supplies a receipt with source, version, channel,
 configuration and artifact hashes. Candidate artifacts are retained for 30 days.
