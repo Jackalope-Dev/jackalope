@@ -3,6 +3,7 @@ import { appendFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { root, version } from './catalog.mjs';
+import { changelogReleases } from './changelog-releases.mjs';
 
 export async function readPublicRelease({ fetcher = fetch, bootstrap = false } = {}) {
   const base = 'https://api.jackalope.dev';
@@ -54,6 +55,13 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   // The Store listing is public, so builds offer it unless the environment overrides it.
   process.env.VITE_WINDOWS_STORE_URL ??= 'https://apps.microsoft.com/detail/9NM89QFJQ244';
   if (build) {
+    // Changelog release state comes from beta-v* and stable-v* tags. Cloudflare
+    // builds clone shallowly, so fetch the tags and stop if none can be read.
+    process.env.JACKALOPE_CHANGELOG_RELEASES = JSON.stringify(
+      process.env.CHANGELOG_RELEASES === 'skip'
+        ? {}
+        : changelogReleases({ fetch: true, required: true }),
+    );
     const website = resolve(root, 'apps/website');
     for (const args of [
       ['node_modules/typescript/bin/tsc', '-b'],

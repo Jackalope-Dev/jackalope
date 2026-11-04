@@ -1,6 +1,7 @@
 import { practicalPosts } from './blog-content.ts';
 import type { BlogPost } from './blog-types.ts';
-import updates from './changelog.json' with { type: 'json' };
+import changelog from './changelog.json' with { type: 'json' };
+import { type ReleaseMap, withReleases } from './changelog.ts';
 import { growthPost } from './growth-content.ts';
 import { knowledgeGuides } from './knowledge-content.ts';
 import { marketingPages } from './marketing-content.ts';
@@ -164,7 +165,12 @@ export const posts: BlogPost[] = [
   },
 ];
 
-export { updates };
+/** Set by the website build from release tags; absent in tooling that loads this file directly. */
+declare const __CHANGELOG_RELEASES__: ReleaseMap | undefined;
+export const changelogReleases: ReleaseMap =
+  typeof __CHANGELOG_RELEASES__ === 'undefined' ? {} : __CHANGELOG_RELEASES__;
+export const updatesWith = (releases: ReleaseMap) => withReleases(changelog, releases);
+export const updates = updatesWith(changelogReleases);
 
 export type SitePage = {
   path: string;

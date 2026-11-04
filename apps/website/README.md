@@ -25,6 +25,14 @@ dated milestones in `src/changelog.json`. Update the shared source when content
 changes; route metadata, structured data, sitemap, RSS and LLM-readable discovery
 files are generated from it.
 
+Changelog entries carry no status. `pnpm build` fetches the `beta-v*` and
+`stable-v*` tags (only their tips in a shallow clone) and labels each app entry
+Released, In beta or Coming soon from the first release whose `src/changelog.json`
+contains its id (`scripts/release/changelog-releases.mjs`). Missing tags can only
+make an entry read Coming soon, and a build that can read no release tags stops;
+set `CHANGELOG_RELEASES=skip` to build without them. Labels refresh on the next
+website deploy after a release. The dev server reads local tags.
+
 The landing page's terminal demo (`src/TerminalDemo.tsx`) imitates the `jackalope`
 terminal UI with scripted replies. It copies the terminal's layout, glyphs, copy and
 command names, so update it when the terminal's visible behavior changes.
