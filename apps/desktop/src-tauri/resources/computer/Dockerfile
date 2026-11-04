@@ -9,8 +9,14 @@ RUN apt-get update \
         chromium fonts-liberation fonts-noto-color-emoji \
         python3 python3-pil python3-pyatspi at-spi2-core dbus dbus-x11 \
         xdotool xclip wmctrl scrot socat ca-certificates procps xterm \
+        git nodejs npm \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --shell /bin/bash --uid 1000 bot
+
+# Agent CLIs for tasks that run their agent on this computer. Their versions
+# are fixed when the image is built.
+RUN npm install --global --no-fund --no-audit @anthropic-ai/claude-code @openai/codex \
+    && npm cache clean --force
 
 COPY start.sh agent.py /opt/jackalope/
 RUN chmod 0755 /opt/jackalope/start.sh && chmod 0644 /opt/jackalope/agent.py

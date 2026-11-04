@@ -8,12 +8,21 @@ Speaks the desktop helper's JSON-lines protocol: requests are
   agent.py http HOST:PORT POST /v1/call with one request per body; requires
                           JACKALOPE_COMPUTER_TOKEN as a bearer secret
   agent.py browser        start Chromium if it is not running
+  agent.py supervise DIR  internal: owns one agent run started by run_start
 
 Coordinates are screen pixels. Element refs are resolved by Jackalope, which
 sends coordinates. Screenshots are returned as base64 PNG.
+
+Agent runs (hello reports `runs`) need no display. Jackalope uploads a task workspace in
+chunks (workspace_put), starts the agent CLI in it (run_start), reads its output
+by byte cursor (run_read), stops it (run_stop), then fetches the changes as a
+binary Git patch against the uploaded files (workspace_diff, workspace_get).
+Each run lives in its own directory and is owned by a detached supervisor, so
+it survives reconnects; a run nobody reads for ORPHAN_SECONDS is stopped.
 """
 
 import base64
+import hashlib
 import hmac
 import io
 import json
@@ -23,6 +32,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tarfile
 import threading
 import time
 import urllib.parse
@@ -30,6 +40,8 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PROTOCOL = 1
+# Agent runs, reported by hello as `runs`.
+RUNS_PROTOCOL = 1
 OUTPUT_LIMIT = 64 * 1024
 BODY_LIMIT = 1024 * 1024
 DEVTOOLS = "http://127.0.0.1:9222"
@@ -37,6 +49,21 @@ HOME = os.path.expanduser("~")
 PROFILE = os.path.join(HOME, ".config", "jackalope-chromium")
 ELEMENT_LIMIT = 300
 VISIT_LIMIT = 4000
+RUNS = os.environ.get("JACKALOPE_RUNS") or os.path.join(HOME, ".jackalope-runs")
+RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}")
+CHUNK_LIMIT = 512 * 1024
+UPLOAD_LIMIT = 512 * 1024 * 1024
+PATCH_LIMIT = 256 * 1024 * 1024
+READ_WAIT_LIMIT = 5.0
+ORPHAN_SECONDS = int(os.environ.get("JACKALOPE_RUN_ORPHAN_SECONDS") or 600)
+RUN_ACTIONS = {
+    "workspace_put", "run_start", "run_read", "run_stop",
+    "workspace_diff", "workspace_get", "run_remove",
+}
+GIT_IDENTITY = [
+    "-c", "user.name=Jackalope", "-c", "user.email=jackalope@agents.jackalope.invalid",
+    "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false",
+]
 
 
 class Failure(Exception):
@@ -379,12 +406,375 @@ def observe(request, action):
     return result
 
 
+# ---- agent runs ----
+
+
+def run_directory(request, create=False):
+    name = request.get("run")
+    if not isinstance(name, str) or not RUN_ID.fullmatch(name):
+        raise Failure("Name the run with letters, digits, - or _.")
+    path = os.path.join(RUNS, name)
+    if create:
+        os.makedirs(path, mode=0o700, exist_ok=True)
+    elif not os.path.isdir(path):
+        raise Failure("That run does not exist in this computer.")
+    return path
+
+
+def git(workspace, *args, env=None, timeout=300):
+    merged = dict(os.environ, GIT_TERMINAL_PROMPT="0", **(env or {}))
+    done = subprocess.run(
+        ["git", *GIT_IDENTITY, *args], cwd=workspace, env=merged,
+        capture_output=True, timeout=timeout,
+    )
+    if done.returncode != 0:
+        detail = done.stderr.decode("utf-8", "replace").strip()[:300]
+        raise Failure(f"git {args[0]} failed: {detail or done.returncode}")
+    return done.stdout
+
+
+def chunk(request):
+    data = request.get("data") or ""
+    if not isinstance(data, str):
+        raise Failure("Send data as base64 text.")
+    raw = base64.b64decode(data, validate=True)
+    if len(raw) > CHUNK_LIMIT:
+        raise Failure(f"Send at most {CHUNK_LIMIT} bytes per chunk.")
+    return raw
+
+
+def inside(root, target):
+    root = os.path.realpath(root)
+    target = os.path.realpath(target)
+    return target == root or target.startswith(root + os.sep)
+
+
+def extract(archive, workspace):
+    """Extracts regular files, directories and in-tree symbolic links only."""
+    with tarfile.open(archive, "r:") as bundle:
+        for member in bundle:
+            name = member.name
+            parts = name.replace("\\", "/").split("/")
+            if name.startswith("/") or ".." in parts or not name or parts[0] == ".git":
+                raise Failure(f"The workspace upload has an unsafe path: {name[:200]}")
+            destination = os.path.join(workspace, name)
+            if not inside(workspace, os.path.dirname(destination) or workspace):
+                raise Failure(f"The workspace upload has an unsafe path: {name[:200]}")
+            if member.isdir():
+                os.makedirs(destination, exist_ok=True)
+            elif member.isfile():
+                os.makedirs(os.path.dirname(destination), exist_ok=True)
+                source = bundle.extractfile(member)
+                with open(destination, "wb") as handle:
+                    shutil.copyfileobj(source, handle)
+                os.chmod(destination, 0o755 if member.mode & 0o100 else 0o644)
+            elif member.issym():
+                target = os.path.join(os.path.dirname(destination), member.linkname)
+                if os.path.isabs(member.linkname) or not inside(workspace, target):
+                    raise Failure(f"The workspace upload links outside itself: {name[:200]}")
+                os.makedirs(os.path.dirname(destination), exist_ok=True)
+                os.symlink(member.linkname, destination)
+            else:
+                raise Failure(f"The workspace upload has an unsupported entry: {name[:200]}")
+
+
+def workspace_put(request):
+    """Appends one chunk of a tar of the task workspace; the final chunk unpacks it
+    and records the uploaded files as the base commit the result is diffed against."""
+    directory = run_directory(request, create=True)
+    archive = os.path.join(directory, "upload.tar")
+    offset = int(request.get("offset") or 0)
+    raw = chunk(request)
+    current = os.path.getsize(archive) if os.path.exists(archive) else 0
+    if offset == 0:
+        current = 0
+        with open(archive, "wb"):
+            pass
+    if offset != current:
+        raise Failure(f"Upload offset {offset} does not follow {current}.")
+    if current + len(raw) > UPLOAD_LIMIT:
+        raise Failure("The workspace is larger than 512 MB. Ignore build output in .gitignore.")
+    with open(archive, "ab") as handle:
+        handle.write(raw)
+    if not request.get("final"):
+        return {"received": current + len(raw)}
+    expected = request.get("sha256")
+    with open(archive, "rb") as handle:
+        digest = hashlib.sha256(handle.read()).hexdigest()
+    if expected and expected != digest:
+        raise Failure("The workspace upload was corrupted. Try again.")
+    workspace = os.path.join(directory, "workspace")
+    if os.path.exists(workspace):
+        shutil.rmtree(workspace)
+    os.makedirs(workspace)
+    try:
+        extract(archive, workspace)
+    finally:
+        os.unlink(archive)
+    git(workspace, "init", "-q", "-b", "jackalope")
+    git(workspace, "add", "-A", "-f")
+    git(workspace, "commit", "-q", "--allow-empty", "--no-verify", "-m", "Jackalope task base")
+    base = git(workspace, "rev-parse", "HEAD").decode().strip()
+    with open(os.path.join(directory, "base"), "w") as handle:
+        handle.write(base)
+    return {"received": current + len(raw), "base": base, "workspace": workspace}
+
+
+# Started supervisors, polled so finished ones do not linger as zombies.
+SUPERVISORS = []
+
+
+def run_start(request):
+    directory = run_directory(request)
+    workspace = os.path.join(directory, "workspace")
+    if not os.path.isfile(os.path.join(directory, "base")):
+        raise Failure("Upload the workspace before starting the run.")
+    if os.path.exists(os.path.join(directory, "spec.json")) or os.path.exists(
+        os.path.join(directory, "pid")
+    ):
+        raise Failure("This run has already started.")
+    argv = request.get("argv")
+    if (
+        not isinstance(argv, list)
+        or not argv
+        or len(argv) > 400
+        or not all(isinstance(arg, str) and len(arg) <= 200000 for arg in argv)
+    ):
+        raise Failure("Supply the command as a list of arguments.")
+    if not shutil.which(argv[0]):
+        raise Failure(f"{argv[0]} is not installed in this computer.")
+    env = request.get("env") or {}
+    if not isinstance(env, dict) or not all(
+        isinstance(k, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", k)
+        and isinstance(v, str) and len(v) <= 100000
+        for k, v in env.items()
+    ):
+        raise Failure("Supply the environment as names and text values.")
+    stdin = request.get("stdin") or ""
+    timeout = min(max(int(request.get("timeout_s") or 3600), 10), 6 * 3600)
+    spec = {"argv": argv, "env": env, "timeout": timeout, "workspace": workspace}
+    # The spec can hold credentials; only the supervisor reads it, then deletes it.
+    descriptor = os.open(os.path.join(directory, "spec.json"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w") as handle:
+        json.dump(spec, handle)
+    with open(os.path.join(directory, "stdin"), "w", encoding="utf-8") as handle:
+        handle.write(stdin)
+    touch(directory)
+    SUPERVISORS[:] = [process for process in SUPERVISORS if process.poll() is None]
+    SUPERVISORS.append(subprocess.Popen(
+        [sys.executable, os.path.abspath(__file__), "supervise", directory],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        start_new_session=True, cwd=directory,
+    ))
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        if os.path.exists(os.path.join(directory, "pid")):
+            return {"started": True}
+        if os.path.exists(os.path.join(directory, "exit.json")):
+            return {"started": False, "exit": read_exit(directory)}
+        time.sleep(0.05)
+    raise Failure("The run did not start.")
+
+
+def touch(directory):
+    with open(os.path.join(directory, "heartbeat"), "w") as handle:
+        handle.write(str(time.time()))
+
+
+def read_exit(directory):
+    path = os.path.join(directory, "exit.json")
+    if not os.path.exists(path):
+        return None
+    with open(path) as handle:
+        return json.load(handle)
+
+
+def read_from(path, offset, limit):
+    if not os.path.exists(path):
+        return b"", offset
+    with open(path, "rb") as handle:
+        handle.seek(offset)
+        data = handle.read(limit)
+    return data, offset + len(data)
+
+
+def run_read(request):
+    """Output after the given byte offsets, waiting up to wait_ms for more. The
+    exit status appears only once both streams have been read to the end."""
+    directory = run_directory(request)
+    touch(directory)
+    out = max(int(request.get("out") or 0), 0)
+    err = max(int(request.get("err") or 0), 0)
+    wait = min(max(int(request.get("wait_ms") or 0), 0) / 1000, READ_WAIT_LIMIT)
+    limit = CHUNK_LIMIT
+    deadline = time.time() + wait
+    while True:
+        finished = read_exit(directory)
+        stdout, next_out = read_from(os.path.join(directory, "stdout"), out, limit)
+        stderr, next_err = read_from(os.path.join(directory, "stderr"), err, limit // 4)
+        if stdout or stderr or finished or time.time() >= deadline:
+            break
+        time.sleep(0.1)
+    drained = finished and len(stdout) < limit and len(stderr) < limit // 4
+    return {
+        "stdout": base64.b64encode(stdout).decode(),
+        "stderr": base64.b64encode(stderr).decode(),
+        "out": next_out,
+        "err": next_err,
+        "exit": finished if drained else None,
+    }
+
+
+def run_stop(request):
+    directory = run_directory(request)
+    with open(os.path.join(directory, "stop"), "w") as handle:
+        handle.write("stop")
+    return {"stopping": read_exit(directory) is None}
+
+
+def workspace_diff(request):
+    """Writes the run's changes since the uploaded base as a binary Git patch,
+    including new files and anything the agent committed."""
+    directory = run_directory(request)
+    if read_exit(directory) is None and os.path.exists(os.path.join(directory, "pid")):
+        raise Failure("Wait for the run to finish before collecting its changes.")
+    workspace = os.path.join(directory, "workspace")
+    with open(os.path.join(directory, "base")) as handle:
+        base = handle.read().strip()
+    index = os.path.join(directory, "result.index")
+    if os.path.exists(index):
+        os.unlink(index)
+    env = {"GIT_INDEX_FILE": index}
+    git(workspace, "read-tree", base, env=env)
+    git(workspace, "add", "-A", env=env)
+    patch = git(
+        workspace, "diff", "--cached", "--binary", "--no-color", "--no-ext-diff",
+        "--no-renames", "--full-index", base, env=env, timeout=600,
+    )
+    names = git(workspace, "diff", "--cached", "--name-only", "-z", base, env=env)
+    if len(patch) > PATCH_LIMIT:
+        raise Failure("The run changed more than 256 MB of files.")
+    with open(os.path.join(directory, "result.patch"), "wb") as handle:
+        handle.write(patch)
+    files = [name for name in names.decode("utf-8", "replace").split("\0") if name]
+    return {
+        "size": len(patch),
+        "sha256": hashlib.sha256(patch).hexdigest(),
+        "files": files[:2000],
+        "fileCount": len(files),
+    }
+
+
+def workspace_get(request):
+    directory = run_directory(request)
+    offset = max(int(request.get("offset") or 0), 0)
+    data, after = read_from(os.path.join(directory, "result.patch"), offset, CHUNK_LIMIT)
+    size = os.path.getsize(os.path.join(directory, "result.patch"))
+    return {"data": base64.b64encode(data).decode(), "offset": after, "size": size}
+
+
+def run_remove(request):
+    directory = run_directory(request)
+    if read_exit(directory) is None and os.path.exists(os.path.join(directory, "pid")):
+        run_stop(request)
+        deadline = time.time() + 15
+        while read_exit(directory) is None and time.time() < deadline:
+            time.sleep(0.2)
+    shutil.rmtree(directory, ignore_errors=True)
+    return {"removed": True}
+
+
+def supervise(directory):
+    """Owns one agent process: feeds its input, captures its output, enforces the
+    time limit, honours stop requests and stops it when no one reads for
+    ORPHAN_SECONDS. Writes exit.json last."""
+    spec_path = os.path.join(directory, "spec.json")
+    with open(spec_path) as handle:
+        spec = json.load(handle)
+    os.unlink(spec_path)
+    environment = dict(os.environ)
+    environment.pop("JACKALOPE_COMPUTER_TOKEN", None)
+    environment.update(spec["env"])
+    stdin_path = os.path.join(directory, "stdin")
+    started = time.time()
+    reason = None
+    try:
+        with open(stdin_path, "rb") as stdin, open(
+            os.path.join(directory, "stdout"), "wb"
+        ) as stdout, open(os.path.join(directory, "stderr"), "wb") as stderr:
+            process = subprocess.Popen(
+                spec["argv"], cwd=spec["workspace"], env=environment,
+                stdin=stdin, stdout=stdout, stderr=stderr, start_new_session=True,
+            )
+    except OSError as error:
+        write_exit(directory, {"code": None, "error": str(error)[:500], "reason": "spawn"})
+        return
+    finally:
+        if os.path.exists(stdin_path):
+            os.unlink(stdin_path)
+    with open(os.path.join(directory, "pid"), "w") as handle:
+        handle.write(str(process.pid))
+    while process.poll() is None:
+        time.sleep(0.2)
+        heartbeat = os.path.join(directory, "heartbeat")
+        idle = time.time() - (os.path.getmtime(heartbeat) if os.path.exists(heartbeat) else started)
+        if os.path.exists(os.path.join(directory, "stop")):
+            reason = "stopped"
+        elif time.time() - started > spec["timeout"]:
+            reason = "timeout"
+        elif idle > ORPHAN_SECONDS:
+            reason = "orphaned"
+        if reason:
+            terminate(process)
+            break
+    code = process.wait()
+    write_exit(directory, {"code": code if code >= 0 else None,
+                           "signal": -code if code < 0 else None, "reason": reason})
+
+
+def terminate(process):
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
+def write_exit(directory, value):
+    temporary = os.path.join(directory, "exit.json.tmp")
+    with open(temporary, "w") as handle:
+        json.dump(value, handle)
+    os.replace(temporary, os.path.join(directory, "exit.json"))
+
+
+def handle_run(request):
+    action = request.get("action")
+    return {
+        "workspace_put": workspace_put,
+        "run_start": run_start,
+        "run_read": run_read,
+        "run_stop": run_stop,
+        "workspace_diff": workspace_diff,
+        "workspace_get": workspace_get,
+        "run_remove": run_remove,
+    }[action](request)
+
+
 def handle(request):
     action = request.get("action")
+    if action in RUN_ACTIONS:
+        return handle_run(request)
     if action == "hello":
         wait_for_display()
         width, height = screen_size()
-        return {"protocol": PROTOCOL, "screen": [width, height], "browser": browser_running()}
+        return {"protocol": PROTOCOL, "runs": RUNS_PROTOCOL, "screen": [width, height],
+                "browser": browser_running()}
     wait_for_display()
     if action in ("snapshot", "screenshot"):
         return observe(request, action)
@@ -527,6 +917,10 @@ def http(address):
                 request = json.loads(self.rfile.read(length))
             except ValueError:
                 return self.reply(400, {"error": "Send one JSON request."})
+            # Runs keep their state in files and may wait for output, so they
+            # do not hold the lock that serializes desktop actions.
+            if isinstance(request, dict) and request.get("action") in RUN_ACTIONS:
+                return self.reply(200, respond(request))
             with lock:
                 self.reply(200, respond(request))
 
@@ -539,6 +933,8 @@ if __name__ == "__main__":
         serve()
     elif mode == "http":
         http(sys.argv[2] if len(sys.argv) > 2 else "0.0.0.0:8765")
+    elif mode == "supervise" and len(sys.argv) > 2:
+        supervise(sys.argv[2])
     elif mode == "browser":
         wait_for_display()
         start_browser()
