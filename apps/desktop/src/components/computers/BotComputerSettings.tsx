@@ -452,7 +452,7 @@ function OwnerComputerSettings({
                 </>
               ) : pairing ? (
                 <PairMachineForm
-                  defaultName={`${bot.name} computer`}
+                  defaultName={`${owner.name} computer`}
                   onCancel={() => setPairing(false)}
                   onPaired={(machine) => {
                     setPairing(false);
