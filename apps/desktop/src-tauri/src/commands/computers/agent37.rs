@@ -1,8 +1,9 @@
 //! The `agent37` provider: computers on the person's own Agent37 account.
 //!
-//! The person saves one Agent37 API key. Jackalope builds the computer image
-//! from `resources/computer` as a template in their workspace (a cloud build,
-//! no registry), creates one instance per computer with auto sleep, and talks
+//! The person saves one Agent37 API key. Jackalope registers the published
+//! computer image (see [`super::image`]) as a template in their workspace, or
+//! builds it there from `resources/computer` when that image cannot be
+//! imported, creates one instance per computer with auto sleep, and talks
 //! to the image's agent through the instance's port URL. Agent37 authenticates
 //! that URL with `X-Agent37-Key`, which leaves `Authorization` for the agent's
 //! own pairing secret. Instances bill to the person's Agent37 balance; deleting
@@ -24,6 +25,8 @@ const API: &str = "https://api.agent37.com";
 /// The image's agent port (`start.sh`).
 const AGENT_PORT: u16 = 8765;
 const BUILD_WAIT: Duration = Duration::from_secs(50 * 60);
+/// Registering a published image copies it before Agent37 answers.
+const IMPORT_WAIT: Duration = Duration::from_secs(15 * 60);
 const BOOT_WAIT: Duration = Duration::from_secs(5 * 60);
 
 pub(crate) struct Agent37;
@@ -260,7 +263,54 @@ pub(crate) fn build_context(directory: &Path) -> Result<Vec<u8>, String> {
     encoder.finish().map_err(|e| e.to_string())
 }
 
-/// Builds the computer template in the person's workspace unless it exists.
+/// The body registering the published image as the computer template.
+pub(crate) fn import_body(name: &str, image: &str) -> Value {
+    json!({"name": name, "image_ref": image, "default_port": AGENT_PORT,
+        "description": "Jackalope bot computer"})
+}
+
+/// What a template registration's status means: `Ok(true)` when the template
+/// now exists (created, or created meanwhile by another start), `Ok(false)`
+/// when the image cannot be imported (not published, not public, not found)
+/// and should be built instead, and an error for a refused key or balance.
+pub(crate) fn imported(status: u16, body: &Value) -> Result<bool, String> {
+    match status {
+        200..=299 | 409 => Ok(true),
+        401 | 402 | 403 => Err(api_error(status, body)),
+        _ => Ok(false),
+    }
+}
+
+/// Registers the published image as the template. Agent37 copies it once
+/// from the public registry before answering, which can take minutes.
+fn import_template(
+    key: &str,
+    name: &str,
+    image: &str,
+    progress: &dyn Fn(&str),
+) -> Result<bool, String> {
+    progress("Importing the computer image on Agent37");
+    let body = import_body(name, image);
+    let answer = remote::block(async {
+        let response = client(IMPORT_WAIT)?
+            .post(format!("{API}/v1/templates"))
+            .bearer_auth(key)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Agent37 did not answer: {}", e.without_url()))?;
+        let status = response.status().as_u16();
+        Ok::<_, String>((status, response.json().await.unwrap_or(Value::Null)))
+    });
+    match answer {
+        Ok((status, body)) => imported(status, &body),
+        // A cloud build follows; it reports its own errors.
+        Err(_) => Ok(false),
+    }
+}
+
+/// Builds the computer template in the person's workspace unless it exists,
+/// importing the published image when Agent37 can pull it.
 fn ensure_template(key: &str, progress: &dyn Fn(&str)) -> Result<String, String> {
     static BUILDING: Mutex<()> = Mutex::new(());
     let _building = BUILDING.lock().map_err(|e| e.to_string())?;
@@ -274,6 +324,9 @@ fn ensure_template(key: &str, progress: &dyn Fn(&str)) -> Result<String, String>
     )?
     .is_some()
     {
+        return Ok(name);
+    }
+    if import_template(key, &name, &super::image::published(&directory)?, progress)? {
         return Ok(name);
     }
     progress("Building the computer image on Agent37 (first use takes several minutes)");
@@ -579,6 +632,20 @@ mod tests {
         assert!(validate_key("sk_live_abcdefghijkl").is_ok());
         assert!(validate_key("sk_test_abcdefghijkl").is_err());
         assert!(validate_key("sk_live_ab cd efghijkl").is_err());
+    }
+
+    #[test]
+    fn templates_import_the_published_image_or_fall_back_to_a_build() {
+        let body = import_body("jackalope-computer-abc", "ghcr.io/x/y:1-abc");
+        assert_eq!(body["name"], "jackalope-computer-abc");
+        assert_eq!(body["image_ref"], "ghcr.io/x/y:1-abc");
+        assert_eq!(body["default_port"], AGENT_PORT);
+        assert_eq!(imported(201, &Value::Null), Ok(true));
+        assert_eq!(imported(409, &Value::Null), Ok(true));
+        let unpullable = json!({"error": {"code": "invalid_request"}});
+        assert_eq!(imported(400, &unpullable), Ok(false));
+        assert_eq!(imported(500, &Value::Null), Ok(false));
+        assert!(imported(401, &Value::Null).is_err());
     }
 
     #[test]

@@ -21,6 +21,7 @@ pub(crate) mod agent37;
 mod browser;
 pub(crate) mod credentials;
 pub(crate) mod docker;
+pub(crate) mod image;
 pub(crate) mod relay;
 pub(crate) mod remote;
 pub(crate) mod runs;
@@ -1183,6 +1184,9 @@ pub struct MachinesView {
     pub machines: Vec<remote::Machine>,
     /// Whether Jackalope-hosted computers can be chosen yet.
     pub hosted_available: bool,
+    /// The published computer image for this version, for a cloud machine's
+    /// start command; empty when the bundled definition cannot be read.
+    pub image: String,
 }
 
 #[tauri::command]
@@ -1194,6 +1198,9 @@ pub async fn computer_machines(
         Ok(MachinesView {
             machines: remote::machines(&root)?,
             hosted_available: HOSTED_AVAILABLE,
+            image: image_directory()
+                .and_then(|directory| image::published(&directory))
+                .unwrap_or_default(),
         })
     })
     .await

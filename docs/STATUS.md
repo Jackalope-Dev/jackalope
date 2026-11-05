@@ -380,7 +380,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   cloud machines are never stopped. Bot settings, the Screen view and Settings →
   Computers show idle time and start, stop, watch, take over and delete computers;
   `/computer` shows and changes one in the terminal. Jackalope-hosted computers are
-  listed as coming soon. See
+  listed as coming soon. The image is published for amd64 to GitHub Container Registry
+  from `beta` and `stable`; local sandboxes pull and Agent37 imports the tag for the
+  app's version and image definition, building it when that is unavailable. See
   [bot computers](BOT-COMPUTERS.md).
 - A project can run its Claude Code and Codex task agents on a computer (**Agents run
   on** in Project settings; beta). The workspace's non-ignored files and copied setup
@@ -641,7 +643,7 @@ real Claude Code or Codex runs there, bridge, desktop and browser tools used by 
 agent, planning there, lost-contact
 recovery against a real computer, the template build and instances on a live Agent37
 account, and gVisor support for the image's desktop are unverified, and Agent37
-computers have no viewer.
+computers have no viewer. The image workflow has not run, so no image is published yet.
 
 Installed provider, accessibility, recovery, performance, signed installation and
 update acceptance remain platform-specific requirements. Real-model quality and

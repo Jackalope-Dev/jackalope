@@ -54,6 +54,8 @@ Website screenshots and walkthroughs use explicit fictional sample data.
 See [licensing and redistribution](LICENSING.md) for project materials and trademarks.
 The desktop bundles agent-browser's native executable, Apache-2.0 license and
 embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
+The published bot computer image is not listed here: its Debian and npm packages
+keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.md#the-image).
 
 ## JavaScript packages
 

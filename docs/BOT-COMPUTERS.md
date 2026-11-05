@@ -92,11 +92,14 @@ backend) and macOS, Colima on macOS, or Docker Engine on Linux. Jackalope runs t
 Computers reports the engine, version and architecture, or what to do: install Docker,
 start it, run `colima start`, or switch Docker Desktop from Windows containers.
 
-The first start builds the image from `apps/desktop/src-tauri/resources/computer`
-(bundled with the app) with `docker build`; the status shows the latest build line. The
-tag `jackalope-computer:<hash>` follows the content of `Dockerfile`, `start.sh` and
-`agent.py`, so a changed definition builds a new image. Docker builds for the host's
-architecture, so Apple Silicon gets an arm64 image. No image is published.
+The first start pulls this version's [published image](#the-image) and tags it
+`jackalope-computer:<hash>`; when it cannot (no published image for this version and
+definition, no network, or an arm64 host, since only amd64 is published) it builds the
+image from `apps/desktop/src-tauri/resources/computer` (bundled with the app) with
+`docker build`. The status shows the latest pull or build line. The tag follows the
+content of `Dockerfile`, `start.sh` and `agent.py`, so a changed definition builds a new
+image. A local build is for the host's architecture, so Apple Silicon gets an arm64
+image.
 
 Each computer is the container `jackalope-computer-<id>` with the named volume
 `jackalope-computer-<id>-home` at `/home/bot`, labelled `dev.jackalope.computer`. It is
@@ -138,14 +141,18 @@ that serves the same image's agent over HTTPS. Jackalope never creates, starts, 
 deletes it. On the machine:
 
 ~~~sh
-docker build -t jackalope-computer path/to/resources/computer
 docker run -d --name jackalope-computer --init --restart unless-stopped \
   --cap-drop ALL --security-opt no-new-privileges --shm-size 1g \
   -e JACKALOPE_COMPUTER_TOKEN -e JACKALOPE_VNC_PASSWORD \
   -v jackalope-home:/home/bot \
   -p 127.0.0.1:8765:8765 -p 127.0.0.1:6080:6080 \
-  jackalope-computer
+  ghcr.io/jackalope-dev/jackalope-computer:<version>-<hash>
 ~~~
+
+The image is this app version's [published image](#the-image) (amd64 only). On an arm64
+machine, or for a build without a published image, build it there with
+`docker build -t jackalope-computer path/to/resources/computer` and run
+`jackalope-computer` instead.
 
 `JACKALOPE_COMPUTER_TOKEN` is the pairing secret, at least 32 characters (for example
 `openssl rand -hex 32`). Put an HTTPS reverse proxy such as Caddy in front of port 8765,
@@ -156,8 +163,9 @@ constant time.
 
 In Settings → Computers, or from a bot's Computer settings when nothing is paired yet,
 **Pair machine** generates a 64-character secret in the app and shows the `docker run`
-command above with it filled in (`PairMachineForm` keeps that command in step with this
-guide). It takes the HTTPS address (plain HTTP only for a `127.0.0.1` tunnel), a name that
+command above with it and this version's image filled in (`PairMachineForm` keeps that
+command in step with this guide; it falls back to `jackalope-computer` when the app
+cannot read its image definition). It takes the HTTPS address (plain HTTP only for a `127.0.0.1` tunnel), a name that
 defaults to one the app picks, the secret, which can be replaced, and an optional noVNC
 page address. Pairing checks the agent first. The secret is stored in protected storage
 (`computers/machines/<id>.bin`), never in `machines.json`. **Test connection** repeats the
@@ -282,10 +290,13 @@ with Agent37 before it is saved in protected storage (`computers/secrets/agent37
 and shows this month's spend from `GET /v1/usage`. The key cannot be removed while an
 Agent37 computer exists.
 
-The first start builds the image from `resources/computer` as a template named
-`jackalope-computer-<hash>` (the local image tag's hash) through Agent37's template
-builds: the build context is uploaded, built on Agent37 and published to the workspace;
-nothing is pushed to a registry. A changed image definition builds a new template. Each
+The first start creates a template named `jackalope-computer-<hash>` (the local image
+tag's hash) in the workspace. It first registers this version's [published
+image](#the-image) by registry import (`POST /v1/templates` with its `image_ref`), which
+Agent37 copies once and pins by digest. When that import is refused (no published image
+for this version and definition, or the package is not public) it falls back to
+Agent37's template builds: the build context is uploaded, built on Agent37 and published
+to the workspace. A changed image definition makes a new template. Each
 computer is one instance from that template, created with its own pairing secret and
 viewer password in its environment, and with auto sleep after its idle stop time
 (Agent37 accepts 5 minutes to a day; Never turns auto sleep off). The instance id is
@@ -356,11 +367,30 @@ URL as `site`. `start.sh` starts Xvfb (1280 × 800 by default), a private D-Bus 
 the AT-SPI bus, Openbox, x11vnc with noVNC when a viewer password is set, Chromium with
 remote debugging, and the HTTP agent when a pairing secret is set.
 
+## The image
+
 The image is Jackalope's own definition; it uses no Cua code. It installs Debian
-packages, including Chromium, Xvfb, Openbox, x11vnc, noVNC and websockify, at build
-time on the machine that builds it, under their own licenses, plus Git and Node with
-the Claude Code and Codex CLIs from npm for agents on a computer. Publishing a prebuilt
-image would need their notices.
+packages, including Chromium, Xvfb, Openbox, x11vnc, noVNC and websockify, under their
+own licenses, plus Git and Node with the Codex CLI from npm for agents on a computer.
+Claude Code's license does not allow redistributing it, so it is not in the image: the
+first run that needs it installs `@anthropic-ai/claude-code` from npm into the home
+volume (`~/.local`, first on `PATH`) within 100 seconds, which needs networking.
+
+`.github/workflows/computer-image.yml` publishes the image for linux/amd64 to
+`ghcr.io/jackalope-dev/jackalope-computer` on every push to `beta` or `stable` and on
+manual dispatch; it has no pull request trigger and pushes with the workflow's
+`GITHUB_TOKEN` (`packages: write`). `scripts/release/computer-image.mjs` reads the
+repository from `REPOSITORY` in `commands/computers/image.rs`, the version from the
+desktop `Cargo.toml` and the definition hash from the same files as
+`docker::image_tag`, and tags the image `<version>-<hash>`, `<version>` and
+`sha-<commit>`; the run summary records the pushed digest. The app only uses
+`<version>-<hash>`, so it never runs an image whose definition differs from its own.
+Before pushing, the workflow checks that the image keeps
+`/usr/share/doc/<package>/copyright` for its Debian packages (the slim base keeps them),
+`/usr/share/common-licenses/Apache-2.0`, the Codex package and
+`/usr/share/doc/jackalope-computer/NOTICE`, and does not contain Claude Code. Labels
+record the source, revision, version and definition. The package must be public for
+anonymous pulls and Agent37 imports; set that once in the package's settings.
 
 ## Checks
 
@@ -377,8 +407,11 @@ refusals, tool-list filtering by the computer's browser and read-only access, an
 forwarding with the attempt's credential; `coordination::eligibility` covers the
 separate concurrency for computer projects; `computers::agent37` covers keys, instance
 creation bodies, states, errors and the template build context.
+`computers::image` covers the published reference and the definition hash shared with
+`node --test scripts/release/computer-image.test.mjs`; `computers::agent37` also covers
+the template import body and its fallback.
 `python3 apps/desktop/scripts/computer-agent.test.py` (POSIX, for example in WSL) covers
-the run actions: upload, run, read, stop, the orphan stop, committed changes, unsafe
+the on-demand CLI install and the run actions: upload, run, read, stop, the orphan stop, committed changes, unsafe
 uploads, the bridge relay's hand-over and answers, and a run whose supervisor died. The
 opt-in `local_docker_computer_round_trip -- --ignored --nocapture` builds the image,
 starts a computer, takes a screenshot and snapshot, runs a command, checks the home

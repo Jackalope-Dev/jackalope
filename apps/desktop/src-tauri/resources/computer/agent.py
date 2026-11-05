@@ -73,6 +73,11 @@ RELAY_URL = "@@JACKALOPE_RELAY_URL@@"
 RELAY_TOKEN = "@@JACKALOPE_RELAY_TOKEN@@"
 RELAY_BODY_LIMIT = 64 * 1024
 RELAY_ANSWER_LIMIT = 512 * 1024
+# Agent CLIs whose licenses do not allow shipping them in a published image are
+# installed into the bot's home on first use, from the package registry.
+ON_DEMAND = {"claude": "@anthropic-ai/claude-code"}
+LOCAL_PREFIX = os.path.join(HOME, ".local")
+INSTALL_SECONDS = 100
 # Bridge calls handed over per read, and their total size.
 RELAY_READ_CALLS = 8
 RELAY_READ_LIMIT = 256 * 1024
@@ -541,6 +546,36 @@ def workspace_put(request):
     return {"received": current + len(raw), "base": base, "workspace": workspace}
 
 
+def local_path():
+    """Puts the home's own programs first on PATH, where on-demand installs go."""
+    directory = os.path.join(LOCAL_PREFIX, "bin")
+    path = os.environ.get("PATH", "")
+    if directory not in path.split(os.pathsep):
+        os.environ["PATH"] = directory + (os.pathsep + path if path else "")
+
+
+def ensure_program(name):
+    """Installs an on-demand agent CLI into the home volume when it is missing."""
+    local_path()
+    if shutil.which(name):
+        return
+    package = ON_DEMAND.get(name)
+    if not package or not shutil.which("npm"):
+        raise Failure(f"{name} is not installed in this computer.")
+    try:
+        result = subprocess.run(
+            ["npm", "install", "--global", "--prefix", LOCAL_PREFIX,
+             "--no-fund", "--no-audit", package],
+            cwd=HOME, stdin=subprocess.DEVNULL, capture_output=True, text=True,
+            timeout=INSTALL_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        raise Failure(f"Installing {name} in this computer took too long. Try again.")
+    if result.returncode != 0 or not shutil.which(name):
+        detail = (result.stderr or result.stdout or "").strip()[-300:]
+        raise Failure(f"{name} could not be installed in this computer: {detail}")
+
+
 # Started supervisors, polled so finished ones do not linger as zombies.
 SUPERVISORS = []
 
@@ -562,8 +597,7 @@ def run_start(request):
         or not all(isinstance(arg, str) and len(arg) <= 200000 for arg in argv)
     ):
         raise Failure("Supply the command as a list of arguments.")
-    if not shutil.which(argv[0]):
-        raise Failure(f"{argv[0]} is not installed in this computer.")
+    ensure_program(argv[0])
     env = request.get("env") or {}
     if not isinstance(env, dict) or not all(
         isinstance(k, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", k)
