@@ -160,8 +160,10 @@ on-demand connection. A Screen view shows the task browser's viewport and deskto
 grant state with revoke controls. Persistent agent browser profiles, one per project and
 optionally per bot, keep sign-ins between tasks with per-site permission and a
 person-only sign-in window. Bots can also have their own computer, a Linux sandbox in
-Docker or a paired cloud machine the person runs, where desktop and browser tools act
-instead of on the person's desktop; tasks get one only with the person's approval.
+Docker, a paired cloud machine the person runs or a machine on their own Agent37
+account, where desktop and browser tools act instead of on the person's desktop; tasks
+get one only with the person's approval. A project can run its Claude Code and Codex
+task agents on such a computer while checks, review and merging stay local.
 Local sandboxes start when needed and stop when idle or when Jackalope quits.
 Jackalope-hosted computers are planned, not available. Installed and live-account
 acceptance remain open.

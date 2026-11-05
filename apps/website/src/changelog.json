@@ -1,5 +1,17 @@
 [
   {
+    "id": "agents-that-run-on-a-computer",
+    "date": "2026-11-05",
+    "status": "In development",
+    "title": "Agents that run on a computer",
+    "description": "A project can run its Claude Code and Codex agents on a computer instead of your machine, while checks, review and merging stay with you.",
+    "items": [
+      "Choose a local sandbox, a cloud machine you run or your own Agent37 account under Agents run on in Project settings.",
+      "Agents there use a Claude Code token or API key you save for computers, never your local accounts.",
+      "Jackalope tools such as peers, questions and the browser are not available to them yet."
+    ]
+  },
+  {
     "id": "jackalope-violet",
     "date": "2026-11-03",
     "status": "In development",

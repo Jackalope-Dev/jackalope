@@ -2,18 +2,22 @@
 
 A bot computer is a persistent machine an agent controls instead of the person's own
 desktop: a Linux desktop with a window manager, Chromium and the usual command-line
-tools. Use this guide to set one up, to run a cloud machine, or to change the providers,
-the image or the in-sandbox agent. [Desktop control](DESKTOP-CONTROL.md) covers the
+tools. Use this guide to set one up, to run a cloud machine, to run a project's task
+agents on a computer, or to change the providers, the image or the in-sandbox agent. [Desktop control](DESKTOP-CONTROL.md) covers the
 person's own desktop and [browser automation](BROWSER-AUTOMATION.md) the task browser.
 
 ## What owns a computer
 
 Each bot has at most one computer, chosen in its settings under **Computer**: None,
-**Local sandbox** (Docker on this device) or **Cloud machine** (a machine the person
-paired). A task gets one only when its agent calls `computer_request` and the person
-answers **Allow a sandbox computer** or **Allow, and share this project read-only**; the
-computer then belongs to that task and is reused by its later attempts. Settings →
-Computers lists every computer, paired cloud machine and Docker's readiness.
+**Local sandbox** (Docker on this device), **Cloud machine** (a machine the person
+paired) or **Agent37** (a machine on the person's own Agent37 account). A task gets one
+only when its agent calls `computer_request` and the person answers **Allow a sandbox
+computer** or **Allow, and share this project read-only**; the computer then belongs to
+that task and is reused by its later attempts. A project can have one too, chosen in
+Project settings under **Agents run on**; its task agents then run there (see
+[agents on a computer](#agents-on-a-computer)). Settings → Computers lists every
+computer, paired cloud machine, the Agent37 connection, agent sign-ins for computers and
+Docker's readiness.
 
 When a run belongs to a bot with a computer, or to a task that was given one:
 
@@ -75,7 +79,8 @@ found running at the next launch, for example after a crash or with the setting 
 adopted: its idle time starts when Jackalope first sees it.
 
 Jackalope never stops a cloud machine. It only drops idle connections to it; the
-machine's own provider schedule (or the person) decides when it runs. A Jackalope-hosted
+machine's own provider schedule (or the person) decides when it runs. Agent37 computers
+sleep through Agent37's own auto sleep (see [Agent37](#agent37)). A Jackalope-hosted
 provider would stop its machines on the server side.
 
 ## Local sandboxes
@@ -157,6 +162,76 @@ uses it. Its viewer opens in the person's browser and asks for its VNC password.
 tools stay on the task's local browser for cloud machines; `desktop_control` and
 `computer_exec` reach the machine. Anyone holding the secret can run commands there.
 
+## Agents on a computer
+
+A project whose **Agents run on** names a computer runs its Claude Code and Codex task
+agents there. Other agents, and planning sessions, which need the bridge for their
+questions, run on this device and say so in the attempt's activity. Workspace
+preparation, checks, the checkpoint, review and integration stay on this device and are
+unchanged, so the coordinator, execution guard and runtime lock order, reservations and
+Git safeguards apply as for a local attempt:
+
+1. The local workspace is prepared as usual. Its tracked files and untracked files Git
+   does not ignore (or, for a folder that is not a repository, the files its ignore files
+   allow) are sent as a tar in 512 KB chunks, at most 512 MB. Ignored files, including
+   copied setup files such as `.env.local`, are not sent.
+2. The computer starts if needed, waiting up to 20 minutes (a first image build is slow).
+   The agent CLI starts in the uploaded copy with the task's prompt on standard input.
+3. Its output is read about once a second and fed to the same event parsers as a local
+   process; stop, quota handoff and the six-hour limit stop it on the computer. Two
+   minutes of failed reads end the attempt as lost contact.
+4. When it ends, its changes since the upload come back as a binary Git patch, checked
+   by SHA-256, and are applied to the local workspace with `git apply`. A patch that does
+   not apply is saved beside the attempt's history and the attempt reports where. Then
+   the attempt completes like a local one.
+
+The command is the local one translated: the program is the CLI on the computer's PATH,
+local paths, profile directories and Jackalope's bridge variables are dropped, and the
+computer is the sandbox, so Claude Code runs with `--permission-mode bypassPermissions`
+and Codex with `sandbox_mode="danger-full-access"`. Persistent Claude Code sessions are
+not used remotely. The agent CLI must still be installed on this device, which resolves
+the agent before launch. The copy lives at `~/.jackalope-runs/w<hash>/workspace`, named
+from the local workspace path, so a continuation reuses the path and the agent's own
+session resumes; the run's folder is removed after its changes come back.
+
+Agents on a computer never use this device's account profiles. They use **Agent sign-ins
+for computers** in Settings → Computers: a Claude Code token from `claude setup-token`
+(`CLAUDE_CODE_OAUTH_TOKEN`), an Anthropic API key (`ANTHROPIC_API_KEY`) or an OpenAI
+API key (`CODEX_API_KEY` and `OPENAI_API_KEY`). They are stored in protected storage
+(`computers/secrets/agent-credentials.bin`), shown only as saved or not, and passed to
+the run's environment only. A missing sign-in fails the attempt with where to add it.
+The bridge listens on this device's loopback, so peers, questions, the browser and other
+Jackalope tools are not offered to agents on a computer, and project connections are
+not delivered there.
+
+Agents on project computers have their own concurrency limit (8 by default, up to 32,
+through `queue_dispatch`'s `remoteConcurrency`), separate from this device's one to six.
+A run holds its computer against the idle stop. On the computer, a run is owned by a
+detached supervisor that survives reconnects; if nobody reads it for ten minutes, for
+example because Jackalope closed, it is stopped. After a restart the attempt is
+interrupted like a local one and is not rerun.
+
+## Agent37
+
+Agent37 computers run on the person's own Agent37 account and bill to its balance.
+Settings → Computers (or the computer chooser) takes one API key (`sk_live_…`), checked
+with Agent37 before it is saved in protected storage (`computers/secrets/agent37.bin`),
+and shows this month's spend from `GET /v1/usage`. The key cannot be removed while an
+Agent37 computer exists.
+
+The first start builds the image from `resources/computer` as a template named
+`jackalope-computer-<hash>` (the local image tag's hash) through Agent37's template
+builds: the build context is uploaded, built on Agent37 and published to the workspace;
+nothing is pushed to a registry. A changed image definition builds a new template. Each
+computer is one instance from that template, created with its own pairing secret and
+viewer password in its environment, and with auto sleep after its idle stop time
+(Agent37 accepts 5 minutes to a day; Never turns auto sleep off). The instance id is
+kept in `computers/agent37.json` and its secret in `computers/secrets/agent37-<id>.bin`.
+Jackalope reaches the agent at `https://<instance>-8765.agent37.app` with
+`X-Agent37-Key` for Agent37 and the pairing secret as `Authorization`. Any request
+wakes a sleeping instance. **Stop** stops the instance; deleting the computer deletes the
+instance and its files. There is no viewer for Agent37 computers yet.
+
 **Jackalope-hosted** is listed as coming soon. Its provider exists so saved records and
 settings have a stable name, and every operation reports that it is not available.
 
@@ -181,8 +256,11 @@ unavailable. A provider implements the `Provider` trait:
 | `viewer` | A noVNC address for watching or taking over, if one is reachable |
 | `devtools` | A DevTools endpoint reachable from this device, if any |
 
-`computers/docker.rs` (`local-docker`) and `computers/remote.rs` (`remote-machine`) are
-the implementations; a VM API provider adds a module and a branch in `provider`.
+`computers/docker.rs` (`local-docker`), `computers/remote.rs` (`remote-machine`) and
+`computers/agent37.rs` (`agent37`) are the implementations; a VM API provider adds a
+module and a branch in `provider`. `computers/runs.rs` is the run protocol client,
+command translation and patch handling, `computers/credentials.rs` the agent sign-ins
+for computers, and `tasks/remote.rs` the attempt side of an agent on a computer.
 `desktop_control/computer.rs` runs desktop actions on a computer and
 `computers/browser.rs` attaches the computer's browser to the task browser through
 `browser::set_router`, gated by the same site questions.
@@ -192,7 +270,17 @@ and `scrot`. It answers the helper protocol's `hello` (`protocol: 1`) and `list`
 `snapshot` (AT-SPI elements with screen bounds, at most 300, password text protected),
 `screenshot` (base64 PNG, optional `thumb` width), `click`, `double_click`, `right_click`,
 `drag`, `scroll`, `type`, `set_value`, `press` (`chord` with modifiers and key), `focus`,
-`open_app`, `clipboard_read`, `clipboard_write`, `open_url` and `exec`. Snapshots and
+`open_app`, `clipboard_read`, `clipboard_write`, `open_url` and `exec`. `hello` also
+reports `runs: 1` for the run actions, which need no display: `workspace_put` (one
+base64 chunk at a byte offset; the final chunk carries the archive's SHA-256, unpacks
+it rejecting absolute, `..`, `.git` and outside-pointing link entries, and commits it as
+the base), `run_start` (a command with environment and standard input under a detached
+`agent.py supervise` process; the specification holding credentials is deleted once
+read), `run_read` (output after byte offsets, waiting up to five seconds, with the exit
+once both streams are read), `run_stop`, `workspace_diff` and `workspace_get` (the binary
+patch from the base, including anything the agent committed) and `run_remove`. Run
+actions keep their state in files under `~/.jackalope-runs` and do not take the HTTP
+agent's lock that serializes desktop actions. Snapshots and
 screenshots report the active window and, when Chromium is in front, its current page
 URL as `site`. `start.sh` starts Xvfb (1280 × 800 by default), a private D-Bus session,
 the AT-SPI bus, Openbox, x11vnc with noVNC when a viewer password is set, Chromium with
@@ -200,7 +288,8 @@ remote debugging, and the HTTP agent when a pairing secret is set.
 
 The image is Jackalope's own definition; it uses no Cua code. It installs Debian
 packages, including Chromium, Xvfb, Openbox, x11vnc, noVNC and websockify, at build
-time on the machine that builds it, under their own licenses. Publishing a prebuilt
+time on the machine that builds it, under their own licenses, plus Git and Node with
+the Claude Code and Codex CLIs from npm for agents on a computer. Publishing a prebuilt
 image would need their notices.
 
 ## Checks
@@ -210,9 +299,16 @@ records and compatibility, settings bounds, one machine per bot, the hosted refu
 Docker detection messages, container arguments, loopback ports and viewer URLs, the
 image tag, cloud address and secret validation, the idle stop choices and their
 exclusion from the container configuration, idle decisions and status text, viewer
-holds and the quit preference. The opt-in
+holds and the quit preference. `cargo test … --lib computers::runs tasks::remote` covers command translation,
+credentials, the workspace archive, chunked upload and patch checks, line splitting
+and patch application; `coordination::eligibility` covers the separate concurrency for
+computer projects; `computers::agent37` covers keys, instance creation bodies, states,
+errors and the template build context. `python3 apps/desktop/scripts/computer-agent.test.py`
+(POSIX, for example in WSL) covers the run actions: upload, run, read, stop, the orphan
+stop, committed changes and unsafe uploads. The opt-in
 `local_docker_computer_round_trip -- --ignored --nocapture` builds the image, starts a
 computer, takes a screenshot and snapshot, runs a command, checks the home volume
-survives a restart and deletes everything; it needs Docker and network access. These
+survives a restart, runs a stand-in agent on an uploaded workspace and applies its
+changes, and deletes everything; it needs Docker and network access. These
 do not establish installed-app acceptance on each operating system, Docker variant or
-cloud provider.
+cloud provider, real Claude Code or Codex runs on a computer, or a live Agent37 account.
