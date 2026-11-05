@@ -161,7 +161,8 @@ impl AgentPolicy {
         }
     }
 
-    pub fn resolve(&self, agent: &str) -> Result<(String, PathBuf), String> {
+    /// The agent's CLI adapter, without locating its executable on this device.
+    pub fn adapter(&self, agent: &str) -> Result<String, String> {
         if self.enabled_agents.get(agent) == Some(&false) {
             return Err(format!(
                 "{agent} is disabled in Agents. Enable it or choose another agent."
@@ -172,6 +173,13 @@ impl AgentPolicy {
         if !super::tasks::BUILTIN_AGENTS.contains(&adapter) && adapter != "acp" {
             return Err("Choose a supported CLI adapter for this manually added agent.".into());
         }
+        Ok(adapter.to_string())
+    }
+
+    pub fn resolve(&self, agent: &str) -> Result<(String, PathBuf), String> {
+        let adapter = self.adapter(agent)?;
+        let adapter = adapter.as_str();
+        let custom = self.custom_agents.iter().find(|a| a.id == agent);
         let configured = self
             .runner_options
             .get(agent)
@@ -270,7 +278,10 @@ impl TaskRuntime {
             }
             request.agent = policy.default_agent(&request.project_id).into();
         }
-        let (adapter, _) = policy.resolve(&request.agent)?;
+        let adapter = policy.adapter(&request.agent)?;
+        if !self.runs_remotely(&request.project_id, &adapter) {
+            policy.resolve(&request.agent)?;
+        }
         if let Some(project) = policy.projects.get(&request.project_id) {
             if project
                 .allowed_agents

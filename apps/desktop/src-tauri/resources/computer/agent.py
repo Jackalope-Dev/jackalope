@@ -19,15 +19,24 @@ by byte cursor (run_read), stops it (run_stop), then fetches the changes as a
 binary Git patch against the uploaded files (workspace_diff, workspace_get).
 Each run lives in its own directory and is owned by a detached supervisor, so
 it survives reconnects; a run nobody reads for ORPHAN_SECONDS is stopped.
+
+A run started with `relay` (runs protocol 2) gets the Jackalope bridge on
+127.0.0.1 inside the computer. Its supervisor serves it with a secret of its
+own, substituted for RELAY_URL and RELAY_TOKEN in the command and environment.
+Each request becomes a file that run_read hands to Jackalope, which forwards it
+to the bridge on its own device with the run's credential and answers through
+run_answer, so the bridge credential never reaches the computer.
 """
 
 import base64
+import fcntl
 import hashlib
 import hmac
 import io
 import json
 import os
 import re
+import secrets
 import shutil
 import signal
 import subprocess
@@ -41,7 +50,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PROTOCOL = 1
 # Agent runs, reported by hello as `runs`.
-RUNS_PROTOCOL = 1
+RUNS_PROTOCOL = 2
 OUTPUT_LIMIT = 64 * 1024
 BODY_LIMIT = 1024 * 1024
 DEVTOOLS = "http://127.0.0.1:9222"
@@ -58,8 +67,20 @@ READ_WAIT_LIMIT = 5.0
 ORPHAN_SECONDS = int(os.environ.get("JACKALOPE_RUN_ORPHAN_SECONDS") or 600)
 RUN_ACTIONS = {
     "workspace_put", "run_start", "run_read", "run_stop",
-    "workspace_diff", "workspace_get", "run_remove",
+    "workspace_diff", "workspace_get", "run_remove", "run_status", "run_answer",
 }
+RELAY_URL = "@@JACKALOPE_RELAY_URL@@"
+RELAY_TOKEN = "@@JACKALOPE_RELAY_TOKEN@@"
+RELAY_BODY_LIMIT = 64 * 1024
+RELAY_ANSWER_LIMIT = 512 * 1024
+# Bridge calls handed over per read, and their total size.
+RELAY_READ_CALLS = 8
+RELAY_READ_LIMIT = 256 * 1024
+RELAY_PENDING_LIMIT = 32
+# Longer than the bridge's own longest call (a queued saved check).
+RELAY_TIMEOUT = int(os.environ.get("JACKALOPE_RELAY_TIMEOUT") or 2400)
+RELAY_HEADERS = ("content-type", "accept", "mcp-protocol-version", "mcp-session-id", "last-event-id")
+CALL_ID = re.compile(r"[0-9a-f]{16,48}")
 GIT_IDENTITY = [
     "-c", "user.name=Jackalope", "-c", "user.email=jackalope@agents.jackalope.invalid",
     "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false",
@@ -552,7 +573,8 @@ def run_start(request):
         raise Failure("Supply the environment as names and text values.")
     stdin = request.get("stdin") or ""
     timeout = min(max(int(request.get("timeout_s") or 3600), 10), 6 * 3600)
-    spec = {"argv": argv, "env": env, "timeout": timeout, "workspace": workspace}
+    spec = {"argv": argv, "env": env, "timeout": timeout, "workspace": workspace,
+            "relay": bool(request.get("relay"))}
     # The spec can hold credentials; only the supervisor reads it, then deletes it.
     descriptor = os.open(os.path.join(directory, "spec.json"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w") as handle:
@@ -608,11 +630,13 @@ def run_read(request):
     wait = min(max(int(request.get("wait_ms") or 0), 0) / 1000, READ_WAIT_LIMIT)
     limit = CHUNK_LIMIT
     deadline = time.time() + wait
+    supervisor_gone(directory)
     while True:
         finished = read_exit(directory)
         stdout, next_out = read_from(os.path.join(directory, "stdout"), out, limit)
         stderr, next_err = read_from(os.path.join(directory, "stderr"), err, limit // 4)
-        if stdout or stderr or finished or time.time() >= deadline:
+        if (stdout or stderr or finished or bridge_waiting(directory)
+                or time.time() >= deadline):
             break
         time.sleep(0.1)
     drained = finished and len(stdout) < limit and len(stderr) < limit // 4
@@ -622,7 +646,207 @@ def run_read(request):
         "out": next_out,
         "err": next_err,
         "exit": finished if drained else None,
+        "bridge": bridge_calls(directory, bool(request.get("reclaim"))),
     }
+
+
+def run_status(request):
+    """Whether a run exists here and how far it got, so Jackalope can recover the
+    changes of a run it lost contact with."""
+    name = request.get("run")
+    if not isinstance(name, str) or not RUN_ID.fullmatch(name):
+        raise Failure("Name the run with letters, digits, - or _.")
+    directory = os.path.join(RUNS, name)
+    if not os.path.isdir(directory):
+        return {"exists": False}
+    supervisor_gone(directory)
+    started = any(os.path.exists(os.path.join(directory, f)) for f in ("pid", "exit.json"))
+    return {
+        "exists": True,
+        "uploaded": os.path.isfile(os.path.join(directory, "base")),
+        "started": started,
+        "exit": read_exit(directory),
+    }
+
+
+def supervisor_gone(directory):
+    """Records a started run whose supervisor no longer runs, for example after
+    the computer restarted, as interrupted. The supervisor holds the run's owner
+    lock for its whole life and the system releases it when the process ends."""
+    if read_exit(directory) is not None or not os.path.exists(os.path.join(directory, "pid")):
+        return False
+    try:
+        descriptor = os.open(os.path.join(directory, "owner"), os.O_RDWR)
+    except FileNotFoundError:
+        return False
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return False
+        if read_exit(directory) is None:
+            write_exit(directory, {"code": None, "signal": None, "reason": "interrupted"})
+        return True
+    finally:
+        os.close(descriptor)
+
+
+def bridge_queue(directory):
+    return os.path.join(directory, "bridge")
+
+
+def bridge_waiting(directory):
+    try:
+        return any(name.endswith(".req") for name in os.listdir(bridge_queue(directory)))
+    except FileNotFoundError:
+        return False
+
+
+def bridge_calls(directory, reclaim=False):
+    """Bridge requests not yet handed to Jackalope, oldest first; each is handed
+    over once. `reclaim` hands over again those handed over but unanswered, for a
+    Jackalope that reconnected without its record of them."""
+    queue = bridge_queue(directory)
+    try:
+        names = sorted(os.listdir(queue))
+    except FileNotFoundError:
+        return []
+    calls = []
+    size = 0
+    for name in names:
+        call, _, kind = name.partition(".")
+        if kind != "req" and not (reclaim and kind == "taken"):
+            continue
+        if os.path.exists(os.path.join(queue, call + ".res")):
+            continue
+        path = os.path.join(queue, name)
+        try:
+            with open(path, encoding="utf-8") as handle:
+                data = handle.read()
+            if calls and size + len(data) > RELAY_READ_LIMIT:
+                break
+            if kind == "req":
+                os.replace(path, os.path.join(queue, call + ".taken"))
+        except OSError:
+            continue  # The agent gave up on it.
+        calls.append(json.loads(data))
+        size += len(data)
+        if len(calls) >= RELAY_READ_CALLS:
+            break
+    return calls
+
+
+def run_answer(request):
+    """Answers one bridge request handed over by run_read."""
+    directory = run_directory(request)
+    touch(directory)
+    call = request.get("call")
+    if not isinstance(call, str) or not CALL_ID.fullmatch(call):
+        raise Failure("Name the bridge call being answered.")
+    queue = bridge_queue(directory)
+    if not any(os.path.exists(os.path.join(queue, call + kind)) for kind in (".taken", ".req")):
+        return {"delivered": False}
+    status = int(request.get("status") or 502)
+    if not 100 <= status <= 599:
+        raise Failure("Answer with an HTTP status.")
+    content_type = request.get("contentType") or "application/json"
+    if not isinstance(content_type, str) or len(content_type) > 200:
+        raise Failure("Answer with a content type.")
+    body = request.get("body") or ""
+    if not isinstance(body, str) or len(body) > (RELAY_ANSWER_LIMIT * 4) // 3 + 4:
+        raise Failure("The bridge answer is too large.")
+    base64.b64decode(body, validate=True)
+    temporary = os.path.join(queue, call + ".res.tmp")
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump({"status": status, "contentType": content_type, "body": body}, handle)
+    os.replace(temporary, os.path.join(queue, call + ".res"))
+    return {"delivered": True}
+
+
+def relay(directory):
+    """Serves the bridge to the run's agent on a free loopback port. Returns its
+    address and the secret the agent must present."""
+    queue = bridge_queue(directory)
+    os.makedirs(queue, mode=0o700, exist_ok=True)
+    secret = secrets.token_hex(32)
+
+    def forget(call):
+        for kind in (".req", ".taken", ".res"):
+            try:
+                os.unlink(os.path.join(queue, call + kind))
+            except FileNotFoundError:
+                pass
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def log_message(self, *args):
+            pass
+
+        def reply(self, status, body, content_type="application/json"):
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def failure(self, status, message):
+            # The request body may be unread, so the connection cannot be reused.
+            self.close_connection = True
+            self.reply(status, json.dumps({"error": message}).encode())
+
+        def forward(self):
+            supplied = self.headers.get("Authorization", "")
+            if not hmac.compare_digest(supplied.encode(), f"Bearer {secret}".encode()):
+                return self.failure(401, "Jackalope bridge credential required.")
+            if self.headers.get("Origin"):
+                return self.failure(403, "Browser requests are not accepted.")
+            if self.headers.get("Transfer-Encoding"):
+                return self.failure(411, "Send a Content-Length.")
+            length = int(self.headers.get("Content-Length") or 0)
+            if length < 0 or length > RELAY_BODY_LIMIT:
+                return self.failure(413, "Bridge requests are limited to 64 KB.")
+            body = self.rfile.read(length) if length else b""
+            if not self.path.startswith("/") or len(self.path) > 2000:
+                return self.failure(400, "Unsupported bridge path.")
+            try:
+                if len(os.listdir(queue)) >= RELAY_PENDING_LIMIT * 2:
+                    return self.failure(503, "Too many bridge calls are waiting. Try again shortly.")
+            except FileNotFoundError:
+                return self.failure(503, "The run has ended.")
+            call = f"{time.time_ns():016x}{secrets.token_hex(8)}"
+            headers = {name: self.headers[name] for name in RELAY_HEADERS if self.headers.get(name)}
+            temporary = os.path.join(queue, call + ".tmp")
+            with open(temporary, "w", encoding="utf-8") as handle:
+                json.dump({"id": call, "method": self.command, "path": self.path,
+                           "headers": headers, "body": base64.b64encode(body).decode()}, handle)
+            os.replace(temporary, os.path.join(queue, call + ".req"))
+            answer = os.path.join(queue, call + ".res")
+            deadline = time.time() + RELAY_TIMEOUT
+            delay = 0.02
+            while not os.path.exists(answer):
+                if time.time() > deadline:
+                    forget(call)
+                    return self.failure(504, "Jackalope did not answer this bridge call in time.")
+                time.sleep(delay)
+                delay = min(delay * 2, 0.25)
+            try:
+                with open(answer, encoding="utf-8") as handle:
+                    result = json.load(handle)
+            finally:
+                forget(call)
+            self.reply(int(result["status"]), base64.b64decode(result["body"]),
+                       result.get("contentType") or "application/json")
+
+        do_GET = forward
+        do_POST = forward
+        do_DELETE = forward
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.daemon_threads = True
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return f"http://127.0.0.1:{server.server_address[1]}", secret
 
 
 def run_stop(request):
@@ -688,10 +912,20 @@ def supervise(directory):
     """Owns one agent process: feeds its input, captures its output, enforces the
     time limit, honours stop requests and stops it when no one reads for
     ORPHAN_SECONDS. Writes exit.json last."""
+    owner = os.open(os.path.join(directory, "owner"), os.O_RDWR | os.O_CREAT, 0o600)
+    fcntl.flock(owner, fcntl.LOCK_EX)
     spec_path = os.path.join(directory, "spec.json")
     with open(spec_path) as handle:
         spec = json.load(handle)
     os.unlink(spec_path)
+    if spec.get("relay"):
+        address, secret = relay(directory)
+
+        def swap(value):
+            return value.replace(RELAY_URL, address).replace(RELAY_TOKEN, secret)
+
+        spec["argv"] = [swap(arg) for arg in spec["argv"]]
+        spec["env"] = {name: swap(value) for name, value in spec["env"].items()}
     environment = dict(os.environ)
     environment.pop("JACKALOPE_COMPUTER_TOKEN", None)
     environment.update(spec["env"])
@@ -763,6 +997,8 @@ def handle_run(request):
         "workspace_diff": workspace_diff,
         "workspace_get": workspace_get,
         "run_remove": run_remove,
+        "run_status": run_status,
+        "run_answer": run_answer,
     }[action](request)
 
 

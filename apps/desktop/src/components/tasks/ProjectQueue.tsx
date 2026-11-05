@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { ownerComputer } from '../../lib/computers';
 import {
   type QueueCommand,
   type QueueItem,
@@ -52,6 +53,7 @@ const emptyQueue: QueueView = {
   messages: [],
   enabledProjects: [],
   concurrency: 3,
+  remoteConcurrency: 8,
   bridgeUrl: null,
   bridgeError: null,
   mergedRunIds: [],
@@ -71,7 +73,19 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [onComputer, setOnComputer] = useState(false);
   const desktop = isTauriEnvironment();
+  useEffect(() => {
+    if (!desktop) return;
+    let disposed = false;
+    ownerComputer({ kind: 'project', id: project.id })
+      .then((computer) => !disposed && setOnComputer(!!computer))
+      .catch(() => !disposed && setOnComputer(false));
+    return () => {
+      disposed = true;
+    };
+  }, [desktop, project.id]);
+  const remoteConcurrency = queue.remoteConcurrency ?? 8;
   const load = async () => {
     if (desktop) setQueue(await queueSnapshot());
     setLoading(false);
@@ -271,29 +285,61 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
       ) : (
         <>
           <div className="queue-controls">
-            <label htmlFor="projectqueue-field-2" className="task-label">
-              Concurrent tasks
-              <Select
-                id="projectqueue-field-2"
-                aria-label="Concurrent tasks"
-                className="task-input"
-                value={String(queue.concurrency)}
-                disabled={busy || !desktop}
-                onValueChange={(value) =>
-                  void act('queue_dispatch', {
-                    projectId: project.id,
-                    enabled,
-                    concurrency: Number(value),
-                  })
-                }
-              >
-                {[1, 2, 3, 4, 5, 6].map((n) => (
-                  <SelectItem key={n} value={String(n)}>
-                    {n} across projects
-                  </SelectItem>
-                ))}
-              </Select>
-            </label>
+            <div className="queue-limits">
+              <label htmlFor="projectqueue-field-2" className="task-label">
+                Concurrent tasks
+                <Select
+                  id="projectqueue-field-2"
+                  aria-label="Concurrent tasks"
+                  className="task-input"
+                  value={String(queue.concurrency)}
+                  disabled={busy || !desktop}
+                  onValueChange={(value) =>
+                    void act('queue_dispatch', {
+                      projectId: project.id,
+                      enabled,
+                      concurrency: Number(value),
+                    })
+                  }
+                >
+                  {[1, 2, 3, 4, 5, 6].map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n} across projects
+                    </SelectItem>
+                  ))}
+                </Select>
+              </label>
+              {onComputer && (
+                <label htmlFor="projectqueue-remote-limit" className="task-label">
+                  <span className="inline-flex items-center gap-2">
+                    On computers <Badge variant="accent">Beta</Badge>
+                  </span>
+                  <Select
+                    id="projectqueue-remote-limit"
+                    aria-label="Concurrent tasks on computers"
+                    className="task-input"
+                    value={String(remoteConcurrency)}
+                    disabled={busy || !desktop}
+                    onValueChange={(value) =>
+                      void act('queue_dispatch', {
+                        projectId: project.id,
+                        enabled,
+                        concurrency: queue.concurrency,
+                        remoteConcurrency: Number(value),
+                      })
+                    }
+                  >
+                    {[...new Set([1, 2, 4, 8, 12, 16, 24, 32, remoteConcurrency])]
+                      .sort((a, b) => a - b)
+                      .map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n} at once
+                        </SelectItem>
+                      ))}
+                  </Select>
+                </label>
+              )}
+            </div>
             <Button
               disabled={
                 !desktop ||

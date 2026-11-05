@@ -1,4 +1,4 @@
-import { DefinitionList, Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Badge, DefinitionList, Disclosure, DisclosureSummary } from '@jackalope/ui';
 import type { TaskRun } from '../../lib/task-runtime';
 import { describeRunUsage } from '../../lib/usage-insights';
 import { TaskLearning } from '../knowledge/TaskLearning';
@@ -24,6 +24,18 @@ export function TaskRunDetails({
           { label: 'Agent', value: run.agent },
           { label: 'Model', value: run.model || 'Agent default' },
           { label: 'Account', value: run.accountBinding?.label || run.account },
+          ...(run.remote
+            ? [
+                {
+                  label: 'Runs on',
+                  value: (
+                    <span className="inline-flex items-center gap-2">
+                      {run.remote.computerName} <Badge variant="accent">Beta</Badge>
+                    </span>
+                  ),
+                },
+              ]
+            : []),
           { label: 'Started', value: new Date(run.startedAt).toLocaleString() },
           ...(run.endedAt
             ? [{ label: 'Ended', value: new Date(run.endedAt).toLocaleString() }]

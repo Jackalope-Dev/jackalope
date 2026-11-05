@@ -188,6 +188,8 @@ pub struct QueueView {
     pub messages: Vec<CoordinationMessage>,
     pub enabled_projects: Vec<String>,
     pub concurrency: usize,
+    /// Agents that may run at once on project computers.
+    pub remote_concurrency: usize,
     pub bridge_url: Option<String>,
     pub bridge_error: Option<String>,
     pub merged_run_ids: Vec<String>,

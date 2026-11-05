@@ -42,7 +42,11 @@ export function AgentSignIns() {
 
   return (
     <SettingGroup
-      title="Agent sign-ins for computers"
+      title={
+        <span className="inline-flex items-center gap-2">
+          Agent sign-ins for computers <Badge variant="accent">Beta</Badge>
+        </span>
+      }
       description="Agents that run on a project's computer use these instead of this device's accounts."
     >
       {error && (

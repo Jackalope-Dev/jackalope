@@ -21,7 +21,14 @@ export function useAgent37() {
 }
 
 /** Paste-and-connect for an Agent37 API key, checked with Agent37 before saving. */
-export function Agent37KeyForm({ onConnected }: { onConnected: () => void }) {
+export function Agent37KeyForm({
+  onConnected,
+  beta = false,
+}: {
+  onConnected: () => void;
+  /** Marks Agent37 as a beta feature where no heading already does. */
+  beta?: boolean;
+}) {
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -42,7 +49,15 @@ export function Agent37KeyForm({ onConnected }: { onConnected: () => void }) {
       }}
     >
       <FormField
-        label="Agent37 API key"
+        label={
+          beta ? (
+            <span className="inline-flex items-center gap-2">
+              Agent37 API key <Badge variant="accent">Beta</Badge>
+            </span>
+          ) : (
+            'Agent37 API key'
+          )
+        }
         description="Computers run and bill on your own Agent37 account."
       >
         <Input
@@ -82,7 +97,13 @@ export function Agent37Settings() {
   }, [connected]);
 
   return (
-    <SettingGroup title="Agent37">
+    <SettingGroup
+      title={
+        <span className="inline-flex items-center gap-2">
+          Agent37 <Badge variant="accent">Beta</Badge>
+        </span>
+      }
+    >
       {connected ? (
         <Setting
           title={

@@ -63,14 +63,22 @@ pub(crate) fn run_name(workspace: &str) -> String {
 /// Environment variables for a run, as name and value.
 pub(crate) type Environment = Vec<(String, String)>;
 
+/// Stand-ins the in-sandbox agent replaces with its bridge relay's address and
+/// secret when a run starts with `relay`.
+pub(crate) const RELAY_URL: &str = "@@JACKALOPE_RELAY_URL@@";
+pub(crate) const RELAY_TOKEN: &str = "@@JACKALOPE_RELAY_TOKEN@@";
+
 /// The agent CLI command for a computer, translated from the local command:
-/// the program becomes the CLI on the computer's PATH, local paths and the
-/// Jackalope bridge are dropped, and the computer itself is the sandbox, so the
-/// agent runs without its own permission prompts or sandbox.
+/// the program becomes the CLI on the computer's PATH, local paths are dropped,
+/// and the computer itself is the sandbox, so the agent runs without its own
+/// permission prompts or sandbox. With `bridge`, this device's bridge address
+/// becomes the computer's relay and its credential the relay's own secret;
+/// without it the Jackalope bridge is dropped.
 pub(crate) fn translate(
     adapter: &str,
     command: &Command,
     root: &Path,
+    bridge: Option<&str>,
 ) -> Result<(Vec<String>, Environment), String> {
     if !credentials::REMOTE_ADAPTERS.contains(&adapter) {
         return Err(format!("{adapter} cannot run on a computer yet."));
@@ -84,7 +92,22 @@ pub(crate) fn translate(
     while index < args.len() {
         let arg = &args[index];
         let value = args.get(index + 1);
+        let relayed = value.and_then(|value| {
+            bridge
+                .filter(|endpoint| value.contains(endpoint))
+                .map(|endpoint| value.replace(endpoint, RELAY_URL))
+        });
         match (adapter, arg.as_str()) {
+            ("claude", "--mcp-config") | ("codex", "-c") if relayed.is_some() => {
+                argv.extend([arg.clone(), relayed.unwrap()]);
+                index += 2;
+                continue;
+            }
+            ("claude", "--allowedTools") if bridge.is_some() && value.is_some() => {
+                argv.extend([arg.clone(), value.unwrap().clone()]);
+                index += 2;
+                continue;
+            }
             ("claude", "--mcp-config" | "--permission-prompt-tool" | "--allowedTools") => {
                 index += 2;
                 continue;
@@ -125,6 +148,10 @@ pub(crate) fn translate(
             (!dropped).then_some((name, value))
         })
         .collect();
+    if bridge.is_some() {
+        env.push(("JACKALOPE_BRIDGE_URL".into(), RELAY_URL.into()));
+        env.push(("JACKALOPE_BRIDGE_TOKEN".into(), RELAY_TOKEN.into()));
+    }
     env.extend(credentials::environment(root, adapter)?);
     Ok((argv, env))
 }
@@ -148,12 +175,23 @@ pub(crate) struct Page {
     pub stderr: Vec<u8>,
     /// Set once the run has ended and all its output has been read.
     pub exit: Option<Value>,
+    /// Bridge requests from the run's agent, for [`super::relay::Relay`].
+    pub bridge: Vec<Value>,
 }
 
 impl Session {
     pub fn open(root: &Path, computer: &Computer, workspace: &str) -> Result<Self, String> {
         let transport = super::provider(&computer.provider)?.transport(root, computer)?;
         Ok(Self::with_transport(transport, run_name(workspace)))
+    }
+
+    /// Replaces a connection that stopped answering, starting the computer
+    /// again if it stopped.
+    pub fn reconnect(&mut self, root: &Path, computer: &Computer) -> Result<(), String> {
+        self.transport.shutdown();
+        super::ready_within(root, computer, Duration::from_secs(90))?;
+        self.transport = super::provider(&computer.provider)?.transport(root, computer)?;
+        Ok(())
     }
 
     pub fn with_transport(transport: Box<dyn Transport>, name: String) -> Self {
@@ -169,10 +207,26 @@ impl Session {
         self.transport.call(&payload, timeout, &self.canceled)
     }
 
+    /// Whether this run exists on the computer and how far it got, or `None`
+    /// when the computer's agent predates the bridge relay and recovery.
+    pub fn status(&mut self) -> Result<Option<Value>, String> {
+        match self.call(json!({"action":"run_status"}), CALL_TIMEOUT) {
+            Ok(status) => Ok(Some(status)),
+            Err(error) if error.contains("Unsupported action") => Ok(None),
+            Err(error) => Err(error),
+        }
+    }
+
     /// Uploads the workspace's files: tracked and untracked ones Git does not
-    /// ignore, or for a folder that is not a repository, those its ignore files allow.
-    pub fn upload(&mut self, workspace: &Path, progress: &dyn Fn(u64, u64)) -> Result<(), String> {
-        let mut file = archive(workspace)?;
+    /// ignore, or for a folder that is not a repository, those its ignore files
+    /// allow, plus the copied `setup` files the local workspace was given.
+    pub fn upload(
+        &mut self,
+        workspace: &Path,
+        setup: &[String],
+        progress: &dyn Fn(u64, u64),
+    ) -> Result<(), String> {
+        let mut file = archive(workspace, setup)?;
         let size = file
             .seek(std::io::SeekFrom::End(0))
             .map_err(|e| e.to_string())?;
@@ -218,24 +272,29 @@ impl Session {
         }
     }
 
-    /// Starts the agent. Returns its exit when it ended at once.
+    /// Starts the agent, with the bridge relay when `relay` is set. Returns its
+    /// exit when it ended at once.
     pub fn start(
         &mut self,
         argv: &[String],
         env: &[(String, String)],
         stdin: &str,
+        relay: bool,
     ) -> Result<Option<Value>, String> {
         let env: HashMap<&str, &str> = env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
         let result = self.call(
-            json!({"action":"run_start","argv":argv,"env":env,"stdin":stdin,"timeout_s":6 * 3600}),
+            json!({"action":"run_start","argv":argv,"env":env,"stdin":stdin,"timeout_s":6 * 3600,"relay":relay}),
             CALL_TIMEOUT,
         )?;
         Ok((result["started"] != true).then(|| result["exit"].clone()))
     }
 
-    pub fn read(&mut self, out: &mut u64, err: &mut u64) -> Result<Page, String> {
+    /// Output after the cursors and new bridge requests. `reclaim` also returns
+    /// requests handed over earlier and still unanswered, after a read whose
+    /// answer may have been lost.
+    pub fn read(&mut self, out: &mut u64, err: &mut u64, reclaim: bool) -> Result<Page, String> {
         let result = self.call(
-            json!({"action":"run_read","out":*out,"err":*err,"wait_ms":READ_WAIT_MS}),
+            json!({"action":"run_read","out":*out,"err":*err,"wait_ms":READ_WAIT_MS,"reclaim":reclaim}),
             Duration::from_millis(READ_WAIT_MS) + Duration::from_secs(30),
         )?;
         let decode = |key: &str| {
@@ -247,10 +306,26 @@ impl Session {
             stdout: decode("stdout")?,
             stderr: decode("stderr")?,
             exit: Some(result["exit"].clone()).filter(|exit| !exit.is_null()),
+            bridge: result["bridge"].as_array().cloned().unwrap_or_default(),
         };
         *out = result["out"].as_u64().unwrap_or(*out);
         *err = result["err"].as_u64().unwrap_or(*err);
         Ok(page)
+    }
+
+    /// Sends one bridge answer to the waiting agent.
+    pub fn answer(&mut self, answer: &super::relay::Answer) -> Result<(), String> {
+        self.call(
+            json!({
+                "action": "run_answer",
+                "call": answer.call,
+                "status": answer.status,
+                "contentType": answer.content_type,
+                "body": base64::engine::general_purpose::STANDARD.encode(&answer.body),
+            }),
+            CALL_TIMEOUT,
+        )
+        .map(|_| ())
     }
 
     pub fn stop(&mut self) -> Result<(), String> {
@@ -352,9 +427,58 @@ fn walked(workspace: &Path) -> Vec<(String, bool)> {
         .collect()
 }
 
-/// A tar of the workspace's files in a temporary file.
-pub(crate) fn archive(workspace: &Path) -> Result<std::fs::File, String> {
-    let files = listed(workspace).unwrap_or_else(|| walked(workspace));
+/// Copied setup files sent with a workspace, in total; each is at most 1 MiB.
+const SETUP_LIMIT: u64 = 8 * 1024 * 1024;
+
+/// Copied setup files present in the workspace that the listing left out
+/// because Git ignores them: relative regular files without links or `.git`.
+fn setup_files(
+    workspace: &Path,
+    setup: &[String],
+    listed: &HashSet<String>,
+) -> Result<Vec<(String, bool)>, String> {
+    let mut files: Vec<(String, bool)> = Vec::new();
+    let mut total = 0u64;
+    for value in setup.iter().take(32) {
+        let relative = value.trim().replace('\\', "/");
+        if relative.is_empty()
+            || relative.starts_with('/')
+            || relative.contains(':')
+            || relative
+                .split('/')
+                .any(|part| part.is_empty() || part == ".." || part.eq_ignore_ascii_case(".git"))
+            || listed.contains(&relative)
+            || files.iter().any(|(path, _)| path == &relative)
+        {
+            continue;
+        }
+        let mut current = workspace.to_path_buf();
+        let mut linked = false;
+        for part in relative.split('/') {
+            current.push(part);
+            linked |= std::fs::symlink_metadata(&current)
+                .map_or(true, |metadata| metadata.file_type().is_symlink());
+        }
+        let Ok(metadata) = std::fs::metadata(&current) else {
+            continue;
+        };
+        if linked || !metadata.is_file() || metadata.len() > 1024 * 1024 {
+            continue;
+        }
+        total += metadata.len();
+        if total > SETUP_LIMIT {
+            return Err("The copied setup files are larger than 8 MB, so they cannot be sent to a computer.".into());
+        }
+        files.push((relative, false));
+    }
+    Ok(files)
+}
+
+/// A tar of the workspace's files and its copied setup files in a temporary file.
+pub(crate) fn archive(workspace: &Path, setup: &[String]) -> Result<std::fs::File, String> {
+    let mut files = listed(workspace).unwrap_or_else(|| walked(workspace));
+    let known: HashSet<String> = files.iter().map(|(path, _)| path.clone()).collect();
+    files.extend(setup_files(workspace, setup, &known)?);
     let file = tempfile_in_temp()?;
     let mut builder = tar::Builder::new(file);
     builder.follow_symlinks(false);
@@ -590,7 +714,7 @@ mod tests {
             .env("JACKALOPE_BRIDGE_TOKEN", "secret")
             .env("GIT_AUTHOR_NAME", "Claude")
             .env("SOME_PATH", "D:\\cache");
-        let (argv, env) = translate("claude", &command, root.path()).unwrap();
+        let (argv, env) = translate("claude", &command, root.path(), None).unwrap();
         assert_eq!(
             argv,
             [
@@ -634,7 +758,7 @@ mod tests {
             "--json",
             "-",
         ]);
-        let (argv, env) = translate("codex", &command, root.path()).unwrap();
+        let (argv, env) = translate("codex", &command, root.path(), None).unwrap();
         assert_eq!(
             argv,
             [
@@ -653,11 +777,64 @@ mod tests {
     }
 
     #[test]
+    fn bridge_points_at_the_computer_relay_without_the_credential() {
+        let root = root();
+        credentials::set(
+            root.path(),
+            "claude-token",
+            Some("sk-ant-oat01-abcdefghijklmnop"),
+        )
+        .unwrap();
+        credentials::set(
+            root.path(),
+            "openai-key",
+            Some("sk-proj-abcdefghijklmnopqrst"),
+        )
+        .unwrap();
+        let endpoint = "http://127.0.0.1:4321";
+        let config = format!(
+            "{{\"mcpServers\":{{\"jackalope\":{{\"url\":\"{endpoint}/mcp\",\"headers\":{{\"Authorization\":\"Bearer ${{JACKALOPE_BRIDGE_TOKEN}}\"}}}}}}}}"
+        );
+        let mut command = Command::new("claude");
+        command
+            .args(["--print", "--mcp-config", &config])
+            .args([
+                "--permission-prompt-tool",
+                "mcp__jackalope__permission_prompt",
+            ])
+            .args(["--allowedTools", "mcp__jackalope__peers"])
+            .env("JACKALOPE_BRIDGE_URL", endpoint)
+            .env("JACKALOPE_BRIDGE_TOKEN", "real-secret");
+        let (argv, env) = translate("claude", &command, root.path(), Some(endpoint)).unwrap();
+        assert_eq!(argv[2], "--mcp-config");
+        assert!(argv[3].contains(&format!("{RELAY_URL}/mcp")));
+        assert!(!argv[3].contains(endpoint));
+        assert!(!argv.iter().any(|arg| arg == "--permission-prompt-tool"));
+        assert_eq!(argv[4..], ["--allowedTools", "mcp__jackalope__peers"]);
+        let value = |name: &str| env.iter().find(|(k, _)| k == name).map(|(_, v)| v.as_str());
+        assert_eq!(value("JACKALOPE_BRIDGE_URL"), Some(RELAY_URL));
+        assert_eq!(value("JACKALOPE_BRIDGE_TOKEN"), Some(RELAY_TOKEN));
+        assert!(!env.iter().any(|(_, v)| v.contains("real-secret")));
+
+        let mut command = Command::new("codex");
+        command.args([
+            "exec",
+            "-c",
+            &format!("mcp_servers={{ jackalope = {{ url = \"{endpoint}/mcp\", bearer_token_env_var = \"JACKALOPE_BRIDGE_TOKEN\" }} }}"),
+            "-c",
+            "mcp_servers.docs.command=\"x\"",
+        ]);
+        let (argv, _) = translate("codex", &command, root.path(), Some(endpoint)).unwrap();
+        assert_eq!(argv.len(), 4);
+        assert!(argv[3].contains(&format!("{RELAY_URL}/mcp")));
+    }
+
+    #[test]
     fn missing_credentials_and_adapters_are_reported() {
         let root = root();
-        let error = translate("claude", &Command::new("claude"), root.path()).unwrap_err();
+        let error = translate("claude", &Command::new("claude"), root.path(), None).unwrap_err();
         assert!(error.contains("Settings → Computers"), "{error}");
-        let error = translate("gemini", &Command::new("gemini"), root.path()).unwrap_err();
+        let error = translate("gemini", &Command::new("gemini"), root.path(), None).unwrap_err();
         assert!(error.contains("cannot run on a computer"), "{error}");
     }
 
@@ -695,7 +872,7 @@ mod tests {
                 .success());
         };
         git(&["init", "-q"]);
-        std::fs::write(path.join(".gitignore"), "build/\n").unwrap();
+        std::fs::write(path.join(".gitignore"), "build/\n.env.local\n").unwrap();
         std::fs::write(path.join("tracked.txt"), "a").unwrap();
         git(&["add", "."]);
         git(&[
@@ -710,7 +887,9 @@ mod tests {
         std::fs::write(path.join("new.txt"), "b").unwrap();
         std::fs::create_dir(path.join("build")).unwrap();
         std::fs::write(path.join("build/out.bin"), "c").unwrap();
-        let mut file = archive(path).unwrap();
+        std::fs::write(path.join(".env.local"), "KEY=1").unwrap();
+        let setup = [".env.local", "../escape", "missing.txt", "tracked.txt"].map(String::from);
+        let mut file = archive(path, &setup).unwrap();
         file.seek(std::io::SeekFrom::Start(0)).unwrap();
         let mut names: Vec<String> = tar::Archive::new(file)
             .entries()
@@ -725,7 +904,10 @@ mod tests {
             })
             .collect();
         names.sort();
-        assert_eq!(names, [".gitignore", "new.txt", "tracked.txt"]);
+        assert_eq!(
+            names,
+            [".env.local", ".gitignore", "new.txt", "tracked.txt"]
+        );
     }
 
     /// Answers the run protocol from memory.
@@ -784,7 +966,7 @@ mod tests {
         let mut session = Session::with_transport(Box::new(fake), "w1".into());
         let sent = std::sync::Mutex::new(0);
         session
-            .upload(dir.path(), &|done, _| *sent.lock().unwrap() = done)
+            .upload(dir.path(), &[], &|done, _| *sent.lock().unwrap() = done)
             .unwrap();
         let archived = upload.lock().unwrap().clone();
         assert_eq!(*sent.lock().unwrap() as usize, archived.len());

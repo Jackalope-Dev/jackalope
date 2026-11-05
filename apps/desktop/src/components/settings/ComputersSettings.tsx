@@ -252,6 +252,9 @@ export function ComputersSettings() {
                 <Badge variant={computer.state === 'running' ? 'accent' : 'default'}>
                   {computerStateLabel(computer)}
                 </Badge>
+                {(computer.ownerKind === 'project' || computer.provider === 'agent37') && (
+                  <Badge variant="accent">Beta</Badge>
+                )}
               </span>
             }
             description={[

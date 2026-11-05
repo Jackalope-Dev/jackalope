@@ -167,33 +167,46 @@ tools stay on the task's local browser for cloud machines; `desktop_control` and
 
 ## Agents on a computer
 
-A project whose **Agents run on** names a computer runs its Claude Code and Codex task
-agents there. Other agents, and planning sessions, which need the bridge for their
-questions, run on this device and say so in the attempt's activity. Workspace
-preparation, checks, the checkpoint, review and integration stay on this device and are
-unchanged, so the coordinator, execution guard and runtime lock order, reservations and
-Git safeguards apply as for a local attempt:
+Running a project's agents on a computer, Agent37 computers and agent sign-ins for
+computers are beta and marked **Beta** wherever the app shows them. A project whose
+**Agents run on** names a computer runs its Claude Code and Codex task agents there.
+Other agents and planning sessions run on this device and say so in the attempt's
+activity. Workspace preparation, checks, the checkpoint, review and integration stay on
+this device and are unchanged, so the coordinator, execution guard and runtime lock
+order, reservations and Git safeguards apply as for a local attempt:
 
-1. The local workspace is prepared as usual. Its tracked files and untracked files Git
-   does not ignore (or, for a folder that is not a repository, the files its ignore files
-   allow) are sent as a tar in 512 KB chunks, at most 512 MB. Ignored files, including
-   copied setup files such as `.env.local`, are not sent.
+1. The local workspace is prepared as usual. If an earlier run of the same workspace
+   left changes on the computer (contact was lost, or Jackalope restarted), they are
+   brought back and applied first; a patch that does not apply is saved as
+   `<attempt>.recovered.patch` beside the attempt's history. The workspace's tracked
+   files and untracked files Git does not ignore (or, for a folder that is not a
+   repository, the files its ignore files allow) are sent as a tar in 512 KB chunks, at
+   most 512 MB, together with the project's copied setup files such as `.env.local`
+   (regular files of at most 1 MiB each, 8 MB in all). Other ignored files are not sent.
 2. The computer starts if needed, waiting up to 20 minutes (a first image build is slow).
    The agent CLI starts in the uploaded copy with the task's prompt on standard input.
 3. Its output is read about once a second and fed to the same event parsers as a local
-   process; stop, quota handoff and the six-hour limit stop it on the computer. Two
-   minutes of failed reads end the attempt as lost contact.
+   process; stop, quota handoff and the six-hour limit stop it on the computer. When
+   reads fail, the attempt keeps trying for 30 minutes, reconnecting every five failed
+   reads and starting the computer again if it stopped, then carries on where it left
+   off. A stopped attempt gives up after 30 seconds without contact. Past the window the
+   attempt ends as lost contact and its changes stay on the computer until the task is
+   continued.
 4. When it ends, its changes since the upload come back as a binary Git patch, checked
    by SHA-256, and are applied to the local workspace with `git apply`. A patch that does
-   not apply is saved beside the attempt's history and the attempt reports where. Then
-   the attempt completes like a local one.
+   not apply is saved as `<attempt>.remote.patch` and the attempt reports where. An agent
+   stopped because nobody read it for ten minutes, or by a computer restart, ends the
+   attempt unsuccessfully, but its changes still come back. Then the attempt completes
+   like a local one.
 
 The command is the local one translated: the program is the CLI on the computer's PATH,
-local paths, profile directories and Jackalope's bridge variables are dropped, and the
-computer is the sandbox, so Claude Code runs with `--permission-mode bypassPermissions`
-and Codex with `sandbox_mode="danger-full-access"`. Persistent Claude Code sessions are
-not used remotely. The agent CLI must still be installed on this device, which resolves
-the agent before launch. The copy lives at `~/.jackalope-runs/w<hash>/workspace`, named
+local paths and profile directories are dropped, and the computer is the sandbox, so
+Claude Code runs with `--permission-mode bypassPermissions` and Codex with
+`sandbox_mode="danger-full-access"`. Persistent Claude Code sessions are not used
+remotely. The agent CLI does not need to be installed on this device: for a project with
+a computer, launch checks only the agent's adapter and model settings, and this device's
+account profiles are neither required nor checked. Automatic routing still chooses among
+agents installed here. The copy lives at `~/.jackalope-runs/w<hash>/workspace`, named
 from the local workspace path, so a continuation reuses the path and the agent's own
 session resumes; the run's folder is removed after its changes come back.
 
@@ -203,16 +216,35 @@ for computers** in Settings → Computers: a Claude Code token from `claude setu
 API key (`CODEX_API_KEY` and `OPENAI_API_KEY`). They are stored in protected storage
 (`computers/secrets/agent-credentials.bin`), shown only as saved or not, and passed to
 the run's environment only. A missing sign-in fails the attempt with where to add it.
-The bridge listens on this device's loopback, so peers, questions, the browser and other
-Jackalope tools are not offered to agents on a computer, and project connections are
-not delivered there.
 
-Agents on project computers have their own concurrency limit (8 by default, up to 32,
-through `queue_dispatch`'s `remoteConcurrency`), separate from this device's one to six.
-A run holds its computer against the idle stop. On the computer, a run is owned by a
-detached supervisor that survives reconnects; if nobody reads it for ten minutes, for
-example because Jackalope closed, it is stopped. After a restart the attempt is
-interrupted like a local one and is not rerun.
+The Jackalope bridge reaches agents on a computer through a relay (`computers/relay.rs`
+and the run's supervisor in `agent.py`). The supervisor serves the bridge on a free
+`127.0.0.1` port inside the computer with a random secret of its own, which replace
+`JACKALOPE_BRIDGE_URL`, `JACKALOPE_BRIDGE_TOKEN` and the bridge address in the agent's
+MCP configuration. Each request it receives (at most 64 KB, 32 waiting) is handed to
+Jackalope by the next output read, which then returns early, and forwarded to the local
+bridge with the attempt's real credential on its own thread, so a long call such as
+`ask_user` does not stall output. Answers go back through `run_answer`, at most 512 KB
+each; a call unanswered for 40 minutes gets a timeout. The bridge credential never
+leaves this device, and requests carrying an `Origin` header are refused. Peers,
+messages, questions, `propose_subtask`, plan deviations, agreements, validation steps,
+decisions and Jev questions work as for a local agent. Tools that act on this device or
+its copy of the workspace (the browser tools, `desktop_control`, `computer_verify`,
+`verification_output`, `read_context` and `peer_adopt`) are left out of the tool list,
+refused when called, and named as unavailable in the agent's instructions; the saved
+check still runs locally after the changes come back. Project connections are not
+delivered to agents on a computer. A computer whose agent predates the relay (a cloud
+machine on an old image) runs the agent without the bridge and says so.
+
+Agents on project computers have their own concurrency limit (8 by default, up to 32),
+separate from this device's one to six. The project's queue shows it as **On
+computers** beside **Concurrent tasks** when the project has a computer, and sets it
+through `queue_dispatch`'s `remoteConcurrency`. A run holds its computer against the
+idle stop, and the attempt's details show the computer it ran on. On the computer, a run
+is owned by a detached supervisor that survives reconnects; if nobody reads it for ten
+minutes, for example because Jackalope closed, it is stopped. After a restart the
+attempt is interrupted like a local one and is not rerun; continuing it brings back what
+its run left on the computer.
 
 ## Agent37
 
@@ -262,8 +294,9 @@ unavailable. A provider implements the `Provider` trait:
 `computers/docker.rs` (`local-docker`), `computers/remote.rs` (`remote-machine`) and
 `computers/agent37.rs` (`agent37`) are the implementations; a VM API provider adds a
 module and a branch in `provider`. `computers/runs.rs` is the run protocol client,
-command translation and patch handling, `computers/credentials.rs` the agent sign-ins
-for computers, and `tasks/remote.rs` the attempt side of an agent on a computer.
+command translation and patch handling, `computers/relay.rs` the bridge relay,
+`computers/credentials.rs` the agent sign-ins for computers, and `tasks/remote.rs` the
+attempt side of an agent on a computer.
 `desktop_control/computer.rs` runs desktop actions on a computer and
 `computers/browser.rs` attaches the computer's browser to the task browser through
 `browser::set_router`, gated by the same site questions.
@@ -274,14 +307,20 @@ and `scrot`. It answers the helper protocol's `hello` (`protocol: 1`) and `list`
 `screenshot` (base64 PNG, optional `thumb` width), `click`, `double_click`, `right_click`,
 `drag`, `scroll`, `type`, `set_value`, `press` (`chord` with modifiers and key), `focus`,
 `open_app`, `clipboard_read`, `clipboard_write`, `open_url` and `exec`. `hello` also
-reports `runs: 1` for the run actions, which need no display: `workspace_put` (one
+reports `runs: 2` for the run actions, which need no display: `workspace_put` (one
 base64 chunk at a byte offset; the final chunk carries the archive's SHA-256, unpacks
 it rejecting absolute, `..`, `.git` and outside-pointing link entries, and commits it as
 the base), `run_start` (a command with environment and standard input under a detached
-`agent.py supervise` process; the specification holding credentials is deleted once
-read), `run_read` (output after byte offsets, waiting up to five seconds, with the exit
-once both streams are read), `run_stop`, `workspace_diff` and `workspace_get` (the binary
-patch from the base, including anything the agent committed) and `run_remove`. Run
+`agent.py supervise` process, optionally with the bridge relay; the specification
+holding credentials is deleted once read), `run_read` (output after byte offsets and up
+to eight waiting bridge requests, each handed over once unless `reclaim` asks again,
+waiting up to five seconds, with the exit once both streams are read), `run_answer`
+(one bridge answer), `run_status` (whether the run exists, was uploaded and started,
+and its exit), `run_stop`, `workspace_diff` and `workspace_get` (the binary patch from
+the base, including anything the agent committed) and `run_remove`. The supervisor
+holds a lock on the run's `owner` file for its life; a started run whose lock is free and
+which has no exit (its computer restarted) is recorded as `interrupted`. An agent from
+before these actions reports `runs: 1` and answers `run_status` as unsupported. Run
 actions keep their state in files under `~/.jackalope-runs` and do not take the HTTP
 agent's lock that serializes desktop actions. Snapshots and
 screenshots report the active window and, when Chromium is in front, its current page
@@ -302,16 +341,21 @@ records and compatibility, settings bounds, one machine per bot, the hosted refu
 Docker detection messages, container arguments, loopback ports and viewer URLs, the
 image tag, cloud address and secret validation, the idle stop choices and their
 exclusion from the container configuration, idle decisions and status text, viewer
-holds and the quit preference. `cargo test … --lib computers::runs tasks::remote` covers command translation,
-credentials, the workspace archive, chunked upload and patch checks, line splitting
-and patch application; `coordination::eligibility` covers the separate concurrency for
-computer projects; `computers::agent37` covers keys, instance creation bodies, states,
-errors and the template build context. `python3 apps/desktop/scripts/computer-agent.test.py`
-(POSIX, for example in WSL) covers the run actions: upload, run, read, stop, the orphan
-stop, committed changes and unsafe uploads. The opt-in
-`local_docker_computer_round_trip -- --ignored --nocapture` builds the image, starts a
-computer, takes a screenshot and snapshot, runs a command, checks the home volume
-survives a restart, runs a stand-in agent on an uploaded workspace and applies its
-changes, and deletes everything; it needs Docker and network access. These
-do not establish installed-app acceptance on each operating system, Docker variant or
-cloud provider, real Claude Code or Codex runs on a computer, or a live Agent37 account.
+holds and the quit preference. `cargo test … --lib computers::runs computers::relay
+tasks::remote` covers command translation with and without the bridge relay,
+credentials, the workspace archive with copied setup files, chunked upload and patch
+checks, line splitting, patch application, and the relay's refusals, tool-list filtering
+and forwarding with the attempt's credential; `coordination::eligibility` covers the
+separate concurrency for computer projects; `computers::agent37` covers keys, instance
+creation bodies, states, errors and the template build context.
+`python3 apps/desktop/scripts/computer-agent.test.py` (POSIX, for example in WSL) covers
+the run actions: upload, run, read, stop, the orphan stop, committed changes, unsafe
+uploads, the bridge relay's hand-over and answers, and a run whose supervisor died. The
+opt-in `local_docker_computer_round_trip -- --ignored --nocapture` builds the image,
+starts a computer, takes a screenshot and snapshot, runs a command, checks the home
+volume survives a restart, runs a stand-in agent on an uploaded workspace with a copied
+setup file and one relayed bridge call, applies its changes, and deletes everything; it
+needs Docker and network access. These do not establish installed-app acceptance on each
+operating system, Docker variant or cloud provider, real Claude Code or Codex runs on a
+computer, bridge tools used by a real agent there, lost-contact recovery against a real
+computer, or a live Agent37 account.
