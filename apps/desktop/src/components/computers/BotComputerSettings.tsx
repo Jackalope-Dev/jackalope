@@ -117,8 +117,9 @@ export function ProjectComputerSettings({ project }: { project: { id: string; na
     <OwnerComputerSettings
       owner={{ kind: 'project', ...project }}
       title="Agents run on"
+      beta
       emptyLabel="This device"
-      description="Claude Code and Codex agents run there instead of on this device, with the sign-ins in Settings → Computers. Checks, review and merging stay here. Jackalope's peer, question and browser tools are not available there yet."
+      description="Claude Code and Codex agents run there instead of on this device, with the sign-ins in Settings → Computers. Checks, review and merging stay here, and so do the browser and desktop control."
     />
   );
 }
@@ -128,11 +129,14 @@ function OwnerComputerSettings({
   title,
   description,
   emptyLabel = 'None',
+  beta = false,
 }: {
   owner: ComputerOwner;
   title: string;
   description: string;
   emptyLabel?: string;
+  /** Marks the group as a beta feature. */
+  beta?: boolean;
 }) {
   const { kind: ownerKind, id: ownerId } = owner;
   const [status, setStatus] = useState<ComputerStatus | null>(null);
@@ -212,9 +216,17 @@ function OwnerComputerSettings({
       await startComputer(created.id);
     });
 
+  const heading = beta ? (
+    <span className="inline-flex items-center gap-2">
+      {title} <Badge variant="accent">Beta</Badge>
+    </span>
+  ) : (
+    title
+  );
+
   if (!loaded && isTauriEnvironment()) {
     return (
-      <SettingGroup title={title} description={description}>
+      <SettingGroup title={heading} description={description}>
         <SettingBody>
           <p className="task-muted">Loading…</p>
         </SettingBody>
@@ -225,7 +237,7 @@ function OwnerComputerSettings({
   const dockerMissing = docker && !docker.available;
 
   return (
-    <SettingGroup title={title} description={description}>
+    <SettingGroup title={heading} description={description}>
       {error && (
         <SettingBody>
           <InlineNotice tone="error">{error}</InlineNotice>
@@ -375,9 +387,9 @@ function OwnerComputerSettings({
               {agent37 ? (
                 <>
                   <p className="form-field-description">
-                    A Linux computer on your Agent37 account, billed to your balance while it runs.
-                    It sleeps after 10 idle minutes. The first start builds its image there, which
-                    takes several minutes.
+                    <Badge variant="accent">Beta</Badge> A Linux computer on your Agent37 account,
+                    billed to your balance while it runs. It sleeps after 10 idle minutes. The first
+                    start builds its image there, which takes several minutes.
                   </p>
                   <Button
                     loading={busy === 'create'}
@@ -389,7 +401,7 @@ function OwnerComputerSettings({
                   </Button>
                 </>
               ) : (
-                <Agent37KeyForm onConnected={() => setAgent37(true)} />
+                <Agent37KeyForm beta onConnected={() => setAgent37(true)} />
               )}
             </div>
           )}

@@ -20,6 +20,7 @@ impl Coordinator {
             messages: inner.ledger.messages.clone(),
             enabled_projects: inner.enabled.iter().cloned().collect(),
             concurrency: inner.concurrency,
+            remote_concurrency: inner.remote_concurrency,
             bridge_url: inner.url.clone(),
             bridge_error: inner.error.clone(),
             merged_run_ids,

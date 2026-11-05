@@ -91,6 +91,8 @@ export interface QueueView {
   messages: QueueMessage[];
   enabledProjects: string[];
   concurrency: number;
+  /** Agents that may run at once on project computers, apart from `concurrency`. */
+  remoteConcurrency?: number;
   bridgeUrl: string | null;
   bridgeError: string | null;
   mergedRunIds: string[];

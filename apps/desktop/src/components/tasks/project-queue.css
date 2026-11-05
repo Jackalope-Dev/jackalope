@@ -20,6 +20,11 @@
   align-items: center;
   gap: 12px;
 }
+.queue-limits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
 .queue-flow {
   display: flex;
   gap: 3px;
