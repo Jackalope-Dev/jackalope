@@ -974,4 +974,43 @@ mod tests {
         let screen = harness.render(100, 30);
         assert!(!screen.contains("orchestrated"), "{screen}");
     }
+
+    #[test]
+    fn a_proposed_swarm_round_shows_in_the_plan_panel_and_approves_with_a_command() {
+        let mut harness = Harness::new();
+        finished_login_fix(&mut harness);
+        let plan = crate::protocol::PlanView {
+            id: "plan-1".into(),
+            title: "Add CSV export".into(),
+            status: "running".into(),
+            revision: Some(1),
+            progress: Some(
+                "swarm (beta) round 1/5 · next round waits for your approval · 2/2 tasks checked"
+                    .into(),
+            ),
+            next_round: vec!["Add the button".into()],
+            ..Default::default()
+        };
+        harness.host.lock().unwrap().reply = Some(Box::new(move |request| match request {
+            Request::PlanDetail { .. } | Request::PlanAction { .. } => Some(Response::Plan {
+                plan: Box::new(plan.clone()),
+            }),
+            _ => None,
+        }));
+        harness.app.open_plan("plan-1".into());
+        let screen = harness.render(140, 40);
+        assert!(screen.contains("Next round waits for you"), "{screen}");
+        assert!(screen.contains("· Add the button"), "{screen}");
+        harness.submit("/rounds later");
+        harness.submit("/rounds approve");
+        let sent: Vec<(String, String)> = harness
+            .requests()
+            .into_iter()
+            .filter_map(|request| match request {
+                Request::PlanAction { action, text, .. } => Some((action, text)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(sent, [("rounds".to_string(), "approve".to_string())]);
+    }
 }
