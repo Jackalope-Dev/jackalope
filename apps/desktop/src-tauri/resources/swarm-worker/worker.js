@@ -330,10 +330,15 @@ var Swarm = class extends DurableObject {
           tokenExpiresAt: token.expiresAt
         };
       } else {
-        created = await base.fork(fork, {
+        const forked = await base.fork(fork, {
           description: text(input.title, 200, "Jackalope agent attempt"),
           defaultBranchOnly: true
         });
+        created = {
+          remote: forked.remote,
+          token: forked.token,
+          tokenExpiresAt: new Date(Date.now() + TOKEN_TTL * 1e3).toISOString()
+        };
       }
       const now = (/* @__PURE__ */ new Date()).toISOString();
       const record = existing ?? {

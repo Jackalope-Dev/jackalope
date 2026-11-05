@@ -80,10 +80,16 @@ export class Swarm extends DurableObject<Env> {
           tokenExpiresAt: token.expiresAt,
         };
       } else {
-        created = await base.fork(fork, {
+        const forked = await base.fork(fork, {
           description: text(input.title, 200, 'Jackalope agent attempt'),
           defaultBranchOnly: true,
         });
+        // Fork results omit the token's expiry; forked tokens use the default TTL.
+        created = {
+          remote: forked.remote,
+          token: forked.token,
+          tokenExpiresAt: new Date(Date.now() + TOKEN_TTL * 1000).toISOString(),
+        };
       }
       const now = new Date().toISOString();
       const record: ForkRecord = existing ?? {

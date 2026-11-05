@@ -1,5 +1,5 @@
 {
-  "version": "300faedf7e1152f1",
+  "version": "d366d8af285d5726",
   "script": "jackalope-swarm",
   "mainModule": "worker.js",
   "compatibilityDate": "2026-09-28",
