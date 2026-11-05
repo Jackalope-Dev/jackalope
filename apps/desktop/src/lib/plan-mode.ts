@@ -94,12 +94,37 @@ export interface PlanSettings {
   exportPath: string;
   /** The most rounds a swarm runs before it waits for a re-plan. */
   maxRounds?: number;
+  /** New swarms ask before starting each next round. */
+  askBeforeRounds?: boolean;
+  /** The most orchestrators reviewing a swarm round in parallel, 1 to 4. */
+  orchestrators?: number;
+}
+
+/** An assignment an orchestrator proposes for the next swarm round. */
+export interface RoundAssignment {
+  key: string;
+  title: string;
+  prompt: string;
+  scopes: string[];
+  dependsOn: string[];
+  covers: string[];
+  briefing: string;
+}
+
+/** One area's orchestrator review within a round. */
+export interface PlanRoundArea {
+  name: string;
+  scopes: string[];
+  state: 'waiting' | 'reviewing' | 'done' | 'next';
+  summary: string;
+  evidence: string[];
+  next: string[];
 }
 
 export interface PlanRound {
   number: number;
   managedTaskId: string;
-  state: 'working' | 'reviewing' | 'held' | 'done' | 'next' | 'limit';
+  state: 'working' | 'reviewing' | 'approval' | 'held' | 'done' | 'next' | 'limit';
   summary: string;
   evidence: string[];
   check: { command: string; passed: boolean } | null;
@@ -108,6 +133,10 @@ export interface PlanRound {
   held: string | null;
   reviewRunId: string | null;
   decidedAt: string | null;
+  /** The next round's assignments while they wait for your approval. */
+  proposal?: RoundAssignment[] | null;
+  /** Areas reviewed by parallel orchestrators; empty when one reviews the plan. */
+  areas?: PlanRoundArea[];
 }
 
 export interface PlanRounds {
@@ -115,6 +144,9 @@ export interface PlanRounds {
   max: number;
   /** The current round waits for you to resume it. */
   paused: boolean;
+  /** Each next round waits for your approval. */
+  askFirst?: boolean;
+  orchestrators?: number;
   rounds: PlanRound[];
 }
 
@@ -217,8 +249,11 @@ export const planCommands = {
     reviewer?: string,
   ) => nativeTask<void>('plan_approve', { id, revision, hash, shape, checks, reviewer }),
   replan: (id: string, comments: string) => nativeTask<void>('plan_replan', { id, comments }),
-  rounds: (id: string, action: 'pause' | 'resume' | 'stop') =>
-    nativeTask<void>('plan_rounds', { id, action }),
+  rounds: (
+    id: string,
+    action: 'pause' | 'resume' | 'stop' | 'approve' | 'ask' | 'auto',
+    assignments?: RoundAssignment[],
+  ) => nativeTask<void>('plan_rounds', { id, action, assignments }),
   resolveDeviation: (id: string, deviationId: string, action: 'accept' | 'redo' | 'replan') =>
     nativeTask<void>('plan_resolve_deviation', { id, deviationId, action }),
   export: (id: string, path?: string) => nativeTask<string>('plan_export', { id, path }),
@@ -305,10 +340,18 @@ export function shapeChoices(view: Pick<PlanView, 'document'>) {
 export const roundStateLabels: Record<PlanRound['state'], string> = {
   working: 'Working',
   reviewing: 'Orchestrator reviewing',
+  approval: 'Needs your approval',
   held: 'Needs you',
   done: 'Criteria met',
   next: 'Next round planned',
   limit: 'Round limit reached',
+};
+
+export const areaStateLabels: Record<PlanRoundArea['state'], string> = {
+  waiting: 'Waiting',
+  reviewing: 'Reviewing',
+  done: 'Criteria met',
+  next: 'More work',
 };
 
 /** Tasks in dependency waves: each wave can start once the previous one is done. */
@@ -383,7 +426,8 @@ export const taskStateLabels: Record<TaskProgress['state'] | 'done', string> = {
 export function stateTone(state: string): 'success' | 'danger' | 'accent' | 'muted' {
   if (['checked', 'merged', 'done', 'check-passed', 'human-accepted', 'next'].includes(state))
     return 'success';
-  if (['needs-attention', 'check-failed', 'held', 'limit'].includes(state)) return 'danger';
+  if (['needs-attention', 'check-failed', 'held', 'limit', 'approval'].includes(state))
+    return 'danger';
   if (['running', 'agent-claimed', 'working', 'reviewing'].includes(state)) return 'accent';
   return 'muted';
 }
