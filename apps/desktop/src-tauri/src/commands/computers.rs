@@ -21,6 +21,7 @@ pub(crate) mod agent37;
 mod browser;
 pub(crate) mod credentials;
 pub(crate) mod docker;
+pub(crate) mod relay;
 pub(crate) mod remote;
 pub(crate) mod runs;
 #[cfg(test)]

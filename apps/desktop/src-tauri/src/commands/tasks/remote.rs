@@ -5,21 +5,40 @@
 //! workspace is uploaded, the agent's output is read back by cursor and fed to
 //! the same event parsers as a local process, and its changes are applied to
 //! the local workspace before [`TaskRuntime::complete_attempt`] runs, so the
-//! coordinator → execution guard → runtime lock order is untouched. The
-//! Jackalope bridge listens on this device's loopback, so bridge tools are not
-//! offered to agents on a computer.
+//! coordinator → execution guard → runtime lock order is untouched. Bridge
+//! calls the agent makes on the computer come back with each read and are
+//! forwarded to this device's bridge by [`runs::Session`]'s caller through
+//! [`relay::Relay`].
 
 use super::*;
-use crate::commands::computers::{self, credentials, runs, Computer};
+use crate::commands::computers::{self, credentials, relay, runs, Computer};
 
 /// How long a run waits for its computer to start; a first image build is slow.
 const START_WAIT: Duration = Duration::from_secs(20 * 60);
-/// Consecutive failed reads, about two seconds apart, before contact is lost.
-const READ_FAILURES: u32 = 60;
+/// How long a run keeps trying to reach its computer before giving up. The
+/// agent there stops after ten minutes without contact, but its changes stay
+/// until they are brought back.
+const LOST_WINDOW: Duration = Duration::from_secs(30 * 60);
+/// Failed reads, about two seconds apart, between reconnection attempts.
+const RECONNECT_EVERY: u32 = 5;
+
+/// How a remote run's reading ended.
+struct Followed {
+    exit: Option<serde_json::Value>,
+    quota_stopped: bool,
+    lost: bool,
+}
 
 impl TaskRuntime {
+    /// Whether this project's attempts with `adapter` run on its computer, so
+    /// the agent CLI need not be installed on this device.
+    pub(in crate::commands) fn runs_remotely(&self, project_id: &str, adapter: &str) -> bool {
+        credentials::REMOTE_ADAPTERS.contains(&adapter)
+            && runs::project_computer(&self.computers_root(), project_id).is_some()
+    }
+
     /// The computer this attempt's agent runs on, or `None` to run it here.
-    /// Planning stays on this device: it needs the bridge for its questions.
+    /// Planning stays on this device.
     pub(super) fn remote_target(
         &self,
         id: &str,
@@ -53,6 +72,13 @@ impl TaskRuntime {
         });
     }
 
+    fn remote_stopped(&self, id: &str) {
+        self.update(id, |r| {
+            r.status = "stopped".into();
+            r.ended_at = Some(Utc::now().to_rfc3339());
+        });
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(super) fn run_remote(
         &self,
@@ -60,20 +86,19 @@ impl TaskRuntime {
         req: &RunRequest,
         adapter: &str,
         cmd: Command,
-        input: String,
+        mut input: String,
         workspace: &str,
         computer: Computer,
     ) -> Result<(), String> {
         let root = self.computers_root();
-        let (argv, env) = runs::translate(adapter, &cmd, &root)?;
+        let bridge = req.coordination.as_ref();
+        // Checks the sign-in before waiting for the computer.
+        runs::translate(adapter, &cmd, &root, bridge.map(|b| b.endpoint.as_str()))?;
         {
             let inner = self.inner.lock().unwrap();
             if inner.canceled.contains(id) {
                 drop(inner);
-                self.update(id, |r| {
-                    r.status = "stopped".into();
-                    r.ended_at = Some(Utc::now().to_rfc3339());
-                });
+                self.remote_stopped(id);
                 return Ok(());
             }
             if inner.runs.values().any(|r| {
@@ -97,9 +122,22 @@ impl TaskRuntime {
         computers::ready_within(&root, &computer, START_WAIT)?;
         computers::usage::note(&root, &computer.id);
         let mut session = runs::Session::open(&root, &computer, workspace)?;
+        // An agent from before the relay answers no status and gets no bridge.
+        let status = session.status()?;
+        if let Some(status) = status.as_ref().filter(|status| status["exists"] == true) {
+            self.recover_remote(id, &mut session, status, workspace, &computer);
+        }
+        let relayed = bridge.filter(|_| status.is_some());
+        let (argv, env) =
+            runs::translate(adapter, &cmd, &root, relayed.map(|b| b.endpoint.as_str()))?;
+        if relayed.is_some() {
+            input.push_str(relay::INSTRUCTIONS);
+        } else if bridge.is_some() {
+            input.push_str("\nJackalope's tools are not available on this computer, whose image predates them. Ignore instructions that mention them.\n");
+        }
         let launched = std::time::Instant::now();
         let label = format!("Sending files to {}", computer.name);
-        session.upload(Path::new(workspace), &|sent, total| {
+        session.upload(Path::new(workspace), &req.setup_files, &|sent, total| {
             self.remote_progress(
                 id,
                 &label,
@@ -112,13 +150,10 @@ impl TaskRuntime {
         if self.inner.lock().unwrap().canceled.contains(id) {
             session.remove();
             session.shutdown();
-            self.update(id, |r| {
-                r.status = "stopped".into();
-                r.ended_at = Some(Utc::now().to_rfc3339());
-            });
+            self.remote_stopped(id);
             return Ok(());
         }
-        let immediate = session.start(&argv, &env, &input)?;
+        let immediate = session.start(&argv, &env, &input, relayed.is_some())?;
         self.update_checked(id, |r| {
             if r.status == "starting" {
                 r.status = "running".into();
@@ -126,24 +161,35 @@ impl TaskRuntime {
             r.progress = None;
             activity(
                 r,
-                &format!(
-                    "The agent runs on {}. Jackalope tools such as peers, questions and the browser are not available there yet.",
-                    computer.name
-                ),
+                &if relayed.is_some() {
+                    format!(
+                        "The agent runs on {} (beta). Browser and desktop control stay on this device, so they are not available to it.",
+                        computer.name
+                    )
+                } else {
+                    format!(
+                        "The agent runs on {} (beta) without Jackalope's tools. Update its image to use them.",
+                        computer.name
+                    )
+                },
             );
         })?;
-        let (exit, quota_stopped, lost) = match immediate {
-            Some(exit) => (Some(exit), false, false),
-            None => self.follow_remote(id, adapter, &mut session, &computer, launched),
+        let mut relay = relayed.map(|b| relay::Relay::new(&b.endpoint, &b.token));
+        let followed = match immediate {
+            Some(exit) => Followed {
+                exit: Some(exit),
+                quota_stopped: false,
+                lost: false,
+            },
+            None => self.follow_remote(id, adapter, &mut session, &computer, launched, &mut relay),
         };
+        let exit = followed.exit.as_ref();
         let code = exit
-            .as_ref()
             .and_then(|exit| exit["code"].as_i64())
             .map(|c| c as i32);
-        let ended_cleanly = exit
-            .as_ref()
-            .is_some_and(|exit| exit["reason"].is_null() && exit["error"].is_null());
-        if let Some(error) = exit.as_ref().and_then(|exit| exit["error"].as_str()) {
+        let ended_cleanly =
+            exit.is_some_and(|exit| exit["reason"].is_null() && exit["error"].is_null());
+        if let Some(error) = exit.and_then(|exit| exit["error"].as_str()) {
             let error = error.to_string();
             self.update(id, |run| {
                 run.error.get_or_insert(format!(
@@ -152,63 +198,137 @@ impl TaskRuntime {
                 ));
             });
         }
-        if let Some(reason) = exit.as_ref().and_then(|exit| exit["reason"].as_str()) {
-            if reason == "timeout" {
-                self.update(id, |run| {
-                    run.error.get_or_insert("The agent exceeded the six-hour limit on its computer. Inspect the saved work and continue the task.".into());
-                });
-            }
+        match exit.and_then(|exit| exit["reason"].as_str()) {
+            Some("timeout") => self.update(id, |run| {
+                run.error.get_or_insert("The agent exceeded the six-hour limit on its computer. Inspect the saved work and continue the task.".into());
+            }),
+            Some("orphaned" | "interrupted") => self.update(id, |run| {
+                run.error.get_or_insert(format!(
+                    "The agent on {} stopped before finishing because contact was lost or the computer restarted. The changes it made are brought back; continue the task to finish.",
+                    computer.name
+                ));
+            }),
+            _ => {}
         }
-        if !lost {
+        if !followed.lost {
             self.remote_progress(
                 id,
                 &format!("Bringing changes back from {}", computer.name),
                 "",
             );
-            match session.collect() {
-                Ok(patch) => {
-                    let files = patch_files(&patch);
-                    if let Err(error) = runs::apply(Path::new(workspace), &patch) {
-                        let saved = self.directory.join(format!("{id}.remote.patch"));
-                        let kept = std::fs::write(&saved, &patch).is_ok();
-                        self.update(id, |run| {
-                            run.error.get_or_insert(format!(
-                                "The agent's changes on {} could not be applied to the workspace: {error}{}",
-                                computer.name,
-                                if kept { format!(" They are saved at {}.", saved.display()) } else { String::new() }
-                            ));
-                        });
-                    } else if files > 0 {
-                        self.update(id, |run| {
-                            activity(
-                                run,
-                                &format!(
-                                    "Brought back changes to {files} file{} from {}.",
-                                    if files == 1 { "" } else { "s" },
-                                    computer.name
-                                ),
-                            )
-                        });
-                    }
-                }
-                Err(error) => self.update(id, |run| {
-                    run.error.get_or_insert(format!(
-                        "The agent's changes could not be collected from {}: {error}",
-                        computer.name
-                    ));
-                }),
+            if self.bring_back(id, &mut session, workspace, &computer, false) {
+                session.remove();
             }
-            session.remove();
         }
         session.shutdown();
         self.update(id, |run| run.progress = None);
-        let success = ended_cleanly && code == Some(0) && !lost;
-        self.complete_attempt(id, req, success, code, quota_stopped)
+        let success = ended_cleanly && code == Some(0) && !followed.lost;
+        self.complete_attempt(id, req, success, code, followed.quota_stopped)
     }
 
-    /// Reads the run until it ends, feeding output to the adapter's parser and
-    /// relaying stop and quota decisions. Returns its exit, whether quota stopped
-    /// it and whether contact with the computer was lost.
+    /// Collects the run's changes and applies them to the local workspace.
+    /// A patch that does not apply is saved beside the attempt's history.
+    /// Returns whether the run's files on the computer may be removed.
+    fn bring_back(
+        &self,
+        id: &str,
+        session: &mut runs::Session,
+        workspace: &str,
+        computer: &Computer,
+        earlier: bool,
+    ) -> bool {
+        let source = if earlier {
+            format!("an earlier run on {} that lost contact", computer.name)
+        } else {
+            computer.name.clone()
+        };
+        let patch = match session.collect() {
+            Ok(patch) => patch,
+            Err(error) => {
+                let message =
+                    format!("The agent's changes could not be collected from {source}: {error}");
+                self.update(id, |run| {
+                    if earlier {
+                        activity(run, &message);
+                    } else {
+                        run.error.get_or_insert(message.clone());
+                    }
+                });
+                return false;
+            }
+        };
+        let files = patch_files(&patch);
+        if let Err(error) = runs::apply(Path::new(workspace), &patch) {
+            let saved = self.directory.join(format!(
+                "{id}.{}patch",
+                if earlier { "recovered." } else { "remote." }
+            ));
+            let kept = std::fs::write(&saved, &patch).is_ok();
+            let message = format!(
+                "The agent's changes from {source} could not be applied to the workspace: {error}{}",
+                if kept {
+                    format!(" They are saved at {}.", saved.display())
+                } else {
+                    String::new()
+                }
+            );
+            self.update(id, |run| {
+                if earlier {
+                    activity(run, &message);
+                } else {
+                    run.error.get_or_insert(message.clone());
+                }
+            });
+            return kept;
+        }
+        if files > 0 {
+            self.update(id, |run| {
+                activity(
+                    run,
+                    &format!(
+                        "Brought back changes to {files} file{} from {source}.",
+                        if files == 1 { "" } else { "s" },
+                    ),
+                )
+            });
+        }
+        true
+    }
+
+    /// Brings back what an earlier run of this workspace left on the computer,
+    /// for example after Jackalope lost contact or restarted, before the
+    /// workspace is uploaded again over it.
+    fn recover_remote(
+        &self,
+        id: &str,
+        session: &mut runs::Session,
+        status: &serde_json::Value,
+        workspace: &str,
+        computer: &Computer,
+    ) {
+        if status["started"] == true && status["exit"].is_null() {
+            let _ = session.stop();
+            let deadline = std::time::Instant::now() + Duration::from_secs(20);
+            while std::time::Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(500));
+                if session
+                    .status()
+                    .ok()
+                    .flatten()
+                    .is_some_and(|status| !status["exit"].is_null())
+                {
+                    break;
+                }
+            }
+        }
+        if status["started"] != true || self.bring_back(id, session, workspace, computer, true) {
+            session.remove();
+        }
+    }
+
+    /// Reads the run until it ends, feeding output to the adapter's parser,
+    /// relaying bridge calls and stop and quota decisions. Contact that is lost
+    /// is retried, reconnecting every few failed reads, for [`LOST_WINDOW`].
     fn follow_remote(
         &self,
         id: &str,
@@ -216,7 +336,9 @@ impl TaskRuntime {
         session: &mut runs::Session,
         computer: &Computer,
         launched: std::time::Instant,
-    ) -> (Option<serde_json::Value>, bool, bool) {
+        relay: &mut Option<relay::Relay>,
+    ) -> Followed {
+        let root = self.computers_root();
         let mut out = 0u64;
         let mut err = 0u64;
         let mut stdout = runs::Lines::new(1_000_000);
@@ -225,6 +347,8 @@ impl TaskRuntime {
         let mut stop_sent = false;
         let mut quota_stopped = false;
         let mut failures = 0u32;
+        let mut lost_since: Option<std::time::Instant> = None;
+        let mut reclaim = false;
         let mut last_note = std::time::Instant::now();
         let exit = loop {
             let (canceled, quota) = {
@@ -242,12 +366,27 @@ impl TaskRuntime {
                 stop_sent = session.stop().is_ok();
             }
             if last_note.elapsed() > Duration::from_secs(60) {
-                computers::usage::note(&self.computers_root(), &computer.id);
+                computers::usage::note(&root, &computer.id);
                 last_note = std::time::Instant::now();
             }
-            match session.read(&mut out, &mut err) {
+            if let Some(relay) = relay.as_mut() {
+                for answer in relay.answers() {
+                    let sent = lost_since.is_none() && session.answer(&answer).is_ok();
+                    relay.delivered(answer, sent);
+                }
+            }
+            match session.read(&mut out, &mut err, reclaim) {
                 Ok(page) => {
                     failures = 0;
+                    reclaim = false;
+                    if lost_since.take().is_some() {
+                        self.update(id, |run| {
+                            activity(run, &format!("Contact with {} is back.", computer.name))
+                        });
+                    }
+                    if let Some(relay) = relay.as_mut() {
+                        relay.accept(&page.bridge);
+                    }
                     for (line, truncated) in stdout.push(&page.stdout) {
                         self.remote_event(id, adapter, &mut partials, launched, line, truncated);
                     }
@@ -260,14 +399,36 @@ impl TaskRuntime {
                 }
                 Err(error) => {
                     failures += 1;
-                    if failures >= READ_FAILURES {
+                    reclaim = true;
+                    let since = *lost_since.get_or_insert_with(std::time::Instant::now);
+                    if failures == 3 {
+                        self.update(id, |run| {
+                            activity(
+                                run,
+                                &format!(
+                                    "Lost contact with {}: {error}. Retrying for up to 30 minutes.",
+                                    computer.name
+                                ),
+                            )
+                        });
+                    }
+                    let gave_up = since.elapsed() > LOST_WINDOW
+                        || (canceled && since.elapsed() > Duration::from_secs(30));
+                    if gave_up {
                         self.update(id, |run| {
                             run.error.get_or_insert(format!(
-                                "Lost contact with {}: {error}. The agent there stops on its own after ten minutes; its changes were not brought back.",
+                                "Lost contact with {}: {error}. The agent there stops on its own after ten minutes; its changes stay there and come back when this task is continued.",
                                 computer.name
                             ));
                         });
-                        return (None, quota_stopped, true);
+                        return Followed {
+                            exit: None,
+                            quota_stopped,
+                            lost: true,
+                        };
+                    }
+                    if failures % RECONNECT_EVERY == 0 {
+                        let _ = session.reconnect(&root, computer);
                     }
                     std::thread::sleep(Duration::from_secs(2));
                 }
@@ -282,7 +443,11 @@ impl TaskRuntime {
         if adapter == "claude" {
             partials.complete(self, id);
         }
-        (exit, quota_stopped, false)
+        Followed {
+            exit,
+            quota_stopped,
+            lost: false,
+        }
     }
 
     fn remote_event(

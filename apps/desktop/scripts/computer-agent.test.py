@@ -181,6 +181,62 @@ class RunProtocol(unittest.TestCase):
                                data=base64.b64encode(data).decode(), final=True)
             self.assertIn("upload", error)
 
+    def test_relay_hands_bridge_calls_over_and_returns_answers(self):
+        self.upload("r7", archive({"a.txt": b"x"}))
+        script = (
+            "import os,urllib.request;"
+            "url=os.environ['JACKALOPE_BRIDGE_URL'];token=os.environ['JACKALOPE_BRIDGE_TOKEN'];"
+            "assert url.startswith('http://127.0.0.1:') and '@@' not in token;"
+            "bad=urllib.request.Request(url+'/mcp',data=b'{}',method='POST');"
+            "exec('try:\\n urllib.request.urlopen(bad)\\nexcept Exception as e:\\n print(\"denied\",e.code)');"
+            "req=urllib.request.Request(url+'/mcp',data=b'{\"x\":1}',method='POST',"
+            "headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'});"
+            "print(urllib.request.urlopen(req).read().decode())"
+        )
+        self.call(action="run_start", run="r7", argv=[sys.executable, "-c", script],
+                  env={"JACKALOPE_BRIDGE_URL": self.agent.RELAY_URL,
+                       "JACKALOPE_BRIDGE_TOKEN": self.agent.RELAY_TOKEN},
+                  relay=True)
+        deadline = time.time() + 20
+        calls = []
+        while not calls and time.time() < deadline:
+            calls = self.call(action="run_read", run="r7", out=0, err=0, wait_ms=500)["bridge"]
+        self.assertEqual(len(calls), 1)
+        call = calls[0]
+        self.assertEqual((call["method"], call["path"]), ("POST", "/mcp"))
+        self.assertEqual(base64.b64decode(call["body"]), b'{"x":1}')
+        self.assertNotIn("authorization", {k.lower() for k in call["headers"]})
+        # Handed over once, again only when reclaimed.
+        self.assertEqual(self.call(action="run_read", run="r7", out=0, err=0)["bridge"], [])
+        self.assertEqual(len(self.call(action="run_read", run="r7", out=0, err=0,
+                                       reclaim=True)["bridge"]), 1)
+        answered = self.call(action="run_answer", run="r7", call=call["id"], status=200,
+                             contentType="application/json",
+                             body=base64.b64encode(b'{"ok":true}').decode())
+        self.assertTrue(answered["delivered"])
+        exit, stdout, _ = self.finish("r7")
+        self.assertEqual(exit["code"], 0)
+        self.assertEqual(stdout, b'denied 401\n{"ok":true}\n')
+        self.assertFalse(self.call(action="run_answer", run="r7", call=call["id"],
+                                   status=200, body="")["delivered"])
+
+    def test_status_reports_a_run_whose_supervisor_died(self):
+        self.assertEqual(self.call(action="run_status", run="r8"), {"exists": False})
+        self.upload("r8", archive({"a.txt": b"x"}))
+        self.assertFalse(self.call(action="run_status", run="r8")["started"])
+        self.call(action="run_start", run="r8",
+                  argv=[sys.executable, "-c", "import time;time.sleep(60)"])
+        status = self.call(action="run_status", run="r8")
+        self.assertTrue(status["started"])
+        self.assertIsNone(status["exit"])
+        pid = int(open(os.path.join(self.temp.name, "r8", "pid")).read())
+        supervisor = self.agent.SUPERVISORS[-1]
+        supervisor.kill()
+        supervisor.wait()
+        os.kill(pid, 9)
+        self.assertEqual(self.call(action="run_status", run="r8")["exit"]["reason"], "interrupted")
+        self.assertIsNotNone(self.call(action="workspace_diff", run="r8"))
+
     def test_validates_requests(self):
         self.assertIn("Name the run", self.fails(action="run_read", run="../x"))
         self.assertIn("does not exist", self.fails(action="run_read", run="missing"))
