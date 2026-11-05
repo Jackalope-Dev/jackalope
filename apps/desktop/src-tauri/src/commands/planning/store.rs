@@ -2,7 +2,10 @@
 //! Records are written atomically; an unreadable record is quarantined and
 //! reported instead of being overwritten.
 
-use super::artifact::{self, PlanDocument};
+use super::{
+    artifact::{self, PlanDocument},
+    rounds::RoundAssignment,
+};
 use crate::commands::{history, tasks::RunRequest};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -84,6 +87,14 @@ pub struct Execution {
     /// Swarm rounds, oldest first; `managed_task_id` is the last round's task.
     #[serde(default)]
     pub rounds: Vec<Round>,
+    /// The next round waits for the person to approve the orchestrator's
+    /// assignments. False for executions saved before this choice existed.
+    #[serde(default)]
+    pub ask_before_rounds: bool,
+    /// The most orchestrator attempts reviewing a round in parallel, one per
+    /// area of the plan. Zero (saved before areas existed) reviews as one.
+    #[serde(default)]
+    pub orchestrators: u32,
 }
 
 /// One swarm round: its assignments run as a managed task, and once their
@@ -125,6 +136,40 @@ pub struct Round {
     pub next: Vec<String>,
     #[serde(default)]
     pub decided_at: Option<String>,
+    /// The next round's assignments while they wait for the person's approval.
+    #[serde(default)]
+    pub proposal: Option<Vec<RoundAssignment>>,
+    /// Areas reviewed by parallel orchestrators; empty when one reviews the
+    /// whole plan. Their verdicts combine into the round's verdict.
+    #[serde(default)]
+    pub areas: Vec<AreaReview>,
+}
+
+/// One orchestrator's review of an area of the plan within a round.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaReview {
+    pub name: String,
+    pub scopes: Vec<String>,
+    /// This area's orchestrator attempts, oldest first; also in the round's
+    /// `review_run_ids`.
+    #[serde(default)]
+    pub run_ids: Vec<String>,
+    /// `done` or `next` once this area's attempt was accepted; empty before.
+    #[serde(default)]
+    pub verdict: String,
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub evidence: Vec<String>,
+    #[serde(default)]
+    pub assignments: Vec<RoundAssignment>,
+    #[serde(default)]
+    pub check: Option<RoundCheck>,
+    #[serde(default)]
+    pub retries: u32,
+    #[serde(default)]
+    pub note: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -273,6 +318,16 @@ pub struct PlanSettings {
     /// The most rounds a swarm runs before it waits for a re-plan.
     #[serde(default = "default_rounds")]
     pub max_rounds: u32,
+    /// New swarms ask before starting each next round.
+    #[serde(default)]
+    pub ask_before_rounds: bool,
+    /// The most orchestrators reviewing a swarm round in parallel.
+    #[serde(default = "default_orchestrators")]
+    pub orchestrators: u32,
+}
+
+fn default_orchestrators() -> u32 {
+    1
 }
 
 fn default_rounds() -> u32 {
@@ -291,6 +346,8 @@ impl Default for PlanSettings {
             planner_model: None,
             export_path: default_export(),
             max_rounds: default_rounds(),
+            ask_before_rounds: false,
+            orchestrators: default_orchestrators(),
         }
     }
 }
@@ -307,6 +364,12 @@ impl PlanSettings {
             return Err(format!(
                 "Allow between 1 and {} swarm rounds.",
                 super::rounds::MAX_ROUNDS
+            ));
+        }
+        if !(1..=super::rounds::MAX_ORCHESTRATORS).contains(&self.orchestrators) {
+            return Err(format!(
+                "Allow between 1 and {} orchestrators.",
+                super::rounds::MAX_ORCHESTRATORS
             ));
         }
         relative_path(&self.export_path.replace("{slug}", "plan"))?;

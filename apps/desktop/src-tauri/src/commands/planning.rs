@@ -255,15 +255,18 @@ pub async fn plan_approve(
     blocking(move || session::approve(&service, &id, revision, &hash, &shape, "app", choices)).await
 }
 
-/// `pause`, `resume` or `stop` a swarm's rounds and its current round's work.
+/// `pause`, `resume` or `stop` a swarm's rounds and its current round's work,
+/// `approve` the proposed next round (with edited `assignments`), or `ask` /
+/// `auto` to choose whether later rounds wait for approval.
 #[tauri::command]
 pub async fn plan_rounds(
     id: String,
     action: String,
+    assignments: Option<Vec<rounds::RoundAssignment>>,
     state: State<'_, Coordinator>,
 ) -> Result<(), String> {
     let service = state.inner().clone();
-    blocking(move || rounds::action(&service, &id, &action)).await
+    blocking(move || rounds::action(&service, &id, &action, assignments)).await
 }
 
 #[tauri::command]
