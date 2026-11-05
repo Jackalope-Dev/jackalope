@@ -377,13 +377,17 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   listed as coming soon. See
   [bot computers](BOT-COMPUTERS.md).
 - A project can run its Claude Code and Codex task agents on a computer (**Agents run
-  on** in Project settings). The workspace's non-ignored files are uploaded, the agent
-  runs there with a Claude Code token or API key saved for computers, its output feeds
-  the usual parsers and its changes come back as a patch applied to the local workspace
-  before checks, checkpoint, review and integration, which stay on this device. Such
-  agents have their own concurrency limit (8 by default, up to 32) and no Jackalope
-  bridge tools or project connections; planning and other agents stay local. See
-  [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
+  on** in Project settings; beta). The workspace's non-ignored files and copied setup
+  files are uploaded, the agent runs there with a Claude Code token or API key saved for
+  computers and without the CLI installed on this device, its output feeds the usual
+  parsers and its changes come back as a patch applied to the local workspace before
+  checks, checkpoint, review and integration, which stay on this device. Jackalope's
+  bridge tools reach it through a relay that keeps the bridge credential on this device;
+  the browser, desktop control and tools that read the local workspace are unavailable
+  there, as are project connections. Lost contact is retried for 30 minutes, and changes
+  left on the computer come back when the task continues. Such agents have their own
+  concurrency limit (8 by default, up to 32, set in the project's queue); planning and
+  other agents stay local. See [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
 - Task and chat Screen views poll the attempt's existing task browser viewport and
   desktop grant state without opening a browser, requesting access or saving an
   artifact. They list recent desktop actions with small after-action captures. People
@@ -617,10 +621,11 @@ viewer or cloud machine has been accepted in an installed app on any platform. C
 machines reach desktop control and commands but not the browser tools, and the
 in-sandbox agent has no accessibility actions. The idle stop, start on demand and quit
 stop are covered by unit tests only. Agents on a computer are covered by unit tests, the
-agent's POSIX run tests and the opt-in Docker trial with a stand-in agent; real Claude
-Code or Codex runs there, the template build and instances on a live Agent37 account,
-and gVisor support for the image's desktop are unverified, and Agent37 computers have
-no viewer.
+agent's POSIX run and relay tests and the opt-in Docker trial with a stand-in agent;
+real Claude Code or Codex runs there, bridge tools used by a real agent, lost-contact
+recovery against a real computer, the template build and instances on a live Agent37
+account, and gVisor support for the image's desktop are unverified, and Agent37
+computers have no viewer.
 
 Installed provider, accessibility, recovery, performance, signed installation and
 update acceptance remain platform-specific requirements. Real-model quality and

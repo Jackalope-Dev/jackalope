@@ -21,15 +21,15 @@ release dates.
 
 ## Agents and task execution
 
-- [ ] Relay Jackalope bridge tools to agents on a computer through the run protocol, so
-  peers, questions, `propose_subtask`, the browser and project connections work there,
-  and let planning run remotely once it can ask its questions.
+- [ ] Extend agents on a computer: the browser tools against the computer's own Chromium,
+  project connections, `computer_verify` and `read_context` against the remote copy,
+  planning on the computer, and automatic routing that does not require the CLI here.
 - [ ] Accept agents on a computer end to end: real Claude Code and Codex runs on a local
   sandbox and on a live Agent37 account (template build under gVisor, auto sleep and
-  wake, spend), stop, quota handoff, lost contact and restart recovery.
+  wake, spend), bridge tools through the relay, stop, quota handoff, lost contact,
+  reattach and restart recovery.
 - [ ] Give Agent37 computers a viewer through signed port URLs, sizes beyond the default
-  shape and idle-time changes after creation, and run remote agents without the CLI
-  installed on this device.
+  shape and idle-time changes after creation.
 
 - [ ] Enforce Keep and combine worktree retention in native cleanup and integration (it is
   enforced only in Project worktrees today).
