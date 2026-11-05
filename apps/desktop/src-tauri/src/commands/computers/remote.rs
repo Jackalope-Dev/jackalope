@@ -137,10 +137,23 @@ pub struct MachineHealth {
     pub message: Option<String>,
 }
 
-async fn hello(url: &str, token: &str) -> Result<Value, String> {
-    let response = client(Duration::from_secs(15))?
+pub(crate) async fn hello(url: &str, token: &str) -> Result<Value, String> {
+    hello_with(url, token, &[]).await
+}
+
+/// `hello` with extra headers, such as a hosting provider's own access key.
+pub(crate) async fn hello_with(
+    url: &str,
+    token: &str,
+    headers: &[(&'static str, String)],
+) -> Result<Value, String> {
+    let mut request = client(Duration::from_secs(15))?
         .get(format!("{url}/v1/health"))
-        .bearer_auth(token)
+        .bearer_auth(token);
+    for (name, value) in headers {
+        request = request.header(*name, value);
+    }
+    let response = request
         .send()
         .await
         .map_err(|e| format!("The machine did not answer: {}", e.without_url()))?;
@@ -241,7 +254,7 @@ fn paired(root: &Path, computer: &Computer) -> Result<(Machine, String), String>
     Ok((machine, token))
 }
 
-fn block<T>(future: impl std::future::Future<Output = T>) -> T {
+pub(crate) fn block<T>(future: impl std::future::Future<Output = T>) -> T {
     tauri::async_runtime::handle().block_on(future)
 }
 
@@ -283,11 +296,7 @@ impl Provider for RemoteMachine {
 
     fn transport(&self, root: &Path, computer: &Computer) -> Result<Box<dyn Transport>, String> {
         let (machine, token) = paired(root, computer)?;
-        Ok(Box::new(Http {
-            url: machine.url,
-            token,
-            next: 0,
-        }))
+        Ok(http(machine.url, token, Vec::new()))
     }
 
     fn viewer(&self, root: &Path, computer: &Computer, _: bool) -> Result<Option<String>, String> {
@@ -299,9 +308,25 @@ impl Provider for RemoteMachine {
     }
 }
 
+/// A transport to the computer agent's HTTP endpoint at `url`, with optional
+/// extra headers for a provider that fronts it.
+pub(crate) fn http(
+    url: String,
+    token: String,
+    headers: Vec<(&'static str, String)>,
+) -> Box<dyn Transport> {
+    Box::new(Http {
+        url,
+        token,
+        headers,
+        next: 0,
+    })
+}
+
 struct Http {
     url: String,
     token: String,
+    headers: Vec<(&'static str, String)>,
     next: u64,
 }
 
@@ -320,11 +345,13 @@ impl Transport for Http {
         request["id"] = json!(self.next);
         let url = format!("{}/v1/call", self.url);
         let token = self.token.clone();
+        let headers = self.headers.clone();
         let body: Value = block(async move {
-            let response = client(timeout)?
-                .post(url)
-                .bearer_auth(token)
-                .json(&request)
+            let mut post = client(timeout)?.post(url).bearer_auth(token).json(&request);
+            for (name, value) in headers {
+                post = post.header(name, value);
+            }
+            let response = post
                 .send()
                 .await
                 .map_err(|e| {

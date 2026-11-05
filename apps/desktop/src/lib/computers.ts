@@ -1,7 +1,7 @@
 import { nativeTask } from './task-runtime.ts';
 
 /** Where a bot computer runs. Unknown values come from newer builds. */
-export type ComputerProvider = 'local-docker' | 'remote-machine' | 'jackalope-hosted';
+export type ComputerProvider = 'local-docker' | 'remote-machine' | 'agent37' | 'jackalope-hosted';
 
 export interface ComputerSettings {
   cpus: number;
@@ -118,6 +118,16 @@ export const configureOwnerComputer = (
     settings,
   });
 
+export const agent37Status = () => nativeTask<{ connected: boolean }>('computer_agent37');
+
+/** Saves the Agent37 API key after Agent37 accepts it, or removes it when `key` is null. */
+export const setAgent37Key = (key: string | null) =>
+  nativeTask<{ connected: boolean }>('computer_set_agent37_key', { key });
+
+/** This month's Agent37 spend in US dollars, overall and by computer id. */
+export const agent37Usage = () =>
+  nativeTask<{ total: number; computers: Record<string, number> }>('computer_agent37_usage');
+
 /** A sign-in agents use when they run on a computer. Values never reach the app. */
 export interface AgentCredential {
   id: string;
@@ -180,9 +190,11 @@ export const providerLabel = (provider: string) =>
     ? 'Local sandbox'
     : provider === 'remote-machine'
       ? 'Cloud machine'
-      : provider === 'jackalope-hosted'
-        ? 'Jackalope-hosted'
-        : 'Unknown machine';
+      : provider === 'agent37'
+        ? 'Agent37'
+        : provider === 'jackalope-hosted'
+          ? 'Jackalope-hosted'
+          : 'Unknown machine';
 
 export function computerStateLabel(status: ComputerStatus): string {
   switch (status.state) {

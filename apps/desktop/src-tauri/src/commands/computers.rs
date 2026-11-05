@@ -7,6 +7,7 @@
 //! implement [`Provider`]: `local-docker` runs a Linux sandbox from the image in
 //! `resources/computer`, `remote-machine` reaches the same in-sandbox agent on a
 //! machine the person runs, over HTTPS with a pairing secret, and
+//! `agent37` creates machines on the person's own Agent37 account, and
 //! `jackalope-hosted` is reserved and unavailable. Every provider speaks the
 //! desktop helper's JSON-lines protocol through a [`Transport`], so desktop
 //! control, screenshots, input, accessibility snapshots, bounded commands and
@@ -16,6 +17,7 @@
 //! per-machine secrets go through `account_storage` and never enter the index,
 //! journals or the renderer except as a viewer URL fragment.
 
+pub(crate) mod agent37;
 mod browser;
 pub(crate) mod credentials;
 pub(crate) mod docker;
@@ -44,6 +46,7 @@ use std::{
 
 pub(crate) const LOCAL_DOCKER: &str = "local-docker";
 pub(crate) const REMOTE_MACHINE: &str = "remote-machine";
+pub(crate) const AGENT37: &str = "agent37";
 pub(crate) const HOSTED: &str = "jackalope-hosted";
 /// Jackalope-hosted computers are planned; the provider exists so settings and
 /// saved records have a stable name, but it refuses every operation.
@@ -147,7 +150,7 @@ pub struct Computer {
     /// `bot` or `task`.
     pub owner_kind: String,
     pub owner_id: String,
-    /// `local-docker`, `remote-machine` or `jackalope-hosted`. Unknown values
+    /// `local-docker`, `remote-machine`, `agent37` or `jackalope-hosted`. Unknown values
     /// written by a newer app are kept and reported unavailable.
     pub provider: String,
     /// The paired remote machine, for `remote-machine`.
@@ -231,8 +234,11 @@ pub(crate) fn configure(
             let machine = machine_id.as_deref().ok_or("Choose a paired machine.")?;
             remote::machine(root, machine)?;
         }
+        AGENT37 => {
+            agent37::key(root)?;
+        }
         HOSTED => return Err(hosted_unavailable()),
-        _ => return Err("Choose a local sandbox or a cloud machine.".into()),
+        _ => return Err("Choose a local sandbox, a cloud machine or Agent37.".into()),
     }
     let _guard = index_lock().lock().map_err(|e| e.to_string())?;
     let mut index = read(root)?;
@@ -423,10 +429,12 @@ impl Provider for Hosted {
 pub(crate) fn provider(name: &str) -> Result<&'static dyn Provider, String> {
     static DOCKER: docker::LocalDocker = docker::LocalDocker;
     static REMOTE: remote::RemoteMachine = remote::RemoteMachine;
+    static AGENT37_PROVIDER: agent37::Agent37 = agent37::Agent37;
     static HOSTED_PROVIDER: Hosted = Hosted;
     match name {
         LOCAL_DOCKER => Ok(&DOCKER),
         REMOTE_MACHINE => Ok(&REMOTE),
+        AGENT37 => Ok(&AGENT37_PROVIDER),
         HOSTED => Ok(&HOSTED_PROVIDER),
         _ => Err("This computer was made by a newer Jackalope. Update to use it.".into()),
     }
@@ -898,6 +906,7 @@ pub(crate) fn status(root: &Path, computer: Computer) -> ComputerStatus {
         stopped_idle: usage.stopped_idle,
         usage: usage.line,
         viewer: state == "running"
+            && computer.provider != AGENT37
             && (computer.settings.network || computer.provider != LOCAL_DOCKER),
         computer,
         state,
@@ -1241,6 +1250,48 @@ pub async fn computer_set_agent_credential(
         credentials::status(&root)
     })
     .await
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Agent37View {
+    pub connected: bool,
+}
+
+#[tauri::command]
+pub async fn computer_agent37(state: tauri::State<'_, TaskRuntime>) -> Result<Agent37View, String> {
+    let root = state.computers_root();
+    blocking(move || {
+        Ok(Agent37View {
+            connected: agent37::has_key(&root),
+        })
+    })
+    .await
+}
+
+/// Saves the Agent37 API key after checking it, or removes it when `key` is empty.
+#[tauri::command]
+pub async fn computer_set_agent37_key(
+    key: Option<String>,
+    state: tauri::State<'_, TaskRuntime>,
+) -> Result<Agent37View, String> {
+    let root = state.computers_root();
+    blocking(move || {
+        let key = key.filter(|key| !key.trim().is_empty());
+        agent37::set_key(&root, key.as_deref())?;
+        Ok(Agent37View {
+            connected: agent37::has_key(&root),
+        })
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn computer_agent37_usage(
+    state: tauri::State<'_, TaskRuntime>,
+) -> Result<agent37::Agent37Usage, String> {
+    let root = state.computers_root();
+    blocking(move || agent37::usage(&root)).await
 }
 
 type BridgeError = (axum::http::StatusCode, axum::Json<Value>);

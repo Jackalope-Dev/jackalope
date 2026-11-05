@@ -20,6 +20,7 @@ import {
   testCloudMachine,
 } from '../../lib/computers';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { Agent37Settings } from '../computers/Agent37Connect';
 import { AgentSignIns } from '../computers/AgentSignIns';
 import { IdleStopSelect } from '../computers/IdleStopSelect';
 import { Button } from '../ui/button';
@@ -278,6 +279,8 @@ export function ComputersSettings() {
           description="Computers Jackalope runs for you, without Docker or your own cloud account."
         />
       </SettingGroup>
+
+      <Agent37Settings />
 
       <AgentSignIns />
 

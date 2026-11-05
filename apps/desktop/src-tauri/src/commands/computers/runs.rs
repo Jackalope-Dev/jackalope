@@ -9,7 +9,7 @@
 //! [`Transport`](super::Transport), so a long run never holds the connection
 //! desktop actions share. See `resources/computer/agent.py` for the protocol.
 
-use super::{credentials, Computer, Transport, LOCAL_DOCKER, PROJECT, REMOTE_MACHINE};
+use super::{credentials, Computer, Transport, AGENT37, LOCAL_DOCKER, PROJECT, REMOTE_MACHINE};
 use crate::commands::git_command;
 use base64::Engine;
 use serde_json::{json, Value};
@@ -33,7 +33,7 @@ pub(crate) const READ_WAIT_MS: u64 = 1000;
 
 /// Providers whose machines run the computer image's agent and so accept runs.
 pub(crate) fn supports_runs(computer: &Computer) -> bool {
-    [LOCAL_DOCKER, REMOTE_MACHINE].contains(&computer.provider.as_str())
+    [LOCAL_DOCKER, REMOTE_MACHINE, AGENT37].contains(&computer.provider.as_str())
 }
 
 /// The computer a project's task agents run on, when it has one.

@@ -25,12 +25,13 @@ import { ConfirmAction } from '../ui/ConfirmAction';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
+import { Agent37KeyForm, useAgent37 } from './Agent37Connect';
 import { ComputerViewer } from './ComputerViewer';
 import { IdleStopSelect } from './IdleStopSelect';
 import '../settings/settings.css';
 import './computers.css';
 
-type Kind = 'none' | 'local-docker' | 'remote-machine';
+type Kind = 'none' | 'local-docker' | 'remote-machine' | 'agent37';
 
 /** Status refresh while a computer runs, so its idle countdown stays current. */
 const RUNNING_REFRESH_MS = 30_000;
@@ -138,6 +139,7 @@ function OwnerComputerSettings({
   const [machines, setMachines] = useState<CloudMachine[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [kind, setKind] = useState<Kind>('none');
+  const [agent37, setAgent37] = useAgent37();
   const [machineId, setMachineId] = useState('');
   const [settings, setSettings] = useState<ComputerSettings>(DEFAULT_COMPUTER_SETTINGS);
   const [busy, setBusy] = useState('');
@@ -200,7 +202,7 @@ function OwnerComputerSettings({
     run('create', async () => {
       const created = await configureOwnerComputer(
         owner,
-        kind === 'remote-machine' ? 'remote-machine' : 'local-docker',
+        kind === 'none' ? 'local-docker' : kind,
         kind === 'remote-machine' ? machineId : null,
         settings,
       );
@@ -252,7 +254,8 @@ function OwnerComputerSettings({
                 .join(' · ')
             }
           >
-            {status.state === 'running' && status.provider === 'local-docker' ? (
+            {status.state === 'running' &&
+            (status.provider === 'local-docker' || status.provider === 'agent37') ? (
               <Button
                 variant="outline"
                 loading={busy === 'stop'}
@@ -318,9 +321,11 @@ function OwnerComputerSettings({
           <Setting
             title="Delete computer"
             description={
-              status.provider === 'remote-machine'
-                ? `Disconnects ${owner.kind === 'bot' ? 'the bot' : 'this project'} from this machine. The machine and its files stay where they run.`
-                : 'Removes the computer and everything stored in it, including its browser sign-ins.'
+              status.provider === 'agent37'
+                ? 'Deletes the computer from your Agent37 account with everything stored in it.'
+                : status.provider === 'remote-machine'
+                  ? `Disconnects ${owner.kind === 'bot' ? 'the bot' : 'this project'} from this machine. The machine and its files stay where they run.`
+                  : 'Removes the computer and everything stored in it, including its browser sign-ins.'
             }
           >
             <ConfirmAction
@@ -360,8 +365,32 @@ function OwnerComputerSettings({
               { id: 'none', label: emptyLabel },
               { id: 'local-docker', label: 'Local sandbox' },
               { id: 'remote-machine', label: 'Cloud machine' },
+              { id: 'agent37', label: 'Agent37' },
             ]}
           />
+          {kind === 'agent37' && (
+            <div className="mt-3 space-y-3">
+              {agent37 ? (
+                <>
+                  <p className="form-field-description">
+                    A Linux computer on your Agent37 account, billed to your balance while it runs.
+                    It sleeps after 10 idle minutes. The first start builds its image there, which
+                    takes several minutes.
+                  </p>
+                  <Button
+                    loading={busy === 'create'}
+                    loadingLabel="Creating…"
+                    disabled={!!busy}
+                    onClick={() => void create()}
+                  >
+                    Create and start
+                  </Button>
+                </>
+              ) : (
+                <Agent37KeyForm onConnected={() => setAgent37(true)} />
+              )}
+            </div>
+          )}
           {kind === 'local-docker' && (
             <div className="mt-3 space-y-3">
               {dockerMissing ? (
