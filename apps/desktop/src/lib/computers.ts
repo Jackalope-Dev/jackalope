@@ -17,7 +17,7 @@ export interface ComputerSettings {
 export interface ComputerStatus {
   id: string;
   name: string;
-  ownerKind: 'bot' | 'task';
+  ownerKind: 'bot' | 'task' | 'project';
   ownerId: string;
   provider: ComputerProvider | string;
   machineId?: string | null;
@@ -87,23 +87,50 @@ export const dockerStatus = () => nativeTask<DockerStatus>('computer_docker_stat
 
 export const listComputers = () => nativeTask<ComputerStatus[]>('computer_list');
 
-export const botComputer = (botId: string) =>
-  nativeTask<ComputerStatus | null>('computer_status', { ownerKind: 'bot', ownerId: botId });
+/**
+ * Who a computer serves: a bot, whose desktop and browser tools act there, or a
+ * project, whose task agents run there.
+ */
+export interface ComputerOwner {
+  kind: 'bot' | 'project';
+  id: string;
+  name: string;
+}
 
-export const configureBotComputer = (
-  bot: { id: string; name: string },
+export const ownerComputer = (owner: Pick<ComputerOwner, 'kind' | 'id'>) =>
+  nativeTask<ComputerStatus | null>('computer_status', {
+    ownerKind: owner.kind,
+    ownerId: owner.id,
+  });
+
+export const configureOwnerComputer = (
+  owner: ComputerOwner,
   provider: ComputerProvider,
   machineId: string | null,
   settings: ComputerSettings,
 ) =>
   nativeTask<ComputerStatus>('computer_configure', {
-    ownerKind: 'bot',
-    ownerId: bot.id,
-    ownerName: bot.name,
+    ownerKind: owner.kind,
+    ownerId: owner.id,
+    ownerName: owner.name,
     provider,
     machineId,
     settings,
   });
+
+/** A sign-in agents use when they run on a computer. Values never reach the app. */
+export interface AgentCredential {
+  id: string;
+  agent: 'claude' | 'codex' | string;
+  label: string;
+  saved: boolean;
+}
+
+export const agentCredentials = () => nativeTask<AgentCredential[]>('computer_agent_credentials');
+
+/** Saves a sign-in, or removes it when `value` is null. */
+export const setAgentCredential = (id: string, value: string | null) =>
+  nativeTask<AgentCredential[]>('computer_set_agent_credential', { id, value });
 
 /** Starts in the background; poll the status for its phase. */
 export const startComputer = (id: string) => nativeTask<ComputerStatus>('computer_start', { id });

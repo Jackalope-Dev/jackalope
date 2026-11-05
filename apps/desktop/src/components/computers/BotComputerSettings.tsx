@@ -1,18 +1,19 @@
 import { Badge, FormField, Input, SegmentedControl } from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  botComputer,
   type CloudMachine,
+  type ComputerOwner,
   type ComputerSettings,
   type ComputerStatus,
   cloudMachines,
   computerStateLabel,
   computerUsage,
-  configureBotComputer,
+  configureOwnerComputer,
   DEFAULT_COMPUTER_SETTINGS,
   type DockerStatus,
   deleteComputer,
   dockerStatus,
+  ownerComputer,
   providerLabel,
   startComputer,
   stopComputer,
@@ -99,6 +100,39 @@ function Resources({
  * machine the person paired in Settings → Computers.
  */
 export function BotComputerSettings({ bot }: { bot: { id: string; name: string } }) {
+  return (
+    <OwnerComputerSettings
+      owner={{ kind: 'bot', ...bot }}
+      title="Computer"
+      description={`A separate machine only ${bot.name} uses, with its own desktop and browser. Its desktop and browser tools act there instead of on your computer, without asking for desktop access. Each website still asks before first use.`}
+    />
+  );
+}
+
+/** The computer a project's Claude Code and Codex task agents run on. */
+export function ProjectComputerSettings({ project }: { project: { id: string; name: string } }) {
+  return (
+    <OwnerComputerSettings
+      owner={{ kind: 'project', ...project }}
+      title="Agents run on"
+      emptyLabel="This device"
+      description="Claude Code and Codex agents run there instead of on this device, with the sign-ins in Settings → Computers. Checks, review and merging stay here. Jackalope's peer, question and browser tools are not available there yet."
+    />
+  );
+}
+
+function OwnerComputerSettings({
+  owner,
+  title,
+  description,
+  emptyLabel = 'None',
+}: {
+  owner: ComputerOwner;
+  title: string;
+  description: string;
+  emptyLabel?: string;
+}) {
+  const { kind: ownerKind, id: ownerId } = owner;
   const [status, setStatus] = useState<ComputerStatus | null>(null);
   const [docker, setDocker] = useState<DockerStatus | null>(null);
   const [machines, setMachines] = useState<CloudMachine[]>([]);
@@ -118,7 +152,7 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
   const refresh = useCallback(async () => {
     if (!isTauriEnvironment()) return;
     try {
-      const next = await botComputer(bot.id);
+      const next = await ownerComputer({ kind: ownerKind, id: ownerId });
       setStatus(next);
       if (next && !edited.current) setSettings(next.settings);
     } catch (cause) {
@@ -126,7 +160,7 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
     } finally {
       setLoaded(true);
     }
-  }, [bot.id]);
+  }, [ownerKind, ownerId]);
 
   useEffect(() => {
     void refresh();
@@ -164,8 +198,8 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
 
   const create = () =>
     run('create', async () => {
-      const created = await configureBotComputer(
-        bot,
+      const created = await configureOwnerComputer(
+        owner,
         kind === 'remote-machine' ? 'remote-machine' : 'local-docker',
         kind === 'remote-machine' ? machineId : null,
         settings,
@@ -174,11 +208,9 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
       await startComputer(created.id);
     });
 
-  const description = `A separate machine only ${bot.name} uses, with its own desktop and browser. Its desktop and browser tools act there instead of on your computer, without asking for desktop access. Each website still asks before first use.`;
-
   if (!loaded && isTauriEnvironment()) {
     return (
-      <SettingGroup title="Computer" description={description}>
+      <SettingGroup title={title} description={description}>
         <SettingBody>
           <p className="task-muted">Loading…</p>
         </SettingBody>
@@ -189,7 +221,7 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
   const dockerMissing = docker && !docker.available;
 
   return (
-    <SettingGroup title="Computer" description={description}>
+    <SettingGroup title={title} description={description}>
       {error && (
         <SettingBody>
           <InlineNotice tone="error">{error}</InlineNotice>
@@ -267,7 +299,7 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
                   disabled={!!busy}
                   onClick={() =>
                     void run('save', async () => {
-                      await configureBotComputer(bot, 'local-docker', null, {
+                      await configureOwnerComputer(owner, 'local-docker', null, {
                         ...settings,
                         idleStopMinutes: status.settings.idleStopMinutes,
                       });
@@ -287,7 +319,7 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
             title="Delete computer"
             description={
               status.provider === 'remote-machine'
-                ? 'Disconnects the bot from this machine. The machine and its files stay where they run.'
+                ? `Disconnects ${owner.kind === 'bot' ? 'the bot' : 'this project'} from this machine. The machine and its files stay where they run.`
                 : 'Removes the computer and everything stored in it, including its browser sign-ins.'
             }
           >
@@ -300,7 +332,7 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
               title={`Delete ${status.name}?`}
               description={
                 status.provider === 'remote-machine'
-                  ? 'The bot stops using this machine. Nothing on the machine is deleted.'
+                  ? `${owner.kind === 'bot' ? 'The bot stops' : 'Agents stop'} using this machine. Nothing on the machine is deleted.`
                   : 'Its desktop, files and browser sign-ins are removed. This cannot be undone.'
               }
               label="Delete computer"
@@ -321,11 +353,11 @@ export function BotComputerSettings({ bot }: { bot: { id: string; name: string }
       ) : (
         <SettingBody>
           <SegmentedControl
-            label="Computer"
+            label={title}
             value={kind}
             onChange={setKind}
             items={[
-              { id: 'none', label: 'None' },
+              { id: 'none', label: emptyLabel },
               { id: 'local-docker', label: 'Local sandbox' },
               { id: 'remote-machine', label: 'Cloud machine' },
             ]}
