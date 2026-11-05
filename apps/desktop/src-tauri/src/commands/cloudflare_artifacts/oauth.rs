@@ -61,11 +61,11 @@ pub struct Tokens {
     pub grant: Grant,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Account {
-    id: String,
-    name: String,
+    pub(super) id: String,
+    pub(super) name: String,
 }
 
 struct Pending {
@@ -404,17 +404,31 @@ pub async fn complete() -> Result<Vec<Account>, String> {
 }
 
 async fn accounts(access: &str) -> Result<Vec<Account>, String> {
+    let body = list_accounts(access).await?;
+    if body["success"] != true {
+        return Err("Cloudflare signed you in but did not list your accounts. Connect again and allow account access.".into());
+    }
+    let accounts = parse_accounts(&body);
+    if accounts.is_empty() {
+        return Err("No Cloudflare accounts were shared with Jackalope. Connect again and select an account.".into());
+    }
+    Ok(accounts)
+}
+
+/// `GET /accounts` with `access`; any API token can list the accounts it covers.
+pub(super) async fn list_accounts(access: &str) -> Result<Value, String> {
     let response = client()?
         .get(ACCOUNTS_URL)
         .bearer_auth(access)
         .send()
         .await
         .map_err(|_| "Could not reach Cloudflare. Check your connection and retry.")?;
-    let body: Value = response.json().await.unwrap_or(Value::Null);
-    if body["success"] != true {
-        return Err("Cloudflare signed you in but did not list your accounts. Connect again and allow account access.".into());
-    }
-    let accounts: Vec<Account> = body["result"]
+    Ok(response.json().await.unwrap_or(Value::Null))
+}
+
+/// The accounts in a `GET /accounts` response, skipping malformed IDs.
+pub(super) fn parse_accounts(body: &Value) -> Vec<Account> {
+    body["result"]
         .as_array()
         .into_iter()
         .flatten()
@@ -430,11 +444,7 @@ async fn accounts(access: &str) -> Result<Vec<Account>, String> {
                 id,
             })
         })
-        .collect();
-    if accounts.is_empty() {
-        return Err("No Cloudflare accounts were shared with Jackalope. Connect again and select an account.".into());
-    }
-    Ok(accounts)
+        .collect()
 }
 
 /// The signed-in tokens for a chosen account, which must be one the person

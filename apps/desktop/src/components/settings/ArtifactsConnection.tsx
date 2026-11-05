@@ -21,6 +21,7 @@ import {
   beginCloudflareSignIn,
   type CloudflareAccount,
   cancelCloudflareSignIn,
+  cloudflareTokenAccounts,
   completeCloudflareSignIn,
   connectArtifacts,
   connectCloudflareAccount,
@@ -44,7 +45,7 @@ type Stage =
   | { kind: 'start' }
   | { kind: 'waiting'; url: string }
   | { kind: 'choose'; accounts: CloudflareAccount[]; accountId: string }
-  | { kind: 'token' };
+  | { kind: 'token'; accounts?: CloudflareAccount[]; manual?: boolean };
 
 /** Cloudflare account IDs are 32 hex characters and appear in every dashboard link. */
 const accountIdIn = (value: string) => value.match(/[0-9a-f]{32}/i)?.[0] ?? value.trim();
@@ -266,6 +267,17 @@ export function ArtifactsConnectForm({
         {error && <InlineNotice tone="error">{error}</InlineNotice>}
       </form>
     );
+  const tokenStage = stage;
+  const connectWithToken = async (accountId: string) => {
+    const status = await connectArtifacts({
+      accountId,
+      namespace: namespace.trim() || 'jackalope',
+      jurisdiction,
+      token: token.trim(),
+    });
+    setToken('');
+    onConnected(status);
+  };
   return (
     <form
       className={className}
@@ -276,14 +288,25 @@ export function ArtifactsConnectForm({
         setBusy(true);
         setError('');
         try {
-          const status = await connectArtifacts({
-            accountId: accountIdIn(accountId),
-            namespace: namespace.trim() || 'jackalope',
-            jurisdiction,
-            token: token.trim(),
-          });
-          setToken('');
-          onConnected(status);
+          const chosen = tokenStage.manual ? accountIdIn(accountId) : accountId;
+          if (chosen) {
+            await connectWithToken(chosen);
+            return;
+          }
+          let accounts: CloudflareAccount[];
+          try {
+            accounts = await cloudflareTokenAccounts(token.trim());
+          } catch (cause) {
+            setStage({ kind: 'token', manual: true });
+            throw cause;
+          }
+          const only = accounts.length === 1 ? accounts[0] : undefined;
+          if (only) {
+            await connectWithToken(only.id);
+            return;
+          }
+          setAccountId(accounts[0]?.id ?? '');
+          setStage({ kind: 'token', accounts });
         } catch (cause) {
           setError(String(cause));
         } finally {
@@ -294,18 +317,6 @@ export function ArtifactsConnectForm({
       <p className="settings-row-description">
         Create an API token with Account → Artifacts → Edit for the account you want to use.
       </p>
-      <FormField label="Account ID" description="Or paste any dashboard link for the account.">
-        <Input
-          required
-          autoComplete="off"
-          spellCheck={false}
-          placeholder="32-character account ID"
-          value={accountId}
-          disabled={busy || disabled}
-          maxLength={2048}
-          onChange={(event) => setAccountId(accountIdIn(event.target.value))}
-        />
-      </FormField>
       <FormField label="API token">
         <Input
           required
@@ -314,16 +325,47 @@ export function ArtifactsConnectForm({
           value={token}
           disabled={busy || disabled}
           maxLength={8192}
-          onChange={(event) => setToken(event.target.value)}
+          onChange={(event) => {
+            setToken(event.target.value);
+            if (tokenStage.accounts) {
+              setAccountId('');
+              setStage({ kind: 'token' });
+            }
+          }}
         />
       </FormField>
+      {tokenStage.accounts && (
+        <FormField label="Cloudflare account">
+          <Select value={accountId} disabled={busy || disabled} onValueChange={setAccountId}>
+            {tokenStage.accounts.map((account) => (
+              <SelectItem key={account.id} value={account.id}>
+                {account.name}
+              </SelectItem>
+            ))}
+          </Select>
+        </FormField>
+      )}
+      {tokenStage.manual && (
+        <FormField label="Account ID" description="Or paste any dashboard link for the account.">
+          <Input
+            required
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="32-character account ID"
+            value={accountId}
+            disabled={busy || disabled}
+            maxLength={2048}
+            onChange={(event) => setAccountId(accountIdIn(event.target.value))}
+          />
+        </FormField>
+      )}
       {fields}
       <div className="flex flex-wrap gap-2">
         <Button
           type="submit"
           loading={busy}
           loadingLabel="Connecting…"
-          disabled={busy || disabled || !accountId.trim() || !token.trim()}
+          disabled={busy || disabled || !token.trim() || (!!tokenStage.manual && !accountId.trim())}
         >
           Connect
         </Button>
@@ -336,6 +378,7 @@ export function ArtifactsConnectForm({
           disabled={busy}
           onClick={() => {
             setError('');
+            setAccountId('');
             setStage({ kind: 'start' });
           }}
         >

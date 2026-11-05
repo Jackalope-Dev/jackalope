@@ -205,16 +205,34 @@ fn validate(connection: &Connection) -> Result<(), String> {
     {
         return Err("Choose EU, US or no data location restriction.".into());
     }
-    if connection.token.is_empty()
-        || connection.token.len() > 8192
-        || connection
-            .token
-            .chars()
-            .any(|c| c.is_whitespace() || c.is_control())
-    {
+    if !plausible_token(&connection.token) {
         return Err("Enter a Cloudflare API token with Artifacts Edit permission.".into());
     }
     Ok(())
+}
+
+fn plausible_token(token: &str) -> bool {
+    !token.is_empty()
+        && token.len() <= 8192
+        && !token.chars().any(|c| c.is_whitespace() || c.is_control())
+}
+
+/// The accounts a pasted API token covers, from its `GET /accounts` response.
+fn token_accounts(body: &Value) -> Result<Vec<oauth::Account>, String> {
+    if body["success"] != true {
+        let code = body["errors"][0]["code"].as_u64().unwrap_or_default();
+        return Err(if matches!(code, 1000 | 6003 | 9109 | 10000) {
+            "Cloudflare did not accept this API token. Check that you copied all of it."
+        } else {
+            "Cloudflare did not list the accounts for this token. Enter the account ID instead."
+        }
+        .into());
+    }
+    let accounts = oauth::parse_accounts(body);
+    if accounts.is_empty() {
+        return Err("This token is not scoped to an account. Give it Account → Artifacts → Edit, or enter the account ID.".into());
+    }
+    Ok(accounts)
 }
 
 /// Only an Artifacts Git host may receive a repo token.
@@ -584,6 +602,16 @@ pub async fn cloudflare_artifacts_connect(
         oauth: None,
     };
     establish(connection, &state).await
+}
+
+/// The accounts a pasted API token can use, so the person need not look up an account ID.
+#[tauri::command]
+pub async fn cloudflare_token_accounts(token: String) -> Result<Vec<oauth::Account>, String> {
+    let token = token.trim();
+    if !plausible_token(token) {
+        return Err("Enter a Cloudflare API token with Artifacts Edit permission.".into());
+    }
+    token_accounts(&oauth::list_accounts(token).await?)
 }
 
 /// Validates the connection against its namespace and saves it.
@@ -1132,6 +1160,41 @@ mod tests {
         ] {
             assert!(validate(&broken).is_err());
         }
+    }
+
+    #[test]
+    fn pasted_tokens_derive_their_accounts() {
+        let one = json!({"success": true, "result": [
+            {"id": "0123456789ABCDEF0123456789abcdef", "name": "Personal"},
+            {"id": "not-an-account", "name": "Broken"}
+        ]});
+        let accounts = token_accounts(&one).unwrap();
+        assert_eq!(accounts.len(), 1);
+        assert_eq!(accounts[0].id, "0123456789abcdef0123456789abcdef");
+        assert_eq!(accounts[0].name, "Personal");
+
+        let several = json!({"success": true, "result": [
+            {"id": "a".repeat(32), "name": "Team"},
+            {"id": "b".repeat(32)}
+        ]});
+        let accounts = token_accounts(&several).unwrap();
+        assert_eq!(accounts.len(), 2);
+        assert_eq!(accounts[1].name, "b".repeat(32));
+
+        assert!(token_accounts(&json!({"success": true, "result": []}))
+            .unwrap_err()
+            .contains("enter the account ID"));
+        assert!(
+            token_accounts(&json!({"success": false, "errors": [{"code": 1000}]}))
+                .unwrap_err()
+                .contains("did not accept this API token")
+        );
+        assert!(token_accounts(&Value::Null)
+            .unwrap_err()
+            .contains("Enter the account ID"));
+        assert!(!plausible_token("has space"));
+        assert!(!plausible_token(""));
+        assert!(plausible_token("abc_DEF-123"));
     }
 
     #[test]

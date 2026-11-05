@@ -64,6 +64,10 @@ export const connectArtifacts = (connection: {
     connection: { ...connection, jurisdiction: connection.jurisdiction || null },
   });
 
+/** The accounts a pasted API token covers, so only the token needs pasting. */
+export const cloudflareTokenAccounts = (token: string) =>
+  nativeTask<CloudflareAccount[]>('cloudflare_token_accounts', { token });
+
 export const disconnectArtifacts = () => nativeTask<void>('cloudflare_artifacts_disconnect');
 
 /** Prepares Connect Cloudflare and returns the consent page to open in the browser. */
