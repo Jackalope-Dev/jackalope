@@ -26,6 +26,8 @@ export interface CloudflareAccount {
 
 export interface ArtifactsProjectLink {
   repository: boolean;
+  /** A repository's top level with no commits yet. */
+  unborn?: boolean;
   remote?: string | null;
   repo?: string | null;
   namespace?: string | null;

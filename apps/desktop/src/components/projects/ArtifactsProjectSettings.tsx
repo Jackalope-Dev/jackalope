@@ -16,6 +16,7 @@ import { ArtifactsConnectForm, ArtifactsTitle } from '../settings/ArtifactsConne
 import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
+import { FirstCommit } from './FirstCommit';
 
 type Busy = '' | 'convert' | 'push' | 'share';
 
@@ -73,19 +74,26 @@ export function ArtifactsProjectSettings({
       )}
       {status?.connected && link && !link.repository && (
         <SettingBody>
-          <InlineNotice
-            action={
-              <Button
-                variant="outline"
-                onClick={() => void refresh().catch((cause) => setError(String(cause)))}
-              >
-                Check again
-              </Button>
-            }
-          >
-            Artifacts needs a Git repository with at least one commit. Make a first commit in this
-            folder, then check again.
-          </InlineNotice>
+          {link.unborn ? (
+            <FirstCommit
+              projectPath={projectPath}
+              reason="Artifacts needs at least one commit."
+              onCommitted={() => void refresh().catch((cause) => setError(String(cause)))}
+            />
+          ) : (
+            <InlineNotice
+              action={
+                <Button
+                  variant="outline"
+                  onClick={() => void refresh().catch((cause) => setError(String(cause)))}
+                >
+                  Check again
+                </Button>
+              }
+            >
+              Artifacts needs this project folder to be the top level of a Git repository.
+            </InlineNotice>
+          )}
         </SettingBody>
       )}
       {status?.connected && link?.repository && !linked && (

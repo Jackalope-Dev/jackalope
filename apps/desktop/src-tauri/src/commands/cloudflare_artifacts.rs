@@ -69,6 +69,8 @@ pub struct Status {
 #[serde(rename_all = "camelCase")]
 pub struct ProjectLink {
     repository: bool,
+    /// The folder is a repository's top level with no commits yet.
+    unborn: bool,
     remote: Option<String>,
     repo: Option<String>,
     namespace: Option<String>,
@@ -808,6 +810,7 @@ pub async fn cloudflare_artifacts_project(
         };
         Ok(ProjectLink {
             repository,
+            unborn: !repository && super::first_commit::is_unborn(&project_path),
             remote,
             namespace: identity.as_ref().map(|(namespace, _)| namespace.clone()),
             repo: identity.map(|(_, repo)| repo),

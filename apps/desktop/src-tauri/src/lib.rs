@@ -524,6 +524,8 @@ pub fn run(launch: Launch) {
             queue_assist_policy,
             queue_retry_reconciliation,
             commands::project_git::project_git_policy,
+            commands::first_commit::project_first_commit_preview,
+            commands::first_commit::project_first_commit,
             integration_prepare,
             integration_apply,
             integration_plans,

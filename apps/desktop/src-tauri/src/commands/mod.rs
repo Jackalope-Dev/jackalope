@@ -88,6 +88,7 @@ pub mod account;
 mod account_storage;
 pub mod community;
 pub mod execution_access;
+pub mod first_commit;
 mod file_lock;
 mod git_command;
 pub mod notifications;
