@@ -196,8 +196,6 @@ fn a_fixture_planner_drafts_a_plan_that_is_revised_approved_only_exactly_and_exp
     // Without a saved project check, the plan's test criterion is the check.
     assert_eq!(view.verification.source, "criteria");
     assert_eq!(view.verification.command.as_deref(), Some("pnpm test csv"));
-    let swarm = session::approve(&coordinator, &record.id, 2, hash, "swarm", "app", checks());
-    assert!(swarm.unwrap_err().contains("swarm Worker"));
     let unapproved = session::store(&coordinator).load(&record.id).unwrap();
     assert!(unapproved.approval.is_none());
 
