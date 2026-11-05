@@ -1,6 +1,8 @@
 import { MailIcon } from '@jackalope/ui';
 import { ArrowRight } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import Markdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { type Author, authorPath, authors, findAuthor } from './authors';
 import type { BlogPost, BlogSection } from './blog-types';
 import { posts, updates } from './content';
@@ -21,6 +23,37 @@ const dateLabel = (date: string) =>
   }).format(new Date(`${date}T12:00:00Z`));
 
 const sectionId = (section: BlogSection, index: number) => section.id || `section-${index + 1}`;
+
+// Raw HTML in Markdown is dropped (skipHtml) and react-markdown strips unsafe URLs, so
+// posts merged without review cannot inject markup or scripts.
+const markdownComponents: Components = {
+  h1: 'h3',
+  h2: 'h3',
+  ul: ({ node: _node, ...props }) => <ul className="blog-checklist" {...props} />,
+  ol: ({ node: _node, ...props }) => <ol className="blog-checklist" {...props} />,
+  pre: ({ node: _node, ...props }) => (
+    <figure className="blog-code">
+      {/* biome-ignore lint/a11y/noNoninteractiveTabindex: Overflowing code must be keyboard-scrollable. */}
+      <pre tabIndex={0} {...props} />
+    </figure>
+  ),
+  table: ({ node: _node, ...props }) => (
+    <section
+      className="blog-table-scroll"
+      aria-label="Table"
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: The table region must support keyboard scrolling on narrow screens.
+      tabIndex={0}
+    >
+      <table {...props} />
+    </section>
+  ),
+};
+
+const BlogMarkdown = ({ children }: { children: string }) => (
+  <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents} skipHtml>
+    {children}
+  </Markdown>
+);
 
 function JournalIndex({
   items = posts,
@@ -164,11 +197,13 @@ export function JournalPage({ path }: { path: string }) {
               </ol>
             </nav>
           )}
+          {post.intro && <BlogMarkdown>{post.intro}</BlogMarkdown>}
           {post.sections.map((section, index) => (
             <section key={section.title} aria-labelledby={sectionId(section, index)}>
               <h2 id={sectionId(section, index)} tabIndex={-1}>
                 {section.title}
               </h2>
+              {section.markdown && <BlogMarkdown>{section.markdown}</BlogMarkdown>}
               {section.paragraphs.map((text) => (
                 <p key={text}>{text}</p>
               ))}
