@@ -2,8 +2,9 @@ import type { BlogPost, BlogSection, EditorialCover } from './blog-types.ts';
 
 /**
  * Posts LopeBase publishes as `apps/website/content/blog/<slug>.md`: front matter with
- * JSON-quoted title, description, slug and tags, and an unquoted YYYY-MM-DD date, then
- * the Markdown body. A file that does not parse throws, so the build (and the CI gate
+ * JSON-quoted title, description, slug and tags, an unquoted YYYY-MM-DD date and
+ * optional updated date, an optional one-line JSON faq ([{"q","a"}]), then the Markdown
+ * body. A file that does not parse throws, so the build (and the CI gate
  * that auto-merges these posts) fails instead of publishing a broken page.
  */
 function readSources(): Record<string, string> {
@@ -73,6 +74,18 @@ function parsePost(file: string, source: string): BlogPost {
   if (!file.endsWith(`/${slug}.md`)) throw new Error(`${file}: file name must match its slug.`);
   if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date))
     throw new Error(`${file}: date must be YYYY-MM-DD.`);
+  const updated = fields.updated;
+  if (
+    updated !== undefined &&
+    (typeof updated !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(updated))
+  )
+    throw new Error(`${file}: updated must be YYYY-MM-DD.`);
+  const faq = (Array.isArray(fields.faq) ? fields.faq : [])
+    .map((pair) => ({
+      question: String(pair?.q ?? '').trim(),
+      answer: String(pair?.a ?? '').trim(),
+    }))
+    .filter((pair) => pair.question && pair.answer);
 
   // A leading H1 repeats the title, which the page already renders.
   const lines = body.replace(/^\s*#\s+.*\r?\n/, '').split(/\r?\n/);
@@ -104,11 +117,13 @@ function parsePost(file: string, source: string): BlogPost {
     title,
     category: 'Practical guides',
     date,
+    updated: updated && updated > date ? updated : undefined,
     readingTime: `${Math.max(1, Math.round(words / 230))} min read`,
     description,
     cover: { ...covers[hash % covers.length], label: label[0].toUpperCase() + label.slice(1) },
     intro: intro.join('\n').trim() || undefined,
     sections,
+    faq: faq.length ? faq : undefined,
   };
 }
 

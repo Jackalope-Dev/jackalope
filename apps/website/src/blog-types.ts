@@ -45,6 +45,8 @@ export type BlogPost = {
   intro?: string;
   sections: BlogSection[];
   related?: BlogLink[];
+  /** Questions answered in the post, for FAQPage structured data. */
+  faq?: { question: string; answer: string }[];
 };
 
 export function serializeBlogPost(post: BlogPost): string {

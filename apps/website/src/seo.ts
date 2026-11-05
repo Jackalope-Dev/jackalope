@@ -223,6 +223,17 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
       })),
     });
   }
+  if (post?.faq && post.faq.length >= 2) {
+    graph.push({
+      '@type': 'FAQPage',
+      '@id': `${url}#faq`,
+      mainEntity: post.faq.map((entry) => ({
+        '@type': 'Question',
+        name: entry.question,
+        acceptedAnswer: { '@type': 'Answer', text: entry.answer },
+      })),
+    });
+  }
   if (normalized === '/blog/') {
     graph.push({
       '@type': 'ItemList',

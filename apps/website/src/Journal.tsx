@@ -185,7 +185,7 @@ export function JournalPage({ path }: { path: string }) {
           </div>
         </header>
         <div className="article-body blog-body">
-          {post.related && (
+          {post.sections.length >= 3 && (
             <nav className="blog-contents" aria-label="On this page">
               <h2>On this page</h2>
               <ol>
@@ -291,7 +291,7 @@ export function JournalPage({ path }: { path: string }) {
             <a href="/tour/">Watch the app tour</a> or <a href="/#how-it-works">see how it works</a>
             .
           </p>
-          {post.related && (
+          {(post.related || post.category === 'Practical guides') && (
             <p>
               <a href="/#newsletter">Sign up free</a> to try Jackalope on your own projects.
             </p>

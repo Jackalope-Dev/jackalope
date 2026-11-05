@@ -8,6 +8,10 @@ import { knowledgeGuides } from './knowledge-content.ts';
 import { marketingPages } from './marketing-content.ts';
 import { recentPosts } from './recent-posts.ts';
 
+/** The brand suffix only when it still fits search results' 60 characters. */
+const postTitle = (title: string) =>
+  title.length + ' | Jackalope'.length <= 60 ? `${title} | Jackalope` : title;
+
 export const siteOrigin = 'https://jackalope.dev';
 export const company = { name: 'Jackalope Digital LLC', url: 'https://jackalope.digital' };
 
@@ -267,7 +271,7 @@ export const pages: SitePage[] = [
   })),
   ...posts.map((post) => ({
     path: `/blog/${post.slug}/`,
-    title: `${post.seoTitle || post.title} | Jackalope`,
+    title: postTitle(post.seoTitle || post.title),
     description: post.description,
   })),
   ...knowledgeGuides.map((guide) => ({
