@@ -19,7 +19,8 @@ Project settings under **Agents run on**; its task agents then run there (see
 computer, paired cloud machine, the Agent37 connection, agent sign-ins for computers and
 Docker's readiness.
 
-When a run belongs to a bot with a computer, or to a task that was given one:
+When a run's agent runs on a computer (see [agents on a computer](#agents-on-a-computer)),
+belongs to a bot with a computer, or belongs to a task that was given one, in that order:
 
 - `desktop_control` acts on the computer's whole screen. `request_access` answers
   `active` at once with no question, indicator or desktop lease, because the computer is
@@ -28,7 +29,7 @@ When a run belongs to a bot with a computer, or to a task that was given one:
   desktop. `select` is unavailable; `invoke` and element `focus` click the element.
 - Browser tools drive the computer's Chromium through its DevTools endpoint when the
   computer is a local sandbox with networking on. Otherwise they keep the task's own
-  local browser.
+  local browser, except for an agent running on the computer, which then has none.
 - Every website the agent reaches in the computer, through either tool, asks the person
   once per task: allow for this task, always allow, decline, or never allow. Saved
   decisions use the bot's key (`bot:<id>`, shared with the bot's browser profile) or the
@@ -91,11 +92,14 @@ backend) and macOS, Colima on macOS, or Docker Engine on Linux. Jackalope runs t
 Computers reports the engine, version and architecture, or what to do: install Docker,
 start it, run `colima start`, or switch Docker Desktop from Windows containers.
 
-The first start builds the image from `apps/desktop/src-tauri/resources/computer`
-(bundled with the app) with `docker build`; the status shows the latest build line. The
-tag `jackalope-computer:<hash>` follows the content of `Dockerfile`, `start.sh` and
-`agent.py`, so a changed definition builds a new image. Docker builds for the host's
-architecture, so Apple Silicon gets an arm64 image. No image is published.
+The first start pulls this version's [published image](#the-image) and tags it
+`jackalope-computer:<hash>`; when it cannot (no published image for this version and
+definition, no network, or an arm64 host, since only amd64 is published) it builds the
+image from `apps/desktop/src-tauri/resources/computer` (bundled with the app) with
+`docker build`. The status shows the latest pull or build line. The tag follows the
+content of `Dockerfile`, `start.sh` and `agent.py`, so a changed definition builds a new
+image. A local build is for the host's architecture, so Apple Silicon gets an arm64
+image.
 
 Each computer is the container `jackalope-computer-<id>` with the named volume
 `jackalope-computer-<id>-home` at `/home/bot`, labelled `dev.jackalope.computer`. It is
@@ -137,14 +141,18 @@ that serves the same image's agent over HTTPS. Jackalope never creates, starts, 
 deletes it. On the machine:
 
 ~~~sh
-docker build -t jackalope-computer path/to/resources/computer
 docker run -d --name jackalope-computer --init --restart unless-stopped \
   --cap-drop ALL --security-opt no-new-privileges --shm-size 1g \
   -e JACKALOPE_COMPUTER_TOKEN -e JACKALOPE_VNC_PASSWORD \
   -v jackalope-home:/home/bot \
   -p 127.0.0.1:8765:8765 -p 127.0.0.1:6080:6080 \
-  jackalope-computer
+  ghcr.io/jackalope-dev/jackalope-computer:<version>-<hash>
 ~~~
+
+The image is this app version's [published image](#the-image) (amd64 only). On an arm64
+machine, or for a build without a published image, build it there with
+`docker build -t jackalope-computer path/to/resources/computer` and run
+`jackalope-computer` instead.
 
 `JACKALOPE_COMPUTER_TOKEN` is the pairing secret, at least 32 characters (for example
 `openssl rand -hex 32`). Put an HTTPS reverse proxy such as Caddy in front of port 8765,
@@ -155,8 +163,9 @@ constant time.
 
 In Settings → Computers, or from a bot's Computer settings when nothing is paired yet,
 **Pair machine** generates a 64-character secret in the app and shows the `docker run`
-command above with it filled in (`PairMachineForm` keeps that command in step with this
-guide). It takes the HTTPS address (plain HTTP only for a `127.0.0.1` tunnel), a name that
+command above with it and this version's image filled in (`PairMachineForm` keeps that
+command in step with this guide; it falls back to `jackalope-computer` when the app
+cannot read its image definition). It takes the HTTPS address (plain HTTP only for a `127.0.0.1` tunnel), a name that
 defaults to one the app picks, the secret, which can be replaced, and an optional noVNC
 page address. Pairing checks the agent first. The secret is stored in protected storage
 (`computers/machines/<id>.bin`), never in `machines.json`. **Test connection** repeats the
@@ -169,9 +178,9 @@ tools stay on the task's local browser for cloud machines; `desktop_control` and
 
 Running a project's agents on a computer, Agent37 computers and agent sign-ins for
 computers are beta and marked **Beta** wherever the app shows them. A project whose
-**Agents run on** names a computer runs its Claude Code and Codex task agents there.
-Other agents and planning sessions run on this device and say so in the attempt's
-activity. Workspace preparation, checks, the checkpoint, review and integration stay on
+**Agents run on** names a computer runs its Claude Code and Codex task agents there,
+including read-only planning attempts (plan mode's planner and a swarm round's
+orchestrator). Other agents run on this device and say so in the attempt's activity. Workspace preparation, checks, the checkpoint, review and integration stay on
 this device and are unchanged, so the coordinator, execution guard and runtime lock
 order, reservations and Git safeguards apply as for a local attempt:
 
@@ -228,12 +237,39 @@ bridge with the attempt's real credential on its own thread, so a long call such
 each; a call unanswered for 40 minutes gets a timeout. The bridge credential never
 leaves this device, and requests carrying an `Origin` header are refused. Peers,
 messages, questions, `propose_subtask`, plan deviations, agreements, validation steps,
-decisions and Jev questions work as for a local agent. Tools that act on this device or
-its copy of the workspace (the browser tools, `desktop_control`, `computer_verify`,
-`verification_output`, `read_context` and `peer_adopt`) are left out of the tool list,
-refused when called, and named as unavailable in the agent's instructions; the saved
-check still runs locally after the changes come back. Project connections are not
-delivered to agents on a computer. A computer whose agent predates the relay (a cloud
+decisions and Jev questions work as for a local agent. `desktop_control`, `computer_exec`
+and `computer_request` act on the computer the agent runs on, as for a bot's computer,
+with the same per-site questions saved under the project. The browser tools drive that
+computer's Chromium when it is a local sandbox with networking on, so a server the agent
+starts there is reachable at `localhost`; on a cloud machine or an Agent37 computer they
+are unavailable, because no DevTools endpoint reaches this device and the task's local
+browser would be the wrong machine. Tools that are unavailable are left out of the tool
+list, refused when called, and named in the agent's instructions:
+
+| Tool | On a computer |
+| --- | --- |
+| `desktop_control`, `computer_exec`, `computer_request` | Act on the agent's computer |
+| Browser tools | The computer's Chromium on a local sandbox with networking; otherwise unavailable |
+| `browser_open_profile` | Unavailable: persistent profiles hold this device's sign-ins |
+| `computer_verify`, `verification_output`, `read_context` | Read-only attempts only; otherwise unavailable |
+| `peer_adopt` | Unavailable |
+
+`computer_verify`, `verification_output` and `read_context` work on this device's copy
+of the workspace. A writing agent changes its own copy on the computer, so that copy
+would be stale; the saved check runs locally after the changes come back instead. A
+read-only attempt changes nothing, so this device's copy is what it reads, and a swarm
+orchestrator can run the plan's check. `peer_adopt` applies another attempt's changes to
+this device's copy while the agent edits the computer's, which would break the single
+writer of each workspace and be overwritten or conflict when the agent's patch comes
+back. Project connections are not delivered to agents on a computer.
+
+A read-only attempt runs with the same read-only CLI settings as locally (Claude Code
+without edit tools and without its permission prompt, so tools needing approval are
+refused; Codex with `sandbox_mode="read-only"`). It uploads to a run folder of its own
+(`~/.jackalope-runs/r<hash>`), so it never shares one with a writing attempt of the same
+workspace, and nothing comes back from it: if it changed files on the computer anyway,
+the attempt reports how many and they are discarded with its run folder. A read-only
+run left behind by lost contact is discarded the same way when planning continues. A computer whose agent predates the relay (a cloud
 machine on an old image) runs the agent without the bridge and says so.
 
 Agents on project computers have their own concurrency limit (8 by default, up to 32),
@@ -254,10 +290,13 @@ with Agent37 before it is saved in protected storage (`computers/secrets/agent37
 and shows this month's spend from `GET /v1/usage`. The key cannot be removed while an
 Agent37 computer exists.
 
-The first start builds the image from `resources/computer` as a template named
-`jackalope-computer-<hash>` (the local image tag's hash) through Agent37's template
-builds: the build context is uploaded, built on Agent37 and published to the workspace;
-nothing is pushed to a registry. A changed image definition builds a new template. Each
+The first start creates a template named `jackalope-computer-<hash>` (the local image
+tag's hash) in the workspace. It first registers this version's [published
+image](#the-image) by registry import (`POST /v1/templates` with its `image_ref`), which
+Agent37 copies once and pins by digest. When that import is refused (no published image
+for this version and definition, or the package is not public) it falls back to
+Agent37's template builds: the build context is uploaded, built on Agent37 and published
+to the workspace. A changed image definition makes a new template. Each
 computer is one instance from that template, created with its own pairing secret and
 viewer password in its environment, and with auto sleep after its idle stop time
 (Agent37 accepts 5 minutes to a day; Never turns auto sleep off). The instance id is
@@ -328,11 +367,30 @@ URL as `site`. `start.sh` starts Xvfb (1280 × 800 by default), a private D-Bus 
 the AT-SPI bus, Openbox, x11vnc with noVNC when a viewer password is set, Chromium with
 remote debugging, and the HTTP agent when a pairing secret is set.
 
+## The image
+
 The image is Jackalope's own definition; it uses no Cua code. It installs Debian
-packages, including Chromium, Xvfb, Openbox, x11vnc, noVNC and websockify, at build
-time on the machine that builds it, under their own licenses, plus Git and Node with
-the Claude Code and Codex CLIs from npm for agents on a computer. Publishing a prebuilt
-image would need their notices.
+packages, including Chromium, Xvfb, Openbox, x11vnc, noVNC and websockify, under their
+own licenses, plus Git and Node with the Codex CLI from npm for agents on a computer.
+Claude Code's license does not allow redistributing it, so it is not in the image: the
+first run that needs it installs `@anthropic-ai/claude-code` from npm into the home
+volume (`~/.local`, first on `PATH`) within 100 seconds, which needs networking.
+
+`.github/workflows/computer-image.yml` publishes the image for linux/amd64 to
+`ghcr.io/jackalope-dev/jackalope-computer` on every push to `beta` or `stable` and on
+manual dispatch; it has no pull request trigger and pushes with the workflow's
+`GITHUB_TOKEN` (`packages: write`). `scripts/release/computer-image.mjs` reads the
+repository from `REPOSITORY` in `commands/computers/image.rs`, the version from the
+desktop `Cargo.toml` and the definition hash from the same files as
+`docker::image_tag`, and tags the image `<version>-<hash>`, `<version>` and
+`sha-<commit>`; the run summary records the pushed digest. The app only uses
+`<version>-<hash>`, so it never runs an image whose definition differs from its own.
+Before pushing, the workflow checks that the image keeps
+`/usr/share/doc/<package>/copyright` for its Debian packages (the slim base keeps them),
+`/usr/share/common-licenses/Apache-2.0`, the Codex package and
+`/usr/share/doc/jackalope-computer/NOTICE`, and does not contain Claude Code. Labels
+record the source, revision, version and definition. The package must be public for
+anonymous pulls and Agent37 imports; set that once in the package's settings.
 
 ## Checks
 
@@ -344,12 +402,16 @@ exclusion from the container configuration, idle decisions and status text, view
 holds and the quit preference. `cargo test … --lib computers::runs computers::relay
 tasks::remote` covers command translation with and without the bridge relay,
 credentials, the workspace archive with copied setup files, chunked upload and patch
-checks, line splitting, patch application, and the relay's refusals, tool-list filtering
-and forwarding with the attempt's credential; `coordination::eligibility` covers the
+checks, line splitting, patch application, the read-only run name, and the relay's
+refusals, tool-list filtering by the computer's browser and read-only access, and
+forwarding with the attempt's credential; `coordination::eligibility` covers the
 separate concurrency for computer projects; `computers::agent37` covers keys, instance
 creation bodies, states, errors and the template build context.
+`computers::image` covers the published reference and the definition hash shared with
+`node --test scripts/release/computer-image.test.mjs`; `computers::agent37` also covers
+the template import body and its fallback.
 `python3 apps/desktop/scripts/computer-agent.test.py` (POSIX, for example in WSL) covers
-the run actions: upload, run, read, stop, the orphan stop, committed changes, unsafe
+the on-demand CLI install and the run actions: upload, run, read, stop, the orphan stop, committed changes, unsafe
 uploads, the bridge relay's hand-over and answers, and a run whose supervisor died. The
 opt-in `local_docker_computer_round_trip -- --ignored --nocapture` builds the image,
 starts a computer, takes a screenshot and snapshot, runs a command, checks the home

@@ -170,7 +170,9 @@ export const setComputerPreferences = (preferences: ComputerPreferences) =>
   nativeTask<ComputerPreferences>('computer_set_preferences', { preferences });
 
 export const cloudMachines = () =>
-  nativeTask<{ machines: CloudMachine[]; hostedAvailable: boolean }>('computer_machines');
+  nativeTask<{ machines: CloudMachine[]; hostedAvailable: boolean; image: string }>(
+    'computer_machines',
+  );
 
 export const addCloudMachine = (
   name: string,

@@ -249,6 +249,31 @@ class RunProtocol(unittest.TestCase):
             action="workspace_put", run="r6", offset=0,
             data=base64.b64encode(b"x" * (self.agent.CHUNK_LIMIT + 1)).decode()))
 
+    def test_on_demand_cli_is_installed_into_the_home(self):
+        tools = os.path.join(self.temp.name, "tools")
+        os.makedirs(tools)
+        npm = os.path.join(tools, "npm")
+        # A stand-in npm that installs a program into --prefix's bin folder.
+        with open(npm, "w") as handle:
+            handle.write(
+                '#!/bin/sh\nset -e\nprefix=$4\nmkdir -p "$prefix/bin"\n'
+                'printf "#!/bin/sh\\nexit 0\\n" > "$prefix/bin/fake-agent-cli"\n'
+                'chmod +x "$prefix/bin/fake-agent-cli"\n'
+            )
+        os.chmod(npm, 0o755)
+        path = os.environ.get("PATH", "")
+        os.environ["PATH"] = tools + os.pathsep + path
+        try:
+            self.agent.LOCAL_PREFIX = os.path.join(self.temp.name, "home-local")
+            self.agent.ON_DEMAND["fake-agent-cli"] = "fake-agent-package"
+            self.agent.ensure_program("fake-agent-cli")
+            self.assertTrue(os.path.exists(
+                os.path.join(self.agent.LOCAL_PREFIX, "bin", "fake-agent-cli")))
+            with self.assertRaises(self.agent.Failure):
+                self.agent.ensure_program("not-on-demand-xyz")
+        finally:
+            os.environ["PATH"] = path
+
 
 if __name__ == "__main__":
     unittest.main()

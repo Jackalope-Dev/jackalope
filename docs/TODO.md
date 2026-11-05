@@ -21,13 +21,16 @@ release dates.
 
 ## Agents and task execution
 
-- [ ] Extend agents on a computer: the browser tools against the computer's own Chromium,
-  project connections, `computer_verify` and `read_context` against the remote copy,
-  planning on the computer, and automatic routing that does not require the CLI here.
+- [ ] Extend agents on a computer: the browser tools on cloud and Agent37 computers,
+  project connections, `computer_verify` and `read_context` against the remote copy for
+  writing agents, and automatic routing that does not require the CLI here.
 - [ ] Accept agents on a computer end to end: real Claude Code and Codex runs on a local
   sandbox and on a live Agent37 account (template build under gVisor, auto sleep and
-  wake, spend), bridge tools through the relay, stop, quota handoff, lost contact,
-  reattach and restart recovery.
+  wake, spend), bridge tools through the relay, desktop control and the browser tools on
+  the agent's computer, read-only planners and swarm orchestrators there, stop, quota
+  handoff, lost contact, reattach and restart recovery.
+- [ ] Publish the first computer image from `beta`, make its package public, and accept
+  a local pull, a cloud machine started from it and an Agent37 registry import.
 - [ ] Give Agent37 computers a viewer through signed port URLs, sizes beyond the default
   shape and idle-time changes after creation.
 

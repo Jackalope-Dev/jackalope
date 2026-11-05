@@ -21,6 +21,7 @@ pub(crate) mod agent37;
 mod browser;
 pub(crate) mod credentials;
 pub(crate) mod docker;
+pub(crate) mod image;
 pub(crate) mod relay;
 pub(crate) mod remote;
 pub(crate) mod runs;
@@ -602,9 +603,20 @@ pub(crate) fn ready_within(root: &Path, computer: &Computer, wait: Duration) -> 
 
 // ---- runs ----
 
-/// A run's computer: its bot's, or the one the person approved for its task.
+/// A run's computer: the one its agent runs on, its bot's, or the one the
+/// person approved for its task. An agent on a computer acts on that same
+/// machine, so its desktop and browser are where its files and servers are.
 pub(crate) fn for_run(runtime: &TaskRuntime, run: &TaskRun) -> Option<Computer> {
     let root = runtime.computers_root();
+    if let Some(remote) = run.remote.as_ref() {
+        if let Some(computer) = list(&root)
+            .unwrap_or_default()
+            .into_iter()
+            .find(|computer| computer.id == remote.computer_id)
+        {
+            return Some(computer);
+        }
+    }
     if let Some(hub) = super::bot_hub::installed() {
         if let Ok((bot, _)) = hub.caller(run) {
             return find(&root, BOT, &bot.id);
@@ -1172,6 +1184,9 @@ pub struct MachinesView {
     pub machines: Vec<remote::Machine>,
     /// Whether Jackalope-hosted computers can be chosen yet.
     pub hosted_available: bool,
+    /// The published computer image for this version, for a cloud machine's
+    /// start command; empty when the bundled definition cannot be read.
+    pub image: String,
 }
 
 #[tauri::command]
@@ -1183,6 +1198,9 @@ pub async fn computer_machines(
         Ok(MachinesView {
             machines: remote::machines(&root)?,
             hosted_available: HOSTED_AVAILABLE,
+            image: image_directory()
+                .and_then(|directory| image::published(&directory))
+                .unwrap_or_default(),
         })
     })
     .await

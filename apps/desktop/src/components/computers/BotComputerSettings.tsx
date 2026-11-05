@@ -119,7 +119,7 @@ export function ProjectComputerSettings({ project }: { project: { id: string; na
       title="Agents run on"
       beta
       emptyLabel="This device"
-      description="Claude Code and Codex agents run there instead of on this device, with the sign-ins in Settings → Computers. Checks, review and merging stay here, and so do the browser and desktop control."
+      description="Claude Code and Codex agents, including planners, run there instead of on this device, with the sign-ins in Settings → Computers. Their desktop and browser tools act on that computer. Checks, review and merging stay here."
     />
   );
 }

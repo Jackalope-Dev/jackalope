@@ -1,9 +1,12 @@
 import { CopyButton, FormField, Input } from '@jackalope/ui';
-import { useState } from 'react';
-import { addCloudMachine, type CloudMachine } from '../../lib/computers';
+import { useEffect, useState } from 'react';
+import { addCloudMachine, type CloudMachine, cloudMachines } from '../../lib/computers';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import './computers.css';
+
+/** The tag of an image built from resources/computer on the machine itself. */
+const LOCAL_IMAGE = 'jackalope-computer';
 
 /** 64 hex characters, above the agent's 32-character minimum. */
 function newSecret() {
@@ -11,9 +14,12 @@ function newSecret() {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-/** Mirrors the cloud machine command in docs/BOT-COMPUTERS.md with the secret filled in. */
-const runCommand = (secret: string) =>
-  `docker run -d --name jackalope-computer --init --restart unless-stopped --cap-drop ALL --security-opt no-new-privileges --shm-size 1g -e JACKALOPE_COMPUTER_TOKEN=${secret} -v jackalope-home:/home/bot -p 127.0.0.1:8765:8765 -p 127.0.0.1:6080:6080 jackalope-computer`;
+/**
+ * Mirrors the cloud machine command in docs/BOT-COMPUTERS.md with the secret and this
+ * version's published image filled in.
+ */
+const runCommand = (secret: string, image: string) =>
+  `docker run -d --name jackalope-computer --init --restart unless-stopped --cap-drop ALL --security-opt no-new-privileges --shm-size 1g -e JACKALOPE_COMPUTER_TOKEN=${secret} -v jackalope-home:/home/bot -p 127.0.0.1:8765:8765 -p 127.0.0.1:6080:6080 ${image}`;
 
 /**
  * Pairs a cloud machine the person runs. The secret is generated here so the start
@@ -34,7 +40,20 @@ export function PairMachineForm({
   const [viewerUrl, setViewerUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const command = runCommand(secret.trim());
+  // This version's published image; a locally built one when it is unknown.
+  const [image, setImage] = useState(LOCAL_IMAGE);
+  useEffect(() => {
+    let current = true;
+    void cloudMachines()
+      .then((view) => {
+        if (current && view.image) setImage(view.image);
+      })
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, []);
+  const command = runCommand(secret.trim(), image);
   return (
     <form
       className="space-y-3"
@@ -62,7 +81,11 @@ export function PairMachineForm({
     >
       <FormField
         label="Start the computer on your machine"
-        description="Build the jackalope-computer image first, then put HTTPS in front of port 8765."
+        description={
+          image === LOCAL_IMAGE
+            ? 'Build the jackalope-computer image first, then put HTTPS in front of port 8765.'
+            : 'Docker downloads the computer image. Put HTTPS in front of port 8765.'
+        }
       >
         <div className="pair-machine-command">
           <code>{command}</code>

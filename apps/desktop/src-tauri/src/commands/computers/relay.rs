@@ -8,9 +8,11 @@
 //! stalls output, and the answers go back through `run_answer`. The credential
 //! stays on this device: the computer only holds the stand-in's own secret.
 //!
-//! Tools that act on this device's screen, browser or local copy of the
-//! workspace would act on the wrong machine for an agent on a computer, so they
-//! are left out of `tools/list` and refused when called.
+//! Desktop control and the browser tools act on the run's own computer, where
+//! the agent is (see [`crate::commands::computers::for_run`]). Tools that read
+//! or change this device's copy of the workspace, or use this device's
+//! sign-ins, would act on the wrong machine, so they are left out of
+//! `tools/list` and refused when called; see [`Access`].
 
 use base64::Engine;
 use serde_json::{json, Value};
@@ -20,8 +22,8 @@ use std::{
     time::Duration,
 };
 
-/// MCP tools an agent on a computer cannot use: they act on this device.
-pub(crate) const UNAVAILABLE_TOOLS: &[&str] = &[
+/// Browser tools, available when the computer's own browser is reachable.
+const BROWSER_TOOLS: &[&str] = &[
     "browser_navigate",
     "browser_screenshot",
     "browser_snapshot",
@@ -29,23 +31,67 @@ pub(crate) const UNAVAILABLE_TOOLS: &[&str] = &[
     "browser_configure",
     "browser_inspect",
     "browser_tabs",
-    "browser_open_profile",
-    "desktop_control",
-    "computer_verify",
-    "verification_output",
-    "read_context",
-    "peer_adopt",
-    "permission_prompt",
 ];
-/// REST routes behind the same tools.
-const UNAVAILABLE_ROUTES: &[&str] = &[
-    "/v1/browser/",
-    "/v1/desktop/",
-    "/v1/computer/verify",
-    "/v1/computer/output",
+/// Tools that read this device's copy of the workspace. A read-only attempt
+/// changes nothing, so that copy matches the computer's and they stay correct.
+const WORKSPACE_TOOLS: &[&str] = &["computer_verify", "verification_output", "read_context"];
+/// Never available on a computer: a persistent profile holds this device's
+/// sign-ins, `peer_adopt` writes another attempt's changes into this device's
+/// copy while the agent edits its own, and permission prompts and native
+/// output belong to a local process.
+const NEVER_TOOLS: &[&str] = &["browser_open_profile", "peer_adopt", "permission_prompt"];
+const BROWSER_ROUTE: &str = "/v1/browser/";
+const WORKSPACE_ROUTES: &[&str] = &["/v1/computer/verify", "/v1/computer/output"];
+const NEVER_ROUTES: &[&str] = &[
+    "/v1/browser/profile",
     "/v1/peers/adopt",
     "/v1/native/output",
 ];
+
+/// Which device-bound tools an agent on a computer may use.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct Access {
+    /// The computer's Chromium is reachable from this device, so the browser
+    /// tools drive it.
+    pub browser: bool,
+    /// The attempt is read-only (planning), so tools reading this device's
+    /// copy of the workspace see what the agent sees.
+    pub read_only: bool,
+}
+
+impl Access {
+    pub fn tool_unavailable(&self, name: &str) -> bool {
+        NEVER_TOOLS.contains(&name)
+            || (!self.browser && BROWSER_TOOLS.contains(&name))
+            || (!self.read_only && WORKSPACE_TOOLS.contains(&name))
+    }
+
+    fn route_unavailable(&self, route: &str) -> bool {
+        NEVER_ROUTES
+            .iter()
+            .any(|blocked| route.starts_with(blocked))
+            || (!self.browser && route.starts_with(BROWSER_ROUTE))
+            || (!self.read_only && WORKSPACE_ROUTES.contains(&route))
+    }
+
+    /// What the agent is told about where its tools act.
+    pub fn instructions(&self) -> String {
+        let mut text = String::from("\nYou run on a separate computer, not on the person's device. Jackalope's coordination, question and planning tools work as usual. desktop_control acts on this computer's own screen");
+        text.push_str(if self.browser {
+            ", and the browser tools drive its own Chromium, so a server you start here is reachable at localhost."
+        } else {
+            ". The browser tools are not available here."
+        });
+        text.push_str(if self.read_only {
+            " computer_verify runs the saved check on Jackalope's identical copy of this read-only workspace."
+        } else {
+            " computer_verify, verification_output, read_context and peer_adopt are not available: use your own shell and file tools, and run checks in the shell."
+        });
+        text.push('\n');
+        text
+    }
+}
+
 const REQUEST_LIMIT: usize = 64 * 1024;
 /// Raw bytes per answer, which keeps each `run_answer` under the agent's 1 MB body limit.
 pub(crate) const ANSWER_LIMIT: usize = 512 * 1024;
@@ -58,9 +104,6 @@ const FORWARDED_HEADERS: &[&str] = &[
     "mcp-session-id",
     "last-event-id",
 ];
-
-/// What the agent's tools are told about where they run.
-pub(crate) const INSTRUCTIONS: &str = "\nYou run on a separate computer, not on the person's device. Jackalope's coordination, question and planning tools work as usual. The browser, desktop control, computer_verify, verification_output, read_context and peer_adopt tools are not available there: use your own shell and file tools, and run checks in the shell.\n";
 
 /// One answer to a bridge request.
 #[derive(Debug, Clone, PartialEq)]
@@ -104,6 +147,7 @@ impl Answer {
 pub(crate) struct Relay {
     endpoint: String,
     token: String,
+    access: Access,
     in_flight: HashSet<String>,
     ready: Vec<Answer>,
     sender: Sender<Answer>,
@@ -111,11 +155,12 @@ pub(crate) struct Relay {
 }
 
 impl Relay {
-    pub fn new(endpoint: &str, token: &str) -> Self {
+    pub fn new(endpoint: &str, token: &str, access: Access) -> Self {
         let (sender, receiver) = channel();
         Self {
             endpoint: endpoint.trim_end_matches('/').to_string(),
             token: token.to_string(),
+            access,
             in_flight: HashSet::new(),
             ready: Vec::new(),
             sender,
@@ -133,7 +178,7 @@ impl Relay {
             if !self.in_flight.insert(id.clone()) {
                 continue;
             }
-            if let Some(answer) = screen(&id, call) {
+            if let Some(answer) = screen(&id, call, self.access) {
                 self.ready.push(answer);
                 continue;
             }
@@ -146,14 +191,15 @@ impl Relay {
                 ));
                 continue;
             }
-            let (endpoint, token, sender) = (
+            let (endpoint, token, sender, access) = (
                 self.endpoint.clone(),
                 self.token.clone(),
                 self.sender.clone(),
+                self.access,
             );
             let call = call.clone();
             std::thread::spawn(move || {
-                let answer = super::remote::block(forward(&endpoint, &token, &id, &call));
+                let answer = super::remote::block(forward(&endpoint, &token, &id, &call, access));
                 let _ = sender.send(answer);
             });
         }
@@ -188,7 +234,7 @@ fn decoded_json(call: &Value) -> Option<Value> {
 }
 
 /// Refuses requests that must not reach the bridge, before forwarding.
-fn screen(id: &str, call: &Value) -> Option<Answer> {
+fn screen(id: &str, call: &Value, access: Access) -> Option<Answer> {
     let method = call["method"].as_str().unwrap_or_default();
     let path = call["path"].as_str().unwrap_or_default();
     let body = decoded(call);
@@ -218,23 +264,21 @@ fn screen(id: &str, call: &Value) -> Option<Answer> {
             .as_ref()
             .filter(|request| request["method"] == "tools/call")
             .and_then(|request| request["params"]["name"].as_str())
-            .is_some_and(|name| UNAVAILABLE_TOOLS.contains(&name))
+            .is_some_and(|name| access.tool_unavailable(name))
     } else {
-        UNAVAILABLE_ROUTES
-            .iter()
-            .any(|blocked| route.starts_with(blocked))
+        access.route_unavailable(route)
     };
     unavailable.then(|| {
         Answer::refused(
             id,
             request.as_ref(),
             403,
-            "This tool acts on the person's device, so it is not available to an agent on a computer. Use your own shell and file tools.",
+            "This tool acts on the person's device or its copy of the workspace, so it is not available to an agent on a computer. Use your own shell and file tools.",
         )
     })
 }
 
-async fn forward(endpoint: &str, token: &str, id: &str, call: &Value) -> Answer {
+async fn forward(endpoint: &str, token: &str, id: &str, call: &Value, access: Access) -> Answer {
     let request = decoded_json(call);
     let failed = |message: &str| Answer::refused(id, request.as_ref(), 502, message);
     let method = match call["method"].as_str() {
@@ -297,7 +341,7 @@ async fn forward(endpoint: &str, token: &str, id: &str, call: &Value) -> Answer 
         .as_ref()
         .is_some_and(|r| r["method"] == "tools/list")
     {
-        without_unavailable_tools(&body, &content_type)
+        without_unavailable_tools(&body, &content_type, access)
     } else {
         body
     };
@@ -316,14 +360,18 @@ async fn forward(endpoint: &str, token: &str, id: &str, call: &Value) -> Answer 
 
 /// Removes unavailable tools from a `tools/list` answer, sent as JSON or as
 /// server-sent events.
-pub(crate) fn without_unavailable_tools(body: &[u8], content_type: &str) -> Vec<u8> {
+pub(crate) fn without_unavailable_tools(
+    body: &[u8],
+    content_type: &str,
+    access: Access,
+) -> Vec<u8> {
     let filter = |text: &str| -> Option<String> {
         let mut message: Value = serde_json::from_str(text).ok()?;
         let tools = message["result"]["tools"].as_array_mut()?;
         tools.retain(|tool| {
             !tool["name"]
                 .as_str()
-                .is_some_and(|name| UNAVAILABLE_TOOLS.contains(&name))
+                .is_some_and(|name| access.tool_unavailable(name))
         });
         Some(message.to_string())
     };
@@ -361,30 +409,96 @@ mod tests {
         })
     }
 
+    const WRITER: Access = Access {
+        browser: false,
+        read_only: false,
+    };
+
+    fn tool_call(name: &str) -> Value {
+        call(
+            "POST",
+            "/mcp",
+            &json!({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":name,"arguments":{}}}),
+        )
+    }
+
     #[test]
     fn device_tools_are_refused_as_tool_errors() {
-        let request = json!({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"browser_navigate","arguments":{}}});
-        let answer = screen("c", &call("POST", "/mcp", &request)).unwrap();
+        let answer = screen("c", &tool_call("browser_navigate"), WRITER).unwrap();
         assert_eq!(answer.status, 200);
         let body: Value = serde_json::from_slice(&answer.body).unwrap();
         assert_eq!(body["id"], 7);
         assert_eq!(body["result"]["isError"], true);
         let allowed = json!({"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"propose_subtask","arguments":{}}});
-        assert!(screen("c", &call("POST", "/mcp", &allowed)).is_none());
+        assert!(screen("c", &call("POST", "/mcp", &allowed), WRITER).is_none());
         let list = json!({"jsonrpc":"2.0","id":9,"method":"tools/list"});
-        assert!(screen("c", &call("POST", "/mcp", &list)).is_none());
+        assert!(screen("c", &call("POST", "/mcp", &list), WRITER).is_none());
+        assert!(screen("c", &tool_call("desktop_control"), WRITER).is_none());
+    }
+
+    #[test]
+    fn access_follows_the_computer_browser_and_read_only_attempts() {
+        let everything = Access {
+            browser: true,
+            read_only: true,
+        };
+        for name in [
+            "browser_navigate",
+            "browser_tabs",
+            "computer_verify",
+            "read_context",
+        ] {
+            assert!(screen("c", &tool_call(name), WRITER).is_some(), "{name}");
+            assert!(
+                screen("c", &tool_call(name), everything).is_none(),
+                "{name}"
+            );
+        }
+        for name in ["browser_open_profile", "peer_adopt", "permission_prompt"] {
+            assert!(
+                screen("c", &tool_call(name), everything).is_some(),
+                "{name}"
+            );
+        }
+        let browser_only = Access {
+            browser: true,
+            read_only: false,
+        };
+        assert!(screen("c", &tool_call("browser_snapshot"), browser_only).is_none());
+        assert!(screen("c", &tool_call("verification_output"), browser_only).is_some());
+        for (path, open) in [
+            ("/v1/browser/navigate", true),
+            ("/v1/browser/profile", false),
+            ("/v1/computer/verify", true),
+            ("/v1/computer/output", true),
+            ("/v1/peers/adopt", false),
+            ("/v1/native/output", false),
+            ("/v1/desktop/control", true),
+        ] {
+            assert_eq!(
+                screen("c", &call("POST", path, &json!({})), everything).is_none(),
+                open,
+                "{path}"
+            );
+        }
+        assert!(WRITER
+            .instructions()
+            .contains("browser tools are not available"));
+        assert!(everything.instructions().contains("its own Chromium"));
+        assert!(everything.instructions().contains("read-only workspace"));
     }
 
     #[test]
     fn device_routes_and_foreign_paths_are_refused() {
         for path in [
             "/v1/browser/navigate",
-            "/v1/desktop/control",
             "/v1/computer/verify",
             "/v1/peers/adopt",
         ] {
             assert_eq!(
-                screen("c", &call("POST", path, &json!({}))).unwrap().status,
+                screen("c", &call("POST", path, &json!({})), WRITER)
+                    .unwrap()
+                    .status,
                 403
             );
         }
@@ -394,15 +508,22 @@ mod tests {
             ("PUT", "/v1/messages"),
         ] {
             assert_eq!(
-                screen("c", &call(method, path, &json!({}))).unwrap().status,
+                screen("c", &call(method, path, &json!({})), WRITER)
+                    .unwrap()
+                    .status,
                 404
             );
         }
-        assert!(screen("c", &call("POST", "/v1/subtasks", &json!({}))).is_none());
-        assert!(screen("c", &call("GET", "/v1/messages?after=3", &json!({}))).is_none());
+        assert!(screen("c", &call("POST", "/v1/subtasks", &json!({})), WRITER).is_none());
+        assert!(screen(
+            "c",
+            &call("GET", "/v1/messages?after=3", &json!({})),
+            WRITER
+        )
+        .is_none());
         let large = json!({ "text": "x".repeat(REQUEST_LIMIT) });
         assert_eq!(
-            screen("c", &call("POST", "/v1/messages", &large))
+            screen("c", &call("POST", "/v1/messages", &large), WRITER)
                 .unwrap()
                 .status,
             413
@@ -422,19 +543,33 @@ mod tests {
                 .map(|tool| tool["name"].as_str().unwrap().to_string())
                 .collect()
         };
-        let filtered = without_unavailable_tools(list.to_string().as_bytes(), "application/json");
-        assert_eq!(names(&filtered), ["peers", "ask_user"]);
+        let filtered =
+            without_unavailable_tools(list.to_string().as_bytes(), "application/json", WRITER);
+        assert_eq!(names(&filtered), ["peers", "desktop_control", "ask_user"]);
+        let browser = Access {
+            browser: true,
+            read_only: false,
+        };
+        let filtered =
+            without_unavailable_tools(list.to_string().as_bytes(), "application/json", browser);
+        assert_eq!(
+            names(&filtered),
+            ["peers", "browser_tabs", "desktop_control", "ask_user"]
+        );
         let events = format!("event: message\ndata: {list}\n\n");
-        let filtered = without_unavailable_tools(events.as_bytes(), "text/event-stream");
+        let filtered = without_unavailable_tools(events.as_bytes(), "text/event-stream", WRITER);
         let data = std::str::from_utf8(&filtered)
             .unwrap()
             .lines()
             .find(|line| line.starts_with("data:"))
             .unwrap()
             .to_string();
-        assert_eq!(names(data.as_bytes()), ["peers", "ask_user"]);
         assert_eq!(
-            without_unavailable_tools(b"not json", "application/json"),
+            names(data.as_bytes()),
+            ["peers", "desktop_control", "ask_user"]
+        );
+        assert_eq!(
+            without_unavailable_tools(b"not json", "application/json", WRITER),
             b"not json"
         );
     }
@@ -472,7 +607,7 @@ mod tests {
             .unwrap();
             (headers, body)
         });
-        let mut relay = Relay::new(&endpoint, "real-token");
+        let mut relay = Relay::new(&endpoint, "real-token", WRITER);
         let list = call(
             "POST",
             "/mcp",

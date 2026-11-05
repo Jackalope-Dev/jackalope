@@ -1,8 +1,9 @@
 //! The `local-docker` provider: one container per computer from the image in
-//! `resources/computer`, built locally on first use. Containers run as an
-//! unprivileged user with no capabilities, `no-new-privileges`, CPU, memory and
-//! process limits, no host mounts unless a task shares its project read-only,
-//! and a named volume for the home folder. The viewer and browser ports are
+//! `resources/computer`, pulled from its published build (see [`super::image`])
+//! or built locally on first use. Containers run as an unprivileged user with
+//! no capabilities, `no-new-privileges`, CPU, memory and process limits, no
+//! host mounts unless a task shares its project read-only, and a named volume
+//! for the home folder. The viewer and browser ports are
 //! published on the host's loopback interface only; with networking off the
 //! container has no network at all. The agent is reached with `docker exec`,
 //! so it needs no port or secret.
@@ -330,20 +331,46 @@ fn inspect(computer: &Computer) -> Result<Option<(String, String)>, String> {
     }
 }
 
-/// Builds the image unless it already exists, reporting build output lines.
+/// Pulls the published image for this version and definition and tags it as
+/// `tag`. Fails when it is not published, cannot be reached, or has no build
+/// for this machine's architecture (it is published for amd64 only).
+fn pull_published(
+    id: &str,
+    directory: &Path,
+    tag: &str,
+    progress: &dyn Fn(&str),
+) -> Result<(), String> {
+    let published = super::image::published(directory)?;
+    progress("Downloading the computer image");
+    let output = supervised(
+        id,
+        &["pull", &published],
+        Limits::supervised(Duration::from_secs(30 * 60), Duration::from_secs(5 * 60)),
+        progress,
+    )?;
+    if !output.success {
+        return Err(clean(&output.stderr));
+    }
+    run(&["tag", &published, tag], QUICK)?;
+    Ok(())
+}
+
+/// Uses the published image or builds it unless it already exists,
+/// reporting Docker's output lines.
 fn ensure_image(id: &str, progress: &dyn Fn(&str)) -> Result<String, String> {
     let directory = super::image_directory()?;
     let tag = image_tag(&directory)?;
     if run(&["image", "inspect", "--format", "{{.Id}}", &tag], QUICK).is_ok() {
         return Ok(tag);
     }
+    if pull_published(id, &directory, &tag, progress).is_ok() {
+        return Ok(tag);
+    }
     progress("Building the computer image (first use takes a few minutes)");
     let context = directory.to_string_lossy().into_owned();
-    let latest: Arc<Mutex<String>> = Arc::default();
-    let seen = latest.clone();
-    let id = id.to_string();
-    let output = process_control::run_supervised(
-        docker(&[
+    let output = supervised(
+        id,
+        &[
             "build",
             "--progress",
             "plain",
@@ -352,8 +379,33 @@ fn ensure_image(id: &str, progress: &dyn Fn(&str)) -> Result<String, String> {
             "--tag",
             &tag,
             &context,
-        ]),
+        ],
         Limits::supervised(Duration::from_secs(45 * 60), Duration::from_secs(10 * 60)),
+        progress,
+    )?;
+    if !output.success {
+        return Err(format!(
+            "The computer image did not build: {}",
+            clean(&output.stderr)
+        ));
+    }
+    Ok(tag)
+}
+
+/// Runs a long Docker command, showing its latest output line as the
+/// computer's phase and reporting the last one when it ends.
+fn supervised(
+    id: &str,
+    args: &[&str],
+    limits: Limits,
+    progress: &dyn Fn(&str),
+) -> Result<process_control::CommandResult, String> {
+    let latest: Arc<Mutex<String>> = Arc::default();
+    let seen = latest.clone();
+    let id = id.to_string();
+    let output = process_control::run_supervised(
+        docker(args),
+        limits,
         || false,
         move |bytes, _| {
             if let Some(line) = String::from_utf8_lossy(bytes)
@@ -373,14 +425,7 @@ fn ensure_image(id: &str, progress: &dyn Fn(&str)) -> Result<String, String> {
     if !line.is_empty() {
         progress(&line);
     }
-    let output = output?;
-    if !output.success {
-        return Err(format!(
-            "The computer image did not build: {}",
-            clean(&output.stderr)
-        ));
-    }
-    Ok(tag)
+    output
 }
 
 /// Detection reused for a few seconds, so status polling does not run Docker

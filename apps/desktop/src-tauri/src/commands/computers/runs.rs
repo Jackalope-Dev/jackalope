@@ -60,6 +60,12 @@ pub(crate) fn run_name(workspace: &str) -> String {
     format!("w{hex}")
 }
 
+/// A read-only (planning) attempt's run name. It never shares a folder with a
+/// writing attempt of the same workspace, whose unrecovered changes stay put.
+pub(crate) fn read_only_run_name(workspace: &str) -> String {
+    format!("r{}", &run_name(workspace)[1..])
+}
+
 /// Environment variables for a run, as name and value.
 pub(crate) type Environment = Vec<(String, String)>;
 
@@ -669,6 +675,8 @@ mod tests {
         assert_ne!(run_name("/a/b"), run_name("/a/c"));
         assert!(run_name("/a/b").starts_with('w'));
         assert_eq!(run_name("/a/b").len(), 21);
+        assert_eq!(read_only_run_name("/a/b")[1..], run_name("/a/b")[1..]);
+        assert!(read_only_run_name("/a/b").starts_with('r'));
     }
 
     struct Scratch(std::path::PathBuf);
