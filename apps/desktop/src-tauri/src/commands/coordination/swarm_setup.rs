@@ -492,6 +492,100 @@ async fn run(app: &AppHandle, service: &Coordinator) -> Result<Value, Failure> {
     Ok(saved)
 }
 
+/// What deleting the deployed Worker came to.
+#[derive(Debug, PartialEq)]
+pub(super) enum Removal {
+    Deleted,
+    /// Cloudflare no longer has the script.
+    AlreadyGone,
+    /// The Worker is still deployed; the message says how to remove it by hand.
+    Kept(String),
+}
+
+/// The Workers route that deletes a script. `force` also removes the Durable
+/// Objects the script defines, which hold the swarm's fork records.
+fn delete_route(script: &str) -> String {
+    let script: String = script
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+        .collect();
+    format!("/scripts/{script}?force=true")
+}
+
+fn removal(status: u16, body: &Value, oauth: bool, dashboard: &str) -> Removal {
+    let code = body["errors"][0]["code"].as_u64().unwrap_or_default();
+    if (200..300).contains(&status) && body["success"] != false {
+        return Removal::Deleted;
+    }
+    if status == 404 || matches!(code, 10007 | 10090 | 10092) {
+        return Removal::AlreadyGone;
+    }
+    let reason = if matches!(status, 401 | 403) || code == 10000 {
+        if oauth {
+            "Cloudflare did not allow Jackalope to delete Workers."
+        } else {
+            "Your Cloudflare API token cannot delete Workers."
+        }
+        .to_string()
+    } else {
+        api_failure(Step::Deploy, status, body, oauth).message
+    };
+    Removal::Kept(format!(
+        "{reason} The Worker is still deployed; delete it in the Cloudflare dashboard: {dashboard}"
+    ))
+}
+
+/// Deletes a Worker that one-click setup deployed, using the saved Cloudflare
+/// connection. A Worker in an account other than the connected one is left alone.
+pub(super) async fn delete_worker(
+    runtime: &crate::commands::tasks::TaskRuntime,
+    deployment: &Deployment,
+) -> Removal {
+    let dashboard = format!(
+        "https://dash.cloudflare.com/{}/workers/services/view/{}",
+        deployment.account_id, deployment.script
+    );
+    let access = match cloudflare_artifacts::workers_access(runtime).await {
+        Ok(access) if access.account_id == deployment.account_id => access,
+        Ok(_) => {
+            return Removal::Kept(format!(
+                "The Worker is in a Cloudflare account that is no longer connected. Delete it in the Cloudflare dashboard: {dashboard}"
+            ))
+        }
+        Err(_) => {
+            return Removal::Kept(format!(
+                "Cloudflare is not connected, so the Worker is still deployed. Delete it in the Cloudflare dashboard: {dashboard}"
+            ))
+        }
+    };
+    let Ok(client) = reqwest::Client::builder()
+        .timeout(Duration::from_secs(60))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+    else {
+        return Removal::Kept(format!(
+            "Delete the Worker in the Cloudflare dashboard: {dashboard}"
+        ));
+    };
+    let api = Api {
+        access: &access,
+        client,
+    };
+    match api
+        .send(
+            reqwest::Method::DELETE,
+            &delete_route(&deployment.script),
+            None,
+        )
+        .await
+    {
+        Ok((status, body)) => removal(status, &body, access.oauth, &dashboard),
+        Err(message) => Removal::Kept(format!(
+            "{message} The Worker is still deployed; delete it in the Cloudflare dashboard: {dashboard}"
+        )),
+    }
+}
+
 /// Sets up or updates the person's swarm Worker. Resolves with
 /// `{ok: true, connection}` or `{ok: false, failure}`; progress arrives as
 /// `swarm-setup-progress` events naming each step as it starts.
@@ -650,6 +744,43 @@ mod tests {
             value["link"],
             "https://dash.cloudflare.com/profile/api-tokens"
         );
+    }
+
+    #[test]
+    fn deleting_the_worker_forces_out_its_durable_objects() {
+        assert_eq!(
+            delete_route("jackalope-swarm"),
+            "/scripts/jackalope-swarm?force=true"
+        );
+        assert_eq!(delete_route("a/../b?x"), "/scripts/ab?force=true");
+    }
+
+    #[test]
+    fn worker_removal_treats_missing_scripts_as_gone_and_refusals_as_kept() {
+        let dash = "https://dash.cloudflare.com/a/workers/services/view/jackalope-swarm";
+        assert_eq!(
+            removal(200, &json!({"success": true}), true, dash),
+            Removal::Deleted
+        );
+        assert_eq!(removal(404, &Value::Null, true, dash), Removal::AlreadyGone);
+        assert_eq!(
+            removal(400, &json!({"errors": [{"code": 10007}]}), false, dash),
+            Removal::AlreadyGone
+        );
+        let Removal::Kept(oauth) = removal(403, &Value::Null, true, dash) else {
+            panic!("a refusal keeps the Worker");
+        };
+        assert!(oauth.contains("did not allow Jackalope"));
+        assert!(oauth.ends_with(dash));
+        let Removal::Kept(token) = removal(400, &json!({"errors": [{"code": 10000}]}), false, dash)
+        else {
+            panic!("a refusal keeps the Worker");
+        };
+        assert!(token.contains("API token cannot delete Workers"));
+        let Removal::Kept(other) = removal(500, &Value::Null, false, dash) else {
+            panic!("a server error keeps the Worker");
+        };
+        assert!(other.starts_with("Cloudflare returned 500"));
     }
 
     #[test]

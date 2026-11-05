@@ -62,7 +62,14 @@ export interface CloudState {
 export const swarmConnection = () => nativeTask<SwarmConnection>('swarm_connection_status');
 export const saveSwarmConnection = (url: string, token: string) =>
   nativeTask<SwarmConnection>('swarm_connection_save', { url, token });
-export const removeSwarmConnection = () => nativeTask<void>('swarm_connection_remove');
+export interface SwarmRemoval {
+  workerDeleted: boolean;
+  /** Set when the Worker is still deployed; says how to delete it by hand. */
+  warning: string | null;
+}
+/** Forgets the Worker; `deleteWorker` also deletes one that one-click setup deployed. */
+export const removeSwarmConnection = (deleteWorker = false) =>
+  nativeTask<SwarmRemoval>('swarm_connection_remove', { deleteWorker });
 /** Deploys or updates the Worker in the connected Cloudflare account and connects it. */
 export const setupSwarm = () => nativeTask<SwarmSetupResult>('swarm_setup');
 export async function onSwarmSetupProgress(listener: (step: SwarmSetupStep) => void) {

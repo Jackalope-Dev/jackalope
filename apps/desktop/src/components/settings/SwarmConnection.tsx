@@ -1,4 +1,13 @@
-import { Badge, Button, FormField, Input, LinkButton, LoadingIcon } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  ConfirmDialog,
+  FormField,
+  Input,
+  LinkButton,
+  LoadingIcon,
+} from '@jackalope/ui';
 import { Check, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -87,6 +96,8 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
   const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<Run | null>(null);
   const [error, setError] = useState('');
+  const [deleteWorker, setDeleteWorker] = useState(true);
+  const [warning, setWarning] = useState('');
   const signingIn = useRef(false);
   const refresh = useCallback(async () => setStatus(await swarmConnection()), []);
   useEffect(() => {
@@ -183,7 +194,7 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
     }
   };
 
-  if (!status || (!artifactsConnected && !status.configured)) return null;
+  if (!status || (!artifactsConnected && !status.configured && !warning)) return null;
   const failure = run?.failure;
   const updating = Boolean(status.configured && status.managed);
 
@@ -210,13 +221,49 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
                 Update Swarm Worker
               </Button>
             )}
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => void act(removeSwarmConnection)}
-            >
-              Disconnect
-            </Button>
+            {status.managed ? (
+              <ConfirmDialog
+                title="Disconnect Jackalope Swarm?"
+                description="Agents stop getting forks and overlap warnings on this computer."
+                label="Disconnect"
+                busyLabel="Disconnecting…"
+                onOpenChange={(open) => open && setDeleteWorker(true)}
+                onConfirm={async () => {
+                  setWarning('');
+                  const result = await removeSwarmConnection(deleteWorker);
+                  if (result.warning) setWarning(result.warning);
+                  await refresh();
+                }}
+                trigger={
+                  <Button variant="outline" disabled={busy}>
+                    Disconnect
+                  </Button>
+                }
+              >
+                <label className="flex items-start gap-3 min-h-11">
+                  <Checkbox
+                    className="mt-1"
+                    checked={deleteWorker}
+                    onChange={(event) => setDeleteWorker(event.target.checked)}
+                  />
+                  <span>
+                    Also delete the Worker from Cloudflare
+                    <span className="settings-row-description block">
+                      Fork tracking stops on every computer that uses it. Artifacts repositories are
+                      not changed.
+                    </span>
+                  </span>
+                </label>
+              </ConfirmDialog>
+            ) : (
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => void act(() => removeSwarmConnection())}
+              >
+                Disconnect
+              </Button>
+            )}
           </div>
         </Setting>
       ) : manual ? (
@@ -346,6 +393,19 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
             </div>
           )}
         </div>
+      )}
+      {warning && (
+        <InlineNotice
+          tone="warning"
+          className="mx-5 my-4"
+          action={
+            <Button variant="ghost" onClick={() => setWarning('')}>
+              Close
+            </Button>
+          }
+        >
+          <span className="swarm-failure">{warning}</span>
+        </InlineNotice>
       )}
       {error && (
         <InlineNotice tone="error" className="mx-5 my-4">

@@ -8,6 +8,7 @@
 //! again after a restart. Snapshots are synthetic commits on the attempt's
 //! starting commit, so nothing is written to the attempt's branch or index.
 
+use super::swarm_setup::Removal;
 use super::*;
 use crate::commands::{account_storage, cloudflare_artifacts, tasks::TaskRun};
 use serde::{Deserialize, Serialize};
@@ -485,9 +486,37 @@ pub async fn swarm_connection_save(
     .await
 }
 
+/// Forgets the Worker. With `delete_worker`, a Worker one-click setup deployed is
+/// also deleted from Cloudflare; a Worker entered by hand is only forgotten.
+/// Resolves with `{workerDeleted, warning}`; the connection is forgotten even
+/// when Cloudflare keeps the Worker, and `warning` says how to remove it.
 #[tauri::command]
-pub fn swarm_connection_remove(state: State<'_, Coordinator>) -> Result<(), String> {
-    account_storage::remove(&storage(&state.runtime))?;
+pub async fn swarm_connection_remove(
+    delete_worker: Option<bool>,
+    state: State<'_, Coordinator>,
+) -> Result<Value, String> {
+    let deployment = connection(&state.runtime)
+        .ok()
+        .flatten()
+        .and_then(|saved| saved.deployment);
+    let removal = match deployment.filter(|_| delete_worker == Some(true)) {
+        Some(deployment) => {
+            Some(super::swarm_setup::delete_worker(&state.runtime, &deployment).await)
+        }
+        None => None,
+    };
+    forget(&state.runtime)?;
+    Ok(match removal {
+        Some(Removal::Deleted | Removal::AlreadyGone) => {
+            json!({"workerDeleted": true, "warning": null})
+        }
+        Some(Removal::Kept(warning)) => json!({"workerDeleted": false, "warning": warning}),
+        None => json!({"workerDeleted": false, "warning": null}),
+    })
+}
+
+fn forget(runtime: &TaskRuntime) -> Result<(), String> {
+    account_storage::remove(&storage(runtime))?;
     if let Ok(mut forks) = FORKS.lock() {
         *forks = None;
     }
