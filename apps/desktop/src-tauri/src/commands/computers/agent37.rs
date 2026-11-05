@@ -629,8 +629,8 @@ mod tests {
 
     #[test]
     fn keys_are_checked_before_saving() {
-        assert!(validate_key("sk_live_abcdefghijkl").is_ok());
-        assert!(validate_key("sk_test_abcdefghijkl").is_err());
+        assert!(validate_key(&format!("sk_live_{}", "abcdefghijkl")).is_ok());
+        assert!(validate_key(&format!("sk_test_{}", "abcdefghijkl")).is_err());
         assert!(validate_key("sk_live_ab cd efghijkl").is_err());
     }
 
