@@ -699,6 +699,8 @@ mod tests {
         Scratch(path)
     }
 
+    // Linux CI has no Secret Service keyring to hold the saved sign-in.
+    #[cfg(not(target_os = "linux"))]
     #[test]
     fn translation_drops_local_state_and_uses_the_computer_as_sandbox() {
         let root = root();
@@ -745,6 +747,8 @@ mod tests {
         assert!(!names.contains(&"SOME_PATH"));
     }
 
+    // Linux CI has no Secret Service keyring to hold the saved sign-in.
+    #[cfg(not(target_os = "linux"))]
     #[test]
     fn codex_runs_without_its_own_sandbox_and_local_tools() {
         let root = root();
@@ -784,6 +788,8 @@ mod tests {
         assert!(env.iter().any(|(k, _)| k == "OPENAI_API_KEY"));
     }
 
+    // Linux CI has no Secret Service keyring to hold the saved sign-in.
+    #[cfg(not(target_os = "linux"))]
     #[test]
     fn bridge_points_at_the_computer_relay_without_the_credential() {
         let root = root();
@@ -846,6 +852,8 @@ mod tests {
         assert!(error.contains("cannot run on a computer"), "{error}");
     }
 
+    // Linux CI has no Secret Service keyring to hold the saved sign-in.
+    #[cfg(not(target_os = "linux"))]
     #[test]
     fn credentials_are_validated_listed_and_removed() {
         let root = root();

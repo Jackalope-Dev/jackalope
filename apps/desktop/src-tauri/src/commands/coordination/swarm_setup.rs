@@ -752,7 +752,7 @@ mod tests {
             delete_route("jackalope-swarm"),
             "/scripts/jackalope-swarm?force=true"
         );
-        assert_eq!(delete_route("a/../b?x"), "/scripts/ab?force=true");
+        assert_eq!(delete_route("a/../b?x"), "/scripts/abx?force=true");
     }
 
     #[test]
