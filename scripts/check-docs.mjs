@@ -12,7 +12,10 @@ const files = execFileSync(
 ).split('\0');
 const missing = [];
 const documents = new Map();
-for (const file of new Set(files.filter((file) => /\.mdx?$/.test(file)))) {
+// Website posts are published content, not repository documentation; the website build
+// validates them.
+const isDocument = (file) => /\.mdx?$/.test(file) && !file.startsWith('apps/website/content/');
+for (const file of new Set(files.filter(isDocument))) {
   const source = path.join(root, file);
   if (!existsSync(source)) continue;
   const content = readFileSync(source, 'utf8');

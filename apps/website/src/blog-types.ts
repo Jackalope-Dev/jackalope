@@ -25,6 +25,8 @@ export type BlogSection = {
   code?: { label: string; language: string; value: string };
   table?: { caption: string; headers: string[]; rows: string[][] };
   links?: BlogLink[];
+  /** Markdown body after the heading, for posts published from Markdown files. */
+  markdown?: string;
 };
 
 export type BlogPost = {
@@ -39,32 +41,35 @@ export type BlogPost = {
   readingTime: string;
   description: string;
   cover?: EditorialCover;
+  /** Markdown before the first section. */
+  intro?: string;
   sections: BlogSection[];
   related?: BlogLink[];
 };
 
 export function serializeBlogPost(post: BlogPost): string {
-  return post.sections
-    .map((section) =>
-      [
-        `## ${section.title}`,
-        ...section.paragraphs,
-        section.bullets?.map((item) => `- ${item}`).join('\n'),
-        section.code &&
-          `${section.code.label}\n\`\`\`${section.code.language}\n${section.code.value}\n\`\`\``,
-        section.table &&
-          `${section.table.caption}\n${[section.table.headers, section.table.headers.map(() => '---'), ...section.table.rows].map((row) => `| ${row.join(' | ')} |`).join('\n')}`,
-        section.links?.map((link) => `[${link.label}](${link.href})`).join('\n'),
-      ]
-        .filter(Boolean)
-        .join('\n\n'),
-    )
-    .concat(
-      post.related?.length
-        ? [
-            `## Further reading\n\n${post.related.map((link) => `[${link.label}](${link.href})`).join('\n')}`,
-          ]
-        : [],
-    )
-    .join('\n\n');
+  const sections = post.sections.map((section) =>
+    [
+      `## ${section.title}`,
+      section.markdown,
+      ...section.paragraphs,
+      section.bullets?.map((item) => `- ${item}`).join('\n'),
+      section.code &&
+        `${section.code.label}\n\`\`\`${section.code.language}\n${section.code.value}\n\`\`\``,
+      section.table &&
+        `${section.table.caption}\n${[section.table.headers, section.table.headers.map(() => '---'), ...section.table.rows].map((row) => `| ${row.join(' | ')} |`).join('\n')}`,
+      section.links?.map((link) => `[${link.label}](${link.href})`).join('\n'),
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
+  );
+  return [
+    ...(post.intro ? [post.intro] : []),
+    ...sections,
+    ...(post.related?.length
+      ? [
+          `## Further reading\n\n${post.related.map((link) => `[${link.label}](${link.href})`).join('\n')}`,
+        ]
+      : []),
+  ].join('\n\n');
 }
