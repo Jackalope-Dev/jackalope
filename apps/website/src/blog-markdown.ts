@@ -1,9 +1,11 @@
+import { findAuthor } from './authors.ts';
 import type { BlogPost, BlogSection, EditorialCover } from './blog-types.ts';
 
 /**
  * Posts LopeBase publishes as `apps/website/content/blog/<slug>.md`: front matter with
  * JSON-quoted title, description, slug and tags, an unquoted YYYY-MM-DD date and
- * optional updated date, an optional one-line JSON faq ([{"q","a"}]), then the Markdown
+ * optional updated date, an optional one-line JSON faq ([{"q","a"}]), an optional
+ * author (a slug from authors.ts, for the byline and author page), then the Markdown
  * body. A file that does not parse throws, so the build (and the CI gate
  * that auto-merges these posts) fails instead of publishing a broken page.
  */
@@ -80,6 +82,9 @@ function parsePost(file: string, source: string): BlogPost {
     (typeof updated !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(updated))
   )
     throw new Error(`${file}: updated must be YYYY-MM-DD.`);
+  const author = fields.author;
+  if (author !== undefined && (typeof author !== 'string' || !findAuthor(author)))
+    throw new Error(`${file}: author must be a slug from authors.ts.`);
   const faq = (Array.isArray(fields.faq) ? fields.faq : [])
     .map((pair) => ({
       question: String(pair?.q ?? '').trim(),
@@ -116,6 +121,7 @@ function parsePost(file: string, source: string): BlogPost {
     slug,
     title,
     category: 'Practical guides',
+    author: typeof author === 'string' ? author : undefined,
     date,
     updated: updated && updated > date ? updated : undefined,
     readingTime: `${Math.max(1, Math.round(words / 230))} min read`,
