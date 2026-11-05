@@ -3,7 +3,24 @@ import { nativeTask } from './task-runtime.ts';
 export interface SwarmConnection {
   configured: boolean;
   url?: string;
+  /** Jackalope deployed this Worker with one-click setup. */
+  managed?: boolean;
+  /** The app bundles a newer Worker, or the Artifacts namespace changed. */
+  updateAvailable?: boolean;
 }
+
+export type SwarmSetupStep = 'account' | 'deploy' | 'publish' | 'verify';
+
+export interface SwarmSetupFailure {
+  step: SwarmSetupStep;
+  message: string;
+  recovery: 'reauthorize' | 'token' | 'subdomain' | null;
+  link: string | null;
+}
+
+type SwarmSetupResult =
+  | { ok: true; connection: SwarmConnection }
+  | { ok: false; failure: SwarmSetupFailure };
 
 export interface SwarmFile {
   path: string;
@@ -46,6 +63,12 @@ export const swarmConnection = () => nativeTask<SwarmConnection>('swarm_connecti
 export const saveSwarmConnection = (url: string, token: string) =>
   nativeTask<SwarmConnection>('swarm_connection_save', { url, token });
 export const removeSwarmConnection = () => nativeTask<void>('swarm_connection_remove');
+/** Deploys or updates the Worker in the connected Cloudflare account and connects it. */
+export const setupSwarm = () => nativeTask<SwarmSetupResult>('swarm_setup');
+export async function onSwarmSetupProgress(listener: (step: SwarmSetupStep) => void) {
+  const { listen } = await import('@tauri-apps/api/event');
+  return listen<SwarmSetupStep>('swarm-setup-progress', (event) => listener(event.payload));
+}
 export const cloudState = (projectId: string) =>
   nativeTask<CloudState>('swarm_cloud_state', { projectId });
 

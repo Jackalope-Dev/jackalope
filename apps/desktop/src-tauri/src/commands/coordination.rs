@@ -6,6 +6,7 @@ pub mod peers;
 mod reconciliation;
 mod scope_audit;
 pub mod subtasks;
+pub mod swarm_setup;
 pub use reconciliation::{queue_assist_policy, queue_retry_reconciliation};
 pub use scope_audit::{queue_cancel_agreement, queue_reconcile_scope};
 pub(super) mod automatic;

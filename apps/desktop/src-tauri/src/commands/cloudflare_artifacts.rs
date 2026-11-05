@@ -638,10 +638,11 @@ async fn establish(connection: Connection, runtime: &TaskRuntime) -> Result<Stat
     Ok(connected_status(&connection))
 }
 
-/// Starts Connect Cloudflare and returns the consent URL for the browser.
+/// Starts Connect Cloudflare and returns the consent URL for the browser. `workers`
+/// also asks to deploy Workers, which Jackalope Swarm setup needs.
 #[tauri::command]
-pub async fn cloudflare_oauth_begin() -> Result<String, String> {
-    oauth::begin().await
+pub async fn cloudflare_oauth_begin(workers: Option<bool>) -> Result<String, String> {
+    oauth::begin(workers.unwrap_or(false)).await
 }
 
 /// Waits for the browser sign-in and returns the accounts the person shared.
@@ -678,6 +679,72 @@ pub async fn cloudflare_oauth_connect(
     .await?;
     oauth::finish();
     Ok(result)
+}
+
+/// Replaces the saved sign-in with a newer one for the same account, keeping the
+/// namespace and data location. Used after Connect Cloudflare asks for Workers access.
+#[tauri::command]
+pub async fn cloudflare_oauth_reauthorize(state: State<'_, TaskRuntime>) -> Result<Status, String> {
+    let existing = connection(&state)?;
+    let previous = existing.oauth.clone().ok_or(
+        "This connection uses an API token. Replace it with one that has Workers Scripts: Edit.",
+    )?;
+    let tokens = oauth::signed_in(&existing.account_id).map_err(|_| {
+        "Share the same Cloudflare account you connected before, or disconnect and connect again."
+            .to_string()
+    })?;
+    let next = Connection {
+        token: tokens.access,
+        oauth: Some(tokens.grant),
+        ..existing
+    };
+    {
+        let _guard = CONNECTION_LOCK.lock().map_err(|e| e.to_string())?;
+        account_storage::write(
+            &storage_path(&state),
+            &serde_json::to_vec(&next).map_err(|e| e.to_string())?,
+        )?;
+    }
+    oauth::finish();
+    oauth::revoke(&previous).await;
+    Ok(connected_status(&next))
+}
+
+/// What Workers deployment can use from the saved Cloudflare connection.
+pub(in crate::commands) struct WorkersAccess {
+    pub account_id: String,
+    pub namespace: String,
+    pub token: String,
+    pub oauth: bool,
+    /// `Some(false)` when Connect Cloudflare reported a grant without Workers access.
+    pub workers_allowed: Option<bool>,
+}
+
+fn workers_access_of(connection: Connection) -> WorkersAccess {
+    WorkersAccess {
+        workers_allowed: connection
+            .oauth
+            .as_ref()
+            .and_then(|grant| grant.allows(oauth::WORKERS_SCOPE)),
+        oauth: connection.oauth.is_some(),
+        account_id: connection.account_id,
+        namespace: connection.namespace,
+        token: connection.token,
+    }
+}
+
+/// The saved connection without refreshing, for status checks. The token may be stale.
+pub(in crate::commands) fn workers_access_saved(
+    runtime: &TaskRuntime,
+) -> Result<Option<WorkersAccess>, String> {
+    Ok(saved(runtime)?.map(workers_access_of))
+}
+
+/// The saved connection with a fresh access token for Workers API calls.
+pub(in crate::commands) async fn workers_access(
+    runtime: &TaskRuntime,
+) -> Result<WorkersAccess, String> {
+    Ok(workers_access_of(current(runtime).await?))
 }
 
 #[tauri::command]
@@ -1020,6 +1087,7 @@ mod tests {
             oauth: Some(oauth::Grant {
                 refresh_token: "refresh".into(),
                 expires_at: 0,
+                scopes: None,
             }),
             ..fixture()
         };

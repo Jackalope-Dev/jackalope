@@ -26,6 +26,9 @@ const PORTS: [u16; 3] = [47851, 47852, 47853];
 const CALLBACK_PATH: &str = "/cloudflare/callback";
 const SCOPES: &str =
     "artifacts.write artifacts.read account-settings.read user-details.read offline_access";
+/// Requested only when the person sets up Jackalope Swarm, so Connect Cloudflare keeps
+/// working for clients whose registration does not allow Workers yet.
+pub const WORKERS_SCOPE: &str = "workers-scripts.write";
 const SIGN_IN_TIMEOUT: Duration = Duration::from_secs(300);
 /// Refresh this long before expiry so a slow request never carries a stale token.
 const REFRESH_MARGIN_SECONDS: i64 = 300;
@@ -37,6 +40,19 @@ pub struct Grant {
     pub refresh_token: String,
     /// Unix seconds when the access token expires.
     pub expires_at: i64,
+    /// Space-separated scopes Cloudflare reported granting, when it reported them.
+    /// Older saved grants have none and are treated as unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scopes: Option<String>,
+}
+
+impl Grant {
+    /// `Some(false)` only when Cloudflare reported the granted scopes and this one is missing.
+    pub fn allows(&self, scope: &str) -> Option<bool> {
+        self.scopes
+            .as_deref()
+            .map(|granted| granted.split_whitespace().any(|item| item == scope))
+    }
 }
 
 #[derive(Clone)]
@@ -136,6 +152,10 @@ async fn token_request(pairs: &[(&str, &str)]) -> Result<Tokens, String> {
         grant: Grant {
             refresh_token: refresh.to_owned(),
             expires_at: now() + body["expires_in"].as_i64().unwrap_or(3600),
+            scopes: body["scope"]
+                .as_str()
+                .filter(|scopes| !scopes.trim().is_empty())
+                .map(str::to_owned),
         },
     })
 }
@@ -145,12 +165,42 @@ pub fn needs_refresh(grant: &Grant) -> bool {
 }
 
 pub async fn refresh(grant: &Grant) -> Result<Tokens, String> {
-    token_request(&[
+    let mut tokens = token_request(&[
         ("grant_type", "refresh_token"),
         ("refresh_token", &grant.refresh_token),
         ("client_id", CLIENT_ID),
     ])
-    .await
+    .await?;
+    // A refresh keeps the original grant's scopes when the response omits them.
+    if tokens.grant.scopes.is_none() {
+        tokens.grant.scopes = grant.scopes.clone();
+    }
+    Ok(tokens)
+}
+
+fn requested_scopes(workers: bool) -> String {
+    if workers {
+        format!("{SCOPES} {WORKERS_SCOPE}")
+    } else {
+        SCOPES.to_owned()
+    }
+}
+
+/// The sign-in error Cloudflare returns in the redirect, in the person's terms.
+fn authorize_error(error: &str, description: Option<&str>) -> String {
+    match error {
+        "access_denied" => "Cloudflare access was not approved.".into(),
+        // The public client's registration does not allow a requested scope.
+        "invalid_scope" => "Cloudflare does not let Jackalope deploy Workers through Connect Cloudflare yet. Connect with an API token that has Workers Scripts: Edit and Artifacts: Edit instead.".into(),
+        _ => format!(
+            "Cloudflare sign-in failed: {}",
+            description
+                .unwrap_or(error)
+                .chars()
+                .take(200)
+                .collect::<String>()
+        ),
+    }
 }
 
 /// Best effort: a failed revocation must not keep the person connected locally.
@@ -169,8 +219,9 @@ pub async fn revoke(grant: &Grant) {
     }
 }
 
-/// Prepares a sign-in and returns the Cloudflare consent URL to open.
-pub async fn begin() -> Result<String, String> {
+/// Prepares a sign-in and returns the Cloudflare consent URL to open. `workers`
+/// also asks to deploy Workers, for Jackalope Swarm.
+pub async fn begin(workers: bool) -> Result<String, String> {
     let mut bound = None;
     for port in PORTS {
         if let Ok(listener) = TcpListener::bind(("127.0.0.1", port)).await {
@@ -189,7 +240,7 @@ pub async fn begin() -> Result<String, String> {
         ("response_type", "code"),
         ("client_id", CLIENT_ID),
         ("redirect_uri", redirect_uri.as_str()),
-        ("scope", SCOPES),
+        ("scope", requested_scopes(workers).as_str()),
         ("state", state.as_str()),
         ("code_challenge", challenge(&verifier).as_str()),
         ("code_challenge_method", "S256"),
@@ -315,19 +366,10 @@ pub async fn complete() -> Result<Vec<Account>, String> {
                     .as_bytes(),
                 )
                 .await;
-            return Err(if error == "access_denied" {
-                "Cloudflare access was not approved.".into()
-            } else {
-                format!(
-                    "Cloudflare sign-in failed: {}",
-                    query
-                        .get("error_description")
-                        .unwrap_or(error)
-                        .chars()
-                        .take(200)
-                        .collect::<String>()
-                )
-            });
+            return Err(authorize_error(
+                error,
+                query.get("error_description").map(String::as_str),
+            ));
         }
         let Some(code) = query.get("code").cloned() else {
             continue;
@@ -450,8 +492,47 @@ mod tests {
         let grant = |offset| Grant {
             refresh_token: "r".into(),
             expires_at: now() + offset,
+            scopes: None,
         };
         assert!(needs_refresh(&grant(60)));
         assert!(!needs_refresh(&grant(3600)));
+    }
+
+    #[test]
+    fn workers_scope_is_requested_only_for_swarm_setup() {
+        assert!(!requested_scopes(false).contains(WORKERS_SCOPE));
+        assert!(requested_scopes(true).ends_with(" workers-scripts.write"));
+        assert!(requested_scopes(true).contains("offline_access"));
+    }
+
+    #[test]
+    fn granted_scopes_are_known_only_when_reported() {
+        let grant = |scopes: Option<&str>| Grant {
+            refresh_token: "r".into(),
+            expires_at: 0,
+            scopes: scopes.map(str::to_owned),
+        };
+        assert_eq!(grant(None).allows(WORKERS_SCOPE), None);
+        assert_eq!(
+            grant(Some("artifacts.write workers-scripts.write")).allows(WORKERS_SCOPE),
+            Some(true)
+        );
+        assert_eq!(
+            grant(Some("artifacts.write workers-scripts.read")).allows(WORKERS_SCOPE),
+            Some(false)
+        );
+        // Saved grants from before scopes were recorded still load.
+        let old: Grant = serde_json::from_str(r#"{"refreshToken":"r","expiresAt":1}"#).unwrap();
+        assert!(old.scopes.is_none());
+    }
+
+    #[test]
+    fn unregistered_scopes_point_to_an_api_token() {
+        let message = authorize_error("invalid_scope", None);
+        assert!(message.contains("Workers Scripts: Edit"));
+        assert_eq!(
+            authorize_error("access_denied", None),
+            "Cloudflare access was not approved."
+        );
     }
 }
