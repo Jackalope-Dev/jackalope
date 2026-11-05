@@ -1010,8 +1010,11 @@ mod tests {
         let patch =
             b"diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-one\n+two\n";
         apply(dir.path(), patch).unwrap();
+        // Git writes the checkout's line endings (CRLF under Windows autocrlf).
         assert_eq!(
-            std::fs::read_to_string(dir.path().join("a.txt")).unwrap(),
+            std::fs::read_to_string(dir.path().join("a.txt"))
+                .unwrap()
+                .replace("\r\n", "\n"),
             "two\n"
         );
         assert!(apply(dir.path(), patch).is_err());
