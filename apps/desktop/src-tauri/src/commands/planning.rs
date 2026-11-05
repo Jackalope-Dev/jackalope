@@ -9,6 +9,9 @@ mod fixture_tests;
 pub mod handoff;
 pub mod interview;
 mod learning;
+#[cfg(test)]
+mod round_tests;
+pub mod rounds;
 pub mod session;
 pub mod store;
 #[cfg(test)]
@@ -250,6 +253,17 @@ pub async fn plan_approve(
     let service = state.inner().clone();
     let choices = session::ApprovalChoices { checks, reviewer };
     blocking(move || session::approve(&service, &id, revision, &hash, &shape, "app", choices)).await
+}
+
+/// `pause`, `resume` or `stop` a swarm's rounds and its current round's work.
+#[tauri::command]
+pub async fn plan_rounds(
+    id: String,
+    action: String,
+    state: State<'_, Coordinator>,
+) -> Result<(), String> {
+    let service = state.inner().clone();
+    blocking(move || rounds::action(&service, &id, &action)).await
 }
 
 #[tauri::command]

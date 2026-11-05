@@ -92,6 +92,30 @@ export interface PlanSettings {
   plannerAgent?: string | null;
   plannerModel?: string | null;
   exportPath: string;
+  /** The most rounds a swarm runs before it waits for a re-plan. */
+  maxRounds?: number;
+}
+
+export interface PlanRound {
+  number: number;
+  managedTaskId: string;
+  state: 'working' | 'reviewing' | 'held' | 'done' | 'next' | 'limit';
+  summary: string;
+  evidence: string[];
+  check: { command: string; passed: boolean } | null;
+  /** Titles of the assignments the orchestrator named for the next round. */
+  next: string[];
+  held: string | null;
+  reviewRunId: string | null;
+  decidedAt: string | null;
+}
+
+export interface PlanRounds {
+  current: number;
+  max: number;
+  /** The current round waits for you to resume it. */
+  paused: boolean;
+  rounds: PlanRound[];
 }
 
 export interface PlanView {
@@ -138,6 +162,8 @@ export interface PlanView {
     review: TaskProgress | null;
     gaps: { severity: 'critical' | 'major' | 'minor'; text: string }[];
   } | null;
+  /** Swarm rounds, for plans approved as a swarm. */
+  rounds: PlanRounds | null;
   criteria: { id: string; state: CriterionStateName; detail?: string }[];
   deviations: PlanDeviation[];
   /** How approving now would verify the work, from the project's mirrored check. */
@@ -191,6 +217,8 @@ export const planCommands = {
     reviewer?: string,
   ) => nativeTask<void>('plan_approve', { id, revision, hash, shape, checks, reviewer }),
   replan: (id: string, comments: string) => nativeTask<void>('plan_replan', { id, comments }),
+  rounds: (id: string, action: 'pause' | 'resume' | 'stop') =>
+    nativeTask<void>('plan_rounds', { id, action }),
   resolveDeviation: (id: string, deviationId: string, action: 'accept' | 'redo' | 'replan') =>
     nativeTask<void>('plan_resolve_deviation', { id, deviationId, action }),
   export: (id: string, path?: string) => nativeTask<string>('plan_export', { id, path }),
@@ -249,23 +277,39 @@ const shapeLabels: Record<PlanShape, { label: string; detail: string }> = {
     label: 'Planned subtasks',
     detail: 'Each task gets its own worker; dependencies run in order.',
   },
-  swarm: { label: 'Swarm', detail: 'Planned subtasks, mirrored through your swarm Worker.' },
+  swarm: {
+    label: 'Swarm',
+    detail:
+      'Rounds of subtasks. After each merge an orchestrator checks the criteria and plans the next round.',
+  },
 };
 
+/** Planned subtasks run at most this many tasks; larger plans run as a swarm. */
+const subtaskLimit = 8;
+
 /** Shapes the person can approve, with why one is unavailable. */
-export function shapeChoices(view: Pick<PlanView, 'swarmConnected' | 'document'>) {
+export function shapeChoices(view: Pick<PlanView, 'document'>) {
   const open = view.document?.tasks.filter((task) => task.status !== 'done').length ?? 0;
   return (Object.keys(shapeLabels) as PlanShape[]).map((shape) => ({
     shape,
     ...shapeLabels[shape],
     unavailable:
-      shape === 'swarm' && !view.swarmConnected
-        ? 'Connect a swarm Worker in Settings first.'
-        : shape !== 'single' && open < 2
+      shape === 'subtasks' && open > subtaskLimit
+        ? `Planned subtasks run at most ${subtaskLimit} tasks.`
+        : shape === 'subtasks' && open < 2
           ? 'The plan has one task left.'
           : undefined,
   }));
 }
+
+export const roundStateLabels: Record<PlanRound['state'], string> = {
+  working: 'Working',
+  reviewing: 'Orchestrator reviewing',
+  held: 'Needs you',
+  done: 'Criteria met',
+  next: 'Next round planned',
+  limit: 'Round limit reached',
+};
 
 /** Tasks in dependency waves: each wave can start once the previous one is done. */
 export function taskWaves(tasks: Pick<PlanTask, 'key' | 'dependsOn'>[]) {
@@ -337,10 +381,10 @@ export const taskStateLabels: Record<TaskProgress['state'] | 'done', string> = {
 };
 
 export function stateTone(state: string): 'success' | 'danger' | 'accent' | 'muted' {
-  if (['checked', 'merged', 'done', 'check-passed', 'human-accepted'].includes(state))
+  if (['checked', 'merged', 'done', 'check-passed', 'human-accepted', 'next'].includes(state))
     return 'success';
-  if (['needs-attention', 'check-failed'].includes(state)) return 'danger';
-  if (['running', 'agent-claimed'].includes(state)) return 'accent';
+  if (['needs-attention', 'check-failed', 'held', 'limit'].includes(state)) return 'danger';
+  if (['running', 'agent-claimed', 'working', 'reviewing'].includes(state)) return 'accent';
   return 'muted';
 }
 

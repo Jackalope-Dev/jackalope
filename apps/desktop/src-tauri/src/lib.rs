@@ -564,6 +564,7 @@ pub fn run(launch: Launch) {
             commands::planning::plan_save,
             commands::planning::plan_approve,
             commands::planning::plan_replan,
+            commands::planning::plan_rounds,
             commands::planning::plan_resolve_deviation,
             commands::planning::plan_export,
             commands::planning::plan_diff,

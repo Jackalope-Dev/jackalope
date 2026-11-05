@@ -7,11 +7,13 @@ import {
   criterionCoverage,
   criterionStateLabels,
   interviewOptions,
+  type PlanRounds,
   type PlanShape,
   type PlanSummary,
   type PlanView,
   planAssumption,
   planCommands,
+  roundStateLabels,
   type SectionChange,
   shapeChoices,
   stateTone,
@@ -49,6 +51,10 @@ const toneVariant = {
 
 function StateBadge({ state, label }: { state: string; label: string }) {
   return <Badge variant={toneVariant[stateTone(state)]}>{label}</Badge>;
+}
+
+function BetaBadge() {
+  return <Badge variant="accent">Beta</Badge>;
 }
 
 function Bullets({ items, empty }: { items: string[]; empty: string }) {
@@ -242,6 +248,12 @@ function PlanDetail({
             {statusLabels[view.status]}
             {view.revision ? ` · revision ${view.revision}` : ''}
             {view.approval ? ` · approved by ${view.approval.approvedBy}` : ''}
+            {view.rounds && (
+              <span className="plan-swarm">
+                {' '}
+                · Swarm round {view.rounds.current} of {view.rounds.max} <BetaBadge />
+              </span>
+            )}
           </p>
         </div>
       </header>
@@ -416,7 +428,10 @@ function PlanReview({
                   onChange={() => setShape(choice.shape)}
                 />
                 <span>
-                  <strong>{choice.label}</strong>
+                  <strong>
+                    {choice.label}
+                    {choice.shape === 'swarm' && <BetaBadge />}
+                  </strong>
                   <span className="plan-muted">{choice.unavailable ?? choice.detail}</span>
                 </span>
               </label>
@@ -687,7 +702,11 @@ function PlanProgress({
           </span>
         )}
       </div>
-      <WorkspaceSectionHeading title="Tasks" level={3} />
+      {view.rounds && <PlanRoundList planId={view.id} rounds={view.rounds} act={act} />}
+      <WorkspaceSectionHeading
+        title={view.rounds ? `Round ${view.rounds.current} tasks` : 'Tasks'}
+        level={3}
+      />
       <ul className="plan-rows">
         {[...progress.tasks, ...(progress.review ? [progress.review] : [])].map((task) => (
           <li key={`${task.key}:${task.runId ?? ''}`}>
@@ -757,12 +776,86 @@ function PlanProgress({
           </ul>
         </>
       )}
-      {progress.merged && (
+      {(view.rounds ? view.status === 'done' : progress.merged) && (
         <Button variant="ghost" onClick={() => void act(() => planCommands.archive(view.id))}>
           Archive plan
         </Button>
       )}
     </div>
+  );
+}
+
+/** Each swarm round's verdict, evidence and the work it queued next. */
+function PlanRoundList({
+  planId,
+  rounds,
+  act,
+}: {
+  planId: string;
+  rounds: PlanRounds;
+  act: (work: () => Promise<unknown>) => Promise<void>;
+}) {
+  const current = rounds.rounds.at(-1);
+  const open = current && ['working', 'reviewing', 'held'].includes(current.state);
+  return (
+    <section className="plan-rounds" aria-labelledby={`${planId}-rounds`}>
+      <WorkspaceSectionHeading
+        title={
+          <span className="plan-swarm">
+            Rounds <BetaBadge />
+          </span>
+        }
+        titleId={`${planId}-rounds`}
+        level={3}
+        description={`Round ${rounds.current} of at most ${rounds.max}. After each merge an orchestrator checks the criteria.`}
+      />
+      {open && (
+        <div className="plan-actions">
+          {rounds.paused ? (
+            <Button
+              variant="outline"
+              onClick={() => void act(() => planCommands.rounds(planId, 'resume'))}
+            >
+              Resume rounds
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={() => void act(() => planCommands.rounds(planId, 'pause'))}
+            >
+              Pause rounds
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            onClick={() => void act(() => planCommands.rounds(planId, 'stop'))}
+          >
+            Stop
+          </Button>
+        </div>
+      )}
+      {current?.held && <InlineNotice tone="warning">{current.held}</InlineNotice>}
+      <ol className="plan-rows">
+        {[...rounds.rounds].reverse().map((round) => (
+          <li key={round.number} className="plan-round">
+            <span>
+              <strong>Round {round.number}</strong>
+              {round.summary && <span className="plan-prose">{round.summary}</span>}
+              {round.check && (
+                <span className="plan-muted">
+                  {round.check.passed ? 'Check passed' : 'Check failed'}: {round.check.command}
+                </span>
+              )}
+              {round.evidence.length > 0 && <Bullets items={round.evidence} empty="" />}
+              {round.next.length > 0 && (
+                <span className="plan-muted">Next: {round.next.join(' · ')}</span>
+              )}
+            </span>
+            <StateBadge state={round.state} label={roundStateLabels[round.state]} />
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 

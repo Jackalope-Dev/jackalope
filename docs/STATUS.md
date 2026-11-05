@@ -303,13 +303,19 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   the same plan document. Revisions, section diffs, direct edits, Save to repo (never
   committed), exact-revision approval, single/subtasks/swarm hand-off through managed
   tasks, an independent plan review, deviation decisions and re-planning are
-  implemented; see [plan mode](PLAN-MODE.md). Approval verifies with the project's check,
+  implemented; see [plan mode](PLAN-MODE.md). A swarm (beta) runs in rounds: after each
+  round merges, a read-only orchestrator reviews the integrated tree against the
+  criteria with the project's check and either declares the plan done or queues the
+  next round (up to 24 assignments where the project's agents have slots), within a
+  round limit (default 5), pause/stop and restart recovery. It no longer needs a swarm
+  Worker. Approval verifies with the project's check,
   else the plan's command and test criteria, else review only (no check gate; the plan
   review must pass). Pending deviations raise a notification and the amber needs-you
   state in the terminal. Planning settings live in Project settings and the terminal's
   `/settings`. Read-only enforcement covers Codex and
   Claude Code; other agents are constrained by prompt and a discarded worktree.
-  Installed-provider interviews and plan-to-merge acceptance remain open.
+  Installed-provider interviews, plan-to-merge and multi-round swarm acceptance remain
+  open.
 - Requests continuing with one lead can delegate through available provider subagent
   tools. Unsupported or denied delegation stays sequential. See
   [agent quality](AGENT-QUALITY.md) for boundaries.

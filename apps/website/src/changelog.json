@@ -1,5 +1,17 @@
 [
   {
+    "id": "swarms-that-keep-going-until-the-work-is-done",
+    "date": "2026-11-05",
+    "status": "In development",
+    "title": "Swarms that keep going until the work is done",
+    "description": "A plan approved as a swarm runs in rounds: after each round merges, an orchestrator checks the result against the plan's acceptance criteria and either declares it done or starts the next round.",
+    "items": [
+      "Each round's verdict, evidence, check result and next assignments appear on the plan's Progress tab.",
+      "A round can run up to 24 assignments when your agents run on a computer or concurrency allows.",
+      "Swarms no longer need a connected swarm Worker. Set the round limit under Planning in Project settings."
+    ]
+  },
+  {
     "id": "agents-that-run-on-a-computer",
     "date": "2026-11-05",
     "status": "In development",

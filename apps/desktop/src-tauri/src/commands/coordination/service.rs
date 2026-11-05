@@ -248,6 +248,8 @@ impl Coordinator {
         self.reconcile()?;
         self.ensure_storage_loaded()?;
         self.auto_start_managed()?;
+        // Swarm rounds take the plan store and coordinator locks one at a time.
+        crate::commands::planning::rounds::tick(self);
         self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();

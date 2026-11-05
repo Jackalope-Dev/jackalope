@@ -112,7 +112,23 @@ pub fn view(plan: &session::PlanView) -> protocol::PlanView {
                 .iter()
                 .filter(|task| ["checked", "merged"].contains(&task.state.as_str()))
                 .count();
-            let mut line = format!("{checked}/{} tasks checked", progress.tasks.len());
+            let mut line = match &plan.rounds {
+                Some(rounds) => format!(
+                    "swarm (beta) round {}/{} · {}",
+                    rounds.current,
+                    rounds.max,
+                    rounds
+                        .rounds
+                        .last()
+                        .map(|round| round.state.as_str())
+                        .unwrap_or("working")
+                ),
+                None => String::new(),
+            };
+            if !line.is_empty() {
+                line.push_str(" · ");
+            }
+            line.push_str(&format!("{checked}/{} tasks checked", progress.tasks.len()));
             if let Some(review) = &progress.review {
                 line.push_str(&format!(" · review {}", review.state));
             }
@@ -122,7 +138,13 @@ pub fn view(plan: &session::PlanView) -> protocol::PlanView {
                     progress.repairs, progress.repair_limit
                 ));
             }
-            if !progress.dispatching && !progress.merged {
+            if plan
+                .rounds
+                .as_ref()
+                .map_or(!progress.dispatching && !progress.merged, |rounds| {
+                    rounds.paused
+                })
+            {
                 line.push_str(" · paused");
             }
             if let Some(error) = &progress.error {

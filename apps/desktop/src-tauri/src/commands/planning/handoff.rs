@@ -95,11 +95,14 @@ pub fn assignments(doc: &PlanDocument, shape: &str) -> Result<String, String> {
     serde_json::to_string(&value).map_err(|error| error.to_string())
 }
 
-/// Picks the shape the planner recommended when it is available.
-pub fn default_shape(doc: &PlanDocument, swarm_connected: bool) -> &'static str {
+/// Picks the shape the planner recommended; plans with more tasks than
+/// planned subtasks run default to a swarm.
+pub fn default_shape(doc: &PlanDocument) -> &'static str {
+    let open = remaining(doc).len();
     match doc.front.recommended_shape.trim() {
-        "swarm" if swarm_connected => "swarm",
-        "subtasks" | "swarm" if remaining(doc).len() > 1 => "subtasks",
+        _ if open > super::artifact::MAX_TASKS => "swarm",
+        "swarm" => "swarm",
+        "subtasks" if open > 1 => "subtasks",
         _ => "single",
     }
 }

@@ -77,6 +77,61 @@ pub struct Execution {
     #[serde(default)]
     pub items: Vec<(String, String)>,
     pub started_at: String,
+    /// The most rounds a swarm may run. Zero for executions without rounds,
+    /// including every execution saved before rounds existed.
+    #[serde(default)]
+    pub max_rounds: u32,
+    /// Swarm rounds, oldest first; `managed_task_id` is the last round's task.
+    #[serde(default)]
+    pub rounds: Vec<Round>,
+}
+
+/// One swarm round: its assignments run as a managed task, and once their
+/// result is merged a read-only orchestrator attempt reviews the integrated
+/// tree and either declares the plan done or names the next round's work.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Round {
+    pub number: u32,
+    pub managed_task_id: String,
+    pub started_at: String,
+    /// Orchestrator attempts for this round, oldest first.
+    #[serde(default)]
+    pub review_run_ids: Vec<String>,
+    /// Attempts whose result was already read.
+    #[serde(default)]
+    pub handled: Vec<String>,
+    /// Automatic retries since the person last resumed the round.
+    #[serde(default)]
+    pub retries: u32,
+    /// Why the next orchestrator attempt runs again, shown to it.
+    #[serde(default)]
+    pub note: String,
+    /// Why the round waits for the person; cleared when they resume.
+    #[serde(default)]
+    pub held: Option<String>,
+    /// `done`, `next` or `limit`; empty while the round runs or is reviewed.
+    #[serde(default)]
+    pub verdict: String,
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub evidence: Vec<String>,
+    /// The check that ran on the integrated tree, when the plan has one.
+    #[serde(default)]
+    pub check: Option<RoundCheck>,
+    /// Titles of the assignments the verdict named for the next round.
+    #[serde(default)]
+    pub next: Vec<String>,
+    #[serde(default)]
+    pub decided_at: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoundCheck {
+    pub command: String,
+    pub passed: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -215,6 +270,13 @@ pub struct PlanSettings {
     /// Where Save to repo writes, relative to the project; `{slug}` is the title.
     #[serde(default = "default_export")]
     pub export_path: String,
+    /// The most rounds a swarm runs before it waits for a re-plan.
+    #[serde(default = "default_rounds")]
+    pub max_rounds: u32,
+}
+
+fn default_rounds() -> u32 {
+    super::rounds::DEFAULT_ROUNDS
 }
 
 fn default_export() -> String {
@@ -228,6 +290,7 @@ impl Default for PlanSettings {
             planner_agent: None,
             planner_model: None,
             export_path: default_export(),
+            max_rounds: default_rounds(),
         }
     }
 }
@@ -238,6 +301,12 @@ impl PlanSettings {
             return Err(format!(
                 "Allow up to {} planning questions.",
                 super::interview::MAX_QUESTION_CAP
+            ));
+        }
+        if !(1..=super::rounds::MAX_ROUNDS).contains(&self.max_rounds) {
+            return Err(format!(
+                "Allow between 1 and {} swarm rounds.",
+                super::rounds::MAX_ROUNDS
             ));
         }
         relative_path(&self.export_path.replace("{slug}", "plan"))?;

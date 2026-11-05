@@ -10,6 +10,8 @@ pub struct PlanLaunch {
     pub request: RunRequest,
     pub title: String,
     pub link: managed::PlanLink,
+    /// Assignments the plan may run; ordinary plans keep the document's limit.
+    pub max_assignments: Option<usize>,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -87,7 +89,9 @@ impl Coordinator {
             started: false,
             error: None,
             auto_start: false,
-            max_assignments: crate::commands::planning::artifact::MAX_TASKS,
+            max_assignments: launch
+                .max_assignments
+                .unwrap_or(crate::commands::planning::artifact::MAX_TASKS),
             plan: Some(launch.link),
         };
         // Validate before saving so a rejected plan leaves no task behind.
@@ -192,5 +196,29 @@ impl Coordinator {
 
     pub(crate) fn swarm_connected(&self) -> bool {
         cloud::configured(&self.runtime)
+    }
+
+    /// Assignments one swarm round of the project may run: more when its
+    /// agents run on a computer with more slots, or local concurrency allows.
+    pub(crate) fn swarm_limit(&self, project_id: &str) -> usize {
+        let inner = self.inner.lock().unwrap();
+        let slots = if inner.remote_projects.contains(project_id) {
+            inner.remote_concurrency
+        } else {
+            inner.concurrency
+        };
+        managed::swarm_assignment_limit(slots)
+    }
+
+    /// The request and plan link a plan's managed task started with, so the
+    /// next swarm round runs with the same checks, agent and reviewer.
+    pub(crate) fn plan_template(&self, id: &str) -> Option<(RunRequest, managed::PlanLink)> {
+        let inner = self.inner.lock().ok()?;
+        let task = inner
+            .ledger
+            .managed_tasks
+            .iter()
+            .find(|task| task.id == id)?;
+        Some((task.request.clone(), task.plan.clone()?))
     }
 }

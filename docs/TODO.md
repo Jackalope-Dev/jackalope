@@ -107,6 +107,10 @@ release dates.
 - [ ] Tune swarm assignment and subtask limits from installed swarm trials: how often
   agents use peers, peer_adopt and propose_subtask, duplicate implementations avoided,
   conflicts caught before completion, and whether planner briefings reduce worker discovery.
+- [ ] Accept multi-round swarms with installed providers: orchestrator verdict accuracy
+  (false done, missed criteria), rounds and cost to completion, round sizes on agents on a
+  computer, and recovery after a restart mid-review. Consider relaying the orchestrator's
+  next assignments for human approval as an autonomy-policy option.
 - [ ] Accept automatic delivery end to end in the installed app: a swarm goal on a new
   Artifacts project merges under a committed policy, pushes the branch to Artifacts and
   deploys to a Workers preview, including a failing check that rolls back and pauses merging.
