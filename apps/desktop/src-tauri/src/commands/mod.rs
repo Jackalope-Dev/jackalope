@@ -34,10 +34,10 @@ pub mod workspace_setup;
 pub mod worktree_cleanup;
 pub mod worktree_usage;
 
+pub mod agent_install;
 pub mod agent_models;
 pub mod agent_policy;
 pub mod agent_profiles;
-pub mod agent_install;
 pub mod agent_sign_in;
 pub mod decision_trail;
 pub mod decisions;
@@ -89,8 +89,8 @@ pub mod account;
 mod account_storage;
 pub mod community;
 pub mod execution_access;
-pub mod first_commit;
 mod file_lock;
+pub mod first_commit;
 mod git_command;
 pub mod notifications;
 
