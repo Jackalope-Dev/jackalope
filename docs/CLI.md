@@ -95,7 +95,8 @@ terminal and the app together. Leaving a terminal does not stop work.
 | `jackalope plans` | Lists this project's plans; `--json` |
 | `jackalope plan show <id>` | Prints a plan and its progress; `--json` |
 | `jackalope plan approve <id> [single\|subtasks\|swarm]` | Shows the assumptions, asks, and approves the latest revision; `--yes` skips the question |
-| `jackalope status` | Shows the host, its endpoint and profile |
+| `jackalope plan rounds <id> [pause\|resume\|stop\|approve]` | Prints a swarm's (beta) round line and any proposed next round, or acts on its rounds. `approve` lists the proposal and asks before starting it; `--yes` skips the question. Editing a proposal happens in the app |
+| `jackalope status` | Shows the host, its endpoint and profile, and this project's running swarms with their round line and whether one needs you; `--json` adds `swarms` |
 
 `ls`, `status`, `plans` and `plan` accept `--json`. Options take a value as `--agent codex` or
 `--agent=codex`; `--` ends options, and an argument containing a space is
@@ -105,7 +106,7 @@ Inside a conversation, typing `/` opens an interactive command menu, and `/help`
 lists commands: `/new`, `/bg`, `/sharpen`, `/init`, `/sessions`, `/close`, `/tabs`, `/projects`, `/agents`, `/settings`,
 `/status`, `/board`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/learnings`, `/files`, `/review` (or `/diff`), `/merge`, `/pr`, `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
 `/unpause`, `/unqueue`, `/copy`, `/history`, `/kill`, `/clear`, `/plan`, `/plans`, `/revise`,
-`/approve`, `/replan`, `/export`, `/deviation`, `/browser`, `/computer`, `/open` and `/quit`. Pickers
+`/approve`, `/replan`, `/export`, `/deviation`, `/rounds`, `/browser`, `/computer`, `/open` and `/quit`. Pickers
 filter as you type. `/new <message>` starts
 and shows a conversation; `/bg <message>` starts one and stays on the current one.
 `/board` replaces the conversation with one row per open conversation, those that
@@ -200,7 +201,10 @@ neither is set) and saves a changed file as a new revision, `/approve [single|su
 approves the revision shown (default: the recommendation), `/export [path]` saves it into
 the repository without committing, `/replan [why]` revises a running plan from what is
 done, and `/deviation` opens a picker to accept and amend, redo or re-plan a pending
-deviation (`/deviation accept|redo|replan` decides directly). While a deviation waits,
+deviation (`/deviation accept|redo|replan` decides directly). A swarm's (beta) progress
+line shows its round, state and, with several orchestrators, each area's state; when the
+next round waits for approval the panel lists its assignments and `/rounds approve`
+starts it (`/rounds pause|resume|stop` act on the rounds too). While a deviation waits,
 the conversation needs you: its tab dot and window title turn amber, and the banner
 above the input states the deviation and its proposed amendment; Enter on an empty input
 opens the same picker. `/plans` opens a picker of the project's plans with status,
@@ -210,9 +214,11 @@ terminal uses the project's check as the app mirrors it.
 
 The host answers `plan-start`, `plans`, `plan-detail` and `plan-action` (`keep`, `replan`,
 `approve` with the exact `revision` and `hash`, `save`, `export`, `accept`, `redo`,
-`replan-deviation`) with `plan`, `plans` or `exported` responses. Questions carry optional
+`replan-deviation`, and `rounds` with `pause`, `resume`, `stop` or `approve` in `text`)
+with `plan`, `plans` or `exported` responses. Questions carry optional
 `header`, `recommended`, `multiSelect`, `rationale` and `whyAsk`; plan views carry `verification`
-(`project`, `criteria` or `review`) and `check`; plan summaries carry `needsYou`;
+(`project`, `criteria` or `review`), `check` and `nextRound` (a proposed round's
+assignment titles); plan summaries carry `needsYou`, which a proposed round also sets;
 deviations carry `amendment`; projects carry `verifyCommand`, `autoVerify`,
 `questionCap` and `plannerAgent`; and `set-project-settings` accepts `question_cap` and
 `planner_agent` (empty plans with the task's agent). Session views carry `run` (stages,

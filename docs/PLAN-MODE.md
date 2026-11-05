@@ -136,8 +136,9 @@ with every revision, its author (`planner`, `you` or `amendment`), approval, exe
 link and deviations. Records are written atomically; an unreadable record is quarantined
 as `<id>.json.corrupt` and reported in the plan list rather than overwritten. Per-project
 settings are in `plans/settings.json`: `questionCap`, `plannerAgent`, `plannerModel`,
-`exportPath` (default `docs/plans/{slug}.md`) and `maxRounds` (swarm rounds, default 5,
-1–20). Missing fields take their defaults. They
+`exportPath` (default `docs/plans/{slug}.md`), `maxRounds` (swarm rounds, default 5,
+1–20), `askBeforeRounds` (default false) and `orchestrators` (1–4, default 1). Missing
+fields take their defaults. They
 are edited under **Planning** in Project settings (the Plans page links there); the
 terminal's `/settings` changes the question limit and planning agent.
 
@@ -225,20 +226,66 @@ returns one JSON verdict:
   orchestrator's own attempt. The plan becomes `done`.
 - `next` names the next round's assignments; their `covers` become requirements. They
   pass the usual assignment validation and may not own anything under `.jackalope`.
-  The next round starts at once and is scheduled like the first.
+  The next round starts at once and is scheduled like the first, unless the plan asks
+  first (below).
 - A verdict that does not parse, a `done` without a passing check, or assignments that
   fail validation start one more orchestrator attempt told why; a second failure holds
   the round until the person resumes it.
 - At the round limit (`maxRounds`), a `next` verdict is recorded with its assignments but
   not started, and the plan asks for a re-plan.
 
+### Approving the next round
+
+**Next swarm round** under Planning in Project settings chooses **Start automatically**
+(the default) or **Ask me first** for new swarms; the Rounds section's **Next rounds**
+choice changes it for one plan and applies from the next verdict. When a plan asks
+first, a `next` verdict is saved as a proposal and nothing dispatches: the Rounds
+section lists the proposed assignments with **Approve**, **Edit** and **Stop**, the
+plan reads as needing you (`needsYou`) and raises the same "A plan needs your
+decision" notification as a deviation. **Edit** changes each assignment's title,
+instructions and scopes or removes it (dependencies on a removed assignment are
+dropped); approved edits pass the same validation as the orchestrator's assignments.
+**Stop** declines the proposal and holds the round; **Resume rounds** reviews it again.
+A proposal is saved on the round, so it survives a restart and still waits for
+approval; approving starts the round without a separate resume. The terminal approves
+with `/rounds approve` or `jackalope plan rounds <id> approve`; editing happens in the
+app. The phone companion does not show proposals.
+
+### Several orchestrators
+
+**Swarm orchestrators** (1 to 4, default 1) lets a round's review split into areas.
+When the setting is above 1, the first review of each round partitions the plan's task
+scopes into at most that many areas, grouped under the shallowest path prefix that
+separates at least two of them and balanced by scope count; a plan whose scopes do not
+separate is reviewed by one orchestrator as before. Each area gets its own read-only
+orchestrator attempt, started together, told its area and scopes; each returns the same
+JSON verdict, and a `done` still needs a passing run of the plan's check in that
+attempt. An area whose verdict fails is retried once on its own and then holds the
+round. When every area has a verdict, they combine without another agent:
+
+- The round is `done` only when every area is `done`; evidence lines are prefixed with
+  their area.
+- Otherwise the areas' next assignments are merged in area order. Work two areas both
+  named (same key or title with the same scopes) runs once, colliding keys get an area
+  suffix with dependencies following the rename, and an assignment whose scopes overlap
+  an earlier area's assignment depends on it. The merged list then follows the usual
+  validation, approval and round limit; a merge that fails validation reviews every
+  area again once before holding.
+
+Each area's name, scopes, verdict and named work are saved on the round and shown under
+it on the Progress tab and in the terminal's round line.
+
+### Saved state and controls
+
 Each round's verdict, summary, evidence, check result and next assignments are saved on
 the plan's execution and shown on its Progress tab and in `jackalope plan show`. Pause,
-Resume and Stop on the Rounds section act on the rounds and the current round's work.
+Resume and Stop on the Rounds section act on the rounds and the current round's work;
+Stop also stops every running orchestrator attempt of the round.
 Dispatch starts paused after a restart: a round whose work was still running resumes
 with its work, and a merged round waits for **Resume rounds**, which also restarts an
 interrupted orchestrator attempt. Executions saved before rounds existed finish when
-their result merges, as before.
+their result merges, as before; executions saved before approval and areas existed start
+next rounds automatically with one orchestrator.
 
 ## Progress, deviations and re-planning
 

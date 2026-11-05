@@ -307,11 +307,13 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   round merges, a read-only orchestrator reviews the integrated tree against the
   criteria with the project's check and either declares the plan done or queues the
   next round (up to 24 assignments where the project's agents have slots), within a
-  round limit (default 5), pause/stop and restart recovery. It no longer needs a swarm
-  Worker. Approval verifies with the project's check,
+  round limit (default 5), pause/stop and restart recovery. A plan can ask before each
+  next round (approve, edit or stop the proposal in the app; approve from the terminal),
+  and up to 4 orchestrators can review a large plan's areas in parallel with a merged
+  verdict. It no longer needs a swarm Worker. Approval verifies with the project's check,
   else the plan's command and test criteria, else review only (no check gate; the plan
-  review must pass). Pending deviations raise a notification and the amber needs-you
-  state in the terminal. Planning settings live in Project settings and the terminal's
+  review must pass). Pending deviations and proposed swarm rounds raise a notification
+  and the amber needs-you state in the terminal. Planning settings live in Project settings and the terminal's
   `/settings`. Read-only enforcement covers Codex and
   Claude Code; other agents are constrained by prompt and a discarded worktree.
   Installed-provider interviews, plan-to-merge and multi-round swarm acceptance remain

@@ -109,8 +109,9 @@ release dates.
   conflicts caught before completion, and whether planner briefings reduce worker discovery.
 - [ ] Accept multi-round swarms with installed providers: orchestrator verdict accuracy
   (false done, missed criteria), rounds and cost to completion, round sizes on agents on a
-  computer, and recovery after a restart mid-review. Consider relaying the orchestrator's
-  next assignments for human approval as an autonomy-policy option.
+  computer, recovery after a restart mid-review, how often people edit proposed rounds,
+  and whether parallel area orchestrators catch more than one. Consider making round
+  approval an autonomy-policy option and showing proposals in the phone companion.
 - [ ] Accept automatic delivery end to end in the installed app: a swarm goal on a new
   Artifacts project merges under a committed policy, pushes the branch to Artifacts and
   deploys to a Workers preview, including a failing check that rolls back and pauses merging.

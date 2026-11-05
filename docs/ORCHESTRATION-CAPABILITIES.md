@@ -182,7 +182,10 @@ A plan approved as a swarm (beta) runs in rounds of managed assignments. After a
 round's combined result merges, a read-only orchestrator attempt reviews the integrated
 tree against the plan's criteria, running the saved check through `computer_verify`,
 and either declares the plan done with evidence or names the next round's assignments,
-which are validated and scheduled like the first. A round runs at least 8 and at most 24
+which are validated and scheduled like the first, or wait for the person's approval
+when the plan asks first. Up to 4 orchestrators can review a large plan's areas in
+parallel; their verdicts merge into one (done only when every area is done, next
+assignments deduplicated and sequenced where scopes overlap). A round runs at least 8 and at most 24
 assignments, sized to the slots where the project's agents run. Rounds stop at the
 plan's round limit (default 5), pause and stop with the plan, start paused after a
 restart, and never assign `.jackalope/**`. A swarm Worker is optional. See
