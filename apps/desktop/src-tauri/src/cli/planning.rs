@@ -341,9 +341,87 @@ pub fn approve(
     Ok(())
 }
 
+/// `plan rounds <id> [action]`: prints the swarm's round line and any
+/// proposed next round, or pauses, resumes, stops or approves it.
+pub fn rounds(
+    preference: Option<ColdStart>,
+    prefix: &str,
+    action: Option<String>,
+    yes: bool,
+) -> Result<(), String> {
+    let mut connection = host::ensure(preference)?;
+    let id = resolve(&mut connection, prefix)?;
+    let view = plan(connection.call(&Request::PlanDetail {
+        plan_id: id.clone(),
+    })?)?;
+    let Some(action) = action else {
+        println!("{}", rounds_lines(&view).join("\n"));
+        return Ok(());
+    };
+    if action == "approve" {
+        if view.next_round.is_empty() {
+            return Err("No round is waiting for approval.".into());
+        }
+        for line in rounds_lines(&view) {
+            eprintln!("{line}");
+        }
+        if !crate::subcommands::approved(yes, "Start the next round with these assignments?")? {
+            eprintln!("Not approved. Edit the assignments in the app, or stop with 'jackalope plan rounds {} stop'.", short(&id));
+            return Ok(());
+        }
+    }
+    let view = plan(connection.call(&Request::PlanAction {
+        plan_id: id,
+        action: "rounds".into(),
+        text: action.clone(),
+        revision: None,
+        hash: None,
+    })?)?;
+    println!("{}", rounds_lines(&view).join("\n"));
+    Ok(())
+}
+
+/// The plan's round line and its proposed next round, as `plan rounds` prints them.
+pub fn rounds_lines(view: &PlanView) -> Vec<String> {
+    let progress = view.progress.as_deref().unwrap_or_default();
+    if !progress.starts_with("swarm") {
+        return vec![format!("{} does not run in swarm rounds.", view.title)];
+    }
+    let mut lines = vec![format!("{} · {progress}", view.title)];
+    if !view.next_round.is_empty() {
+        lines.push("Next round waits for your approval:".into());
+        lines.extend(view.next_round.iter().map(|title| format!("  · {title}")));
+    }
+    lines
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rounds_lines_show_the_round_and_the_proposal() {
+        let view = PlanView {
+            title: "Export".into(),
+            progress: Some("swarm (beta) round 2/5 · next round waits for your approval".into()),
+            next_round: vec!["Add the button".into()],
+            ..Default::default()
+        };
+        assert_eq!(
+            rounds_lines(&view),
+            [
+                "Export · swarm (beta) round 2/5 · next round waits for your approval",
+                "Next round waits for your approval:",
+                "  · Add the button",
+            ]
+        );
+        let single = PlanView {
+            title: "Fix".into(),
+            progress: Some("1/1 tasks checked".into()),
+            ..Default::default()
+        };
+        assert_eq!(rounds_lines(&single), ["Fix does not run in swarm rounds."]);
+    }
 
     fn question(multi: bool) -> Question {
         Question {

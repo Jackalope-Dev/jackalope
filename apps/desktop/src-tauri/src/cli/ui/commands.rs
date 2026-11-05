@@ -79,6 +79,7 @@ pub const COMMANDS: &[(&str, &str)] = &[
         "deviation",
         "decide on a plan deviation: accept, redo or replan",
     ),
+    ("rounds", "a swarm's rounds: approve, pause, resume or stop"),
     (
         "browser",
         "show the project browser; /browser open [url] to sign in",

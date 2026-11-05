@@ -437,6 +437,8 @@ fn settings_default_and_reject_paths_outside_the_project() {
         planner_model: None,
         export_path: "plans/{slug}.md".into(),
         max_rounds: 3,
+        ask_before_rounds: true,
+        orchestrators: 3,
     };
     store.save_settings("p", custom.clone()).unwrap();
     assert_eq!(store.settings("p"), custom);
@@ -451,6 +453,13 @@ fn settings_default_and_reject_paths_outside_the_project() {
         ..Default::default()
     };
     assert!(store.save_settings("p", chatty).is_err());
+    for orchestrators in [0, super::rounds::MAX_ORCHESTRATORS + 1] {
+        let parallel = PlanSettings {
+            orchestrators,
+            ..Default::default()
+        };
+        assert!(store.save_settings("p", parallel).is_err());
+    }
     for max_rounds in [0, super::rounds::MAX_ROUNDS + 1] {
         let rounds = PlanSettings {
             max_rounds,
@@ -465,6 +474,8 @@ fn settings_default_and_reject_paths_outside_the_project() {
         store.settings("p").max_rounds,
         super::rounds::DEFAULT_ROUNDS
     );
+    assert!(!store.settings("p").ask_before_rounds);
+    assert_eq!(store.settings("p").orchestrators, 1);
     std::fs::remove_dir_all(folder).unwrap();
 }
 

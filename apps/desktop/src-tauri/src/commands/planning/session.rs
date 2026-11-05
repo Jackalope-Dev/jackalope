@@ -192,7 +192,7 @@ pub struct PlanSummary {
     pub status: String,
     pub revision: Option<u32>,
     pub updated_at: String,
-    /// A deviation is waiting on the person's decision.
+    /// A deviation or a proposed swarm round is waiting on the person.
     pub needs_you: bool,
 }
 
@@ -204,7 +204,7 @@ pub fn summary(record: &PlanRecord) -> PlanSummary {
         status: record.status(),
         revision: record.latest().map(|revision| revision.number),
         updated_at: record.updated_at.clone(),
-        needs_you: pending_deviation(record).is_some(),
+        needs_you: pending_deviation(record).is_some() || rounds::awaiting(record),
     }
 }
 
@@ -1107,8 +1107,9 @@ pub fn approve(
         link,
         max_assignments: swarm_limit,
     });
+    let settings = store.settings(&record.project_id);
     let max_rounds = if shape == "swarm" {
-        store.settings(&record.project_id).max_rounds
+        settings.max_rounds
     } else {
         0
     };
@@ -1123,6 +1124,8 @@ pub fn approve(
                     items: vec![],
                     started_at: started_at.clone(),
                     max_rounds,
+                    ask_before_rounds: settings.ask_before_rounds,
+                    orchestrators: settings.orchestrators,
                     rounds: if max_rounds > 0 {
                         vec![Round {
                             number: 1,

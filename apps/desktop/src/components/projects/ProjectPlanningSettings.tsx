@@ -11,10 +11,11 @@ import { Select, SelectItem } from '../ui/Select';
 
 const QUESTION_LIMITS = Array.from({ length: 13 }, (_, limit) => limit);
 const ROUND_LIMITS = [1, 2, 3, 5, 8, 12, 20];
+const ORCHESTRATOR_LIMITS = [1, 2, 3, 4];
 const TASK_AGENT = 'task';
 const AGENT_DEFAULT = 'default';
 
-/** Plan mode settings for one project: the interview limit, planning agent and model, and where Save to repo writes. */
+/** Plan mode settings for one project: the interview limit, swarm rounds, planning agent and model, and where Save to repo writes. */
 export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
   const id = useId();
   const runners = useExecutionStore((state) => state.runners);
@@ -103,6 +104,47 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
                 {limit === 1 ? '1 round' : `${limit} rounds`}
               </SelectItem>
             ))}
+        </Select>
+      </Setting>
+      <Setting
+        title={
+          <span className="inline-flex items-center gap-2">
+            Next swarm round <Badge variant="accent">Beta</Badge>
+          </span>
+        }
+        description="After a review names more work, start it or wait for your approval. Each plan can change this."
+        descriptionId={`${id}-approval-description`}
+      >
+        <Select
+          aria-label="Next swarm round"
+          aria-describedby={`${id}-approval-description`}
+          value={settings.askBeforeRounds ? 'ask' : 'auto'}
+          onValueChange={(value) => void save({ ...settings, askBeforeRounds: value === 'ask' })}
+        >
+          <SelectItem value="auto">Start automatically</SelectItem>
+          <SelectItem value="ask">Ask me first</SelectItem>
+        </Select>
+      </Setting>
+      <Setting
+        title={
+          <span className="inline-flex items-center gap-2">
+            Swarm orchestrators <Badge variant="accent">Beta</Badge>
+          </span>
+        }
+        description="Large swarms split their review into areas, each checked by its own orchestrator at once."
+        descriptionId={`${id}-orchestrators-description`}
+      >
+        <Select
+          aria-label="Swarm orchestrators"
+          aria-describedby={`${id}-orchestrators-description`}
+          value={String(settings.orchestrators ?? 1)}
+          onValueChange={(value) => void save({ ...settings, orchestrators: Number(value) })}
+        >
+          {ORCHESTRATOR_LIMITS.map((limit) => (
+            <SelectItem key={limit} value={String(limit)}>
+              {limit === 1 ? '1 orchestrator' : `Up to ${limit}`}
+            </SelectItem>
+          ))}
         </Select>
       </Setting>
       <Setting

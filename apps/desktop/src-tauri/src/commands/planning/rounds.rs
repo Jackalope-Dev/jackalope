@@ -3,13 +3,16 @@
 //! read-only orchestrator attempt reviews the integrated tree against the
 //! plan's acceptance criteria. It declares the plan done, with evidence and a
 //! passing check when the plan has one, or names the next round's assignments,
-//! which run like the first. Rounds stop at the plan's round limit, pause and
-//! stop with the plan, and start paused after a restart like all dispatch.
+//! which run like the first, or wait for the person's approval when the plan
+//! asks first. Large plans may split the review into areas, each reviewed by
+//! its own orchestrator attempt in parallel; their verdicts combine into the
+//! round's. Rounds stop at the plan's round limit, pause and stop with the
+//! plan, and start paused after a restart like all dispatch.
 
 use super::{
     artifact::PlanDocument,
     handoff, interview, session,
-    store::{PlanRecord, Round, RoundCheck, Store},
+    store::{AreaReview, PlanRecord, Round, RoundCheck, Store},
 };
 use crate::commands::{
     coordination::{managed::PlanLink, planned::PlanLaunch, Coordinator},
@@ -18,7 +21,7 @@ use crate::commands::{
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashSet,
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Mutex,
     time::{Duration, Instant},
 };
@@ -26,6 +29,8 @@ use uuid::Uuid;
 
 pub const DEFAULT_ROUNDS: u32 = 5;
 pub const MAX_ROUNDS: u32 = 20;
+/// Parallel orchestrators a round's review may use, one per area.
+pub const MAX_ORCHESTRATORS: u32 = 4;
 /// Automatic orchestrator retries per round before it waits for the person.
 const RETRIES: u32 = 1;
 const INTERVAL: Duration = Duration::from_secs(3);
@@ -99,8 +104,18 @@ fn active(status: &str) -> bool {
     ["starting", "running", "stopping", "routing", "queued"].contains(&status)
 }
 
+/// The current round's proposed assignments wait for the person.
+pub fn awaiting(record: &PlanRecord) -> bool {
+    open(record)
+        && record
+            .execution
+            .as_ref()
+            .and_then(|execution| execution.rounds.last())
+            .is_some_and(|round| round.proposal.is_some())
+}
+
 /// An assignment the orchestrator names for the next round.
-#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RoundAssignment {
     pub key: String,
@@ -233,6 +248,10 @@ pub fn assignments(
     serde_json::to_string(&value).map_err(|error| error.to_string())
 }
 
+fn titles(items: &[RoundAssignment]) -> Vec<String> {
+    items.iter().map(|item| clip(&item.title, 160)).collect()
+}
+
 /// What one finished orchestrator attempt means for its round.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Outcome {
@@ -244,8 +263,11 @@ pub enum Outcome {
     Next {
         summary: String,
         evidence: Vec<String>,
+        /// The validated assignments in the managed-task JSON shape.
         assignments: String,
         titles: Vec<String>,
+        /// The assignments as named, for a proposal the person may edit.
+        items: Vec<RoundAssignment>,
     },
     /// Review the round again, telling the orchestrator why.
     Retry(String),
@@ -292,7 +314,8 @@ pub fn decide(doc: &PlanDocument, round: u32, run: &TaskRun, check: Option<&str>
                 summary,
                 evidence,
                 assignments,
-                titles: next.iter().map(|item| clip(&item.title, 160)).collect(),
+                titles: titles(&next),
+                items: next,
             },
             Err(error) => Outcome::Retry(error),
         },
@@ -311,14 +334,41 @@ pub enum Step {
     Hold(String),
 }
 
+fn settled(round: &Round, merged: bool, enabled: bool) -> bool {
+    !round.verdict.is_empty()
+        || round.held.is_some()
+        || round.proposal.is_some()
+        || !merged
+        || !enabled
+}
+
 pub fn step(round: &Round, merged: bool, enabled: bool, runs: &[TaskRun]) -> Step {
-    if !round.verdict.is_empty() || round.held.is_some() || !merged || !enabled {
+    if settled(round, merged, enabled) {
         return Step::Wait;
     }
-    let Some(id) = round.review_run_ids.last() else {
+    attempt_step(round.review_run_ids.last(), &round.handled, runs)
+}
+
+/// One step per area, in area order; an area with a verdict waits for the rest.
+pub fn area_steps(round: &Round, merged: bool, enabled: bool, runs: &[TaskRun]) -> Vec<Step> {
+    round
+        .areas
+        .iter()
+        .map(|area| {
+            if settled(round, merged, enabled) || !area.verdict.is_empty() {
+                Step::Wait
+            } else {
+                attempt_step(area.run_ids.last(), &round.handled, runs)
+            }
+        })
+        .collect()
+}
+
+fn attempt_step(last: Option<&String>, handled: &[String], runs: &[TaskRun]) -> Step {
+    let Some(id) = last else {
         return Step::Review;
     };
-    if round.handled.contains(id) {
+    if handled.contains(id) {
         return Step::Review;
     }
     match runs.iter().find(|run| &run.id == id) {
@@ -358,19 +408,26 @@ pub fn review_prompt(
     rounds: &[Round],
     max_rounds: u32,
     check: Option<&str>,
+    area: Option<&AreaReview>,
 ) -> String {
     let check = match check {
         Some(command) => format!("Call computer_verify with {{}} to run the project's check (`{command}`) on this tree; a done verdict stands only when it passes."),
         None => "The project has no saved check: exercise each criterion yourself with read-only commands.".into(),
     };
     let earlier = history(rounds);
-    let note = if round.note.is_empty() {
+    let note = area.map_or(&round.note, |area| &area.note);
+    let note = if note.is_empty() {
         String::new()
     } else {
-        format!(
-            "\n\nYour previous review of this round was not accepted: {}",
-            round.note
-        )
+        format!("\n\nYour previous review of this round was not accepted: {note}")
+    };
+    let area = match area {
+        Some(area) => format!(
+            "\n\nYou review one area of this plan: {} ({}). Other orchestrators review the other areas at the same time. Judge the criteria this area's work affects, declare done only when they are met here, and name next assignments only within these scopes unless an integration gap requires otherwise.",
+            area.name,
+            area.scopes.join(", ")
+        ),
+        None => String::new(),
     };
     format!(
         "You are the swarm orchestrator reviewing round {number} of at most {max_rounds}. Work read-only: do not edit, create or delete files, install dependencies, commit or launch agents. This workspace is the target branch with every earlier round's work merged.\n\n\
@@ -378,7 +435,7 @@ Review the integrated tree against every acceptance criterion of the approved pl
 Then decide. Declare done only when every criterion is met, with one evidence line per criterion (\"AC-n: how you know\"). Otherwise name the next round's assignments: work that remains, fixes for failed checks or criteria, and integration gaps. Keep tightly coupled work and its tests together, give each shared contract one owner, make dependent work sequential, and keep independent assignments' scopes apart. Never assign files under .jackalope; gates and policy belong to the person.\n\n\
 Return ONLY one JSON object:\n\
 {{\"verdict\":\"done\"|\"next\",\"summary\":\"<two sentences>\",\"evidence\":[\"AC-1: ...\"],\"assignments\":[{{\"key\":\"...\",\"title\":\"...\",\"prompt\":\"<self-contained instructions>\",\"scopes\":[\"relative/path\"],\"dependsOn\":[],\"covers\":[\"AC-1\"],\"briefing\":\"<facts the worker needs, under 1500 characters>\"}}]}}\n\
-Leave assignments empty when done.{note}\n\n\
+Leave assignments empty when done.{area}{note}\n\n\
 Earlier rounds:\n{earlier}\n\nApproved plan:\n{plan}",
         number = round.number,
         earlier = if earlier.is_empty() { "- None\n".into() } else { earlier },
@@ -386,12 +443,222 @@ Earlier rounds:\n{earlier}\n\nApproved plan:\n{plan}",
     )
 }
 
+fn normalize(scope: &str) -> String {
+    scope
+        .trim()
+        .replace('\\', "/")
+        .trim_start_matches("./")
+        .trim_end_matches('/')
+        .to_string()
+}
+
+/// Whether two scopes can touch the same files: equal, nested, or the root.
+pub fn overlaps(a: &str, b: &str) -> bool {
+    let (a, b) = (
+        normalize(a).to_ascii_lowercase(),
+        normalize(b).to_ascii_lowercase(),
+    );
+    let root = |scope: &str| scope.is_empty() || scope == ".";
+    root(a.as_str())
+        || root(b.as_str())
+        || a == b
+        || a.starts_with(&format!("{b}/"))
+        || b.starts_with(&format!("{a}/"))
+}
+
+/// Splits a plan into at most `most` review areas by its tasks' scopes,
+/// grouped under the shallowest path prefix that tells at least two apart and
+/// balanced by scope count. Fewer than two areas means one orchestrator
+/// reviews the whole plan.
+pub fn partition(doc: &PlanDocument, most: u32) -> Vec<AreaReview> {
+    let most = most.min(MAX_ORCHESTRATORS) as usize;
+    if most < 2 {
+        return vec![];
+    }
+    let scopes: Vec<String> = doc
+        .tasks
+        .iter()
+        .flat_map(|task| task.scopes.iter())
+        .map(|scope| normalize(scope))
+        .filter(|scope| !scope.is_empty() && scope != ".")
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let mut groups: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for depth in 1..=3 {
+        groups.clear();
+        for scope in &scopes {
+            let key = scope.split('/').take(depth).collect::<Vec<_>>().join("/");
+            groups.entry(key).or_default().push(scope.clone());
+        }
+        if groups.len() >= 2 {
+            break;
+        }
+    }
+    if groups.len() < 2 {
+        return vec![];
+    }
+    let mut sorted: Vec<(String, Vec<String>)> = groups.into_iter().collect();
+    sorted.sort_by(|a, b| b.1.len().cmp(&a.1.len()).then_with(|| a.0.cmp(&b.0)));
+    let mut bins: Vec<(Vec<String>, Vec<String>)> = vec![(vec![], vec![]); most.min(sorted.len())];
+    for (name, members) in sorted {
+        // The first of the least-loaded bins, so the split is deterministic.
+        if let Some(bin) = bins.iter_mut().min_by_key(|bin| bin.1.len()) {
+            bin.0.push(name);
+            bin.1.extend(members);
+        }
+    }
+    bins.into_iter()
+        .map(|(names, scopes)| AreaReview {
+            name: names.join(", "),
+            scopes,
+            ..Default::default()
+        })
+        .collect()
+}
+
+fn same_work(a: &RoundAssignment, b: &RoundAssignment) -> bool {
+    let scopes = |item: &RoundAssignment| {
+        let mut scopes: Vec<String> = item
+            .scopes
+            .iter()
+            .map(|scope| normalize(scope).to_ascii_lowercase())
+            .collect();
+        scopes.sort();
+        scopes
+    };
+    (a.key == b.key || a.title.trim().eq_ignore_ascii_case(b.title.trim()))
+        && scopes(a) == scopes(b)
+}
+
+/// Combines the areas' next assignments: work two areas both named runs once,
+/// colliding keys get an area suffix, and work whose scopes overlap an earlier
+/// area's runs after it, so the round's usual scope validation holds.
+pub fn merge_assignments(areas: &[AreaReview]) -> Vec<RoundAssignment> {
+    let mut merged: Vec<RoundAssignment> = vec![];
+    for (index, area) in areas.iter().enumerate() {
+        if area.verdict != "next" {
+            continue;
+        }
+        let start = merged.len();
+        let mut keys: HashMap<String, String> = HashMap::new();
+        let mut fresh: Vec<RoundAssignment> = vec![];
+        for item in &area.assignments {
+            if let Some(same) = merged[..start]
+                .iter()
+                .find(|earlier| same_work(earlier, item))
+            {
+                keys.insert(item.key.clone(), same.key.clone());
+                continue;
+            }
+            let mut key = item.key.clone();
+            let mut suffix = index + 1;
+            while merged
+                .iter()
+                .chain(fresh.iter())
+                .any(|other| other.key == key)
+            {
+                key = format!("{}-{suffix}", item.key);
+                suffix += 1;
+            }
+            keys.insert(item.key.clone(), key.clone());
+            fresh.push(RoundAssignment {
+                key,
+                ..item.clone()
+            });
+        }
+        for mut item in fresh {
+            let mut depends: Vec<String> = vec![];
+            for dependency in &item.depends_on {
+                let dependency = keys.get(dependency).unwrap_or(dependency).clone();
+                if !depends.contains(&dependency) {
+                    depends.push(dependency);
+                }
+            }
+            for earlier in &merged[..start] {
+                let touches = earlier
+                    .scopes
+                    .iter()
+                    .any(|a| item.scopes.iter().any(|b| overlaps(a, b)));
+                if touches && !depends.contains(&earlier.key) {
+                    depends.push(earlier.key.clone());
+                }
+            }
+            item.depends_on = depends;
+            merged.push(item);
+        }
+    }
+    merged.truncate(MAX_NEXT);
+    let kept: HashSet<String> = merged.iter().map(|item| item.key.clone()).collect();
+    for item in &mut merged {
+        item.depends_on
+            .retain(|dependency| kept.contains(dependency));
+    }
+    merged
+}
+
+/// The round's verdict from its areas' verdicts. Done only when every area is
+/// done; each area's done already required the plan's check to pass on the
+/// integrated tree in its own attempt.
+pub fn merge(doc: &PlanDocument, round: u32, areas: &[AreaReview]) -> Outcome {
+    let summary = clip(
+        &areas
+            .iter()
+            .map(|area| format!("{}: {}", area.name, area.summary.trim()))
+            .collect::<Vec<_>>()
+            .join(" "),
+        2000,
+    );
+    let evidence: Vec<String> = areas
+        .iter()
+        .flat_map(|area| {
+            area.evidence
+                .iter()
+                .map(move |line| format!("{} · {line}", area.name))
+        })
+        .take(48)
+        .collect();
+    if areas.iter().all(|area| area.verdict == "done") {
+        return Outcome::Done {
+            summary,
+            evidence,
+            check: areas.iter().find_map(|area| area.check.clone()),
+        };
+    }
+    let next = merge_assignments(areas);
+    if next.is_empty() {
+        return Outcome::Retry("The areas named no next assignments.".into());
+    }
+    match assignments(doc, round + 1, &next) {
+        Ok(assignments) => Outcome::Next {
+            summary,
+            evidence,
+            assignments,
+            titles: titles(&next),
+            items: next,
+        },
+        Err(error) => Outcome::Retry(error),
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaView {
+    pub name: String,
+    pub scopes: Vec<String>,
+    /// `waiting`, `reviewing`, `done` or `next`.
+    pub state: String,
+    pub summary: String,
+    pub evidence: Vec<String>,
+    pub next: Vec<String>,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RoundView {
     pub number: u32,
     pub managed_task_id: String,
-    /// `working`, `reviewing`, `held`, `done`, `next` or `limit`.
+    /// `working`, `reviewing`, `approval`, `held`, `done`, `next` or `limit`.
     pub state: String,
     pub summary: String,
     pub evidence: Vec<String>,
@@ -400,6 +667,9 @@ pub struct RoundView {
     pub held: Option<String>,
     pub review_run_id: Option<String>,
     pub decided_at: Option<String>,
+    /// The next round's assignments waiting for the person's approval.
+    pub proposal: Option<Vec<RoundAssignment>>,
+    pub areas: Vec<AreaView>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -409,7 +679,16 @@ pub struct RoundsView {
     pub max: u32,
     /// The current round waits for the person to resume it.
     pub paused: bool,
+    /// Each next round waits for the person's approval.
+    pub ask_first: bool,
+    pub orchestrators: u32,
     pub rounds: Vec<RoundView>,
+}
+
+fn live(run_id: Option<&String>, runs: &[TaskRun]) -> bool {
+    run_id
+        .and_then(|id| runs.iter().find(|run| &run.id == id))
+        .is_some_and(|run| active(&run.status) || run.finishing)
 }
 
 pub fn view(
@@ -433,15 +712,13 @@ pub fn view(
         .rounds
         .iter()
         .map(|round| {
-            let review = round
-                .review_run_ids
-                .last()
-                .and_then(|id| runs.iter().find(|run| &run.id == id));
             let state = if !round.verdict.is_empty() {
                 round.verdict.clone()
+            } else if round.proposal.is_some() {
+                "approval".into()
             } else if round.held.is_some() {
                 "held".into()
-            } else if review.is_some_and(|run| active(&run.status) || run.finishing)
+            } else if live(round.review_run_ids.last(), runs)
                 || (round.number == current.number && merged)
             {
                 "reviewing".into()
@@ -459,14 +736,37 @@ pub fn view(
                 held: round.held.clone(),
                 review_run_id: round.review_run_ids.last().cloned(),
                 decided_at: round.decided_at.clone(),
+                proposal: round.proposal.clone(),
+                areas: round
+                    .areas
+                    .iter()
+                    .map(|area| AreaView {
+                        name: area.name.clone(),
+                        scopes: area.scopes.clone(),
+                        state: if !area.verdict.is_empty() {
+                            area.verdict.clone()
+                        } else if live(area.run_ids.last(), runs) {
+                            "reviewing".into()
+                        } else {
+                            "waiting".into()
+                        },
+                        summary: area.summary.clone(),
+                        evidence: area.evidence.clone(),
+                        next: titles(&area.assignments),
+                    })
+                    .collect(),
             }
         })
         .collect();
     Some(RoundsView {
         current: current.number,
         max: execution.max_rounds,
+        // A proposal waits for approval, not for Resume.
         paused: current.verdict.is_empty()
+            && current.proposal.is_none()
             && (current.held.is_some() || !(dispatching || resumed(&record.id))),
+        ask_first: execution.ask_before_rounds,
+        orchestrators: execution.orchestrators.max(1),
         rounds,
     })
 }
@@ -532,6 +832,15 @@ fn check_of(coordinator: &Coordinator, round: &Round) -> Option<String> {
         .filter(|command| !command.trim().is_empty())
 }
 
+/// Keeps a live orchestrator attempt read-only after the planning registry restarts.
+fn keep_read_only(record: &PlanRecord, run_id: Option<&String>, runs: &[TaskRun]) {
+    if live(run_id, runs) {
+        if let Some(id) = run_id {
+            super::register_run(id, &record.id, 0, 0);
+        }
+    }
+}
+
 fn advance(
     coordinator: &Coordinator,
     store: &Store,
@@ -560,19 +869,32 @@ fn advance(
             return Ok(());
         }
     };
+    let merged = delivery.applied_at.is_some();
     let enabled =
         (delivery.dispatching || resumed(id)) && session::pending_deviation(&record).is_none();
-    match step(round, delivery.applied_at.is_some(), enabled, runs) {
-        Step::Wait => {
-            // Keep a live attempt read-only after the planning registry restarts.
-            if let Some(run) = round
-                .review_run_ids
-                .last()
-                .and_then(|run_id| runs.iter().find(|run| &run.id == run_id))
-                .filter(|run| active(&run.status) || run.finishing)
-            {
-                super::register_run(&run.id, &record.id, 0, 0);
+    // A round splits into areas once, before its first review starts.
+    if execution.orchestrators > 1
+        && round.areas.is_empty()
+        && round.review_run_ids.is_empty()
+        && step(round, merged, enabled, runs) == Step::Review
+    {
+        if let Some(doc) = record.document() {
+            let areas = partition(&doc, execution.orchestrators);
+            if !areas.is_empty() {
+                store.update(id, |saved| {
+                    current(saved)?.areas = areas.clone();
+                    Ok(())
+                })?;
+                return Ok(());
             }
+        }
+    }
+    if !round.areas.is_empty() {
+        return advance_areas(coordinator, store, &record, merged, enabled, runs);
+    }
+    match step(round, merged, enabled, runs) {
+        Step::Wait => {
+            keep_read_only(&record, round.review_run_ids.last(), runs);
             Ok(())
         }
         Step::Hold(reason) => {
@@ -586,18 +908,146 @@ fn advance(
             })?;
             Ok(())
         }
-        Step::Review => start_review(coordinator, store, &record),
+        Step::Review => start_review(coordinator, store, &record, None),
         Step::Read(run_id) => {
             let run = runs.iter().find(|run| run.id == run_id).unwrap();
-            read(coordinator, store, &record, run)
+            let doc = record.document().ok_or("The plan could not be read.")?;
+            let outcome = decide(
+                &doc,
+                round.number,
+                run,
+                check_of(coordinator, round).as_deref(),
+            );
+            conclude(coordinator, store, &record, &doc, outcome, Some(&run.id))
         }
     }
 }
 
+/// Starts or reads each area's orchestrator attempt, then combines the
+/// areas' verdicts once every area has one.
+fn advance_areas(
+    coordinator: &Coordinator,
+    store: &Store,
+    record: &PlanRecord,
+    merged: bool,
+    enabled: bool,
+    runs: &[TaskRun],
+) -> Result<(), String> {
+    let round = record.execution.as_ref().unwrap().rounds.last().unwrap();
+    for (index, step) in area_steps(round, merged, enabled, runs)
+        .into_iter()
+        .enumerate()
+    {
+        match step {
+            Step::Wait => keep_read_only(record, round.areas[index].run_ids.last(), runs),
+            Step::Hold(reason) => {
+                store.update(&record.id, |saved| {
+                    let round = current(saved)?;
+                    if let Some(last) = round.areas[index].run_ids.last().cloned() {
+                        round.handled.push(last);
+                    }
+                    round.held = Some(format!("{}: {reason}", round.areas[index].name));
+                    Ok(())
+                })?;
+                return Ok(());
+            }
+            Step::Review => start_review(coordinator, store, record, Some(index))?,
+            Step::Read(run_id) => {
+                let run = runs.iter().find(|run| run.id == run_id).unwrap();
+                read_area(coordinator, store, record, index, run)?;
+            }
+        }
+    }
+    let saved = store.load(&record.id)?;
+    let Some(round) = saved
+        .execution
+        .as_ref()
+        .and_then(|execution| execution.rounds.last())
+    else {
+        return Ok(());
+    };
+    let combined = round.verdict.is_empty()
+        && round.held.is_none()
+        && round.proposal.is_none()
+        && !round.areas.is_empty()
+        && round.areas.iter().all(|area| !area.verdict.is_empty());
+    if combined {
+        let doc = saved.document().ok_or("The plan could not be read.")?;
+        let outcome = merge(&doc, round.number, &round.areas);
+        conclude(coordinator, store, &saved, &doc, outcome, None)?;
+    }
+    Ok(())
+}
+
+fn read_area(
+    coordinator: &Coordinator,
+    store: &Store,
+    record: &PlanRecord,
+    index: usize,
+    run: &TaskRun,
+) -> Result<(), String> {
+    let doc = record.document().ok_or("The plan could not be read.")?;
+    let round = record.execution.as_ref().unwrap().rounds.last().unwrap();
+    let outcome = decide(
+        &doc,
+        round.number,
+        run,
+        check_of(coordinator, round).as_deref(),
+    );
+    store.update(&record.id, |saved| {
+        let round = current(saved)?;
+        round.handled.push(run.id.clone());
+        let area = round
+            .areas
+            .get_mut(index)
+            .ok_or("This round's areas changed.")?;
+        match &outcome {
+            Outcome::Done {
+                summary,
+                evidence,
+                check,
+            } => {
+                area.verdict = "done".into();
+                area.summary = summary.clone();
+                area.evidence = evidence.clone();
+                area.check = check.clone();
+                area.assignments.clear();
+                area.note.clear();
+            }
+            Outcome::Next {
+                summary,
+                evidence,
+                items,
+                ..
+            } => {
+                area.verdict = "next".into();
+                area.summary = summary.clone();
+                area.evidence = evidence.clone();
+                area.assignments = items.clone();
+                area.note.clear();
+            }
+            Outcome::Retry(reason) => {
+                if area.retries < RETRIES {
+                    area.retries += 1;
+                    area.note = reason.clone();
+                } else {
+                    let held = format!("{}: {reason}", area.name);
+                    round.held = Some(held);
+                }
+            }
+        }
+        Ok(())
+    })?;
+    Ok(())
+}
+
+/// Starts an orchestrator attempt on the integrated tree, for the whole plan
+/// or for one area.
 fn start_review(
     coordinator: &Coordinator,
     store: &Store,
     record: &PlanRecord,
+    area: Option<usize>,
 ) -> Result<(), String> {
     let doc = record.document().ok_or("The plan could not be read.")?;
     let execution = record.execution.as_ref().unwrap();
@@ -610,6 +1060,7 @@ fn start_review(
         &execution.rounds,
         execution.max_rounds,
         check.as_deref(),
+        area.and_then(|index| round.areas.get(index)),
     );
     let mut request = session::planning_request(&record.request, &settings, prompt);
     // computer_verify runs the plan's check; the attempt itself stays read-only.
@@ -617,17 +1068,21 @@ fn start_review(
     store.update(&record.id, |saved| {
         let round = current(saved)?;
         round.review_run_ids.push(request.id.clone());
-        round.note.clear();
+        match area.and_then(|index| round.areas.get_mut(index)) {
+            Some(area) => {
+                area.run_ids.push(request.id.clone());
+                area.note.clear();
+            }
+            None => round.note.clear(),
+        }
         Ok(())
     })?;
     // No questions: the orchestrator decides from the code, the check and the plan.
     super::register_run(&request.id, &record.id, 0, 0);
-    if let Err(error) = coordinator.start_manual(request) {
+    if let Err(error) = coordinator.start_manual(request.clone()) {
         store.update(&record.id, |saved| {
             let round = current(saved)?;
-            if let Some(last) = round.review_run_ids.last().cloned() {
-                round.handled.push(last);
-            }
+            round.handled.push(request.id.clone());
             round.held = Some(format!("The orchestrator review did not start: {error}"));
             Ok(())
         })?;
@@ -635,21 +1090,19 @@ fn start_review(
     Ok(())
 }
 
-fn read(
+/// Records what a round's review concluded: the plan is done, the next round
+/// starts or waits for approval, or the review runs again. `handled` is the
+/// single orchestrator attempt read; area reviews mark theirs as they finish.
+fn conclude(
     coordinator: &Coordinator,
     store: &Store,
     record: &PlanRecord,
-    run: &TaskRun,
+    doc: &PlanDocument,
+    outcome: Outcome,
+    handled: Option<&str>,
 ) -> Result<(), String> {
-    let doc = record.document().ok_or("The plan could not be read.")?;
     let execution = record.execution.as_ref().unwrap();
     let round = execution.rounds.last().unwrap();
-    let outcome = decide(
-        &doc,
-        round.number,
-        run,
-        check_of(coordinator, round).as_deref(),
-    );
     let now = Utc::now().to_rfc3339();
     let settle = |saved: &mut PlanRecord,
                   verdict: &str,
@@ -657,7 +1110,9 @@ fn read(
                   evidence: &[String]|
      -> Result<(), String> {
         let round = current(saved)?;
-        round.handled.push(run.id.clone());
+        if let Some(id) = handled {
+            round.handled.push(id.into());
+        }
         round.verdict = verdict.into();
         round.summary = summary.into();
         round.evidence = evidence.to_vec();
@@ -678,10 +1133,10 @@ fn read(
             })?;
             deactivate(&record.id);
             let runs = coordinator.runtime.integration_runs()?;
-            let criteria = session::progress(coordinator, &saved, &doc, &runs)
-                .map(|(_, evidence)| handoff::criterion_states(&doc, &evidence))
-                .unwrap_or_else(|| handoff::criterion_states(&doc, &[]));
-            super::learning::reflect(coordinator, store, &saved, &doc, &criteria);
+            let criteria = session::progress(coordinator, &saved, doc, &runs)
+                .map(|(_, evidence)| handoff::criterion_states(doc, &evidence))
+                .unwrap_or_else(|| handoff::criterion_states(doc, &[]));
+            super::learning::reflect(coordinator, store, &saved, doc, &criteria);
             Ok(())
         }
         Outcome::Next {
@@ -689,6 +1144,7 @@ fn read(
             evidence,
             assignments,
             titles,
+            items,
         } => {
             if execution.rounds.len() as u32 >= execution.max_rounds {
                 let limit = execution.max_rounds;
@@ -701,39 +1157,77 @@ fn read(
                 deactivate(&record.id);
                 return Ok(());
             }
-            match launch(coordinator, record, &doc, round, &summary, assignments) {
+            if execution.ask_before_rounds {
+                store.update(&record.id, |saved| {
+                    let round = current(saved)?;
+                    if let Some(id) = handled {
+                        round.handled.push(id.into());
+                    }
+                    round.summary = summary.clone();
+                    round.evidence = evidence.clone();
+                    round.next = titles.clone();
+                    round.proposal = Some(items.clone());
+                    saved.error = None;
+                    Ok(())
+                })?;
+                crate::commands::notifications::plan_decision_needed(
+                    &record.id,
+                    &format!("round-{}", round.number),
+                );
+                return Ok(());
+            }
+            match launch(coordinator, record, doc, round, &summary, assignments) {
                 Ok(managed) => {
-                    let number = round.number + 1;
                     store.update(&record.id, |saved| {
                         settle(saved, "next", &summary, &evidence)?;
                         current(saved)?.next = titles.clone();
-                        let execution = saved.execution.as_mut().unwrap();
-                        execution.managed_task_id = Some(managed.clone());
-                        execution.rounds.push(Round {
-                            number,
-                            managed_task_id: managed.clone(),
-                            started_at: now.clone(),
-                            ..Default::default()
-                        });
+                        next_round(saved, &managed, &now);
                         saved.error = None;
                         Ok(())
                     })?;
                     Ok(())
                 }
-                Err(error) => retry(store, record, run, error),
+                Err(error) => retry(store, record, handled, error),
             }
         }
-        Outcome::Retry(reason) => retry(store, record, run, reason),
+        Outcome::Retry(reason) => retry(store, record, handled, reason),
     }
 }
 
-fn retry(store: &Store, record: &PlanRecord, run: &TaskRun, reason: String) -> Result<(), String> {
+fn next_round(saved: &mut PlanRecord, managed: &str, now: &str) {
+    if let Some(execution) = saved.execution.as_mut() {
+        let number = execution.rounds.last().map_or(1, |round| round.number + 1);
+        execution.managed_task_id = Some(managed.into());
+        execution.rounds.push(Round {
+            number,
+            managed_task_id: managed.into(),
+            started_at: now.into(),
+            ..Default::default()
+        });
+    }
+}
+
+/// Reviews the round again with the reason, or holds it after the retries.
+/// Area reviews all run again, since their combined verdict did not stand.
+fn retry(
+    store: &Store,
+    record: &PlanRecord,
+    handled: Option<&str>,
+    reason: String,
+) -> Result<(), String> {
     store.update(&record.id, |saved| {
         let round = current(saved)?;
-        round.handled.push(run.id.clone());
+        if let Some(id) = handled {
+            round.handled.push(id.into());
+        }
         if round.retries < RETRIES {
             round.retries += 1;
             round.note = reason.clone();
+            for area in &mut round.areas {
+                area.verdict.clear();
+                area.assignments.clear();
+                area.note = reason.clone();
+            }
         } else {
             round.held = Some(reason.clone());
         }
@@ -779,15 +1273,100 @@ fn launch(
     })
 }
 
-/// `pause`, `resume` or `stop` a swarm's rounds and its current round's work.
-pub fn action(coordinator: &Coordinator, id: &str, action: &str) -> Result<(), String> {
-    if !["pause", "resume", "stop"].contains(&action) {
-        return Err("Choose pause, resume or stop.".into());
+/// Checks the assignments a person approves, as proposed or edited.
+pub fn approvable(items: &[RoundAssignment]) -> Result<(), String> {
+    if items.is_empty() {
+        return Err("Keep at least one assignment, or stop the swarm.".into());
+    }
+    if items.len() > MAX_NEXT {
+        return Err(format!("Keep at most {MAX_NEXT} assignments for a round."));
+    }
+    let mut keys = HashSet::new();
+    for item in items {
+        if item.key.trim().is_empty()
+            || item.title.trim().is_empty()
+            || item.prompt.trim().is_empty()
+            || item.scopes.iter().all(|scope| scope.trim().is_empty())
+        {
+            return Err(
+                "Each assignment needs a title, instructions and at least one scope.".into(),
+            );
+        }
+        if !keys.insert(item.key.as_str()) {
+            return Err(format!("Two assignments share the key {}.", item.key));
+        }
+    }
+    Ok(())
+}
+
+/// Starts the proposed round, with the person's edits when they made any.
+fn approve(
+    coordinator: &Coordinator,
+    id: &str,
+    edited: Option<Vec<RoundAssignment>>,
+) -> Result<(), String> {
+    let store = session::store(coordinator);
+    let record = store.load(id)?;
+    if !awaiting(&record) {
+        return Err("No swarm round is waiting for approval.".into());
+    }
+    let doc = record.document().ok_or("The plan could not be read.")?;
+    let round = record.execution.as_ref().unwrap().rounds.last().unwrap();
+    let items = match edited {
+        Some(items) => items,
+        None => round.proposal.clone().unwrap_or_default(),
+    };
+    approvable(&items)?;
+    let json = assignments(&doc, round.number + 1, &items)?;
+    let managed = launch(coordinator, &record, &doc, round, &round.summary, json)?;
+    let now = Utc::now().to_rfc3339();
+    store.update(id, |saved| {
+        let round = current(saved)?;
+        round.verdict = "next".into();
+        round.next = titles(&items);
+        round.proposal = None;
+        round.decided_at = Some(now.clone());
+        next_round(saved, &managed, &now);
+        saved.error = None;
+        Ok(())
+    })?;
+    activate(id, false);
+    Ok(())
+}
+
+/// Acts on a swarm's rounds: `pause`, `resume` or `stop` the rounds and the
+/// current round's work; `approve` the proposed next round, with `edited`
+/// assignments in place of the proposal; `ask` or `auto` chooses whether
+/// later rounds wait for approval.
+pub fn action(
+    coordinator: &Coordinator,
+    id: &str,
+    action: &str,
+    edited: Option<Vec<RoundAssignment>>,
+) -> Result<(), String> {
+    if !["pause", "resume", "stop", "approve", "ask", "auto"].contains(&action) {
+        return Err("Choose pause, resume, stop or approve.".into());
+    }
+    if edited.is_some() && action != "approve" {
+        return Err("Edited assignments apply to approve.".into());
+    }
+    if action == "approve" {
+        return approve(coordinator, id, edited);
     }
     let store = session::store(coordinator);
     let record = store.load(id)?;
     if !open(&record) {
         return Err("This plan has no swarm round to change.".into());
+    }
+    if action == "ask" || action == "auto" {
+        // Applies to the next verdict; a proposal already waiting still needs a decision.
+        store.update(id, |saved| {
+            if let Some(execution) = saved.execution.as_mut() {
+                execution.ask_before_rounds = action == "ask";
+            }
+            Ok(())
+        })?;
+        return Ok(());
     }
     let round = record
         .execution
@@ -797,6 +1376,23 @@ pub fn action(coordinator: &Coordinator, id: &str, action: &str) -> Result<(), S
         .last()
         .unwrap()
         .clone();
+    if action == "stop" && round.proposal.is_some() {
+        // Declining the proposal keeps the merged work; Resume reviews the round again.
+        with_state(|state| state.resumed.remove(id));
+        store.update(id, |saved| {
+            let round = current(saved)?;
+            round.proposal = None;
+            round.next.clear();
+            for area in &mut round.areas {
+                area.verdict.clear();
+                area.assignments.clear();
+            }
+            round.held =
+                Some("You stopped the proposed round. Resume to review the round again.".into());
+            Ok(())
+        })?;
+        return Ok(());
+    }
     let delivery = coordinator.plan_delivery(&round.managed_task_id)?;
     if action == "resume" {
         if delivery.applied_at.is_none() && !delivery.dispatching {
@@ -806,6 +1402,9 @@ pub fn action(coordinator: &Coordinator, id: &str, action: &str) -> Result<(), S
             let round = current(saved)?;
             round.held = None;
             round.retries = 0;
+            for area in &mut round.areas {
+                area.retries = 0;
+            }
             saved.error = None;
             Ok(())
         })?;
@@ -816,11 +1415,9 @@ pub fn action(coordinator: &Coordinator, id: &str, action: &str) -> Result<(), S
     coordinator.plan_dispatch(&round.managed_task_id, action)?;
     if action == "stop" {
         let runs = coordinator.runtime.integration_runs()?;
-        if let Some(run) = round
-            .review_run_ids
-            .last()
-            .and_then(|run_id| runs.iter().find(|run| &run.id == run_id))
-            .filter(|run| active(&run.status))
+        for run in runs
+            .iter()
+            .filter(|run| round.review_run_ids.contains(&run.id) && active(&run.status))
         {
             coordinator.runtime.stop(&run.id)?;
         }

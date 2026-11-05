@@ -82,6 +82,7 @@ test('states map to tones with failures distinct from success', () => {
   assert.equal(stateTone('reviewing'), 'accent');
   assert.equal(stateTone('held'), 'danger');
   assert.equal(stateTone('limit'), 'danger');
+  assert.equal(stateTone('approval'), 'danger');
 });
 
 test('plan-started managed tasks do not report a missing planner attempt', () => {
