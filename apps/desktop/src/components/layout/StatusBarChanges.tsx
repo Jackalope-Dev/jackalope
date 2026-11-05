@@ -19,15 +19,22 @@ export function StatusBarChanges({
   useEffect(() => {
     if (!isTauriEnvironment() || !projectPath || !checkout) return;
     let live = true;
+    let reading = false;
     const read = () => {
-      if (document.hidden) return;
+      // A read can outlast the interval on a busy disk; overlapping ones would
+      // stack Git processes that each walk the whole checkout.
+      if (document.hidden || reading) return;
+      reading = true;
       nativeTask<{ files: unknown[] }>('git_working_changes', {
         repoPath: projectPath,
         worktreePath: checkout,
       })
         .then((changes) => live && setCount(changes.files.length))
         // A worktree still being prepared, or removed, simply shows nothing.
-        .catch(() => live && setCount(null));
+        .catch(() => live && setCount(null))
+        .finally(() => {
+          reading = false;
+        });
     };
     read();
     const timer = setInterval(read, 15_000);
