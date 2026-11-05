@@ -574,7 +574,11 @@ Worker bundled with the app to the connected account (bound to the connected nam
 a generated token in protected storage), publishes it on workers.dev, checks it and connects
 it, with per-step progress and retry; it shows Update Swarm Worker when the bundle or namespace
 changes. Connect Cloudflare asks for Workers access only then; API tokens need Workers Scripts:
-Edit. Use an existing Worker still accepts a URL and token. The page opens on a map
+Edit. Use an existing Worker still accepts a URL and token. Disconnecting a Worker that setup
+deployed offers to delete it from Cloudflare as well (on by default, through the Workers
+script delete API with the saved connection); a missing script counts as deleted, and a
+refusal still forgets the Worker and links to it in the dashboard. A Worker entered by hand is
+only forgotten. Artifacts repositories are never touched. The page opens on a map
 of the project's tasks by stage, the files several agents share and their conflicts. Forks are
 deleted when attempts finish; merging is local, and projects that merge automatically push
 the merged branch back to Artifacts. Deploys and one-click setup are not yet accepted against a
@@ -586,8 +590,12 @@ Settings → Cloudflare. Connect Cloudflare signs in through the browser with Ja
 public OAuth client (PKCE, loopback redirect on 127.0.0.1 ports 47851–47853) and lists the
 accounts the person shared, finishing on its own when only one account was shared. Namespace
 (default `jackalope`) and data location sit under one optional disclosure. An API token
-remains an alternative, and its Account ID field accepts a pasted dashboard link. Project
-settings connect inline. Tokens stay in protected
+remains an alternative: Jackalope lists the accounts the token covers and uses the only one
+or asks which, falling back to an Account ID field (which accepts a pasted dashboard link)
+when Cloudflare does not list them. Project settings connect inline. A project folder that is
+a repository without commits offers Create first commit, which shows the file count and
+asks first, commits every non-ignored file as the configured Git identity with the message
+"Initial commit" and no trailers, and refuses until a Git name and email are set. Tokens stay in protected
 native storage, OAuth access refreshes before expiry and disconnecting revokes it. Setup can
 create a new project backed by an Artifacts repository, and Project settings can move an
 existing repository there through a new `artifacts` remote, leaving other remotes and local

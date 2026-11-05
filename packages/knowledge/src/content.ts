@@ -697,8 +697,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Artifacts requires the Workers Paid plan, and Cloudflare bills operations and storage to your account. Open Settings → Cloudflare and fill in Cloudflare Artifacts.',
         ],
         steps: [
-          'Copy your account ID from the Cloudflare dashboard.',
-          'Create an API token with the Account → Artifacts → Edit permission.',
+          'Choose Connect Cloudflare and approve Jackalope in your browser, or choose Use an API token.',
+          'For a token, create one with the Account → Artifacts → Edit permission and paste it. Jackalope finds the account it covers, or asks which one when it covers several.',
           'Choose a namespace for Jackalope repositories, such as jackalope.',
           'Optionally restrict data to the EU or US. This applies only when Jackalope creates the namespace and cannot be changed later.',
           'Choose Connect. Jackalope checks the token with Cloudflare before saving it in your system’s protected storage.',
@@ -709,7 +709,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How do I create a new project on Artifacts or move an existing one?',
         paragraphs: [
           'In project setup, choose Create on Artifacts. Jackalope creates the repository, a local project folder with Git, and pushes the first commit.',
-          'For an existing repository, open Project settings → Cloudflare Artifacts and choose Move to Artifacts. Jackalope creates the repository, adds a remote named artifacts and pushes your branches, tags and notes. Your other remotes stay as they are, and Jackalope task branches stay local.',
+          'For an existing repository, open Project settings → Cloudflare Artifacts and choose Move to Artifacts. Jackalope creates the repository, adds a remote named artifacts and pushes your branches, tags and notes. Your other remotes stay as they are, and Jackalope task branches stay local. A repository without commits offers Create first commit, which commits your files as your Git identity after showing how many there are.',
         ],
         callout: {
           kind: 'note',

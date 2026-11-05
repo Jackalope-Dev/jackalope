@@ -50,6 +50,13 @@ Deploying needs Workers access. Connect Cloudflare asks for the
 the saved sign-in lacks it. An API token needs Account → Workers Scripts → Edit as
 well as Artifacts → Edit.
 
+Disconnecting a Worker that Set up Swarm deployed offers **Also delete the Worker
+from Cloudflare**, on by default. Deleting it removes the script and its Durable
+Object data, so fork tracking stops on every computer using it; Artifacts
+repositories are untouched. If Cloudflare refuses (for example, a token without
+Workers Scripts → Edit), the connection is still forgotten and Settings links to
+the Worker in the dashboard. A Worker entered by hand is only forgotten.
+
 ### Use an existing Worker
 
 To deploy it yourself, set the namespace in `wrangler.jsonc` if yours is not
