@@ -110,6 +110,10 @@ release dates.
 - [ ] Accept automatic delivery end to end in the installed app: a swarm goal on a new
   Artifacts project merges under a committed policy, pushes the branch to Artifacts and
   deploys to a Workers preview, including a failing check that rolls back and pauses merging.
+- [ ] Accept one-click Swarm setup against a live Cloudflare account: Connect Cloudflare with
+  the Workers scope (and its invalid-scope fallback), an API token with Workers Scripts: Edit, an
+  account without a workers.dev subdomain, a first publish, and an in-place update that keeps
+  the token working on a second computer.
 - [ ] Explore agent-native Artifacts workflows: a fork per task attempt instead of a local
   worktree, provenance notes on integrated commits, push-event review and check triggers,
   and opening an existing Artifacts repository as a project. Keep the coordinator,

@@ -559,10 +559,16 @@ Jackalope Swarm (beta) gives each live attempt on an Artifacts-linked project it
 through the person's own Worker (`apps/swarm`). Every 15 seconds the desktop pushes changed
 snapshots as synthetic commits, and the Worker reports files and overlapping edits across
 forks on Project → Swarm, which appears once a swarm Worker is connected. Its Settings card
-appears once Artifacts is connected, or while a Worker is saved. The page opens on a map
+appears once Artifacts is connected, or while a Worker is saved. Set up Swarm deploys the
+Worker bundled with the app to the connected account (bound to the connected namespace, with
+a generated token in protected storage), publishes it on workers.dev, checks it and connects
+it, with per-step progress and retry; it shows Update Swarm Worker when the bundle or namespace
+changes. Connect Cloudflare asks for Workers access only then; API tokens need Workers Scripts:
+Edit. Use an existing Worker still accepts a URL and token. The page opens on a map
 of the project's tasks by stage, the files several agents share and their conflicts. Forks are
 deleted when attempts finish; merging is local, and projects that merge automatically push
-the merged branch back to Artifacts. Deploys are not yet accepted against a live Worker.
+the merged branch back to Artifacts. Deploys and one-click setup are not yet accepted against a
+live Cloudflare account.
 See [the Worker guide](../apps/swarm/README.md).
 
 Cloudflare Artifacts (beta) connects a user's own Cloudflare account and namespace from
