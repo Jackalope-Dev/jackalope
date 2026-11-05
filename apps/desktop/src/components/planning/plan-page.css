@@ -227,6 +227,25 @@
   overflow-wrap: anywhere;
 }
 
+.plan-swarm,
+.plan-shape strong {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.plan-rounds {
+  display: grid;
+  gap: 8px;
+}
+.plan-rows > li.plan-round {
+  align-items: flex-start;
+}
+.plan-rows > li.plan-round > span:first-child {
+  display: grid;
+  gap: 4px;
+}
+
 .plan-compare {
   display: flex;
   flex-wrap: wrap;

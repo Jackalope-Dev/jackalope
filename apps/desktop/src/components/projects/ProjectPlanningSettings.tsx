@@ -1,3 +1,4 @@
+import { Badge } from '@jackalope/ui';
 import { useEffect, useId, useState } from 'react';
 import { useAgentModels } from '../../lib/agent-models';
 import { type PlanSettings, planCommands } from '../../lib/plan-mode';
@@ -9,6 +10,7 @@ import { Input } from '../ui/input';
 import { Select, SelectItem } from '../ui/Select';
 
 const QUESTION_LIMITS = Array.from({ length: 13 }, (_, limit) => limit);
+const ROUND_LIMITS = [1, 2, 3, 5, 8, 12, 20];
 const TASK_AGENT = 'task';
 const AGENT_DEFAULT = 'default';
 
@@ -77,6 +79,30 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
               {limit === 0 ? 'None' : limit === 1 ? '1 question' : `${limit} questions`}
             </SelectItem>
           ))}
+        </Select>
+      </Setting>
+      <Setting
+        title={
+          <span className="inline-flex items-center gap-2">
+            Most swarm rounds <Badge variant="accent">Beta</Badge>
+          </span>
+        }
+        description="A swarm stops for a re-plan when its criteria are still unmet after this many rounds."
+        descriptionId={`${id}-rounds-description`}
+      >
+        <Select
+          aria-label="Most swarm rounds"
+          aria-describedby={`${id}-rounds-description`}
+          value={String(settings.maxRounds ?? 5)}
+          onValueChange={(value) => void save({ ...settings, maxRounds: Number(value) })}
+        >
+          {[...new Set([...ROUND_LIMITS, settings.maxRounds ?? 5])]
+            .sort((a, b) => a - b)
+            .map((limit) => (
+              <SelectItem key={limit} value={String(limit)}>
+                {limit === 1 ? '1 round' : `${limit} rounds`}
+              </SelectItem>
+            ))}
         </Select>
       </Setting>
       <Setting
