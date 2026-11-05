@@ -12,6 +12,7 @@ pre-commit:
       run: node scripts/git-hooks.mjs staged
     - name: staged secrets
       run: node scripts/check-secrets.mjs --staged
+      tags: [secrets]
 
 pre-push:
   piped: true
@@ -24,3 +25,4 @@ pre-push:
     - name: secrets
       run: node scripts/check-secrets.mjs --push "{1}"
       use_stdin: true
+      tags: [secrets]
