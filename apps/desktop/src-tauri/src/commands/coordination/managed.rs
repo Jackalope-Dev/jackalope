@@ -910,6 +910,8 @@ mod tests {
             ledger: ledger.clone(),
             enabled: [dispatch_key("parent")].into(),
             concurrency: 3,
+            remote_concurrency: DEFAULT_REMOTE_CONCURRENCY,
+            remote_projects: HashSet::new(),
             grants: HashMap::new(),
             url: None,
             error: None,

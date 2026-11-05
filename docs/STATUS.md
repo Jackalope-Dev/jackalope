@@ -360,8 +360,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   agent. Composio holds third-party tokens and bills usage to that project. See
   [Connected apps](MCP-DISCOVERY.md#connected-apps-through-composio).
 - Bots can have their own computer: a Linux sandbox in Docker on this device (Docker
-  Desktop, Colima or Docker Engine, detected but never installed) or a cloud machine the
-  person runs and pairs with an HTTPS address and a secret kept in protected storage.
+  Desktop, Colima or Docker Engine, detected but never installed), a cloud machine the
+  person runs and pairs with an HTTPS address and a secret kept in protected storage, or
+  an auto-sleeping machine on the person's own Agent37 account from one saved API key,
+  built from the same image as an Agent37 template.
   Tasks get one only after the person approves `computer_request`. Desktop control acts
   on the computer without an access question, browser tools drive its Chromium for local
   sandboxes with networking on, each site still asks first, and `computer_exec` runs
@@ -374,6 +376,14 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   `/computer` shows and changes one in the terminal. Jackalope-hosted computers are
   listed as coming soon. See
   [bot computers](BOT-COMPUTERS.md).
+- A project can run its Claude Code and Codex task agents on a computer (**Agents run
+  on** in Project settings). The workspace's non-ignored files are uploaded, the agent
+  runs there with a Claude Code token or API key saved for computers, its output feeds
+  the usual parsers and its changes come back as a patch applied to the local workspace
+  before checks, checkpoint, review and integration, which stay on this device. Such
+  agents have their own concurrency limit (8 by default, up to 32) and no Jackalope
+  bridge tools or project connections; planning and other agents stay local. See
+  [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
 - Task and chat Screen views poll the attempt's existing task browser viewport and
   desktop grant state without opening a browser, requesting access or saving an
   artifact. They list recent desktop actions with small after-action captures. People
@@ -606,7 +616,11 @@ Bot computers have unit coverage and an opt-in Docker trial; no image build, con
 viewer or cloud machine has been accepted in an installed app on any platform. Cloud
 machines reach desktop control and commands but not the browser tools, and the
 in-sandbox agent has no accessibility actions. The idle stop, start on demand and quit
-stop are covered by unit tests only.
+stop are covered by unit tests only. Agents on a computer are covered by unit tests, the
+agent's POSIX run tests and the opt-in Docker trial with a stand-in agent; real Claude
+Code or Codex runs there, the template build and instances on a live Agent37 account,
+and gVisor support for the image's desktop are unverified, and Agent37 computers have
+no viewer.
 
 Installed provider, accessibility, recovery, performance, signed installation and
 update acceptance remain platform-specific requirements. Real-model quality and

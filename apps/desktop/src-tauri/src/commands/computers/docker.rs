@@ -22,7 +22,7 @@ use std::{
 
 pub(crate) const LABEL: &str = "dev.jackalope.computer";
 const CONFIG_LABEL: &str = "dev.jackalope.computer.config";
-const IMAGE_FILES: &[&str] = &["Dockerfile", "start.sh", "agent.py"];
+pub(crate) const IMAGE_FILES: &[&str] = &["Dockerfile", "start.sh", "agent.py"];
 const QUICK: Duration = Duration::from_secs(20);
 
 fn docker(args: &[&str]) -> Command {

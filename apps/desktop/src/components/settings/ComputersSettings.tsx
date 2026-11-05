@@ -19,6 +19,8 @@ import {
   testCloudMachine,
 } from '../../lib/computers';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { Agent37Settings } from '../computers/Agent37Connect';
+import { AgentSignIns } from '../computers/AgentSignIns';
 import { IdleStopSelect } from '../computers/IdleStopSelect';
 import { PairMachineForm } from '../computers/PairMachineForm';
 import { Button } from '../ui/button';
@@ -225,11 +227,19 @@ export function ComputersSettings() {
         />
       </SettingGroup>
 
-      <SettingGroup title="Computers" description="Every bot and task computer on this device.">
+      <Agent37Settings />
+
+      <AgentSignIns />
+
+      <SettingGroup
+        title="Computers"
+        description="Every bot, project and task computer on this device."
+      >
         {computers.length === 0 && (
           <SettingBody>
             <p className="settings-section-subtitle">
-              No computers yet. Give a bot one in its settings under Computer.
+              No computers yet. Give a bot one in its settings, or choose where a project's agents
+              run in Project settings.
             </p>
           </SettingBody>
         )}
@@ -247,7 +257,11 @@ export function ComputersSettings() {
             description={[
               computerUsage(computer),
               providerLabel(computer.provider),
-              computer.ownerKind === 'bot' ? 'Bot' : 'Task',
+              computer.ownerKind === 'bot'
+                ? 'Bot'
+                : computer.ownerKind === 'project'
+                  ? 'Project agents'
+                  : 'Task',
               computer.error,
             ]
               .filter(Boolean)
@@ -277,7 +291,7 @@ export function ComputersSettings() {
                 title={`Delete ${computer.name}?`}
                 description={
                   computer.provider === 'remote-machine'
-                    ? 'The bot stops using this machine. Nothing on the machine is deleted.'
+                    ? 'Jackalope stops using this machine. Nothing on the machine is deleted.'
                     : 'Its desktop, files and browser sign-ins are removed. This cannot be undone.'
                 }
                 label="Delete computer"

@@ -251,6 +251,8 @@ impl Coordinator {
         self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
+        inner.remote_projects =
+            crate::commands::computers::runs::run_projects(&self.runtime.computers_root());
         let _guard = crate::commands::integration::execution_guard()?;
         self.runtime.ensure_history_saved()?;
         let merged = crate::commands::integration::applied_run_ids(&self.runtime)?;
