@@ -78,6 +78,7 @@ const sharedChecks = [
   [process.execPath, ['--test', 'scripts/change-scope.test.mjs']],
   [process.execPath, [pnpm, 'check:docs']],
   [process.execPath, [pnpm, 'check:tokens']],
+  [process.execPath, [pnpm, 'check:swarm-bundle']],
   [process.execPath, [pnpm, 'check:changelog']],
   [process.execPath, [pnpm, 'test:release']],
   [process.execPath, [pnpm, 'ui:build']],

@@ -10,7 +10,8 @@ export { Swarm };
  * against the attempt's starting commit and compared with every other active
  * fork, so overlapping edits surface while agents are still working.
  *
- * Routes (all require `Authorization: Bearer <SWARM_TOKEN>`):
+ * `/health` is public and reports the bundle version Jackalope deployed, if any.
+ * Other routes require `Authorization: Bearer <SWARM_TOKEN>`:
  *   GET    /v1/swarms/:repo                         live state
  *   GET    /v1/swarms/:repo/live                    WebSocket of state changes
  *   POST   /v1/swarms/:repo/forks                   fork for a new attempt
@@ -38,7 +39,7 @@ const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname === '/health') return json({ ok: true });
+    if (url.pathname === '/health') return json({ ok: true, version: env.SWARM_VERSION ?? null });
     if (!(await authorized(request, env.SWARM_TOKEN)))
       return json({ error: 'Send the swarm token as a bearer token.' }, 401);
     const match =

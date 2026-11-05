@@ -1,0 +1,22 @@
+{
+  "version": "300faedf7e1152f1",
+  "script": "jackalope-swarm",
+  "mainModule": "worker.js",
+  "compatibilityDate": "2026-09-28",
+  "compatibilityFlags": [],
+  "artifactsBinding": "ARTIFACTS",
+  "durableObjects": [
+    {
+      "name": "SWARM",
+      "className": "Swarm"
+    }
+  ],
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "Swarm"
+      ]
+    }
+  ]
+}
