@@ -532,6 +532,14 @@ export function OnboardingFlow({
                     <AgentInstallCatalog
                       agents={installableAgents}
                       first={!detectedAgents.length && !execution.discovering}
+                      onInstalled={
+                        desktop
+                          ? async (id) => {
+                              await execution.discover();
+                              if (available(id)) setAgent(id);
+                            }
+                          : undefined
+                      }
                     />
                   </>
                 );

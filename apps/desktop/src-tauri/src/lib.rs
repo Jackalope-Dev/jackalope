@@ -586,6 +586,8 @@ pub fn run(launch: Launch) {
             agent_profile_sign_in_input,
             agent_profile_sign_in_resize,
             agent_profile_sign_in_stop,
+            commands::agent_install::agent_install_plan,
+            commands::agent_install::agent_install,
             agent_profile_status,
             commands::local_detection::system_detect_local_llms,
             commands::local_detection::system_detect_env_keys,

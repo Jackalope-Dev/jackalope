@@ -37,6 +37,7 @@ pub mod worktree_usage;
 pub mod agent_models;
 pub mod agent_policy;
 pub mod agent_profiles;
+pub mod agent_install;
 pub mod agent_sign_in;
 pub mod decision_trail;
 pub mod decisions;

@@ -172,6 +172,26 @@ fn spawn_session(
 ) -> Result<Arc<Mutex<Session>>, String> {
     let lease = Lease::acquire(binding.directory.clone())?;
     let runner_lease = super::managed_runtime::acquire(&executable)?;
+    let command = login_command(&binding, &executable)?;
+    spawn_terminal(
+        command,
+        Some(lease),
+        runner_lease,
+        cols,
+        rows,
+        "Could not start sign-in. Check this agent's installation and try again.",
+    )
+}
+
+/// Runs `command` in an owned terminal whose output the poll command streams.
+fn spawn_terminal(
+    command: CommandBuilder,
+    lease: Option<Lease>,
+    runner_lease: Option<super::managed_runtime::UseGuard>,
+    cols: u16,
+    rows: u16,
+    start_error: &str,
+) -> Result<Arc<Mutex<Session>>, String> {
     let pair = native_pty_system()
         .openpty(size(cols, rows))
         .map_err(|_| "Could not open the sign-in terminal.")?;
@@ -185,8 +205,8 @@ fn spawn_session(
         .map_err(|_| "Could not write to the sign-in terminal.")?;
     let mut child = pair
         .slave
-        .spawn_command(login_command(&binding, &executable)?)
-        .map_err(|_| "Could not start sign-in. Check this agent's installation and try again.")?;
+        .spawn_command(command)
+        .map_err(|_| start_error.to_string())?;
     drop(pair.slave);
     let tree = match child
         .process_id()
@@ -208,7 +228,7 @@ fn spawn_session(
             tree: None,
         }),
         tree: Some(tree),
-        lease: Some(lease),
+        lease,
         runner_lease,
         state: "running",
         exit_code: None,
@@ -318,6 +338,16 @@ fn start_sign_in(
     let executable = super::tasks::executable(&agent)?;
     std::fs::create_dir_all(&binding.directory)
         .map_err(|_| "Could not prepare this account's sign-in folder.")?;
+    register(&service, || {
+        spawn_session(binding, executable, cols.unwrap_or(80), rows.unwrap_or(16))
+    })
+}
+
+/// Adds a session that the poll, input, resize and stop commands serve.
+fn register(
+    service: &SignInService,
+    spawn: impl FnOnce() -> Result<Arc<Mutex<Session>>, String>,
+) -> Result<String, String> {
     let mut sessions = service.0.lock().map_err(|_| "Sign-in state unavailable")?;
     sessions.retain(|_, session| {
         session
@@ -325,12 +355,25 @@ fn start_sign_in(
             .is_ok_and(|s| s.touched.elapsed() < SESSION_LIMIT)
     });
     if sessions.len() >= 4 {
-        return Err("Close another sign-in panel before opening a new one.".into());
+        return Err("Close another sign-in or install panel before opening a new one.".into());
     }
-    let session = spawn_session(binding, executable, cols.unwrap_or(80), rows.unwrap_or(16))?;
+    let session = spawn()?;
     let session_id = uuid::Uuid::new_v4().to_string();
     sessions.insert(session_id.clone(), session);
     Ok(session_id)
+}
+
+/// Runs a command, such as an agent install, in a terminal served like a sign-in.
+pub(super) fn start_terminal(
+    service: &SignInService,
+    command: CommandBuilder,
+    cols: u16,
+    rows: u16,
+    start_error: &str,
+) -> Result<String, String> {
+    register(service, || {
+        spawn_terminal(command, None, None, cols, rows, start_error)
+    })
 }
 
 #[tauri::command]
