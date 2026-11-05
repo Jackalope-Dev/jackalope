@@ -602,9 +602,20 @@ pub(crate) fn ready_within(root: &Path, computer: &Computer, wait: Duration) -> 
 
 // ---- runs ----
 
-/// A run's computer: its bot's, or the one the person approved for its task.
+/// A run's computer: the one its agent runs on, its bot's, or the one the
+/// person approved for its task. An agent on a computer acts on that same
+/// machine, so its desktop and browser are where its files and servers are.
 pub(crate) fn for_run(runtime: &TaskRuntime, run: &TaskRun) -> Option<Computer> {
     let root = runtime.computers_root();
+    if let Some(remote) = run.remote.as_ref() {
+        if let Some(computer) = list(&root)
+            .unwrap_or_default()
+            .into_iter()
+            .find(|computer| computer.id == remote.computer_id)
+        {
+            return Some(computer);
+        }
+    }
     if let Some(hub) = super::bot_hub::installed() {
         if let Ok((bot, _)) = hub.caller(run) {
             return find(&root, BOT, &bot.id);

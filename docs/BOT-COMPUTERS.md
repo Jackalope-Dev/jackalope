@@ -19,7 +19,8 @@ Project settings under **Agents run on**; its task agents then run there (see
 computer, paired cloud machine, the Agent37 connection, agent sign-ins for computers and
 Docker's readiness.
 
-When a run belongs to a bot with a computer, or to a task that was given one:
+When a run's agent runs on a computer (see [agents on a computer](#agents-on-a-computer)),
+belongs to a bot with a computer, or belongs to a task that was given one, in that order:
 
 - `desktop_control` acts on the computer's whole screen. `request_access` answers
   `active` at once with no question, indicator or desktop lease, because the computer is
@@ -28,7 +29,7 @@ When a run belongs to a bot with a computer, or to a task that was given one:
   desktop. `select` is unavailable; `invoke` and element `focus` click the element.
 - Browser tools drive the computer's Chromium through its DevTools endpoint when the
   computer is a local sandbox with networking on. Otherwise they keep the task's own
-  local browser.
+  local browser, except for an agent running on the computer, which then has none.
 - Every website the agent reaches in the computer, through either tool, asks the person
   once per task: allow for this task, always allow, decline, or never allow. Saved
   decisions use the bot's key (`bot:<id>`, shared with the bot's browser profile) or the
@@ -169,9 +170,9 @@ tools stay on the task's local browser for cloud machines; `desktop_control` and
 
 Running a project's agents on a computer, Agent37 computers and agent sign-ins for
 computers are beta and marked **Beta** wherever the app shows them. A project whose
-**Agents run on** names a computer runs its Claude Code and Codex task agents there.
-Other agents and planning sessions run on this device and say so in the attempt's
-activity. Workspace preparation, checks, the checkpoint, review and integration stay on
+**Agents run on** names a computer runs its Claude Code and Codex task agents there,
+including read-only planning attempts (plan mode's planner and a swarm round's
+orchestrator). Other agents run on this device and say so in the attempt's activity. Workspace preparation, checks, the checkpoint, review and integration stay on
 this device and are unchanged, so the coordinator, execution guard and runtime lock
 order, reservations and Git safeguards apply as for a local attempt:
 
@@ -228,12 +229,39 @@ bridge with the attempt's real credential on its own thread, so a long call such
 each; a call unanswered for 40 minutes gets a timeout. The bridge credential never
 leaves this device, and requests carrying an `Origin` header are refused. Peers,
 messages, questions, `propose_subtask`, plan deviations, agreements, validation steps,
-decisions and Jev questions work as for a local agent. Tools that act on this device or
-its copy of the workspace (the browser tools, `desktop_control`, `computer_verify`,
-`verification_output`, `read_context` and `peer_adopt`) are left out of the tool list,
-refused when called, and named as unavailable in the agent's instructions; the saved
-check still runs locally after the changes come back. Project connections are not
-delivered to agents on a computer. A computer whose agent predates the relay (a cloud
+decisions and Jev questions work as for a local agent. `desktop_control`, `computer_exec`
+and `computer_request` act on the computer the agent runs on, as for a bot's computer,
+with the same per-site questions saved under the project. The browser tools drive that
+computer's Chromium when it is a local sandbox with networking on, so a server the agent
+starts there is reachable at `localhost`; on a cloud machine or an Agent37 computer they
+are unavailable, because no DevTools endpoint reaches this device and the task's local
+browser would be the wrong machine. Tools that are unavailable are left out of the tool
+list, refused when called, and named in the agent's instructions:
+
+| Tool | On a computer |
+| --- | --- |
+| `desktop_control`, `computer_exec`, `computer_request` | Act on the agent's computer |
+| Browser tools | The computer's Chromium on a local sandbox with networking; otherwise unavailable |
+| `browser_open_profile` | Unavailable: persistent profiles hold this device's sign-ins |
+| `computer_verify`, `verification_output`, `read_context` | Read-only attempts only; otherwise unavailable |
+| `peer_adopt` | Unavailable |
+
+`computer_verify`, `verification_output` and `read_context` work on this device's copy
+of the workspace. A writing agent changes its own copy on the computer, so that copy
+would be stale; the saved check runs locally after the changes come back instead. A
+read-only attempt changes nothing, so this device's copy is what it reads, and a swarm
+orchestrator can run the plan's check. `peer_adopt` applies another attempt's changes to
+this device's copy while the agent edits the computer's, which would break the single
+writer of each workspace and be overwritten or conflict when the agent's patch comes
+back. Project connections are not delivered to agents on a computer.
+
+A read-only attempt runs with the same read-only CLI settings as locally (Claude Code
+without edit tools and without its permission prompt, so tools needing approval are
+refused; Codex with `sandbox_mode="read-only"`). It uploads to a run folder of its own
+(`~/.jackalope-runs/r<hash>`), so it never shares one with a writing attempt of the same
+workspace, and nothing comes back from it: if it changed files on the computer anyway,
+the attempt reports how many and they are discarded with its run folder. A read-only
+run left behind by lost contact is discarded the same way when planning continues. A computer whose agent predates the relay (a cloud
 machine on an old image) runs the agent without the bridge and says so.
 
 Agents on project computers have their own concurrency limit (8 by default, up to 32),
@@ -344,8 +372,9 @@ exclusion from the container configuration, idle decisions and status text, view
 holds and the quit preference. `cargo test … --lib computers::runs computers::relay
 tasks::remote` covers command translation with and without the bridge relay,
 credentials, the workspace archive with copied setup files, chunked upload and patch
-checks, line splitting, patch application, and the relay's refusals, tool-list filtering
-and forwarding with the attempt's credential; `coordination::eligibility` covers the
+checks, line splitting, patch application, the read-only run name, and the relay's
+refusals, tool-list filtering by the computer's browser and read-only access, and
+forwarding with the attempt's credential; `coordination::eligibility` covers the
 separate concurrency for computer projects; `computers::agent37` covers keys, instance
 creation bodies, states, errors and the template build context.
 `python3 apps/desktop/scripts/computer-agent.test.py` (POSIX, for example in WSL) covers

@@ -9,6 +9,11 @@
 //! calls the agent makes on the computer come back with each read and are
 //! forwarded to this device's bridge by [`runs::Session`]'s caller through
 //! [`relay::Relay`].
+//!
+//! Read-only attempts (a plan-mode planner, a swarm round's orchestrator) run
+//! there too. They upload to a run folder of their own and bring nothing back:
+//! changes they make on the computer anyway are reported and discarded, so this
+//! device's copy stays identical to what they read.
 
 use super::*;
 use crate::commands::computers::{self, credentials, relay, runs, Computer};
@@ -38,16 +43,13 @@ impl TaskRuntime {
     }
 
     /// The computer this attempt's agent runs on, or `None` to run it here.
-    /// Planning stays on this device.
+    /// Read-only planning attempts follow the project like any other.
     pub(super) fn remote_target(
         &self,
         id: &str,
         req: &RunRequest,
         adapter: &str,
     ) -> Option<Computer> {
-        if crate::commands::planning::read_only(id) {
-            return None;
-        }
         let computer = runs::project_computer(&self.computers_root(), &req.project_id)?;
         if !credentials::REMOTE_ADAPTERS.contains(&adapter) {
             self.update(id, |run| {
@@ -92,6 +94,7 @@ impl TaskRuntime {
     ) -> Result<(), String> {
         let root = self.computers_root();
         let bridge = req.coordination.as_ref();
+        let read_only = crate::commands::planning::read_only(id);
         // Checks the sign-in before waiting for the computer.
         runs::translate(adapter, &cmd, &root, bridge.map(|b| b.endpoint.as_str()))?;
         {
@@ -122,16 +125,27 @@ impl TaskRuntime {
         computers::ready_within(&root, &computer, START_WAIT)?;
         computers::usage::note(&root, &computer.id);
         let mut session = runs::Session::open(&root, &computer, workspace)?;
+        if read_only {
+            session.name = runs::read_only_run_name(workspace);
+        }
         // An agent from before the relay answers no status and gets no bridge.
         let status = session.status()?;
         if let Some(status) = status.as_ref().filter(|status| status["exists"] == true) {
-            self.recover_remote(id, &mut session, status, workspace, &computer);
+            self.recover_remote(id, &mut session, status, workspace, &computer, read_only);
         }
         let relayed = bridge.filter(|_| status.is_some());
         let (argv, env) =
             runs::translate(adapter, &cmd, &root, relayed.map(|b| b.endpoint.as_str()))?;
+        // Desktop control and the browser tools act on the computer itself.
+        let access = relay::Access {
+            browser: computers::provider(&computer.provider)
+                .ok()
+                .and_then(|provider| provider.devtools(&root, &computer))
+                .is_some(),
+            read_only,
+        };
         if relayed.is_some() {
-            input.push_str(relay::INSTRUCTIONS);
+            input.push_str(&access.instructions());
         } else if bridge.is_some() {
             input.push_str("\nJackalope's tools are not available on this computer, whose image predates them. Ignore instructions that mention them.\n");
         }
@@ -163,8 +177,18 @@ impl TaskRuntime {
                 r,
                 &if relayed.is_some() {
                     format!(
-                        "The agent runs on {} (beta). Browser and desktop control stay on this device, so they are not available to it.",
-                        computer.name
+                        "The agent runs on {} (beta). {}{}",
+                        computer.name,
+                        if access.browser {
+                            "Desktop control and the browser tools act on that computer."
+                        } else {
+                            "Desktop control acts on that computer; the browser tools are not available there."
+                        },
+                        if read_only {
+                            " The attempt is read-only, so nothing comes back from it."
+                        } else {
+                            ""
+                        }
                     )
                 } else {
                     format!(
@@ -174,7 +198,7 @@ impl TaskRuntime {
                 },
             );
         })?;
-        let mut relay = relayed.map(|b| relay::Relay::new(&b.endpoint, &b.token));
+        let mut relay = relayed.map(|b| relay::Relay::new(&b.endpoint, &b.token, access));
         let followed = match immediate {
             Some(exit) => Followed {
                 exit: Some(exit),
@@ -210,7 +234,10 @@ impl TaskRuntime {
             }),
             _ => {}
         }
-        if !followed.lost {
+        if !followed.lost && read_only {
+            self.refuse_changes(id, &mut session, &computer);
+            session.remove();
+        } else if !followed.lost {
             self.remote_progress(
                 id,
                 &format!("Bringing changes back from {}", computer.name),
@@ -295,9 +322,28 @@ impl TaskRuntime {
         true
     }
 
+    /// A read-only attempt applies nothing to the workspace. Changes it made
+    /// on the computer anyway are reported, then removed with its run.
+    fn refuse_changes(&self, id: &str, session: &mut runs::Session, computer: &Computer) {
+        let files = session.collect().map_or(0, |patch| patch_files(&patch));
+        if files > 0 {
+            self.update(id, |run| {
+                activity(
+                    run,
+                    &format!(
+                        "This read-only attempt changed {files} file{} on {}. They were discarded, not brought back.",
+                        if files == 1 { "" } else { "s" },
+                        computer.name
+                    ),
+                )
+            });
+        }
+    }
+
     /// Brings back what an earlier run of this workspace left on the computer,
     /// for example after Jackalope lost contact or restarted, before the
-    /// workspace is uploaded again over it.
+    /// workspace is uploaded again over it. An earlier read-only run brings
+    /// nothing back.
     fn recover_remote(
         &self,
         id: &str,
@@ -305,6 +351,7 @@ impl TaskRuntime {
         status: &serde_json::Value,
         workspace: &str,
         computer: &Computer,
+        read_only: bool,
     ) {
         if status["started"] == true && status["exit"].is_null() {
             let _ = session.stop();
@@ -321,7 +368,10 @@ impl TaskRuntime {
                 }
             }
         }
-        if status["started"] != true || self.bring_back(id, session, workspace, computer, true) {
+        if status["started"] != true
+            || read_only
+            || self.bring_back(id, session, workspace, computer, true)
+        {
             session.remove();
         }
     }
