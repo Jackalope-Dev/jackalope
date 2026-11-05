@@ -105,8 +105,12 @@ An existing `core.hooksPath` requires manual integration instead of being overwr
 
 Pre-commit checks staged whitespace and runs Biome on staged JavaScript, TypeScript,
 JSON, CSS and GraphQL content. It reads the index, preserves partial staging, and
-does not format, stage or stash files. This gate is intended to take seconds.
-Pre-push runs `pnpm verify --changed` followed by `pnpm check:secrets`. `--changed`
+does not format, stage or stash files, then scans the staged changes for secrets. This
+gate is intended to take seconds.
+Pre-push runs `pnpm verify --changed`, then scans only the commits being pushed that the
+remote does not have, plus the working files, for secrets. A secret on another local
+branch is caught when that branch is pushed, so it does not block unrelated pushes.
+`pnpm check:secrets` and CI scan every commit on every ref. `--changed`
 compares the commits being pushed with their upstream (or `origin/master`): native
 formatting and Rust tests run only when files the native build reads changed
 (`apps/desktop/src-tauri/**`, its icons, the files it embeds, the vendored GLib patch,
