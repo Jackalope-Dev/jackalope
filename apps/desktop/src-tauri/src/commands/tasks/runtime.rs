@@ -708,10 +708,25 @@ impl TaskRuntime {
         if !EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
             return Err(unimplemented_adapter(&adapter));
         }
+        // An agent on a project computer cannot reach this device's bridge or
+        // its connections, so its command is built without them.
+        let remote = self.remote_target(id, req, &adapter);
+        let original = req;
+        let remote_request;
+        let req = if remote.is_some() {
+            remote_request = RunRequest {
+                coordination: None,
+                connection_ids: Some(Vec::new()),
+                ..req.clone()
+            };
+            &remote_request
+        } else {
+            req
+        };
         let runner_lease = crate::commands::managed_runtime::acquire(&executable)?;
         let claude =
             (adapter == "claude").then(|| super::claude_session::settings(self, &req.project_id));
-        let persistent = claude.is_some_and(|settings| settings.persistent);
+        let persistent = claude.is_some_and(|settings| settings.persistent) && remote.is_none();
         let mut cmd = command(executable);
         let mut opencode_connection = None;
         if let Some(binding) = &req.account_binding {
@@ -1138,6 +1153,10 @@ impl TaskRuntime {
             std::fs::write(self.directory.join(format!("{id}.input")), &input)
                 .map_err(|e| e.to_string())?;
         }
+        if let Some(computer) = remote {
+            drop(runner_lease);
+            return self.run_remote(id, original, &adapter, cmd, input, &workspace, computer);
+        }
         if persistent {
             let outcome = self.run_claude_session(super::claude_session::Launch {
                 id,
@@ -1448,7 +1467,7 @@ impl TaskRuntime {
     }
 
     /// Checks, checkpoints and records the outcome of an agent turn that has ended.
-    fn complete_attempt(
+    pub(super) fn complete_attempt(
         &self,
         id: &str,
         req: &RunRequest,
@@ -2126,6 +2145,7 @@ impl TaskRuntime {
                 account_binding: Some(binding),
                 target_branch: request.target_branch.clone(),
                 process_contained: false,
+                remote: None,
                 verify_command: request.verify_command.clone(),
                 prepare_command: request.prepare_command.clone(),
                 setup_files: request.setup_files.clone(),

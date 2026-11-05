@@ -362,6 +362,8 @@ pub fn run(launch: Launch) {
             commands::computers::computer_machine_add,
             commands::computers::computer_machine_test,
             commands::computers::computer_machine_remove,
+            commands::computers::computer_agent_credentials,
+            commands::computers::computer_set_agent_credential,
             commands::browser_profiles::browser_profile_open,
             commands::browser_profiles::browser_profile_close,
             commands::browser_profiles::browser_profile_clear_site,

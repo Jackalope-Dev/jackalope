@@ -500,6 +500,58 @@ fn local_docker_computer_round_trip() {
             "hi",
             "the home volume persists"
         );
+        // An agent run: upload a workspace, run a stand-in agent, bring its changes back.
+        let workspace = root.join("workspace");
+        std::fs::create_dir_all(&workspace).map_err(|e| e.to_string())?;
+        std::fs::write(workspace.join("a.txt"), "one\n").map_err(|e| e.to_string())?;
+        let mut session = runs::Session::open(&root, &computer, &workspace.to_string_lossy())?;
+        session.upload(&workspace, &|_, _| {})?;
+        for tool in ["git", "node", "claude", "codex"] {
+            let found = call(
+                &root,
+                &computer,
+                json!({"action":"exec","command":format!("command -v {tool}")}),
+                Duration::from_secs(30),
+                &canceled,
+            )?;
+            assert_eq!(found["exitCode"], 0, "{tool} is installed");
+        }
+        let script = "read line; echo \"{\\\"type\\\":\\\"echo\\\",\\\"text\\\":\\\"$line\\\"}\"; echo two > a.txt; echo new > b.txt; echo done >&2";
+        assert!(session
+            .start(
+                &["bash".into(), "-c".into(), script.into()],
+                &[("EXAMPLE".into(), "1".into())],
+                "hello\n",
+            )?
+            .is_none());
+        let (mut out, mut err) = (0, 0);
+        let (mut stdout, mut stderr) = (Vec::new(), Vec::new());
+        let exit = loop {
+            let page = session.read(&mut out, &mut err)?;
+            stdout.extend(page.stdout);
+            stderr.extend(page.stderr);
+            if let Some(exit) = page.exit {
+                break exit;
+            }
+        };
+        assert_eq!(exit["code"], 0);
+        assert_eq!(
+            String::from_utf8_lossy(&stdout),
+            "{\"type\":\"echo\",\"text\":\"hello\"}\n"
+        );
+        assert_eq!(String::from_utf8_lossy(&stderr), "done\n");
+        let patch = session.collect()?;
+        runs::apply(&workspace, &patch)?;
+        assert_eq!(
+            std::fs::read_to_string(workspace.join("a.txt")).unwrap(),
+            "two\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(workspace.join("b.txt")).unwrap(),
+            "new\n"
+        );
+        session.remove();
+        session.shutdown();
         Ok(())
     })();
     disconnect(&computer.id);

@@ -23,6 +23,14 @@ pub struct UsageObservation {
     pub output: u64,
 }
 
+/// Where an attempt's agent ran when a project computer ran it.
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteExecution {
+    pub computer_id: String,
+    pub computer_name: String,
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskRun {
@@ -90,6 +98,9 @@ pub struct TaskRun {
     pub target_branch: Option<String>,
     #[serde(default)]
     pub process_contained: bool,
+    /// The computer the agent ran on, when it did not run on this device.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remote: Option<RemoteExecution>,
     #[serde(default)]
     pub verify_command: Option<String>,
     #[serde(default)]
@@ -338,6 +349,7 @@ impl TaskRun {
             account_binding: self.account_binding.clone(),
             target_branch: self.target_branch.clone(),
             process_contained: self.process_contained.clone(),
+            remote: self.remote.clone(),
             verify_command: self.verify_command.clone(),
             prepare_command: self.prepare_command.clone(),
             setup_files: self.setup_files.clone(),

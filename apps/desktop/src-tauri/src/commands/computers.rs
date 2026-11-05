@@ -1,8 +1,9 @@
 //! Bot computers: a persistent machine an agent controls instead of the
 //! person's own desktop.
 //!
-//! A computer belongs to a bot (`owner_kind` `bot`) or, after the person
-//! approves an agent's `computer_request`, to one task (`task`). Providers
+//! A computer belongs to a bot (`owner_kind` `bot`), after the person
+//! approves an agent's `computer_request`, to one task (`task`), or to a
+//! project whose task agents run on it (`project`, see [`runs`]). Providers
 //! implement [`Provider`]: `local-docker` runs a Linux sandbox from the image in
 //! `resources/computer`, `remote-machine` reaches the same in-sandbox agent on a
 //! machine the person runs, over HTTPS with a pairing secret, and
@@ -16,8 +17,10 @@
 //! journals or the renderer except as a viewer URL fragment.
 
 mod browser;
+pub(crate) mod credentials;
 pub(crate) mod docker;
 pub(crate) mod remote;
+pub(crate) mod runs;
 #[cfg(test)]
 mod tests;
 pub(crate) mod usage;
@@ -47,6 +50,7 @@ pub(crate) const HOSTED: &str = "jackalope-hosted";
 const HOSTED_AVAILABLE: bool = false;
 const BOT: &str = "bot";
 const TASK: &str = "task";
+pub(crate) const PROJECT: &str = "project";
 
 static RESOURCES: OnceLock<PathBuf> = OnceLock::new();
 
@@ -217,8 +221,8 @@ pub(crate) fn configure(
     settings: ComputerSettings,
     decisions: &str,
 ) -> Result<Computer, String> {
-    if ![BOT, TASK].contains(&kind) || owner.trim().is_empty() || owner.len() > 200 {
-        return Err("Choose a bot or task computer.".into());
+    if ![BOT, TASK, PROJECT].contains(&kind) || owner.trim().is_empty() || owner.len() > 200 {
+        return Err("Choose a bot, task or project computer.".into());
     }
     settings.validate()?;
     match provider {
@@ -549,7 +553,7 @@ pub(crate) fn ready(root: &Path, computer: &Computer) -> Result<(), String> {
     ready_within(root, computer, START_WAIT)
 }
 
-fn ready_within(root: &Path, computer: &Computer, wait: Duration) -> Result<(), String> {
+pub(crate) fn ready_within(root: &Path, computer: &Computer, wait: Duration) -> Result<(), String> {
     usage::note(root, &computer.id);
     let provider = provider(&computer.provider)?;
     let deadline = Instant::now() + wait;
@@ -958,20 +962,30 @@ pub async fn computer_configure(
     settings: ComputerSettings,
     state: tauri::State<'_, TaskRuntime>,
 ) -> Result<ComputerStatus, String> {
-    if owner_kind != BOT {
-        return Err("Only bots get a computer from settings; tasks ask for one.".into());
+    if owner_kind != BOT && owner_kind != PROJECT {
+        return Err(
+            "Only bots and projects get a computer from settings; tasks ask for one.".into(),
+        );
     }
     let root = state.computers_root();
     blocking(move || {
+        let (name, decisions) = if owner_kind == PROJECT {
+            (format!("{} agents", owner_name.trim()), owner_id.clone())
+        } else {
+            (
+                format!("{} computer", owner_name.trim()),
+                format!("bot:{owner_id}"),
+            )
+        };
         let computer = configure(
             &root,
-            BOT,
+            &owner_kind,
             &owner_id,
-            &format!("{} computer", owner_name.trim()),
+            &name,
             &provider,
             machine_id,
             settings,
-            &format!("bot:{owner_id}"),
+            &decisions,
         )?;
         Ok(status(&root, computer))
     })
@@ -1202,6 +1216,31 @@ pub async fn computer_machine_remove(
 ) -> Result<(), String> {
     let root = state.computers_root();
     blocking(move || remote::remove(&root, &id)).await
+}
+
+/// Which agent sign-ins for computers are saved; values never leave native storage.
+#[tauri::command]
+pub async fn computer_agent_credentials(
+    state: tauri::State<'_, TaskRuntime>,
+) -> Result<Vec<credentials::CredentialStatus>, String> {
+    let root = state.computers_root();
+    blocking(move || credentials::status(&root)).await
+}
+
+/// Saves an agent sign-in for computers, or removes it when `value` is empty.
+#[tauri::command]
+pub async fn computer_set_agent_credential(
+    id: String,
+    value: Option<String>,
+    state: tauri::State<'_, TaskRuntime>,
+) -> Result<Vec<credentials::CredentialStatus>, String> {
+    let root = state.computers_root();
+    blocking(move || {
+        let value = value.filter(|value| !value.trim().is_empty());
+        credentials::set(&root, &id, value.as_deref())?;
+        credentials::status(&root)
+    })
+    .await
 }
 
 type BridgeError = (axum::http::StatusCode, axum::Json<Value>);
