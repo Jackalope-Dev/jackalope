@@ -103,7 +103,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Project setup asks for the project, its agents and an optional first task;
   decisions, Git behavior and appearance start from defaults edited in Project settings.
   When no agent is detected, the agents step offers API-key and local-server
-  connections through the private runner, applied app-wide. Background command detection fills unset preferences without running
+  connections through the private runner, applied app-wide. It re-scans agents when the
+  window regains focus, signs a signed-out account in through the in-app sign-in, and
+  offers an environment API key for an installed agent without a working account; the key
+  is imported only when chosen. Background command detection fills unset preferences without running
   commands or replacing explicit choices; inspection failure does not block setup.
 - Work combines a new-conversation composer and the project-scoped work list,
   with remembered filters, compact capture and keyboard row navigation. Work rows show
@@ -300,13 +303,21 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   the same plan document. Revisions, section diffs, direct edits, Save to repo (never
   committed), exact-revision approval, single/subtasks/swarm hand-off through managed
   tasks, an independent plan review, deviation decisions and re-planning are
-  implemented; see [plan mode](PLAN-MODE.md). Approval verifies with the project's check,
+  implemented; see [plan mode](PLAN-MODE.md). A swarm (beta) runs in rounds: after each
+  round merges, a read-only orchestrator reviews the integrated tree against the
+  criteria with the project's check and either declares the plan done or queues the
+  next round (up to 24 assignments where the project's agents have slots), within a
+  round limit (default 5), pause/stop and restart recovery. A plan can ask before each
+  next round (approve, edit or stop the proposal in the app; approve from the terminal),
+  and up to 4 orchestrators can review a large plan's areas in parallel with a merged
+  verdict. It no longer needs a swarm Worker. Approval verifies with the project's check,
   else the plan's command and test criteria, else review only (no check gate; the plan
-  review must pass). Pending deviations raise a notification and the amber needs-you
-  state in the terminal. Planning settings live in Project settings and the terminal's
+  review must pass). Pending deviations and proposed swarm rounds raise a notification
+  and the amber needs-you state in the terminal. Planning settings live in Project settings and the terminal's
   `/settings`. Read-only enforcement covers Codex and
   Claude Code; other agents are constrained by prompt and a discarded worktree.
-  Installed-provider interviews and plan-to-merge acceptance remain open.
+  Installed-provider interviews, plan-to-merge and multi-round swarm acceptance remain
+  open.
 - Requests continuing with one lead can delegate through available provider subagent
   tools. Unsupported or denied delegation stays sequential. See
   [agent quality](AGENT-QUALITY.md) for boundaries.
@@ -357,8 +368,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   agent. Composio holds third-party tokens and bills usage to that project. See
   [Connected apps](MCP-DISCOVERY.md#connected-apps-through-composio).
 - Bots can have their own computer: a Linux sandbox in Docker on this device (Docker
-  Desktop, Colima or Docker Engine, detected but never installed) or a cloud machine the
-  person runs and pairs with an HTTPS address and a secret kept in protected storage.
+  Desktop, Colima or Docker Engine, detected but never installed), a cloud machine the
+  person runs and pairs with an HTTPS address and a secret kept in protected storage, or
+  an auto-sleeping machine on the person's own Agent37 account from one saved API key,
+  built from the same image as an Agent37 template.
   Tasks get one only after the person approves `computer_request`. Desktop control acts
   on the computer without an access question, browser tools drive its Chromium for local
   sandboxes with networking on, each site still asks first, and `computer_exec` runs
@@ -369,14 +382,33 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   cloud machines are never stopped. Bot settings, the Screen view and Settings →
   Computers show idle time and start, stop, watch, take over and delete computers;
   `/computer` shows and changes one in the terminal. Jackalope-hosted computers are
-  listed as coming soon. See
+  listed as coming soon. The image is published for amd64 to GitHub Container Registry
+  from `beta` and `stable`; local sandboxes pull and Agent37 imports the tag for the
+  app's version and image definition, building it when that is unavailable. See
   [bot computers](BOT-COMPUTERS.md).
+- A project can run its Claude Code and Codex task agents on a computer (**Agents run
+  on** in Project settings; beta). The workspace's non-ignored files and copied setup
+  files are uploaded, the agent runs there with a Claude Code token or API key saved for
+  computers and without the CLI installed on this device, its output feeds the usual
+  parsers and its changes come back as a patch applied to the local workspace before
+  checks, checkpoint, review and integration, which stay on this device. Jackalope's
+  bridge tools reach it through a relay that keeps the bridge credential on this device;
+  desktop control acts on that computer, and the browser tools drive its Chromium on a
+  local sandbox with networking (unavailable on cloud and Agent37 computers). Tools that
+  read the local workspace work only for read-only attempts; `peer_adopt` and project
+  connections are unavailable. Plan-mode planners and swarm orchestrators run there
+  read-only and bring nothing back. Lost contact is retried for 30 minutes, and changes
+  left on the computer come back when the task continues. Such agents have their own
+  concurrency limit (8 by default, up to 32, set in the project's queue); other agents
+  stay local. See [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
 - Task and chat Screen views poll the attempt's existing task browser viewport and
   desktop grant state without opening a browser, requesting access or saving an
   artifact. They list recent desktop actions with small after-action captures. People
   can stop the browser, revoke desktop control or always allow the granted app there.
-- Saved bots keep a name, role, standing instructions, agent and model, project,
-  connection scope and a chosen character and colour locally. Messaging a bot starts a
+- Saved bots keep a name, role, standing instructions, agent and model, a home project
+  plus any other projects they work in, connection scope and a chosen character and
+  colour locally. The Bots page starts with a card per project showing its bots and
+  their activity, then lists one project's bots. Messaging a bot starts a
   chat inside the Bots page, or continues its latest open one, whose native persona is
   repeated in every batch prompt and follows later edits; those chats skip workspace
   preparation and automatic checks and open only on the Bots page. Bots keep up to 30
@@ -543,16 +575,34 @@ links. GitHub uses the installed CLI; Linear/Jira credentials use protected nati
 Jackalope Swarm (beta) gives each live attempt on an Artifacts-linked project its own fork
 through the person's own Worker (`apps/swarm`). Every 15 seconds the desktop pushes changed
 snapshots as synthetic commits, and the Worker reports files and overlapping edits across
-forks on Project → Swarm, which appears once a swarm Worker is connected. The page opens on a map
+forks on Project → Swarm, which appears once a swarm Worker is connected. Its Settings card
+appears once Artifacts is connected, or while a Worker is saved. Set up Swarm deploys the
+Worker bundled with the app to the connected account (bound to the connected namespace, with
+a generated token in protected storage), publishes it on workers.dev, checks it and connects
+it, with per-step progress and retry; it shows Update Swarm Worker when the bundle or namespace
+changes. Connect Cloudflare asks for Workers access only then; API tokens need Workers Scripts:
+Edit. Use an existing Worker still accepts a URL and token. Disconnecting a Worker that setup
+deployed offers to delete it from Cloudflare as well (on by default, through the Workers
+script delete API with the saved connection); a missing script counts as deleted, and a
+refusal still forgets the Worker and links to it in the dashboard. A Worker entered by hand is
+only forgotten. Artifacts repositories are never touched. The page opens on a map
 of the project's tasks by stage, the files several agents share and their conflicts. Forks are
 deleted when attempts finish; merging is local, and projects that merge automatically push
-the merged branch back to Artifacts. Deploys are not yet accepted against a live Worker.
+the merged branch back to Artifacts. Deploys and one-click setup are not yet accepted against a
+live Cloudflare account.
 See [the Worker guide](../apps/swarm/README.md).
 
 Cloudflare Artifacts (beta) connects a user's own Cloudflare account and namespace from
 Settings → Cloudflare. Connect Cloudflare signs in through the browser with Jackalope's
 public OAuth client (PKCE, loopback redirect on 127.0.0.1 ports 47851–47853) and lists the
-accounts the person shared; an API token remains an alternative. Tokens stay in protected
+accounts the person shared, finishing on its own when only one account was shared. Namespace
+(default `jackalope`) and data location sit under one optional disclosure. An API token
+remains an alternative: Jackalope lists the accounts the token covers and uses the only one
+or asks which, falling back to an Account ID field (which accepts a pasted dashboard link)
+when Cloudflare does not list them. Project settings connect inline. A project folder that is
+a repository without commits offers Create first commit, which shows the file count and
+asks first, commits every non-ignored file as the configured Git identity with the message
+"Initial commit" and no trailers, and refuses until a Git name and email are set. Tokens stay in protected
 native storage, OAuth access refreshes before expiry and disconnecting revokes it. Setup can
 create a new project backed by an Artifacts repository, and Project settings can move an
 existing repository there through a new `artifacts` remote, leaving other remotes and local
@@ -564,7 +614,8 @@ those forks and push-triggered automation are not implemented. Live
 Cloudflare account and installed acceptance remain open.
 
 Trusted hosts and a responsive phone companion are implemented for native validation.
-Settings → Remote access scopes paired devices to selected projects. A separate loopback
+Settings → Remote access scopes paired devices to selected projects. Before it is on, every
+project starts selected and Pair a phone turns access on and creates the code in one step. A separate loopback
 API supports task status, questions, follow-ups, new isolated sessions and change review.
 Desktop connections use verified SSH forwarding or HTTPS; phones use HTTPS, from any HTTPS
 address or private Tailscale Serve, which Remote access sets up through detected steps.
@@ -596,7 +647,13 @@ Bot computers have unit coverage and an opt-in Docker trial; no image build, con
 viewer or cloud machine has been accepted in an installed app on any platform. Cloud
 machines reach desktop control and commands but not the browser tools, and the
 in-sandbox agent has no accessibility actions. The idle stop, start on demand and quit
-stop are covered by unit tests only.
+stop are covered by unit tests only. Agents on a computer are covered by unit tests, the
+agent's POSIX run and relay tests and the opt-in Docker trial with a stand-in agent;
+real Claude Code or Codex runs there, bridge, desktop and browser tools used by a real
+agent, planning there, lost-contact
+recovery against a real computer, the template build and instances on a live Agent37
+account, and gVisor support for the image's desktop are unverified, and Agent37
+computers have no viewer. The image workflow has not run, so no image is published yet.
 
 Installed provider, accessibility, recovery, performance, signed installation and
 update acceptance remain platform-specific requirements. Real-model quality and

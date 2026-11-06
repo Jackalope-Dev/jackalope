@@ -225,7 +225,9 @@ and steps; their saved storage is left intact until the plan is saved.
 The [example plan](./examples/parallel-plan.json) demonstrates the import schema.
 It is not an automatic launch. Edit agents, scopes and prompts for your project
 and review every task before dispatch. Native schedules use the same guarded
-runtime; proactive proposals and remote execution remain roadmap work.
+runtime; proactive proposals remain roadmap work. Claude Code and Codex agents can run on
+a project's computer while the queue, reservations and integration stay local; see
+[agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
 
 Optional feature staging consumes verified immutable predecessor snapshots before final
 integration. Queue admission favors critical paths and fair project access; finishing

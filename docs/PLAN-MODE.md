@@ -10,9 +10,9 @@ terminal commands are in [terminal command](CLI.md#plan-mode).
 
 ## Starting a plan
 
-- App: **Plan with me** beside **Start task** in the composer, and beside the choices
+- App: **Plan with me** in the Work composer's Options menu, and beside the choices
   when a task assessment suggests a plan or investigation, starts the interview.
-  **Write the plan myself**, in the composer or on Feature work, opens a form instead.
+  **Write the plan myself** on Feature work opens a form instead.
 - Terminal: `/plan <goal>` in a conversation, or `jackalope plan "<goal>"`.
 
 A written plan skips the interview. Its tasks (title, instructions, files or folders and
@@ -109,9 +109,10 @@ Briefing for the implementer.
 ## Surprises
 ```
 
-Validation: a title up to 160 characters, a Goal, 1–8 tasks with unique keys (letters,
+Validation: a title up to 160 characters, a Goal, 1–24 tasks with unique keys (letters,
 digits, `-`, `_`) and at least one scope, 1–12 criteria with unique IDs and 1–480
-characters, and every `dependsOn` and `covers` reference resolving. Verify tags are
+characters, and every `dependsOn` and `covers` reference resolving. Planned subtasks
+run at most 8 tasks; a larger plan defaults to, and runs as, a swarm. Verify tags are
 `command` or `test` (optionally `: <exact command>`), `browser` or `manual`; an untagged
 criterion is manual. Bullet sections render `- None` when empty.
 
@@ -134,8 +135,10 @@ Plans live in app storage under `task-runs-v1/plans/<plan id>.json`, one record 
 with every revision, its author (`planner`, `you` or `amendment`), approval, execution
 link and deviations. Records are written atomically; an unreadable record is quarantined
 as `<id>.json.corrupt` and reported in the plan list rather than overwritten. Per-project
-settings are in `plans/settings.json`: `questionCap`, `plannerAgent`, `plannerModel` and
-`exportPath` (default `docs/plans/{slug}.md`). Missing fields take their defaults. They
+settings are in `plans/settings.json`: `questionCap`, `plannerAgent`, `plannerModel`,
+`exportPath` (default `docs/plans/{slug}.md`), `maxRounds` (swarm rounds, default 5,
+1–20), `askBeforeRounds` (default false) and `orchestrators` (1–4, default 1). Missing
+fields take their defaults. They
 are edited under **Planning** in Project settings (the Plans page links there); the
 terminal's `/settings` changes the question limit and planning agent.
 
@@ -146,8 +149,8 @@ refused. Nothing is staged or committed.
 ## Approval and hand-off
 
 Approval is one explicit call naming the revision number and hash the person reviewed;
-a changed plan, a running planner, a done plan or swarm without a connected swarm Worker
-is refused. The app approves with the project's current check, prepare command and setup
+a changed plan, a running planner, a done plan, planned subtasks with more than 8 open
+tasks, or a swarm with more open tasks than one round may run is refused. The app approves with the project's current check, prepare command and setup
 files; the terminal uses the copy the app mirrors into the native project registry
 (`preferences/projects.json`: `verifyCommand`, `autoVerify`, `prepareCommand`,
 `setupFiles`). The work is verified with the first of:
@@ -172,7 +175,7 @@ task's request is the self-contained plan, so each worker starts from a fresh co
 | --- | --- |
 | single | One assignment covering every remaining task and all criteria |
 | subtasks | One assignment per remaining task, with its scopes, dependencies, covered criteria as requirements and its briefing |
-| swarm | The subtasks assignments, with the connected swarm Worker mirroring each attempt |
+| swarm (beta) | The subtasks assignments as round 1, then further rounds (below) until an orchestrator finds every criterion met |
 
 Assignments pass the same validation as planner-produced plans: limits, scopes inside the
 repository, no overlapping independent ownership and no cycles. Each criterion becomes a
@@ -199,6 +202,91 @@ snapshot; repairs are started for open review gaps and unresolved interfaces rat
 failed checks; and the combined result is ready only after a `Plan review` step passed,
 not merely when no gaps are open. Attempts that have a check keep every check gate.
 
+## Swarm rounds (beta)
+
+A swarm runs in rounds. Each round is a managed task with the same checks, agent and
+independent review as planned subtasks. A round may run as many assignments as the
+slots where the project's agents run (local concurrency, or the computer's concurrency
+when the project's agents run on a computer), at least 8 and at most 24; other shapes
+keep their limits. A connected swarm Worker still mirrors attempts but is not required.
+
+When a round's combined result is merged, by the person in result review or by the
+autonomy policy, Jackalope starts a read-only orchestrator attempt on the target branch
+with the planning agent and no questions. It reviews the integrated tree against every
+criterion, runs the project's check through `computer_verify` when the plan has one, and
+returns one JSON verdict:
+
+```json
+{"verdict": "next", "summary": "…", "evidence": ["AC-1: …"],
+ "assignments": [{"key": "…", "title": "…", "prompt": "…", "scopes": ["…"],
+   "dependsOn": [], "covers": ["AC-2"], "briefing": "…"}]}
+```
+
+- `done` needs evidence and, with a check, a passing run of that check in the
+  orchestrator's own attempt. The plan becomes `done`.
+- `next` names the next round's assignments; their `covers` become requirements. They
+  pass the usual assignment validation and may not own anything under `.jackalope`.
+  The next round starts at once and is scheduled like the first, unless the plan asks
+  first (below).
+- A verdict that does not parse, a `done` without a passing check, or assignments that
+  fail validation start one more orchestrator attempt told why; a second failure holds
+  the round until the person resumes it.
+- At the round limit (`maxRounds`), a `next` verdict is recorded with its assignments but
+  not started, and the plan asks for a re-plan.
+
+### Approving the next round
+
+**Next swarm round** under Planning in Project settings chooses **Start automatically**
+(the default) or **Ask me first** for new swarms; the Rounds section's **Next rounds**
+choice changes it for one plan and applies from the next verdict. When a plan asks
+first, a `next` verdict is saved as a proposal and nothing dispatches: the Rounds
+section lists the proposed assignments with **Approve**, **Edit** and **Stop**, the
+plan reads as needing you (`needsYou`) and raises the same "A plan needs your
+decision" notification as a deviation. **Edit** changes each assignment's title,
+instructions and scopes or removes it (dependencies on a removed assignment are
+dropped); approved edits pass the same validation as the orchestrator's assignments.
+**Stop** declines the proposal and holds the round; **Resume rounds** reviews it again.
+A proposal is saved on the round, so it survives a restart and still waits for
+approval; approving starts the round without a separate resume. The terminal approves
+with `/rounds approve` or `jackalope plan rounds <id> approve`; editing happens in the
+app. The phone companion does not show proposals.
+
+### Several orchestrators
+
+**Swarm orchestrators** (1 to 4, default 1) lets a round's review split into areas.
+When the setting is above 1, the first review of each round partitions the plan's task
+scopes into at most that many areas, grouped under the shallowest path prefix that
+separates at least two of them and balanced by scope count; a plan whose scopes do not
+separate is reviewed by one orchestrator as before. Each area gets its own read-only
+orchestrator attempt, started together, told its area and scopes; each returns the same
+JSON verdict, and a `done` still needs a passing run of the plan's check in that
+attempt. An area whose verdict fails is retried once on its own and then holds the
+round. When every area has a verdict, they combine without another agent:
+
+- The round is `done` only when every area is `done`; evidence lines are prefixed with
+  their area.
+- Otherwise the areas' next assignments are merged in area order. Work two areas both
+  named (same key or title with the same scopes) runs once, colliding keys get an area
+  suffix with dependencies following the rename, and an assignment whose scopes overlap
+  an earlier area's assignment depends on it. The merged list then follows the usual
+  validation, approval and round limit; a merge that fails validation reviews every
+  area again once before holding.
+
+Each area's name, scopes, verdict and named work are saved on the round and shown under
+it on the Progress tab and in the terminal's round line.
+
+### Saved state and controls
+
+Each round's verdict, summary, evidence, check result and next assignments are saved on
+the plan's execution and shown on its Progress tab and in `jackalope plan show`. Pause,
+Resume and Stop on the Rounds section act on the rounds and the current round's work;
+Stop also stops every running orchestrator attempt of the round.
+Dispatch starts paused after a restart: a round whose work was still running resumes
+with its work, and a merged round waits for **Resume rounds**, which also restarts an
+interrupted orchestrator attempt. Executions saved before rounds existed finish when
+their result merges, as before; executions saved before approval and areas existed start
+next rounds automatically with one orchestrator.
+
 ## Progress, deviations and re-planning
 
 The plan view shows each task as waiting, running, checked, needs attention or merged,
@@ -224,7 +312,8 @@ Re-planning continues the planning conversation with the current revision and th
 tasks. Finished tasks are kept with `status: done` and are not assigned again; the new
 revision needs approval, and approving it is refused while earlier assignments still run.
 
-When the plan's work is merged its status becomes `done`, and accepted deviations and
+When the plan's work is merged (for a swarm, when the orchestrator declares it done) its
+status becomes `done`, and accepted deviations and
 criteria whose checks failed are sent once as reflection observations through the
 learned-lesson promotion gate.
 
@@ -232,7 +321,7 @@ learned-lesson promotion gate.
 
 ```sh
 cd apps/desktop/src-tauri
-cargo test --lib planning          # document, interview, store, hand-off and a fixture planner
+cargo test --lib planning          # document, interview, store, hand-off, rounds and a fixture planner
 cargo test --lib coordination::managed
 cargo test --bin jackalope plan    # terminal commands, panel and protocol
 cd .. && node --test scripts/plan-mode.test.mjs

@@ -16,7 +16,10 @@ export interface Bot {
   /** 'auto' lets Jackalope route each conversation. */
   agent: string;
   model: { id: string; name: string } | null;
+  /** Its home project: chosen connections and wake-ups start here unless a wake-up says otherwise. */
   projectId: string;
+  /** Other projects it also works in; conversations started there run in that project. */
+  projectIds?: string[];
   /** null delivers every enabled connection; a list limits new conversations to those IDs. */
   connectionIds: string[] | null;
   /** Native schedule IDs created as routines before wake-ups existed; still listed and toggled. */
@@ -86,6 +89,8 @@ export interface BotWake {
   prompt: string;
   enabled: boolean;
   trigger: BotWakeTrigger;
+  /** The project it watches and starts in, for a bot in several projects; home when absent. */
+  projectId?: string;
 }
 
 export type BotDraft = Omit<Bot, 'id' | 'routineIds' | 'pinned' | 'createdAt' | 'updatedAt'>;
@@ -123,6 +128,11 @@ export function validateWake(wake: BotWake, connectionIds: string[] | null) {
   return '';
 }
 
+/** Every project a bot works in, home first. */
+export function botProjectIds(bot: Pick<Bot, 'projectId' | 'projectIds'>) {
+  return [...new Set([bot.projectId, ...(bot.projectIds ?? [])].filter(Boolean))];
+}
+
 export function validateBot(draft: BotDraft) {
   const name = draft.name.trim();
   if (!name) return 'Give the bot a name.';
@@ -131,9 +141,12 @@ export function validateBot(draft: BotDraft) {
   if ([...draft.instructions.trim()].length > BOT_INSTRUCTIONS_MAX)
     return `Shorten the instructions to under ${BOT_INSTRUCTIONS_MAX.toLocaleString()} characters.`;
   if (draft.wakes.length > BOT_WAKES_MAX) return `Keep at most ${BOT_WAKES_MAX} wake-ups per bot.`;
+  const projects = botProjectIds(draft);
   for (const wake of draft.wakes) {
     const error = validateWake(wake, draft.connectionIds);
     if (error) return error;
+    if (wake.projectId && !projects.includes(wake.projectId))
+      return `Choose one of this bot's projects for “${wake.name.trim()}”.`;
   }
   return '';
 }
@@ -146,6 +159,9 @@ interface BotState {
   selectedId: string | null;
   /** The bot conversation open on the Bots page, if any. Not saved. */
   openSessionId: string | null;
+  /** The project the Bots page shows; null shows every project. Not saved. */
+  projectView: string | null;
+  viewProject: (projectId: string | null) => void;
   /** When each bot conversation was last read, by session ID. */
   seen: Record<string, string>;
   /** Activity before this counts as read, so conversations from before read tracking are not all new. */
@@ -168,9 +184,17 @@ export const useBotStore = create<BotState>()(
       bots: [],
       selectedId: null,
       openSessionId: null,
+      projectView: null,
+      viewProject: (projectView) => set({ projectView, openSessionId: null }),
       seen: {},
       seenFloor: new Date().toISOString(),
-      select: (selectedId) => set({ selectedId }),
+      // Selecting a bot from elsewhere opens its home project on the Bots page.
+      select: (selectedId) =>
+        set((state) => ({
+          selectedId,
+          projectView:
+            state.bots.find((bot) => bot.id === selectedId)?.projectId ?? state.projectView,
+        })),
       openConversation: (openSessionId, botId) =>
         set((state) => ({
           openSessionId,
@@ -237,6 +261,7 @@ export const useBotStore = create<BotState>()(
           agent: source.agent,
           model: source.model,
           projectId: source.projectId,
+          projectIds: source.projectIds,
           connectionIds: source.connectionIds,
           appearance: source.appearance,
           collaborate: source.collaborate,

@@ -49,6 +49,9 @@ USAGE
   jackalope plan show <id>       print a plan (--json)
   jackalope plan approve <id> [single|subtasks|swarm]
                                  approve the latest revision and start it (--yes)
+  jackalope plan rounds <id> [pause|resume|stop|approve]
+                                 show a swarm's rounds, or act on them; approve
+                                 starts a proposed next round (--yes)
   jackalope status               show the host, this project and your agents
   jackalope help                 show this message
 
@@ -146,6 +149,9 @@ fn run() -> Result<(), String> {
         Command::PlanShow { id, json } => planning::show(cli.cold_start, &id, json),
         Command::PlanApprove { id, shape, yes } => {
             planning::approve(cli.cold_start, &id, shape, yes)
+        }
+        Command::PlanRounds { id, action, yes } => {
+            planning::rounds(cli.cold_start, &id, action, yes)
         }
         Command::Plans { json } => planning::list(cli.cold_start, json),
         Command::Status { json } => subcommands::status(json),

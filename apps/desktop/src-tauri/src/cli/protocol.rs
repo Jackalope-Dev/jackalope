@@ -209,7 +209,8 @@ pub enum Request {
     /// takes the shape (`single`, `subtasks` or `swarm`) in `text` with the
     /// exact `revision` and `hash` shown; `save` takes Markdown in `text` and
     /// the `revision` it was edited from; `export` takes an optional path;
-    /// `accept`, `redo` and `replan-deviation` take a deviation ID in `text`.
+    /// `accept`, `redo` and `replan-deviation` take a deviation ID in `text`;
+    /// `rounds` takes `pause`, `resume`, `stop` or `approve` in `text`.
     PlanAction {
         plan_id: String,
         action: String,
@@ -499,6 +500,10 @@ pub struct PlanView {
     /// The check approval would use, when there is one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check: Option<String>,
+    /// Titles of a swarm's proposed next round while it waits for approval.
+    /// Absent when nothing waits and from older hosts.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub next_round: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

@@ -56,7 +56,7 @@ window.__TAURI_INTERNALS__ = { metadata: { currentWindow: { label: 'main' }, cur
     default: return null;
   }
 }};
-useProjectStore.setState({ activeProjectId: 'work', projects: [{ id: 'work', name: 'Work', path: '/fixture/work', gitBranch: 'main', worktrees: [], agentProvider: 'codex', preferences: {} }] });
+useProjectStore.setState({ activeProjectId: 'work', projects: [{ id: 'work', name: 'Work', path: '/fixture/work', gitBranch: 'main', worktrees: [], agentProvider: 'codex', preferences: {} }, { id: 'personal', name: 'Personal', path: '/fixture/personal', gitBranch: 'main', worktrees: [], agentProvider: 'codex', preferences: {} }] });
 useBotStore.setState({ bots: [{ id: bot, name: 'Scout', role: 'Keeps dependencies healthy', instructions: 'Keep dependencies healthy.', agent: 'codex', model: null, projectId: 'work', connectionIds: null, routineIds: [], wakes: [], collaborate: true, pinned: false, createdAt: at(100), updatedAt: at(100), appearance: { style: 'cat', color: 'teal' } }], selectedId: bot, seen: { limited: at(0) }, seenFloor: at(1000), openSessionId: null });
 void useBotHubStore.getState().refresh();
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement('main', { style: { height: '100vh', overflow: 'auto' } }, React.createElement(BotsWorkspace)));
@@ -86,10 +86,29 @@ try {
       command,
     );
 
+  // The overview lists every project with the bots that work in it.
+  const workCard = page.getByRole('button', { name: /^Work 1 bot/ });
+  await workCard.waitFor();
+  await page.getByRole('button', { name: /^Personal No bots yet/ }).waitFor();
+  const cards = await page
+    .locator('.bots-project')
+    .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().height));
+  assert.equal(new Set(cards).size, 1, `project cards share one height: ${cards}`);
+  for (const dark of [false, true]) {
+    await page.evaluate((dark) => window.botFixture.theme(dark), dark);
+    // Let surface transitions finish so the capture shows the settled theme.
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${output}/overview-${dark ? 'dark' : 'light'}.png` });
+  }
+  await page.evaluate(() => window.botFixture.theme(false));
+  await workCard.focus();
+  await page.keyboard.press('Enter');
+
   // The roster names real activity: an unread reply, not a decorative status.
   await page.getByRole('button', { name: 'Scout, 1 new reply', exact: true }).waitFor();
   const composer = page.getByRole('textbox', { name: 'Message Scout', exact: true });
   await composer.waitFor();
+  await page.screenshot({ path: `${output}/project.png` });
   const thread = page.locator('.bots-composer-thread');
   assert.match(await thread.innerText(), /Continues Fix the flaky lockfile check/);
   assert.match(await page.locator('.bots-conversation-preview').first().innerText(), /^Found it$/);
@@ -130,16 +149,19 @@ try {
   assert.equal(sent.id, 'latest');
   assert.equal(sent.text, 'Also check the CI cache.');
   assert.equal((await calls('live_session_create')).length, 0);
-  await page.getByRole('button', { name: 'Back to work' }).click();
+  await page.getByRole('button', { name: 'Back to bots' }).click();
 
   // The person can remove a note the bot saved.
-  await page.getByRole('button', { name: /^Remove note: The user prefers/ }).click();
+  await page.getByRole('button', { name: /^Memory/ }).click();
+  await page.getByRole('button', { name: /^Note options: The user prefers/ }).click();
+  await page.getByRole('menuitem', { name: 'Remove note', exact: true }).click();
   await page.waitForFunction(() =>
     window.botFixture.calls.some((c) => c.command === 'bot_hub_forget_note'),
   );
   await page.getByText(/Nothing saved yet/).waitFor();
 
   // A conversation paused at its batch limit explains why and can continue.
+  await page.getByRole('button', { name: /^Conversations/ }).click();
   await page.getByRole('button', { name: /Nightly dependency sweep/ }).click();
   await page.getByText(/paused after 2 replies it started without you/).waitFor();
   await page.screenshot({ path: `${output}/batch-limit.png` });
@@ -152,6 +174,9 @@ try {
   assert.equal(limits.limits.maxBatches, 22);
   const [resume] = await calls('live_session_action');
   assert.equal(resume.action, 'resume');
+  // All projects returns to the overview.
+  await page.getByRole('button', { name: 'All projects', exact: true }).click();
+  await workCard.waitFor();
   assert.deepEqual(errors, []);
   console.log(
     'Bots fixtures passed: unread roster, continuing conversations, search, memory, batch limits, themes and narrow layout.',

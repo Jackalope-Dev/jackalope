@@ -8,7 +8,8 @@ for the chat sessions bots start.
 ## Profiles
 
 `stores/botStore.ts` keeps bots in renderer storage: name, role, standing instructions,
-agent (`auto` or an agent ID), optional model, project, connection scope, wake-ups,
+agent (`auto` or an agent ID), optional model, a home project and any other projects it
+also works in (`projectIds`), connection scope, wake-ups,
 whether the bot works with other bots (`collaborate`) and the schedule IDs of routines
 created before wake-ups existed. A `null` connection scope delivers every enabled
 connection; a list becomes the run request's `connectionIds`. Name and instruction edits
@@ -16,6 +17,16 @@ reach open conversations from their next batch; agent, model, project and connec
 changes apply to new conversations. Instructions are limited to 6,000 characters in the renderer and
 in native validation. Version 2 of the store adds empty wake-ups and `collaborate: true`
 to older saved bots; duplicates copy wake-ups turned off.
+
+A bot works in its home project and every project in `projectIds`. A conversation runs in
+the project it was started from; chosen connections apply by ID in each project. A
+wake-up may name one of the bot's projects (`projectId`) to watch and start in, otherwise
+it uses the home project; removing a project from the bot moves its wake-ups home.
+
+The Bots page opens on a card per project showing the bots that work there, what they
+are doing and what waits on you. Choosing a card lists that project's bots and their
+conversations in that project, and **Add an existing bot** adds a bot from another
+project to this one. An open conversation shows the project it runs in.
 
 An optional `appearance` holds a character style (the shared `AgentCharacter`
 silhouettes plus bot-only shapes whose face stays inside the fill) and a colour from
@@ -43,7 +54,10 @@ the renderer's bot record.
 The renderer mirrors bots whose project still exists into `commands/bot_hub.rs` through
 `bot_hub_sync`, after both the bot and project stores hydrate so an empty early
 directory cannot clear wake-up progress. Each entry carries the conversation run
-request the Bots page would start with. The hub stores its directory, wake-up state,
+request the Bots page would start with in its home project, plus one request per other
+available project (`projects`). Wake-ups and bot messages start in the project they name
+or the sender's project when the bot works there, otherwise in the home project; the
+`bots` tool reports `sameProject` when the listed bot works in the caller's project. The hub stores its directory, wake-up state,
 cards, suggestions, hand-offs, saved notes and the latest 300 activity entries in
 `bots/hub.json` in the profile directory, written atomically. An unreadable file is
 preserved and every write is refused until it is repaired. `bot-hub-changed` events

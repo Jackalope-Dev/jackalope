@@ -144,9 +144,17 @@ pub(super) fn ready_items(
     merged: &[String],
 ) -> Vec<QueueItem> {
     let active_runs: Vec<_> = runs.iter().filter(|r| active(&r.status)).collect();
-    let slots = inner
-        .concurrency
-        .saturating_sub(active_runs.iter().filter(|r| !r.finishing).count());
+    // Agents on project computers have their own limit, so they neither wait
+    // for nor take this device's slots.
+    let on_computer = |project: &str| inner.remote_projects.contains(project);
+    let working = |remote: bool| {
+        active_runs
+            .iter()
+            .filter(|r| !r.finishing && on_computer(&r.project_id) == remote)
+            .count()
+    };
+    let mut local_slots = inner.concurrency.saturating_sub(working(false));
+    let mut remote_slots = inner.remote_concurrency.saturating_sub(working(true));
     let mut reserved = Vec::new();
     let priority = dependency_priority(&inner.ledger.items);
     let mut pending: Vec<_> = inner
@@ -203,7 +211,7 @@ pub(super) fn ready_items(
         *counts.entry(run.project_id.clone()).or_default() += 1;
     }
     let mut reorder = true;
-    while !pending.is_empty() && reserved.len() < slots {
+    while !pending.is_empty() && (local_slots > 0 || remote_slots > 0) {
         if reorder {
             pending.sort_by_key(|item| {
                 std::cmp::Reverse((
@@ -216,6 +224,14 @@ pub(super) fn ready_items(
             reorder = false;
         }
         let item = pending.pop().unwrap();
+        let remote = on_computer(&item.project_id);
+        if if remote {
+            remote_slots == 0
+        } else {
+            local_slots == 0
+        } {
+            continue;
+        }
         if super::managed_delivery::scope_blocked(&inner.ledger, item, runs) {
             continue;
         }
@@ -280,6 +296,11 @@ pub(super) fn ready_items(
             continue;
         }
         *counts.entry(item.project_id.clone()).or_default() += 1;
+        if remote {
+            remote_slots -= 1;
+        } else {
+            local_slots -= 1;
+        }
         reserved.push(item);
         reorder = true;
     }
@@ -342,6 +363,8 @@ mod scheduling_tests {
             },
             enabled: ["a".into(), "b".into()].into(),
             concurrency: 2,
+            remote_concurrency: DEFAULT_REMOTE_CONCURRENCY,
+            remote_projects: HashSet::new(),
             grants: HashMap::new(),
             url: None,
             error: None,
@@ -353,6 +376,31 @@ mod scheduling_tests {
             ["root", "peer"]
         );
         assert!(!ready.iter().any(|i| i.id == "child"));
+    }
+
+    #[test]
+    fn computer_projects_use_their_own_slots() {
+        let mut items: Vec<_> = (0..5)
+            .map(|n| item(&format!("cloud{n}"), "cloud", &[]))
+            .collect();
+        items.push(item("here", "local", &[]));
+        let inner = Inner {
+            ledger: Ledger {
+                items,
+                ..Default::default()
+            },
+            enabled: ["cloud".into(), "local".into()].into(),
+            concurrency: 1,
+            remote_concurrency: 4,
+            remote_projects: ["cloud".to_string()].into(),
+            grants: HashMap::new(),
+            url: None,
+            error: None,
+            delivered: HashMap::new(),
+        };
+        let ready = ready_items(&inner, &[], &[]);
+        assert_eq!(ready.iter().filter(|i| i.project_id == "cloud").count(), 4);
+        assert_eq!(ready.iter().filter(|i| i.project_id == "local").count(), 1);
     }
 }
 

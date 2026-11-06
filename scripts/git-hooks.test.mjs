@@ -11,7 +11,14 @@ const script = fileURLToPath(new URL('./git-hooks.mjs', import.meta.url));
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'jackalope-hook-test-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const env = { ...process.env, CI: '', LEFTHOOK: '', NODE_ENV: 'test' };
+  // Secret scans need gitleaks and are covered by check-secrets.mjs itself.
+  const env = {
+    ...process.env,
+    CI: '',
+    LEFTHOOK: '',
+    LEFTHOOK_EXCLUDE: 'secrets',
+    NODE_ENV: 'test',
+  };
   for (const key of Object.keys(env)) {
     if (key.startsWith('GIT_')) delete env[key];
   }

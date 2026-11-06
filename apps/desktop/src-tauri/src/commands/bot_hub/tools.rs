@@ -220,7 +220,7 @@ impl BotHub {
                         "id": bot.id,
                         "name": bot.name,
                         "role": bot.role,
-                        "sameProject": bot.request.project_id == me.request.project_id,
+                        "sameProject": bot.works_in(&run.project_id),
                         "project": bot.request.project_name,
                         "acceptsMessages": bot.collaborate,
                         "working": working,
@@ -298,7 +298,14 @@ impl BotHub {
             bot_name: Some(me.name.clone()),
             session_id: Some(session.clone()),
         };
-        let (target, message) = self.deliver(&to, &text, origin, existing.as_deref())?;
+        // A bot that also works in the sender's project answers there.
+        let (target, message) = self.deliver(
+            &to,
+            Some(&run.project_id),
+            &text,
+            origin,
+            existing.as_deref(),
+        )?;
         let relay = Relay {
             id: Uuid::new_v4().to_string(),
             from_bot_id: me.id.clone(),

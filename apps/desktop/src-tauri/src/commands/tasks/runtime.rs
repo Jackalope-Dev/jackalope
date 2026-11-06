@@ -656,7 +656,17 @@ impl TaskRuntime {
             .workspace
             .clone();
         let policy = self.policy()?;
-        let (adapter, executable) = policy.resolve(&req.agent)?;
+        // An agent on the project's computer uses the CLI installed there.
+        let adapter = policy.adapter(&req.agent)?;
+        let remote = if EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
+            self.remote_target(id, req, &adapter)
+        } else {
+            None
+        };
+        let executable = match remote {
+            Some(_) => PathBuf::from(&adapter),
+            None => policy.resolve(&req.agent)?.1,
+        };
         let selected_model = policy.model(&req.agent, req.model.as_deref())?;
         if self
             .inner
@@ -708,10 +718,26 @@ impl TaskRuntime {
         if !EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
             return Err(unimplemented_adapter(&adapter));
         }
-        let runner_lease = crate::commands::managed_runtime::acquire(&executable)?;
+        // An agent on a project computer reaches the bridge through its relay,
+        // but this device's project connections are not delivered there.
+        let original = req;
+        let remote_request;
+        let req = if remote.is_some() {
+            remote_request = RunRequest {
+                connection_ids: Some(Vec::new()),
+                ..req.clone()
+            };
+            &remote_request
+        } else {
+            req
+        };
+        let runner_lease = match remote {
+            Some(_) => None,
+            None => crate::commands::managed_runtime::acquire(&executable)?,
+        };
         let claude =
             (adapter == "claude").then(|| super::claude_session::settings(self, &req.project_id));
-        let persistent = claude.is_some_and(|settings| settings.persistent);
+        let persistent = claude.is_some_and(|settings| settings.persistent) && remote.is_none();
         let mut cmd = command(executable);
         let mut opencode_connection = None;
         if let Some(binding) = &req.account_binding {
@@ -723,9 +749,12 @@ impl TaskRuntime {
                     "This account is disabled in Settings. Choose an enabled account.".into(),
                 );
             }
-            crate::commands::agent_profiles::validate_binding(&self.profiles_root(), binding)?;
+            if remote.is_none() {
+                crate::commands::agent_profiles::validate_binding(&self.profiles_root(), binding)?;
+            }
         }
-        if crate::commands::agent_profiles::env_var_for(&adapter).is_some() {
+        // Agents on a computer use the sign-ins saved for computers instead.
+        if remote.is_none() && crate::commands::agent_profiles::env_var_for(&adapter).is_some() {
             let binding = req
                 .account_binding
                 .as_ref()
@@ -1138,6 +1167,10 @@ impl TaskRuntime {
             std::fs::write(self.directory.join(format!("{id}.input")), &input)
                 .map_err(|e| e.to_string())?;
         }
+        if let Some(computer) = remote {
+            drop(runner_lease);
+            return self.run_remote(id, original, &adapter, cmd, input, &workspace, computer);
+        }
         if persistent {
             let outcome = self.run_claude_session(super::claude_session::Launch {
                 id,
@@ -1448,7 +1481,7 @@ impl TaskRuntime {
     }
 
     /// Checks, checkpoints and records the outcome of an agent turn that has ended.
-    fn complete_attempt(
+    pub(super) fn complete_attempt(
         &self,
         id: &str,
         req: &RunRequest,
@@ -1889,11 +1922,17 @@ impl TaskRuntime {
             }
         }
         let policy = self.policy()?;
-        let (adapter, _) = policy.resolve(if request.agent == "auto" {
-            policy.routing_agent(&request.project_id)?
+        let adapter = if request.agent == "auto" {
+            policy
+                .resolve(policy.routing_agent(&request.project_id)?)?
+                .0
         } else {
-            &request.agent
-        })?;
+            let adapter = policy.adapter(&request.agent)?;
+            if !self.runs_remotely(&request.project_id, &adapter) {
+                policy.resolve(&request.agent)?;
+            }
+            adapter
+        };
         {
             let mut inner = self.inner.lock().unwrap();
             if let Some(existing) = inner.runs.get(&request.id) {
@@ -2126,6 +2165,7 @@ impl TaskRuntime {
                 account_binding: Some(binding),
                 target_branch: request.target_branch.clone(),
                 process_contained: false,
+                remote: None,
                 verify_command: request.verify_command.clone(),
                 prepare_command: request.prepare_command.clone(),
                 setup_files: request.setup_files.clone(),

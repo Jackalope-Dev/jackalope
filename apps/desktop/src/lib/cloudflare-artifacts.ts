@@ -26,6 +26,8 @@ export interface CloudflareAccount {
 
 export interface ArtifactsProjectLink {
   repository: boolean;
+  /** A repository's top level with no commits yet. */
+  unborn?: boolean;
   remote?: string | null;
   repo?: string | null;
   namespace?: string | null;
@@ -64,10 +66,15 @@ export const connectArtifacts = (connection: {
     connection: { ...connection, jurisdiction: connection.jurisdiction || null },
   });
 
+/** The accounts a pasted API token covers, so only the token needs pasting. */
+export const cloudflareTokenAccounts = (token: string) =>
+  nativeTask<CloudflareAccount[]>('cloudflare_token_accounts', { token });
+
 export const disconnectArtifacts = () => nativeTask<void>('cloudflare_artifacts_disconnect');
 
 /** Prepares Connect Cloudflare and returns the consent page to open in the browser. */
-export const beginCloudflareSignIn = () => nativeTask<string>('cloudflare_oauth_begin');
+export const beginCloudflareSignIn = (options: { workers?: boolean } = {}) =>
+  nativeTask<string>('cloudflare_oauth_begin', { workers: options.workers ?? false });
 /** Waits for the browser to return; resolves with the accounts the person shared. */
 export const completeCloudflareSignIn = () =>
   nativeTask<CloudflareAccount[]>('cloudflare_oauth_complete');
@@ -81,6 +88,10 @@ export const connectCloudflareAccount = (connection: {
     ...connection,
     jurisdiction: connection.jurisdiction || null,
   });
+
+/** Saves a newer sign-in for the connected account, keeping its namespace. */
+export const reauthorizeCloudflare = () =>
+  nativeTask<ArtifactsStatus>('cloudflare_oauth_reauthorize');
 
 export const artifactsProject = (projectPath: string) =>
   nativeTask<ArtifactsProjectLink>('cloudflare_artifacts_project', { projectPath });

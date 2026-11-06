@@ -26,11 +26,41 @@ to re-analyze, and shows forks and conflicts on the Swarm page.
 The Worker never merges. Jackalope keeps review and integration on the person's
 machine through its existing guarded merge.
 
-## Deploy to your account
+## Set up from Jackalope
 
-You need a Cloudflare account on the Workers Paid plan with Artifacts, and an
-Artifacts namespace (Jackalope uses `jackalope` by default; change it in
-`wrangler.jsonc` if yours differs).
+You need a Cloudflare account on the Workers Paid plan with Artifacts, connected in
+Settings → Cloudflare. Under Jackalope Swarm, **Set up Swarm**:
+
+1. checks the account and its workers.dev subdomain (choose one in the dashboard if
+   the account has none);
+2. uploads the Worker bundled with the app as `jackalope-swarm`, with the Artifacts
+   binding pointed at the connected namespace, the `Swarm` Durable Object and its
+   migrations, a generated `SWARM_TOKEN` secret (64 random characters kept in
+   protected storage) and `SWARM_VERSION`;
+3. publishes it at `https://jackalope-swarm.<subdomain>.workers.dev`;
+4. waits for `/health` to report the uploaded version, makes an authenticated call
+   and saves the connection.
+
+Each step can be retried. Running it again updates the Worker in place and keeps
+its token. Settings shows **Update Swarm Worker** when the app bundles a newer
+Worker or the connected namespace changes.
+
+Deploying needs Workers access. Connect Cloudflare asks for the
+`workers-scripts.write` scope only during Swarm setup, opening the browser once if
+the saved sign-in lacks it. An API token needs Account → Workers Scripts → Edit as
+well as Artifacts → Edit.
+
+Disconnecting a Worker that Set up Swarm deployed offers **Also delete the Worker
+from Cloudflare**, on by default. Deleting it removes the script and its Durable
+Object data, so fork tracking stops on every computer using it; Artifacts
+repositories are untouched. If Cloudflare refuses (for example, a token without
+Workers Scripts → Edit), the connection is still forgotten and Settings links to
+the Worker in the dashboard. A Worker entered by hand is only forgotten.
+
+### Use an existing Worker
+
+To deploy it yourself, set the namespace in `wrangler.jsonc` if yours is not
+`jackalope`, then:
 
 ```sh
 pnpm install
@@ -41,13 +71,15 @@ npx wrangler secret put SWARM_TOKEN
 npx wrangler deploy
 ```
 
-In Jackalope, open Settings → Cloudflare → Jackalope Swarm and enter the
-Worker URL and the same token. Projects linked to Artifacts then sync every 15
-seconds while tasks run; open Project → Swarm to watch.
+Choose **Use an existing Worker** and enter its URL and the same token. Projects
+linked to Artifacts then sync every 15 seconds while tasks run; open Project →
+Swarm to watch.
 
 ## API
 
 Every route except `/health` requires `Authorization: Bearer <SWARM_TOKEN>`.
+`/health` returns `{ok, version}`, where `version` is the `SWARM_VERSION` that
+one-click setup uploaded, or `null`.
 A WebSocket client that cannot set headers may send the subprotocol `swarm.<SWARM_TOKEN>`.
 
 | Method | Route | Purpose |
@@ -65,6 +97,12 @@ A WebSocket client that cannot set headers may send the subprotocol `swarm.<SWAR
 pnpm --filter @jackalope/swarm test       # diff, tree walk, conflicts and access
 pnpm --filter @jackalope/swarm typecheck
 pnpm --filter @jackalope/swarm build      # dry-run bundle
+pnpm --filter @jackalope/swarm bundle     # refresh the copy the desktop embeds
+pnpm check:swarm-bundle                   # fails when that copy is stale
 ```
+
+The desktop embeds `apps/desktop/src-tauri/resources/swarm-worker/worker.js` and
+`manifest.json` (compatibility date, bindings, migrations and a content version).
+Run the bundle script after changing `src/` or `wrangler.jsonc` and commit both files.
 
 Tests use an in-memory Git object store; they do not reach Cloudflare.

@@ -369,7 +369,7 @@
 }
 
 /* Contained dialogs pad their own body and footer to line up with the header. */
-.bot-editor-form {
+.bot-editor-body {
   display: grid;
   flex: 1;
   align-content: start;
@@ -377,6 +377,12 @@
   min-height: 0;
   padding: 0 32px 20px;
   overflow-y: auto;
+}
+
+.bot-editor-form {
+  display: grid;
+  align-content: start;
+  gap: 20px;
 }
 
 .bot-editor-steps {
@@ -731,7 +737,7 @@
 }
 
 /* Scrolling grid containers drop bottom padding in some WebViews; this keeps space above the footer. */
-.bot-editor-form::after {
+.bot-editor-body::after {
   content: "";
   height: 4px;
 }
@@ -775,4 +781,126 @@
 .bots-note {
   overflow-wrap: anywhere;
   font-size: var(--text-sm);
+}
+
+/* Bots overview: one card per project with the bots that work in it. */
+.bots-projects {
+  --workspace-card-min-width: 260px;
+}
+
+.bots-project {
+  display: grid;
+  grid-template-rows: auto 40px 16px;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 140ms,
+    background 140ms;
+}
+
+.bots-project:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface-hover);
+}
+
+.bots-project:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
+.bots-project-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bots-project-heading strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bots-project-heading > svg {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.bots-project-mark {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+}
+
+.bots-project-crew {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bots-project[data-empty] .bots-project-crew {
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+/* A bot that also works in other projects carries a small ring so it reads as shared. */
+.bots-project-member {
+  display: grid;
+  padding: 1px;
+  border-radius: var(--radius-full);
+}
+
+.bots-project-member[data-shared] {
+  box-shadow: 0 0 0 1px var(--color-border);
+}
+
+.bots-project-hint {
+  padding-inline: 12px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.bots-project-more {
+  padding-inline: 6px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+.bots-project-summary {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bots-project-summary[data-waiting] {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.bots-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bots-project {
+    transition: none;
+  }
 }

@@ -23,9 +23,9 @@ today. Signed installers and platform acceptance remain in progress; see
 Joining the [waitlist](https://jackalope.dev/#newsletter) is optional for contributors.
 Running native tasks requires an approved Jackalope account, including in source builds.
 
-<img src=".github/assets/agents.png" alt="Jackalope Agents overview showing installed coding agents, connected accounts and configuration controls" width="1419" />
+<img src=".github/assets/work.png" alt="Jackalope Work view listing a project's tasks grouped by what needs you, what agents are working on and drafts" width="1440" />
 
-*Agents overview. [Watch the tour](https://jackalope.dev/tour/).*
+*Work view. [Watch the tour](https://jackalope.dev/tour/).*
 
 ## What you can do
 

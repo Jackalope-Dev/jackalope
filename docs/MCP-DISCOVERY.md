@@ -2,9 +2,7 @@
 
 In Connections, choose **Add tools** to browse the marketplace or **Custom connection**
 to supply your own endpoint or command. Add or edit a project or all-project connection
-and enable **On-demand tools**. New tasks include enabled project connections automatically; review them
-under Customize task → Tools. Saved task connection restrictions remain honored,
-with an explicit action to return to project defaults. Direct delivery
+and enable **On-demand tools**. New tasks include enabled project connections automatically. Direct delivery
 remains the default for existing connections. A task's selected connection IDs
 carry into continuations; each attempt takes a fresh configuration snapshot.
 

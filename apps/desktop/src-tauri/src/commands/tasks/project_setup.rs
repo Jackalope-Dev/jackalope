@@ -78,9 +78,9 @@ fn git(path: &Path, args: &[&str]) -> Result<String, String> {
 
 fn create_project(parent: &Path, name: &str) -> Result<ProjectInfo, String> {
     let name = validate_name(name)?;
-    let parent = parent
-        .canonicalize()
-        .map_err(|_| "Choose an existing parent folder.".to_string())?;
+    // dunce keeps Windows paths in their ordinary form; a `\\?\` path breaks Git worktrees.
+    let parent =
+        dunce::canonicalize(parent).map_err(|_| "Choose an existing parent folder.".to_string())?;
     let path = parent.join(name);
     std::fs::create_dir(&path).map_err(|error| {
         if error.kind() == std::io::ErrorKind::AlreadyExists {
@@ -165,6 +165,7 @@ mod tests {
         let path = Path::new(&info.path);
         assert_eq!(info.branch, "main");
         assert!(info.repository);
+        assert!(!info.path.starts_with(r"\\?\"), "{}", info.path);
         assert_eq!(git(path, &["status", "--porcelain"]).unwrap(), "");
         assert_eq!(git(path, &["ls-tree", "HEAD"]).unwrap(), "");
         assert_eq!(git(path, &["rev-list", "--count", "HEAD"]).unwrap(), "1");

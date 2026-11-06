@@ -37,38 +37,6 @@
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
-.task-composer {
-  border-radius: var(--radius-2xl);
-  background: var(--color-surface-elevated);
-  box-shadow: var(--shadow-flat);
-  border: 1px solid var(--color-border);
-  transition: border-color 0.18s;
-}
-.task-composer:focus-within {
-  border-color: var(--color-accent-ink);
-}
-.task-composer .composer-intent {
-  display: block;
-  padding: 25px 26px 12px;
-  width: 100%;
-  background: transparent;
-  outline: none;
-  font-size: var(--text-base);
-  line-height: 1.65;
-  resize: vertical;
-  min-height: 144px;
-  max-height: 340px;
-}
-.task-composer .composer-intent::placeholder {
-  color: var(--color-text-muted);
-}
-.task-composer-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 20px;
-}
 select option {
   background: var(--color-surface-elevated);
   color: var(--color-text-primary);
@@ -308,9 +276,6 @@ select option {
   }
   .task-hero-title {
     font-size: var(--text-4xl);
-  }
-  .task-composer-footer {
-    align-items: flex-end;
   }
 }
 .feedback-touchpoint {

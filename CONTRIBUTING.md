@@ -105,13 +105,18 @@ An existing `core.hooksPath` requires manual integration instead of being overwr
 
 Pre-commit checks staged whitespace and runs Biome on staged JavaScript, TypeScript,
 JSON, CSS and GraphQL content. It reads the index, preserves partial staging, and
-does not format, stage or stash files. This gate is intended to take seconds.
-Pre-push runs `pnpm verify --changed` followed by `pnpm check:secrets`. `--changed`
+does not format, stage or stash files, then scans the staged changes for secrets. This
+gate is intended to take seconds.
+Pre-push runs `pnpm verify --changed`, then scans only the commits being pushed that the
+remote does not have, plus the working files, for secrets. A secret on another local
+branch is caught when that branch is pushed, so it does not block unrelated pushes.
+`pnpm check:secrets` and CI scan every commit on every ref. `--changed`
 compares the commits being pushed with their upstream (or `origin/master`): native
 formatting and Rust tests run only when files the native build reads changed
-(`apps/desktop/src-tauri/**`, its icons, `agent-capabilities.json`, Cargo settings
-and the JavaScript lockfiles), and the JavaScript and shared checks run only when
-something outside `src-tauri` changed. When the comparison is unavailable it runs
+(`apps/desktop/src-tauri/**`, its icons, the files it embeds, the vendored GLib patch,
+Cargo settings and the JavaScript lockfiles), and the JavaScript and shared checks run
+only when something outside `src-tauri` changed. `scripts/change-scope.mjs` holds these
+path rules for both the hook and CI. When the comparison is unavailable it runs
 everything; CI always runs the full gate. Allow many minutes when Rust tests run.
 TypeScript runs early so type failures stop before native compilation. Check timings
 are printed. Use `pnpm exec lefthook run pre-push` to exercise the checks without
@@ -140,6 +145,14 @@ CI runs the full gate once on Windows. Linux and macOS use `pnpm verify --native
 for desktop JavaScript, Rust formatting and native unit tests, then run their
 browser, credential-storage, desktop-control and packaging checks. Shared server,
 website, UI gallery and repository checks are covered by the required Windows job.
+A pull request whose files nothing in the desktop app reads (documentation, root
+Markdown, the website, the swarm Worker, mobile, and the server outside `admin/`)
+skips the Rust, desktop and packaging steps: Windows runs `pnpm verify --shared-only`
+and the other platform checks report from a short Linux job without building. Any other file,
+including workflows, lockfiles and shared packages, runs everything, and pushes
+always run everything. The Rust cache is keyed by the base branch's lockfile, so
+pull requests restore master's dependency builds instead of uploading their own. A
+new push to a pull request cancels its older run; pushes to master never cancel.
 The separate security workflow also runs weekly so new advisories are detected
 without rebuilding every platform. Required check names stay consistent with the
 release source checks and branch protection.

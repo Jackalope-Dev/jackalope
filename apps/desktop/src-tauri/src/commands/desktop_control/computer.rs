@@ -1,6 +1,7 @@
-//! `desktop_control` on a run's bot computer. The computer is the bot's (or
-//! the task's approved) own machine, so the whole screen is in scope without
-//! an access question, an indicator or a lease on the person's desktop.
+//! `desktop_control` on a run's computer: the one its agent runs on, its bot's
+//! or its task's approved one. That machine is not the person's desktop, so
+//! the whole screen is in scope without an access question, an indicator or a
+//! lease on the person's desktop.
 //! Snapshot IDs, element refs, key validation, the action log and per-site
 //! questions for the computer's browser work as on the person's desktop.
 
@@ -441,7 +442,7 @@ pub async fn execute(
     if request.action == "release" {
         close(&run.id);
         return Ok(
-            json!({"status":"released","instruction":"The computer belongs to the bot. It keeps running until it has been idle for its idle stop time."}),
+            json!({"status":"released","instruction":"The computer is not the person's desktop. It keeps running until it has been idle for its idle stop time."}),
         );
     }
     tauri::async_runtime::spawn_blocking(move || {
@@ -449,7 +450,7 @@ pub async fn execute(
         computers::ready(&root, &computer)?;
         if request.action == "request_access" {
             return Ok(json!({"status":"active","scope":"desktop","granted":format!("the whole screen of {}", computer.name),
-                "instruction":"This is the bot's own computer, not the person's desktop. Take a snapshot or screenshot, then act by ref or coordinates. Each input consumes the latest snapshotId."}));
+                "instruction":"This computer is not the person's desktop. Take a snapshot or screenshot, then act by ref or coordinates. Each input consumes the latest snapshotId."}));
         }
         let owned = session(&run.id)?;
         let mut state = owned

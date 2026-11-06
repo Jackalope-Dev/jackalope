@@ -1,4 +1,5 @@
-use super::{clip, BotHub, HubBot, WakeDefinition, WakeState, WakeTrigger};
+use super::{clip, BotHub, WakeDefinition, WakeState, WakeTrigger};
+use crate::commands::tasks::RunRequest;
 use chrono::{DateTime, Duration as Span, Utc};
 use sha2::{Digest, Sha256};
 
@@ -37,14 +38,17 @@ impl BotHub {
                 }
                 let observation = match &wake.trigger {
                     WakeTrigger::Schedule { .. } => None,
-                    WakeTrigger::RepoChange { path } => Some(observe_repo(bot, path)),
+                    WakeTrigger::RepoChange { path } => Some(observe_repo(
+                        bot.request_in(wake.project_id.as_deref()),
+                        path,
+                    )),
                     WakeTrigger::Connection {
                         connection_id,
                         tool,
                         arguments,
                         ..
                     } => Some(observe_connection(
-                        bot,
+                        bot.request_in(wake.project_id.as_deref()),
                         connection_id,
                         tool,
                         arguments.clone(),
@@ -212,31 +216,30 @@ fn short(revision: &str) -> &str {
     revision.get(..8).unwrap_or(revision)
 }
 
-fn observe_repo(bot: &HubBot, path: &str) -> Observation {
-    let branch = bot
-        .request
+fn observe_repo(request: &RunRequest, path: &str) -> Observation {
+    let branch = request
         .target_branch
         .clone()
         .filter(|branch| !branch.trim().is_empty())
         .map_or_else(
-            || crate::commands::tasks::resolve_target_branch(&bot.request.project_path, None),
+            || crate::commands::tasks::resolve_target_branch(&request.project_path, None),
             Ok,
         )?;
     crate::commands::monitors::ChangeMonitor {
         path: path.into(),
         action: crate::commands::monitors::MonitorAction::Run,
     }
-    .observe(&bot.request.project_path, &branch)
+    .observe(&request.project_path, &branch)
     .map(|revision| (revision, None))
 }
 
 fn observe_connection(
-    bot: &HubBot,
+    request: &RunRequest,
     connection: &str,
     tool: &str,
     arguments: serde_json::Map<String, serde_json::Value>,
 ) -> Observation {
-    let server = crate::commands::mcp::resolve_connection(&bot.request.project_id, connection)?;
+    let server = crate::commands::mcp::resolve_connection(&request.project_id, connection)?;
     let result = tauri::async_runtime::block_on(crate::commands::mcp::read_tool_once(
         &server, tool, arguments,
     ))?;

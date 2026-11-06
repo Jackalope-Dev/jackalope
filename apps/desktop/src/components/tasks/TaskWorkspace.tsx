@@ -24,7 +24,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
-import { SessionStart } from '../sessions/SessionStart';
+import { type ComposerSeed, SessionStart } from '../sessions/SessionStart';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
@@ -50,13 +50,15 @@ const ArchivedHistory = lazy(() =>
 export function TaskWorkspace({
   onCapture,
   onSchedule,
-  composerVisible = true,
   composerFocus = 0,
+  composerSeed,
+  onComposerSeedApplied,
 }: {
   onCapture: (ideaId?: string) => void;
   onSchedule: (runId: string) => void;
-  composerVisible?: boolean;
   composerFocus?: number;
+  composerSeed?: ComposerSeed | null;
+  onComposerSeedApplied?: (seed: ComposerSeed) => void;
 }) {
   const { projects, activeProjectId } = useProjectStore(
     useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
@@ -278,7 +280,7 @@ export function TaskWorkspace({
         title="Work"
         action={
           <div className="task-home-actions">
-            {hasWork && !(composerVisible && composerExpanded) && (
+            {hasWork && !composerExpanded && (
               <Button
                 onClick={() => {
                   setComposerExpanded(true);
@@ -327,9 +329,11 @@ export function TaskWorkspace({
           </div>
         }
       />
-      {composerVisible && (!hasWork || composerExpanded) && (
+      {(!hasWork || composerExpanded) && (
         <SessionStart
           embedded
+          seed={composerSeed}
+          onSeedApplied={onComposerSeedApplied}
           key={project?.id ?? 'none'}
           project={project}
           starters={!hasWork}

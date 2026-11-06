@@ -176,6 +176,21 @@ standalone task's subtasks are ordinary queue tasks with their own review and me
 they dispatch on the parent's own key while its run continues, and other manual work
 in the project still holds them. Every spawn posts a project handoff message.
 
+## Swarm rounds
+
+A plan approved as a swarm (beta) runs in rounds of managed assignments. After a
+round's combined result merges, a read-only orchestrator attempt reviews the integrated
+tree against the plan's criteria, running the saved check through `computer_verify`,
+and either declares the plan done with evidence or names the next round's assignments,
+which are validated and scheduled like the first, or wait for the person's approval
+when the plan asks first. Up to 4 orchestrators can review a large plan's areas in
+parallel; their verdicts merge into one (done only when every area is done, next
+assignments deduplicated and sequenced where scopes overlap). A round runs at least 8 and at most 24
+assignments, sized to the slots where the project's agents run. Rounds stop at the
+plan's round limit (default 5), pause and stop with the plan, start paused after a
+restart, and never assign `.jackalope/**`. A swarm Worker is optional. See
+[plan mode](PLAN-MODE.md#swarm-rounds-beta).
+
 ## Ownership and interface decisions
 
 `agreement` (HTTP `POST /v1/agreements`) saves structured decisions in the locked,
@@ -278,7 +293,9 @@ need a person.
 With a committed policy, a ready planned or swarm result (all assignments plus the
 combined review) also merges automatically when the project merges verified work
 automatically and its queue is running. A held result is not retried until the target
-branch or its attempts change; the task shows why it was not merged.
+branch or its attempts change; the task shows why it was not merged. A merged swarm round then
+goes to its orchestrator review; human acceptance still applies to every round the
+policy holds.
 
 While a project merges verified work automatically, Jackalope also delivers its branch.
 Every 20 seconds it reads the branch head; when the head changes it pushes the branch

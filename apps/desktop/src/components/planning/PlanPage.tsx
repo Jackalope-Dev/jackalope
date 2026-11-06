@@ -4,14 +4,18 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow';
 import {
   approvalVerification,
+  areaStateLabels,
   criterionCoverage,
   criterionStateLabels,
   interviewOptions,
+  type PlanRounds,
   type PlanShape,
   type PlanSummary,
   type PlanView,
   planAssumption,
   planCommands,
+  type RoundAssignment,
+  roundStateLabels,
   type SectionChange,
   shapeChoices,
   stateTone,
@@ -49,6 +53,10 @@ const toneVariant = {
 
 function StateBadge({ state, label }: { state: string; label: string }) {
   return <Badge variant={toneVariant[stateTone(state)]}>{label}</Badge>;
+}
+
+function BetaBadge() {
+  return <Badge variant="accent">Beta</Badge>;
 }
 
 function Bullets({ items, empty }: { items: string[]; empty: string }) {
@@ -175,7 +183,7 @@ export function PlanPage() {
         <EmptyState
           icon={ClipboardList}
           title="No plans yet"
-          description="Write a request in the composer, then choose Plan with me or Write the plan myself."
+          description="Write a request in the Work composer and choose Options → Plan with me, or choose Plan feature work from the Work menu to write the plan yourself."
           action={
             <Button
               onClick={() => {
@@ -242,6 +250,12 @@ function PlanDetail({
             {statusLabels[view.status]}
             {view.revision ? ` · revision ${view.revision}` : ''}
             {view.approval ? ` · approved by ${view.approval.approvedBy}` : ''}
+            {view.rounds && (
+              <span className="plan-swarm">
+                {' '}
+                · Swarm round {view.rounds.current} of {view.rounds.max} <BetaBadge />
+              </span>
+            )}
           </p>
         </div>
       </header>
@@ -416,7 +430,10 @@ function PlanReview({
                   onChange={() => setShape(choice.shape)}
                 />
                 <span>
-                  <strong>{choice.label}</strong>
+                  <strong>
+                    {choice.label}
+                    {choice.shape === 'swarm' && <BetaBadge />}
+                  </strong>
                   <span className="plan-muted">{choice.unavailable ?? choice.detail}</span>
                 </span>
               </label>
@@ -687,7 +704,11 @@ function PlanProgress({
           </span>
         )}
       </div>
-      <WorkspaceSectionHeading title="Tasks" level={3} />
+      {view.rounds && <PlanRoundList planId={view.id} rounds={view.rounds} act={act} />}
+      <WorkspaceSectionHeading
+        title={view.rounds ? `Round ${view.rounds.current} tasks` : 'Tasks'}
+        level={3}
+      />
       <ul className="plan-rows">
         {[...progress.tasks, ...(progress.review ? [progress.review] : [])].map((task) => (
           <li key={`${task.key}:${task.runId ?? ''}`}>
@@ -757,12 +778,238 @@ function PlanProgress({
           </ul>
         </>
       )}
-      {progress.merged && (
+      {(view.rounds ? view.status === 'done' : progress.merged) && (
         <Button variant="ghost" onClick={() => void act(() => planCommands.archive(view.id))}>
           Archive plan
         </Button>
       )}
     </div>
+  );
+}
+
+/** Each swarm round's verdict, evidence and the work it queued next. */
+function PlanRoundList({
+  planId,
+  rounds,
+  act,
+}: {
+  planId: string;
+  rounds: PlanRounds;
+  act: (work: () => Promise<unknown>) => Promise<void>;
+}) {
+  const current = rounds.rounds.at(-1);
+  const open = current && ['working', 'reviewing', 'held', 'approval'].includes(current.state);
+  const orchestrators = rounds.orchestrators ?? 1;
+  return (
+    <section className="plan-rounds" aria-labelledby={`${planId}-rounds`}>
+      <WorkspaceSectionHeading
+        title={
+          <span className="plan-swarm">
+            Rounds <BetaBadge />
+          </span>
+        }
+        titleId={`${planId}-rounds`}
+        level={3}
+        description={`Round ${rounds.current} of at most ${rounds.max}. After each merge ${
+          orchestrators > 1
+            ? `up to ${orchestrators} orchestrators check`
+            : 'an orchestrator checks'
+        } the criteria.`}
+      />
+      {open && (
+        <div className="plan-actions">
+          <Select
+            aria-label="Next rounds"
+            value={rounds.askFirst ? 'ask' : 'auto'}
+            onValueChange={(value) =>
+              void act(() => planCommands.rounds(planId, value === 'ask' ? 'ask' : 'auto'))
+            }
+          >
+            <SelectItem value="auto">Start next rounds automatically</SelectItem>
+            <SelectItem value="ask">Ask me first</SelectItem>
+          </Select>
+          {current.state !== 'approval' && (
+            <>
+              {rounds.paused ? (
+                <Button
+                  variant="outline"
+                  onClick={() => void act(() => planCommands.rounds(planId, 'resume'))}
+                >
+                  Resume rounds
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => void act(() => planCommands.rounds(planId, 'pause'))}
+                >
+                  Pause rounds
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                onClick={() => void act(() => planCommands.rounds(planId, 'stop'))}
+              >
+                Stop
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+      {current?.held && <InlineNotice tone="warning">{current.held}</InlineNotice>}
+      {current?.proposal && (
+        <RoundProposal key={current.number} planId={planId} proposal={current.proposal} act={act} />
+      )}
+      <ol className="plan-rows">
+        {[...rounds.rounds].reverse().map((round) => (
+          <li key={round.number} className="plan-round">
+            <span>
+              <strong>Round {round.number}</strong>
+              {round.summary && <span className="plan-prose">{round.summary}</span>}
+              {round.check && (
+                <span className="plan-muted">
+                  {round.check.passed ? 'Check passed' : 'Check failed'}: {round.check.command}
+                </span>
+              )}
+              {round.evidence.length > 0 && <Bullets items={round.evidence} empty="" />}
+              {round.next.length > 0 && !round.proposal && (
+                <span className="plan-muted">Next: {round.next.join(' · ')}</span>
+              )}
+              {!!round.areas?.length && (
+                <ul className="plan-round-areas" aria-label={`Round ${round.number} areas`}>
+                  {round.areas.map((area) => (
+                    <li key={area.name}>
+                      <span>
+                        {area.name}
+                        {area.next.length > 0 && (
+                          <span className="plan-muted"> · next: {area.next.join(' · ')}</span>
+                        )}
+                      </span>
+                      <StateBadge state={area.state} label={areaStateLabels[area.state]} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </span>
+            <StateBadge state={round.state} label={roundStateLabels[round.state]} />
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+/** The orchestrator's proposed next round: nothing starts until it is approved. */
+function RoundProposal({
+  planId,
+  proposal,
+  act,
+}: {
+  planId: string;
+  proposal: RoundAssignment[];
+  act: (work: () => Promise<unknown>) => Promise<void>;
+}) {
+  const id = useId();
+  const [draft, setDraft] = useState<RoundAssignment[] | null>(null);
+  const items = draft ?? proposal;
+  const change = (index: number, edit: Partial<RoundAssignment>) =>
+    setDraft(items.map((item, at) => (at === index ? { ...item, ...edit } : item)));
+  const remove = (index: number) => {
+    const removed = items[index].key;
+    setDraft(
+      items
+        .filter((_, at) => at !== index)
+        .map((item) => ({
+          ...item,
+          dependsOn: item.dependsOn.filter((key) => key !== removed),
+        })),
+    );
+  };
+  const approved = draft?.map((item) => ({
+    ...item,
+    scopes: item.scopes.map((scope) => scope.trim()).filter(Boolean),
+  }));
+  return (
+    <section className="plan-round-proposal" aria-labelledby={`${id}-proposal`}>
+      <WorkspaceSectionHeading
+        title="Next round"
+        titleId={`${id}-proposal`}
+        level={3}
+        description="Nothing starts until you approve."
+      />
+      <ol className="plan-rows">
+        {items.map((item, index) =>
+          draft ? (
+            <li key={item.key} className="plan-round">
+              <span className="plan-proposal-edit">
+                <label htmlFor={`${id}-${index}-title`}>Title</label>
+                <Input
+                  id={`${id}-${index}-title`}
+                  value={item.title}
+                  maxLength={160}
+                  onChange={(event) => change(index, { title: event.target.value })}
+                />
+                <label htmlFor={`${id}-${index}-prompt`}>Instructions</label>
+                <Textarea
+                  id={`${id}-${index}-prompt`}
+                  rows={3}
+                  maxLength={8000}
+                  value={item.prompt}
+                  onChange={(event) => change(index, { prompt: event.target.value })}
+                />
+                <label htmlFor={`${id}-${index}-scopes`}>Scopes</label>
+                <Input
+                  id={`${id}-${index}-scopes`}
+                  value={item.scopes.join(', ')}
+                  placeholder="src/feature"
+                  onChange={(event) =>
+                    change(index, {
+                      scopes: event.target.value.split(',').map((scope) => scope.trimStart()),
+                    })
+                  }
+                />
+              </span>
+              <Button
+                variant="ghost"
+                aria-label={`Remove ${item.title}`}
+                onClick={() => remove(index)}
+              >
+                Remove
+              </Button>
+            </li>
+          ) : (
+            <li key={item.key} className="plan-round">
+              <span>
+                <strong>{item.title}</strong>
+                <span className="plan-muted">
+                  {item.scopes.join(', ')}
+                  {item.dependsOn.length > 0 && ` · after ${item.dependsOn.join(', ')}`}
+                </span>
+              </span>
+            </li>
+          ),
+        )}
+      </ol>
+      <div className="plan-actions">
+        <Button
+          disabled={approved?.length === 0}
+          onClick={() => void act(() => planCommands.rounds(planId, 'approve', approved))}
+        >
+          {draft ? 'Approve edits' : 'Approve'}
+        </Button>
+        {draft ? (
+          <Button variant="outline" onClick={() => setDraft(null)}>
+            Discard edits
+          </Button>
+        ) : (
+          <Button variant="outline" onClick={() => setDraft(proposal)}>
+            Edit
+          </Button>
+        )}
+        <Button variant="ghost" onClick={() => void act(() => planCommands.rounds(planId, 'stop'))}>
+          Stop
+        </Button>
+      </div>
+    </section>
   );
 }
 

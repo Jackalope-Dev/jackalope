@@ -6,6 +6,7 @@ pub mod peers;
 mod reconciliation;
 mod scope_audit;
 pub mod subtasks;
+pub mod swarm_setup;
 pub use reconciliation::{queue_assist_policy, queue_retry_reconciliation};
 pub use scope_audit::{queue_cancel_agreement, queue_reconcile_scope};
 pub(super) mod automatic;
@@ -68,10 +69,18 @@ use std::{
 use tauri::State;
 use uuid::Uuid;
 
+/// Agents that may run at once on project computers by default, and at most.
+const DEFAULT_REMOTE_CONCURRENCY: usize = 8;
+const MAX_REMOTE_CONCURRENCY: usize = 32;
+
 struct Inner {
     ledger: Ledger,
     enabled: HashSet<String>,
     concurrency: usize,
+    /// Agents that may run at once on project computers, apart from `concurrency`.
+    remote_concurrency: usize,
+    /// Projects whose agents run on a computer, refreshed each dispatch tick.
+    remote_projects: HashSet<String>,
     grants: HashMap<String, (String, String)>,
     url: Option<String>,
     error: Option<String>,
@@ -661,6 +670,7 @@ pub async fn queue_dispatch(
     project_id: String,
     enabled: bool,
     concurrency: usize,
+    remote_concurrency: Option<usize>,
     state: State<'_, Coordinator>,
 ) -> Result<(), String> {
     let service = state.inner().clone();
@@ -668,6 +678,12 @@ pub async fn queue_dispatch(
         let mut inner = service.inner.lock().unwrap();
         if !(1..=6).contains(&concurrency) {
             return Err("Choose between one and six concurrent agents.".into());
+        }
+        if let Some(remote) = remote_concurrency {
+            if !(1..=MAX_REMOTE_CONCURRENCY).contains(&remote) {
+                return Err("Choose between 1 and 32 agents on computers.".into());
+            }
+            inner.remote_concurrency = remote;
         }
         if enabled {
             service.ensure_storage_loaded()?;

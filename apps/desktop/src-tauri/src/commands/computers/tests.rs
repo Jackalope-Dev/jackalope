@@ -500,6 +500,81 @@ fn local_docker_computer_round_trip() {
             "hi",
             "the home volume persists"
         );
+        // An agent run: upload a workspace, run a stand-in agent, bring its changes back.
+        let workspace = root.join("workspace");
+        std::fs::create_dir_all(&workspace).map_err(|e| e.to_string())?;
+        std::fs::write(workspace.join("a.txt"), "one\n").map_err(|e| e.to_string())?;
+        std::fs::write(workspace.join(".env.local"), "KEY=1\n").map_err(|e| e.to_string())?;
+        let mut session = runs::Session::open(&root, &computer, &workspace.to_string_lossy())?;
+        let status = session.status()?.ok_or("the agent knows run_status")?;
+        if status["exists"] == true {
+            session.remove();
+        }
+        session.upload(&workspace, &[".env.local".into()], &|_, _| {})?;
+        for tool in ["git", "node", "claude", "codex"] {
+            let found = call(
+                &root,
+                &computer,
+                json!({"action":"exec","command":format!("command -v {tool}")}),
+                Duration::from_secs(30),
+                &canceled,
+            )?;
+            assert_eq!(found["exitCode"], 0, "{tool} is installed");
+        }
+        // The stand-in also reads its copied setup file and makes one bridge call.
+        let script = "read line; echo \"{\\\"type\\\":\\\"echo\\\",\\\"text\\\":\\\"$line\\\"}\"; cat .env.local >&2; python3 -c 'import os,urllib.request as u;e=os.environ;r=u.Request(e[\"JACKALOPE_BRIDGE_URL\"]+\"/v1/messages\",data=b\"{}\",headers={\"Authorization\":\"Bearer \"+e[\"JACKALOPE_BRIDGE_TOKEN\"],\"Content-Type\":\"application/json\"});print(u.urlopen(r).read().decode())'; echo two > a.txt; echo new > b.txt; echo done >&2";
+        assert!(session
+            .start(
+                &["bash".into(), "-c".into(), script.into()],
+                &[
+                    ("EXAMPLE".into(), "1".into()),
+                    ("JACKALOPE_BRIDGE_URL".into(), runs::RELAY_URL.into()),
+                    ("JACKALOPE_BRIDGE_TOKEN".into(), runs::RELAY_TOKEN.into()),
+                ],
+                "hello\n",
+                true,
+            )?
+            .is_none());
+        let (mut out, mut err) = (0, 0);
+        let (mut stdout, mut stderr) = (Vec::new(), Vec::new());
+        let mut relayed = 0;
+        let exit = loop {
+            let page = session.read(&mut out, &mut err, false)?;
+            stdout.extend(page.stdout);
+            stderr.extend(page.stderr);
+            for call in &page.bridge {
+                assert_eq!(call["path"], "/v1/messages");
+                relayed += 1;
+                session.answer(&super::relay::Answer {
+                    call: call["id"].as_str().unwrap().into(),
+                    status: 200,
+                    content_type: "application/json".into(),
+                    body: b"{\"relayed\":true}".to_vec(),
+                })?;
+            }
+            if let Some(exit) = page.exit {
+                break exit;
+            }
+        };
+        assert_eq!(exit["code"], 0);
+        assert_eq!(relayed, 1, "the bridge call reached this device");
+        assert_eq!(
+            String::from_utf8_lossy(&stdout),
+            "{\"type\":\"echo\",\"text\":\"hello\"}\n{\"relayed\":true}\n"
+        );
+        assert_eq!(String::from_utf8_lossy(&stderr), "KEY=1\ndone\n");
+        let patch = session.collect()?;
+        runs::apply(&workspace, &patch)?;
+        assert_eq!(
+            std::fs::read_to_string(workspace.join("a.txt")).unwrap(),
+            "two\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(workspace.join("b.txt")).unwrap(),
+            "new\n"
+        );
+        session.remove();
+        session.shutdown();
         Ok(())
     })();
     disconnect(&computer.id);

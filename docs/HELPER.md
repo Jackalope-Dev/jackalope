@@ -58,8 +58,7 @@ professional would also do, the rawest material to start from, the methods and t
 use, and an outside check that would show the result is right. Choices that belong to the
 person stay open. It does not do the task and never sends.
 
-The New work composer and the task capture dialog show it as an icon button with the
-draft tools; the terminal offers `/sharpen <draft>`. It runs only on that explicit
+The New work composer shows it as an icon button with the draft tools; the terminal offers `/sharpen <draft>`. It runs only on that explicit
 action. `useSharpen` in `components/tasks/SharpenButton.tsx` calls `helper_sharpen`
 with the composer's character limit; while it runs the draft is read-only and the
 button stops it through `helper_sharpen_cancel`. The rewrite replaces the draft as

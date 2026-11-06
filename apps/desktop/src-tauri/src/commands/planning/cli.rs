@@ -112,7 +112,19 @@ pub fn view(plan: &session::PlanView) -> protocol::PlanView {
                 .iter()
                 .filter(|task| ["checked", "merged"].contains(&task.state.as_str()))
                 .count();
-            let mut line = format!("{checked}/{} tasks checked", progress.tasks.len());
+            let mut line = match &plan.rounds {
+                Some(rounds) => format!(
+                    "swarm (beta) round {}/{} · {}",
+                    rounds.current,
+                    rounds.max,
+                    round_state(rounds)
+                ),
+                None => String::new(),
+            };
+            if !line.is_empty() {
+                line.push_str(" · ");
+            }
+            line.push_str(&format!("{checked}/{} tasks checked", progress.tasks.len()));
             if let Some(review) = &progress.review {
                 line.push_str(&format!(" · review {}", review.state));
             }
@@ -122,7 +134,13 @@ pub fn view(plan: &session::PlanView) -> protocol::PlanView {
                     progress.repairs, progress.repair_limit
                 ));
             }
-            if !progress.dispatching && !progress.merged {
+            if plan
+                .rounds
+                .as_ref()
+                .map_or(!progress.dispatching && !progress.merged, |rounds| {
+                    rounds.paused
+                })
+            {
                 line.push_str(" · paused");
             }
             if let Some(error) = &progress.error {
@@ -132,7 +150,35 @@ pub fn view(plan: &session::PlanView) -> protocol::PlanView {
         }),
         verification: Some(plan.verification.source.into()),
         check: plan.verification.command.clone(),
+        next_round: plan
+            .rounds
+            .as_ref()
+            .and_then(|rounds| rounds.rounds.last())
+            .and_then(|round| round.proposal.as_ref())
+            .map(|proposal| proposal.iter().map(|item| item.title.clone()).collect())
+            .unwrap_or_default(),
     }
+}
+
+/// The current round's state for the progress line, with its areas'
+/// verdicts when parallel orchestrators review it.
+pub fn round_state(rounds: &super::rounds::RoundsView) -> String {
+    let Some(round) = rounds.rounds.last() else {
+        return "working".into();
+    };
+    let mut state = match round.state.as_str() {
+        "approval" => "next round waits for your approval".to_string(),
+        other => other.to_string(),
+    };
+    if !round.areas.is_empty() {
+        let areas: Vec<String> = round
+            .areas
+            .iter()
+            .map(|area| format!("{} {}", area.name, area.state))
+            .collect();
+        state.push_str(&format!(" ({})", areas.join(", ")));
+    }
+    state
 }
 
 fn detail(coordinator: &Coordinator, id: &str) -> Result<protocol::Response, String> {
@@ -210,6 +256,7 @@ pub fn action(
         "replan-deviation" => {
             session::resolve_deviation(coordinator, id, &text, "replan", "terminal")?
         }
+        "rounds" => super::rounds::action(coordinator, id, text.trim(), None)?,
         _ => return Err("Unknown plan action.".into()),
     }
     detail(coordinator, id)

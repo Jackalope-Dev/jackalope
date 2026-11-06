@@ -1,4 +1,6 @@
+import { authorPath, authors } from './authors.ts';
 import { practicalPosts } from './blog-content.ts';
+import { markdownPosts } from './blog-markdown.ts';
 import type { BlogPost } from './blog-types.ts';
 import changelog from './changelog.json' with { type: 'json' };
 import { type ReleaseMap, withReleases } from './changelog.ts';
@@ -6,6 +8,10 @@ import { growthPost } from './growth-content.ts';
 import { knowledgeGuides } from './knowledge-content.ts';
 import { marketingPages } from './marketing-content.ts';
 import { recentPosts } from './recent-posts.ts';
+
+/** The brand suffix only when it still fits search results' 60 characters. */
+const postTitle = (title: string) =>
+  title.length + ' | Jackalope'.length <= 60 ? `${title} | Jackalope` : title;
 
 export const siteOrigin = 'https://jackalope.dev';
 export const company = { name: 'Jackalope Digital LLC', url: 'https://jackalope.digital' };
@@ -24,6 +30,7 @@ export const tour = {
 };
 
 export const posts: BlogPost[] = [
+  ...markdownPosts,
   ...recentPosts,
   ...practicalPosts,
   growthPost,
@@ -164,6 +171,8 @@ export const posts: BlogPost[] = [
     ],
   },
 ];
+// Newest first: the blog index, feed and sitemap list posts in this order.
+posts.sort((a, b) => b.date.localeCompare(a.date));
 
 /** Set by the website build from release tags; absent in tooling that loads this file directly. */
 declare const __CHANGELOG_RELEASES__: ReleaseMap | undefined;
@@ -178,6 +187,12 @@ export type SitePage = {
   description: string;
   noindex?: boolean;
 };
+
+// A published Markdown post must not take over a hand-written post's URL.
+const duplicateSlug = posts.find(
+  (post, index) => posts.findIndex((other) => other.slug === post.slug) !== index,
+);
+if (duplicateSlug) throw new Error(`Two blog posts use the slug ${duplicateSlug.slug}.`);
 
 export const pages: SitePage[] = [
   {
@@ -255,9 +270,14 @@ export const pages: SitePage[] = [
     title: page.title,
     description: page.description,
   })),
+  ...authors.map((author) => ({
+    path: authorPath(author),
+    title: `${author.name}, ${author.jobTitle} | Jackalope`,
+    description: author.summary,
+  })),
   ...posts.map((post) => ({
     path: `/blog/${post.slug}/`,
-    title: `${post.seoTitle || post.title} | Jackalope`,
+    title: postTitle(post.seoTitle || post.title),
     description: post.description,
   })),
   ...knowledgeGuides.map((guide) => ({

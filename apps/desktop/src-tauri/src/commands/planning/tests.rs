@@ -108,7 +108,8 @@ fn validation_rejects_unknown_references_and_limits() {
     doc.tasks[1].key = "csv".into();
     assert!(doc.validate().is_err());
     let mut doc = sample();
-    doc.tasks = (0..9)
+    // Documents hold up to 24 tasks; only a swarm runs more than eight.
+    doc.tasks = (0..25)
         .map(|i| PlanTask {
             key: format!("t{i}"),
             title: "T".into(),
@@ -116,7 +117,7 @@ fn validation_rejects_unknown_references_and_limits() {
             ..Default::default()
         })
         .collect();
-    assert!(doc.validate().is_err());
+    assert!(doc.validate().unwrap_err().contains("24 tasks"));
     assert!(sample().validate().is_ok());
 }
 
@@ -260,15 +261,25 @@ fn approved_plans_map_to_managed_assignments() {
 #[test]
 fn shape_defaults_follow_the_recommendation_when_available() {
     let mut doc = sample();
+    // A swarm no longer needs a connected Worker.
     doc.front.recommended_shape = "swarm".into();
-    assert_eq!(handoff::default_shape(&doc, true), "swarm");
-    assert_eq!(handoff::default_shape(&doc, false), "subtasks");
+    assert_eq!(handoff::default_shape(&doc), "swarm");
     doc.front.recommended_shape = "single".into();
-    assert_eq!(handoff::default_shape(&doc, true), "single");
+    assert_eq!(handoff::default_shape(&doc), "single");
     doc.front.recommended_shape = "subtasks".into();
+    let mut large = doc.clone();
+    large.tasks = (0..9)
+        .map(|i| PlanTask {
+            key: format!("t{i}"),
+            title: "T".into(),
+            scopes: vec![format!("s{i}")],
+            ..Default::default()
+        })
+        .collect();
+    assert_eq!(handoff::default_shape(&large), "swarm");
     doc.tasks.truncate(1);
     doc.tasks[0].covers = vec!["AC-1".into(), "AC-2".into()];
-    assert_eq!(handoff::default_shape(&doc, false), "single");
+    assert_eq!(handoff::default_shape(&doc), "single");
 }
 
 fn step(name: &str, status: &str, notes: &str) -> ValidationStep {
@@ -425,6 +436,9 @@ fn settings_default_and_reject_paths_outside_the_project() {
         planner_agent: Some("claude".into()),
         planner_model: None,
         export_path: "plans/{slug}.md".into(),
+        max_rounds: 3,
+        ask_before_rounds: true,
+        orchestrators: 3,
     };
     store.save_settings("p", custom.clone()).unwrap();
     assert_eq!(store.settings("p"), custom);
@@ -439,9 +453,29 @@ fn settings_default_and_reject_paths_outside_the_project() {
         ..Default::default()
     };
     assert!(store.save_settings("p", chatty).is_err());
+    for orchestrators in [0, super::rounds::MAX_ORCHESTRATORS + 1] {
+        let parallel = PlanSettings {
+            orchestrators,
+            ..Default::default()
+        };
+        assert!(store.save_settings("p", parallel).is_err());
+    }
+    for max_rounds in [0, super::rounds::MAX_ROUNDS + 1] {
+        let rounds = PlanSettings {
+            max_rounds,
+            ..Default::default()
+        };
+        assert!(store.save_settings("p", rounds).is_err());
+    }
     // Saved without newer fields, settings still load.
     std::fs::write(folder.join("settings.json"), br#"{"p":{"questionCap":2}}"#).unwrap();
     assert_eq!(store.settings("p").export_path, "docs/plans/{slug}.md");
+    assert_eq!(
+        store.settings("p").max_rounds,
+        super::rounds::DEFAULT_ROUNDS
+    );
+    assert!(!store.settings("p").ask_before_rounds);
+    assert_eq!(store.settings("p").orchestrators, 1);
     std::fs::remove_dir_all(folder).unwrap();
 }
 

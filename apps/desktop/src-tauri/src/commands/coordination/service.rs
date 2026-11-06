@@ -20,6 +20,7 @@ impl Coordinator {
             messages: inner.ledger.messages.clone(),
             enabled_projects: inner.enabled.iter().cloned().collect(),
             concurrency: inner.concurrency,
+            remote_concurrency: inner.remote_concurrency,
             bridge_url: inner.url.clone(),
             bridge_error: inner.error.clone(),
             merged_run_ids,
@@ -248,9 +249,13 @@ impl Coordinator {
         self.reconcile()?;
         self.ensure_storage_loaded()?;
         self.auto_start_managed()?;
+        // Swarm rounds take the plan store and coordinator locks one at a time.
+        crate::commands::planning::rounds::tick(self);
         self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
+        inner.remote_projects =
+            crate::commands::computers::runs::run_projects(&self.runtime.computers_root());
         let _guard = crate::commands::integration::execution_guard()?;
         self.runtime.ensure_history_saved()?;
         let merged = crate::commands::integration::applied_run_ids(&self.runtime)?;

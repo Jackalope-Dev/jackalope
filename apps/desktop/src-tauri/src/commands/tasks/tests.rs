@@ -38,6 +38,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         account_binding: None,
         target_branch: None,
         process_contained: false,
+        remote: None,
         verify_command: None,
         prepare_command: None,
         setup_files: Vec::new(),
