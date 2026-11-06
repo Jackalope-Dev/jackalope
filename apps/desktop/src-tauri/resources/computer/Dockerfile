@@ -20,6 +20,13 @@ RUN apt-get update \
 RUN npm install --global --no-fund --no-audit @openai/codex \
     && npm cache clean --force
 
+# The browser tools of agents on this computer: agent-browser (Apache-2.0)
+# drives the Chromium above. Keep the version the desktop bundles
+# (src-tauri/build.rs); agent.py runs its native program for this processor.
+RUN npm install --global --no-fund --no-audit agent-browser@0.41.1 \
+    && chmod 0755 /usr/local/lib/node_modules/agent-browser/bin/agent-browser-linux-* \
+    && npm cache clean --force
+
 # Each Debian package's notices stay in /usr/share/doc/<package>/copyright (the
 # slim image's dpkg filter keeps them); do not remove them.
 RUN mkdir -p /usr/share/doc/jackalope-computer \

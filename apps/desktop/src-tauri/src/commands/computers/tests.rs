@@ -533,7 +533,7 @@ fn local_docker_computer_round_trip() {
                 ],
                 "hello\n",
                 true,
-                None,
+                &Default::default(),
             )?
             .exit
             .is_none());

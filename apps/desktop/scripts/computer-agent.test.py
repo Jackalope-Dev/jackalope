@@ -25,6 +25,8 @@ AGENT = os.path.join(
 def load(runs):
     os.environ["JACKALOPE_RUNS"] = runs
     os.environ["JACKALOPE_RUN_ORPHAN_SECONDS"] = "3"
+    # No agent-browser here unless a test provides one.
+    os.environ["JACKALOPE_AGENT_BROWSER_HOME"] = os.path.join(runs, "no-agent-browser")
     spec = importlib.util.spec_from_file_location("computer_agent", AGENT)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -245,7 +247,8 @@ class RunProtocol(unittest.TestCase):
 
     def test_status_reports_a_run_whose_supervisor_died(self):
         self.assertEqual(self.call(action="run_status", run="r8"),
-                         {"exists": False, "runs": self.agent.RUNS_PROTOCOL})
+                         {"exists": False, "runs": self.agent.RUNS_PROTOCOL,
+                          "capabilities": self.agent.capabilities()})
         self.upload("r8", archive({"a.txt": b"x"}))
         self.assertFalse(self.call(action="run_status", run="r8")["started"])
         self.call(action="run_start", run="r8",
@@ -473,6 +476,314 @@ class RunProtocol(unittest.TestCase):
         server.server_close()
         # A bridge that cannot be reached denies the call.
         self.assertEqual(hook(event)["permissionDecision"], "deny")
+
+
+AGENT_SCRIPT = """
+import json, os, urllib.request
+url = os.environ['JACKALOPE_BRIDGE_URL']
+token = os.environ['JACKALOPE_BRIDGE_TOKEN']
+def call(name, arguments, number):
+    body = json.dumps({'jsonrpc': '2.0', 'id': number, 'method': 'tools/call',
+                       'params': {'name': name, 'arguments': arguments}}).encode()
+    request = urllib.request.Request(url + '/mcp', data=body, method='POST', headers={
+        'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
+    return json.loads(urllib.request.urlopen(request).read())
+verify = call('computer_verify', {}, 1)['result']
+print('verify', verify['isError'], verify['structuredContent']['success'],
+      verify['structuredContent']['stdout'].strip())
+again = call('computer_verify', {}, 2)['result']['structuredContent']
+print('reused', again['reused'])
+output = call('verification_output', {}, 3)['result']['structuredContent']
+print('output', output['text'].strip())
+read = call('read_context', {'blocks': [{'path': 'a.txt', 'lines': 1}]}, 4)['result']
+print('read', read['structuredContent']['blocks'][0]['text'].strip())
+other = call('computer_verify', {'command': 'rm -rf /'}, 5)['result']
+print('refused', other['isError'])
+print('route', os.environ.get('JACKALOPE_POLICY_ROUTE'))
+print('ask', json.dumps(call('ask_user', {'question': 'q'}, 6)['result']))
+"""
+
+
+class Runner(unittest.TestCase):
+    """Runs protocol 4: capabilities, the local bridge and policy callbacks."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.agent = load(self.temp.name)
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def call(self, **request):
+        response = self.agent.respond(request)
+        if not response["ok"]:
+            raise AssertionError(response["error"])
+        return response["result"]
+
+    def upload(self, run, files):
+        data = archive(files)
+        return self.call(action="workspace_put", run=run, offset=0,
+                         data=base64.b64encode(data).decode(), final=True,
+                         sha256=hashlib.sha256(data).hexdigest())
+
+    def drive(self, run, answer):
+        """Reads the run to its end, answering each relayed bridge call."""
+        out = err = 0
+        stdout = b""
+        calls = []
+        deadline = time.time() + 60
+        while time.time() < deadline:
+            page = self.call(action="run_read", run=run, out=out, err=err, wait_ms=300)
+            stdout += base64.b64decode(page["stdout"])
+            out, err = page["out"], page["err"]
+            for call in page["bridge"]:
+                calls.append(call)
+                status, body = answer(call)
+                self.call(action="run_answer", run=run, call=call["id"], status=status,
+                          contentType="application/json",
+                          body=base64.b64encode(json.dumps(body).encode()).decode())
+            if page["exit"] is not None:
+                return page["exit"], stdout.decode(), calls
+        self.fail("The run did not finish.")
+
+    def test_capabilities_are_one_list_reported_with_the_protocol(self):
+        self.assertEqual(self.agent.RUNS_PROTOCOL, 4)
+        self.assertEqual(self.agent.CAPABILITIES,
+                         ["local-bridge", "browser", "workspace-tools", "policy-callbacks"])
+        # Without agent-browser, the browser capability is not reported.
+        self.assertEqual(self.agent.capabilities(),
+                         ["local-bridge", "workspace-tools", "policy-callbacks"])
+        status = self.call(action="run_status", run="c1")
+        self.assertEqual((status["runs"], status["capabilities"]),
+                         (4, self.agent.capabilities()))
+
+    def test_local_requests_are_validated(self):
+        spec = self.agent.local_spec
+        self.assertIsNone(spec(None))
+        self.assertEqual(spec({"tools": ["computer_verify", "browser_tabs", "computer_verify"],
+                               "check": "make test"}),
+                         {"tools": ["computer_verify"], "check": "make test"})
+        for bad in ({"tools": ["ask_user"]}, {"tools": "computer_verify"}, [],
+                    {"tools": [], "check": " "}, {"tools": [], "check": "x" * 4001}):
+            with self.assertRaises(self.agent.Failure):
+                spec(bad)
+
+    def test_workspace_tools_run_here_and_control_tools_are_relayed(self):
+        self.upload("l1", {"a.txt": b"first line\nsecond\n"})
+        started = self.call(
+            action="run_start", run="l1", argv=[sys.executable, "-c", AGENT_SCRIPT],
+            env={"JACKALOPE_BRIDGE_URL": self.agent.RELAY_URL,
+                 "JACKALOPE_BRIDGE_TOKEN": self.agent.RELAY_TOKEN},
+            relay=True, local={"tools": ["computer_verify", "verification_output", "read_context",
+                                         "browser_navigate"], "check": "echo checked"})
+        # The browser tools are dropped where agent-browser is missing.
+        self.assertEqual(started["local"]["tools"],
+                         ["computer_verify", "verification_output", "read_context"])
+
+        def answer(call):
+            if call["path"] == "/v1/runner/event":
+                return 200, {"recorded": True}
+            request = json.loads(base64.b64decode(call["body"]))
+            return 200, {"jsonrpc": "2.0", "id": request["id"],
+                         "result": {"content": [{"type": "text", "text": "answered"}]}}
+
+        exit, stdout, calls = self.drive("l1", answer)
+        self.assertEqual(exit["code"], 0, stdout)
+        lines = stdout.splitlines()
+        self.assertEqual(lines[0], "verify False True checked")
+        self.assertEqual(lines[1], "reused True")
+        self.assertEqual(lines[2], "output checked")
+        self.assertEqual(lines[3], "read first line")
+        self.assertEqual(lines[4], "refused True")
+        self.assertEqual(lines[5], "route /v1/policy")
+        self.assertIn("answered", lines[6])
+        # Only the control tool reached the device's queue, besides the runner's events.
+        relayed = [json.loads(base64.b64decode(call["body"])) for call in calls
+                   if call["path"] == "/mcp"]
+        self.assertEqual([request["params"]["name"] for request in relayed], ["ask_user"])
+        events = [json.loads(base64.b64decode(call["body"])) for call in calls
+                  if call["path"] == "/v1/runner/event"]
+        self.assertTrue(events)
+        self.assertTrue(all(event["tool"] == "computer_verify" for event in events))
+        self.assertEqual(events[0]["check"]["success"], True)
+        # The stored check stays outside the workspace, so it is not in the patch.
+        self.assertNotIn("verification.json", self.call(action="workspace_diff", run="l1")["files"])
+
+    def test_policy_allows_only_an_explicit_allow(self):
+        directory = os.path.join(self.temp.name, "p1")
+        os.makedirs(os.path.join(directory, "bridge"))
+        runner = self.agent.Runner(directory, directory, {"tools": [], "check": None})
+        answers = []
+        seen = []
+
+        def answering():
+            queue = os.path.join(directory, "bridge")
+            while answers:
+                for name in os.listdir(queue):
+                    if name.endswith(".req"):
+                        request = json.load(open(os.path.join(queue, name)))
+                        seen.append((request["path"], json.loads(base64.b64decode(request["body"]))))
+                        status, body = answers.pop(0)
+                        with open(os.path.join(queue, name[:-4] + ".res"), "w") as handle:
+                            json.dump({"status": status, "contentType": "application/json",
+                                       "body": base64.b64encode(json.dumps(body).encode()).decode()},
+                                      handle)
+                time.sleep(0.02)
+
+        import threading
+        for status, body, expected in (
+            (200, {"behavior": "allow"}, True),
+            (200, {"behavior": "deny", "message": "Not that site."}, False),
+            (200, {"behavior": "Allow"}, False),
+            (400, {"error": "Ask about a tool, site or secret."}, False),
+            (200, ["allow"], False),
+        ):
+            answers.append((status, body))
+            worker = threading.Thread(target=answering)
+            worker.start()
+            allowed, message = runner.policy("site", url="https://example.com/", host="example.com")
+            worker.join()
+            self.assertEqual(allowed, expected, body)
+            if not expected:
+                self.assertTrue(message)
+        self.assertEqual(seen[0], ("/v1/policy", {"kind": "site", "url": "https://example.com/",
+                                                  "host": "example.com"}))
+        # No answer in time, or no run at all, denies.
+        self.agent.APPROVAL_SECONDS = 0.3
+        allowed, message = runner.policy("tool", tool_name="mcp__x__y", input={})
+        self.assertFalse(allowed)
+        self.assertIn("could not be asked", message)
+        queue = os.path.join(directory, "bridge")
+        for name in os.listdir(queue):
+            os.unlink(os.path.join(queue, name))
+        os.rmdir(queue)
+        self.assertFalse(runner.policy("secret", name="API_KEY")[0])
+
+    def test_sites_are_asked_about_except_this_computers_own(self):
+        asked = []
+        verdicts = {"example.com": (True, None), "blocked.example": (False, "Declined.")}
+
+        class Stub:
+            allowed_sites = set()
+
+            def policy(self, kind, **fields):
+                asked.append((kind, fields["host"], fields["login"]))
+                return verdicts[fields["host"]]
+
+        browser = self.agent.Browser(Stub())
+        for url in ("http://localhost:5173/", "http://127.0.0.1:8080/x", "about:blank",
+                    "file:///home/bot/a.html", ""):
+            browser.site(url)
+        self.assertEqual(asked, [])
+        browser.site("https://example.com/a")
+        browser.site("https://EXAMPLE.com/b")
+        self.assertEqual(asked, [("site", "example.com", False)])
+        # A page asking for a password is always asked about.
+        browser.site("https://example.com/login", login=True)
+        self.assertEqual(len(asked), 2)
+        with self.assertRaises(self.agent.Failure) as raised:
+            browser.site("https://blocked.example/")
+        self.assertEqual(str(raised.exception), "Declined.")
+
+    def test_screenshots_are_saved_in_the_workspace(self):
+        workspace = os.path.join(self.temp.name, "w")
+        os.makedirs(workspace)
+        events = []
+        png = (b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (640).to_bytes(4, "big")
+               + (480).to_bytes(4, "big") + b"\x08\x06\x00\x00\x00")
+
+        class Stub:
+            def __init__(self):
+                self.workspace = workspace
+
+            def notify(self, event):
+                events.append(event)
+
+        browser = self.agent.Browser(Stub())
+        browser.directory = os.path.join(self.temp.name, "session")
+        os.makedirs(browser.directory)
+
+        def send(request):
+            if request["action"] == "url":
+                return {"url": "http://localhost:3000/"}
+            if request["action"] == "screenshot":
+                self.assertTrue(request["fullPage"])
+                open(request["path"], "wb").write(png)
+                return {}
+            self.fail(request)
+
+        browser.send = send
+        browser.guarded = lambda target, work: work()
+        artifact = browser.screenshot({"name": "Home"})
+        relative = os.path.join(".jackalope", "artifacts", "screenshots", artifact["id"] + ".png")
+        self.assertEqual(artifact["relativePath"], relative)
+        self.assertEqual(artifact["filePath"], os.path.join(workspace, relative))
+        self.assertEqual(open(artifact["filePath"], "rb").read(), png)
+        self.assertEqual((artifact["width"], artifact["height"], artifact["name"]), (640, 480, "Home"))
+        self.assertEqual(os.listdir(browser.directory), [])
+        self.assertEqual(events[0]["screenshot"]["relativePath"], relative)
+        self.assertNotIn("filePath", events[0]["screenshot"])
+
+    def test_screenshots_come_back_even_when_ignored(self):
+        self.upload("s1", {".gitignore": b".jackalope/\n", "a.txt": b"x"})
+        script = ("import os;d='.jackalope/artifacts/screenshots';os.makedirs(d);"
+                  "open(d+'/0f8fad5b-d9cb-469f-a165-70867728950e.png','wb').write(b'png');"
+                  "open('.jackalope/other.txt','w').write('kept out')")
+        self.call(action="run_start", run="s1", argv=[sys.executable, "-c", script])
+        self.drive("s1", lambda call: (500, {}))
+        files = self.call(action="workspace_diff", run="s1")["files"]
+        self.assertEqual(files, [".jackalope/artifacts/screenshots/0f8fad5b-d9cb-469f-a165-70867728950e.png"])
+
+    def test_source_reads_stay_inside_the_workspace(self):
+        workspace = os.path.join(self.temp.name, "src")
+        os.makedirs(workspace)
+        open(os.path.join(workspace, "a.ts"), "w").write("export const a = 1;\nexport const b = 2;\n")
+        runner = self.agent.Runner(os.path.join(self.temp.name, "d"), workspace,
+                                   {"tools": ["read_context"], "check": None})
+        first = runner.read_context({"blocks": [{"path": "a.ts", "startLine": 1, "lines": 1}]})
+        block = first["blocks"][0]
+        self.assertEqual((block["text"], block["nextLine"], block["endLine"]),
+                         ("export const a = 1;\n", 2, 1))
+        same = runner.read_context({"blocks": [{"path": "a.ts", "startLine": 1, "lines": 1,
+                                                 "knownHash": block["blockHash"]}]})["blocks"][0]
+        self.assertTrue(same["unchanged"])
+        self.assertIsNone(same["text"])
+        open(os.path.join(workspace, "a.ts"), "w").write("export const a = 3;\n")
+        changed = runner.read_context({"blocks": [{"path": "a.ts", "startLine": 1, "lines": 1,
+                                                    "knownHash": block["blockHash"]}]})["blocks"][0]
+        self.assertFalse(changed["unchanged"])
+        for path in ("../a.ts", ".env", "C:/a.ts", "a.ts:stream", "\\a.ts", "/etc/passwd.txt", "a.bin"):
+            result = runner.read_context({"blocks": [{"path": path}]})
+            self.assertIn("error", result["blocks"][0], path)
+        with self.assertRaises(self.agent.Failure):
+            runner.read_context({})
+
+    def test_stored_check_output_pages_by_character(self):
+        directory = os.path.join(self.temp.name, "v")
+        os.makedirs(directory)
+        runner = self.agent.Runner(directory, directory, {"tools": [], "check": "x"})
+        with self.assertRaises(self.agent.Failure):
+            runner.verification_output({})
+        json.dump({"command": "x", "checked_at": "c1", "tree": None, "result": {
+            "exitCode": 1, "success": False, "timedOut": False, "truncated": False,
+            "durationMs": 3, "stdout": "one\U0001F98Atwo", "stderr": "bad"}},
+            open(os.path.join(directory, "verification.json"), "w"))
+        page = runner.verification_output({"check_id": "c1", "offset": 3, "limit": 1})
+        self.assertEqual((page["text"], page["next_offset"]), ("\U0001F98A", 4))
+        self.assertEqual(runner.verification_output({"stream": "stderr"})["text"], "bad")
+        for bad in ({"check_id": "older"}, {"offset": 1}, {"stream": "both"}):
+            with self.assertRaises(self.agent.Failure):
+                runner.verification_output(bad)
+
+    def test_checks_stop_when_they_go_quiet(self):
+        self.agent.CHECK_STALL = 1
+        workspace = os.path.join(self.temp.name, "q")
+        os.makedirs(workspace)
+        result = self.agent.run_check("echo start; sleep 30", workspace)
+        self.assertTrue(result["timedOut"])
+        self.assertFalse(result["success"])
+        self.assertIsNone(result["exitCode"])
+        self.assertIn("start", result["stdout"])
 
 
 if __name__ == "__main__":
