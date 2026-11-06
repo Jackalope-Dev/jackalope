@@ -28,8 +28,8 @@ importers:
         specifier: ^2.6.3
         version: 2.6.5
       agent-browser:
-        specifier: 0.40.0
-        version: 0.40.0
+        specifier: 0.41.1
+        version: 0.41.1
       knip:
         specifier: ^6.41.0
         version: 6.44.1
@@ -2162,8 +2162,8 @@ packages:
   '@xyflow/system@0.0.84':
     resolution: {integrity: sha512-96zfGFjH3oZ3T0MRdH4gJ0SlXuCIxbBuHVevZ4xry5UTxqjzjt010+LRdholgepq7jhrcaz1JNtzrETscwnkEA==}
 
-  agent-browser@0.40.0:
-    resolution: {integrity: sha512-uqDAR3ozwJKYzVENMr/ZKYTZT1LUZauI49rTiK/KsFBxQDVTdtmrWGWTMWZlaIIQWToEtZUfWVXBSSTY6aHzrA==}
+  agent-browser@0.41.1:
+    resolution: {integrity: sha512-9DhCeIhcpxu3Mj+f25Bolk6N+BT5SpOttRSZw0Ytz5MZ8zpKeVp2bv9Zxo1gajlvZE3l//rOoiRdq+qTYHBg1Q==}
     engines: {node: '>=24.0.0', pnpm: '>=11.0.0'}
     hasBin: true
 
@@ -4604,7 +4604,7 @@ snapshots:
       d3-selection: 3.0.1
       d3-zoom: 3.0.1
 
-  agent-browser@0.40.0: {}
+  agent-browser@0.41.1: {}
 
   aria-hidden@1.2.6:
     dependencies:
