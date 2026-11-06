@@ -25,7 +25,7 @@ export function IssueConnections() {
   }, [refresh]);
   return (
     <SettingGroup title="Connected work">
-      <Setting title="GitHub" description="Uses your GitHub CLI sign-in for this repository." />
+      <Setting title="GitHub" description="Uses your GitHub CLI sign-in (gh auth login)." />
       {connections.map((connection) => (
         <Setting
           key={connection.provider}

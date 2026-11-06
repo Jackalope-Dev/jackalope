@@ -136,7 +136,12 @@ export function RemoteAccess() {
   const pairingDevices = useRef(new Set<string>());
   const apply = useCallback((next: Status) => {
     setStatus(next);
-    setSelected(next.projectIds);
+    // Before remote access is first turned on, every project starts selected.
+    setSelected(
+      next.enabled || next.projectIds.length
+        ? next.projectIds
+        : useProjectStore.getState().projects.map((project) => project.id),
+    );
     setPort(next.port);
     setAddress(next.publicOrigin);
     setEnabled(next.enabled);
@@ -205,43 +210,72 @@ export function RemoteAccess() {
       setBusy(false);
     }
   };
+  const configure = async (allow: boolean) => {
+    await syncAgentConfig();
+    const templates: RunRequest[] = projects
+      .filter((p) => selected.includes(p.id))
+      .map((project) => {
+        const agent = project.preferences?.preferredRunner || 'auto';
+        return {
+          id: crypto.randomUUID(),
+          projectId: project.id,
+          projectName: project.name,
+          projectPath: project.path,
+          agent,
+          agentProfileId: agentAccountFor(project, agent),
+          isolated: true,
+          prompt: project.preferences?.customInstructions || '',
+          targetBranch: project.preferences?.baseBranch || project.gitBranch,
+          verifyCommand: project.preferences?.verifyCommand,
+          prepareCommand: project.preferences?.prepareCommand,
+          setupFiles: project.preferences?.setupFiles,
+          autoVerify: project.preferences?.autoVerify ?? true,
+        };
+      });
+    const next = await nativeTask<Status>('remote_configure', {
+      enabled: allow,
+      port,
+      publicOrigin: address,
+      projects: templates,
+    });
+    apply(next);
+    setPair(null);
+    return next;
+  };
+  const createPairing = async (devices: Status['devices']) => {
+    const result = await nativeTask<PairingCode>('remote_pairing');
+    pairingDevices.current = new Set(devices.map((device) => device.id));
+    setPair(result);
+    setExpires(Date.now() + result.expiresIn * 1000);
+  };
   return (
     <SettingGroup title="Remote access">
+      {status && !status.enabled && projects.length > 0 && (
+        <Setting
+          title="Pair a phone"
+          description="Turns on remote access. Your phone can read work, start tasks and respond in the projects selected below."
+        >
+          <Button
+            disabled={busy || !selected.length}
+            onClick={() =>
+              void perform(async () => {
+                const next = await configure(true);
+                if (next.listening && next.publicOrigin) await createPairing(next.devices);
+                else if (next.listening)
+                  setNotice('Remote access is on. Set up private HTTPS below to pair a phone.');
+              })
+            }
+          >
+            Pair a phone
+          </Button>
+        </Setting>
+      )}
       <form
         className="remote-setup px-5 py-4"
         onSubmit={(event) => {
           event.preventDefault();
           void perform(async () => {
-            await syncAgentConfig();
-            const templates: RunRequest[] = projects
-              .filter((p) => selected.includes(p.id))
-              .map((project) => {
-                const agent = project.preferences?.preferredRunner || 'auto';
-                return {
-                  id: crypto.randomUUID(),
-                  projectId: project.id,
-                  projectName: project.name,
-                  projectPath: project.path,
-                  agent,
-                  agentProfileId: agentAccountFor(project, agent),
-                  isolated: true,
-                  prompt: project.preferences?.customInstructions || '',
-                  targetBranch: project.preferences?.baseBranch || project.gitBranch,
-                  verifyCommand: project.preferences?.verifyCommand,
-                  prepareCommand: project.preferences?.prepareCommand,
-                  setupFiles: project.preferences?.setupFiles,
-                  autoVerify: project.preferences?.autoVerify ?? true,
-                };
-              });
-            apply(
-              await nativeTask<Status>('remote_configure', {
-                enabled,
-                port,
-                publicOrigin: address,
-                projects: templates,
-              }),
-            );
-            setPair(null);
+            await configure(enabled);
             setNotice('Remote access saved.');
           });
         }}
@@ -336,14 +370,7 @@ export function RemoteAccess() {
           <Button
             variant={pair ? 'outline' : 'primary'}
             disabled={busy}
-            onClick={() =>
-              void perform(async () => {
-                const result = await nativeTask<PairingCode>('remote_pairing');
-                pairingDevices.current = new Set(status.devices.map((device) => device.id));
-                setPair(result);
-                setExpires(Date.now() + result.expiresIn * 1000);
-              })
-            }
+            onClick={() => void perform(() => createPairing(status.devices))}
           >
             {pair ? 'New code' : status.publicOrigin ? 'Pair a phone' : 'Create pairing code'}
           </Button>

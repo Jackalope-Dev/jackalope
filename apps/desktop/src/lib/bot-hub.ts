@@ -172,6 +172,11 @@ export function hubDirectory(
   return bots.flatMap((bot) => {
     const project = projects.find((item) => item.id === bot.projectId);
     if (!project) return [];
+    const others = (bot.projectIds ?? []).flatMap((id) => {
+      const other = id !== bot.projectId && projects.find((item) => item.id === id);
+      return other ? [other] : [];
+    });
+    const available = new Set([project.id, ...others.map((item) => item.id)]);
     return [
       {
         id: bot.id,
@@ -179,8 +184,16 @@ export function hubDirectory(
         role: bot.role,
         instructions: bot.instructions,
         collaborate: bot.collaborate,
-        wakes: bot.wakes,
+        // A wake-up whose project was removed falls back to the home project.
+        wakes: bot.wakes.map((wake) =>
+          wake.projectId && !available.has(wake.projectId)
+            ? { ...wake, projectId: undefined }
+            : wake,
+        ),
         request: botRequest(bot, project, bot.id, 'Bot', true, profileId(bot, project)),
+        projects: others.map((other) =>
+          botRequest(bot, other, bot.id, 'Bot', true, profileId(bot, other)),
+        ),
       },
     ];
   });

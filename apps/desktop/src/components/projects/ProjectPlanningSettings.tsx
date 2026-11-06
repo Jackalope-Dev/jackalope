@@ -1,3 +1,4 @@
+import { Badge } from '@jackalope/ui';
 import { useEffect, useId, useState } from 'react';
 import { useAgentModels } from '../../lib/agent-models';
 import { type PlanSettings, planCommands } from '../../lib/plan-mode';
@@ -9,10 +10,12 @@ import { Input } from '../ui/input';
 import { Select, SelectItem } from '../ui/Select';
 
 const QUESTION_LIMITS = Array.from({ length: 13 }, (_, limit) => limit);
+const ROUND_LIMITS = [1, 2, 3, 5, 8, 12, 20];
+const ORCHESTRATOR_LIMITS = [1, 2, 3, 4];
 const TASK_AGENT = 'task';
 const AGENT_DEFAULT = 'default';
 
-/** Plan mode settings for one project: the interview limit, planning agent and model, and where Save to repo writes. */
+/** Plan mode settings for one project: the interview limit, swarm rounds, planning agent and model, and where Save to repo writes. */
 export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
   const id = useId();
   const runners = useExecutionStore((state) => state.runners);
@@ -75,6 +78,71 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
           {QUESTION_LIMITS.map((limit) => (
             <SelectItem key={limit} value={String(limit)}>
               {limit === 0 ? 'None' : limit === 1 ? '1 question' : `${limit} questions`}
+            </SelectItem>
+          ))}
+        </Select>
+      </Setting>
+      <Setting
+        title={
+          <span className="inline-flex items-center gap-2">
+            Most swarm rounds <Badge variant="accent">Beta</Badge>
+          </span>
+        }
+        description="A swarm stops for a re-plan when its criteria are still unmet after this many rounds."
+        descriptionId={`${id}-rounds-description`}
+      >
+        <Select
+          aria-label="Most swarm rounds"
+          aria-describedby={`${id}-rounds-description`}
+          value={String(settings.maxRounds ?? 5)}
+          onValueChange={(value) => void save({ ...settings, maxRounds: Number(value) })}
+        >
+          {[...new Set([...ROUND_LIMITS, settings.maxRounds ?? 5])]
+            .sort((a, b) => a - b)
+            .map((limit) => (
+              <SelectItem key={limit} value={String(limit)}>
+                {limit === 1 ? '1 round' : `${limit} rounds`}
+              </SelectItem>
+            ))}
+        </Select>
+      </Setting>
+      <Setting
+        title={
+          <span className="inline-flex items-center gap-2">
+            Next swarm round <Badge variant="accent">Beta</Badge>
+          </span>
+        }
+        description="After a review names more work, start it or wait for your approval. Each plan can change this."
+        descriptionId={`${id}-approval-description`}
+      >
+        <Select
+          aria-label="Next swarm round"
+          aria-describedby={`${id}-approval-description`}
+          value={settings.askBeforeRounds ? 'ask' : 'auto'}
+          onValueChange={(value) => void save({ ...settings, askBeforeRounds: value === 'ask' })}
+        >
+          <SelectItem value="auto">Start automatically</SelectItem>
+          <SelectItem value="ask">Ask me first</SelectItem>
+        </Select>
+      </Setting>
+      <Setting
+        title={
+          <span className="inline-flex items-center gap-2">
+            Swarm orchestrators <Badge variant="accent">Beta</Badge>
+          </span>
+        }
+        description="Large swarms split their review into areas, each checked by its own orchestrator at once."
+        descriptionId={`${id}-orchestrators-description`}
+      >
+        <Select
+          aria-label="Swarm orchestrators"
+          aria-describedby={`${id}-orchestrators-description`}
+          value={String(settings.orchestrators ?? 1)}
+          onValueChange={(value) => void save({ ...settings, orchestrators: Number(value) })}
+        >
+          {ORCHESTRATOR_LIMITS.map((limit) => (
+            <SelectItem key={limit} value={String(limit)}>
+              {limit === 1 ? '1 orchestrator' : `Up to ${limit}`}
             </SelectItem>
           ))}
         </Select>

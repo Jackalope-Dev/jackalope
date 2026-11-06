@@ -10,6 +10,7 @@
     "typecheck": "wrangler types --strict-vars=false && tsc --noEmit",
     "test": "vitest run",
     "build": "wrangler deploy --dry-run --outdir dist",
+    "bundle": "node scripts/bundle.mjs",
     "deploy": "wrangler deploy"
   },
   "devDependencies": {

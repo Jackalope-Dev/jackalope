@@ -1,10 +1,12 @@
 version: 2
+# Monthly: each update PR runs the full macOS matrix, which used more Mac runner time
+# than releases. Security updates still open as soon as they are found.
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 2
     ignore:
       - dependency-name: '@pierre/diffs'
         update-types:
@@ -14,15 +16,23 @@ updates:
     groups:
       npm-minor-patch:
         patterns: ['*']
+        # build.rs pins the bundled agent-browser binary, so its bump needs a code
+        # change and fails CI alone instead of holding back the whole group.
+        exclude-patterns: [agent-browser]
         update-types: [minor, patch]
   - package-ecosystem: cargo
     directory: /apps/desktop/src-tauri
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 2
     ignore:
       - dependency-name: keyring
         update-types: [version-update:semver-major]
+      # windows-collections and windows-future 0.100 require windows_core from the
+      # windows 0.100 line, but windows itself is pinned at 0.62.2, so bumping just
+      # these two always fails to compile. Wait for a manual windows upgrade.
+      - dependency-name: windows-collections
+      - dependency-name: windows-future
     groups:
       windows-bindings:
         patterns: [windows, windows-collections, windows-future]
@@ -33,8 +43,8 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 1
     groups:
       actions-minor-patch:
         patterns: ['*']

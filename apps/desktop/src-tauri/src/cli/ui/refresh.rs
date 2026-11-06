@@ -281,8 +281,9 @@ impl App {
             }
             Some(_) => {}
             None => {
-                if let Some((_, at)) = self.work_started.take() {
+                if let Some((run, at)) = self.work_started.take() {
                     self.last_run_took = Some(at.elapsed());
+                    self.reveal = Some((run, Instant::now()));
                 }
             }
         }

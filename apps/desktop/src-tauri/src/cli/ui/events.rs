@@ -107,6 +107,7 @@ fn handle(app: &mut App, event: Event) -> bool {
         Event::Files { directory, files } => app.files_listed(directory, files),
         Event::Sharpened { original, result } => app.sharpened(original, result),
         Event::Resize => {}
+        Event::Focus(focused) => app.focused = focused,
         Event::Scroll(lines) => app.scroll(lines),
         Event::Paste(text) => {
             if app.picker.is_none() {
@@ -147,6 +148,8 @@ pub fn spawn_input(events: Sender<Event>) {
             }
             Ok(TermEvent::Resize(_, _)) => events.send(Event::Resize),
             Ok(TermEvent::Paste(text)) => events.send(Event::Paste(text)),
+            Ok(TermEvent::FocusGained) => events.send(Event::Focus(true)),
+            Ok(TermEvent::FocusLost) => events.send(Event::Focus(false)),
             Ok(TermEvent::Mouse(mouse)) => match mouse.kind {
                 MouseEventKind::ScrollUp => events.send(Event::Scroll(3)),
                 MouseEventKind::ScrollDown => events.send(Event::Scroll(-3)),
@@ -235,8 +238,8 @@ impl App {
     }
 
     /// Rotates to the next tip every 8 seconds, returning true when changed.
-    fn rotate_tip_if_elapsed(&mut self) -> bool {
-        if self.last_tip_change.elapsed() >= Duration::from_secs(8) {
+    pub(super) fn rotate_tip_if_elapsed(&mut self) -> bool {
+        if !self.framed.get() && self.last_tip_change.elapsed() >= Duration::from_secs(8) {
             self.tip_index = (self.tip_index + 1) % render::TIPS.len();
             self.last_tip_change = std::time::Instant::now();
             true

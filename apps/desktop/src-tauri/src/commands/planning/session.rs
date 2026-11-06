@@ -4,8 +4,8 @@
 
 use super::{
     artifact::{self, PlanDocument},
-    handoff, interview,
-    store::{Approval, Deviation, Execution, PlanRecord, PlanSettings, Session, Store},
+    handoff, interview, rounds,
+    store::{Approval, Deviation, Execution, PlanRecord, PlanSettings, Round, Session, Store},
 };
 use crate::commands::{
     coordination::{managed::PlanLink, planned::PlanLaunch, Coordinator},
@@ -84,6 +84,8 @@ pub struct PlanView {
     pub shape: String,
     pub swarm_connected: bool,
     pub progress: Option<Progress>,
+    /// Swarm rounds, for plans approved as a swarm.
+    pub rounds: Option<rounds::RoundsView>,
     pub criteria: Vec<handoff::CriterionState>,
     pub deviations: Vec<Deviation>,
     /// How approving now would verify the work.
@@ -190,7 +192,7 @@ pub struct PlanSummary {
     pub status: String,
     pub revision: Option<u32>,
     pub updated_at: String,
-    /// A deviation is waiting on the person's decision.
+    /// A deviation or a proposed swarm round is waiting on the person.
     pub needs_you: bool,
 }
 
@@ -202,7 +204,7 @@ pub fn summary(record: &PlanRecord) -> PlanSummary {
         status: record.status(),
         revision: record.latest().map(|revision| revision.number),
         updated_at: record.updated_at.clone(),
-        needs_you: pending_deviation(record).is_some(),
+        needs_you: pending_deviation(record).is_some() || rounds::awaiting(record),
     }
 }
 
@@ -215,7 +217,11 @@ pub fn pending_deviation(record: &PlanRecord) -> Option<&Deviation> {
 }
 
 /// A planning request: read-only, isolated, unchecked and without outcomes.
-fn planning_request(template: &RunRequest, settings: &PlanSettings, prompt: String) -> RunRequest {
+pub(super) fn planning_request(
+    template: &RunRequest,
+    settings: &PlanSettings,
+    prompt: String,
+) -> RunRequest {
     let mut request = template.clone();
     request.id = Uuid::new_v4().to_string();
     request.prompt = prompt;
@@ -569,7 +575,7 @@ fn ingest(store: &Store, record: &PlanRecord, runs: &[TaskRun]) -> Result<PlanRe
 
 /// Updates the latest revision's front matter in place; the content hash,
 /// which excludes front matter, is unchanged.
-fn set_front(
+pub(super) fn set_front(
     record: &mut PlanRecord,
     change: impl FnOnce(&mut artifact::FrontMatter),
 ) -> Result<(), String> {
@@ -603,7 +609,7 @@ fn task_state(run: Option<&TaskRun>, merged: bool, error: bool) -> &'static str 
     }
 }
 
-fn progress(
+pub(super) fn progress(
     coordinator: &Coordinator,
     record: &PlanRecord,
     doc: &PlanDocument,
@@ -731,7 +737,9 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
                         .any(|deviation| &deviation.summary == summary)
                 })
                 .collect();
-            let finished = progress.merged && doc.front.status != "done";
+            // A swarm is done when its orchestrator says so, not when a round merges.
+            let finished =
+                progress.merged && doc.front.status != "done" && !rounds::in_rounds(&record);
             if !found.is_empty() || finished {
                 record = store
                     .update(id, |saved| {
@@ -767,6 +775,7 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
         }
     }
     let doc = record.document();
+    let rounds_view = rounds::view(coordinator, &record, &runs);
     let latest = record.latest();
     let previous = record
         .revisions
@@ -820,10 +829,11 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
         approval: record.approval.clone(),
         shape: doc
             .as_ref()
-            .map(|doc| handoff::default_shape(doc, coordinator.swarm_connected()).to_string())
+            .map(|doc| handoff::default_shape(doc).to_string())
             .unwrap_or_else(|| "single".into()),
         swarm_connected: coordinator.swarm_connected(),
         progress: progress_view,
+        rounds: rounds_view,
         criteria,
         deviations: record.deviations.clone(),
         criteria_check: doc
@@ -1005,8 +1015,23 @@ pub fn approve(
     // dependencies continue from clean finishes and integration waits for a
     // passing plan review.
     let verified = verification(&checks, &doc);
-    if shape == "swarm" && !coordinator.swarm_connected() {
-        return Err("Connect a swarm Worker in Settings before running as a swarm.".into());
+    let open = doc
+        .tasks
+        .iter()
+        .filter(|task| !task.status.eq_ignore_ascii_case("done"))
+        .count();
+    if shape == "subtasks" && open > artifact::MAX_TASKS {
+        return Err(format!(
+            "Planned subtasks run at most {} tasks. Run this plan as a swarm.",
+            artifact::MAX_TASKS
+        ));
+    }
+    // A swarm round may run more assignments where the project's agents have slots.
+    let swarm_limit = (shape == "swarm").then(|| coordinator.swarm_limit(&record.project_id));
+    if let Some(limit) = swarm_limit.filter(|limit| open > *limit) {
+        return Err(format!(
+            "This swarm can run {limit} assignments per round with the current concurrency. Raise concurrency or run agents on a computer."
+        ));
     }
     if let Some(previous) = record
         .execution
@@ -1080,16 +1105,37 @@ pub fn approve(
         request,
         title: doc.title.clone(),
         link,
+        max_assignments: swarm_limit,
     });
+    let settings = store.settings(&record.project_id);
+    let max_rounds = if shape == "swarm" {
+        settings.max_rounds
+    } else {
+        0
+    };
     store.update(id, |saved| {
         match &launched {
             Ok(managed) => {
+                let started_at = Utc::now().to_rfc3339();
                 saved.execution = Some(Execution {
                     shape: shape.into(),
                     revision,
                     managed_task_id: Some(managed.clone()),
                     items: vec![],
-                    started_at: Utc::now().to_rfc3339(),
+                    started_at: started_at.clone(),
+                    max_rounds,
+                    ask_before_rounds: settings.ask_before_rounds,
+                    orchestrators: settings.orchestrators,
+                    rounds: if max_rounds > 0 {
+                        vec![Round {
+                            number: 1,
+                            managed_task_id: managed.clone(),
+                            started_at,
+                            ..Default::default()
+                        }]
+                    } else {
+                        vec![]
+                    },
                 });
                 saved.error = None;
                 set_front(saved, |front| front.status = "running".into())?;
@@ -1098,6 +1144,9 @@ pub fn approve(
         }
         Ok(())
     })?;
+    if launched.is_ok() && max_rounds > 0 {
+        rounds::activate(id, false);
+    }
     launched.map(|_| ())
 }
 

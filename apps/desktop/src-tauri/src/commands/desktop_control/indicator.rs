@@ -14,7 +14,7 @@ pub fn desktop_control_theme(accent: String) -> Result<(), String> {
         return Err("Expected a six-digit theme color.".into());
     }
     *ACCENT
-        .get_or_init(|| Mutex::new("#6366f1".into()))
+        .get_or_init(|| Mutex::new("#8b5cf6".into()))
         .lock()
         .map_err(|e| e.to_string())? = accent;
     Ok(())
@@ -92,7 +92,7 @@ impl Indicator {
             std::env::temp_dir().join(format!("jackalope-window-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&directory).map_err(|e| e.to_string())?;
         let accent = ACCENT
-            .get_or_init(|| Mutex::new("#6366f1".into()))
+            .get_or_init(|| Mutex::new("#8b5cf6".into()))
             .lock()
             .unwrap()
             .clone();
@@ -169,7 +169,7 @@ impl Indicator {
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     fn start_unix(grant: &super::grant::Grant, directory: PathBuf) -> Result<Self, String> {
         let accent = ACCENT
-            .get_or_init(|| Mutex::new("#6366f1".into()))
+            .get_or_init(|| Mutex::new("#8b5cf6".into()))
             .lock()
             .unwrap()
             .clone();

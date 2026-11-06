@@ -30,3 +30,23 @@
   gap: 8px;
   min-width: 160px;
 }
+.pair-machine-command {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-sunken);
+}
+.pair-machine-command code {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.pair-machine-command > button {
+  flex-shrink: 0;
+}

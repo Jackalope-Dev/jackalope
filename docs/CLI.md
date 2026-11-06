@@ -95,7 +95,8 @@ terminal and the app together. Leaving a terminal does not stop work.
 | `jackalope plans` | Lists this project's plans; `--json` |
 | `jackalope plan show <id>` | Prints a plan and its progress; `--json` |
 | `jackalope plan approve <id> [single\|subtasks\|swarm]` | Shows the assumptions, asks, and approves the latest revision; `--yes` skips the question |
-| `jackalope status` | Shows the host, its endpoint and profile |
+| `jackalope plan rounds <id> [pause\|resume\|stop\|approve]` | Prints a swarm's (beta) round line and any proposed next round, or acts on its rounds. `approve` lists the proposal and asks before starting it; `--yes` skips the question. Editing a proposal happens in the app |
+| `jackalope status` | Shows the host, its endpoint and profile, and this project's running swarms with their round line and whether one needs you; `--json` adds `swarms` |
 
 `ls`, `status`, `plans` and `plan` accept `--json`. Options take a value as `--agent codex` or
 `--agent=codex`; `--` ends options, and an argument containing a space is
@@ -103,16 +104,19 @@ always message text. Unknown or misplaced options are refused with exit status 6
 
 Inside a conversation, typing `/` opens an interactive command menu, and `/help`
 lists commands: `/new`, `/bg`, `/sharpen`, `/init`, `/sessions`, `/close`, `/tabs`, `/projects`, `/agents`, `/settings`,
-`/status`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/learnings`, `/files`, `/review` (or `/diff`), `/merge`, `/pr`, `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
+`/status`, `/board`, `/agent`, `/model`, `/usage`, `/theme`, `/learn`, `/learnings`, `/files`, `/review` (or `/diff`), `/merge`, `/pr`, `/stop`, `/retry`, `/answer`, `/finish`, `/resume`, `/pause`,
 `/unpause`, `/unqueue`, `/copy`, `/history`, `/kill`, `/clear`, `/plan`, `/plans`, `/revise`,
-`/approve`, `/replan`, `/export`, `/deviation`, `/browser`, `/computer`, `/open` and `/quit`. Pickers
+`/approve`, `/replan`, `/export`, `/deviation`, `/rounds`, `/browser`, `/computer`, `/open` and `/quit`. Pickers
 filter as you type. `/new <message>` starts
 and shows a conversation; `/bg <message>` starts one and stays on the current one.
+`/board` replaces the conversation with one row per open conversation, those that
+need you first, then working ones, each with its state, agent and current step;
+typing filters it, Enter opens the chosen one and Esc returns.
 `/status` prints the project and branch, the open work's state, agent and model, the
 conversations that need you and each agent's state, without leaving the conversation.
 `/merge [message]` prepares a merge of the latest attempt as `jackalope merge` does,
-lists its files and asks; the conversation is paused only once you confirm, and a
-failed merge resumes it. `/pr [title]` asks whether to open a draft or ready pull
+lists its files and asks. It pauses the conversation first, since the host prepares
+merges only for paused conversations; declining, or a merge that fails, resumes it. `/pr [title]` asks whether to open a draft or ready pull
 request, then commits what is left, pushes and opens it. `/unqueue` takes back your
 newest message that has not reached an agent and puts it in the input to edit.
 `/sharpen <draft>` asks a helper agent, on its own connection so the terminal stays usable,
@@ -197,7 +201,10 @@ neither is set) and saves a changed file as a new revision, `/approve [single|su
 approves the revision shown (default: the recommendation), `/export [path]` saves it into
 the repository without committing, `/replan [why]` revises a running plan from what is
 done, and `/deviation` opens a picker to accept and amend, redo or re-plan a pending
-deviation (`/deviation accept|redo|replan` decides directly). While a deviation waits,
+deviation (`/deviation accept|redo|replan` decides directly). A swarm's (beta) progress
+line shows its round, state and, with several orchestrators, each area's state; when the
+next round waits for approval the panel lists its assignments and `/rounds approve`
+starts it (`/rounds pause|resume|stop` act on the rounds too). While a deviation waits,
 the conversation needs you: its tab dot and window title turn amber, and the banner
 above the input states the deviation and its proposed amendment; Enter on an empty input
 opens the same picker. `/plans` opens a picker of the project's plans with status,
@@ -207,12 +214,16 @@ terminal uses the project's check as the app mirrors it.
 
 The host answers `plan-start`, `plans`, `plan-detail` and `plan-action` (`keep`, `replan`,
 `approve` with the exact `revision` and `hash`, `save`, `export`, `accept`, `redo`,
-`replan-deviation`) with `plan`, `plans` or `exported` responses. Questions carry optional
+`replan-deviation`, and `rounds` with `pause`, `resume`, `stop` or `approve` in `text`)
+with `plan`, `plans` or `exported` responses. Questions carry optional
 `header`, `recommended`, `multiSelect`, `rationale` and `whyAsk`; plan views carry `verification`
-(`project`, `criteria` or `review`) and `check`; plan summaries carry `needsYou`;
+(`project`, `criteria` or `review`), `check` and `nextRound` (a proposed round's
+assignment titles); plan summaries carry `needsYou`, which a proposed round also sets;
 deviations carry `amendment`; projects carry `verifyCommand`, `autoVerify`,
 `questionCap` and `plannerAgent`; and `set-project-settings` accepts `question_cap` and
-`planner_agent` (empty plans with the task's agent). Older hosts omit them and the
+`planner_agent` (empty plans with the task's agent). Session views carry `run` (stages,
+duration, step counts, the check and the newest typed steps) and session summaries carry
+`agent` and `step`. Older hosts omit them and the
 protocol version is unchanged. See [plan mode](PLAN-MODE.md) for the document format.
 
 A leading `/`, `!` or `@` is the input's mode: the prompt at the left of the input
@@ -240,9 +251,13 @@ rounded content card, following the app's surfaces:
   hints sit on its right.
 
 The project name (which opens `/projects`), tabs, agent, model, open-conversation
-count and key hints can be clicked. A start screen shows the JACKALOPE wordmark (a two-row version in narrow
-windows), which light sweeps across once when the screen appears, and the agents that are set up. When work finishes cleanly, the status line says how long it took and what usually comes next. Smaller terminals drop the shell for a
-compact header, a status line and a rotating tip.
+count and key hints can be clicked, as can menu and picker rows, `/board` rows, the run
+card's commands and files, changed files in the panel, the start screen's agents and
+`/sessions`, a pinned question, a failure's `/retry` and a tip's command. What would
+be clicked is tinted under the pointer. A start screen shows the JACKALOPE wordmark (a two-row version in narrow
+windows), which light sweeps across once when the screen appears and which breaks into noise and resolves back a few seconds later, then every 12 to 18 seconds while the terminal has focus, and the agents that are set up. When work finishes cleanly, the status line says how long it took and what usually comes next. An empty input has a tip beneath it,
+which changes each time you send something and gives way to typing and menus. Smaller
+terminals drop the shell for a compact header, a status line and a tip that rotates.
 
 Your messages and pending work read as tinted blocks with a bar down their left edge.
 When a conversation is blocked, an amber "Needs you" banner above the input says why
@@ -250,9 +265,21 @@ and how to carry on. A question with options docks in the input's place with its
 text, the reason it matters and its options, so the conversation above stays readable;
 the mouse wheel, Page Up/Down and dragging still act on the conversation. Esc leaves the
 dock to type an answer instead, the question stays pinned above the input, and
-`/answer` brings the options back. Running work lists its newest steps (tool calls and narration) as the
-host records them, and `jackalope -p` prints the same steps to standard error.
-`JACKALOPE_REDUCED_MOTION=1` keeps the band, spinners, shimmer and wordmark sweep still.
+`/answer` brings the options back.
+
+The latest run is a run card: its state, agent, model and duration on the top edge,
+the reply, then what the host recorded about the work and, along the bottom edge, the
+commands that move it on (`/review`, `/merge` and `/pr` once it is ready, `/retry`
+after a failure). The record is a gauge of the run's stages (route, prepare, work and
+check), each as long as it took; counts of reads, searches, commands and failures; the
+check's result; and the changed files with their line counts, unless the changes
+panel already shows them. Counts come from the run's recorded activity, which keeps
+its newest entries, so a long run marks them with `+`. While work runs the card lists
+its newest steps by kind, the running stage shimmers and each new step resolves out of
+noise as it arrives; a result decodes into place once when it arrives. Older hosts
+send no run summary and keep the plain transcript. `jackalope -p` prints the steps
+to standard error. `JACKALOPE_REDUCED_MOTION=1` keeps the band, spinners, shimmer,
+decoding and wordmark sweep and glitch still.
 
 The changes panel lists files the conversation's checkout changed since it left
 the project's checked-out commit, committed or not, including untracked files, with
@@ -357,9 +384,17 @@ Both binaries ship in each package, and the command finds the app beside itself.
   command to `~/.local/share/jackalope/` because its mount point changes, and
   records how to relaunch itself in `preferences/host-launcher`. Development
   builds and isolated profiles skip this step.
-- macOS: the default shell PATH does not include `~/.local/bin`. The terminal
-  window offers Install command, which links `/usr/local/bin/jackalope` after an
-  administrator prompt.
+- macOS: the default shell PATH does not include `~/.local/bin`, so when the
+  login shell's PATH lacks it the same launch also links
+  `/usr/local/bin/jackalope` if that folder is on PATH and writable without a
+  password (Homebrew on Intel Macs). Otherwise it appends a marked
+  `export PATH="$HOME/.local/bin:$PATH"` line to the zsh `.zprofile` (under
+  `ZDOTDIR` when set) or the bash login profile bash already reads, creating
+  `.bash_profile` only when none exists. Other shells are left alone. The edit
+  happens only once, recorded in `preferences/cli-login-profile`, so a
+  removed line stays removed; new terminals find the command, already-open ones
+  do not. Settings and the terminal window still offer Install command, which
+  links `/usr/local/bin/jackalope` after an administrator prompt.
 - Windows: the EXE installer adds its folder to the user's PATH and the
   uninstaller removes it; see `apps/desktop/src-tauri/installer/README.md`. The
   Store package declares a console `jackalope.exe` execution alias.

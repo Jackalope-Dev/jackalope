@@ -17,7 +17,7 @@ import { syncAgentConfig } from './agentConfigStore';
 import { useMascotStore } from './mascotStore';
 import type { TaskStatus } from './taskStore';
 
-export interface TaskDraft {
+interface TaskDraft {
   effort?: TaskEffort;
   codexSpeed?: 'standard' | 'fast';
   model?: string;
@@ -33,7 +33,7 @@ export interface TaskDraft {
   skills?: string[];
   connectionIds?: string[];
 }
-export const emptyDraft: TaskDraft = { prompt: '', agent: '', isolated: true };
+const emptyDraft: TaskDraft = { prompt: '', agent: '', isolated: true };
 interface ExecutionState {
   runs: TaskRun[];
   runners: Runner[];

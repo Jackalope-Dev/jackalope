@@ -2,11 +2,167 @@ import type { BlogPost } from './blog-types.ts';
 
 export const practicalPosts: BlogPost[] = [
   {
+    slug: 'run-ai-coding-agents-in-parallel',
+    cover: { kind: 'parallel', tone: 'rose', label: 'More hands. One review.' },
+    title: 'How to run AI coding agents in parallel without drowning in review',
+    seoTitle: 'How to run AI coding agents in parallel',
+    category: 'Practical guides',
+    author: 'caden-sumner',
+    date: '2026-11-04',
+    readingTime: '7 min read',
+    description:
+      'Run several coding agents at once: choose independent tasks, find shared resources, set a concurrency limit you can review, and merge in a safe order.',
+    sections: [
+      {
+        id: 'bottleneck',
+        title: 'Parallel agents move the bottleneck',
+        paragraphs: [
+          'Starting five coding-agent sessions takes about a minute. Codex in one terminal, Claude Code in another, a third agent chasing a flaky test. For a while it feels like the team just got bigger.',
+          'Then the results arrive. Each one needs someone to read the patch, run it, decide whether it is right and merge it without breaking the others. Agents write code in parallel; you still review it one change at a time. Running agents in parallel pays off when the tasks are genuinely independent and the results come back in a shape you can review as fast as they land. This guide is about getting both of those right.',
+        ],
+      },
+      {
+        id: 'independent-work',
+        title: 'Pick work that is actually independent',
+        paragraphs: [
+          'A useful test: could these changes be merged in any order, and would each still make sense on its own? If yes, they are good parallel candidates. If one task needs a decision or an interface that another task is still producing, they are a sequence, however separate the prompts sound.',
+          'Split by outcome, not by layer. “Add the export button” split into a frontend agent and a backend agent creates two halves that only work together, and neither agent can check its own result. “Fix the date parsing bug” and “add keyboard shortcuts to the settings page” are separate outcomes, each with its own check.',
+        ],
+        table: {
+          caption: 'What to run in parallel and what to keep in sequence',
+          headers: ['Usually fine in parallel', 'Usually better in sequence'],
+          rows: [
+            [
+              'Bug fixes in unrelated modules',
+              'A refactor and a feature that touches the refactored code',
+            ],
+            [
+              'Tests for existing, stable behavior',
+              'An API change and the client code that consumes it',
+            ],
+            ['Docs or help text that does not depend on new code', 'Two schema migrations'],
+            [
+              'Investigations that only report findings',
+              'Any task whose brief says “whatever the other agent decides”',
+            ],
+          ],
+        },
+      },
+      {
+        id: 'shared-resources',
+        title: 'Find the shared resources before the agents do',
+        paragraphs: [
+          'Separate checkouts stop two agents from editing the same files. They do not separate everything else the project touches. Most surprising failures in parallel agent work come from a resource that both tasks quietly share.',
+          'Before starting, list what a typical task reads and writes outside its own source files. Then give each task its own copy, make the resource read-only for agents, or decide that tasks touching it run one at a time.',
+        ],
+        bullets: [
+          'Lockfiles and dependency manifests: two agents adding packages conflict on every merge.',
+          'Database schema and migrations: numbered migrations collide, and a shared dev database lets one agent’s test data break another’s run.',
+          'Generated code: two agents regenerating the same client produce noisy, conflicting diffs.',
+          'Fixed ports: two dev servers on port 3000 means one agent tests the other’s build.',
+          'Provider usage limits: several sessions on one account draw on the same allowance, so a busy run can stall every agent at once.',
+        ],
+        code: {
+          label: 'Give each checkout its own port and database',
+          language: 'bash',
+          value:
+            '# Run from each task\'s worktree\nexport PORT=$((3000 + RANDOM % 1000))\nexport DATABASE_URL="postgres://localhost/app_$(basename "$PWD")"\npnpm db:reset && pnpm dev',
+        },
+        links: [
+          {
+            label: 'Git worktrees for AI coding agents',
+            href: '/blog/git-worktrees-for-ai-coding-agents/',
+          },
+          { label: 'git worktree documentation', href: 'https://git-scm.com/docs/git-worktree' },
+        ],
+      },
+      {
+        id: 'concurrency',
+        title: 'Set the concurrency limit from your review capacity',
+        paragraphs: [
+          'The right number of agents is not how many your machine or plan can run. It is how many results you can review properly in the time the agents take to produce them. If finished tasks sit in a queue for hours, the extra agents are producing work that goes stale against a moving main branch.',
+          'Start with two. Run a few rounds and watch where the time goes. If you finish reviewing before the next result lands, add a third. If you catch yourself approving patches after skimming the summary, or merge conflicts start appearing between tasks, lower the limit again. Larger, well-tested tasks support more concurrency than small ones that each need a careful read.',
+        ],
+        bullets: [
+          'Raise the limit when reviews finish before new results arrive and merges stay clean.',
+          'Lower it when results wait unreviewed, conflicts repeat, or agents ask you the same question.',
+          'Keep the limit per project: a well-tested backend and an untested prototype need different caps.',
+        ],
+      },
+      {
+        id: 'briefs',
+        title: 'Write briefs that end in a handoff',
+        paragraphs: [
+          'A parallel agent cannot lean over and ask what the other one is doing, so the brief has to carry the boundaries. Name the outcome, the files the task owns, the files it must leave alone, the check that proves it works, and what it should report when it stops.',
+          'The report matters as much as the code. Ask each agent to list the files it changed, the checks it ran with their results, and anything it assumed or could not finish. A consistent handoff lets you review five results in the same order every time instead of rediscovering what each one did.',
+        ],
+        code: {
+          label: 'A brief for one parallel task',
+          language: 'markdown',
+          value:
+            "## Outcome\nDates in the CSV import parse in the user's locale, not UTC.\n\n## Scope\n- Own: src/import/dates.ts and its tests.\n- Leave alone: src/import/schema.ts (another task is changing it).\n\n## Done when\n- pnpm test --filter import passes, including a new case for en-GB dates.\n\n## Report\n- Files changed, checks run with results, assumptions, open questions.\n- Do not commit or merge.",
+        },
+      },
+      {
+        id: 'merge-order',
+        title: 'Merge one at a time, in dependency order',
+        paragraphs: [
+          'Each task passing its own checks does not mean the combination passes. Two changes can each be correct and still conflict in behavior: one renames a setting while another adds a new reader of the old name. Integrate results one at a time, rerun the full checks after each merge, and update the remaining branches before reviewing them.',
+          'Merge prerequisites first, then their dependents, then independent work in whatever order it finished. When a result fails review, send precise feedback to the same task instead of starting a new one, so the correction keeps its history. After the last merge, run the whole suite once more on the combined result before you call the batch done.',
+        ],
+        links: [
+          {
+            label: 'How to review AI-generated code',
+            href: '/blog/review-ai-generated-code-checklist/',
+          },
+        ],
+      },
+      {
+        id: 'when-to-stop',
+        title: 'Know when to go back to one agent',
+        paragraphs: [
+          'Parallel work is a tool for a particular kind of backlog: several well-understood, separable changes. It is the wrong tool for exploratory work, for a design that has not settled, or for a change concentrated in one module. In those cases a single focused session, followed by review, is faster than coordinating several agents around an open question.',
+          'Watch for the signs: you rewrite briefs mid-run because the plan changed, agents keep touching each other’s files, or most of your time goes to resolving conflicts rather than reviewing behavior. Pause new tasks, finish what is running, and decide the open question before fanning out again.',
+        ],
+      },
+      {
+        id: 'where-jackalope-fits',
+        title: 'Keep the plan and the review in one place',
+        paragraphs: [
+          'Jackalope is a desktop workspace for running Codex, Claude Code and other coding agents side by side. A parallel plan holds each task’s brief, file scope, dependencies and assigned agent, with a concurrency limit per project. Each task can get its own Git worktree, and finished work returns to one review queue with its patch, checks and attempt history, so you can inspect the combined result before it reaches your branch.',
+          'It does not make independent tasks out of dependent ones. The choices above, what to split, what to share and how many agents to run, still decide whether parallel work saves time.',
+        ],
+        links: [
+          { label: 'Parallel coding agents in Jackalope', href: '/parallel-coding-agents/' },
+          {
+            label: 'Run Codex and Claude Code in parallel',
+            href: '/guides/run-codex-and-claude-code-in-parallel/',
+          },
+        ],
+      },
+    ],
+    related: [
+      {
+        label: 'Git worktrees for AI coding agents',
+        href: '/blog/git-worktrees-for-ai-coding-agents/',
+      },
+      {
+        label: 'Use Claude Code and Codex together',
+        href: '/blog/claude-code-and-codex-together/',
+      },
+      {
+        label: 'Write project instructions agents follow',
+        href: '/blog/agents-md-claude-md-project-instructions/',
+      },
+    ],
+  },
+  {
     slug: 'agents-md-claude-md-project-instructions',
     cover: { kind: 'context', tone: 'honey', label: 'Write it down once.' },
     title: 'AGENTS.md and CLAUDE.md: writing project instructions agents follow',
     seoTitle: 'AGENTS.md vs CLAUDE.md: a practical guide',
     category: 'Practical guides',
+    author: 'caden-sumner',
     date: '2026-09-27',
     readingTime: '7 min read',
     description:
@@ -137,6 +293,7 @@ export const practicalPosts: BlogPost[] = [
     title: 'Git worktrees for AI coding agents: from setup to cleanup',
     seoTitle: 'Git worktree tutorial for coding agents',
     category: 'Practical guides',
+    author: 'caden-sumner',
     date: '2026-09-09',
     readingTime: '8 min read',
     description:
@@ -257,6 +414,7 @@ export const practicalPosts: BlogPost[] = [
     title: 'Using Claude Code and Codex together: a practical workflow',
     seoTitle: 'Using Claude Code and Codex together',
     category: 'Working with agents',
+    author: 'caden-sumner',
     date: '2026-09-09',
     readingTime: '7 min read',
     description:
@@ -378,6 +536,7 @@ export const practicalPosts: BlogPost[] = [
     title: 'How to review AI-generated code: a checklist with examples',
     seoTitle: 'AI code review checklist with examples',
     category: 'Practical guides',
+    author: 'caden-sumner',
     date: '2026-09-09',
     readingTime: '7 min read',
     description:
@@ -503,6 +662,7 @@ export const practicalPosts: BlogPost[] = [
     title: 'MCP for coding agents: tools, permissions, and project context',
     seoTitle: 'MCP for coding agents: tools and permissions',
     category: 'Practical guides',
+    author: 'caden-sumner',
     date: '2026-09-09',
     readingTime: '7 min read',
     description:
@@ -635,6 +795,7 @@ export const practicalPosts: BlogPost[] = [
     title: 'How to choose an AI coding-agent workspace',
     seoTitle: 'How to choose an AI coding-agent workspace',
     category: 'Choosing your tools',
+    author: 'caden-sumner',
     date: '2026-09-09',
     readingTime: '7 min read',
     description:

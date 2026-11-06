@@ -1,7 +1,6 @@
-import { Badge, FormField, Input } from '@jackalope/ui';
+import { Badge } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  addCloudMachine,
   type CloudMachine,
   type ComputerPreferences,
   type ComputerStatus,
@@ -20,7 +19,10 @@ import {
   testCloudMachine,
 } from '../../lib/computers';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { Agent37Settings } from '../computers/Agent37Connect';
+import { AgentSignIns } from '../computers/AgentSignIns';
 import { IdleStopSelect } from '../computers/IdleStopSelect';
+import { PairMachineForm } from '../computers/PairMachineForm';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -45,7 +47,7 @@ export function ComputersSettings() {
   const [computers, setComputers] = useState<ComputerStatus[]>([]);
   const [preferences, setPreferences] = useState<ComputerPreferences | null>(null);
   const [health, setHealth] = useState<Record<string, string>>({});
-  const [form, setForm] = useState({ name: '', url: '', secret: '', viewerUrl: '' });
+  const [pairing, setPairing] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
 
@@ -111,7 +113,7 @@ export function ComputersSettings() {
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       <SettingGroup
         title="Local sandboxes"
-        description="Bots and tasks can get their own Linux desktop with a browser, running in Docker on this device. Jackalope never installs Docker for you."
+        description="Bots and tasks get their own Linux desktop and browser in Docker on this device."
       >
         <Setting
           title={
@@ -147,7 +149,7 @@ export function ComputersSettings() {
         </Setting>
         <Setting
           title="Keep computers running when Jackalope quits"
-          description="Off stops every local sandbox when Jackalope quits; their files are kept. Each sandbox also stops after its idle time, set per computer below or in its bot's settings."
+          description="When off, local sandboxes stop when Jackalope quits. Their files are kept."
         >
           <Switch
             label="Keep computers running when Jackalope quits"
@@ -164,7 +166,7 @@ export function ComputersSettings() {
 
       <SettingGroup
         title="Cloud machines"
-        description="Bring your own machine from any cloud provider: run the Jackalope computer image there behind HTTPS and pair it with its secret. The secret is kept in this device's protected storage. Jackalope never stops a cloud machine; its provider's own schedule applies."
+        description="Run the Jackalope computer on any machine you own behind HTTPS. Jackalope never stops it; your provider’s schedule applies."
       >
         {machines.map((machine) => (
           <Setting
@@ -197,77 +199,24 @@ export function ComputersSettings() {
             </div>
           </Setting>
         ))}
-        <SettingBody>
-          <form
-            className="space-y-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void run('add', async () => {
-                await addCloudMachine(
-                  form.name,
-                  form.url,
-                  form.secret,
-                  form.viewerUrl.trim() || null,
-                );
-                setForm({ name: '', url: '', secret: '', viewerUrl: '' });
-              });
-            }}
-          >
-            <FormField label="Name">
-              <Input
-                value={form.name}
-                maxLength={80}
-                placeholder="Research VM"
-                disabled={!!busy}
-                onChange={(event) => setForm({ ...form, name: event.target.value })}
-              />
-            </FormField>
-            <FormField label="Agent address">
-              <Input
-                required
-                type="url"
-                spellCheck={false}
-                placeholder="https://computer.example.com"
-                value={form.url}
-                disabled={!!busy}
-                onChange={(event) => setForm({ ...form, url: event.target.value })}
-              />
-            </FormField>
-            <FormField
-              label="Pairing secret"
-              description="The JACKALOPE_COMPUTER_TOKEN you set on the machine, at least 32 characters."
-            >
-              <Input
-                required
-                type="password"
-                autoComplete="off"
-                value={form.secret}
-                disabled={!!busy}
-                onChange={(event) => setForm({ ...form, secret: event.target.value })}
-              />
-            </FormField>
-            <FormField
-              label="Viewer address"
-              description="Optional. Its noVNC page, opened in your browser for Watch / take over."
-            >
-              <Input
-                type="url"
-                spellCheck={false}
-                value={form.viewerUrl}
-                disabled={!!busy}
-                onChange={(event) => setForm({ ...form, viewerUrl: event.target.value })}
-              />
-            </FormField>
-            <Button
-              type="submit"
-              loading={busy === 'add'}
-              loadingLabel="Checking…"
-              disabled={!!busy || !form.url.trim() || !form.secret.trim()}
-            >
+        {pairing ? (
+          <SettingBody>
+            <PairMachineForm
+              defaultName={`Cloud machine ${machines.length + 1}`}
+              onCancel={() => setPairing(false)}
+              onPaired={() => {
+                setPairing(false);
+                void refresh().catch((cause) => setError(String(cause)));
+              }}
+            />
+          </SettingBody>
+        ) : (
+          <Setting title="Pair a cloud machine">
+            <Button variant="outline" disabled={!!busy} onClick={() => setPairing(true)}>
               Pair machine
             </Button>
-          </form>
-        </SettingBody>
+          </Setting>
+        )}
         <Setting
           title={
             <span className="inline-flex items-center gap-2">
@@ -278,11 +227,19 @@ export function ComputersSettings() {
         />
       </SettingGroup>
 
-      <SettingGroup title="Computers" description="Every bot and task computer on this device.">
+      <Agent37Settings />
+
+      <AgentSignIns />
+
+      <SettingGroup
+        title="Computers"
+        description="Every bot, project and task computer on this device."
+      >
         {computers.length === 0 && (
           <SettingBody>
             <p className="settings-section-subtitle">
-              No computers yet. Give a bot one in its settings under Computer.
+              No computers yet. Give a bot one in its settings, or choose where a project's agents
+              run in Project settings.
             </p>
           </SettingBody>
         )}
@@ -295,12 +252,19 @@ export function ComputersSettings() {
                 <Badge variant={computer.state === 'running' ? 'accent' : 'default'}>
                   {computerStateLabel(computer)}
                 </Badge>
+                {(computer.ownerKind === 'project' || computer.provider === 'agent37') && (
+                  <Badge variant="accent">Beta</Badge>
+                )}
               </span>
             }
             description={[
               computerUsage(computer),
               providerLabel(computer.provider),
-              computer.ownerKind === 'bot' ? 'Bot' : 'Task',
+              computer.ownerKind === 'bot'
+                ? 'Bot'
+                : computer.ownerKind === 'project'
+                  ? 'Project agents'
+                  : 'Task',
               computer.error,
             ]
               .filter(Boolean)
@@ -330,7 +294,7 @@ export function ComputersSettings() {
                 title={`Delete ${computer.name}?`}
                 description={
                   computer.provider === 'remote-machine'
-                    ? 'The bot stops using this machine. Nothing on the machine is deleted.'
+                    ? 'Jackalope stops using this machine. Nothing on the machine is deleted.'
                     : 'Its desktop, files and browser sign-ins are removed. This cannot be undone.'
                 }
                 label="Delete computer"

@@ -3,7 +3,11 @@
 //! full-width row for the highlight, ellipses instead of hard cuts, and the
 //! position in the bottom border when the list scrolls.
 
-use super::super::Mention;
+use super::super::{Click, Mention};
+use std::cell::RefCell;
+
+/// Where the frame being drawn put each clickable thing.
+pub type Hits = RefCell<Vec<(Rect, Click)>>;
 use crate::brand;
 use crate::ui::pickers::{Picker, PickerKind};
 use ratatui::layout::Rect;
@@ -11,6 +15,34 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Padding, Paragraph, Wrap};
 use ratatui::Frame;
+
+/// Makes each of a menu's `rows` rows, the first being entry `first`,
+/// clickable inside its border.
+fn menu_hits(hits: &Hits, area: Rect, first: usize, rows: usize) {
+    for row in 0..rows {
+        let y = area.y + 1 + row as u16;
+        if y + 1 < area.bottom() {
+            hits.borrow_mut().push((
+                Rect::new(area.x + 1, y, area.width.saturating_sub(2), 1),
+                Click::Menu(first + row),
+            ));
+        }
+    }
+}
+
+/// Makes the picker rows drawn from row `top` of `area` clickable: `count`
+/// rows, the first at position `first` of the shown list.
+fn row_hits(hits: &Hits, area: Rect, top: u16, first: usize, count: usize) {
+    for row in 0..count {
+        let y = top + row as u16;
+        if y < area.bottom().saturating_sub(1) {
+            hits.borrow_mut().push((
+                Rect::new(area.x + 1, y, area.width.saturating_sub(2), 1),
+                Click::Row(first + row),
+            ));
+        }
+    }
+}
 
 /// The first row to show so `selected` stays in a window of `rows`.
 pub(super) fn window_start(selected: usize, rows: usize) -> usize {
@@ -57,7 +89,13 @@ pub(super) fn row(spans: Vec<Span<'static>>, width: usize, chosen: bool) -> Line
 
 /// Agents and files for an `@` mention, in the same place as the command
 /// menu.
-pub fn mention_menu(frame: &mut Frame, mentions: &[Mention], selected: usize, input: Rect) {
+pub fn mention_menu(
+    frame: &mut Frame,
+    hits: &Hits,
+    mentions: &[Mention],
+    selected: usize,
+    input: Rect,
+) {
     let accent = Style::default().fg(brand::accent());
     let muted = Style::default().fg(brand::muted());
     let rows = mentions.len().min(8);
@@ -119,6 +157,7 @@ pub fn mention_menu(frame: &mut Frame, mentions: &[Mention], selected: usize, in
             }
         })
         .collect();
+    menu_hits(hits, area, first, rows);
     let position = (mentions.len() > rows).then_some((selected, mentions.len()));
     frame.render_widget(Clear, area);
     frame.render_widget(
@@ -132,7 +171,13 @@ pub fn mention_menu(frame: &mut Frame, mentions: &[Mention], selected: usize, in
 }
 
 /// The command menu, floating just above the input like an editor's completions.
-pub fn slash_menu(frame: &mut Frame, matches: &[(&str, &str)], selected: usize, input: Rect) {
+pub fn slash_menu(
+    frame: &mut Frame,
+    hits: &Hits,
+    matches: &[(&str, &str)],
+    selected: usize,
+    input: Rect,
+) {
     let accent = Style::default().fg(brand::command());
     let muted = Style::default().fg(brand::muted());
     let rows = matches.len().min(8);
@@ -180,6 +225,7 @@ pub fn slash_menu(frame: &mut Frame, matches: &[(&str, &str)], selected: usize, 
             )
         })
         .collect();
+    menu_hits(hits, area, first, rows);
     let position = (matches.len() > rows).then_some((selected, matches.len()));
     frame.render_widget(Clear, area);
     frame.render_widget(
@@ -192,7 +238,7 @@ pub fn slash_menu(frame: &mut Frame, matches: &[(&str, &str)], selected: usize, 
     );
 }
 
-pub fn picker(frame: &mut Frame, picker: &Picker, area: Rect) {
+pub fn picker(frame: &mut Frame, hits: &Hits, picker: &Picker, area: Rect) {
     let width = area
         .width
         .saturating_sub(4)
@@ -239,7 +285,10 @@ pub fn picker(frame: &mut Frame, picker: &Picker, area: Rect) {
             .fg(brand::accent())
             .add_modifier(Modifier::BOLD),
     );
-    let lines = picker_lines(picker, context, width, visible);
+    let (lines, rows_from) = picker_lines(picker, context, width, visible);
+    let first = window_start(picker.selected, visible);
+    let count = picker.shown().len().saturating_sub(first).min(visible);
+    row_hits(hits, popup, popup.y + 1 + rows_from as u16, first, count);
     frame.render_widget(Clear, popup);
     frame.render_widget(
         Paragraph::new(lines).block(picker_block(picker, title, visible)),
@@ -305,15 +354,20 @@ impl Docked {
         self.context_rows + self.visible as u16 + 4
     }
 
-    pub fn draw(self, frame: &mut Frame, picker: &Picker, area: Rect) {
+    pub fn draw(self, frame: &mut Frame, hits: &Hits, picker: &Picker, area: Rect) {
         let warning = Style::default().fg(brand::warning());
         let title = Span::styled(" ? Question ", warning.add_modifier(Modifier::BOLD));
-        let lines = picker_lines(
+        let (lines, _) = picker_lines(
             picker,
             self.context,
             area.width.saturating_sub(2),
             self.visible,
         );
+        // The question wraps, so its rows are counted rather than its lines;
+        // the filter line and a spacer follow it.
+        let first = window_start(picker.selected, self.visible);
+        let count = picker.shown().len().saturating_sub(first).min(self.visible);
+        row_hits(hits, area, area.y + 1 + self.context_rows + 2, first, count);
         frame.render_widget(Clear, area);
         frame.render_widget(
             Paragraph::new(lines).wrap(Wrap { trim: false }).block(
@@ -346,7 +400,7 @@ fn picker_lines(
     context: Vec<Line<'static>>,
     width: u16,
     visible: usize,
-) -> Vec<Line<'static>> {
+) -> (Vec<Line<'static>>, usize) {
     let accent = Style::default().fg(brand::accent());
     let muted = Style::default().fg(brand::muted());
     let shown = picker.shown();
@@ -381,6 +435,7 @@ fn picker_lines(
         ]
     }));
     lines.push(Line::raw(""));
+    let rows_from = lines.len();
     lines.extend(
         shown
             .iter()
@@ -428,7 +483,7 @@ fn picker_lines(
             muted,
         ));
     }
-    lines
+    (lines, rows_from)
 }
 
 #[cfg(test)]
@@ -476,7 +531,7 @@ mod tests {
         let mut terminal =
             ratatui::Terminal::new(ratatui::backend::TestBackend::new(area.width, height)).unwrap();
         terminal
-            .draw(|frame| dock.draw(frame, &picker, frame.area()))
+            .draw(|frame| dock.draw(frame, &Hits::default(), &picker, frame.area()))
             .unwrap();
         let buffer = terminal.backend().buffer();
         let screen: String = (0..height)

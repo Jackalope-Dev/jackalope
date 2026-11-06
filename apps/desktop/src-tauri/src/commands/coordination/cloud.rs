@@ -8,6 +8,7 @@
 //! again after a restart. Snapshots are synthetic commits on the attempt's
 //! starting commit, so nothing is written to the attempt's branch or index.
 
+use super::swarm_setup::Removal;
 use super::*;
 use crate::commands::{account_storage, cloudflare_artifacts, tasks::TaskRun};
 use serde::{Deserialize, Serialize};
@@ -28,7 +29,22 @@ const TOKEN_MARGIN_SECONDS: i64 = 3600;
 #[serde(rename_all = "camelCase")]
 pub struct Connection {
     pub url: String,
-    token: String,
+    pub(super) token: String,
+    /// Set when Jackalope deployed this Worker itself; absent for a Worker the
+    /// person deployed and entered by hand.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) deployment: Option<Deployment>,
+}
+
+/// What one-click setup uploaded, so Settings can offer an update when the app's
+/// bundled Worker or the connected Artifacts namespace changes.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct Deployment {
+    pub account_id: String,
+    pub script: String,
+    pub namespace: String,
+    pub version: String,
 }
 
 #[derive(Clone)]
@@ -68,7 +84,7 @@ fn storage(runtime: &TaskRuntime) -> std::path::PathBuf {
     runtime.integration_directory().join(STORAGE_FILE)
 }
 
-fn connection(runtime: &TaskRuntime) -> Result<Option<Connection>, String> {
+pub(super) fn connection(runtime: &TaskRuntime) -> Result<Option<Connection>, String> {
     account_storage::read(&storage(runtime))?
         .map(|bytes| {
             serde_json::from_slice(&bytes).map_err(|_| {
@@ -83,7 +99,7 @@ pub(crate) fn configured(runtime: &TaskRuntime) -> bool {
     connection(runtime).is_ok_and(|connection| connection.is_some())
 }
 
-fn validate(connection: &Connection) -> Result<String, String> {
+pub(super) fn validate(connection: &Connection) -> Result<String, String> {
     let url = reqwest::Url::parse(connection.url.trim())
         .map_err(|_| "Enter the URL of your Jackalope Swarm Worker.")?;
     let local = matches!(url.host_str(), Some("127.0.0.1" | "localhost"));
@@ -119,7 +135,7 @@ fn client() -> Result<reqwest::Client, String> {
         .map_err(|e| e.to_string())
 }
 
-async fn call(
+pub(super) async fn call(
     connection: &Connection,
     method: reqwest::Method,
     route: &str,
@@ -386,25 +402,53 @@ pub fn launch(service: Coordinator) {
     });
 }
 
-#[tauri::command]
-pub fn swarm_connection_status(state: State<'_, Coordinator>) -> Result<Value, String> {
-    Ok(match connection(&state.runtime)? {
-        Some(connection) => json!({"configured": true, "url": connection.url}),
-        None => json!({"configured": false}),
-    })
+/// Whether a Worker Jackalope deployed needs uploading again: the app bundles a
+/// newer Worker, or the connected account now uses another Artifacts namespace.
+/// A deployment in a different account than the connected one is left alone.
+pub(super) fn update_available(
+    deployment: &Deployment,
+    bundled_version: &str,
+    account_id: &str,
+    namespace: &str,
+) -> bool {
+    deployment.account_id == account_id
+        && (deployment.version != bundled_version || deployment.namespace != namespace)
 }
 
-/// Checks the Worker and token before saving them.
-#[tauri::command]
-pub async fn swarm_connection_save(
-    url: String,
-    token: String,
-    state: State<'_, Coordinator>,
-) -> Result<Value, String> {
-    let mut candidate = Connection {
-        url,
-        token: token.trim().into(),
+pub(super) fn status_value(runtime: &TaskRuntime) -> Result<Value, String> {
+    let Some(connection) = connection(runtime)? else {
+        return Ok(json!({"configured": false}));
     };
+    let cloudflare = cloudflare_artifacts::workers_access_saved(runtime)
+        .ok()
+        .flatten();
+    let update = match (&connection.deployment, &cloudflare) {
+        (Some(deployment), Some(access)) => update_available(
+            deployment,
+            super::swarm_setup::bundled_version(),
+            &access.account_id,
+            &access.namespace,
+        ),
+        _ => false,
+    };
+    Ok(json!({
+        "configured": true,
+        "url": connection.url,
+        "managed": connection.deployment.is_some(),
+        "updateAvailable": update,
+    }))
+}
+
+#[tauri::command]
+pub fn swarm_connection_status(state: State<'_, Coordinator>) -> Result<Value, String> {
+    status_value(&state.runtime)
+}
+
+/// Checks the Worker and token, then saves them and starts a sync.
+pub(super) async fn check_and_save(
+    service: &Coordinator,
+    mut candidate: Connection,
+) -> Result<Value, String> {
     candidate.url = validate(&candidate)?;
     call(
         &candidate,
@@ -414,19 +458,65 @@ pub async fn swarm_connection_save(
     )
     .await?;
     account_storage::write(
-        &storage(&state.runtime),
+        &storage(&service.runtime),
         &serde_json::to_vec(&candidate).map_err(|e| e.to_string())?,
     )?;
-    let service = state.inner().clone();
+    let service = service.clone();
     tauri::async_runtime::spawn(async move {
         let _ = sync(&service).await;
     });
     Ok(json!({"configured": true, "url": candidate.url}))
 }
 
+/// Connects a Worker the person deployed themselves.
 #[tauri::command]
-pub fn swarm_connection_remove(state: State<'_, Coordinator>) -> Result<(), String> {
-    account_storage::remove(&storage(&state.runtime))?;
+pub async fn swarm_connection_save(
+    url: String,
+    token: String,
+    state: State<'_, Coordinator>,
+) -> Result<Value, String> {
+    check_and_save(
+        state.inner(),
+        Connection {
+            url,
+            token: token.trim().into(),
+            deployment: None,
+        },
+    )
+    .await
+}
+
+/// Forgets the Worker. With `delete_worker`, a Worker one-click setup deployed is
+/// also deleted from Cloudflare; a Worker entered by hand is only forgotten.
+/// Resolves with `{workerDeleted, warning}`; the connection is forgotten even
+/// when Cloudflare keeps the Worker, and `warning` says how to remove it.
+#[tauri::command]
+pub async fn swarm_connection_remove(
+    delete_worker: Option<bool>,
+    state: State<'_, Coordinator>,
+) -> Result<Value, String> {
+    let deployment = connection(&state.runtime)
+        .ok()
+        .flatten()
+        .and_then(|saved| saved.deployment);
+    let removal = match deployment.filter(|_| delete_worker == Some(true)) {
+        Some(deployment) => {
+            Some(super::swarm_setup::delete_worker(&state.runtime, &deployment).await)
+        }
+        None => None,
+    };
+    forget(&state.runtime)?;
+    Ok(match removal {
+        Some(Removal::Deleted | Removal::AlreadyGone) => {
+            json!({"workerDeleted": true, "warning": null})
+        }
+        Some(Removal::Kept(warning)) => json!({"workerDeleted": false, "warning": warning}),
+        None => json!({"workerDeleted": false, "warning": null}),
+    })
+}
+
+fn forget(runtime: &TaskRuntime) -> Result<(), String> {
+    account_storage::remove(&storage(runtime))?;
     if let Ok(mut forks) = FORKS.lock() {
         *forks = None;
     }
@@ -467,6 +557,7 @@ mod tests {
             validate(&Connection {
                 url: url.into(),
                 token: token.clone(),
+                deployment: None,
             })
         };
         assert_eq!(
@@ -478,7 +569,8 @@ mod tests {
         assert!(check("https://user:pass@example.com").is_err());
         assert!(validate(&Connection {
             url: "https://example.com".into(),
-            token: "short".into()
+            token: "short".into(),
+            deployment: None,
         })
         .is_err());
     }
@@ -486,5 +578,27 @@ mod tests {
     #[test]
     fn route_segments_drop_anything_outside_artifact_names() {
         assert_eq!(segment("app--3f2a/../x?y"), "app--3f2a..xy");
+    }
+
+    #[test]
+    fn saved_connections_without_a_deployment_still_load() {
+        let old: Connection =
+            serde_json::from_str(r#"{"url":"https://a.example","token":"t"}"#).unwrap();
+        assert!(old.deployment.is_none());
+        assert!(!serde_json::to_string(&old).unwrap().contains("deployment"));
+    }
+
+    #[test]
+    fn updates_follow_the_bundle_and_namespace_in_the_same_account() {
+        let deployment = Deployment {
+            account_id: "a".into(),
+            script: "jackalope-swarm".into(),
+            namespace: "jackalope".into(),
+            version: "v1".into(),
+        };
+        assert!(!update_available(&deployment, "v1", "a", "jackalope"));
+        assert!(update_available(&deployment, "v2", "a", "jackalope"));
+        assert!(update_available(&deployment, "v1", "a", "work"));
+        assert!(!update_available(&deployment, "v2", "b", "jackalope"));
     }
 }

@@ -75,6 +75,9 @@ pub struct WakeDefinition {
     pub prompt: String,
     pub enabled: bool,
     pub trigger: WakeTrigger,
+    /// The project it watches and starts in, for a bot that works in several; home when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
 }
 
 /// The renderer's bot profile plus the run request its conversations start with.
@@ -91,7 +94,32 @@ pub struct HubBot {
     pub collaborate: bool,
     #[serde(default)]
     pub wakes: Vec<WakeDefinition>,
+    /// Its home project: where its conversations start unless another project asks.
     pub request: RunRequest,
+    /// Requests for the other projects it also works in.
+    #[serde(default)]
+    pub projects: Vec<RunRequest>,
+}
+
+impl HubBot {
+    /// The request for `project_id` when the bot works there, otherwise its home request.
+    pub(super) fn request_in(&self, project_id: Option<&str>) -> &RunRequest {
+        project_id
+            .and_then(|id| {
+                self.projects
+                    .iter()
+                    .find(|request| request.project_id == id)
+            })
+            .unwrap_or(&self.request)
+    }
+
+    pub(super) fn works_in(&self, project_id: &str) -> bool {
+        self.request.project_id == project_id
+            || self
+                .projects
+                .iter()
+                .any(|request| request.project_id == project_id)
+    }
 }
 
 fn enabled() -> bool {
@@ -600,6 +628,7 @@ impl BotHub {
     fn deliver(
         &self,
         bot: &HubBot,
+        project_id: Option<&str>,
         text: &str,
         origin: MessageOrigin,
         continue_in: Option<&str>,
@@ -612,7 +641,7 @@ impl BotHub {
         self.runtime.access.ensure()?;
         let id = Uuid::new_v4().to_string();
         let message = Uuid::new_v4().to_string();
-        let mut request = bot.request.clone();
+        let mut request = bot.request_in(project_id).clone();
         request.id = id.clone();
         self.sessions.create_with_persona(
             id.clone(),
@@ -773,6 +802,7 @@ impl BotHub {
             session = Some(
                 self.deliver(
                     &bot,
+                    None,
                     &message,
                     MessageOrigin {
                         kind: "card".into(),
@@ -934,7 +964,13 @@ impl BotHub {
         };
         // Continuing the latest open wake-up conversation keeps its context and workspace;
         // a finished, paused or merged one is replaced by a new conversation.
-        match self.deliver(bot, text, origin, current.as_deref()) {
+        match self.deliver(
+            bot,
+            wake.project_id.as_deref(),
+            text,
+            origin,
+            current.as_deref(),
+        ) {
             Ok((session, _)) => {
                 self.record(bot, wake, now, "Woke up", Some(&session), true)?;
                 Ok(session)
@@ -1051,7 +1087,12 @@ fn validate_bots(bots: &[HubBot]) -> Result<(), String> {
         if bot.instructions.chars().count() > 6_000 || bot.role.chars().count() > 200 {
             return Err(format!("Shorten {name}'s role or instructions."));
         }
-        if bot.request.project_id.trim().is_empty() || bot.request.project_path.trim().is_empty() {
+        if std::iter::once(&bot.request)
+            .chain(&bot.projects)
+            .any(|request| {
+                request.project_id.trim().is_empty() || request.project_path.trim().is_empty()
+            })
+        {
             return Err(format!("Choose a project for {name}."));
         }
         if bot.wakes.len() > MAX_WAKES {
@@ -1077,6 +1118,16 @@ pub(super) fn validate_wake(bot: &HubBot, wake: &WakeDefinition) -> Result<(), S
     if wake.prompt.trim().is_empty() || wake.prompt.chars().count() > 4_000 {
         return Err(format!(
             "Describe what “{name}” should do in up to 4,000 characters."
+        ));
+    }
+    if wake
+        .project_id
+        .as_deref()
+        .is_some_and(|project| !bot.works_in(project))
+    {
+        return Err(format!(
+            "{} does not work in the project “{name}” uses.",
+            bot.name.trim()
         ));
     }
     match &wake.trigger {

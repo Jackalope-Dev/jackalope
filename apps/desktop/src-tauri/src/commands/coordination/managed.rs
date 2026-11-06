@@ -52,6 +52,17 @@ pub(super) fn assignment_limit(concurrency: usize) -> usize {
     concurrency.clamp(4, 8)
 }
 
+/// Assignments one swarm round may run: an ordinary plan's eight, or as many
+/// as the slots where the project's agents run, up to 24.
+pub(super) fn swarm_assignment_limit(slots: usize) -> usize {
+    slots.clamp(
+        crate::commands::planning::artifact::MAX_TASKS,
+        SWARM_ROUND_LIMIT,
+    )
+}
+
+pub(super) const SWARM_ROUND_LIMIT: usize = 24;
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProposedStep {
@@ -865,6 +876,10 @@ mod tests {
         assert_eq!(assignment_limit(1), 4);
         assert_eq!(assignment_limit(6), 6);
         assert_eq!(assignment_limit(32), 8);
+        // Swarm rounds keep the ordinary eight and grow with available slots.
+        assert_eq!(swarm_assignment_limit(2), 8);
+        assert_eq!(swarm_assignment_limit(16), 16);
+        assert_eq!(swarm_assignment_limit(32), 24);
         let five = (0..5)
             .map(|i| {
                 format!(r#"{{"key":"k{i}","title":"T{i}","prompt":"P{i}","scopes":["s{i}"]}}"#)
@@ -910,6 +925,8 @@ mod tests {
             ledger: ledger.clone(),
             enabled: [dispatch_key("parent")].into(),
             concurrency: 3,
+            remote_concurrency: DEFAULT_REMOTE_CONCURRENCY,
+            remote_projects: HashSet::new(),
             grants: HashMap::new(),
             url: None,
             error: None,

@@ -126,6 +126,8 @@ export interface TaskRun {
   finishing?: boolean;
   verificationError?: string | null;
   verification?: Verification | null;
+  /** The project computer the agent ran on, when it did not run on this device. */
+  remote?: { computerId: string; computerName: string } | null;
   accountBinding?: {
     adapter: string;
     profileId: string | null;

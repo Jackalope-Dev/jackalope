@@ -792,7 +792,10 @@ html[data-window-glass] {
 }
 /* On glass the title bar is clear; its name and controls float as 28px frosted capsules,
    centred in the bar like the search field and inset to line up with the panes below. */
+/* At least the workspace bar's 40px everywhere, so the 28px capsules keep the same inset
+   from the window's top edge on onboarding and sign-in as in the workspace. */
 html[data-window-glass] .app-titlebar {
+  min-height: 40px;
   background: transparent;
 }
 html[data-window-glass] .app-titlebar :is(.app-titlebar-label, .app-titlebar-controls) {

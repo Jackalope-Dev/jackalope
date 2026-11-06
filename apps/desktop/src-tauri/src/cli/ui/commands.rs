@@ -19,6 +19,7 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ),
     ("init", "write or refresh AGENTS.md for this repository"),
     ("sessions", "switch to any open conversation"),
+    ("board", "see every open conversation's state at a glance"),
     ("close", "close this tab, a tab by number, others or all"),
     ("tabs", "hide or show the top bar with the tabs (Ctrl+T)"),
     ("resume", "pick up an earlier conversation"),
@@ -78,6 +79,7 @@ pub const COMMANDS: &[(&str, &str)] = &[
         "deviation",
         "decide on a plan deviation: accept, redo or replan",
     ),
+    ("rounds", "a swarm's rounds: approve, pause, resume or stop"),
     (
         "browser",
         "show the project browser; /browser open [url] to sign in",
@@ -209,6 +211,7 @@ impl App {
         if text.is_empty() {
             return;
         }
+        self.tip_index = (self.tip_index + 1) % super::render::TIPS.len();
         if history::keep(&raw) {
             history::remember(&mut self.history, &text);
             history::append(&text);
@@ -510,6 +513,7 @@ impl App {
             "help" | "?" => self.help(),
             "quit" | "exit" | "q" => self.quit = true,
             "sessions" | "resume" => self.open_picker(PickerKind::Sessions),
+            "board" => self.open_picker(PickerKind::Board),
             "close" => self.close_tabs(argument),
             "tabs" | "header" => self.toggle_top_bar(),
             "history" => self.open_picker(PickerKind::History),

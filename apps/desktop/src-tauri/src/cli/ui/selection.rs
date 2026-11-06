@@ -2,7 +2,7 @@
 //! the conversation, so it selects and copies itself, from the drawn screen.
 
 use super::{App, Click};
-use crossterm::event::{MouseEvent, MouseEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use ratatui::buffer::Buffer;
 
 /// A drag across the screen, in screen cells, from where it started to
@@ -63,10 +63,16 @@ fn selected_text(screen: &Buffer, selection: &Selection) -> String {
 impl App {
     /// Selection by dragging, the way a terminal would, then copying on release.
     pub(super) fn select(&mut self, mouse: MouseEvent) {
+        let at = (mouse.column, mouse.row);
+        // An open list takes clicks on its rows and nothing else.
         if self.picker.is_some() && !self.picker_docked() {
+            if matches!(mouse.kind, MouseEventKind::Up(_))
+                && matches!(self.hit(at), Some(Click::Row(_)))
+            {
+                self.click(at);
+            }
             return;
         }
-        let at = (mouse.column, mouse.row);
         match mouse.kind {
             MouseEventKind::Down(_) => {
                 self.selection = Some(Selection {
@@ -133,6 +139,12 @@ impl App {
             }
             Some(Click::Tab(index)) => self.jump_session(index),
             Some(Click::CloseTab(index)) => self.close_tab(index),
+            Some(Click::Row(position)) => self.choose_row(position),
+            Some(Click::Menu(index)) => {
+                self.slash = index;
+                self.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+            }
+            Some(Click::File(index)) => self.show_file(index),
             None => {}
         }
     }

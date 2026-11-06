@@ -21,6 +21,19 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Extend agents on a computer: the browser tools on cloud and Agent37 computers,
+  project connections, `computer_verify` and `read_context` against the remote copy for
+  writing agents, and automatic routing that does not require the CLI here.
+- [ ] Accept agents on a computer end to end: real Claude Code and Codex runs on a local
+  sandbox and on a live Agent37 account (template build under gVisor, auto sleep and
+  wake, spend), bridge tools through the relay, desktop control and the browser tools on
+  the agent's computer, read-only planners and swarm orchestrators there, stop, quota
+  handoff, lost contact, reattach and restart recovery.
+- [ ] Publish the first computer image from `beta`, make its package public, and accept
+  a local pull, a cloud machine started from it and an Agent37 registry import.
+- [ ] Give Agent37 computers a viewer through signed port URLs, sizes beyond the default
+  shape and idle-time changes after creation.
+
 - [ ] Enforce Keep and combine worktree retention in native cleanup and integration (it is
   enforced only in Project worktrees today).
 - [ ] Tighten the merge gate: run the saved check on the combined integration tree in a
@@ -97,9 +110,18 @@ release dates.
 - [ ] Tune swarm assignment and subtask limits from installed swarm trials: how often
   agents use peers, peer_adopt and propose_subtask, duplicate implementations avoided,
   conflicts caught before completion, and whether planner briefings reduce worker discovery.
+- [ ] Accept multi-round swarms with installed providers: orchestrator verdict accuracy
+  (false done, missed criteria), rounds and cost to completion, round sizes on agents on a
+  computer, recovery after a restart mid-review, how often people edit proposed rounds,
+  and whether parallel area orchestrators catch more than one. Consider making round
+  approval an autonomy-policy option and showing proposals in the phone companion.
 - [ ] Accept automatic delivery end to end in the installed app: a swarm goal on a new
   Artifacts project merges under a committed policy, pushes the branch to Artifacts and
   deploys to a Workers preview, including a failing check that rolls back and pauses merging.
+- [ ] Accept one-click Swarm setup against a live Cloudflare account: Connect Cloudflare with
+  the Workers scope (and its invalid-scope fallback), an API token with Workers Scripts: Edit, an
+  account without a workers.dev subdomain, a first publish, and an in-place update that keeps
+  the token working on a second computer.
 - [ ] Explore agent-native Artifacts workflows: a fork per task attempt instead of a local
   worktree, provenance notes on integrated commits, push-event review and check triggers,
   and opening an existing Artifacts repository as a project. Keep the coordinator,

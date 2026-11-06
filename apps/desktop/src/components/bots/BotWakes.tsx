@@ -67,6 +67,7 @@ function newWake(kind: BotWakeTrigger['kind'], connectionId = ''): BotWake {
 export function BotWakes({
   wakes,
   projectId,
+  projects = [],
   connectionIds,
   connections,
   onChange,
@@ -74,6 +75,8 @@ export function BotWakes({
 }: {
   wakes: BotWake[];
   projectId: string;
+  /** Every project the bot works in; with more than one, each wake-up picks its own. */
+  projects?: { id: string; name: string }[];
   connectionIds: string[] | null;
   connections: { id: string; name: string }[];
   onChange: (wakes: BotWake[]) => void;
@@ -112,6 +115,8 @@ export function BotWakes({
                     wake,
                     nameOf(wake.trigger.kind === 'connection' ? wake.trigger.connectionId : ''),
                   )}
+                  {projects.length > 1 &&
+                    ` · ${projects.find((item) => item.id === (wake.projectId ?? projectId))?.name ?? 'Home project'}`}
                 </small>
               </span>
               <span className="bot-wake-actions">
@@ -143,7 +148,8 @@ export function BotWakes({
       {editing ? (
         <WakeForm
           wake={editing}
-          projectId={projectId}
+          projectId={editing.projectId ?? projectId}
+          projects={projects}
           connections={usable}
           error={error}
           onChange={setEditing}
@@ -189,6 +195,7 @@ export function BotWakes({
 function WakeForm({
   wake,
   projectId,
+  projects,
   connections,
   error,
   onChange,
@@ -197,6 +204,7 @@ function WakeForm({
 }: {
   wake: BotWake;
   projectId: string;
+  projects: { id: string; name: string }[];
   connections: { id: string; name: string }[];
   error: string;
   onChange: (wake: BotWake) => void;
@@ -215,6 +223,22 @@ function WakeForm({
           onChange={(event) => onChange({ ...wake, name: event.target.value })}
         />
       </FormField>
+      {projects.length > 1 && (
+        <FormField label="Project" description="Where it watches for changes and starts work.">
+          <Select
+            value={projectId}
+            onValueChange={(id) =>
+              onChange({ ...wake, projectId: id === projects[0]?.id ? undefined : id })
+            }
+          >
+            {projects.map((item) => (
+              <SelectItem key={item.id} value={item.id}>
+                {item.name}
+              </SelectItem>
+            ))}
+          </Select>
+        </FormField>
+      )}
       {trigger.kind === 'schedule' && (
         <ScheduleFields
           expression={trigger.expression}

@@ -398,6 +398,90 @@ fn attempts<'a>(run_id: &str, runs: &'a [TaskRun]) -> Vec<&'a TaskRun> {
 
 /// Activity entries a terminal receives, enough to show what work is doing.
 const ACTIVITY_TAIL: usize = 12;
+/// Steps a run card lists.
+const STEPS_SHOWN: usize = 6;
+/// Entries `events::activity` keeps; a run holding this many has dropped older ones.
+const ACTIVITY_KEPT: usize = 150;
+
+/// The stage a recorded execution stage belongs to on a run card. The
+/// checkpoint saved after the work is bookkeeping and stays off the card.
+fn card_stage(stage: &str) -> Option<&'static str> {
+    match stage {
+        "routing" => Some("route"),
+        "preparation" => Some("prepare"),
+        "execution" => Some("work"),
+        "verification_wait" | "verification" => Some("check"),
+        _ => None,
+    }
+}
+
+fn millis_between(start: &str, end: &str) -> Option<u64> {
+    let start = chrono::DateTime::parse_from_rfc3339(start).ok()?;
+    let end = chrono::DateTime::parse_from_rfc3339(end).ok()?;
+    u64::try_from((end - start).num_milliseconds()).ok()
+}
+
+/// The run's recorded stages, steps and check as figures for a run card.
+fn run_summary(run: &TaskRun) -> protocol::RunSummary {
+    use super::tasks::tool_activity::{counts_as_step, kind, preview, step_text};
+    let mut stages: Vec<protocol::RunStage> = Vec::new();
+    for stage in &run.stages {
+        let Some(name) = card_stage(&stage.stage) else {
+            continue;
+        };
+        let duration = stage
+            .duration_ms
+            .and_then(|ms| u64::try_from(ms).ok())
+            .filter(|_| stage.ended_at.is_some());
+        match stages.last_mut() {
+            Some(last) if last.name == name => {
+                last.duration_ms = last.duration_ms.zip(duration).map(|(a, b)| a + b);
+            }
+            _ => stages.push(protocol::RunStage {
+                name: name.into(),
+                duration_ms: duration,
+            }),
+        }
+    }
+    let previews: Vec<String> = run.activity.iter().map(|entry| preview(entry)).collect();
+    let mut summary = protocol::RunSummary {
+        stages,
+        duration_ms: run
+            .ended_at
+            .as_deref()
+            .and_then(|end| millis_between(&run.started_at, end)),
+        trimmed: run.activity.len() >= ACTIVITY_KEPT,
+        check: run.verification.as_ref().map(|check| protocol::RunCheck {
+            command: check.command.chars().take(80).collect(),
+            passed: check.result.success,
+            duration_ms: check.result.duration_ms,
+        }),
+        ..Default::default()
+    };
+    for preview in previews.iter().filter(|preview| counts_as_step(preview)) {
+        match kind(preview) {
+            "read" => summary.reads += 1,
+            "search" => summary.searches += 1,
+            "command" => summary.commands += 1,
+            "failure" => summary.failures += 1,
+            _ => {}
+        }
+    }
+    let mut steps: Vec<protocol::RunStep> = Vec::new();
+    for preview in &previews {
+        let text = step_text(preview).trim();
+        if text.is_empty() || steps.last().is_some_and(|last| last.text == text) {
+            continue;
+        }
+        steps.push(protocol::RunStep {
+            kind: kind(preview).into(),
+            text: text.into(),
+        });
+    }
+    let skip = steps.len().saturating_sub(STEPS_SHOWN);
+    summary.steps = steps.split_off(skip);
+    summary
+}
 
 /// Projects the newest attempt in a conversation into what a terminal renders.
 /// The conversation's most recently started run.
@@ -481,6 +565,7 @@ fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionVie
                     .collect()
             })
             .unwrap_or_default(),
+        run: run.map(run_summary),
     }
 }
 
@@ -521,6 +606,10 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                     asking: latest_run(session, &snapshot.runs).is_some_and(|run| {
                         run.prompts.iter().any(|prompt| prompt.status == "pending")
                     }),
+                    agent: latest_run(session, &snapshot.runs).map(|run| run.agent.clone()),
+                    step: latest_run(session, &snapshot.runs)
+                        .and_then(|run| run.progress.as_ref())
+                        .map(|progress| progress.label.clone()),
                 })
                 .collect();
             open.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
@@ -1297,6 +1386,70 @@ mod tests {
             started_at: started_at.into(),
             ..TaskRun::default()
         }
+    }
+
+    #[test]
+    fn a_run_summary_merges_stages_counts_each_step_once_and_hides_commands() {
+        let mut task = run("a", None, "2026-01-01T00:00:00Z");
+        task.ended_at = Some("2026-01-01T00:03:00Z".into());
+        task.stages = serde_json::from_value(serde_json::json!([
+            {"stage": "routing", "startedAt": "", "endedAt": "x", "durationMs": 200},
+            {"stage": "preparation", "startedAt": "", "endedAt": "x", "durationMs": 3000},
+            {"stage": "execution", "startedAt": "", "endedAt": "x", "durationMs": 160000},
+            {"stage": "checkpoint", "startedAt": "", "endedAt": "x", "durationMs": 1000},
+            {"stage": "verification", "startedAt": "", "endedAt": null, "durationMs": null},
+        ]))
+        .expect("stages");
+        task.activity = [
+            "Searching the project",
+            "Reading src/a.rs · running",
+            "Reading src/a.rs · completed",
+            "Running cargo",
+            "cargo test --secret-flag\nExit: 0\nok",
+            "Running cargo",
+            "cargo build\nExit: 101\nerror",
+        ]
+        .map(String::from)
+        .to_vec();
+        let summary = run_summary(&task);
+        let stages: Vec<(&str, Option<u64>)> = summary
+            .stages
+            .iter()
+            .map(|stage| (stage.name.as_str(), stage.duration_ms))
+            .collect();
+        assert_eq!(
+            stages,
+            [
+                ("route", Some(200)),
+                ("prepare", Some(3000)),
+                ("work", Some(160_000)),
+                ("check", None)
+            ]
+        );
+        assert_eq!(summary.duration_ms, Some(180_000));
+        assert_eq!(
+            (
+                summary.reads,
+                summary.searches,
+                summary.commands,
+                summary.failures
+            ),
+            (1, 1, 2, 1)
+        );
+        let steps: Vec<&str> = summary
+            .steps
+            .iter()
+            .map(|step| step.text.as_str())
+            .collect();
+        assert!(
+            !steps.iter().any(|step| step.contains("secret")),
+            "{steps:?}"
+        );
+        assert_eq!(steps.last(), Some(&"Command failed (exit 101)"));
+        assert_eq!(
+            summary.steps.last().map(|step| step.kind.as_str()),
+            Some("failure")
+        );
     }
 
     #[test]

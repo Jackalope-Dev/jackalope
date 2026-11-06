@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-pub(super) fn preview(text: &str) -> String {
+pub(in crate::commands) fn preview(text: &str) -> String {
     if let Some((_, result)) = text.split_once("\nExit: ") {
         if let Some(code) = result
             .lines()
@@ -21,6 +21,71 @@ pub(super) fn preview(text: &str) -> String {
         .chars()
         .take(240)
         .collect()
+}
+
+/// A preview without the status OpenCode appends (`Reading a.rs · completed`),
+/// and that status.
+fn split_status(preview: &str) -> (&str, Option<&str>) {
+    match preview.rsplit_once(" · ") {
+        Some((base, status))
+            if matches!(
+                status,
+                "pending" | "running" | "completed" | "error" | "failed"
+            ) =>
+        {
+            (base, Some(status))
+        }
+        _ => (preview, None),
+    }
+}
+
+/// What sort of step a [`preview`] describes: `read`, `edit`, `search`,
+/// `command`, `check`, `failure` or `note` (narration and anything unknown).
+pub(in crate::commands) fn kind(preview: &str) -> &'static str {
+    let (base, status) = split_status(preview);
+    let base = base.to_ascii_lowercase();
+    if matches!(status, Some("error" | "failed"))
+        || base.starts_with("command failed")
+        || base.starts_with("permission denied")
+        || base.ends_with("failed")
+        || base.contains("were denied")
+    {
+        "failure"
+    } else if base == "running project checks" {
+        "check"
+    } else if base.starts_with("reading") {
+        "read"
+    } else if ["editing", "writing", "changed "]
+        .iter()
+        .any(|verb| base.starts_with(verb))
+        || base == "changed a file"
+    {
+        "edit"
+    } else if base == "searching the project" {
+        "search"
+    } else if base.starts_with("running ") || base == "command finished" {
+        "command"
+    } else {
+        "note"
+    }
+}
+
+/// A preview as a step to show: the status suffix dropped unless it failed.
+pub(in crate::commands) fn step_text(preview: &str) -> &str {
+    match split_status(preview) {
+        (base, Some("pending" | "running" | "completed")) => base,
+        _ => preview,
+    }
+}
+
+/// Whether a preview is one step rather than an update to one: OpenCode
+/// reports a tool as running and again once it finishes, and Codex reports a
+/// command starting and then its exit, so only one of each counts.
+pub(in crate::commands) fn counts_as_step(preview: &str) -> bool {
+    match split_status(preview) {
+        (_, Some(status)) => matches!(status, "completed" | "error" | "failed"),
+        (base, None) => base != "Command finished" && base != "Tool finished",
+    }
 }
 
 pub(super) fn workspace_path(raw: &str, workspace: &str) -> Option<String> {
@@ -121,11 +186,29 @@ pub(super) fn label(name: &str, input: &Value, workspace: &str) -> String {
             .find_map(|raw| workspace_path(raw, workspace));
         return path.map_or_else(|| format!("{verb} a file"), |path| format!("{verb} {path}"));
     }
+    match name {
+        "mcp__jackalope__ask_user" | "ask_user" | "AskUserQuestion" => {
+            return "Asking you a question".into()
+        }
+        "ToolSearch" => return "Finding tools".into(),
+        "TodoWrite" | "update_plan" => return "Updating its plan".into(),
+        "WebSearch" | "web_search" => return "Searching the web".into(),
+        "WebFetch" => return "Reading a web page".into(),
+        "Task" | "Agent" => return "Starting a helper agent".into(),
+        _ => {}
+    }
     let name: String = name
         .chars()
         .filter(|ch| !ch.is_control())
         .take(80)
         .collect();
+    // An MCP tool reads as its own name and the server it came from.
+    if let Some((server, tool)) = name
+        .strip_prefix("mcp__")
+        .and_then(|rest| rest.split_once("__"))
+    {
+        return format!("Using {} ({server})", tool.replace('_', " "));
+    }
     format!("Using {name}")
 }
 
@@ -133,6 +216,31 @@ pub(super) fn label(name: &str, input: &Value, workspace: &str) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn steps_are_classified_and_counted_once() {
+        for (preview, expected) in [
+            ("Reading src/a.rs", "read"),
+            ("Reading src/a.rs · completed", "read"),
+            ("Editing src/a.rs", "edit"),
+            ("Changed src/a.rs", "edit"),
+            ("Searching the project", "search"),
+            ("Running pnpm", "command"),
+            ("Running project checks", "check"),
+            ("Command failed (exit 7)", "failure"),
+            ("Running cargo · error", "failure"),
+            ("Tool request failed", "failure"),
+            ("I'll look at the session code first.", "note"),
+        ] {
+            assert_eq!(kind(preview), expected, "{preview}");
+        }
+        assert_eq!(step_text("Reading a.rs · completed"), "Reading a.rs");
+        assert_eq!(step_text("Running cargo · error"), "Running cargo · error");
+        assert!(counts_as_step("Reading a.rs"));
+        assert!(counts_as_step("Reading a.rs · completed"));
+        assert!(!counts_as_step("Reading a.rs · running"));
+        assert!(!counts_as_step("Command finished"));
+    }
 
     #[test]
     fn command_previews_keep_outcomes_without_shell_arguments_or_output() {
@@ -200,6 +308,15 @@ mod tests {
         assert_eq!(
             label("Read", &json!({"file_path":"/private/secret"}), "/work"),
             "Reading a file"
+        );
+        assert_eq!(
+            label("mcp__jackalope__ask_user", &json!({}), ""),
+            "Asking you a question"
+        );
+        assert_eq!(label("ToolSearch", &json!({}), ""), "Finding tools");
+        assert_eq!(
+            label("mcp__linear__create_issue", &json!({}), ""),
+            "Using create issue (linear)"
         );
     }
 }

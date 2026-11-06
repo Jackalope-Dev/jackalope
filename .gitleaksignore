@@ -1,0 +1,3 @@
+# Verified false positives: fake keys in agent37.rs's keys_are_checked_before_saving test.
+21e1bb565579e5c18b12c302bd9b20a4e0890c0b:apps/desktop/src-tauri/src/commands/computers/agent37.rs:stripe-access-token:579
+21e1bb565579e5c18b12c302bd9b20a4e0890c0b:apps/desktop/src-tauri/src/commands/computers/agent37.rs:stripe-access-token:580

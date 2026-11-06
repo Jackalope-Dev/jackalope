@@ -149,11 +149,15 @@ export async function publishCloud(
   };
   validateRelease();
   const checkAsset = async (local, remoteAsset) => {
+    // Name the file and asset so an operator can find an incomplete upload in Cloud.
+    const remoteHash = await readAssetHash(remoteAsset.id).catch((error) => {
+      throw new Error(`${error.message}: ${local.name} (Cloud asset ${remoteAsset.id})`);
+    });
     if (
       (remoteAsset.publicPlatform || undefined) !== local.publicPlatform ||
       (remoteAsset.updatePlatform || undefined) !== local.updatePlatform ||
       (remoteAsset.signature || undefined) !== local.signature ||
-      (await readAssetHash(remoteAsset.id)) !== local.sha256
+      remoteHash !== local.sha256
     )
       throw new Error(`Remote artifact does not match candidate: ${local.name}`);
   };
@@ -211,7 +215,7 @@ async function downloadHash(url) {
     signal: AbortSignal.timeout(600000),
   });
   if (!response.ok || !response.url.startsWith('https://'))
-    throw new Error('Cannot verify uploaded asset bytes');
+    throw new Error(`Cannot verify uploaded asset bytes (HTTP ${response.status})`);
   const hash = createHash('sha256');
   for await (const bytes of response.body) hash.update(bytes);
   return hash.digest('hex');

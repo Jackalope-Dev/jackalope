@@ -59,6 +59,8 @@ pub enum Action {
     TypeAnswer,
     /// Put an earlier input back in the composer.
     Recall(String),
+    /// Decline a prepared merge, resuming what preparing it paused.
+    CancelMerge,
     /// Apply a prepared merge.
     ApplyMerge {
         plan_id: String,
@@ -82,6 +84,8 @@ pub struct Item {
 #[derive(Clone, Copy, PartialEq)]
 pub enum PickerKind {
     Sessions,
+    /// Every open conversation at a glance, drawn in place of the transcript.
+    Board,
     Projects,
     Agents,
     Settings,
@@ -233,6 +237,28 @@ impl App {
             .is_some_and(|picker| picker.kind == PickerKind::Question)
     }
 
+    /// A click on the open picker's row at `position`: it ticks an option of a
+    /// question that takes several, and otherwise chooses the row.
+    pub(super) fn choose_row(&mut self, position: usize) {
+        let Some(picker) = self.picker.as_mut() else {
+            return;
+        };
+        if position >= picker.shown().len() {
+            return;
+        }
+        picker.selected = position;
+        let toggles = matches!(
+            picker.chosen().map(|item| &item.action),
+            Some(Action::Toggle(_))
+        );
+        let key = if toggles {
+            KeyCode::Char(' ')
+        } else {
+            KeyCode::Enter
+        };
+        self.picker_key(KeyEvent::new(key, KeyModifiers::NONE));
+    }
+
     pub(super) fn picker_key(&mut self, key: KeyEvent) {
         if self.picker_docked() && matches!(key.code, KeyCode::PageUp | KeyCode::PageDown) {
             let page = super::keys::page(self.body_area.get().height);
@@ -253,7 +279,15 @@ impl App {
                 picker.filter.clear();
                 picker.selected = 0;
             }
-            KeyCode::Esc => self.picker = None,
+            KeyCode::Esc => {
+                // Closing the merge question declines the merge.
+                if picker.kind == PickerKind::Delivery {
+                    self.picker = None;
+                    self.release_merge_pause();
+                } else {
+                    self.picker = None;
+                }
+            }
             KeyCode::Up => picker.step(false),
             KeyCode::Down | KeyCode::Tab => picker.step(true),
             KeyCode::Char('p') if control => picker.step(false),
@@ -317,12 +351,15 @@ impl App {
         };
         let kind = picker.kind;
         match kind {
-            PickerKind::Sessions | PickerKind::Settings => self.open_picker(kind),
+            PickerKind::Sessions | PickerKind::Board | PickerKind::Settings => {
+                self.open_picker(kind)
+            }
             // The work it would deliver changed, so the prepared merge is stale.
             PickerKind::Delivery
                 if picker.subject != self.view.as_ref().and_then(|view| view.run_id.clone()) =>
             {
                 self.picker = None;
+                self.release_merge_pause();
             }
             PickerKind::Deviation if picker.subject != self.picker_subject(kind) => {
                 self.picker = None;
@@ -565,6 +602,7 @@ impl App {
             }
             Action::OpenApp => self.open_app(),
             Action::ApplyMerge { plan_id, cleanup } => self.apply_merge(plan_id, cleanup),
+            Action::CancelMerge => self.release_merge_pause(),
             Action::OpenPullRequest { title, draft } => self.open_pull_request(title, draft),
             Action::Dismiss => {}
         }
@@ -1040,6 +1078,31 @@ impl App {
                     }
                 }
                 ("Conversations · Ctrl+N/P to step".to_string(), items)
+            }
+            PickerKind::Board => {
+                if !rebuilding {
+                    self.refresh();
+                }
+                let mut sessions: Vec<&SessionSummary> = self.sessions.iter().collect();
+                // Needs you, then working, then the rest, newest first within each.
+                sessions.sort_by_key(|session| {
+                    if super::conversation::needs_you(session) {
+                        0
+                    } else if protocol::working(session.status.as_deref()) {
+                        1
+                    } else {
+                        2
+                    }
+                });
+                let items = sessions
+                    .into_iter()
+                    .map(|session| Item {
+                        label: session.title.clone(),
+                        detail: session.agent.clone().unwrap_or_default(),
+                        action: Action::Session(session.id.clone()),
+                    })
+                    .collect();
+                ("Board".to_string(), items)
             }
             PickerKind::Projects => {
                 let projects = match self.request(Request::Projects) {

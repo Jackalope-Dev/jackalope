@@ -6,6 +6,7 @@ import { REVIEW_PAGE_LIMIT, reviewCapturesOn } from '../../lib/review-captures';
 import { VETTED_SKILLS } from '../../lib/skills/catalog';
 import { type WorkspaceMode, workspaceModeFor } from '../../lib/workspace-mode';
 import { useProjectStore } from '../../stores/projectStore';
+import { ProjectComputerSettings } from '../computers/BotComputerSettings';
 import { openProjectSettings } from '../layout/navigation';
 import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
@@ -147,7 +148,7 @@ export function ProjectPreferences({
             </Setting>
             <Setting
               title="Choose guidelines automatically"
-              description="Match testing, security, onboarding and other guidance to each new task. Fine-tune the selection under Customize task → Context."
+              description="Match testing, security, onboarding and other guidance to each new task. Fine-tune the selection under Options → Saved project context in the Work composer."
             >
               <Switch
                 label="Choose guidelines automatically"
@@ -284,6 +285,10 @@ export function ProjectPreferences({
               projectName={project.name}
             />
           )}
+          <ProjectComputerSettings
+            key={`computer-${project.id}`}
+            project={{ id: project.id, name: project.name }}
+          />
           <SettingGroup title="Workspace">
             {!project.plainFolder && (
               <Setting

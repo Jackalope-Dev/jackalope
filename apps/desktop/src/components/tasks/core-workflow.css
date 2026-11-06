@@ -1,25 +1,8 @@
-.task-dialog.capture-dialog {
-  max-width: calc(100vw - 48px);
-  max-height: calc(100dvh - 48px);
-  width: min(780px, calc(100vw - 48px));
-}
-.capture-destination,
 .task-followup-footer {
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-}
-.capture-destination {
-  margin: 8px 24px;
-}
-.capture-destination ~ .task-muted {
-  margin-left: 24px;
-  margin-right: 24px;
-}
-.capture-destination > [role="combobox"] {
-  flex: 1;
-  min-width: 0;
 }
 .work-item-action {
   display: inline-flex;
@@ -84,12 +67,6 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-.capture-dialog .task-composer-footer {
-  border-top: 1px solid var(--color-border-subtle);
-  margin-top: 16px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
 .task-dialog.task-tools-dialog {
   width: min(960px, calc(100vw - 48px));
 }
@@ -97,9 +74,6 @@
   padding: 20px 0;
 }
 @media (max-width: 1000px) {
-  .capture-dialog {
-    padding: 24px;
-  }
   .workspace-chrome {
     gap: 12px;
   }
@@ -108,8 +82,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .result-canvas *,
-  .capture-dialog * {
+  .result-canvas * {
     scroll-behavior: auto;
   }
 }

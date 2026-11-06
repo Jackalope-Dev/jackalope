@@ -10,9 +10,11 @@ export const requiredChecks = [
   'Verify macos-15-intel',
 ];
 
+// Release builds do not repeat the platform checks, so publication can be ready
+// before the slowest platform check for the same commit finishes; wait up to 45 minutes.
 export async function waitForSourceChecks(
   read,
-  { attempts = 80, pause = () => new Promise((resolve) => setTimeout(resolve, 15000)) } = {},
+  { attempts = 180, pause = () => new Promise((resolve) => setTimeout(resolve, 15000)) } = {},
 ) {
   for (let attempt = 0; attempt < attempts; attempt++) {
     const checks = await read();

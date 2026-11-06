@@ -405,7 +405,6 @@ button:disabled {
   .worktree-fields {
     grid-template-columns: minmax(0, 1fr);
   }
-  .task-composer-footer,
   .worktree-row {
     flex-wrap: wrap;
   }

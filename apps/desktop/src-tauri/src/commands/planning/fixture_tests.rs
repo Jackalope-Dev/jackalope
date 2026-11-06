@@ -196,8 +196,6 @@ fn a_fixture_planner_drafts_a_plan_that_is_revised_approved_only_exactly_and_exp
     // Without a saved project check, the plan's test criterion is the check.
     assert_eq!(view.verification.source, "criteria");
     assert_eq!(view.verification.command.as_deref(), Some("pnpm test csv"));
-    let swarm = session::approve(&coordinator, &record.id, 2, hash, "swarm", "app", checks());
-    assert!(swarm.unwrap_err().contains("swarm Worker"));
     let unapproved = session::store(&coordinator).load(&record.id).unwrap();
     assert!(unapproved.approval.is_none());
 
@@ -226,23 +224,26 @@ fn a_fixture_planner_drafts_a_plan_that_is_revised_approved_only_exactly_and_exp
         progress.review.is_some(),
         "one worker still gets an independent review"
     );
+    // The fixture records its arguments before it writes its input, so the
+    // worker's prompt can land after its argument line; wait for both.
     let deadline = Instant::now() + Duration::from_secs(60);
     loop {
         let args = std::fs::read_to_string(folder.join("args.txt")).unwrap();
-        if args.lines().count() >= 2 {
+        let input = std::fs::read_to_string(folder.join("input.txt")).unwrap_or_default();
+        if args.lines().count() >= 2
+            && input.contains("Implement this approved plan")
+            && input.contains("AC-1")
+        {
             let worker = args.lines().nth(1).unwrap();
             assert!(worker.contains("workspace-write"), "{worker}");
             break;
         }
         if Instant::now() > deadline {
             runtime.stop_all();
-            panic!("The approved plan did not start a worker.");
+            panic!("The approved plan did not start a worker with its plan: {input}");
         }
         std::thread::sleep(Duration::from_millis(50));
     }
-    let input = std::fs::read_to_string(folder.join("input.txt")).unwrap();
-    assert!(input.contains("Implement this approved plan"));
-    assert!(input.contains("AC-1"));
 
     drop(coordinator);
     runtime.stop_all();

@@ -209,7 +209,8 @@ pub enum Request {
     /// takes the shape (`single`, `subtasks` or `swarm`) in `text` with the
     /// exact `revision` and `hash` shown; `save` takes Markdown in `text` and
     /// the `revision` it was edited from; `export` takes an optional path;
-    /// `accept`, `redo` and `replan-deviation` take a deviation ID in `text`.
+    /// `accept`, `redo` and `replan-deviation` take a deviation ID in `text`;
+    /// `rounds` takes `pause`, `resume`, `stop` or `approve` in `text`.
     PlanAction {
         plan_id: String,
         action: String,
@@ -411,6 +412,12 @@ pub struct SessionSummary {
     /// Whether an agent is waiting on an answer. Absent from older hosts.
     #[serde(default)]
     pub asking: bool,
+    /// The latest run's agent and the step it is on, for the board. Absent
+    /// from older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub step: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -493,6 +500,10 @@ pub struct PlanView {
     /// The check approval would use, when there is one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check: Option<String>,
+    /// Titles of a swarm's proposed next round while it waits for approval.
+    /// Absent when nothing waits and from older hosts.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub next_round: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -591,6 +602,66 @@ pub struct SessionView {
     pub draft: String,
     #[serde(default)]
     pub draft_revision: u64,
+    /// What the latest run has done so far, for its run card. Older hosts
+    /// omit it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run: Option<RunSummary>,
+}
+
+/// The latest run in figures the host recorded: its stages, the steps it took
+/// and its check. Counts come from the run's recorded activity, which keeps
+/// only its newest entries; `trimmed` says older ones were dropped.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunSummary {
+    /// Stages in the order they ran.
+    #[serde(default)]
+    pub stages: Vec<RunStage>,
+    /// How long the run took, once it ended.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
+    #[serde(default)]
+    pub reads: usize,
+    #[serde(default)]
+    pub searches: usize,
+    #[serde(default)]
+    pub commands: usize,
+    /// Tool calls and commands that reported failure.
+    #[serde(default)]
+    pub failures: usize,
+    #[serde(default)]
+    pub trimmed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check: Option<RunCheck>,
+    /// The newest steps, oldest first, each with its kind.
+    #[serde(default)]
+    pub steps: Vec<RunStep>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunStage {
+    /// `route`, `prepare`, `work` or `check`.
+    pub name: String,
+    /// Absent while the stage runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunCheck {
+    pub command: String,
+    pub passed: bool,
+    pub duration_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunStep {
+    /// `read`, `edit`, `search`, `command`, `check`, `failure` or `note`.
+    pub kind: String,
+    pub text: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

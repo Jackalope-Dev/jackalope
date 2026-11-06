@@ -1,11 +1,15 @@
 # Your first useful change
 
 Install Git and a supported agent CLI, then sign in using that agent's normal
-flow. Jackalope uses the account already on this computer unless you choose an
+flow. Onboarding can install an agent for you: **Install** shows the exact npm
+command, runs it with its output visible and finds the agent when it finishes
+(npm agents need Node.js; OpenCode uses Jackalope's private runner where
+supported). Jackalope uses the account already on this computer unless you choose an
 isolated account in Agents. Each provider's own subscription and permissions
 still apply.
 
-1. Open a Git repository with at least one commit. Choose the agent you want.
+1. Open a Git repository with at least one commit (Project settings → Cloudflare
+   Artifacts can make the first one). Choose the agent you want.
    Project setup asks for the project, its agents and an optional first-task
    draft. Decisions, Git behavior and appearance start from defaults that you can
    change in Project settings.

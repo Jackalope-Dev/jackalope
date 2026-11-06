@@ -124,7 +124,10 @@ The default Cloud matrix builds macOS Apple Silicon and Intel DMGs plus app
 updater archives, and Linux x64 AppImage. Windows x64 NSIS remains available only
 for separately configured direct distribution with `RELEASE_DISTRIBUTION=cloud`. AppImage is the supported Linux
 in-app update path; OS-managed package upgrades and Store updates are separate.
-Every candidate runs repository verification and native account-access tests.
+Every candidate runs the native account-access tests. Repository and platform checks
+run once per commit in **Verify platforms**, not again in each Cloud or Store build;
+publication and Store submission wait up to 45 minutes for those checks on the exact
+source commit and stop if any failed. Release builds start without a Rust cache.
 Signing credentials are passed only to signing/build steps, not dependency installation
 or test steps. Every platform supplies a receipt with source, version, channel,
 configuration and artifact hashes. Candidate artifacts are retained for 30 days.
@@ -238,18 +241,16 @@ require 2FA, and grant each integration only the repositories it needs.
 ## Website and services
 
 Desktop publication does not deploy the server or automatically advertise unaccepted
-platforms. Keep one deployment controller per Worker; leave optional Actions deployment
-disabled when Cloudflare Git builds own it. Server staging uses `service-staging`
-(beta only); website/server production use
-`service-production` (master only, with approval). These environments do not contain
-desktop signing or publication credentials. Configure their deployment credentials
-following [server operations](SERVER-LAUNCH.md#github-deployment-environments).
-Cloudflare Git builds retain their tokens in Cloudflare; no duplicate deployment
-secrets are required in GitHub. The main verification workflow covers server and
-website checks on PRs. Optional Actions deployment runs only on eligible pushes or
-manual dispatch and validates the service before deploying. Infrastructure preflight
-is a manual operational check: it only reads public API and website responses and
-has no deployment environment or Cloudflare credentials.
+platforms. Cloudflare Workers Builds deploys the server and website, not GitHub
+Actions: every push to `master` builds and deploys `jackalope-service-production`
+and `jackalope-website`, and every push to `beta` deploys `jackalope-service-staging`,
+each as its own Cloudflare Worker. These
+Workers' build settings in Cloudflare, not GitHub environments, hold their build
+variables and deploy credentials; see [server operations](SERVER-LAUNCH.md#cloudflare-workers-builds-deployment).
+The main verification workflow covers server and website checks on PRs, but GitHub
+Actions never deploys them. Infrastructure preflight is a manual operational check:
+it only reads public API and website responses and has no deployment environment or
+Cloudflare credentials.
 Set `VITE_WINDOWS_STORE_URL` and server `ACCESS_STORE_URL` to the accepted Store
 product link. Website Mac/Linux download variables must identify accepted Cloud artifacts; review any Store URL override before changing distribution.
 The legacy website synchronization script reads the R2 feed and must not be used as

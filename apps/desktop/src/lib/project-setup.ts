@@ -1,8 +1,6 @@
 import { syncAgentConfig } from '../stores/agentConfigStore';
 import { useContextMemoryStore } from '../stores/contextMemoryStore';
-import { useExecutionStore } from '../stores/executionStore';
 import { type Project, projectPathKey, useProjectStore } from '../stores/projectStore';
-import { captureDraftForProject } from './capture-draft';
 import { missingProjectDefaults } from './context/project-defaults';
 import { nativeTask } from './task-runtime';
 
@@ -68,7 +66,6 @@ export function projectGitState(info: {
 }
 
 export function commitProjectSetup(pending: Project): Project {
-  const previousProjectId = useProjectStore.getState().activeProjectId;
   let project = useProjectStore.getState().completeSetup(pending);
   const memory = useContextMemoryStore.getState().getMemory(project.id);
   if (memory?.projectPath === project.path) {
@@ -77,13 +74,6 @@ export function commitProjectSetup(pending: Project): Project {
       project = { ...project, preferences: { ...project.preferences, ...defaults } };
       useProjectStore.getState().updateProjectPreferences(project.id, defaults);
     }
-  }
-  const execution = useExecutionStore.getState();
-  if (execution.drafts.capture) {
-    execution.draft(
-      'capture',
-      captureDraftForProject(execution.drafts, project, previousProjectId),
-    );
   }
   void useContextMemoryStore
     .getState()

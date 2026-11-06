@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { constants, setPriority } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { affected, changedFiles } from './change-scope.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const pnpm = process.env.npm_execpath;
@@ -21,9 +22,13 @@ if (
   process.env.RUSTC_WRAPPER = 'sccache';
 }
 const args = process.argv.slice(2);
-if (args.length > 1 || args.some((arg) => !['--native-only', '--changed'].includes(arg)))
-  throw new Error('Usage: pnpm verify [--native-only | --changed]');
+if (
+  args.length > 1 ||
+  args.some((arg) => !['--native-only', '--shared-only', '--changed'].includes(arg))
+)
+  throw new Error('Usage: pnpm verify [--native-only | --shared-only | --changed]');
 const nativeOnly = args.includes('--native-only');
+const sharedOnly = args.includes('--shared-only');
 
 // Keep the machine responsive while checks run; child processes inherit this.
 if (process.env.JACKALOPE_VERIFY_PRIORITY !== 'normal') {
@@ -33,25 +38,12 @@ if (process.env.JACKALOPE_VERIFY_PRIORITY !== 'normal') {
 }
 
 /**
- * Files the native build or its tests read. Anything else cannot change a Rust
- * result, and Rust sources cannot change a JavaScript one.
- */
-const NATIVE_INPUTS = [
-  /^apps\/desktop\/src-tauri\//,
-  /^apps\/desktop\/icons\//,
-  /^apps\/desktop\/src\/lib\/agent-capabilities\.json$/,
-  /^\.cargo\//,
-  /^rust-toolchain/,
-  /^package\.json$/,
-  /^pnpm-(lock|workspace)\.yaml$/,
-  /^scripts\/verify\.mjs$/,
-];
-
-/**
  * With --changed, which halves of the gate the commits since the upstream
- * branch can affect. Unknown history runs everything; CI always runs everything.
+ * branch can affect. Unknown history runs everything; CI runs everything unless
+ * it passes --shared-only for a change no desktop input reads.
  */
 function changedScope() {
+  if (sharedOnly) return { shared: true, native: false };
   if (!args.includes('--changed')) return { shared: true, native: true };
   const git = (...gitArgs) =>
     spawnSync('git', gitArgs, { cwd: root, encoding: 'utf8', windowsHide: true });
@@ -60,19 +52,17 @@ function changedScope() {
       ? '@{upstream}'
       : 'origin/master';
   const base = git('merge-base', 'HEAD', upstream);
-  const diff = base.status === 0 ? git('diff', '--name-only', base.stdout.trim(), 'HEAD') : null;
-  const files = diff?.status === 0 ? diff.stdout.split('\n').filter(Boolean) : [];
-  if (!files.length) return { shared: true, native: true };
-  const native = files.some((file) => NATIVE_INPUTS.some((input) => input.test(file)));
-  const shared = files.some((file) => !file.startsWith('apps/desktop/src-tauri/'));
-  console.log(
-    `Checking ${files.length} changed files since ${upstream}: ${[
-      shared && 'JavaScript and shared checks',
-      native && 'native checks',
-    ]
-      .filter(Boolean)
-      .join(' and ')}.`,
-  );
+  const files = base.status === 0 ? changedFiles(base.stdout.trim()) : null;
+  const { shared, native } = affected(files);
+  if (files)
+    console.log(
+      `Checking ${files.length} changed files since ${upstream}: ${[
+        shared && 'JavaScript and shared checks',
+        native && 'native checks',
+      ]
+        .filter(Boolean)
+        .join(' and ')}.`,
+    );
   return { shared, native };
 }
 const scope = changedScope();
@@ -85,8 +75,10 @@ const sharedChecks = [
   [process.execPath, [pnpm, 'typecheck']],
   [process.execPath, [pnpm, 'test:hooks']],
   [process.execPath, ['--test', 'scripts/docs-policy.test.mjs']],
+  [process.execPath, ['--test', 'scripts/change-scope.test.mjs']],
   [process.execPath, [pnpm, 'check:docs']],
   [process.execPath, [pnpm, 'check:tokens']],
+  [process.execPath, [pnpm, 'check:swarm-bundle']],
   [process.execPath, [pnpm, 'check:changelog']],
   [process.execPath, [pnpm, 'test:release']],
   [process.execPath, [pnpm, 'ui:build']],

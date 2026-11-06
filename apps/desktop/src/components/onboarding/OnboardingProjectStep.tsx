@@ -1,6 +1,6 @@
 import { Input, SegmentedControl } from '@jackalope/ui';
 import { ArrowRight, Cloud, FolderOpen, FolderPlus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import {
   type ArtifactsStatus,
   artifactsStatus,
@@ -24,6 +24,7 @@ export function OnboardingProjectStep({
   busy,
   attempt,
   clearError,
+  errorNotice,
   onOpened,
 }: {
   initialPath: string;
@@ -32,6 +33,8 @@ export function OnboardingProjectStep({
   busy: boolean;
   attempt: (action: () => Promise<void>) => Promise<void>;
   clearError: () => void;
+  /** The flow's error, placed above the actions so the sticky footer never covers it. */
+  errorNotice: ReactNode;
   /** Called with the provisional project; `created` is true for a new folder. */
   onOpened: (project: Project, created: boolean) => Promise<void>;
 }) {
@@ -149,6 +152,7 @@ export function OnboardingProjectStep({
           />
         </section>
       )}
+      {needsConnection && errorNotice}
       <form
         hidden={needsConnection}
         onSubmit={(event) => {
@@ -279,6 +283,7 @@ export function OnboardingProjectStep({
             <ProjectPreview path={path} />
           </>
         )}
+        {!needsConnection && errorNotice}
         <div className="onboarding-actions">
           <Button
             type="submit"

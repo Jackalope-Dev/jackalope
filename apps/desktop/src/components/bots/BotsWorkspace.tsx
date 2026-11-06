@@ -1,5 +1,6 @@
 import {
   ConfirmDialog,
+  LinkButton,
   DropdownMenu as Menu,
   SearchField,
   SegmentedNav,
@@ -9,6 +10,7 @@ import {
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   AlarmClock,
+  ArrowLeft,
   ArrowRightLeft,
   Bot as BotIcon,
   MessageSquare,
@@ -50,6 +52,7 @@ import {
   type Bot,
   type BotDraft,
   type BotWake,
+  botProjectIds,
   rosterOrder,
   useBotStore,
 } from '../../stores/botStore';
@@ -67,6 +70,7 @@ import { WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import { BotAvatar } from './BotAvatar';
 import { BotCardView } from './BotCardView';
 import { BotEditor } from './BotEditor';
+import { BotProjects } from './BotProjects';
 import './bots.css';
 
 interface ScheduleLedger {
@@ -151,11 +155,12 @@ function conversationOrigin(session: LiveSession) {
 }
 
 export function BotsWorkspace() {
-  const { bots, selectedId, openId, seen, seenFloor } = useBotStore(
+  const { bots, selectedId, openId, projectView, seen, seenFloor } = useBotStore(
     useShallow((state) => ({
       bots: state.bots,
       selectedId: state.selectedId,
       openId: state.openSessionId,
+      projectView: state.projectView,
       seen: state.seen,
       seenFloor: state.seenFloor,
     })),
@@ -190,15 +195,25 @@ export function BotsWorkspace() {
     proposalId?: string;
   } | null>(null);
   const [deleting, setDeleting] = useState<Bot | null>(null);
-  const roster = useMemo(() => rosterOrder(bots), [bots]);
-  const selected = bots.find((bot) => bot.id === selectedId) ?? roster[0];
-  const defaultProject = activeProjectId ?? projects[0]?.id ?? '';
+  // An open conversation shows the project it runs in; otherwise the chosen project or every project.
+  const scopeId = open?.request.projectId ?? projectView;
+  const scope = projects.find((project) => project.id === scopeId);
+  const roster = useMemo(
+    () => rosterOrder(bots).filter((bot) => !scope || botProjectIds(bot).includes(scope.id)),
+    [bots, scope],
+  );
+  const elsewhere = scope ? bots.filter((bot) => !botProjectIds(bot).includes(scope.id)) : [];
+  const selected = roster.find((bot) => bot.id === selectedId) ?? roster[0];
+  const defaultProject = scope?.id ?? activeProjectId ?? projects[0]?.id ?? '';
   useEffect(() => {
     if (isTauriEnvironment()) void useLiveSessionStore.getState().refresh(null);
   }, []);
   const conversationsFor = useCallback(
-    (bot: Bot) => botConversations(sessions, bot.id),
-    [sessions],
+    (bot: Bot) =>
+      botConversations(sessions, bot.id).filter(
+        (session) => !scope || session.request.projectId === scope.id,
+      ),
+    [sessions, scope],
   );
   // Opening another bot's conversation, such as one a message came from, selects that bot too.
   const openSession = useCallback(
@@ -213,9 +228,46 @@ export function BotsWorkspace() {
   return (
     <WorkspacePage className="bots-page">
       <WorkspaceHeading
-        title="Bots"
+        title={scope ? scope.name : 'Bots'}
+        eyebrow={
+          scope ? (
+            <LinkButton
+              className="bots-back"
+              onClick={() => useBotStore.getState().viewProject(null)}
+            >
+              <ArrowLeft size={14} aria-hidden="true" />
+              All projects
+            </LinkButton>
+          ) : undefined
+        }
         action={
           <div className="bots-heading-actions">
+            {scope && elsewhere.length > 0 && (
+              <Menu.Root>
+                <Menu.Trigger asChild>
+                  <Button variant="outline">Add an existing bot</Button>
+                </Menu.Trigger>
+                <Menu.Portal>
+                  <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
+                    {elsewhere.map((bot) => (
+                      <Menu.Item
+                        key={bot.id}
+                        className="workspace-menu-item"
+                        onSelect={() => {
+                          useBotStore.getState().update(bot.id, {
+                            projectIds: [...(bot.projectIds ?? []), scope.id],
+                          });
+                          useBotStore.getState().openConversation(null, bot.id);
+                        }}
+                      >
+                        <BotAvatar appearance={bot.appearance} agent={bot.agent} />
+                        {bot.name}
+                      </Menu.Item>
+                    ))}
+                  </Menu.Content>
+                </Menu.Portal>
+              </Menu.Root>
+            )}
             {bots.length > 0 && (
               <HubMenu
                 paused={hub.paused}
@@ -248,6 +300,21 @@ export function BotsWorkspace() {
       {hub.error && <InlineNotice tone="error">{hub.error}</InlineNotice>}
       {bots.length === 0 ? (
         <BotTemplates disabled={!projects.length} onUse={(template) => startNew(template)} />
+      ) : !scope ? (
+        <BotProjects
+          projects={projects}
+          bots={bots}
+          sessions={sessions}
+          runs={sessionRuns}
+          hub={hub}
+          onOpen={(id) => useBotStore.getState().viewProject(id)}
+        />
+      ) : roster.length === 0 ? (
+        <BotTemplates
+          disabled={!projects.length}
+          title={`No bots in ${scope.name} yet. Start from a template`}
+          onUse={(template) => startNew(template)}
+        />
       ) : (
         <div className="bots-layout">
           <nav className="bots-roster" aria-label="Bots">
@@ -324,7 +391,7 @@ export function BotsWorkspace() {
                 key={selected.id}
                 bot={selected}
                 bots={bots}
-                project={projects.find((project) => project.id === selected.projectId)}
+                project={scope}
                 conversations={conversationsFor(selected)}
                 runs={sessionRuns}
                 isUnread={(session) => isUnread(session, sessionRuns, seen, seenFloor)}
@@ -340,7 +407,7 @@ export function BotsWorkspace() {
                 onOpen={openSession}
                 onReviewProposal={(proposal) =>
                   setEditing({
-                    draft: proposalDraft(proposal, selected.projectId),
+                    draft: proposalDraft(proposal, scope.id),
                     proposalId: proposal.id,
                   })
                 }
@@ -402,14 +469,16 @@ function BotTemplates({
   disabled,
   onUse,
   heading = true,
+  title = 'Start from a template',
 }: {
   disabled: boolean;
   onUse: (template: BotTemplate) => void;
   heading?: boolean;
+  title?: string;
 }) {
   return (
     <section className="workspace-section workspace-stack">
-      {heading && <WorkspaceSectionHeading title="Start from a template" />}
+      {heading && <WorkspaceSectionHeading title={title} />}
       <ul className="bots-templates">
         {BOT_TEMPLATES.map((template) => (
           <li key={template.id}>

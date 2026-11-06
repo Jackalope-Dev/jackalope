@@ -446,6 +446,7 @@ mod tests {
             merged: false,
             draft: String::new(),
             draft_revision: 0,
+            run: None,
         }
     }
 

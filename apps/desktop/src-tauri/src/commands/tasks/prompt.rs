@@ -16,15 +16,26 @@ pub(super) fn workflow_guidance() -> bool {
 
 pub(super) const SCOPE_GUIDANCE: &str = "\nSeparate required outcomes from suggested implementation options. Choose the smallest complete change that meets the requirements and preserves existing contracts. Add persistence, new abstractions, dependency changes or unrelated defaults only when the task requires them. Inspect existing regression coverage; do not weaken tests to fit a patch. Read relevant symbols/ranges first, expanding to callers and full files when needed. Select checks that cover the changed behavior and its dependents, plus every user/repository-required check. A necessary early reproduction is useful; repeated unchanged full builds are not. Before finishing, inspect the final diff for scope and compatibility regressions and state any unverified requirements.\n";
 
-/// One line: Claude receives this as a command-line argument, and Windows refuses to pass
-/// an argument containing a line break to a `.cmd` shim.
 pub(super) fn lean_preamble() -> String {
-    let core = format!("{} {EVIDENCE}", CORE.trim_end());
-    if workflow_guidance() {
-        format!("{core}{WORKFLOW_GUIDANCE}")
-    } else {
-        core
-    }
+    lean_contract(workflow_guidance())
+}
+
+/// Claude receives the lean contract as one command-line argument, and Windows refuses a
+/// line break in an argument to a .cmd shim such as npm's `claude.cmd`, so the parts
+/// share one line.
+fn lean_contract(workflow: bool) -> String {
+    let parts = [
+        CORE,
+        EVIDENCE,
+        if workflow { WORKFLOW_GUIDANCE } else { "" },
+    ];
+    let line = parts
+        .iter()
+        .map(|part| part.trim())
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!("{line}\n")
 }
 
 pub(super) fn preamble() -> String {
@@ -36,10 +47,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_default_preamble_is_one_line_for_windows_cmd_shims() {
-        let preamble = lean_preamble();
-        assert!(!preamble.trim_end().contains(['\n', '\r']), "{preamble}");
-        assert!(preamble.contains("edit and write tools"));
+    fn the_lean_contract_is_one_line_with_or_without_workflow_guidance() {
+        for workflow in [false, true] {
+            let contract = lean_contract(workflow);
+            assert!(!contract.trim_end().contains(['\r', '\n']), "{contract:?}");
+            assert!(contract.ends_with('\n'));
+        }
     }
 
     #[test]

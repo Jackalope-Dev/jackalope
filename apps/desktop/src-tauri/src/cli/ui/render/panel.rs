@@ -1,10 +1,11 @@
 //! Panels the interface opens as work needs them: the changed files beside
 //! the conversation, and a pending question pinned above the input.
 
+use super::hit;
 use super::menus::{frame_block, row, window_start};
 use crate::brand;
 use crate::git::FileChange;
-use crate::ui::App;
+use crate::ui::{App, Click};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -106,6 +107,13 @@ pub fn changes(frame: &mut Frame, app: &App, area: Rect) {
     let width = inner.width as usize;
     let list_rows = files.min((inner.height as usize / 3).max(3));
     let first = window_start(selected, list_rows);
+    for row in 0..files.saturating_sub(first).min(list_rows) {
+        hit(
+            app,
+            Rect::new(inner.x, inner.y + row as u16, inner.width, 1),
+            Click::File(first + row),
+        );
+    }
     let mut lines: Vec<Line> = app
         .changes
         .iter()

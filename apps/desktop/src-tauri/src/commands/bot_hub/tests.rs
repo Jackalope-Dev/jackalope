@@ -71,6 +71,7 @@ fn bot(fixture: &Fixture, name: &str) -> HubBot {
             "previousRunId": null,
         }))
         .unwrap(),
+        projects: vec![],
     }
 }
 
@@ -84,6 +85,7 @@ fn schedule(expression: &str) -> WakeDefinition {
             expression: expression.into(),
             timezone: "UTC".into(),
         },
+        project_id: None,
     }
 }
 
@@ -93,6 +95,7 @@ fn conversation(fixture: &Fixture, bot: &HubBot) -> TaskRun {
         .hub
         .deliver(
             bot,
+            None,
             "Start",
             MessageOrigin {
                 kind: "wake".into(),
@@ -788,6 +791,7 @@ fn bots_recall_only_their_own_earlier_conversations() {
         .hub
         .deliver(
             &scout,
+            None,
             "The lockfile check fails on Windows.",
             origin(),
             None,
@@ -795,12 +799,13 @@ fn bots_recall_only_their_own_earlier_conversations() {
         .unwrap();
     fixture
         .hub
-        .deliver(&scout, "Review the release notes.", origin(), None)
+        .deliver(&scout, None, "Review the release notes.", origin(), None)
         .unwrap();
     let (theirs, _) = fixture
         .hub
         .deliver(
             &other,
+            None,
             "A lockfile question for someone else.",
             origin(),
             None,
@@ -835,4 +840,56 @@ fn bots_recall_only_their_own_earlier_conversations() {
         .call(&run, "recall", serde_json::json!({"query": "release"}))
         .unwrap();
     assert_eq!(through_bridge["conversations"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn a_shared_bot_starts_in_the_project_that_asks_and_wakes_only_where_it_works() {
+    let fixture = fixture();
+    let mut scout = bot(&fixture, "Scout");
+    let mut second = scout.request.clone();
+    second.project_id = "second".into();
+    second.project_name = "Second".into();
+    scout.projects.push(second);
+    fixture.hub.sync(vec![scout.clone()]).unwrap();
+    let origin = || MessageOrigin {
+        kind: "wake".into(),
+        label: "Test".into(),
+        bot_id: None,
+        bot_name: None,
+        session_id: None,
+    };
+    let (there, _) = fixture
+        .hub
+        .deliver(
+            &scout,
+            Some("second"),
+            "Check this project.",
+            origin(),
+            None,
+        )
+        .unwrap();
+    let (elsewhere, _) = fixture
+        .hub
+        .deliver(&scout, Some("unknown"), "Check that one.", origin(), None)
+        .unwrap();
+    let project = |id: &str| {
+        fixture
+            .hub
+            .sessions
+            .bot_sessions(&scout.id)
+            .into_iter()
+            .find(|session| session.id == id)
+            .map(|session| session.request.project_id)
+            .unwrap()
+    };
+    assert_eq!(project(&there), "second");
+    assert_eq!(project(&elsewhere), "fixture");
+
+    let mut wake = schedule("0 9 * * *");
+    wake.project_id = Some("second".into());
+    scout.wakes = vec![wake.clone()];
+    fixture.hub.sync(vec![scout.clone()]).unwrap();
+    wake.project_id = Some("unknown".into());
+    scout.wakes = vec![wake];
+    assert!(fixture.hub.sync(vec![scout]).is_err());
 }

@@ -1,6 +1,6 @@
 {
   "name": "jackalope-monorepo",
-  "version": "0.1.32",
+  "version": "0.1.33",
   "private": true,
   "description": "Jackalope - Ultra-performant desktop shell and harness for agentic workflows",
   "scripts": {
@@ -39,6 +39,7 @@
     "evaluate:jev": "node scripts/evaluation/jev.mjs",
     "evaluate:routing": "node scripts/evaluation/routing.mjs",
     "check:docs": "node scripts/check-docs.mjs",
+    "check:swarm-bundle": "node apps/swarm/scripts/bundle.mjs --check",
     "check:tokens": "node scripts/check-color-tokens.mjs",
     "check:links:website": "node apps/website/scripts/audit-links.mjs",
     "check:changelog": "node scripts/changelog.mjs check",

@@ -257,10 +257,8 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
             </FormField>
             {method === 'wsl' && (
               <p className="task-muted">
-                Start the Linux build of Jackalope inside this distribution, configure its projects
-                and agent accounts, then create a pairing code in its Remote access settings. Python
-                3 is required for the connection. Tasks, Git, setup and checks execute in Linux
-                using that host’s credentials.
+                Run the Linux build of Jackalope in this distribution (needs Python 3) and create a
+                code there. Tasks run in Linux with its own accounts.
               </p>
             )}
             {(method === 'ssh' || method === 'wsl') && (
@@ -279,9 +277,10 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
             )}
             <FormField label="Pairing code">
               <Input
-                type="password"
                 required
                 autoComplete="off"
+                spellCheck={false}
+                placeholder="ABCDE-FGHJK"
                 value={code}
                 disabled={busy}
                 onChange={(event) => setCode(event.target.value)}

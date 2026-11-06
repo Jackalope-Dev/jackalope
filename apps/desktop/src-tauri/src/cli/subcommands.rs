@@ -16,6 +16,53 @@ pub fn here(connection: &mut Connection) -> Result<Project, String> {
     connection.project(&directory.to_string_lossy())
 }
 
+/// A running swarm in this project: its plan, round line and whether a
+/// proposed round or deviation waits on the person.
+pub struct Swarm {
+    pub id: String,
+    pub line: String,
+    pub needs_you: bool,
+}
+
+/// This project's running swarms (beta), at most a few so status stays quick.
+fn swarms(connection: &mut Connection, path: &str) -> Vec<Swarm> {
+    let Ok(Response::Plans { plans }) = connection.call(&Request::Plans {
+        project_path: path.into(),
+    }) else {
+        return vec![];
+    };
+    plans
+        .into_iter()
+        .filter(|plan| plan.status == "running")
+        .take(5)
+        .filter_map(|plan| {
+            let Ok(Response::Plan { plan: view }) = connection.call(&Request::PlanDetail {
+                plan_id: plan.id.clone(),
+            }) else {
+                return None;
+            };
+            let progress = view.progress.as_deref()?;
+            progress.starts_with("swarm").then(|| Swarm {
+                id: plan.id.clone(),
+                line: format!("{} · {progress}", view.title),
+                needs_you: plan.needs_you,
+            })
+        })
+        .collect()
+}
+
+/// The status row for a swarm.
+pub fn swarm_row(swarm: &Swarm) -> String {
+    let mut row = format!("{}  {}", short(&swarm.id), swarm.line);
+    if swarm.needs_you {
+        row.push_str(&format!(
+            " · needs you: jackalope plan rounds {}",
+            short(&swarm.id)
+        ));
+    }
+    row
+}
+
 /// The most recent conversation in this project, for `--continue`. The host
 /// lists conversations newest first.
 pub fn latest(connection: &mut Connection, project: &Project) -> Result<Option<String>, String> {
@@ -423,6 +470,10 @@ pub fn status(as_json: bool) -> Result<(), String> {
         })
     });
     let overview = agents(&mut connection);
+    let swarms = project
+        .as_ref()
+        .map(|project| swarms(&mut connection, &project.path))
+        .unwrap_or_default();
 
     if as_json {
         let (agents, default_agent) = overview.clone().unwrap_or_default();
@@ -439,6 +490,11 @@ pub fn status(as_json: bool) -> Result<(), String> {
                 "branch": branch,
             })),
             "openHere": open_here,
+            "swarms": swarms.iter().map(|swarm| json!({
+                "id": swarm.id,
+                "rounds": swarm.line,
+                "needsYou": swarm.needs_you,
+            })).collect::<Vec<_>>(),
             "agents": agents.iter().map(|agent| json!({
                 "id": agent.id,
                 "name": agent.name,
@@ -473,6 +529,9 @@ pub fn status(as_json: bool) -> Result<(), String> {
     }
     if let Some(count) = open_here {
         row("Open", &format!("{count} conversation(s) here"));
+    }
+    for (index, swarm) in swarms.iter().enumerate() {
+        row(if index == 0 { "Swarms" } else { "" }, &swarm_row(swarm));
     }
     match overview {
         Ok((agents, default_agent)) => {
@@ -509,6 +568,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_swarm_waiting_on_you_names_the_command_that_decides() {
+        let mut swarm = Swarm {
+            id: "ab12cd34-0000".into(),
+            line: "Export · swarm (beta) round 2/5 · reviewing".into(),
+            needs_you: false,
+        };
+        assert!(!swarm_row(&swarm).contains("needs you"));
+        swarm.needs_you = true;
+        assert!(swarm_row(&swarm).ends_with(&format!(
+            "needs you: jackalope plan rounds {}",
+            short(&swarm.id)
+        )));
+    }
+
+    #[test]
     fn ages_read_briefly() {
         let ago = |seconds: i64| {
             age(&(chrono::Utc::now() - chrono::Duration::seconds(seconds)).to_rfc3339())
@@ -532,6 +606,8 @@ mod tests {
             updated_at: String::new(),
             status: None,
             asking: false,
+            agent: None,
+            step: None,
         };
         assert_eq!(state(&session), "open");
         session.pending = 2;

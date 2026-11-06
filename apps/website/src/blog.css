@@ -285,3 +285,69 @@
     padding: 16px;
   }
 }
+
+/* A signed post links its byline to the author's page. */
+.article-byline {
+  align-items: center;
+}
+.article-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-secondary);
+}
+.article-author:hover {
+  color: var(--color-text-primary);
+}
+.article-author img {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.author-profile {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+  max-width: 760px;
+  margin: 48px auto 64px;
+}
+.author-profile img {
+  flex-shrink: 0;
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.author-name {
+  font-size: clamp(40px, 6vw, 64px);
+  letter-spacing: -0.05em;
+}
+.author-profile p {
+  line-height: 1.8;
+  color: var(--color-text-secondary);
+}
+.author-profile .author-role {
+  margin-block: 4px 16px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+.author-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+.author-links a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 640px) {
+  .author-profile {
+    flex-direction: column;
+    gap: 20px;
+  }
+}

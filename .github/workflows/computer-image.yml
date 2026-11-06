@@ -1,0 +1,80 @@
+name: Computer image
+# Publishes the bot computer image (apps/desktop/src-tauri/resources/computer) to
+# GitHub Container Registry for linux/amd64. The app pulls the tag matching its
+# version and image definition; see docs/BOT-COMPUTERS.md. There is deliberately
+# no pull_request trigger: publishing needs packages: write and never runs for
+# fork code.
+on:
+  push:
+    branches: [stable, beta]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: computer-image-${{ github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'Jackalope-Dev/jackalope'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: '.node-version'
+      - id: plan
+        run: node scripts/release/computer-image.mjs
+      - name: Build
+        env:
+          DEFINITION: ${{ steps.plan.outputs.definition }}
+          VERSION: ${{ steps.plan.outputs.version }}
+          TAGS: ${{ steps.plan.outputs.tags }}
+          SOURCE: https://github.com/${{ github.repository }}
+        run: |
+          args=()
+          for tag in $TAGS; do args+=(--tag "$tag"); done
+          docker build --platform linux/amd64 --pull \
+            --label dev.jackalope.computer.image=1 \
+            --label "dev.jackalope.computer.definition=$DEFINITION" \
+            --label "org.opencontainers.image.source=$SOURCE" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.version=$VERSION" \
+            --label "org.opencontainers.image.title=Jackalope computer" \
+            --label "org.opencontainers.image.description=Linux desktop for Jackalope agents. Bundled Debian and npm packages keep their own licenses; see /usr/share/doc/jackalope-computer/NOTICE." \
+            --label org.opencontainers.image.licenses=Apache-2.0 \
+            "${args[@]}" apps/desktop/src-tauri/resources/computer
+      - name: Check notices
+        env:
+          TAGS: ${{ steps.plan.outputs.tags }}
+        run: |
+          image="${TAGS%% *}"
+          docker run --rm --entrypoint sh "$image" -c '
+            set -e
+            test -s /usr/share/doc/jackalope-computer/NOTICE
+            test -s /usr/share/common-licenses/Apache-2.0
+            for package in chromium x11vnc novnc python3 nodejs; do
+              test -s "/usr/share/doc/$package/copyright"
+            done
+            test "$(ls /usr/share/doc/*/copyright | wc -l)" -gt 100
+            test -d /usr/local/lib/node_modules/@openai/codex
+            ! command -v claude'
+      - name: Publish
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+          TAGS: ${{ steps.plan.outputs.tags }}
+        run: |
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          for tag in $TAGS; do docker push "$tag"; done
+          first="${TAGS%% *}"
+          digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$first")"
+          docker logout ghcr.io
+          {
+            echo "Published $digest"
+            for tag in $TAGS; do echo "- $tag"; done
+          } >> "$GITHUB_STEP_SUMMARY"

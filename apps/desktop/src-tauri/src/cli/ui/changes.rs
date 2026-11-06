@@ -20,6 +20,9 @@ pub struct Panel {
 
 impl App {
     pub(super) fn set_changes(&mut self, changes: Vec<FileChange>) {
+        if let Some(id) = &self.session {
+            self.seen_changes.insert(id.clone(), changes.clone());
+        }
         if changes == self.changes {
             return;
         }
@@ -59,6 +62,15 @@ impl App {
             .as_ref()
             .and_then(|path| self.changes.iter().position(|change| &change.path == path))
             .unwrap_or(0)
+    }
+
+    /// Opens the panel on the changed file at `index`.
+    pub(super) fn show_file(&mut self, index: usize) {
+        let Some(change) = self.changes.get(index) else {
+            return;
+        };
+        self.panel.selected = Some(change.path.clone());
+        self.panel.open = true;
     }
 
     /// Moves the selection `delta` rows, stopping at either end.

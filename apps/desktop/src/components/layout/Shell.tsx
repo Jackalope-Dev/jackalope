@@ -15,10 +15,10 @@ import { useWindowEvent } from '../../hooks/useWindowEvent';
 import { unreadBotConversations } from '../../lib/bot-conversations';
 import { needsYou, useBotHubStore } from '../../lib/bot-hub';
 import { observeBots } from '../../lib/bot-hub-sync';
-import { captureDraftForProject } from '../../lib/capture-draft';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { helperTheme } from '../../lib/helper-actions';
 import type { LiveSession } from '../../lib/live-session';
+import { planningDraft } from '../../lib/planning';
 import { displayShortcut, matchesShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { swarmConnection } from '../../lib/swarm';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -38,6 +38,7 @@ import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTa
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { mergeProjectRegistry, type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useTaskStore } from '../../stores/taskStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { observeWorkbenchPreferences } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
@@ -53,6 +54,7 @@ import './workspace-shell.css';
 import { useShallow } from 'zustand/react/shallow';
 import { CompanionSources } from '../mascot/CompanionSources';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
+import type { ComposerSeed } from '../sessions/SessionStart';
 import type { SettingsCategory } from '../settings/SettingsPage';
 import { UpdateNotice } from '../settings/UpdateNotice';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
@@ -141,9 +143,6 @@ const SettingsPage = lazy(() =>
 );
 const CommandPalette = lazy(() =>
   import('./CommandPalette').then((m) => ({ default: m.CommandPalette })),
-);
-const CaptureTask = lazy(() =>
-  import('../tasks/CaptureTask').then((m) => ({ default: m.CaptureTask })),
 );
 const RemoveProjectAction = lazy(() =>
   import('../projects/RemoveProjectAction').then((m) => ({ default: m.RemoveProjectAction })),
@@ -286,29 +285,63 @@ export function Shell({
   useEffect(() => {
     if (commandsOpen) setCommandsSeen(true);
   }, [commandsOpen]);
-  const [capture, setCapture] = useState<{
-    ideaId?: string;
-    agent?: string;
-    draftKey?: string;
-  } | null>(
-    initialDraftKey || initialTaskAgent
-      ? { agent: initialTaskAgent, draftKey: initialDraftKey }
-      : initialCapture
-        ? {}
-        : null,
-  );
   const [scheduleRunId, setScheduleRunId] = useState<string>();
-  useWindowEvent<string>('jackalope:helper-draft', (key) => {
-    if (key.startsWith('helper-') && useExecutionStore.getState().drafts[key])
-      setCapture({ draftKey: key });
-  });
   const [composerFocus, setComposerFocus] = useState(0);
   const focusComposer = useCallback(() => {
-    setCapture(null);
     selectWork();
     setActiveTab('kanban');
     setComposerFocus((value) => value + 1);
   }, []);
+  const [composerSeed, setComposerSeed] = useState<ComposerSeed | null>(null);
+  /** Loads a saved draft, idea or agent choice into the Work composer. */
+  const openInComposer = useCallback(
+    ({ ideaId, agent, draftKey }: { ideaId?: string; agent?: string; draftKey?: string }) => {
+      const saved = draftKey ? useExecutionStore.getState().drafts[draftKey] : undefined;
+      const idea = ideaId
+        ? useTaskStore.getState().tasks.find((task) => task.id === ideaId)
+        : undefined;
+      const fromIdea = idea ? planningDraft(idea) : undefined;
+      const projectId = saved?.projectId || idea?.projectId;
+      const projects = useProjectStore.getState();
+      if (
+        projectId &&
+        projectId !== projects.activeProjectId &&
+        projects.projects.some((p) => p.id === projectId)
+      )
+        projects.selectProject(projectId);
+      setComposerSeed({
+        id: crypto.randomUUID(),
+        text: saved?.prompt ?? fromIdea?.prompt ?? '',
+        agent: saved?.agent || agent || fromIdea?.agent || undefined,
+        contextSelection: saved?.contextSelection ?? fromIdea?.contextSelection,
+        readOnly: saved?.readOnly,
+        ideaId: idea?.id,
+        draftKey,
+      });
+      focusComposer();
+    },
+    [focusComposer],
+  );
+  const composerSeedApplied = useCallback((seed: ComposerSeed) => {
+    if (seed.draftKey)
+      useExecutionStore.setState((state) => {
+        const drafts = { ...state.drafts };
+        if (seed.draftKey) delete drafts[seed.draftKey];
+        return { drafts };
+      });
+    setComposerSeed((current) => (current?.id === seed.id ? null : current));
+  }, []);
+  const initialEntry = useRef({ initialDraftKey, initialTaskAgent, initialCapture });
+  useEffect(() => {
+    const entry = initialEntry.current;
+    if (entry.initialDraftKey || entry.initialTaskAgent)
+      openInComposer({ draftKey: entry.initialDraftKey, agent: entry.initialTaskAgent });
+    else if (entry.initialCapture) focusComposer();
+  }, [openInComposer, focusComposer]);
+  // Helpers, conversation topics and lesson checks prepare a draft, then open it here.
+  useWindowEvent<string>('jackalope:helper-draft', (key) => {
+    if (useExecutionStore.getState().drafts[key]) openInComposer({ draftKey: key });
+  });
   const { projects, activeProjectId, selectProject } = useProjectStore(
     useShallow((s) => ({
       projects: s.projects,
@@ -353,8 +386,6 @@ export function Shell({
     if (id === activeProjectId) return;
     const project = projects.find((item) => item.id === id);
     if (!project) return;
-    const execution = useExecutionStore.getState();
-    execution.draft('capture', captureDraftForProject(execution.drafts, project, activeProjectId));
     selectWork();
     selectProject(id);
   };
@@ -699,9 +730,10 @@ export function Shell({
             >
               {activeTab === 'kanban' && (
                 <TaskWorkspace
-                  composerVisible={!capture}
                   composerFocus={composerFocus}
-                  onCapture={(ideaId) => (ideaId ? setCapture({ ideaId }) : focusComposer())}
+                  composerSeed={composerSeed}
+                  onComposerSeedApplied={composerSeedApplied}
+                  onCapture={(ideaId) => (ideaId ? openInComposer({ ideaId }) : focusComposer())}
                   onSchedule={(id) => {
                     const run = useExecutionStore.getState().runs.find((r) => r.id === id);
                     if (run) selectProject(run.projectId);
@@ -728,16 +760,14 @@ export function Shell({
               {activeTab === 'repo-todos' && (
                 <RepoTodos
                   key={project?.path ?? activeProjectId}
-                  onCapture={(draftKey) => setCapture({ draftKey })}
+                  onCapture={(draftKey) => openInComposer({ draftKey })}
                   onOpenProject={openProjectSetup}
                 />
               )}
               {activeTab === 'agents' && (
                 <RunnerConnections
                   onNewTask={(agent) => {
-                    selectWork();
-                    setCapture({ agent });
-                    setActiveTab('kanban');
+                    openInComposer({ agent });
                   }}
                   onRun={(run) => {
                     selectProject(run.projectId);
@@ -804,19 +834,6 @@ export function Shell({
           </PageErrorBoundary>
         </main>
       </div>
-      {capture && (
-        <Suspense fallback={null}>
-          <CaptureTask
-            key={capture.ideaId ?? 'capture'}
-            {...capture}
-            onClose={() => setCapture(null)}
-            onStarted={() => {
-              setCapture(null);
-              setActiveTab('kanban');
-            }}
-          />
-        </Suspense>
-      )}
       <UpdateNotice />
       {removingProject && (
         <Suspense fallback={null}>
