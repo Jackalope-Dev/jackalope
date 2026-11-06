@@ -237,7 +237,7 @@ export interface PoolHost {
 }
 
 /** A computer the person can add to a project's pool. */
-export interface PoolChoice {
+interface PoolChoice {
   id: string;
   name: string;
   provider: string;
