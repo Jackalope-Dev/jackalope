@@ -870,6 +870,22 @@ async fn bridge_tool_execute(
     Ok(Json(result))
 }
 
+/// Asks for a computer connection's tool the way Claude Code's permission
+/// prompt asks on this device; see `coordination_mcp::approve_computer_tool`.
+async fn bridge_tool_approve(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let run = service
+        .authorized_run(&headers)
+        .map_err(|status| (status, "Unauthorized".into()))?;
+    super::coordination_mcp::approve_computer_tool(&service, &run, body)
+        .await
+        .map(Json)
+        .map_err(|message| (StatusCode::BAD_REQUEST, message))
+}
+
 async fn bridge_tool_read(
     WebState(service): WebState<Coordinator>,
     headers: HeaderMap,

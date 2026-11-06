@@ -143,6 +143,9 @@ shown again. Removing the last secret removes the record.
 
 Secrets go only into the environment of task agent processes: local attempts, including
 persistent Claude Code sessions, and [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
+For an agent on a computer, a selected stdio connection that runs there can also use a
+secret available to computers as `${NAME}` in its arguments or environment
+([details](BOT-COMPUTERS.md#agents-on-a-computer)).
 Workspace preparation, checks, previews and deploy commands do not receive them. A
 secret replaces an inherited variable of the same name. The attempt's activity names the
 secrets the agent received. An unreadable record fails the attempt with the storage error

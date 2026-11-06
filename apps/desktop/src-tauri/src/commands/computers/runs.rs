@@ -209,10 +209,53 @@ fn bridge_only(adapter: &str, value: &str) -> Result<String, String> {
     Ok(format!("mcp_servers={}", toml::Value::Table(servers)))
 }
 
-fn looks_local(value: &str) -> bool {
+/// Whether a value names a file on this device: a Windows drive or network
+/// path, or an absolute path that exists here.
+pub(crate) fn looks_local(value: &str) -> bool {
     let bytes = value.as_bytes();
     let windows = bytes.len() > 2 && bytes[1] == b':' && (bytes[2] == b'\\' || bytes[2] == b'/');
     windows || value.starts_with("\\\\") || (value.starts_with('/') && Path::new(value).exists())
+}
+
+/// The runs protocol from which a computer's agent runs selected stdio
+/// connections and reports it in `run_status`.
+const CONNECTIONS_PROTOCOL: u64 = 3;
+
+/// Whether the computer's agent, by its run status, runs stdio connections.
+pub(crate) fn runs_connections(status: Option<&Value>) -> bool {
+    status
+        .and_then(|status| status["runs"].as_u64())
+        .is_some_and(|protocol| protocol >= CONNECTIONS_PROTOCOL)
+}
+
+/// The `mcp` part of `run_start`: each connection's command, arguments and
+/// resolved environment. The computer's agent keeps them out of the command
+/// line and the CLI's configuration: it writes each to a private file beside
+/// the workspace and adds an entry that starts the server from it. With
+/// `approve`, Claude Code asks Jackalope before each of their tools runs.
+pub(crate) fn connections_request(
+    adapter: &str,
+    connections: &[crate::commands::mcp::ComputerConnection],
+) -> Value {
+    json!({
+        "config": adapter,
+        "approve": adapter == "claude",
+        "servers": connections.iter().map(|connection| json!({
+            "key": connection.key,
+            "name": connection.name,
+            "command": connection.command,
+            "args": connection.args,
+            "env": connection.env.iter().cloned().collect::<HashMap<_, _>>(),
+        })).collect::<Vec<_>>(),
+    })
+}
+
+/// A started run.
+pub(crate) struct Started {
+    /// The exit, when it ended at once.
+    pub exit: Option<Value>,
+    /// Connections the computer could not start, as name and reason.
+    pub unavailable: Vec<(String, String)>,
 }
 
 /// One run's conversation with a computer's agent.
@@ -326,21 +369,42 @@ impl Session {
         }
     }
 
-    /// Starts the agent, with the bridge relay when `relay` is set. Returns its
-    /// exit when it ended at once.
+    /// Starts the agent, with the bridge relay when `relay` is set and the
+    /// selected stdio connections in `connections` (see [`connections_request`]).
     pub fn start(
         &mut self,
         argv: &[String],
         env: &[(String, String)],
         stdin: &str,
         relay: bool,
-    ) -> Result<Option<Value>, String> {
+        connections: Option<&Value>,
+    ) -> Result<Started, String> {
         let env: HashMap<&str, &str> = env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
-        let result = self.call(
-            json!({"action":"run_start","argv":argv,"env":env,"stdin":stdin,"timeout_s":6 * 3600,"relay":relay}),
-            CALL_TIMEOUT,
-        )?;
-        Ok((result["started"] != true).then(|| result["exit"].clone()))
+        let mut request = json!({"action":"run_start","argv":argv,"env":env,"stdin":stdin,"timeout_s":6 * 3600,"relay":relay});
+        if let Some(connections) = connections {
+            request["mcp"] = connections.clone();
+        }
+        // Installing a connection's runtime can add a minute or two.
+        let timeout = if connections.is_some() {
+            CALL_TIMEOUT * 3
+        } else {
+            CALL_TIMEOUT
+        };
+        let result = self.call(request, timeout)?;
+        Ok(Started {
+            exit: (result["started"] != true).then(|| result["exit"].clone()),
+            unavailable: result["mcp"]["unavailable"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|item| {
+                    Some((
+                        item["name"].as_str()?.to_string(),
+                        item["reason"].as_str()?.to_string(),
+                    ))
+                })
+                .collect(),
+        })
     }
 
     /// Output after the cursors and new bridge requests. `reclaim` also returns

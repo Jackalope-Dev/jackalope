@@ -66,6 +66,25 @@ impl TaskRuntime {
         Some(computer)
     }
 
+    /// Records which selected stdio connections start with the run and tells
+    /// the agent. Returns the `run_start` request for them.
+    #[allow(clippy::too_many_arguments)]
+    fn computer_connections(
+        &self,
+        id: &str,
+        adapter: &str,
+        computer: &Computer,
+        status: Option<&serde_json::Value>,
+        relayed: bool,
+        connections: Vec<crate::commands::mcp::ComputerConnection>,
+        input: &mut String,
+    ) -> Option<serde_json::Value> {
+        let plan = connection_plan(adapter, &computer.name, status, relayed, &connections)?;
+        self.update(id, |run| activity(run, &plan.activity));
+        input.push_str(&plan.instructions);
+        plan.request
+    }
+
     fn remote_progress(&self, id: &str, label: &str, detail: &str) {
         self.update(id, |run| {
             let mut step = super::preparation::StepProgress::new("agent", label, 1);
@@ -91,6 +110,7 @@ impl TaskRuntime {
         mut input: String,
         workspace: &str,
         computer: Computer,
+        connections: Vec<crate::commands::mcp::ComputerConnection>,
     ) -> Result<(), String> {
         let root = self.computers_root();
         let bridge = req.coordination.as_ref();
@@ -169,6 +189,15 @@ impl TaskRuntime {
         } else if bridge.is_some() {
             input.push_str("\nJackalope's tools are not available on this computer, whose image predates them. Ignore instructions that mention them.\n");
         }
+        let connections = self.computer_connections(
+            id,
+            adapter,
+            &computer,
+            status.as_ref(),
+            relayed.is_some(),
+            connections,
+            &mut input,
+        );
         let launched = std::time::Instant::now();
         let label = format!("Sending files to {}", computer.name);
         session.upload(Path::new(workspace), &req.setup_files, &|sent, total| {
@@ -187,7 +216,17 @@ impl TaskRuntime {
             self.remote_stopped(id);
             return Ok(());
         }
-        let immediate = session.start(&argv, &env, &input, relayed.is_some())?;
+        let started =
+            session.start(&argv, &env, &input, relayed.is_some(), connections.as_ref())?;
+        let immediate = started.exit;
+        for (name, reason) in &started.unavailable {
+            self.update(id, |run| {
+                activity(
+                    run,
+                    &format!("{name} could not start on {}: {reason}", computer.name),
+                )
+            });
+        }
         self.update_checked(id, |r| {
             if r.status == "starting" {
                 r.status = "running".into();
@@ -555,6 +594,63 @@ impl TaskRuntime {
     }
 }
 
+/// What happens to the selected stdio connections of a run on a computer.
+struct ConnectionPlan {
+    /// The `run_start` request, when they start with the run.
+    request: Option<serde_json::Value>,
+    /// The activity line, naming connections but never their values.
+    activity: String,
+    instructions: String,
+}
+
+/// Connections start with the run when the computer's agent supports them
+/// and, for Claude Code (which runs there without its permission prompt),
+/// when the bridge relay can carry each tool's approval to this device.
+fn connection_plan(
+    adapter: &str,
+    computer: &str,
+    status: Option<&serde_json::Value>,
+    relayed: bool,
+    connections: &[crate::commands::mcp::ComputerConnection],
+) -> Option<ConnectionPlan> {
+    if connections.is_empty() {
+        return None;
+    }
+    let names = connections
+        .iter()
+        .map(|connection| connection.name.as_str())
+        .collect::<Vec<_>>()
+        .join(", ");
+    let missing = if !runs::runs_connections(status) {
+        Some(format!(
+            "the image of {computer} predates connections that run on it; update the image"
+        ))
+    } else if adapter == "claude" && !relayed {
+        Some("Jackalope approves their tools for Claude Code through its bridge, which this attempt does not have".to_string())
+    } else {
+        None
+    };
+    Some(match missing {
+        Some(reason) => ConnectionPlan {
+            request: None,
+            activity: format!("Connections not available on {computer}: {names} ({reason})."),
+            instructions: format!("\nThese selected connections are not available to you on this computer: {names}. Do not look for their tools.\n"),
+        },
+        None => ConnectionPlan {
+            request: Some(runs::connections_request(adapter, connections)),
+            activity: format!("Connections that run on {computer}, in the agent's workspace: {names}. Their commands and environment go with the run like project secrets."),
+            instructions: format!(
+                "\nThese selected connections run as MCP servers on this computer, in the workspace you edit: {names}. Use their tools directly.{}\n",
+                if adapter == "claude" {
+                    " Jackalope approves each of their tool calls the way it approves tools on the person's device."
+                } else {
+                    ""
+                }
+            ),
+        },
+    })
+}
+
 fn megabytes(bytes: u64) -> String {
     format!("{:.1} MB", bytes as f64 / 1_000_000.0)
 }
@@ -569,6 +665,69 @@ fn patch_files(patch: &[u8]) -> usize {
 
 #[cfg(test)]
 mod tests {
+    use crate::commands::mcp::ComputerConnection;
+    use serde_json::json;
+
+    fn linear() -> ComputerConnection {
+        ComputerConnection {
+            key: "linear".into(),
+            name: "Linear".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@linear/mcp".into()],
+            env: vec![("LINEAR_API_KEY".into(), "lin-secret-value".into())],
+        }
+    }
+
+    #[test]
+    fn connections_start_only_where_the_computer_and_approvals_allow() {
+        let connections = [linear()];
+        let current = json!({"exists": false, "runs": 3});
+        assert!(super::connection_plan("claude", "Box", Some(&current), true, &[]).is_none());
+
+        let plan =
+            super::connection_plan("claude", "Box", Some(&current), true, &connections).unwrap();
+        let request = plan.request.unwrap();
+        assert_eq!(request["config"], "claude");
+        assert_eq!(request["approve"], true);
+        assert_eq!(request["servers"][0]["key"], "linear");
+        assert_eq!(request["servers"][0]["command"], "npx");
+        // The value travels only in the run request, the channel secrets use.
+        assert_eq!(
+            request["servers"][0]["env"]["LINEAR_API_KEY"],
+            "lin-secret-value"
+        );
+        for text in [&plan.activity, &plan.instructions] {
+            assert!(text.contains("Linear"), "{text}");
+            assert!(!text.contains("lin-secret-value") && !text.contains("LINEAR_API_KEY"));
+        }
+        assert!(plan
+            .instructions
+            .contains("approves each of their tool calls"));
+
+        let codex =
+            super::connection_plan("codex", "Box", Some(&current), false, &connections).unwrap();
+        assert_eq!(codex.request.unwrap()["approve"], false);
+        assert!(!codex.instructions.contains("approves"));
+
+        let unapproved =
+            super::connection_plan("claude", "Box", Some(&current), false, &connections).unwrap();
+        assert!(unapproved.request.is_none());
+        assert!(unapproved.activity.contains("through its bridge"));
+        assert!(unapproved.instructions.contains("not available"));
+
+        for status in [None, Some(json!({"exists": false}))] {
+            let old = super::connection_plan("codex", "Box", status.as_ref(), true, &connections)
+                .unwrap();
+            assert!(old.request.is_none());
+            assert!(
+                old.activity.contains("update the image"),
+                "{}",
+                old.activity
+            );
+            assert!(!old.activity.contains("lin-secret-value"));
+        }
+    }
+
     #[test]
     fn counts_patch_files() {
         assert_eq!(super::patch_files(b""), 0);

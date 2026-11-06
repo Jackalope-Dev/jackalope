@@ -413,10 +413,15 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   desktop control acts on that computer, and the browser tools drive its Chromium on a
   local sandbox with networking (unavailable on cloud and Agent37 computers). Tools that
   read the local workspace work only for read-only attempts; `peer_adopt` is
-  unavailable. Selected on-demand connections reach it through the broker on this
-  device (stdio ones only for read-only attempts), with Claude Code's `execute_tool`
-  approved at the bridge; directly delivered connections are withheld and named in the
-  attempt's activity. Plan-mode planners and swarm orchestrators run there
+  unavailable. Selected on-demand HTTP connections, and every on-demand connection of a
+  read-only attempt, reach it through the broker on this device, with Claude Code's
+  `execute_tool` approved at the bridge. A writing attempt's on-demand stdio connections
+  run on the computer in the workspace the agent edits, with their command and
+  environment resolved here and sent like project secrets, uv installed when needed, and
+  Claude Code asking the bridge before each of their tools runs; one the computer cannot
+  run (Docker, a program on this device) falls back to this device only when it does not
+  use the workspace. Directly delivered connections are withheld; the attempt's activity
+  names where each connection runs or why it is withheld. Plan-mode planners and swarm orchestrators run there
   read-only and bring nothing back. Lost contact is retried for 30 minutes, and changes
   left on the computer come back when the task continues. Such agents have their own
   concurrency limit (8 by default, up to 32, set in the project's queue); other agents
