@@ -120,6 +120,10 @@ const nativeChecks = [
       '--bin',
       'jackalope',
       '--no-default-features',
+      // CI tests the configuration a platform ships, such as the Windows Store build.
+      ...(process.env.JACKALOPE_VERIFY_FEATURES
+        ? ['--features', process.env.JACKALOPE_VERIFY_FEATURES]
+        : []),
     ],
   ],
 ];
