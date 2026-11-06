@@ -235,6 +235,33 @@ from the local workspace path, so a continuation reuses the path and the agent's
 session resumes; the run's folder is removed after its changes come back (for a bundle,
 with its worktree, branch and refs; the project's repository keeps the commits).
 
+### The runner
+
+Every attempt has a runner, the execution host that owns its workspace: the local runner
+(`tasks/runner/local.rs`) for an agent on this device and the remote runner
+(`tasks/runner/remote.rs`) for one on the project's computer. The task runtime builds the
+agent's command and prompt once, then takes either runner through the same steps
+(`TaskRuntime::run_attempt` in `tasks/runner.rs`): prepare the workspace (the local
+worktree as it is, or the upload described above), start the agent, follow its events
+until it ends (with stop and quota handoffs, and reconnection on a computer), and collect
+its result (nothing on this device; the patch or bundle from a computer). The attempt then
+completes on this device in both cases.
+
+The local runner reports the `device` capability with every workspace capability, so the
+[placement table](#agents-on-a-computer) offers it every tool and adds nothing to its
+instructions; a computer's runner cannot claim `device`. A running attempt's placement is
+attached while its agent runs, and the bridge leaves the tools it makes unavailable out of
+`tools/list` for either runner. What workspace tools did (pages visited, screenshots,
+browser interactions and tab changes, accessibility audits and, on a computer, the saved
+check's outcome) is recorded by one function (`tasks/runner/record.rs`), which names the
+computer in the activity and lists a computer's screenshots once they come back with the
+agent's changes.
+
+The command itself still differs where the hosts do: an agent on this device uses its
+account profiles, project secrets for this device, directly delivered connections and,
+for Claude Code, a persistent session; one on a computer uses the sign-ins and connections
+described in this section.
+
 ### How workspaces travel
 
 A computer's runner reports its runs protocol and capabilities in `hello` and
@@ -567,8 +594,9 @@ command translation and patch handling, `computers/relay.rs` the bridge relay,
 `computers/runner.rs` runner capabilities and tool placement, `computers/policy.rs` the
 answers to the runner's policy callbacks and events, `computers/sync.rs` the Git bundles
 of `git-sync`, `computers/artifacts.rs` the artifact transfers,
-`computers/credentials.rs` the agent sign-ins for computers, and `tasks/remote.rs` the
-attempt side of an agent on a computer.
+`computers/credentials.rs` the agent sign-ins for computers, and
+`tasks/runner/remote.rs` the attempt side of an agent on a computer, one of the two
+runners behind `tasks/runner.rs` (see [the runner](#the-runner)).
 `desktop_control/computer.rs` runs desktop actions on a computer and
 `computers/browser.rs` attaches the computer's browser to the task browser through
 `browser::set_router`, gated by the same site questions, which also answer a runner's
@@ -653,17 +681,22 @@ Docker detection messages, container arguments, loopback ports and viewer URLs, 
 image tag, cloud address and secret validation, the idle stop choices and their
 exclusion from the container configuration, idle decisions and status text, viewer
 holds and the quit preference. `cargo test … --lib computers::runs computers::relay
-tasks::remote` covers command translation with and without the bridge relay,
+tasks::runner` covers command translation with and without the bridge relay,
 credentials, the workspace archive with copied setup files, chunked upload and patch
 checks, line splitting, patch application, the read-only run name, and the relay's
-refusals, tool-list filtering by placement, the computer's browser and read-only access, and
-forwarding with the attempt's credential; `tasks::remote` also covers when stdio
+refusals, the computer's browser and read-only access, and
+forwarding with the attempt's credential; `tasks::runner::remote` also covers when stdio
 connections start with a run and that activity and instructions carry no values;
+`tasks::runner` runs one launch through the local runner (a real agent process) and the
+remote runner (a stand-in protocol 4 runner) and checks that both record the same result,
+deliver the same input apart from the placement instructions and place every tool from
+the same table, and `tasks::runner::record` that both record the same tool events;
 `mcp::tests` covers the connection policy for computers (where each connection runs,
 command and path translation, `${NAME}` secrets, fallback and withheld reasons, values
 kept out of `Debug`); `coordination_mcp` covers which tools the approval route accepts
 and that every bridge tool has a placement; `computers::runner` covers capability
-negotiation, including the protocol 3 fallback, and where each tool runs and which reach the
+negotiation, including the protocol 3 fallback, the device runner and attached placements,
+and where each tool runs and which reach the
 tool list for each capability set; `computers::relay` also covers forwarding only control
 tools for a runner with the local bridge; `computers::policy` covers the policy kinds,
 secrets answered without values, untrusted event text and finding returned screenshots;

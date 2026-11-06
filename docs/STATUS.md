@@ -697,6 +697,8 @@ or task's cloud machine reaches desktop control and commands but not the browser
 and the in-sandbox agent has no accessibility actions. The idle stop, start on demand and quit
 stop are covered by unit tests only. Agents on a computer are covered by unit tests, the
 agent's POSIX run, relay and runner tests and the opt-in Docker trial with a stand-in agent;
+attempts on this device and on a computer share one runner path, which a unit test drives
+with a real local agent process and a stand-in computer runner;
 real Claude Code or Codex runs there, bridge, desktop and browser tools used by a real
 agent, the runner's local bridge and agent-browser in a built image, planning there, lost-contact
 recovery against a real computer, Git-synced workspaces and artifacts against a built

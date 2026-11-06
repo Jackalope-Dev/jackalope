@@ -80,9 +80,9 @@ names; changes must preserve both sides and old saved records.
 | bot_hub.rs, bot_hub/ | Mirrored bot directory, wake-ups, bot-to-bot hand-offs, cards and suggestions over persona live sessions |
 | desktop_control.rs, desktop_control/, resources/gnome-extension/ | Attempt-scoped window, app and desktop grants, remembered project permissions, resident native helpers, accessibility refs, capture and guarded Windows/macOS/X11/GNOME 46 Wayland input |
 | computers.rs, computers/, desktop_control/computer.rs, resources/computer/ | Bot, task and project computers: provider trait, local Docker sandboxes, paired cloud machines, Agent37 machines, the in-sandbox agent image, run routing for desktop and browser tools, and the run protocol, command translation and sign-ins for agents on a computer |
-| computers/runner.rs, computers/policy.rs | The control plane / runner boundary for agents on a computer: runner capability negotiation, the table of where each bridge tool executes, and the device's answers to the runner's policy callbacks and events |
+| computers/runner.rs, computers/policy.rs | The control plane / runner boundary: runner capability negotiation, the table of where each bridge tool executes for any runner (this device's included) and each running attempt's attached placement, and the device's answers to a computer runner's policy callbacks and events |
 | computers/sync.rs, computers/artifacts.rs | How workspaces and files travel to a runner with `git-sync` and `artifacts`: Git bundles against a per-project repository on the computer, and chunked, content-addressed, resumable transfers for bundles, saved output and large bridge answers |
-| tasks/remote.rs | The attempt side of an agent on a project computer: upload (bundle or tar), output relay, stop and quota, and applying its changes before the local completion path |
+| tasks/runner.rs, tasks/runner/ | The runner of every attempt: one path through prepare, start, follow, stop and collect for the local runner (the agent CLI in this device's worktree, its process ownership and persistent Claude Code sessions) and the remote runner (upload as a bundle or tar, output relay, stop and quota, and applying its changes), and one record of what workspace tools did |
 | knowledge.rs, monitors.rs | Project lessons/workflows, immutable task context receipts and local Git change checks |
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |
@@ -119,6 +119,18 @@ Control (forwarded to this device through the relay queue). The runner asks this
 device before anything a person or rule governs through `POST /v1/policy` (kinds
 `tool`, `site`, `secret`); anything but an explicit allow, including no answer, is a
 refusal. See [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
+
+Placement is a parameter of every attempt, not a separate code path. The task runtime
+assembles the agent's command and prompt, then runs it through an `AttemptRunner`
+(`tasks/runner.rs`): `LocalRunner` uses this device's worktree as it is and owns the agent
+process, and `RemoteRunner` is the computer's runner seen from here. Both go through
+`TaskRuntime::run_attempt` (prepare, attach the placement, start, follow, collect) before
+the shared completion path, so checks, checkpoints, review, integration and the lock order
+are the same. The local runner reports the `device` capability and every workspace
+capability, so its tool list comes from the same `computers::runner::TOOLS` table, and the
+bridge applies each attempt's attached placement to `tools/list`. Tool events from the
+bridge's own handlers and from a runner's `/v1/runner/event` are recorded by one function.
+See [the runner](BOT-COMPUTERS.md#the-runner).
 
 `desktop_control.rs` separately owns explicit window, app and desktop grants, the
 session's resident helper process and a single desktop input lease. Both transports share task authorization, cancellation and snapshot
