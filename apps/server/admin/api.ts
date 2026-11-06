@@ -190,7 +190,37 @@ export interface Broadcast {
   configured: boolean;
   synced: number;
   tags: string[];
-  entries: { id: string; title: string; date: string; description: string; status?: string }[];
+  entries: {
+    id: string;
+    title: string;
+    date: string;
+    description: string;
+    status?: string;
+    version?: string;
+  }[];
+  monthly?: {
+    enabled: boolean;
+    autosend: boolean;
+    latest: {
+      month: string;
+      state: 'drafting' | 'failed' | 'skipped' | 'ready' | 'handed_off' | 'dismissed';
+      draft: {
+        subject: string;
+        preview: string;
+        headline: string;
+        intro: string;
+        outro: string;
+        entries: string[];
+        extras: { title: string; body: string }[];
+        action?: { label: string; url: string } | null;
+        tag: string;
+      } | null;
+      model: string | null;
+      reason: string | null;
+      updatedAt: number;
+      campaignUrl: string | null;
+    } | null;
+  };
 }
 
 export const date = (value?: number | null) =>

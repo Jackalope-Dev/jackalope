@@ -22,6 +22,10 @@ serving `ACCESS_WEB_ORIGIN`. Deploy the website before the API. Workers on route
 cannot receive same-zone public fetches from another Worker. Local development
 without this binding reads the public feed directly.
 
+The cron also drafts a monthly product note with Claude when
+`PRODUCT_NOTES_ENABLED` is `true` and `ANTHROPIC_API_KEY` is set. The draft waits in
+the composer for review; see [monthly product notes](../../docs/EARLY-ACCESS.md#monthly-product-notes).
+
 From the repository root, use Node 26 and the repository's pnpm version:
 
 ```powershell

@@ -321,7 +321,10 @@ export function JournalPage({ path }: { path: string }) {
             <article id={update.id} key={update.id} className="change-entry">
               <div className="change-date">
                 <time dateTime={update.date}>{dateLabel(update.date)}</time>
-                <span>{update.status}</span>
+                <span className="change-status" data-state={update.state}>
+                  {update.status}
+                  {update.version && <small>v{update.version}</small>}
+                </span>
               </div>
               <div>
                 <h2>

@@ -13,6 +13,7 @@ import { accessEmail } from './mail';
 import { checkMailDelivery } from './mail-status';
 import type { Mail } from './mail-templates';
 import { markAudienceStale } from './newsletter';
+import { latestProductNote } from './product-notes';
 import { installerKey, linuxChannels, macChannels, stableDownloads, storeUrl } from './routes';
 import { AccessError, approve, requestLink } from './service';
 import { openSignup, waitlistRankSql } from './waitlist';
@@ -151,14 +152,31 @@ export async function accessAdmin(
         synced: audience?.total ?? 0,
         tags: MANAGED_TAGS,
         entries: await changelogEntries(env),
+        monthly: await latestProductNote(env),
       });
     }
     if (request.method === 'POST' && url.pathname === '/admin/api/access/broadcast') {
       if (!env.SEQUENZY_API_KEY || !env.ACCESS_AUDIENCE_LIST || !env.ACCESS_EMAIL_FROM)
         return json({ error: 'access_not_configured' }, 409);
-      const draft = broadcastSchema.parse(await readJson(request));
+      const { draftMonth, ...body } = z
+        .looseObject({
+          draftMonth: z
+            .string()
+            .regex(/^\d{4}-\d{2}$/)
+            .optional(),
+        })
+        .parse(await readJson(request));
+      const draft = broadcastSchema.parse(body);
       const entries = await changelogEntries(env);
-      return json(await createBroadcastDraft(env, draft, entries));
+      const created = await createBroadcastDraft(env, draft, entries);
+      // A monthly draft that reached Sequenzy stops asking for review.
+      if (draftMonth)
+        await env.DB.prepare(
+          "UPDATE product_note_drafts SET state='handed_off',campaign_id=?,campaign_url=?,updated_at=? WHERE month=? AND state='ready'",
+        )
+          .bind(created.id, created.url, Date.now(), draftMonth)
+          .run();
+      return json(created);
     }
     if (request.method === 'GET' && url.pathname === '/admin/api/access/insights')
       return json(await waitlistInsights(env));
@@ -262,6 +280,17 @@ export async function accessAdmin(
     if (request.method === 'POST') {
       if (request.headers.get('origin') !== url.origin)
         return json({ error: 'origin_required' }, 403);
+      if (url.pathname === '/admin/api/access/product-notes') {
+        const { month } = z
+          .strictObject({ month: z.string().regex(/^\d{4}-\d{2}$/), action: z.literal('dismiss') })
+          .parse(await readJson(request));
+        await env.DB.prepare(
+          "UPDATE product_note_drafts SET state='dismissed',updated_at=? WHERE month=? AND state IN ('ready','failed','skipped')",
+        )
+          .bind(Date.now(), month)
+          .run();
+        return json({ success: true });
+      }
       if (url.pathname === '/admin/api/access/delivery') {
         const { id } = z.strictObject({ id: z.uuid() }).parse(await readJson(request));
         return json(await checkMailDelivery(env, id));
