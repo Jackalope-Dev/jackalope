@@ -203,6 +203,7 @@ function Conversation({
                 onAnswer={(text) => work.answer(detail.id, prompt.id, text)}
               />
             ))}
+          {detail?.host && <p className="mobile-note">Runs on {detail.host}</p>}
           {detail?.error && detail.error !== session?.error && (
             <InlineNotice tone="error">{detail.error}</InlineNotice>
           )}

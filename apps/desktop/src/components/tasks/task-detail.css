@@ -362,3 +362,9 @@
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
+
+.task-run-host {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}

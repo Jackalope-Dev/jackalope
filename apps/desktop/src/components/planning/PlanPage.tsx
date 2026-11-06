@@ -2,6 +2,7 @@ import { Badge, Input, Textarea } from '@jackalope/ui';
 import { ClipboardList, Settings2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { runHostName } from '../../lib/computers';
 import {
   type AutonomyEntry,
   approvalVerification,
@@ -30,6 +31,7 @@ import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { usePlanStore } from '../../stores/planStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { HostCapacity } from '../computers/HostCapacity';
 import { navigateWorkspace, openProjectSettings } from '../layout/navigation';
 import { EscalationNote } from '../tasks/AgentDecision';
 import { AgentQuestion } from '../tasks/AgentQuestion';
@@ -708,8 +710,13 @@ function PlanProgress({
   act: (work: () => Promise<unknown>) => Promise<void>;
 }) {
   const progress = view.progress;
+  const runs = useExecutionStore((state) => state.runs);
   if (!progress) return null;
   const states = new Map(view.criteria.map((state) => [state.id, state]));
+  const hostOf = (runId: string | null | undefined) => {
+    const run = runId ? runs.find((candidate) => candidate.id === runId) : undefined;
+    return run ? runHostName(run) : null;
+  };
   return (
     <div className="plan-progress">
       {progress.error && <InlineNotice tone="warning">{progress.error}</InlineNotice>}
@@ -735,6 +742,7 @@ function PlanProgress({
       {view.rounds && (
         <PlanRoundList
           planId={view.id}
+          projectId={view.projectId}
           rounds={view.rounds}
           escalation={view.autonomy?.entries.find(
             (entry) =>
@@ -754,6 +762,7 @@ function PlanProgress({
           <li key={`${task.key}:${task.runId ?? ''}`}>
             <span>
               {task.key === 'review' ? 'Independent review' : task.title}
+              {hostOf(task.runId) && <span className="plan-muted"> · on {hostOf(task.runId)}</span>}
               {!!task.outside?.length && (
                 <span className="plan-muted"> · outside scope: {task.outside.join(', ')}</span>
               )}
@@ -830,11 +839,13 @@ function PlanProgress({
 /** Each swarm round's verdict, evidence and the work it queued next. */
 function PlanRoundList({
   planId,
+  projectId,
   rounds,
   escalation,
   act,
 }: {
   planId: string;
+  projectId: string;
   rounds: PlanRounds;
   /** Why the proposed round came to the person although an agent could approve it. */
   escalation?: AutonomyEntry;
@@ -859,6 +870,7 @@ function PlanRoundList({
             : 'an orchestrator checks'
         } the criteria.`}
       />
+      {open && <HostCapacity projectId={projectId} label="Where this round runs" />}
       {open && (
         <div className="plan-actions">
           <Select

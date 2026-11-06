@@ -22,6 +22,19 @@ export interface RunUsage {
   reported: boolean;
   estimatedCostUsd: number | null;
 }
+/** The execution host an attempt runs on: this device (`device`) or a computer. */
+export interface RunHost {
+  id: string;
+  name: string;
+  /** Why the placer chose it. */
+  reason: string;
+  /** Why the host was lost during the attempt. */
+  lost?: string | null;
+  /** The lost host this attempt replaced. */
+  retriedFrom?: string | null;
+  /** What became of the attempt after its host was lost. */
+  retry?: string | null;
+}
 export interface TaskRun {
   archivedAt?: string | null;
   liveSessionId?: string | null;
@@ -128,6 +141,8 @@ export interface TaskRun {
   verification?: Verification | null;
   /** The project computer the agent ran on, when it did not run on this device. */
   remote?: { computerId: string; computerName: string } | null;
+  /** Where the capacity pool placed the attempt and why; older attempts omit it. */
+  host?: RunHost | null;
   accountBinding?: {
     adapter: string;
     profileId: string | null;

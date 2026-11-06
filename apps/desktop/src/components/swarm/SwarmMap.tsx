@@ -403,7 +403,11 @@ export function SwarmMap({
                 <strong className="swarm-detail-title" title={current.title}>
                   {current.title}
                 </strong>
-                <small>{current.plan ? `${current.agent} · ${current.plan}` : current.agent}</small>
+                <small>
+                  {[current.agent, current.plan, current.host && `on ${current.host}`]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </small>
               </div>
             </header>
             <p className="swarm-detail-phase">

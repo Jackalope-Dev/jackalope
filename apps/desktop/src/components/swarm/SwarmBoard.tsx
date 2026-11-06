@@ -1,6 +1,7 @@
 import { Badge } from '@jackalope/ui';
 import { AlertTriangle, GitFork, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { runHostName } from '../../lib/computers';
 import { type DeployStatus, deliveryPhase, deployStatus } from '../../lib/deploy';
 import { ago, type CloudState, cloudState, conflictSummary, fileStatus } from '../../lib/swarm';
 import { swarmMap } from '../../lib/swarm-map';
@@ -10,6 +11,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
+import { HostCapacity } from '../computers/HostCapacity';
 import { navigateWorkspace, openCloudResources, openSettings } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -115,6 +117,7 @@ export function SwarmBoard() {
       {model && isTauriEnvironment() && (
         <SwarmMap model={model} target={target} delivery={deliveryPhase(delivery)} />
       )}
+      <HostCapacity projectId={projectId} label="Where agents run" />
       {delivery && <SwarmDelivery status={delivery} onChange={() => setTick((n) => n + 1)} />}
       {!isTauriEnvironment() && (
         <InlineNotice>The swarm is available in the desktop app.</InlineNotice>
@@ -210,7 +213,9 @@ export function SwarmBoard() {
                       <div>
                         <strong>{fork.title}</strong>
                         <small>
-                          {run?.agent ?? fork.agent} · <code>{fork.fork}</code>
+                          {run?.agent ?? fork.agent}
+                          {run && runHostName(run) && ` · on ${runHostName(run)}`} ·{' '}
+                          <code>{fork.fork}</code>
                         </small>
                       </div>
                       {hot?.size ? (

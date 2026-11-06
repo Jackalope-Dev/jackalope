@@ -1,4 +1,5 @@
 import { Badge, DefinitionList, Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { runHostName } from '../../lib/computers';
 import type { TaskRun } from '../../lib/task-runtime';
 import { describeRunUsage } from '../../lib/usage-insights';
 import { TaskLearning } from '../knowledge/TaskLearning';
@@ -24,13 +25,22 @@ export function TaskRunDetails({
           { label: 'Agent', value: run.agent },
           { label: 'Model', value: run.model || 'Agent default' },
           { label: 'Account', value: run.accountBinding?.label || run.account },
-          ...(run.remote
+          ...(run.host || run.remote
             ? [
                 {
                   label: 'Runs on',
                   value: (
-                    <span className="inline-flex items-center gap-2">
-                      {run.remote.computerName} <Badge variant="accent">Beta</Badge>
+                    <span className="task-run-host">
+                      <span className="inline-flex items-center gap-2">
+                        {runHostName(run)}
+                        {(run.remote || (run.host && run.host.id !== 'device')) && (
+                          <Badge variant="accent">Beta</Badge>
+                        )}
+                        {run.host?.lost && <Badge variant="warning">Lost contact</Badge>}
+                      </span>
+                      {run.host?.reason && <small className="task-muted">{run.host.reason}</small>}
+                      {run.host?.lost && <small className="task-muted">{run.host.lost}</small>}
+                      {run.host?.retry && <small className="task-muted">{run.host.retry}</small>}
                     </span>
                   ),
                 },

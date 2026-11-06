@@ -24,6 +24,8 @@ export interface RemoteTask {
   status: string;
   result: string;
   error: string | null;
+  /** Where the agent runs, in a task's detail; older hosts omit it. */
+  host?: string | null;
   startedAt: string;
   prompts: PendingUserPrompt[];
   activity: string[];

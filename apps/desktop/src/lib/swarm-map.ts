@@ -26,6 +26,8 @@ export interface SwarmAgent {
   detail: string;
   /** The planned task this work belongs to. */
   plan: string | null;
+  /** The host the work runs on, once it has started. */
+  host: string | null;
   files: string[];
   /** Files reported only partially by the swarm Worker. */
   truncated: boolean;
@@ -132,6 +134,7 @@ export function swarmMap({
       phase,
       detail,
       plan: planOfTask.get(run.taskId) ?? null,
+      host: run.host?.name ?? run.remote?.computerName ?? null,
       files: fork && !fork.error ? fork.files.map((file) => file.path) : [],
       truncated: fork?.truncated ?? false,
       conflicts: 0,
@@ -151,6 +154,7 @@ export function swarmMap({
       phase: 'queued',
       detail: item.dependencies.length ? 'Waiting for the work it depends on' : 'Waiting to start',
       plan: item.featureId ? (plans.get(item.featureId)?.title ?? null) : (item.feature ?? null),
+      host: null,
       files: item.scopes,
       truncated: false,
       conflicts: 0,
