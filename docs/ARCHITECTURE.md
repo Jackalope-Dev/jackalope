@@ -80,6 +80,7 @@ names; changes must preserve both sides and old saved records.
 | bot_hub.rs, bot_hub/ | Mirrored bot directory, wake-ups, bot-to-bot hand-offs, cards and suggestions over persona live sessions |
 | desktop_control.rs, desktop_control/, resources/gnome-extension/ | Attempt-scoped window, app and desktop grants, remembered project permissions, resident native helpers, accessibility refs, capture and guarded Windows/macOS/X11/GNOME 46 Wayland input |
 | computers.rs, computers/, desktop_control/computer.rs, resources/computer/ | Bot, task and project computers: provider trait, local Docker sandboxes, paired cloud machines, Agent37 machines, the in-sandbox agent image, run routing for desktop and browser tools, and the run protocol, command translation and sign-ins for agents on a computer |
+| computers/runner.rs, computers/policy.rs | The control plane / runner boundary for agents on a computer: runner capability negotiation, the table of where each bridge tool executes, and the device's answers to the runner's policy callbacks and events |
 | tasks/remote.rs | The attempt side of an agent on a project computer: upload, output relay, stop and quota, and applying its changes before the local completion path |
 | knowledge.rs, monitors.rs | Project lessons/workflows, immutable task context receipts and local Git change checks |
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
@@ -102,6 +103,21 @@ owns the bundled agent-browser daemon, process tree and disposable profile. Nati
 MCP and HTTP handlers use the same seven tools and existing screenshot artifacts.
 The daemon is a pinned local implementation detail, not a hosted service or an
 agent-supplied executable. See [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
+
+An agent on a computer splits one attempt across two planes. This device is the
+control plane: it keeps identity and credentials, approvals and policy (including
+autonomy deciders), orchestration, history and review, and the final Git integration,
+and it never runs a tool against the computer's workspace. The computer's agent
+(`resources/computer/agent.py`) is the runner, the execution plane: it owns the
+uploaded workspace and everything that touches it. They speak one versioned run
+protocol (`runs` in `run_status`); from protocol 4 the runner lists `capabilities`,
+and each behaviour past protocol 3 is enabled only by a listed capability, so older
+images keep their earlier behaviour. `computers/runner.rs` places every bridge tool
+as Workspace (served by the runner's local bridge when it has the capability) or
+Control (forwarded to this device through the relay queue). The runner asks this
+device before anything a person or rule governs through `POST /v1/policy` (kinds
+`tool`, `site`, `secret`); anything but an explicit allow, including no answer, is a
+refusal. See [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
 
 `desktop_control.rs` separately owns explicit window, app and desktop grants, the
 session's resident helper process and a single desktop input lease. Both transports share task authorization, cancellation and snapshot

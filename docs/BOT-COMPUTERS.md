@@ -29,7 +29,9 @@ belongs to a bot with a computer, or belongs to a task that was given one, in th
   desktop. `select` is unavailable; `invoke` and element `focus` click the element.
 - Browser tools drive the computer's Chromium through its DevTools endpoint when the
   computer is a local sandbox with networking on. Otherwise they keep the task's own
-  local browser, except for an agent running on the computer, which then has none.
+  local browser, except for an agent running on the computer, which uses its runner's
+  browser on every computer type or, on an image before runs protocol 4, has none (see
+  [agents on a computer](#agents-on-a-computer)).
 - Every website the agent reaches in the computer, through either tool, asks the person
   once per task: allow for this task, always allow, decline, or never allow. Saved
   decisions use the bot's key (`bot:<id>`, shared with the bot's browser profile) or the
@@ -170,8 +172,9 @@ defaults to one the app picks, the secret, which can be replaced, and an optiona
 page address. Pairing checks the agent first. The secret is stored in protected storage
 (`computers/machines/<id>.bin`), never in `machines.json`. **Test connection** repeats the
 check. A paired machine belongs to at most one bot, and cannot be removed while a bot
-uses it. Its viewer opens in the person's browser and asks for its VNC password. Browser
-tools stay on the task's local browser for cloud machines; `desktop_control` and
+uses it. Its viewer opens in the person's browser and asks for its VNC password. A
+bot's or task's browser tools stay on the task's local browser for cloud machines (an
+agent running on the machine uses its runner's); `desktop_control` and
 `computer_exec` reach the machine. Anyone holding the secret can run commands there.
 
 ## Agents on a computer
@@ -239,52 +242,109 @@ from the translated command and are kept even when the value looks like a local 
 but never replace a sign-in variable or one of Jackalope's own `JACKALOPE_*` variables.
 The attempt's activity names the secrets the agent received, never their values.
 
-The Jackalope bridge reaches agents on a computer through a relay (`computers/relay.rs`
-and the run's supervisor in `agent.py`). The supervisor serves the bridge on a free
-`127.0.0.1` port inside the computer with a random secret of its own, which replace
-`JACKALOPE_BRIDGE_URL`, `JACKALOPE_BRIDGE_TOKEN` and the bridge address in the agent's
-MCP configuration. Each request it receives (at most 64 KB, 32 waiting) is handed to
-Jackalope by the next output read, which then returns early, and forwarded to the local
-bridge with the attempt's real credential on its own thread, so a long call such as
-`ask_user` does not stall output. Answers go back through `run_answer`, at most 512 KB
-each; a call unanswered for 40 minutes gets a timeout. A larger MCP tool call, or an
-answer above 512 KB, comes back to the agent as a tool error that says nothing ran (for
-a request) or that the call ran and to ask for less (for an answer), not as a timeout or
-transport failure. The bridge credential never
-leaves this device, and requests carrying an `Origin` header are refused. Peers,
-messages, questions, `propose_subtask`, plan deviations, agreements, validation steps,
-decisions and Jev questions work as for a local agent. `desktop_control`, `computer_exec`
-and `computer_request` act on the computer the agent runs on, as for a bot's computer,
-with the same per-site questions saved under the project. The browser tools drive that
-computer's Chromium when it is a local sandbox with networking on, so a server the agent
-starts there is reachable at `localhost`; on a cloud machine or an Agent37 computer they
-are unavailable, because no DevTools endpoint reaches this device and the task's local
-browser would be the wrong machine. Tools that are unavailable are left out of the tool
-list, refused when called, and named in the agent's instructions:
+This device is the control plane of an agent on a computer: it keeps the sign-ins and
+credentials, approvals and policy (including autonomy deciders), orchestration, history
+and review, and the final Git integration. The computer's agent (`agent.py`) is the
+run's runner, which owns the uploaded workspace and the tools that touch it. The run
+protocol is versioned (`runs` in `hello` and `run_status`). From protocol 4 the runner
+also reports `capabilities`, and `computers/runner.rs` turns them into
+`RunnerCapabilities`; each behaviour below that needs one is used only when it is
+listed, so a computer on an older image keeps the protocol 3 behaviour exactly:
 
-| Tool | On a computer |
+| Capability | What the runner does |
 | --- | --- |
-| `desktop_control`, `computer_exec`, `computer_request` | Act on the agent's computer |
-| Browser tools | The computer's Chromium on a local sandbox with networking; otherwise unavailable |
-| `browser_open_profile` | Unavailable: persistent profiles hold this device's sign-ins |
-| `computer_verify`, `verification_output`, `read_context` | Read-only attempts only; otherwise unavailable |
-| `peer_adopt` | Unavailable |
-| On-demand connections over HTTP | `search_tools`, `read_tool`, `read_tool_result` and `execute_tool` reach them on this device |
-| On-demand stdio connections | Writing attempts: run on the computer as the agent's own MCP servers; read-only attempts: on this device through on-demand tools |
-| Directly delivered connections | Withheld |
+| `local-bridge` | Serves the agent's Jackalope MCP server and bridge routes on the computer's loopback, answering the tools placed with the workspace itself |
+| `workspace-tools` | Runs `computer_verify`, `verification_output` and `read_context` in the computer's workspace |
+| `browser` | Runs the browser tools through agent-browser on the computer's Chromium; left out when the image has no agent-browser |
+| `policy-callbacks` | Asks this device before opening a website, and sends the approval hook's questions to `POST /v1/policy` |
 
-`browser_screenshot` saves its capture as evidence in this device's copy of the workspace,
-where the attempt and review show it; its answer gives the agent that file's path, which
-does not exist on the computer, so the agent cannot open the image itself.
+The bridge reaches the agent through a relay (`computers/relay.rs` and the run's
+supervisor in `agent.py`). The supervisor serves the bridge on a free `127.0.0.1` port
+inside the computer with a random secret of its own, which replace
+`JACKALOPE_BRIDGE_URL`, `JACKALOPE_BRIDGE_TOKEN` and the bridge address in the agent's
+MCP configuration; requests without that secret or carrying an `Origin` header are
+refused, and the attempt's real bridge credential never leaves this device. When the
+runner has `local-bridge`, `run_start` names the tools it serves (`local`, with the
+attempt's saved check) and the runner answers their MCP calls and REST routes itself.
+Every other request (at most 64 KB, 32 waiting) is queued, handed to Jackalope by the
+next output read, which then returns early, and forwarded to the local bridge with the
+attempt's credential on its own thread, so a long call such as `ask_user` does not
+stall output. Answers go back through `run_answer`, at most 512 KB each; a call
+unanswered for 40 minutes gets a timeout. A larger MCP tool call, or an answer above
+512 KB, comes back to the agent as a tool error that says nothing ran (for a request) or
+that the call ran and to ask for less (for an answer), not as a timeout or transport
+failure. Answers of tools the runner serves do not pass through the relay, so its limits
+do not apply to them.
 
-`computer_verify`, `verification_output` and `read_context` work on this device's copy
-of the workspace. A writing agent changes its own copy on the computer, so that copy
-would be stale; the saved check runs locally after the changes come back instead. A
-read-only attempt changes nothing, so this device's copy is what it reads, and a swarm
-orchestrator can run the plan's check. `peer_adopt` applies another attempt's changes to
-this device's copy while the agent edits the computer's, which would break the single
-writer of each workspace and be overwritten or conflict when the agent's patch comes
-back.
+Each bridge tool declares in one table (`computers::runner::TOOLS`) whether it executes
+with the workspace or on the control plane; `coordination_mcp`'s tests keep the table
+complete. With the runner's capabilities it gives the agent's tool list, what the relay
+refuses, the agent's instructions and the attempt's activity line, which names the
+runner's protocol and capabilities, the tools that run on the computer and those that
+are unavailable there. Unavailable tools are left out of the tool list and refused when
+called; a workspace tool that should have run on the computer and reaches this device
+is refused rather than run against this device's copy:
+
+| Tool | Placement | Protocol 4 runner with the capability | Older runner |
+| --- | --- | --- | --- |
+| `computer_verify`, `verification_output`, `read_context` | Workspace (`workspace-tools`) | Writing attempts: on the computer. Read-only attempts: this device's identical copy | Read-only attempts only; otherwise unavailable |
+| Browser tools | Workspace (`browser`, with `policy-callbacks`) | On the computer, every computer type | The computer's Chromium from this device on a local sandbox with networking; otherwise unavailable |
+| `browser_open_profile`, `peer_adopt`, `permission_prompt` | This device only | Unavailable | Unavailable |
+| `desktop_control`, `computer_exec`, `computer_request` | Control | Act on the agent's computer, as for a bot's computer | Same |
+| Peers, messages, `ask_user` and `user_response`, `request_human_action`, `propose_subtask`, plan deviations, agreements, validation steps, decisions, Jev questions, bot tools | Control | This device, as for a local agent | Same |
+| On-demand connections over HTTP | Control | `search_tools`, `read_tool`, `read_tool_result` and `execute_tool` reach them on this device | Same |
+| On-demand stdio connections | Not bridge tools | Writing attempts: run on the computer as the agent's own MCP servers; read-only attempts: on this device through on-demand tools | Same |
+| Directly delivered connections | Not bridge tools | Withheld | Withheld |
+
+A read-only attempt (a planner, a swarm orchestrator) keeps the workspace tools on this
+device: it changes nothing, so this device's copy is what it reads, and the plan's check
+result is recorded where the planning round reads it. `peer_adopt` applies another
+attempt's changes to this device's copy while the agent edits the computer's, which
+would break the single writer of each workspace and be overwritten or conflict when the
+agent's patch comes back; `browser_open_profile` opens profiles holding this device's
+sign-ins.
+
+On the computer, `computer_verify` runs the project's saved check, the same command
+Project settings saves for the attempt, with `/bin/sh -c` in the workspace without the
+bridge variables, under the same limits as a check here (30 minutes, stopped after 10
+minutes without output, 128,000 bytes kept per stream). Only `{}` or the exact saved
+command is accepted. A passing result is reused while the workspace's Git tree is
+unchanged. Its answer has the same shape as on this device, and the stored result,
+which `verification_output` pages by character, stays in the run folder outside the
+workspace. The attempt's activity records each check's outcome. The saved check still
+runs on this device after the changes come back, as for every attempt. `read_context`
+reads source blocks with the same path rules, limits and block hashes as here; its
+repository search ranks files by plain text matches in the computer's copy rather than
+by this device's symbol map. It is offered only when source context reads are enabled.
+
+The browser tools on the computer start agent-browser (installed in the image at the
+version this app bundles) on the computer's own Chromium, so a server the agent starts
+there is reachable at `localhost`. They take the same requests and give the same answers
+as here. Before opening a site, and on the page each command ends on, the runner asks
+this device through `POST /v1/policy` with kind `site`; the computer's own pages
+(`localhost`, `127.0.0.1`, `::1`) and non-web addresses are not asked about. This device
+answers with the computer's per-site questions and saved decisions (allow for this task,
+always allow, decline, never allow, saved under the project), and a page with a visible
+password field asks the person to sign in through **Watch / take over** instead; while a
+question waits the tool returns that it asked and to call again, and page content is
+withheld until the site is allowed. `browser_screenshot` saves its capture as
+`.jackalope/artifacts/screenshots/<id>.png` in the computer's workspace and returns that
+path, so the agent can open the image. Captures come back with the agent's changes
+(added even when the project's ignore files cover `.jackalope`) and are then listed with
+the attempt and its review, with the name and address the runner reported.
+`browser_navigate` records local pages for review, interactions and tab changes are
+recorded in the activity, and an accessibility inspection adds its validation step, as
+here.
+
+Policy callbacks have explicit kinds. `tool` decides a tool of a stdio connection that
+runs on the computer exactly as `POST /v1/tools/approve` does (see below), and `secret`
+answers whether a named [project secret](AGENT-ACCOUNTS.md#project-secrets) is
+available to agents on computers, never returning its value. The answer is
+`{"behavior":"allow"}` or a denial with a message; the runner treats anything else, an
+unknown kind, an error, a device that cannot be reached or no answer within 1,900
+seconds, as a denial. What the runner's tools did reaches this device as
+`POST /v1/runner/event`, which only adds to the attempt's activity, screenshots and
+validation steps.
 
 Connections selected for the task, project and managed all-project ones such as
 Composio alike, reach an agent on a computer only when they are on-demand. Before
@@ -331,7 +391,7 @@ timeout for first downloads). Entry names are the connection IDs with only lette
 digits, `-` and `_`. A connection whose program is still missing on the computer (an
 unknown command, or uv that cannot be downloaded) is left out and named, with its
 reason, in the activity and in the agent's input. A computer whose agent predates these
-connections (`run_status` without `runs: 3`) runs without them and the activity says to
+connections (`run_status` without `runs` of 3 or more) runs without them and the activity says to
 update its image.
 
 Activity names every connection that runs on the computer, falls back to this device or
@@ -356,7 +416,8 @@ device.
 Tools of stdio connections that run on the computer are not behind the bridge, so for
 Claude Code the computer's agent adds a `PreToolUse` hook for them (`--settings`,
 matching `mcp__<entry>__.*`). The hook (`agent.py mcp-approve`) sends the tool name and
-input through the relay to `POST /v1/tools/approve`, which decides with the same project
+input through the relay to `POST /v1/tools/approve`, or to `POST /v1/policy` with kind
+`tool` when the run has the runner's local bridge, which decides with the same project
 rules, auto-approval and question as Claude Code's permission prompt for that tool on
 this device and records the outcome in the activity. Anything but an explicit allow,
 including a bridge that cannot be reached, denies the call. An input above the relay's
@@ -435,25 +496,30 @@ unavailable. A provider implements the `Provider` trait:
 `computers/agent37.rs` (`agent37`) are the implementations; a VM API provider adds a
 module and a branch in `provider`. `computers/runs.rs` is the run protocol client,
 command translation and patch handling, `computers/relay.rs` the bridge relay,
+`computers/runner.rs` runner capabilities and tool placement, `computers/policy.rs` the
+answers to the runner's policy callbacks and events,
 `computers/credentials.rs` the agent sign-ins for computers, and `tasks/remote.rs` the
 attempt side of an agent on a computer.
 `desktop_control/computer.rs` runs desktop actions on a computer and
 `computers/browser.rs` attaches the computer's browser to the task browser through
-`browser::set_router`, gated by the same site questions.
+`browser::set_router`, gated by the same site questions, which also answer a runner's
+`site` callbacks.
 
-`agent.py` uses only Debian's Python with Pillow, pyatspi, `xdotool`, `wmctrl`, `xclip`
-and `scrot`. It answers the helper protocol's `hello` (`protocol: 1`) and `list`,
+`agent.py` uses only Debian's Python with Pillow, pyatspi, `xdotool`, `wmctrl`, `xclip`,
+`scrot`, and agent-browser for the runner's browser tools. It answers the helper protocol's `hello` (`protocol: 1`) and `list`,
 `snapshot` (AT-SPI elements with screen bounds, at most 300, password text protected),
 `screenshot` (base64 PNG, optional `thumb` width), `click`, `double_click`, `right_click`,
 `drag`, `scroll`, `type`, `set_value`, `press` (`chord` with modifiers and key), `focus`,
 `open_app`, `clipboard_read`, `clipboard_write`, `open_url` and `exec`. `hello` and
-`run_status` also report `runs: 3` for the run actions, which need no display: `workspace_put` (one
+`run_status` also report `runs: 4` and `capabilities` (the `CAPABILITIES` list, one name per line, without
+`browser` when agent-browser is missing) for the run actions, which need no display: `workspace_put` (one
 base64 chunk at a byte offset; the final chunk carries the archive's SHA-256, unpacks
 it rejecting absolute, `..`, `.git` and outside-pointing link entries, and commits it as
 the base), `run_start` (a command with environment and standard input under a detached
 `agent.py supervise` process, optionally with the bridge relay and with `mcp`, the
-selected stdio connections, at most 16; the specification holding credentials is
-deleted once read, and the result lists connections that could not start),
+selected stdio connections, at most 16, and with `local`, the tools the runner serves and
+the saved check; the specification holding credentials is deleted once read, and the
+result lists connections that could not start and the tools the runner serves),
 `run_read` (output after byte offsets and up
 to eight waiting bridge requests, each handed over once unless `reclaim` asks again,
 waiting up to five seconds, with the exit once both streams are read), `run_answer`
@@ -463,7 +529,8 @@ the base, including anything the agent committed) and `run_remove`. The supervis
 holds a lock on the run's `owner` file for its life; a started run whose lock is free and
 which has no exit (its computer restarted) is recorded as `interrupted`. An agent from
 before these actions reports `runs: 1` and answers `run_status` as unsupported; one from
-before stdio connections reports `runs: 2` and no `runs` in `run_status`. Run
+before stdio connections reports `runs: 2` and no `runs` in `run_status`; one from before
+the runner reports `runs: 3` and no capabilities. Run
 actions keep their state in files under `~/.jackalope-runs` and do not take the HTTP
 agent's lock that serializes desktop actions. Snapshots and
 screenshots report the active window and, when Chromium is in front, its current page
@@ -475,7 +542,8 @@ remote debugging, and the HTTP agent when a pairing secret is set.
 
 The image is Jackalope's own definition; it uses no Cua code. It installs Debian
 packages, including Chromium, Xvfb, Openbox, x11vnc, noVNC and websockify, under their
-own licenses, plus Git and Node with the Codex CLI from npm for agents on a computer.
+own licenses, plus Git and Node with the Codex CLI and agent-browser (at the version the
+desktop bundles, checked in `build.rs`) from npm for agents on a computer.
 Claude Code's license does not allow redistributing it, so it is not in the image: the
 first run that needs it installs `@anthropic-ai/claude-code` from npm into the home
 volume (`~/.local`, first on `PATH`) within 100 seconds, which needs networking. The
@@ -494,7 +562,7 @@ desktop `Cargo.toml` and the definition hash from the same files as
 `<version>-<hash>`, so it never runs an image whose definition differs from its own.
 Before pushing, the workflow checks that the image keeps
 `/usr/share/doc/<package>/copyright` for its Debian packages (the slim base keeps them),
-`/usr/share/common-licenses/Apache-2.0`, the Codex package and
+`/usr/share/common-licenses/Apache-2.0`, the Codex package, agent-browser's program and
 `/usr/share/doc/jackalope-computer/NOTICE`, and does not contain Claude Code. Labels
 record the source, revision, version and definition. The package must be public for
 anonymous pulls and Agent37 imports; set that once in the package's settings.
@@ -510,12 +578,17 @@ holds and the quit preference. `cargo test … --lib computers::runs computers::
 tasks::remote` covers command translation with and without the bridge relay,
 credentials, the workspace archive with copied setup files, chunked upload and patch
 checks, line splitting, patch application, the read-only run name, and the relay's
-refusals, tool-list filtering by the computer's browser and read-only access, and
+refusals, tool-list filtering by placement, the computer's browser and read-only access, and
 forwarding with the attempt's credential; `tasks::remote` also covers when stdio
 connections start with a run and that activity and instructions carry no values;
 `mcp::tests` covers the connection policy for computers (where each connection runs,
 command and path translation, `${NAME}` secrets, fallback and withheld reasons, values
-kept out of `Debug`); `coordination_mcp` covers which tools the approval route accepts;
+kept out of `Debug`); `coordination_mcp` covers which tools the approval route accepts
+and that every bridge tool has a placement; `computers::runner` covers capability
+negotiation, including the protocol 3 fallback, and where each tool runs and which reach the
+tool list for each capability set; `computers::relay` also covers forwarding only control
+tools for a runner with the local bridge; `computers::policy` covers the policy kinds,
+secrets answered without values, untrusted event text and finding returned screenshots;
 `agent_context` covers the Jackalope context in the archive and its exclusion from
 returned patches; `coordination::eligibility` covers the
 separate concurrency for computer projects; `computers::agent37` covers keys, instance
@@ -528,7 +601,11 @@ the on-demand CLI install and the run actions: upload, run, read, stop, the orph
 uploads, the bridge relay's hand-over and answers, a run whose supervisor died, stdio
 connections (private launch files, Claude Code and Codex configuration, values absent
 from the command line, run files and patch, request validation, uv install and the
-`python` stand-in) and the approval hook. The
+`python` stand-in), the approval hook, and the runner: capabilities, `local` validation,
+workspace tools answered on the computer while control tools are relayed, the saved check
+and its reuse, stall and stored output, source reads, policy callbacks that allow only an
+explicit allow (including no answer), site questions skipped for the computer's own pages,
+and screenshots saved in the workspace and returned even when ignored. The
 opt-in `local_docker_computer_round_trip -- --ignored --nocapture` builds the image,
 starts a computer, takes a screenshot and snapshot, runs a command, checks the home
 volume survives a restart, runs a stand-in agent on an uploaded workspace with a copied
@@ -536,5 +613,5 @@ setup file and one relayed bridge call, applies its changes, and deletes everyth
 needs Docker and network access. These do not establish installed-app acceptance on each
 operating system, Docker variant or cloud provider, real Claude Code or Codex runs on a
 computer, bridge tools used by a real agent there, stdio connections and their approval
-hook in a real Claude Code or Codex run there, lost-contact recovery against a real
-computer, or a live Agent37 account.
+hook in a real Claude Code or Codex run there, the runner's local bridge and agent-browser
+in a built image, lost-contact recovery against a real computer, or a live Agent37 account.
