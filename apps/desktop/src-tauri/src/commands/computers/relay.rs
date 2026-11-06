@@ -13,8 +13,10 @@
 //! answers workspace tools itself, so they never arrive; desktop control acts
 //! on the run's own computer (see [`crate::commands::computers::for_run`]).
 //! Tools that would act on this device's copy of the workspace or use its
-//! sign-ins are left out of `tools/list` and refused when called, and so is a
-//! workspace tool that should have run on the computer.
+//! sign-ins are refused when called, and so is a workspace tool that should
+//! have run on the computer. The bridge leaves unavailable tools out of
+//! `tools/list` itself, from the attempt's attached placement
+//! ([`super::runner::attach`]).
 
 pub(crate) use super::runner::Access;
 use super::runner::Where;
@@ -141,17 +143,15 @@ impl Relay {
                 ));
                 continue;
             }
-            let (endpoint, token, sender, access, limit) = (
+            let (endpoint, token, sender, limit) = (
                 self.endpoint.clone(),
                 self.token.clone(),
                 self.sender.clone(),
-                self.access.clone(),
                 self.answer_limit,
             );
             let call = call.clone();
             std::thread::spawn(move || {
-                let answer =
-                    super::remote::block(forward(&endpoint, &token, &id, &call, &access, limit));
+                let answer = super::remote::block(forward(&endpoint, &token, &id, &call, limit));
                 let _ = sender.send(answer);
             });
         }
@@ -230,14 +230,7 @@ fn screen(id: &str, call: &Value, access: &Access) -> Option<Answer> {
     Some(Answer::refused(id, request.as_ref(), 403, message))
 }
 
-async fn forward(
-    endpoint: &str,
-    token: &str,
-    id: &str,
-    call: &Value,
-    access: &Access,
-    limit: usize,
-) -> Answer {
+async fn forward(endpoint: &str, token: &str, id: &str, call: &Value, limit: usize) -> Answer {
     let request = decoded_json(call);
     let failed = |message: &str| Answer::refused(id, request.as_ref(), 502, message);
     let method = match call["method"].as_str() {
@@ -296,14 +289,6 @@ async fn forward(
             ))
         }
     };
-    let body = if request
-        .as_ref()
-        .is_some_and(|r| r["method"] == "tools/list")
-    {
-        without_unavailable_tools(&body, &content_type, access)
-    } else {
-        body
-    };
     if body.len() > limit {
         return failed(&if limit == ANSWER_LIMIT {
             ANSWER_TOO_LARGE.to_string()
@@ -316,43 +301,6 @@ async fn forward(
         status,
         content_type,
         body,
-    }
-}
-
-/// Removes unavailable tools from a `tools/list` answer, sent as JSON or as
-/// server-sent events.
-pub(crate) fn without_unavailable_tools(
-    body: &[u8],
-    content_type: &str,
-    access: &Access,
-) -> Vec<u8> {
-    let filter = |text: &str| -> Option<String> {
-        let mut message: Value = serde_json::from_str(text).ok()?;
-        let tools = message["result"]["tools"].as_array_mut()?;
-        tools.retain(|tool| {
-            !tool["name"]
-                .as_str()
-                .is_some_and(|name| access.tool_unavailable(name))
-        });
-        Some(message.to_string())
-    };
-    let Ok(text) = std::str::from_utf8(body) else {
-        return body.to_vec();
-    };
-    if content_type.starts_with("text/event-stream") {
-        let mut lines = Vec::new();
-        for line in text.split('\n') {
-            match line
-                .strip_prefix("data:")
-                .and_then(|data| filter(data.trim()))
-            {
-                Some(filtered) => lines.push(format!("data: {filtered}")),
-                None => lines.push(line.to_string()),
-            }
-        }
-        lines.join("\n").into_bytes()
-    } else {
-        filter(text).map_or_else(|| body.to_vec(), String::into_bytes)
     }
 }
 
@@ -495,20 +443,13 @@ mod tests {
             403
         );
         // The tool list still offers them, since the computer serves them.
-        let list = json!({"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"browser_tabs"},{"name":"computer_verify"},{"name":"peer_adopt"}]}});
-        let filtered: Value = serde_json::from_slice(&without_unavailable_tools(
-            list.to_string().as_bytes(),
-            "application/json",
-            &current,
-        ))
-        .unwrap();
-        let names: Vec<&str> = filtered["result"]["tools"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|tool| tool["name"].as_str().unwrap())
-            .collect();
-        assert_eq!(names, ["browser_tabs", "computer_verify"]);
+        assert_eq!(
+            super::super::runner::offered(
+                &current,
+                ["browser_tabs", "computer_verify", "peer_adopt"]
+            ),
+            ["browser_tabs", "computer_verify"]
+        );
     }
 
     #[test]
@@ -651,43 +592,13 @@ connection: close
 
     #[test]
     fn tool_lists_omit_unavailable_tools() {
-        let list = json!({"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"peers"},{"name":"browser_tabs"},{"name":"desktop_control"},{"name":"ask_user"}]}});
-        let names = |body: &[u8]| -> Vec<String> {
-            let text = std::str::from_utf8(body).unwrap();
-            let json = text.trim().strip_prefix("data: ").unwrap_or(text);
-            serde_json::from_str::<Value>(json).unwrap()["result"]["tools"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|tool| tool["name"].as_str().unwrap().to_string())
-                .collect()
-        };
-        let filtered =
-            without_unavailable_tools(list.to_string().as_bytes(), "application/json", &writer());
-        assert_eq!(names(&filtered), ["peers", "desktop_control", "ask_user"]);
-        let browser = &access(true, false);
-        let filtered =
-            without_unavailable_tools(list.to_string().as_bytes(), "application/json", browser);
+        use super::super::runner::offered;
+        let names = ["peers", "browser_tabs", "desktop_control", "ask_user"];
         assert_eq!(
-            names(&filtered),
-            ["peers", "browser_tabs", "desktop_control", "ask_user"]
-        );
-        let events = format!("event: message\ndata: {list}\n\n");
-        let filtered = without_unavailable_tools(events.as_bytes(), "text/event-stream", &writer());
-        let data = std::str::from_utf8(&filtered)
-            .unwrap()
-            .lines()
-            .find(|line| line.starts_with("data:"))
-            .unwrap()
-            .to_string();
-        assert_eq!(
-            names(data.as_bytes()),
+            offered(&writer(), names),
             ["peers", "desktop_control", "ask_user"]
         );
-        assert_eq!(
-            without_unavailable_tools(b"not json", "application/json", &writer()),
-            b"not json"
-        );
+        assert_eq!(offered(&access(true, false), names), names);
     }
 
     #[test]
@@ -738,8 +649,9 @@ connection: close
             std::thread::sleep(Duration::from_millis(20));
         }
         assert_eq!(answers.len(), 1);
+        // The bridge's own answer is passed on as it is.
         let body: Value = serde_json::from_slice(&answers[0].body).unwrap();
-        assert_eq!(body["result"]["tools"].as_array().unwrap().len(), 1);
+        assert_eq!(body["result"]["tools"].as_array().unwrap().len(), 2);
         let (headers, body) = server.join().unwrap();
         assert!(headers
             .iter()

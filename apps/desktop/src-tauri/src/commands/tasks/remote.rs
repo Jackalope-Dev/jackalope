@@ -256,7 +256,12 @@ impl TaskRuntime {
         if let Some(local) = local.clone() {
             parts.insert("local".into(), local);
         }
-        let started = session.start(&argv, &env, &input, relayed.is_some(), &parts)?;
+        runner::attach(id, access.clone());
+        let started = session.start(&argv, &env, &input, relayed.is_some(), &parts);
+        if started.is_err() {
+            runner::detach(id);
+        }
+        let started = started?;
         let immediate = started.exit;
         if relayed.is_some() {
             let placement = placement_activity(
@@ -320,6 +325,7 @@ impl TaskRuntime {
             },
             None => self.follow_remote(id, adapter, &mut session, &computer, launched, &mut relay),
         };
+        runner::detach(id);
         let exit = followed.exit.as_ref();
         let code = exit
             .and_then(|exit| exit["code"].as_i64())

@@ -1504,6 +1504,17 @@ impl ServerHandler for CoordinationTools {
             .authorized_run(&headers)
             .map_err(bridge_error)?;
         let mut tools = self.tool_router.list_all();
+        // Where the attempt's runner places each tool; an attempt on this
+        // device is offered all of them.
+        let placement = super::computers::runner::for_run(&run.id);
+        let offered = super::computers::runner::offered(
+            &placement,
+            tools.iter().map(|tool| tool.name.as_ref()),
+        )
+        .into_iter()
+        .map(str::to_string)
+        .collect::<std::collections::HashSet<_>>();
+        tools.retain(|tool| offered.contains(tool.name.as_ref()));
         if !super::bot_hub::installed().is_some_and(|hub| hub.is_bot_run(&run)) {
             tools.retain(|tool| !super::bot_hub::BOT_TOOLS.contains(&tool.name.as_ref()));
         }

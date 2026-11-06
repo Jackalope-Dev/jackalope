@@ -13,9 +13,18 @@
 //! the runner's capabilities to decide, per run, which tools the runner
 //! serves, which are forwarded to this device through the relay
 //! ([`super::relay`]), and which are unavailable.
+//!
+//! An attempt whose agent runs on this device has a runner too: the task
+//! runtime's local runner (`tasks::runner`), which reports [`DEVICE`] and
+//! every workspace capability, so the same table and the same [`Access`]
+//! decide its tools. Each running attempt's [`Access`] is registered
+//! ([`attach`]), and the bridge offers each attempt the tools it allows.
 
 use serde_json::{json, Value};
-use std::collections::BTreeSet;
+use std::{
+    collections::{BTreeSet, HashMap},
+    sync::{Mutex, OnceLock},
+};
 
 /// The runs protocol from which a runner reports capabilities.
 pub(crate) const CAPABILITIES_PROTOCOL: u64 = 4;
@@ -34,6 +43,10 @@ pub(crate) const GIT_SYNC: &str = "git-sync";
 /// Content-addressed, chunked and resumable transfers (`artifact_*`, see
 /// [`super::artifacts`]).
 pub(crate) const ARTIFACTS: &str = "artifacts";
+/// The runner is this device: the workspace, account profiles and sign-ins
+/// are this device's own, so tools placed [`Placement::DeviceOnly`] are
+/// available. Only the local runner has it; a computer cannot claim it.
+pub(crate) const DEVICE: &str = "device";
 
 /// What a computer's runner reported it can do.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -56,13 +69,30 @@ impl RunnerCapabilities {
                 .into_iter()
                 .flatten()
                 .filter_map(Value::as_str)
-                .filter(|name| name.len() <= 64)
+                .filter(|name| name.len() <= 64 && *name != DEVICE)
                 .map(str::to_string)
                 .collect()
         } else {
             BTreeSet::new()
         };
         Self { protocol, names }
+    }
+
+    /// The local runner: this device, with every workspace capability.
+    pub fn device() -> Self {
+        Self {
+            protocol: CAPABILITIES_PROTOCOL,
+            names: [
+                DEVICE,
+                LOCAL_BRIDGE,
+                WORKSPACE_TOOLS,
+                BROWSER,
+                POLICY_CALLBACKS,
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        }
     }
 
     pub fn has(&self, name: &str) -> bool {
@@ -233,6 +263,20 @@ pub(crate) struct Access {
 }
 
 impl Access {
+    /// An attempt whose runner is this device.
+    pub fn device(read_only: bool) -> Self {
+        Self {
+            runner: RunnerCapabilities::device(),
+            devtools: false,
+            read_only,
+        }
+    }
+
+    /// Whether the runner is this device.
+    pub fn on_device(&self) -> bool {
+        self.runner.has(DEVICE)
+    }
+
     /// Whether the runner serves tools itself for this run.
     fn local_bridge(&self) -> bool {
         self.runner.has(LOCAL_BRIDGE)
@@ -241,6 +285,7 @@ impl Access {
     pub fn tool(&self, name: &str) -> Where {
         match placement(name) {
             Control => Where::Device,
+            DeviceOnly if self.on_device() => Where::Runner,
             DeviceOnly => Where::Unavailable,
             // The runner asks about each website, so it drives the browser
             // only when it can ask.
@@ -274,7 +319,11 @@ impl Access {
     pub fn route(&self, route: &str) -> Where {
         let under = |prefix: &str| route == prefix || route.starts_with(&format!("{prefix}/"));
         if DEVICE_ONLY_ROUTES.iter().any(|prefix| under(prefix)) {
-            return Where::Unavailable;
+            return if self.on_device() {
+                Where::Runner
+            } else {
+                Where::Unavailable
+            };
         }
         TOOLS
             .iter()
@@ -309,8 +358,12 @@ impl Access {
         })
     }
 
-    /// What the agent is told about where its tools act.
+    /// What the agent is told about where its tools act. An agent on this
+    /// device is told nothing: its tools act where it runs.
     pub fn instructions(&self) -> String {
+        if self.on_device() {
+            return String::new();
+        }
         let browser = self.tool("browser_navigate");
         let verify = self.tool("computer_verify");
         let mut text = String::from("\nYou run on a separate computer, not on the person's device. Jackalope's coordination, question and planning tools work as usual and reach the person's device. desktop_control acts on this computer's own screen.");
@@ -360,6 +413,46 @@ impl Access {
         }
         text
     }
+}
+
+type Attached = Mutex<HashMap<String, Access>>;
+static ATTACHED: OnceLock<Attached> = OnceLock::new();
+
+fn attached() -> std::sync::MutexGuard<'static, HashMap<String, Access>> {
+    ATTACHED
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// Records where a running attempt's tools run, before its agent starts.
+pub(crate) fn attach(run_id: &str, access: Access) {
+    attached().insert(run_id.to_string(), access);
+}
+
+/// Forgets a finished attempt's placement.
+pub(crate) fn detach(run_id: &str) {
+    attached().remove(run_id);
+}
+
+/// Where a running attempt's tools run. An attempt that is not attached, such
+/// as a bot conversation or a helper, runs on this device.
+pub(crate) fn for_run(run_id: &str) -> Access {
+    attached()
+        .get(run_id)
+        .cloned()
+        .unwrap_or_else(|| Access::device(false))
+}
+
+/// The tools among `names` an attempt with `access` is offered, in order.
+pub(crate) fn offered<'a>(
+    access: &Access,
+    names: impl IntoIterator<Item = &'a str>,
+) -> Vec<&'a str> {
+    names
+        .into_iter()
+        .filter(|name| !access.tool_unavailable(name))
+        .collect()
 }
 
 #[cfg(test)]
@@ -538,6 +631,44 @@ mod tests {
             assert_eq!(legacy.route(route), before, "{route}");
             assert_eq!(current.route(route), now, "{route}");
         }
+    }
+
+    #[test]
+    fn the_device_runner_offers_every_tool_and_adds_no_instructions() {
+        for read_only in [false, true] {
+            let device = Access::device(read_only);
+            assert!(device.on_device());
+            for tool in TOOLS {
+                assert!(!device.tool_unavailable(tool.name), "{}", tool.name);
+            }
+            for name in ["browser_open_profile", "peer_adopt", "permission_prompt"] {
+                assert_eq!(device.tool(name), Where::Runner, "{name}");
+            }
+            assert_eq!(device.tool("ask_user"), Where::Device);
+            assert!(device.instructions().is_empty());
+            assert_eq!(device.route("/v1/peers/adopt"), Where::Runner);
+            assert_eq!(device.route("/v1/native/output"), Where::Runner);
+        }
+        // A computer cannot claim to be this device.
+        let claimed = runner(4, &[DEVICE, LOCAL_BRIDGE, BROWSER]);
+        assert!(!claimed.has(DEVICE));
+        let access = Access {
+            runner: claimed,
+            ..Access::default()
+        };
+        assert!(!access.on_device());
+        assert!(access.tool_unavailable("peer_adopt"));
+    }
+
+    #[test]
+    fn attached_attempts_keep_their_placement_until_detached() {
+        let id = format!("attached-{}", uuid::Uuid::new_v4());
+        assert!(for_run(&id).on_device());
+        attach(&id, Access::default());
+        assert!(!for_run(&id).on_device());
+        assert!(for_run(&id).tool_unavailable("browser_navigate"));
+        detach(&id);
+        assert!(for_run(&id).on_device());
     }
 
     #[test]
