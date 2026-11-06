@@ -132,7 +132,11 @@ fn short(value: &Value, limit: usize) -> String {
 }
 
 /// Records what one workspace tool did on the computer in the attempt.
-pub(crate) fn record_event(runtime: &TaskRuntime, run: &TaskRun, event: &Value) -> Result<(), String> {
+pub(crate) fn record_event(
+    runtime: &TaskRuntime,
+    run: &TaskRun,
+    event: &Value,
+) -> Result<(), String> {
     let computer = run
         .remote
         .as_ref()
@@ -154,7 +158,10 @@ pub(crate) fn record_event(runtime: &TaskRuntime, run: &TaskRun, event: &Value) 
                 }
             };
             runtime.update(&run.id, |run| {
-                activity(run, &format!("Ran the saved check on {computer}: {outcome}."))
+                activity(
+                    run,
+                    &format!("Ran the saved check on {computer}: {outcome}."),
+                )
             });
         }
         "browser_navigate" => {
@@ -195,7 +202,10 @@ pub(crate) fn record_event(runtime: &TaskRuntime, run: &TaskRun, event: &Value) 
         "browser_interact" => {
             let summary = short(&event["summary"], 300);
             runtime.update(&run.id, |run| {
-                activity(run, &format!("Browser interaction on {computer}: {summary}"))
+                activity(
+                    run,
+                    &format!("Browser interaction on {computer}: {summary}"),
+                )
             });
         }
         "browser_tabs" => runtime.update(&run.id, |run| {
@@ -255,7 +265,10 @@ mod tests {
     fn policy_kinds_are_explicit() {
         assert_eq!(Kind::parse(&json!({"kind":"tool"})).unwrap(), Kind::Tool);
         assert_eq!(Kind::parse(&json!({"kind":"site"})).unwrap(), Kind::Site);
-        assert_eq!(Kind::parse(&json!({"kind":"secret"})).unwrap(), Kind::Secret);
+        assert_eq!(
+            Kind::parse(&json!({"kind":"secret"})).unwrap(),
+            Kind::Secret
+        );
         for body in [json!({}), json!({"kind":"everything"}), json!({"kind":1})] {
             assert!(Kind::parse(&body).is_err(), "{body}");
         }

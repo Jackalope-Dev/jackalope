@@ -109,21 +109,61 @@ use Placement::{Control, DeviceOnly, Workspace};
 /// Every bridge tool and where it executes. A tool missing here is treated as
 /// [`Placement::Control`]; `coordination_mcp`'s tests keep the table complete.
 pub(crate) const TOOLS: &[Tool] = &[
-    tool("computer_verify", Workspace(WORKSPACE_TOOLS), Some("/v1/computer/verify")),
-    tool("verification_output", Workspace(WORKSPACE_TOOLS), Some("/v1/computer/output")),
+    tool(
+        "computer_verify",
+        Workspace(WORKSPACE_TOOLS),
+        Some("/v1/computer/verify"),
+    ),
+    tool(
+        "verification_output",
+        Workspace(WORKSPACE_TOOLS),
+        Some("/v1/computer/output"),
+    ),
     tool("read_context", Workspace(WORKSPACE_TOOLS), None),
-    tool("browser_navigate", Workspace(BROWSER), Some("/v1/browser/navigate")),
-    tool("browser_screenshot", Workspace(BROWSER), Some("/v1/browser/screenshot")),
-    tool("browser_snapshot", Workspace(BROWSER), Some("/v1/browser/snapshot")),
-    tool("browser_interact", Workspace(BROWSER), Some("/v1/browser/interact")),
-    tool("browser_configure", Workspace(BROWSER), Some("/v1/browser/configure")),
-    tool("browser_inspect", Workspace(BROWSER), Some("/v1/browser/inspect")),
+    tool(
+        "browser_navigate",
+        Workspace(BROWSER),
+        Some("/v1/browser/navigate"),
+    ),
+    tool(
+        "browser_screenshot",
+        Workspace(BROWSER),
+        Some("/v1/browser/screenshot"),
+    ),
+    tool(
+        "browser_snapshot",
+        Workspace(BROWSER),
+        Some("/v1/browser/snapshot"),
+    ),
+    tool(
+        "browser_interact",
+        Workspace(BROWSER),
+        Some("/v1/browser/interact"),
+    ),
+    tool(
+        "browser_configure",
+        Workspace(BROWSER),
+        Some("/v1/browser/configure"),
+    ),
+    tool(
+        "browser_inspect",
+        Workspace(BROWSER),
+        Some("/v1/browser/inspect"),
+    ),
     tool("browser_tabs", Workspace(BROWSER), Some("/v1/browser/tabs")),
-    tool("browser_open_profile", DeviceOnly, Some("/v1/browser/profile")),
+    tool(
+        "browser_open_profile",
+        DeviceOnly,
+        Some("/v1/browser/profile"),
+    ),
     tool("peer_adopt", DeviceOnly, Some("/v1/peers/adopt")),
     tool("permission_prompt", DeviceOnly, None),
     tool("desktop_control", Control, Some("/v1/desktop/control")),
-    tool("computer_request", Control, Some("/v1/bot-computer/request")),
+    tool(
+        "computer_request",
+        Control,
+        Some("/v1/bot-computer/request"),
+    ),
     tool("computer_exec", Control, Some("/v1/bot-computer/exec")),
     tool("ask_jev", Control, Some("/v1/jev/questions")),
     tool("discover_harness_tools", Control, None),
@@ -149,7 +189,11 @@ pub(crate) const TOOLS: &[Tool] = &[
     tool("ask_user", Control, Some("/v1/user-prompt")),
     tool("user_response", Control, Some("/v1/user-prompt/poll")),
     tool("request_human_action", Control, Some("/v1/human-action")),
-    tool("record_validation_step", Control, Some("/v1/validation-step")),
+    tool(
+        "record_validation_step",
+        Control,
+        Some("/v1/validation-step"),
+    ),
     tool("restate_goal", Control, Some("/v1/goal-restatement")),
     tool("record_decision", Control, Some("/v1/decisions")),
 ];
@@ -300,11 +344,16 @@ impl Access {
         };
         let unavailable: Vec<&str> = TOOLS
             .iter()
-            .filter(|tool| matches!(tool.placement, Workspace(_)) && self.tool_unavailable(tool.name))
+            .filter(|tool| {
+                matches!(tool.placement, Workspace(_)) && self.tool_unavailable(tool.name)
+            })
             .map(|tool| tool.name)
             .collect();
         if !unavailable.is_empty() {
-            text.push_str(&format!(" Not available there: {}.", unavailable.join(", ")));
+            text.push_str(&format!(
+                " Not available there: {}.",
+                unavailable.join(", ")
+            ));
         }
         if self.tool("browser_navigate") == Where::Device {
             text.push_str(" The browser tools drive that computer's Chromium from here.");
@@ -366,7 +415,12 @@ mod tests {
         ] {
             assert!(writer.tool_unavailable(name), "{name}");
         }
-        for name in ["desktop_control", "ask_user", "execute_tool", "some_new_tool"] {
+        for name in [
+            "desktop_control",
+            "ask_user",
+            "execute_tool",
+            "some_new_tool",
+        ] {
             assert_eq!(writer.tool(name), Where::Device, "{name}");
         }
         let sandbox = Access {
@@ -377,7 +431,9 @@ mod tests {
         for name in ["browser_tabs", "computer_verify", "read_context"] {
             assert_eq!(sandbox.tool(name), Where::Device, "{name}");
         }
-        assert!(writer.instructions().contains("browser tools are not available"));
+        assert!(writer
+            .instructions()
+            .contains("browser tools are not available"));
         assert!(sandbox.instructions().contains("read-only workspace"));
     }
 
@@ -412,7 +468,10 @@ mod tests {
         assert_eq!(request["tools"][0], "computer_verify");
         assert!(writer.local_request(Some("  ")).unwrap()["check"].is_null());
         let text = writer.instructions();
-        assert!(text.contains("run on this computer") && text.contains(".jackalope/artifacts/screenshots"));
+        assert!(
+            text.contains("run on this computer")
+                && text.contains(".jackalope/artifacts/screenshots")
+        );
         assert!(text.contains("read_context reads this computer's copy"));
         assert!(writer
             .activity("Box", &writer.local_tools())
@@ -447,7 +506,9 @@ mod tests {
         };
         assert!(no_bridge.local_tools().is_empty());
         assert!(no_bridge.tool_unavailable("computer_verify"));
-        assert!(no_bridge.activity("Box", &[]).contains("Not available there"));
+        assert!(no_bridge
+            .activity("Box", &[])
+            .contains("Not available there"));
     }
 
     #[test]
@@ -459,7 +520,11 @@ mod tests {
         };
         for (route, before, now) in [
             ("/v1/browser/navigate", Where::Unavailable, Where::Runner),
-            ("/v1/browser/profile", Where::Unavailable, Where::Unavailable),
+            (
+                "/v1/browser/profile",
+                Where::Unavailable,
+                Where::Unavailable,
+            ),
             ("/v1/computer/verify", Where::Unavailable, Where::Runner),
             ("/v1/computer/output", Where::Unavailable, Where::Runner),
             ("/v1/peers/adopt", Where::Unavailable, Where::Unavailable),

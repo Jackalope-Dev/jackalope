@@ -461,11 +461,25 @@ mod tests {
             read_only: false,
         };
         // Control tools, policy callbacks and runner events are forwarded.
-        for name in ["ask_user", "message", "request_human_action", "execute_tool", "record_decision"] {
+        for name in [
+            "ask_user",
+            "message",
+            "request_human_action",
+            "execute_tool",
+            "record_decision",
+        ] {
             assert!(screen("c", &tool_call(name), &current).is_none(), "{name}");
         }
-        for path in ["/v1/policy", "/v1/runner/event", "/v1/tools/approve", "/v1/human-action"] {
-            assert!(screen("c", &call("POST", path, &json!({})), &current).is_none(), "{path}");
+        for path in [
+            "/v1/policy",
+            "/v1/runner/event",
+            "/v1/tools/approve",
+            "/v1/human-action",
+        ] {
+            assert!(
+                screen("c", &call("POST", path, &json!({})), &current).is_none(),
+                "{path}"
+            );
         }
         // Workspace tools are answered on the computer; one reaching this device is refused.
         for name in ["computer_verify", "browser_navigate", "read_context"] {
@@ -525,7 +539,12 @@ mod tests {
         }
         assert!(screen("c", &call("POST", "/v1/subtasks", &json!({})), &writer()).is_none());
         // Approvals for tools of connections that run on the computer.
-        assert!(screen("c", &call("POST", "/v1/tools/approve", &json!({})), &writer()).is_none());
+        assert!(screen(
+            "c",
+            &call("POST", "/v1/tools/approve", &json!({})),
+            &writer()
+        )
+        .is_none());
         assert!(screen(
             "c",
             &call("GET", "/v1/messages?after=3", &json!({})),

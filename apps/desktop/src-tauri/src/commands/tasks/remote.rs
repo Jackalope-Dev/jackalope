@@ -513,7 +513,9 @@ impl TaskRuntime {
         // a bundle.
         let mut shots = computers::policy::patch_screenshots(patch);
         for artifact in &collected.artifacts {
-            if artifact.path.starts_with(".jackalope/artifacts/screenshots/")
+            if artifact
+                .path
+                .starts_with(".jackalope/artifacts/screenshots/")
                 && !shots.contains(&artifact.path)
             {
                 shots.push(artifact.path.clone());
@@ -975,17 +977,34 @@ mod tests {
             read_only: false,
         };
         let local = current.local_request(Some("pnpm test")).unwrap();
-        let served = vec!["computer_verify".to_string(), "verification_output".to_string()];
+        let served = vec![
+            "computer_verify".to_string(),
+            "verification_output".to_string(),
+        ];
         let text = super::placement_activity(&current, "Box", Some(&local), Some(&served));
-        assert!(text.contains("Run on Box: computer_verify, verification_output."), "{text}");
-        assert!(text.contains("could not run read_context, browser_navigate"), "{text}");
-        assert!(text.contains("Runner protocol 4 (browser, local-bridge, policy-callbacks, workspace-tools)."), "{text}");
+        assert!(
+            text.contains("Run on Box: computer_verify, verification_output."),
+            "{text}"
+        );
+        assert!(
+            text.contains("could not run read_context, browser_navigate"),
+            "{text}"
+        );
+        assert!(
+            text.contains(
+                "Runner protocol 4 (browser, local-bridge, policy-callbacks, workspace-tools)."
+            ),
+            "{text}"
+        );
         let older = crate::commands::computers::relay::Access {
             runner: RunnerCapabilities::from_status(Some(&json!({"runs": 3}))),
             ..current
         };
         let text = super::placement_activity(&older, "Box", None, None);
-        assert!(text.contains("reach this device") && text.contains("Not available there"), "{text}");
+        assert!(
+            text.contains("reach this device") && text.contains("Not available there"),
+            "{text}"
+        );
         assert!(!text.contains("Runner protocol"), "{text}");
     }
 
