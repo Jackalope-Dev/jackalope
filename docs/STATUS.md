@@ -405,10 +405,14 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   [bot computers](BOT-COMPUTERS.md).
 - A project can run its Claude Code and Codex task agents on a computer (**Agents run
   on** in Project settings; beta). The workspace's non-ignored files and copied setup
-  files are uploaded, the agent runs there with a Claude Code token or API key saved for
+  files are uploaded (to a current image as a Git bundle of only what the computer's
+  per-project repository lacks, with the project's history; otherwise, or for
+  repositories a bundle cannot carry such as LFS or shallow clones, as a tar), the
+  agent runs there with a Claude Code token or API key saved for
   computers and without the CLI installed on this device, its output feeds the usual
   parsers and its changes come back as a patch applied to the local workspace before
-  checks, checkpoint, review and integration, which stay on this device. Jackalope's
+  checks, checkpoint, review and integration, which stay on this device; saved output
+  and large bridge answers travel as resumable, hash-checked artifacts. Jackalope's
   bridge tools reach it through a relay that keeps the bridge credential on this device;
   desktop control acts on that computer, and the browser tools drive its Chromium on a
   local sandbox with networking (unavailable on cloud and Agent37 computers). Tools that
@@ -689,7 +693,8 @@ stop are covered by unit tests only. Agents on a computer are covered by unit te
 agent's POSIX run and relay tests and the opt-in Docker trial with a stand-in agent;
 real Claude Code or Codex runs there, bridge, desktop and browser tools used by a real
 agent, planning there, lost-contact
-recovery against a real computer, the template build and instances on a live Agent37
+recovery against a real computer, Git-synced workspaces and artifacts against a built
+image from Windows and macOS hosts, the template build and instances on a live Agent37
 account, and gVisor support for the image's desktop are unverified, and Agent37
 computers have no viewer. The image workflow has not run, so no image is published yet.
 

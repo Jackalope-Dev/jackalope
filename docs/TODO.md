@@ -34,6 +34,13 @@ release dates.
   images) reaching the agent there, desktop control and the browser tools on
   the agent's computer, read-only planners and swarm orchestrators there, stop, quota
   handoff, lost contact, reattach and restart recovery.
+- [ ] Accept Git-synced workspaces on a built image from Windows and macOS hosts: a first
+  bundle with history, a retry and a post-checkpoint attempt sending only deltas, CRLF
+  checkouts under `core.autocrlf`, a task worktree of a large repository falling back
+  to the tar, copied setup files and context arriving and staying out of the result,
+  `.jackalope/artifacts` screenshots coming back, a conflicting result leaving the
+  workspace unchanged with its patch and output saved, two concurrent runs of one
+  project, and an on-demand tool result between 512 KB and 1 MB reaching the agent whole.
 - [ ] Publish the first computer image from `beta`, make its package public, and accept
   a local pull, a cloud machine started from it and an Agent37 registry import.
 - [ ] Give Agent37 computers a viewer through signed port URLs, sizes beyond the default

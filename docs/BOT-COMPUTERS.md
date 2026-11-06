@@ -189,13 +189,15 @@ order, reservations and Git safeguards apply as for a local attempt:
    brought back and applied first; a patch that does not apply is saved as
    `<attempt>.recovered.patch` beside the attempt's history. The workspace's tracked
    files and untracked files Git does not ignore (or, for a folder that is not a
-   repository, the files its ignore files allow) are sent as a tar in 512 KB chunks, at
-   most 512 MB, together with the project's copied setup files such as `.env.local`
-   (regular files of at most 1 MiB each, 8 MB in all) and the
-   [Jackalope context](CORE-WORKFLOW.md#jackalope-context) placed in the workspace: the
-   project's `.jackalope/cloudflare.json` and the newest pasted images under
-   `.jackalope/attachments` (at most 16, 64 MB in all), which the prompt names by
-   workspace-relative path. Other ignored files are not sent.
+   repository, the files its ignore files allow) are sent with the project's copied
+   setup files such as `.env.local` (regular files of at most 1 MiB each, 8 MB in all)
+   and the [Jackalope context](CORE-WORKFLOW.md#jackalope-context) placed in the
+   workspace: the project's `.jackalope/cloudflare.json` and the newest pasted images
+   under `.jackalope/attachments` (at most 16, 64 MB in all), which the prompt names by
+   workspace-relative path. Other ignored files are not sent. They travel one of two
+   ways (see [how workspaces travel](#how-workspaces-travel)): as a Git bundle of only
+   what the computer lacks when its runner supports it, or as a tar in 512 KB chunks,
+   at most 512 MB.
 2. The computer starts if needed, waiting up to 20 minutes (a first image build is slow).
    The agent CLI starts in the uploaded copy with the task's prompt on standard input.
 3. Its output is read about once a second and fed to the same event parsers as a local
@@ -206,11 +208,14 @@ order, reservations and Git safeguards apply as for a local attempt:
    attempt ends as lost contact and its changes stay on the computer until the task is
    continued.
 4. When it ends, its changes since the upload come back as a binary Git patch, checked
-   by SHA-256, and are applied to the local workspace with `git apply`. Changes to the
-   Jackalope context are left out (`--exclude`), so an agent cannot alter it; new files it
-   saved, such as screenshots under `.jackalope/artifacts`, come back and stay ignored by
-   Git, like the same files from a local agent. A patch that does
-   not apply is saved as `<attempt>.remote.patch` and the attempt reports where. An agent
+   by SHA-256 (from a bundle, the patch is rebuilt on this device from the result
+   bundle), and are applied to the local workspace with `git apply`, which changes
+   nothing unless the whole patch applies. Changes to the Jackalope context are left
+   out (`--exclude`), so an agent cannot alter it; new files it saved, such as
+   screenshots under `.jackalope/artifacts`, come back and stay ignored by Git, like
+   the same files from a local agent. A patch that does not apply is saved as
+   `<attempt>.remote.patch` (with a bundle's saved output in `<attempt>.remote.artifacts`)
+   and the attempt reports where. An agent
    stopped because nobody read it for ten minutes, or by a computer restart, ends the
    attempt unsuccessfully, but its changes still come back. Then the attempt completes
    like a local one.
@@ -224,7 +229,65 @@ a computer, launch checks only the agent's adapter and model settings, and this 
 account profiles are neither required nor checked. Automatic routing still chooses among
 agents installed here. The copy lives at `~/.jackalope-runs/w<hash>/workspace`, named
 from the local workspace path, so a continuation reuses the path and the agent's own
-session resumes; the run's folder is removed after its changes come back.
+session resumes; the run's folder is removed after its changes come back (for a bundle,
+with its worktree, branch and refs; the project's repository keeps the commits).
+
+### How workspaces travel
+
+A computer's runner reports its runs protocol and capabilities in `hello` and
+`run_status` (`runs: 4`, `capabilities`). The workspace goes as a Git bundle when the
+runner reports both `git-sync` and `artifacts` (bundles travel as artifacts) and the
+workspace is a Git repository of its own; otherwise it goes as a tar and comes back as a
+patch exactly as described above.
+
+- **Up.** The computer keeps one bare repository per project,
+  `~/.jackalope-runs/.repos/p<hash>.git`, named from the local repository's common Git
+  directory, so every task worktree of a project shares it. `sync_status` lists the base
+  commits it holds (the newest 64). Jackalope records the workspace's tracked files and
+  untracked files Git does not ignore as a synthetic snapshot commit whose parent is
+  `HEAD`, and bundles it without the listed commits this repository also has, so a
+  retry, a continuation or a later attempt after a checkpoint sends only what changed.
+  The snapshot is built in a temporary repository that reads the workspace's objects
+  through `objects/info/alternates` and writes only its own, with its own index and ref,
+  so no commit, object, ref, reflog or index entry is added to the person's repository.
+  Git safeguards are untouched: the person's repository is only read.
+- **On the computer.** `sync_checkout` verifies the bundle, fetches it into the
+  project's repository and checks the run's workspace out as a worktree of it: `HEAD`
+  at the task's base commit on the branch `jackalope/<run>`, the person's uncommitted
+  changes uncommitted, so the agent sees the project's history and `git status` as on
+  this device. Copied setup files and Jackalope context are ignored by Git, so a bundle
+  cannot carry them; they go beside it as a small side tar (an artifact, unpacked with
+  the same path checks as an uploaded tar) and the repository ignores `.jackalope/`.
+- **Back.** `sync_result` commits the working tree as a synthetic result commit on top of
+  whatever the agent committed, leaving out the side tar's files, and bundles it with the
+  uploaded snapshot against the base. Jackalope rebuilds the patch from snapshot to
+  result in a temporary repository and applies it as above, so the agent's commits are
+  flattened into the attempt's own checkpoint as for a tar upload. Files under
+  `.jackalope/artifacts` come back as artifacts (at most 2,000 files, 256 MB), written
+  only after the patch applied and skipped when an identical file is there. Changes the
+  agent made to copied setup files stay on the computer.
+- **Size.** The first bundle of a project carries its history; when the repository's
+  stored history is above 512 MB, or a bundle would be, the workspace goes as a tar
+  instead, as it would have. The returned bundle is limited to 256 MB, like the patch.
+
+A workspace that a bundle cannot represent faithfully goes as a tar, and the activity
+says why: a folder that is not a repository or sits inside another one, a repository
+with no commits, a shallow or partial clone, a SHA-256 repository, or one whose
+attributes assign a Git filter such as LFS (a bundle holds the filtered pointers, not
+the files). A bundle that fails to send falls back to the tar as well. Git runs on this
+device through the same isolated, time-limited Git command as other workspace
+operations, with forward-slash paths in the alternates file so Windows and macOS hosts
+behave alike.
+
+Artifacts are content-addressed (SHA-256) files sent in 512 KB chunks, so no request
+nears the 1 MB body limit whatever their size. `artifact_stat` reports whether the
+computer holds one or how much of it arrived: a stored one is not sent again and an
+interrupted one resumes at its last byte (up to four tries). Downloads append to a
+`.part` file and resume the same way. The computer checks the hash when the last chunk
+arrives and this device checks it before using a download; a mismatch discards the
+partial file and fails the transfer. The computer keeps artifacts in
+`~/.jackalope-runs/.artifacts`, at most 1 GB each, and removes those unused for a day.
+They also carry large bridge answers (see the relay below).
 
 Agents on a computer never use this device's account profiles. They use **Agent sign-ins
 for computers** in Settings → Computers: a Claude Code token from `claude setup-token`
@@ -247,8 +310,10 @@ MCP configuration. Each request it receives (at most 64 KB, 32 waiting) is hande
 Jackalope by the next output read, which then returns early, and forwarded to the local
 bridge with the attempt's real credential on its own thread, so a long call such as
 `ask_user` does not stall output. Answers go back through `run_answer`, at most 512 KB
-each; a call unanswered for 40 minutes gets a timeout. A larger MCP tool call, or an
-answer above 512 KB, comes back to the agent as a tool error that says nothing ran (for
+each, or up to 16 MB when the runner has `artifacts`: a larger answer is uploaded as an
+artifact first and `run_answer` names it. A call unanswered for 40 minutes gets a
+timeout. A larger MCP tool call, or an
+answer above that limit, comes back to the agent as a tool error that says nothing ran (for
 a request) or that the call ran and to ask for less (for an answer), not as a timeout or
 transport failure. The bridge credential never
 leaves this device, and requests carrying an `Origin` header are refused. Peers,
@@ -331,13 +396,15 @@ timeout for first downloads). Entry names are the connection IDs with only lette
 digits, `-` and `_`. A connection whose program is still missing on the computer (an
 unknown command, or uv that cannot be downloaded) is left out and named, with its
 reason, in the activity and in the agent's input. A computer whose agent predates these
-connections (`run_status` without `runs: 3`) runs without them and the activity says to
-update its image.
+connections (`run_status` without `runs` of at least 3) runs without them and the
+activity says to update its image.
 
 Activity names every connection that runs on the computer, falls back to this device or
 is withheld, with its reason and never its values, and the agent's instructions say the
-same. An agent that keeps on-demand connections is told the size limits.
-Results above about 480 KB are captured on this device and returned as a 2,000-character
+same. An agent that keeps on-demand connections is told the size limits, once the run
+knows its computer's runner. With `artifacts`, results arrive whole up to the broker's
+1 MB limit, as on this device. Without it, results above about 480 KB are captured on
+this device and returned as a 2,000-character
 preview with a `resultHandle` for `read_tool_result`, so they fit the relay's answer limit;
 a result that cannot be previewed (an error or non-text content) returns a tool error
 asking for a smaller result. A `read_tool_result` page above the limit is refused with
@@ -434,7 +501,9 @@ unavailable. A provider implements the `Provider` trait:
 `computers/docker.rs` (`local-docker`), `computers/remote.rs` (`remote-machine`) and
 `computers/agent37.rs` (`agent37`) are the implementations; a VM API provider adds a
 module and a branch in `provider`. `computers/runs.rs` is the run protocol client,
-command translation and patch handling, `computers/relay.rs` the bridge relay,
+command translation and patch handling, `computers/runner.rs` the runner's reported
+capabilities, `computers/sync.rs` the Git bundles of `git-sync`, `computers/artifacts.rs`
+the artifact transfers, `computers/relay.rs` the bridge relay,
 `computers/credentials.rs` the agent sign-ins for computers, and `tasks/remote.rs` the
 attempt side of an agent on a computer.
 `desktop_control/computer.rs` runs desktop actions on a computer and
@@ -447,7 +516,8 @@ and `scrot`. It answers the helper protocol's `hello` (`protocol: 1`) and `list`
 `screenshot` (base64 PNG, optional `thumb` width), `click`, `double_click`, `right_click`,
 `drag`, `scroll`, `type`, `set_value`, `press` (`chord` with modifiers and key), `focus`,
 `open_app`, `clipboard_read`, `clipboard_write`, `open_url` and `exec`. `hello` and
-`run_status` also report `runs: 3` for the run actions, which need no display: `workspace_put` (one
+`run_status` also report `runs: 4` and `capabilities` (agent.py's `CAPABILITIES`,
+currently `git-sync` and `artifacts`) for the run actions, which need no display: `workspace_put` (one
 base64 chunk at a byte offset; the final chunk carries the archive's SHA-256, unpacks
 it rejecting absolute, `..`, `.git` and outside-pointing link entries, and commits it as
 the base), `run_start` (a command with environment and standard input under a detached
@@ -457,13 +527,23 @@ deleted once read, and the result lists connections that could not start),
 `run_read` (output after byte offsets and up
 to eight waiting bridge requests, each handed over once unless `reclaim` asks again,
 waiting up to five seconds, with the exit once both streams are read), `run_answer`
-(one bridge answer), `run_status` (whether the run exists, was uploaded and started,
-and its exit), `run_stop`, `workspace_diff` and `workspace_get` (the binary patch from
-the base, including anything the agent committed) and `run_remove`. The supervisor
+(one bridge answer, inline or as a named artifact), `run_status` (whether the run exists,
+was uploaded, synced from a bundle and started, and its exit), `run_stop`,
+`workspace_diff` and `workspace_get` (the binary patch from
+the base, including anything the agent committed) and `run_remove` (for a synced run
+also its worktree, branch and refs). With `artifacts`: `artifact_stat`, `artifact_put`
+(one chunk at an offset, 0 restarting; the chunk that completes the announced size
+checks the SHA-256 the artifact is named by) and `artifact_get` (a chunk from an
+offset). With `git-sync`: `sync_status` (the base commits a project's repository holds),
+`sync_checkout` (verify and fetch an uploaded bundle, check the snapshot's parent is the
+named base, check the worktree out and unpack the side tar) and `sync_result` (the
+result bundle with the snapshot, and the `.jackalope/artifacts` manifest). Runs of one
+project take a lock on its repository while they change it. The supervisor
 holds a lock on the run's `owner` file for its life; a started run whose lock is free and
 which has no exit (its computer restarted) is recorded as `interrupted`. An agent from
 before these actions reports `runs: 1` and answers `run_status` as unsupported; one from
-before stdio connections reports `runs: 2` and no `runs` in `run_status`. Run
+before stdio connections reports `runs: 2` and no `runs` in `run_status`; one from
+before capabilities reports `runs: 3` and none, and keeps the tar and patch. Run
 actions keep their state in files under `~/.jackalope-runs` and do not take the HTTP
 agent's lock that serializes desktop actions. Snapshots and
 screenshots report the active window and, when Chromium is in front, its current page
@@ -517,7 +597,15 @@ connections start with a run and that activity and instructions carry no values;
 command and path translation, `${NAME}` secrets, fallback and withheld reasons, values
 kept out of `Debug`); `coordination_mcp` covers which tools the approval route accepts;
 `agent_context` covers the Jackalope context in the archive and its exclusion from
-returned patches; `coordination::eligibility` covers the
+returned patches; `computers::sync` covers the bundle round trip against a stand-in
+runner repository, deltas against the commits it holds, the snapshot staying out of the
+person's repository, context edits left out, conflicts and bad bundles leaving the
+workspace unchanged, the workspaces that go as files, artifact paths, a session that
+syncs and brings back saved output, and older runners keeping the tar and patch;
+`computers::artifacts` covers chunked uploads, resuming, skipping stored artifacts,
+resumed downloads, hash mismatches and large bridge answers; `computers::runner` covers
+reading capabilities; `mcp_broker` covers lifting the result limit;
+`coordination::eligibility` covers the
 separate concurrency for computer projects; `computers::agent37` covers keys, instance
 creation bodies, states, errors and the template build context.
 `computers::image` covers the published reference and the definition hash shared with
@@ -528,7 +616,10 @@ the on-demand CLI install and the run actions: upload, run, read, stop, the orph
 uploads, the bridge relay's hand-over and answers, a run whose supervisor died, stdio
 connections (private launch files, Claude Code and Codex configuration, values absent
 from the command line, run files and patch, request validation, uv install and the
-`python` stand-in) and the approval hook. The
+`python` stand-in), the approval hook, artifact resume, deduplication and hash checks,
+the git-sync round trip (checkout, history, context and setup files kept out of the
+result, artifacts, deltas, cleanup), refused snapshots and large answers delivered from
+an artifact. The
 opt-in `local_docker_computer_round_trip -- --ignored --nocapture` builds the image,
 starts a computer, takes a screenshot and snapshot, runs a command, checks the home
 volume survives a restart, runs a stand-in agent on an uploaded workspace with a copied
@@ -537,4 +628,5 @@ needs Docker and network access. These do not establish installed-app acceptance
 operating system, Docker variant or cloud provider, real Claude Code or Codex runs on a
 computer, bridge tools used by a real agent there, stdio connections and their approval
 hook in a real Claude Code or Codex run there, lost-contact recovery against a real
-computer, or a live Agent37 account.
+computer, Git-synced workspaces and artifact transfers against a built image from
+Windows and macOS hosts, or a live Agent37 account.
