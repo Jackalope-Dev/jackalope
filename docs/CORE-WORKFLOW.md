@@ -17,8 +17,11 @@ Sharpen in either composer rewrites the draft into a deeper version of the same 
 one-step undo; it runs one helper call on request and never sends (see
 [HELPER.md](HELPER.md#sharpen)).
 
-Project instructions are included; optional guidelines and tool selection remain
-inspectable. Project connection loading must finish before dispatch. An explicitly
+Project instructions (Project settings → Tasks) reach every task agent natively at launch,
+whatever started the work; a resumed agent session is not given them again, and a prompt
+that already contains them (scheduled and remote tasks add them) does not repeat them.
+Optional guidelines and tool selection remain inspectable. Project connection loading must
+finish before dispatch. An explicitly
 empty connection list stays empty through save/restore. Task setup opens existing
 agent, project and connection controls without discarding the draft.
 
@@ -26,6 +29,31 @@ Connected work browses GitHub issues and pull requests, Linear issues and Jira C
 issues. Selecting one prepares an editable draft with its source link; it does not
 start work or update the issue. GitHub uses the existing CLI sign-in. Linear and Jira
 connections are tested before their tokens are saved in protected native storage.
+
+### Jackalope context
+
+Files Jackalope keeps for a project under its `.jackalope` folder reach agents without the
+person committing, copying or pasting them (`commands/agent_context.rs`). After the
+workspace is prepared, every attempt, including a continuation, copies into it the project's
+`.jackalope/cloudflare.json` ([cloud resources](ORCHESTRATION-CAPABILITIES.md#cloud-resources))
+and the pasted images under `.jackalope/attachments` that its prompt names (at most 16, 64 MB
+in all), replacing an older or edited copy and removing a manifest the project no longer has.
+The prompt's absolute paths to those images become workspace-relative. The attempt's
+activity lists what it received. `/.jackalope/` is in the repository's `info/exclude`, so the
+copies never appear in `git status`, task commits, swarm snapshots or integration; a path the
+workspace's Git tracks (the person committed it) or does not ignore is left untouched. Work in
+the project checkout itself needs no copy.
+
+The launch input adds a Jackalope context section of at most 1,200 bytes naming each cloud
+resource and binding, ending with "and N more" when they do not fit, and pointing to the file.
+Project instructions, at most 4,000 characters, come before it. Writing to a context file is
+a risky action, so automatic approval does not approve it, and the next attempt restores the
+file anyway. On a project's computer the context is uploaded with the workspace, and changes
+the agent made to it are left out of what comes back (see
+[bot computers](BOT-COMPUTERS.md#agents-on-a-computer)). Screenshots and other output
+the agent saves under `.jackalope/artifacts` come back and stay out of commits.
+`cargo test --lib agent_context` covers placement, refresh, the committed-file case, Git
+exclusion, the computer archive, patches from a computer and the launch summary's budget.
 
 ## Work and results
 

@@ -1,6 +1,7 @@
 //! Files a user attaches to a prompt. Existing files are referenced by path;
 //! pasted images have no path, so they are written under the project's
 //! `.jackalope/attachments` folder, which Git ignores through info/exclude.
+//! `agent_context` copies the ones a prompt names into its task workspace.
 
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;

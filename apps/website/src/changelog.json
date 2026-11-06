@@ -1,5 +1,17 @@
 [
   {
+    "id": "agents-get-your-project-s-context-automatically",
+    "date": "2026-11-06",
+    "title": "Agents get your project's context automatically",
+    "description": "Project instructions, cloud resources and pasted images reach every agent on its own, in a worktree or on a project's computer, with nothing to commit or paste.",
+    "items": [
+      "Agents see your Cloudflare resources and their bindings at launch, with the full details in .jackalope/cloudflare.json in their workspace.",
+      "Project instructions reach every agent again, whatever started the work.",
+      "Pasted images are copied into the task's workspace, so agents on a computer can open them too.",
+      "Jackalope keeps this context current on every attempt and out of commits."
+    ]
+  },
+  {
     "id": "see-which-agent-is-working",
     "date": "2026-11-06",
     "title": "See which agent is working",

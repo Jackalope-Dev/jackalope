@@ -344,6 +344,8 @@ interface ProjectRecord {
   /** Mirrored one way so a terminal approving a plan uses the app's check. */
   verifyCommand?: string;
   autoVerify?: boolean;
+  /** Project instructions, given to every task agent at launch. */
+  instructions?: string;
   prepareCommand?: string;
   setupFiles?: string[];
   previewCommand?: string;
@@ -382,6 +384,7 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
     editCheck: preferences?.editCheck,
     verifyCommand: preferences?.verifyCommand?.trim() || undefined,
     autoVerify: preferences?.autoVerify,
+    instructions: preferences?.customInstructions?.trim() || undefined,
     prepareCommand: preferences?.prepareCommand?.trim() || undefined,
     setupFiles: preferences?.setupFiles?.length ? preferences.setupFiles : undefined,
     previewCommand: preferences?.previewCommand?.trim() || undefined,

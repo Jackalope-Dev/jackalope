@@ -118,9 +118,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   each other and show status, time, check, changed lines and reported tokens side by side;
   keeping one archives the other finished attempts. Composers accept pasted images, dropped
   files and picked files as editable path lines. Pasted images are saved under the
-  project's Git-excluded `.jackalope/attachments`; project files are referenced relative
-  to the project so isolated worktrees read their own copy. Empty projects offer editable
-  starter requests.
+  project's Git-excluded `.jackalope/attachments` and copied into each task workspace that
+  names them, worktree or computer alike; project files are referenced relative to the
+  project so isolated worktrees read their own copy. Project instructions and the project's
+  Jackalope context (the cloud resources manifest) reach every agent at launch without
+  being committed; see [Jackalope context](CORE-WORKFLOW.md#jackalope-context). Empty
+  projects offer editable starter requests.
   Work rows show elapsed time while an attempt runs, changed lines from a bounded native
   Git count, and an unread marker for finished work not yet opened; work can be marked
   unread again. Sidebar rows keep their width for the title: they mark finished work whose
@@ -638,7 +641,8 @@ Cloud resources (beta) set up R2, D1, KV, Queues, Hyperdrive and Turnstile in th
 Cloudflare account for a project, and declare Durable Objects and a Worker name, from Project
 settings or Project → Swarm. Each resource is found by name before it is created, with per-step
 progress and retry; the result is `.jackalope/cloudflare.json` (names, IDs and a wrangler
-bindings snippet, no secrets). See [cloud resources](ORCHESTRATION-CAPABILITIES.md#cloud-resources).
+bindings snippet, no secrets), which every task agent receives in its workspace and launch
+summary automatically. See [cloud resources](ORCHESTRATION-CAPABILITIES.md#cloud-resources).
 Which product scopes Connect Cloudflare grants, and provisioning against a live account, are
 not yet accepted.
 

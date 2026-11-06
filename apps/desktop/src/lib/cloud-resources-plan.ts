@@ -153,13 +153,3 @@ export function requiredPermissions(kinds: readonly CloudResourceKind[]): string
     ),
   ];
 }
-
-export const AGENT_NOTE =
-  'Cloudflare resources for this project are recorded in .jackalope/cloudflare.json, with a wrangler bindings snippet to merge into wrangler.jsonc.';
-
-/** Project instructions with the manifest note appended once. */
-export function withAgentNote(instructions: string | undefined): string {
-  const current = instructions?.trim() ?? '';
-  if (current.includes('.jackalope/cloudflare.json')) return instructions ?? '';
-  return current ? `${current}\n\n${AGENT_NOTE}` : AGENT_NOTE;
-}

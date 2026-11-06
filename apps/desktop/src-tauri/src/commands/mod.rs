@@ -35,6 +35,7 @@ pub mod workspace_setup;
 pub mod worktree_cleanup;
 pub mod worktree_usage;
 
+pub mod agent_context;
 pub mod agent_decider;
 pub mod agent_install;
 pub mod agent_models;

@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  AGENT_NOTE,
   CLOUD_RESOURCES,
   DEFAULT_KINDS,
   orderedKinds,
@@ -10,7 +9,6 @@ import {
   resourcePrefix,
   SETUP_ORDER,
   validPrefix,
-  withAgentNote,
 } from '../src/lib/cloud-resources-plan.ts';
 
 test('project names become valid resource prefixes', () => {
@@ -62,11 +60,4 @@ test('domains accept lines, commas and pasted URLs', () => {
     'play.example.com',
   ]);
   assert.deepEqual(parseDomains('   '), []);
-});
-
-test('the agent note is added to project instructions once', () => {
-  assert.equal(withAgentNote(undefined), AGENT_NOTE);
-  assert.equal(withAgentNote('Use pnpm.'), `Use pnpm.\n\n${AGENT_NOTE}`);
-  const once = withAgentNote('Use pnpm.');
-  assert.equal(withAgentNote(once), once);
 });

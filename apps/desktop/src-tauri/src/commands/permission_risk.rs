@@ -372,6 +372,9 @@ impl Context {
         if self.git_metadata(path) {
             return risky("it changes Git metadata");
         }
+        if self.jackalope_context(path) {
+            return risky("it changes context Jackalope provides to agents");
+        }
         Routine
     }
 
@@ -463,6 +466,15 @@ impl Context {
         self.resolve(raw).is_some_and(|path| {
             path.strip_prefix(&self.workspace)
                 .is_some_and(|rest| rest == "/.git" || rest.starts_with("/.git/"))
+        })
+    }
+
+    /// Files Jackalope places in the workspace for agents to read; see `agent_context`.
+    fn jackalope_context(&self, raw: &str) -> bool {
+        self.resolve(raw).is_some_and(|path| {
+            path.strip_prefix(&self.workspace)
+                .and_then(|rest| rest.strip_prefix('/'))
+                .is_some_and(crate::commands::agent_context::is_context_path)
         })
     }
 
@@ -2741,6 +2753,27 @@ mod tests {
         asks(
             context.tool("Write", &json!({"file_path": "/work/repo/.git/config"})),
             "git metadata",
+        );
+        asks(
+            context.tool(
+                "Edit",
+                &json!({"file_path": "/work/repo/.jackalope/cloudflare.json"}),
+            ),
+            "jackalope context",
+        );
+        asks(
+            context.tool(
+                "Write",
+                &json!({"file_path": ".jackalope/attachments/a.png"}),
+            ),
+            "jackalope attachment",
+        );
+        routine(
+            context.tool(
+                "Write",
+                &json!({"file_path": "/work/repo/.jackalope/artifacts/screenshots/a.png"}),
+            ),
+            "agent evidence",
         );
         asks(
             context.tool("Edit", &json!({"file_path": "/home/me/.zshrc"})),

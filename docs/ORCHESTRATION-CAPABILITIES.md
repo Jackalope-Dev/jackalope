@@ -404,10 +404,12 @@ kind, name, ID (the bucket name for R2, the site key for Turnstile) and binding,
 wrangler.jsonc fragment under `wrangler`. It holds no secret and is safe to commit. A
 failed run still records what it set up. Jackalope never edits `wrangler.jsonc`; the result
 view offers **Copy bindings**, per-resource copy buttons, the Turnstile secret key read from
-Cloudflare on demand, and a link to the dashboard. **Tell agents** adds one line pointing to
-the manifest to the project instructions. Task preparation excludes `/.jackalope/` from Git
-locally, so the result view shows `git add -f .jackalope/cloudflare.json` when Git ignores
-the manifest; task worktrees include it only once it is committed.
+Cloudflare on demand, and a link to the dashboard. Agents need nothing from the person:
+every attempt receives the manifest as [Jackalope context](CORE-WORKFLOW.md#jackalope-context)
+in its workspace, worktree or computer alike, and its launch input names each resource and
+binding (for example "R2 bucket shop-assets bound as ASSETS") and points to the file. The
+manifest stays ignored by Git there, so it never lands in task commits; committing it
+yourself is optional, and a committed copy is used as it is.
 
 Creating resources needs these account permissions: Workers R2 Storage, D1, Workers KV
 Storage, Queues, Hyperdrive and Turnstile, each Edit. With an API token, a refusal (401, 403

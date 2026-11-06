@@ -272,7 +272,8 @@ impl Session {
 
     /// Uploads the workspace's files: tracked and untracked ones Git does not
     /// ignore, or for a folder that is not a repository, those its ignore files
-    /// allow, plus the copied `setup` files the local workspace was given.
+    /// allow, plus the copied `setup` files the local workspace was given and the
+    /// Jackalope context placed in it.
     pub fn upload(
         &mut self,
         workspace: &Path,
@@ -527,11 +528,20 @@ fn setup_files(
     Ok(files)
 }
 
-/// A tar of the workspace's files and its copied setup files in a temporary file.
+/// A tar of the workspace's files, its copied setup files and the Jackalope
+/// context placed in it, in a temporary file.
 pub(crate) fn archive(workspace: &Path, setup: &[String]) -> Result<std::fs::File, String> {
     let mut files = listed(workspace).unwrap_or_else(|| walked(workspace));
-    let known: HashSet<String> = files.iter().map(|(path, _)| path.clone()).collect();
+    let mut known: HashSet<String> = files.iter().map(|(path, _)| path.clone()).collect();
     files.extend(setup_files(workspace, setup, &known)?);
+    known.extend(files.iter().map(|(path, _)| path.clone()));
+    // Git ignores context in the workspace, so the listing leaves it out.
+    files.extend(
+        crate::commands::agent_context::present(workspace)
+            .into_iter()
+            .filter(|path| !known.contains(path))
+            .map(|path| (path, false)),
+    );
     let file = tempfile_in_temp()?;
     let mut builder = tar::Builder::new(file);
     builder.follow_symlinks(false);
@@ -613,16 +623,18 @@ impl Temporary {
     }
 }
 
-/// Applies a run's patch to the local workspace.
+/// Applies a run's patch to the local workspace. Changes the agent made to
+/// Jackalope context are left out; new files it saved, such as screenshots under
+/// `.jackalope/artifacts`, come back like any other.
 pub(crate) fn apply(workspace: &Path, patch: &[u8]) -> Result<(), String> {
     if patch.is_empty() {
         return Ok(());
     }
-    let mut command = git_command::command(
-        workspace,
-        &["apply", "--binary", "--whitespace=nowarn", "-"],
-        git_command::Policy::Isolated,
-    );
+    let exclusions = crate::commands::agent_context::apply_exclusions();
+    let mut args = vec!["apply", "--binary", "--whitespace=nowarn"];
+    args.extend(exclusions.iter().map(String::as_str));
+    args.push("-");
+    let mut command = git_command::command(workspace, &args, git_command::Policy::Isolated);
     // A folder that is not its own repository must not apply paths relative
     // to an enclosing one.
     if !workspace.join(".git").exists() {
