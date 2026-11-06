@@ -122,7 +122,7 @@ export function ProjectPreferences({
             <SettingBody>
               <FormField
                 label="Project instructions"
-                description="Appended to prompts launched from the task composer."
+                description="Given to every agent that works on this project."
               >
                 <Textarea
                   id="project-instructions"

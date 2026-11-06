@@ -25,8 +25,6 @@ export interface CloudResourceManifest {
 
 export interface CloudResourcesStatus {
   manifest: CloudResourceManifest | null;
-  /** Git ignores the manifest in this checkout. */
-  ignored: boolean;
   postgresSaved: boolean;
   /** The connected Cloudflare account, or null when Cloudflare is not connected. */
   accountId: string | null;

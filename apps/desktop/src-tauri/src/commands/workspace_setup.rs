@@ -24,7 +24,7 @@ fn relative(value: &str) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-fn no_links(root: &Path, relative: &Path) -> Result<PathBuf, String> {
+pub(super) fn no_links(root: &Path, relative: &Path) -> Result<PathBuf, String> {
     let mut current = root.to_path_buf();
     for part in relative.components() {
         current.push(part);

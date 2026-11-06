@@ -16,7 +16,6 @@ import {
 import { Cloud, MoreHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AGENT_NOTE,
   CLOUD_RESOURCES,
   type CloudResourceKind,
   DEFAULT_KINDS,
@@ -27,7 +26,6 @@ import {
   resourceOption,
   resourcePrefix,
   validPrefix,
-  withAgentNote,
 } from '../../lib/cloud-resources-plan';
 import {
   ARTIFACTS_TOKEN_URL,
@@ -101,7 +99,6 @@ export function CloudResources() {
   const project = useProjectStore((state) =>
     state.projects.find((item) => item.id === state.activeProjectId),
   );
-  const updateProjectPreferences = useProjectStore((state) => state.updateProjectPreferences);
   const savedDraft = useCloudResourcesStore((state) =>
     project ? state.drafts[project.id] : undefined,
   );
@@ -270,9 +267,6 @@ export function CloudResources() {
     ? ''
     : `Creating these needs ${permissions.join(', ')} on your Cloudflare connection.`;
   const failure = run?.failure;
-  const agentsKnow = (project.preferences?.customInstructions ?? '').includes(
-    '.jackalope/cloudflare.json',
-  );
 
   return (
     <WorkspacePage className="cloud-resources-page">
@@ -501,40 +495,11 @@ export function CloudResources() {
             ))}
           </ul>
           <pre className="cloud-resources-snippet">{manifest.wrangler}</pre>
-          {status?.ignored && (
-            <InlineNotice
-              tone="warning"
-              action={
-                <CopyButton
-                  text="git add -f .jackalope/cloudflare.json"
-                  label="Copy command"
-                  variant="outline"
-                />
-              }
-            >
-              Git ignores .jackalope/ here, so task worktrees will not include the manifest until
-              you commit it.
-            </InlineNotice>
-          )}
           <div className="cloud-resources-footer">
             <p className="cloud-resources-permission">
-              {agentsKnow
-                ? 'Project instructions point agents to .jackalope/cloudflare.json.'
-                : AGENT_NOTE}
+              Agents get these details and .jackalope/cloudflare.json in every task automatically.
             </p>
             <div className="cloud-resources-actions">
-              {!agentsKnow && (
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    updateProjectPreferences(projectId, {
-                      customInstructions: withAgentNote(project.preferences?.customInstructions),
-                    })
-                  }
-                >
-                  Tell agents
-                </Button>
-              )}
               <Button
                 variant="outline"
                 onClick={() => {

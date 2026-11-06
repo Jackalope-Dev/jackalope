@@ -191,7 +191,11 @@ order, reservations and Git safeguards apply as for a local attempt:
    files and untracked files Git does not ignore (or, for a folder that is not a
    repository, the files its ignore files allow) are sent as a tar in 512 KB chunks, at
    most 512 MB, together with the project's copied setup files such as `.env.local`
-   (regular files of at most 1 MiB each, 8 MB in all). Other ignored files are not sent.
+   (regular files of at most 1 MiB each, 8 MB in all) and the
+   [Jackalope context](CORE-WORKFLOW.md#jackalope-context) placed in the workspace: the
+   project's `.jackalope/cloudflare.json` and the newest pasted images under
+   `.jackalope/attachments` (at most 16, 64 MB in all), which the prompt names by
+   workspace-relative path. Other ignored files are not sent.
 2. The computer starts if needed, waiting up to 20 minutes (a first image build is slow).
    The agent CLI starts in the uploaded copy with the task's prompt on standard input.
 3. Its output is read about once a second and fed to the same event parsers as a local
@@ -202,7 +206,10 @@ order, reservations and Git safeguards apply as for a local attempt:
    attempt ends as lost contact and its changes stay on the computer until the task is
    continued.
 4. When it ends, its changes since the upload come back as a binary Git patch, checked
-   by SHA-256, and are applied to the local workspace with `git apply`. A patch that does
+   by SHA-256, and are applied to the local workspace with `git apply`. Changes to the
+   Jackalope context are left out (`--exclude`), so an agent cannot alter it; new files it
+   saved, such as screenshots under `.jackalope/artifacts`, come back and stay ignored by
+   Git, like the same files from a local agent. A patch that does
    not apply is saved as `<attempt>.remote.patch` and the attempt reports where. An agent
    stopped because nobody read it for ten minutes, or by a computer restart, ends the
    attempt unsuccessfully, but its changes still come back. Then the attempt completes
@@ -265,6 +272,10 @@ list, refused when called, and named in the agent's instructions:
 | On-demand connections over HTTP | `search_tools`, `read_tool`, `read_tool_result` and `execute_tool` reach them on this device |
 | On-demand stdio connections | Read-only attempts only; otherwise withheld |
 | Directly delivered connections | Withheld |
+
+`browser_screenshot` saves its capture as evidence in this device's copy of the workspace,
+where the attempt and review show it; its answer gives the agent that file's path, which
+does not exist on the computer, so the agent cannot open the image itself.
 
 `computer_verify`, `verification_output` and `read_context` work on this device's copy
 of the workspace. A writing agent changes its own copy on the computer, so that copy
@@ -448,7 +459,8 @@ tasks::remote` covers command translation with and without the bridge relay,
 credentials, the workspace archive with copied setup files, chunked upload and patch
 checks, line splitting, patch application, the read-only run name, and the relay's
 refusals, tool-list filtering by the computer's browser and read-only access, and
-forwarding with the attempt's credential; `coordination::eligibility` covers the
+forwarding with the attempt's credential; `agent_context` covers the Jackalope context in
+the archive and its exclusion from returned patches; `coordination::eligibility` covers the
 separate concurrency for computer projects; `computers::agent37` covers keys, instance
 creation bodies, states, errors and the template build context.
 `computers::image` covers the published reference and the definition hash shared with

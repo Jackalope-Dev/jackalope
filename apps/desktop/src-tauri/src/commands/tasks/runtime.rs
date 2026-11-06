@@ -240,6 +240,7 @@ impl TaskRuntime {
         self.timed(id, "workspace", || {
             self.prepare_workspace(id, req, previous.clone())
         })?;
+        self.provide_context(id, req);
         self.update(id, |run| run.progress = None);
         if req.agent == "auto" && !early.is_finished() && self.is_running(id) {
             self.stage(id, Some("routing"));
@@ -305,6 +306,35 @@ impl TaskRuntime {
             }
             request = self.handoff(req, &run)?;
         }
+    }
+
+    /// Places the project's Jackalope context into this attempt's workspace, every
+    /// attempt, so a continuation sees current files. A failure is reported and the
+    /// attempt goes on without them.
+    fn provide_context(&self, id: &str, req: &RunRequest) {
+        let Some(workspace) = self
+            .run_snapshot(id)
+            .map(|run| run.workspace)
+            .filter(|workspace| !workspace.is_empty())
+        else {
+            return;
+        };
+        let placed = crate::commands::agent_context::place(
+            Path::new(&req.project_path),
+            Path::new(&workspace),
+            &req.prompt,
+        );
+        self.update(id, |run| match &placed {
+            Ok(files) if !files.is_empty() => activity(
+                run,
+                &format!("Jackalope context for the agent: {}.", files.join(", ")),
+            ),
+            Ok(_) => {}
+            Err(error) => activity(
+                run,
+                &format!("Jackalope context could not be placed in the workspace: {error}"),
+            ),
+        });
     }
 
     pub(super) fn prepare_workspace(
@@ -1154,7 +1184,25 @@ impl TaskRuntime {
             }
         }
         input.push_str(&remote_connections);
-        input.push_str(&format!("\nTask:\n{}\n", req.prompt));
+        // A resumed session already holds the project instructions; context files can
+        // change between attempts, so their summary is always current.
+        let instructions = previous
+            .is_none()
+            .then(|| crate::commands::project_registry::record(self, &req.project_id))
+            .flatten()
+            .and_then(|project| project.instructions);
+        input.push_str(&crate::commands::agent_context::launch_section(
+            Path::new(&workspace),
+            instructions.as_deref(),
+            &req.prompt,
+        ));
+        input.push_str(&format!(
+            "\nTask:\n{}\n",
+            crate::commands::agent_context::portable_prompt(
+                &req.prompt,
+                Path::new(&req.project_path)
+            )
+        ));
         if adapter == "grok" {
             std::fs::write(self.directory.join(format!("{id}.prompt")), &input)
                 .map_err(|e| e.to_string())?;

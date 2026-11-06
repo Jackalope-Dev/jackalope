@@ -12,7 +12,6 @@
 use super::{
     account_storage,
     cloudflare_artifacts::{self, AccountAccess},
-    git_command::{command, Policy},
     tasks::TaskRuntime,
 };
 use serde::{Deserialize, Serialize};
@@ -21,7 +20,6 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, HashSet},
     path::{Path, PathBuf},
-    process::Stdio,
     sync::Mutex,
     time::Duration,
 };
@@ -80,6 +78,20 @@ impl Kind {
             Kind::Turnstile => "a Turnstile widget",
             Kind::DurableObjects => "Durable Objects",
             Kind::Workers => "a Worker",
+        }
+    }
+
+    /// The resource's name in an agent's launch summary.
+    fn noun(self) -> &'static str {
+        match self {
+            Kind::R2 => "R2 bucket",
+            Kind::D1 => "D1 database",
+            Kind::Kv => "KV namespace",
+            Kind::Queue => "Queue",
+            Kind::Hyperdrive => "Hyperdrive config",
+            Kind::Turnstile => "Turnstile widget",
+            Kind::DurableObjects => "Durable Object class",
+            Kind::Workers => "Worker",
         }
     }
 
@@ -559,6 +571,26 @@ fn read_manifest(project: &Path) -> Result<Option<Manifest>, String> {
     }
 }
 
+/// One clause per resource in the manifest under `folder`, such as "R2 bucket
+/// shop-assets bound as ASSETS", for an agent's launch summary. `None` without a
+/// readable manifest.
+pub(super) fn agent_summary(folder: &Path) -> Option<Vec<String>> {
+    let manifest = read_manifest(folder).ok()??;
+    Some(
+        manifest
+            .resources
+            .iter()
+            .map(|resource| {
+                let mut clause = format!("{} {}", resource.kind.noun(), resource.name);
+                if !resource.binding.is_empty() {
+                    clause.push_str(&format!(" bound as {}", resource.binding));
+                }
+                clause
+            })
+            .collect(),
+    )
+}
+
 /// Rebuilds the manifest from `resources` and writes it beside the project, replacing
 /// it atomically. Removing the last resource removes the file.
 fn write_manifest(
@@ -665,20 +697,6 @@ fn save_postgres_url(
         &path,
         &serde_json::to_vec(&urls).map_err(|e| e.to_string())?,
     )
-}
-
-/// Whether Git would leave the manifest out of commits, so the person knows to add it.
-fn ignored_by_git(project: &Path) -> bool {
-    command(
-        project,
-        &["check-ignore", "--quiet", "--", MANIFEST_PATH],
-        Policy::Inspection,
-    )
-    .stdin(Stdio::null())
-    .stdout(Stdio::null())
-    .stderr(Stdio::null())
-    .status()
-    .is_ok_and(|status| status.success())
 }
 
 struct RunGuard(String);
@@ -891,8 +909,6 @@ async fn run(
 #[serde(rename_all = "camelCase")]
 pub struct Status {
     manifest: Option<Manifest>,
-    /// Git ignores the manifest here (`.jackalope/` is excluded locally).
-    ignored: bool,
     /// A Hyperdrive connection string is saved for this project.
     postgres_saved: bool,
     /// The connected Cloudflare account, when there is one.
@@ -905,13 +921,8 @@ pub async fn cloudflare_resources_status(
     state: State<'_, TaskRuntime>,
 ) -> Result<Status, String> {
     let project = project_folder(&project_path)?;
-    let checked = project.clone();
-    let ignored = tauri::async_runtime::spawn_blocking(move || ignored_by_git(&checked))
-        .await
-        .map_err(|e| e.to_string())?;
     Ok(Status {
         manifest: read_manifest(&project)?,
-        ignored,
         postgres_saved: postgres_urls(&state)?.contains_key(&project_key(&project)),
         account_id: cloudflare_artifacts::connected_account(&state),
     })
