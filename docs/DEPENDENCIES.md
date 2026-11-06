@@ -148,7 +148,7 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | @xterm/xterm | 6.0.0 | MIT |
 | @xyflow/react | 12.12.0 | MIT |
 | @xyflow/system | 0.0.83 | MIT |
-| agent-browser | 0.40.0 | Apache-2.0 |
+| agent-browser | 0.41.1 | Apache-2.0 |
 | aria-hidden | 1.2.6 | MIT |
 | assertion-error | 2.0.1 | MIT |
 | bail | 2.0.2 | MIT |
