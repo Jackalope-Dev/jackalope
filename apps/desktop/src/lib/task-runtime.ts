@@ -238,14 +238,41 @@ export interface ArchivedRun {
   startedAt: string;
   endedAt: string | null;
 }
+/** An agent's answer given on the person's behalf. */
+interface AgentAnswer {
+  kind: 'agent';
+  agent: string;
+  model?: string;
+  /** The answer without the attribution the asking agent received. */
+  answer: string;
+  rationale: string;
+  confidence: number;
+  evidence?: string[];
+  runId?: string;
+}
+
+/** Something only the person can do; never routed to an agent. */
+interface HumanAction {
+  kind: 'secret' | 'sign_in' | 'payment' | 'account' | 'other';
+  instructions: string;
+  url?: string;
+  secretName?: string;
+}
+
 export interface PendingUserPrompt {
   id: string;
   runId: string;
   question: string;
-  inputType: 'text' | 'choice' | 'confirmation' | 'multiChoice';
+  inputType: 'text' | 'choice' | 'confirmation' | 'multiChoice' | 'humanAction';
   options: string[];
   defaultValue?: string | null;
-  status: 'pending' | 'answered';
+  /** `deciding`: an agent decides first; the person may still answer. */
+  status: 'pending' | 'deciding' | 'answered';
+  /** Set when an agent answered for the person. */
+  answeredBy?: AgentAnswer;
+  /** Why it reached the person although agents may decide. */
+  escalation?: { category: string; reason: string };
+  humanAction?: HumanAction;
   answer?: string | null;
   createdAt: string;
   answeredAt?: string | null;

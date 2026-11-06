@@ -578,6 +578,7 @@ impl Call<'_> {
                     allow_other: Some(false),
                     ..Default::default()
                 },
+                autonomy: Default::default(),
             };
             self.push_prompt(&prompt)?;
             self.access.prompt_id = prompt.id;
@@ -723,6 +724,7 @@ impl Call<'_> {
                 allow_other: Some(false),
                 ..Default::default()
             },
+            autonomy: Default::default(),
         };
         self.push_prompt(&prompt)?;
         self.access.snapshot = None;

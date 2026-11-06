@@ -221,4 +221,39 @@ impl Coordinator {
             .find(|task| task.id == id)?;
         Some((task.request.clone(), task.plan.clone()?))
     }
+
+    /// Sends one direct message from Jackalope to the task `run` belongs to. It
+    /// arrives at the agent's next tool response, or with a continuation.
+    pub(crate) fn tell_task(
+        &self,
+        run: &crate::commands::tasks::TaskRun,
+        text: String,
+    ) -> Result<(), String> {
+        self.ensure_storage_loaded()?;
+        let mut inner = self.inner.lock().unwrap();
+        let owner = inner
+            .ledger
+            .items
+            .iter()
+            .find(|item| item.run_id.as_ref() == Some(&run.id))
+            .map_or(run.task_id.clone(), |item| item.id.clone());
+        let mut ledger = inner.ledger.clone();
+        ledger.messages.push(CoordinationMessage {
+            id: Uuid::new_v4().to_string(),
+            project_id: run.project_id.clone(),
+            task_id: "jackalope".into(),
+            kind: "handoff".into(),
+            text,
+            created_at: Utc::now().to_rfc3339(),
+            recipient_task_id: Some(owner),
+            acknowledged_by: vec![],
+            report: None,
+            run_id: Some(run.id.clone()),
+            source_tree: None,
+            resolved_by: None,
+        });
+        self.save(&ledger)?;
+        inner.ledger = ledger;
+        Ok(())
+    }
 }

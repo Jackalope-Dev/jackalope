@@ -318,6 +318,20 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Claude Code; other agents are constrained by prompt and a discarded worktree.
   Installed-provider interviews, plan-to-merge and multi-round swarm acceptance remain
   open.
+- Autonomy in Project settings lets agents decide for the person on approved plans:
+  routine questions from plan work, proposed swarm rounds once the merged round passed its
+  check, and declared deviations inside the plan's scopes. A local classifier sends
+  secrets, payment, sign-ins, accounts, publishing, protected paths, changes of direction
+  and destructive actions to the person; everything else goes to a read-only decider
+  attempt from another model family, whose answer stands only at 70% confidence or more,
+  within a per-plan limit (default 50) and a 3-minute timeout. The asking agent receives
+  the answer marked as an agent's; the plan view and task activity show who decided, why
+  and how sure, with Override, and say why anything was sent to the person. A committed
+  `decide` section in `.jackalope/autonomy.json` can only make it stricter. Agents ask for
+  sign-ins, payment, accounts and secrets with `request_human_action`, which always reaches
+  the person. Isolated work in a repository without commits creates the first commit
+  (leaving out `.env` files and keys); plans also initialize a plain folder. Decider runs
+  with installed agents remain to be accepted on Windows and macOS.
 - Requests continuing with one lead can delegate through available provider subagent
   tools. Unsupported or denied delegation stays sequential. See
   [agent quality](AGENT-QUALITY.md) for boundaries.

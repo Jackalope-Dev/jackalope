@@ -575,6 +575,8 @@ pub fn run(launch: Launch) {
             commands::planning::plan_archive,
             commands::planning::plan_settings_get,
             commands::planning::plan_settings_set,
+            commands::agent_decider::plan_autonomy_override,
+            commands::agent_decider::task_prompt_override,
             commands::planning::plan_create,
             agent_profile_rename,
             agent_profile_delete,

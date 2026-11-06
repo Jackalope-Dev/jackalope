@@ -79,6 +79,10 @@ interface PlanDeviation {
   amendment: string;
   status: 'pending' | 'accepted' | 'redo' | 'replan';
   createdAt: string;
+  /** An agent is deciding whether to accept it for you. */
+  agentDeciding?: boolean;
+  /** The agent that accepted it, when one did. */
+  resolvedBy?: string | null;
 }
 
 export interface PlanVerification {
@@ -98,6 +102,64 @@ export interface PlanSettings {
   askBeforeRounds?: boolean;
   /** The most orchestrators reviewing a swarm round in parallel, 1 to 4. */
   orchestrators?: number;
+  /** What agents may decide for you in this project's plans. */
+  decide?: DecideSettings;
+}
+
+/** The project's Autonomy settings; a committed autonomy policy can only make them stricter. */
+export interface DecideSettings {
+  questions: boolean;
+  rounds: boolean;
+  deviations: boolean;
+  maxAgentDecisions: number;
+  /** `auto` or an agent ID. */
+  decider: string;
+}
+
+export const defaultDecideSettings: DecideSettings = {
+  questions: false,
+  rounds: false,
+  deviations: false,
+  maxAgentDecisions: 50,
+  decider: 'auto',
+};
+
+/** One decision an agent made, or handed to you, on a plan. */
+export interface AutonomyEntry {
+  id: string;
+  kind: 'question' | 'round' | 'deviation';
+  subject: string;
+  runId?: string | null;
+  promptId?: string | null;
+  deviationId?: string | null;
+  outcome: 'deciding' | 'decided' | 'escalated' | 'person';
+  answer?: string | null;
+  decider?: string | null;
+  deciderRunId?: string | null;
+  rationale: string;
+  confidence?: number | null;
+  evidence: string[];
+  category?: string | null;
+  reason?: string | null;
+  createdAt: string;
+  decidedAt?: string | null;
+  overridden?: { answer: string; by: string; at: string } | null;
+}
+
+export interface PlanAutonomy {
+  questions: boolean;
+  rounds: boolean;
+  deviations: boolean;
+  /** Why agents decide nothing although the project lets them. */
+  blocked: string | null;
+  limit: number;
+  used: number;
+  decided: number;
+  waiting: number;
+  deciding: number;
+  escalate: string[];
+  /** Newest first. */
+  entries: AutonomyEntry[];
 }
 
 /** An assignment an orchestrator proposes for the next swarm round. */
@@ -135,6 +197,8 @@ export interface PlanRound {
   decidedAt: string | null;
   /** The next round's assignments while they wait for your approval. */
   proposal?: RoundAssignment[] | null;
+  /** An agent is deciding the proposal for you. */
+  agentDeciding?: boolean;
   /** Areas reviewed by parallel orchestrators; empty when one reviews the plan. */
   areas?: PlanRoundArea[];
 }
@@ -196,6 +260,8 @@ export interface PlanView {
   } | null;
   /** Swarm rounds, for plans approved as a swarm. */
   rounds: PlanRounds | null;
+  /** What agents decided for you, when the project lets them. */
+  autonomy?: PlanAutonomy | null;
   criteria: { id: string; state: CriterionStateName; detail?: string }[];
   deviations: PlanDeviation[];
   /** How approving now would verify the work, from the project's mirrored check. */
@@ -256,6 +322,11 @@ export const planCommands = {
   ) => nativeTask<void>('plan_rounds', { id, action, assignments }),
   resolveDeviation: (id: string, deviationId: string, action: 'accept' | 'redo' | 'replan') =>
     nativeTask<void>('plan_resolve_deviation', { id, deviationId, action }),
+  /** Sends your answer in place of an agent's and records the override. */
+  overrideDecision: (id: string, entryId: string, answer: string) =>
+    nativeTask<void>('plan_autonomy_override', { id, entryId, answer }),
+  overridePrompt: (runId: string, promptId: string, answer: string) =>
+    nativeTask<void>('task_prompt_override', { runId, promptId, answer }),
   export: (id: string, path?: string) => nativeTask<string>('plan_export', { id, path }),
   diff: (id: string, from: number, to: number) =>
     nativeTask<SectionChange[]>('plan_diff', { id, from, to }),

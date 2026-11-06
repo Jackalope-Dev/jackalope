@@ -484,6 +484,7 @@ impl Coordinator {
                         )
                         .route("/v1/user-prompt", post(bridge_user_prompt))
                         .route("/v1/user-prompt/poll", get(bridge_get_user_prompt))
+                        .route("/v1/human-action", post(bridge_human_action))
                         .route("/v1/validation-step", post(bridge_validation_step))
                         .route("/v1/goal-restatement", post(bridge_goal_restatement))
                         .route(

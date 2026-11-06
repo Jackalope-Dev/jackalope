@@ -156,6 +156,7 @@ impl Call<'_> {
                 allow_other: Some(false),
                 ..Default::default()
             },
+            autonomy: Default::default(),
         };
         let mut pushed = false;
         self.runtime.update_checked(&self.run.id, |r| {

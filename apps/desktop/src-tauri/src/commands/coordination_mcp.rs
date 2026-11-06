@@ -1020,7 +1020,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Ask the user for required data, choices or confirmation in Jackalope. Do not request secrets. Waits briefly and returns pending when unanswered; retrieve the saved answer with user_response. Neither a default nor elapsed time grants approval.",
+        description = "Ask the user for required data, choices or confirmation in Jackalope. Do not request secrets; use request_human_action for sign-ins, payment, accounts and secrets. Routine questions on an approved plan may be answered by another agent on the owner's behalf, marked in the answer. Waits briefly and returns pending when unanswered; retrieve the saved answer with user_response. Neither a default nor elapsed time grants approval.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
@@ -1048,16 +1048,58 @@ impl CoordinationTools {
         if let Some(reply) = super::planning::question_gate(&run, &mut input) {
             return Ok(CallToolResult::structured(reply));
         }
-        let prompt = super::harness::ask_user_async(
-            &run.id,
+        let prompt = super::agent_decider::ask(
+            &self.service,
+            &run,
             input,
+            std::time::Duration::from_secs(60),
+        )
+        .await;
+        self.service.runtime.record_prompt(&prompt);
+        let value = serde_json::to_value(prompt)
+            .map_err(|_| ErrorData::internal_error("Could not encode user prompt", None))?;
+        Ok(CallToolResult::structured(value))
+    }
+
+    #[tool(
+        description = "Ask the person to do something only they can: sign in, pay, create an account, add a secret or another manual step. Give short numbered steps and a link. Never ask them to paste a secret into the conversation; for a secret, name the environment variable. Always goes to the person, never to another agent. Waits briefly and returns pending; poll user_response for Done or Declined and any note.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn request_human_action(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::harness::HumanActionInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let headers = request_headers(&context)?;
+        let run = self
+            .service
+            .authorized_run(&headers)
+            .map_err(bridge_error)?;
+        if run.prompts.len() >= 100 {
+            return Err(ErrorData::invalid_request(
+                "This attempt has reached the question limit.",
+                None,
+            ));
+        }
+        let (question, autonomy) = super::agent_decider::human_action(input)
+            .map_err(|error| ErrorData::invalid_params(error, None))?;
+        let prompt = super::harness::ask_routed(
+            &run.id,
+            question,
+            autonomy,
+            false,
             std::time::Duration::from_secs(60),
             |prompt| self.service.runtime.record_prompt(prompt),
         )
         .await;
         self.service.runtime.record_prompt(&prompt);
         let value = serde_json::to_value(prompt)
-            .map_err(|_| ErrorData::internal_error("Could not encode user prompt", None))?;
+            .map_err(|_| ErrorData::internal_error("Could not encode the request", None))?;
         Ok(CallToolResult::structured(value))
     }
 
@@ -1122,6 +1164,7 @@ impl CoordinationTools {
                 options,
                 default_value: None,
                 presentation: Default::default(),
+                category: None,
             };
             let prompt = super::harness::ask_user_async(
                 &run.id,
@@ -1166,7 +1209,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Read the user's saved answer to a question from this attempt. Poll this after ask_user returns pending. An unanswered question is not approval.",
+        description = "Read the user's saved answer to a question from this attempt. Poll this after ask_user returns pending or deciding (another agent is answering for the owner). An unanswered question is not approval.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn user_response(

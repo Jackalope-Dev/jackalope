@@ -198,7 +198,8 @@ export function TaskDetail({
     draft(key, { prompt: appendFeedbackDraft(current, text, PROMPT_MAX_CHARS) });
     if (focus) document.getElementById('task-reply')?.focus();
   };
-  const pending = run.prompts?.filter((p) => p.status === 'pending') ?? [];
+  // Questions an agent is deciding stay visible so the person can answer first.
+  const pending = run.prompts?.filter((p) => p.status !== 'answered') ?? [];
   const isolated =
     !!run.workspace &&
     run.workspace.replaceAll('\\', '/').toLowerCase() !==

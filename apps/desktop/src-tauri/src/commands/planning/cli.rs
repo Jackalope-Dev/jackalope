@@ -20,7 +20,25 @@ pub fn question(prompt: &PendingUserPrompt) -> protocol::Question {
         header: prompt.presentation.header.clone(),
         recommended: prompt.presentation.recommended.clone(),
         multi_select: prompt.input_type == "multiChoice",
-        rationale: prompt.presentation.rationale.clone(),
+        // The terminal shows why a question reached the person although agents
+        // may decide, and a human action's steps, on the rationale line.
+        rationale: match (&prompt.autonomy.human_action, &prompt.autonomy.escalation) {
+            (Some(action), _) => Some(match &action.url {
+                Some(url) => format!("Only you can do this: {} ({url})", action.instructions),
+                None => format!("Only you can do this: {}", action.instructions),
+            }),
+            (None, Some(escalation)) => Some(format!(
+                "Sent to you, not an agent: {}{}",
+                escalation.reason,
+                prompt
+                    .presentation
+                    .rationale
+                    .as_deref()
+                    .map(|why| format!(" {why}"))
+                    .unwrap_or_default()
+            )),
+            (None, None) => prompt.presentation.rationale.clone(),
+        },
         why_ask: prompt.presentation.why_ask.clone(),
         allow_other: prompt.presentation.allow_other,
     }

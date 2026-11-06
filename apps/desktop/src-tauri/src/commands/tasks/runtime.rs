@@ -548,6 +548,7 @@ impl TaskRuntime {
             created_at: Utc::now().to_rfc3339(),
             answered_at: None,
             presentation: Default::default(),
+            autonomy: Default::default(),
         };
         self.record_prompt(&prompt);
         self.update(id, |run| {
@@ -1595,7 +1596,9 @@ impl TaskRuntime {
     ) {
         self.update(&prompt.run_id, |run| {
             if let Some(existing) = run.prompts.iter_mut().find(|p| p.id == prompt.id) {
-                if existing.status != "answered" {
+                // A saved prompt only moves forward: a stale copy returned after the
+                // wait must not undo an escalation or an answer saved meanwhile.
+                if existing.status != "answered" && prompt.status == "answered" {
                     *existing = prompt.clone();
                 }
             } else {
@@ -1639,6 +1642,78 @@ impl TaskRuntime {
             *run = updated;
         }
         crate::commands::harness::resolve_user_prompt(prompt_id, answer.trim());
+        Ok(true)
+    }
+
+    /// Saves an agent's answer to a question still waiting on an agent and
+    /// delivers `delivered` to the asking agent like a person's answer. Returns
+    /// false when the person answered first or the attempt ended.
+    pub(in crate::commands) fn answer_for_person(
+        &self,
+        run_id: &str,
+        prompt_id: &str,
+        delivered: &str,
+        by: crate::commands::harness::AnsweredBy,
+    ) -> Result<bool, String> {
+        {
+            let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+            let Some(run) = inner.runs.get_mut(run_id) else {
+                return Ok(false);
+            };
+            if !["starting", "running"].contains(&run.status.as_str()) {
+                return Ok(false);
+            }
+            let mut updated = run.clone();
+            let Some(prompt) = updated
+                .prompts
+                .iter_mut()
+                .find(|p| p.id == prompt_id && p.status == "deciding")
+            else {
+                return Ok(false);
+            };
+            prompt.status = "answered".into();
+            prompt.answer = Some(delivered.chars().take(4000).collect());
+            prompt.answered_at = Some(Utc::now().to_rfc3339());
+            let agent = by.agent.clone();
+            prompt.autonomy.answered_by = Some(by);
+            activity(
+                &mut updated,
+                &format!("{agent} answered a question on your behalf."),
+            );
+            self.save(&updated)?;
+            updated.persistence_error = None;
+            *run = updated;
+        }
+        crate::commands::harness::resolve_user_prompt(prompt_id, delivered);
+        Ok(true)
+    }
+
+    /// Hands a question an agent was deciding to the person, with the reason.
+    /// Returns false when it was already answered.
+    pub(in crate::commands) fn escalate_prompt(
+        &self,
+        run_id: &str,
+        prompt_id: &str,
+        escalation: crate::commands::harness::Escalation,
+    ) -> Result<bool, String> {
+        let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+        let Some(run) = inner.runs.get_mut(run_id) else {
+            return Ok(false);
+        };
+        let mut updated = run.clone();
+        let Some(prompt) = updated
+            .prompts
+            .iter_mut()
+            .find(|p| p.id == prompt_id && p.status == "deciding")
+        else {
+            return Ok(false);
+        };
+        prompt.status = "pending".into();
+        prompt.autonomy.escalation = Some(escalation);
+        activity(&mut updated, "A question was handed to you.");
+        self.save(&updated)?;
+        updated.persistence_error = None;
+        *run = updated;
         Ok(true)
     }
 
@@ -1909,6 +1984,10 @@ impl TaskRuntime {
             self.refresh_knowledge(&request.project_id, &request.project_path, true)?;
         }
         self.apply_policy(&mut request)?;
+        // Isolated work needs a commit to branch from; a new repository gets its first one.
+        if request.isolated && request.previous_run_id.is_none() && request.retry_of.is_none() {
+            crate::commands::first_commit::ensure_first_commit(&request.project_path, false)?;
+        }
         let previous;
         let retried;
         if let Some(id) = &request.previous_run_id {
@@ -2182,7 +2261,9 @@ impl TaskRuntime {
                 result: String::new(),
                 streaming: String::new(),
                 details_omitted: false,
-                activity: vec![],
+                activity: crate::commands::first_commit::take_note(&request.project_path)
+                    .into_iter()
+                    .collect(),
                 diagnostics: vec![],
                 error: None,
                 persistence_error: None,

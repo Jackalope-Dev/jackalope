@@ -104,14 +104,24 @@ fn active(status: &str) -> bool {
     ["starting", "running", "stopping", "routing", "queued"].contains(&status)
 }
 
-/// The current round's proposed assignments wait for the person.
-pub fn awaiting(record: &PlanRecord) -> bool {
+/// The current round's proposed assignments wait for a decision.
+fn proposed(record: &PlanRecord) -> bool {
     open(record)
         && record
             .execution
             .as_ref()
             .and_then(|execution| execution.rounds.last())
             .is_some_and(|round| round.proposal.is_some())
+}
+
+/// The current round's proposed assignments wait for the person, not an agent.
+pub fn awaiting(record: &PlanRecord) -> bool {
+    proposed(record)
+        && record
+            .execution
+            .as_ref()
+            .and_then(|execution| execution.rounds.last())
+            .is_some_and(|round| !round.agent_deciding)
 }
 
 /// An assignment the orchestrator names for the next round.
@@ -669,6 +679,8 @@ pub struct RoundView {
     pub decided_at: Option<String>,
     /// The next round's assignments waiting for the person's approval.
     pub proposal: Option<Vec<RoundAssignment>>,
+    /// An agent is deciding the proposal for the person.
+    pub agent_deciding: bool,
     pub areas: Vec<AreaView>,
 }
 
@@ -737,6 +749,7 @@ pub fn view(
                 review_run_id: round.review_run_ids.last().cloned(),
                 decided_at: round.decided_at.clone(),
                 proposal: round.proposal.clone(),
+                agent_deciding: round.agent_deciding,
                 areas: round
                     .areas
                     .iter()
@@ -825,7 +838,7 @@ fn current<'a>(saved: &'a mut PlanRecord) -> Result<&'a mut Round, String> {
 }
 
 /// The check the plan's work runs with, from the round's managed task.
-fn check_of(coordinator: &Coordinator, round: &Round) -> Option<String> {
+pub(in crate::commands) fn check_of(coordinator: &Coordinator, round: &Round) -> Option<String> {
     coordinator
         .plan_template(&round.managed_task_id)
         .and_then(|(request, _)| request.verify_command)
@@ -851,6 +864,7 @@ fn advance(
         deactivate(id);
         return Ok(());
     };
+    let record = crate::commands::agent_decider::reconcile(store, record);
     if !open(&record) {
         deactivate(id);
         return Ok(());
@@ -1158,6 +1172,31 @@ fn conclude(
                 return Ok(());
             }
             if execution.ask_before_rounds {
+                // An agent may approve in the person's place only after the
+                // merged round passed its checks.
+                let checks = match (
+                    coordinator.plan_delivery(&round.managed_task_id),
+                    coordinator.runtime.integration_runs(),
+                ) {
+                    (Ok(delivery), Ok(runs)) => {
+                        crate::commands::agent_decider::round_checks_passed(
+                            check_of(coordinator, round).as_deref(),
+                            &delivery,
+                            &runs,
+                        )
+                    }
+                    (Err(error), _) | (_, Err(error)) => Err(error),
+                };
+                let job = crate::commands::agent_decider::route_round(
+                    coordinator,
+                    record,
+                    round.number,
+                    &summary,
+                    &evidence,
+                    &items,
+                    checks,
+                );
+                let deciding = job.is_ok();
                 store.update(&record.id, |saved| {
                     let round = current(saved)?;
                     if let Some(id) = handled {
@@ -1167,13 +1206,21 @@ fn conclude(
                     round.evidence = evidence.clone();
                     round.next = titles.clone();
                     round.proposal = Some(items.clone());
+                    round.agent_deciding = deciding;
                     saved.error = None;
                     Ok(())
                 })?;
-                crate::commands::notifications::plan_decision_needed(
-                    &record.id,
-                    &format!("round-{}", round.number),
-                );
+                match job {
+                    Ok(job) => crate::commands::agent_decider::spawn_round(
+                        coordinator.clone(),
+                        job,
+                        round.number,
+                    ),
+                    Err(_) => crate::commands::notifications::plan_decision_needed(
+                        &record.id,
+                        &format!("round-{}", round.number),
+                    ),
+                }
                 return Ok(());
             }
             match launch(coordinator, record, doc, round, &summary, assignments) {
@@ -1307,7 +1354,7 @@ fn approve(
 ) -> Result<(), String> {
     let store = session::store(coordinator);
     let record = store.load(id)?;
-    if !awaiting(&record) {
+    if !proposed(&record) {
         return Err("No swarm round is waiting for approval.".into());
     }
     let doc = record.document().ok_or("The plan could not be read.")?;
@@ -1325,6 +1372,7 @@ fn approve(
         round.verdict = "next".into();
         round.next = titles(&items);
         round.proposal = None;
+        round.agent_deciding = false;
         round.decided_at = Some(now.clone());
         next_round(saved, &managed, &now);
         saved.error = None;
@@ -1332,6 +1380,25 @@ fn approve(
     })?;
     activate(id, false);
     Ok(())
+}
+
+/// Starts the proposed round as `agent` decided for the person, unless the
+/// person already approved, edited or stopped it.
+pub(in crate::commands) fn approve_by(
+    coordinator: &Coordinator,
+    id: &str,
+    agent: &str,
+) -> Result<(), String> {
+    let record = session::store(coordinator).load(id)?;
+    let deciding = record
+        .execution
+        .as_ref()
+        .and_then(|execution| execution.rounds.last())
+        .is_some_and(|round| round.agent_deciding && round.proposal.is_some());
+    if !deciding {
+        return Err(format!("The proposal changed before {agent} decided."));
+    }
+    approve(coordinator, id, None)
 }
 
 /// Acts on a swarm's rounds: `pause`, `resume` or `stop` the rounds and the
@@ -1382,6 +1449,7 @@ pub fn action(
         store.update(id, |saved| {
             let round = current(saved)?;
             round.proposal = None;
+            round.agent_deciding = false;
             round.next.clear();
             for area in &mut round.areas {
                 area.verdict.clear();

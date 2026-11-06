@@ -82,6 +82,7 @@ message. Agents must read pending answers; elapsed time is never an answer.
 | Read messages | inbox | GET /v1/messages?after=cursor&limit=50 |
 | Acknowledge reading | acknowledge_message | POST /v1/messages/ack with id |
 | Ask a question | ask_user | POST /v1/user-prompt |
+| Ask the person to do something only they can | request_human_action | POST /v1/human-action with kind, title, instructions, optional url and secretName |
 | Retrieve an answer | user_response | GET /v1/user-prompt/poll?id=question |
 | Restate the goal at the start | restate_goal | POST /v1/goal-restatement with goal, problem, smallestChange |
 | Record checks and requirement assessments | record_validation_step | POST /v1/validation-step |
@@ -102,6 +103,22 @@ planning attempt are limited by the plan's question cap and end when the person 
 to stop; a closed question returns `status: closed` with a message instead of reaching
 the person. A planning question without `why_ask` returns `status: not_asked` and does
 not count toward the cap.
+`ask_user` also accepts an optional `category` (`routine`, `secret`, `payment`, `sign_in`,
+`account`, `publish`, `protected_path`, `direction` or `destructive`). When a project lets
+agents decide on approved plans, a routine question from plan work may be answered by a
+read-only decider attempt; the asker receives it prefixed `Answered by <agent> on your
+owner's behalf:` and the saved prompt carries `answeredBy`. Any other category, or a
+question the local classifier flags, reaches the person with an `escalation` reason. See
+[agent decisions](PLAN-MODE.md#agent-decisions).
+`request_human_action` asks the person to sign in, pay, create an account, add a secret or
+take another manual step: `kind` (`secret`, `sign_in`, `payment`, `account` or `other`), a
+`title` up to 120 characters, numbered `instructions` up to 2,000, an optional https `url`
+and, for a secret, a `secretName` shaped like an environment variable. It is never routed
+to an agent. The app and the phone companion show it as a **Needs you** card with the steps,
+the link, a hint to add a secret under Project settings → Secrets, an optional note and
+**Done** or **I can't do this**; the agent waits like `ask_user` and reads `Done` or
+`Declined`, followed by `Note: ...` when the person wrote one. It counts toward the
+attempt's 100-question limit.
 `record_validation_step` requirement assessments and the optional `safety_fact` carry an
 evidence level that Jackalope checks locally; `restate_goal` records the agent's short
 restatement once at the start. See [task outcomes](TASK-OUTCOMES.md#evidence-levels).
@@ -183,7 +200,8 @@ round's combined result merges, a read-only orchestrator attempt reviews the int
 tree against the plan's criteria, running the saved check through `computer_verify`,
 and either declares the plan done with evidence or names the next round's assignments,
 which are validated and scheduled like the first, or wait for the person's approval
-when the plan asks first. Up to 4 orchestrators can review a large plan's areas in
+when the plan asks first, or for a deciding agent once the merged round passed its check
+when the project lets agents approve rounds. Up to 4 orchestrators can review a large plan's areas in
 parallel; their verdicts merge into one (done only when every area is done, next
 assignments deduplicated and sequenced where scopes overlap). A round runs at least 8 and at most 24
 assignments, sized to the slots where the project's agents run. Rounds stop at the
@@ -281,6 +299,31 @@ stays in **Review & merge** with the reason shown under Automatic coordination.
 Without the file, automatic merging behaves as described above. Protect the files that
 define the saved check (such as package scripts and test configuration) so agent work
 cannot weaken the check that verified it.
+
+The same file can limit what agents decide for the person on approved plans. The project's
+**Autonomy** settings turn agent decisions on; a `decide` section can only make them
+stricter, and without one the project's settings apply unchanged:
+
+```json
+{
+  "version": 1,
+  "decide": {
+    "questions": "agent",
+    "rounds": "person",
+    "deviations": "agent",
+    "escalate": ["payment"],
+    "maxAgentDecisions": 30,
+    "decider": "auto"
+  }
+}
+```
+
+`person` turns that kind of agent decision off; `agent` or leaving it out keeps the
+project's setting. `escalate` adds categories to the ones that always reach the person
+(none can be removed), a lower `maxAgentDecisions` replaces the project's, and `decider`
+(`auto` or an agent ID) replaces the project's choice. Unknown fields or categories make
+the policy unreadable, which stops every agent decision. The policy's `protected` paths
+also escalate questions that name them. See [agent decisions](PLAN-MODE.md#agent-decisions).
 
 Required outcomes still need a person unless `acceptOutcomes` is `evidence`. Then an
 outcome counts as accepted when the agent's latest report marks it met with evidence

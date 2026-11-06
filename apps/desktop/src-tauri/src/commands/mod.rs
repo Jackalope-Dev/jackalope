@@ -34,6 +34,7 @@ pub mod workspace_setup;
 pub mod worktree_cleanup;
 pub mod worktree_usage;
 
+pub mod agent_decider;
 pub mod agent_install;
 pub mod agent_models;
 pub mod agent_policy;
@@ -66,6 +67,7 @@ pub mod permission_risk;
 pub mod permission_rules;
 pub mod planning;
 pub mod previews;
+pub mod question_risk;
 pub mod readiness;
 pub mod schedules;
 

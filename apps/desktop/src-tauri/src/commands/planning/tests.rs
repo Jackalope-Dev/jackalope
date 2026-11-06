@@ -376,6 +376,7 @@ fn record(directory: &std::path::Path) -> PlanRecord {
         error: None,
         reflected: false,
         archived: false,
+        autonomy: vec![],
     }
 }
 
@@ -439,6 +440,11 @@ fn settings_default_and_reject_paths_outside_the_project() {
         max_rounds: 3,
         ask_before_rounds: true,
         orchestrators: 3,
+        decide: super::store::DecideSettings {
+            questions: true,
+            max_agent_decisions: 20,
+            ..Default::default()
+        },
     };
     store.save_settings("p", custom.clone()).unwrap();
     assert_eq!(store.settings("p"), custom);
@@ -460,6 +466,26 @@ fn settings_default_and_reject_paths_outside_the_project() {
         };
         assert!(store.save_settings("p", parallel).is_err());
     }
+    for decide in [
+        super::store::DecideSettings {
+            max_agent_decisions: 0,
+            ..Default::default()
+        },
+        super::store::DecideSettings {
+            decider: "two words".into(),
+            ..Default::default()
+        },
+    ] {
+        let invalid = PlanSettings {
+            decide,
+            ..Default::default()
+        };
+        assert!(store.save_settings("p", invalid).is_err());
+    }
+    // Settings saved before Autonomy existed load with everything off.
+    let legacy: PlanSettings = serde_json::from_str(r#"{"questionCap":2}"#).unwrap();
+    assert_eq!(legacy.decide, super::store::DecideSettings::default());
+    assert!(!legacy.decide.questions && !legacy.decide.rounds && !legacy.decide.deviations);
     for max_rounds in [0, super::rounds::MAX_ROUNDS + 1] {
         let rounds = PlanSettings {
             max_rounds,
@@ -493,6 +519,8 @@ fn reflection_turns_accepted_deviations_and_failing_criteria_into_directives() {
         status: "accepted".into(),
         created_at: "now".into(),
         resolved_at: None,
+        agent_deciding: false,
+        resolved_by: None,
     });
     let states = vec![handoff::CriterionState {
         id: "AC-1".into(),

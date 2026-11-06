@@ -1,6 +1,8 @@
 import { getAgentMetadata } from '../../lib/agent-catalog';
+import { planCommands } from '../../lib/plan-mode';
 import type { PendingUserPrompt } from '../../lib/task-runtime';
 import { respondToPrompt } from '../../lib/task-runtime';
+import { openInBrowser } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
@@ -49,6 +51,12 @@ export function UserPromptCard({
     useMascotStore.getState().say('Your response is saved for the agent.', 3000);
     await useExecutionStore.getState().refresh();
   };
+  const override = prompt.answeredBy
+    ? async (value: string) => {
+        await planCommands.overridePrompt(runId, prompt.id, value);
+        await useExecutionStore.getState().refresh();
+      }
+    : undefined;
   return (
     <AgentQuestion
       key={`${runId}:${prompt.id}`}
@@ -58,6 +66,8 @@ export function UserPromptCard({
       agentDetail={agentDetail}
       onAnswer={answer}
       onContinue={onContinue}
+      onOverride={override}
+      onOpenLink={(url) => void openInBrowser(url)}
     />
   );
 }

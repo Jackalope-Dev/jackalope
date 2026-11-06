@@ -34,6 +34,7 @@ fn prompt(id: &str, run: &str, status: &str, answer: Option<&str>) -> PendingUse
         created_at: "now".into(),
         answered_at: None,
         presentation: Default::default(),
+        autonomy: Default::default(),
     }
 }
 
