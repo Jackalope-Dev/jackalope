@@ -335,6 +335,56 @@ The trial defaults to ten minutes; `JACKALOPE_AGREEMENT_TRIAL_TIMEOUT_SECONDS`
 sets a bounded 30–1200 second deadline. On Windows, run a copied test executable
 when builds are running to avoid locking Cargo's linker output.
 
+## Cloud resources
+
+**Project settings → Cloud resources** (or **Cloud resources** on Project → Swarm) creates
+what a project's Worker binds to in the Cloudflare account connected under Settings →
+Cloudflare. Without a connection the card links there instead. The screen offers R2, D1,
+KV, Queues, Durable Objects, Workers, Hyperdrive and Turnstile; R2, KV, Queues and Durable
+Objects start selected. Choices, the name prefix (the project name in lowercase words) and
+Turnstile domains are kept per project across Back, retry and reload until setup succeeds.
+The Hyperdrive connection string is not kept with them: setup saves it in protected native
+storage for the project and sends it only to Cloudflare.
+
+Resources are named `<prefix>-assets` (R2), `-db` (D1), `-config` (KV), `-jobs` (Queue),
+`-postgres` (Hyperdrive) and `-turnstile` (a managed Turnstile widget). Setup runs one step
+at a time, emitting `cloudflare-resources-progress` with the project path and step, and one
+run per project at a time. Each step looks the resource up by name (`GET
+/r2/buckets/{name}`, or the D1, KV, Queues, Hyperdrive and Turnstile list endpoints) and
+creates it only when it is missing, so **Retry** reuses everything a failed run created. An
+existing Hyperdrive config is reused as it is and needs no connection string. Durable Objects
+and Workers are not created by setup; they appear in the bindings and are created when the
+Worker deploys.
+
+The result is written to `.jackalope/cloudflare.json`: account ID, prefix, each resource's
+kind, name, ID (the bucket name for R2, the site key for Turnstile) and binding, and a
+wrangler.jsonc fragment under `wrangler`. It holds no secret and is safe to commit. A
+failed run still records what it set up. Jackalope never edits `wrangler.jsonc`; the result
+view offers **Copy bindings**, per-resource copy buttons, the Turnstile secret key read from
+Cloudflare on demand, and a link to the dashboard. **Tell agents** adds one line pointing to
+the manifest to the project instructions. Task preparation excludes `/.jackalope/` from Git
+locally, so the result view shows `git add -f .jackalope/cloudflare.json` when Git ignores
+the manifest; task worktrees include it only once it is committed.
+
+Creating resources needs these account permissions: Workers R2 Storage, D1, Workers KV
+Storage, Queues, Hyperdrive and Turnstile, each Edit. With an API token, a refusal (401, 403
+or error 10000) names the permission the step needs and links to API tokens. With Connect
+Cloudflare, setup asks for the matching scopes (`workers-r2-storage.write`, `d1.write`,
+`workers-kv-storage.write`, `queues.write`, `hyperdrive.write`, `turnstile.write`) once,
+through the same reauthorization Swarm uses, and keeps scopes the sign-in already had. When
+Cloudflare does not allow those scopes for Jackalope's client, sign-in reports which token
+permissions to use instead. An account without R2 turned on (10042) links to the R2 page;
+rate limits ask to retry.
+
+**Remove from Jackalope** only takes a resource out of the manifest (and forgets a saved
+Hyperdrive connection string). **Delete from Cloudflare** is per resource and needs an
+explicit acknowledgment; R2 deletes only empty buckets and Cloudflare's reason is shown.
+Resources Cloudflare no longer has count as deleted.
+
+`cargo test --lib cloudflare_resources::` covers each resource against a local server with
+Cloudflare's response shapes (reuse, create, refusal, rate limit), bindings, the manifest
+and scope gating; `apps/desktop/scripts/cloud-resources.test.mjs` covers the screen's
+defaults and validation. Neither reaches Cloudflare.
 
 ## Visible support
 

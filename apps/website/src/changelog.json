@@ -1,5 +1,17 @@
 [
   {
+    "id": "cloud-resources-for-your-projects",
+    "date": "2026-11-06",
+    "status": "In development",
+    "title": "Cloud resources for your projects.",
+    "description": "Create R2 storage, a D1 database, KV, Queues, Hyperdrive and Turnstile in your own Cloudflare account from Project settings, with wrangler bindings ready to copy.",
+    "items": [
+      "Each resource is found by name before it is created, so retrying never makes duplicates.",
+      "Progress shows each step as it runs, and permission problems name exactly what to add.",
+      "Names, IDs and bindings are saved to .jackalope/cloudflare.json with no secrets."
+    ]
+  },
+  {
     "id": "swarms-that-keep-going-until-the-work-is-done",
     "date": "2026-11-05",
     "status": "In development",

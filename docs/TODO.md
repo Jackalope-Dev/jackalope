@@ -122,6 +122,11 @@ release dates.
   the Workers scope (and its invalid-scope fallback), an API token with Workers Scripts: Edit, an
   account without a workers.dev subdomain, a first publish, and an in-place update that keeps
   the token working on a second computer.
+- [ ] Accept Cloud resources against a live Cloudflare account on Windows and macOS: each
+  resource created and then reused on retry, Connect Cloudflare's product scopes (and the
+  invalid-scope fallback to an API token), a token missing one permission, an account without
+  R2 turned on, a Hyperdrive origin and Turnstile domains, and deleting an empty and a
+  non-empty bucket.
 - [ ] Explore agent-native Artifacts workflows: a fork per task attempt instead of a local
   worktree, provenance notes on integrated commits, push-event review and check triggers,
   and opening an existing Artifacts repository as a project. Keep the coordinator,

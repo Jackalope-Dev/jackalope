@@ -122,7 +122,7 @@ type ProjectActions = {
 };
 
 const projectViews = WORKSPACE_VIEWS.filter(
-  (view) => view.group === 'project' && view.id !== 'swarm',
+  (view) => view.group === 'project' && view.id !== 'swarm' && view.id !== 'cloud-resources',
 );
 
 /**

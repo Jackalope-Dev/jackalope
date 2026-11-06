@@ -73,6 +73,8 @@ struct Pending {
     verifier: String,
     redirect_uri: String,
     listener: Option<TcpListener>,
+    /// What to say when Cloudflare refuses a requested scope, when extra scopes were asked for.
+    invalid_scope: Option<String>,
 }
 
 static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
@@ -178,19 +180,25 @@ pub async fn refresh(grant: &Grant) -> Result<Tokens, String> {
     Ok(tokens)
 }
 
-fn requested_scopes(workers: bool) -> String {
+fn requested_scopes(workers: bool, extra: &[String]) -> String {
+    let mut scopes = SCOPES.to_owned();
     if workers {
-        format!("{SCOPES} {WORKERS_SCOPE}")
-    } else {
-        SCOPES.to_owned()
+        scopes.push(' ');
+        scopes.push_str(WORKERS_SCOPE);
     }
+    for scope in extra {
+        scopes.push(' ');
+        scopes.push_str(scope);
+    }
+    scopes
 }
 
 /// The sign-in error Cloudflare returns in the redirect, in the person's terms.
-fn authorize_error(error: &str, description: Option<&str>) -> String {
+fn authorize_error(error: &str, description: Option<&str>, invalid_scope: Option<&str>) -> String {
     match error {
         "access_denied" => "Cloudflare access was not approved.".into(),
         // The public client's registration does not allow a requested scope.
+        "invalid_scope" if invalid_scope.is_some() => invalid_scope.unwrap_or_default().into(),
         "invalid_scope" => "Cloudflare does not let Jackalope deploy Workers through Connect Cloudflare yet. Connect with an API token that has Workers Scripts: Edit and Artifacts: Edit instead.".into(),
         _ => format!(
             "Cloudflare sign-in failed: {}",
@@ -220,8 +228,13 @@ pub async fn revoke(grant: &Grant) {
 }
 
 /// Prepares a sign-in and returns the Cloudflare consent URL to open. `workers`
-/// also asks to deploy Workers, for Jackalope Swarm.
-pub async fn begin(workers: bool) -> Result<String, String> {
+/// also asks to deploy Workers, for Jackalope Swarm; `extra` adds product scopes, and
+/// `invalid_scope` is the message shown when Cloudflare refuses one of them.
+pub async fn begin(
+    workers: bool,
+    extra: &[String],
+    invalid_scope: Option<String>,
+) -> Result<String, String> {
     let mut bound = None;
     for port in PORTS {
         if let Ok(listener) = TcpListener::bind(("127.0.0.1", port)).await {
@@ -240,7 +253,7 @@ pub async fn begin(workers: bool) -> Result<String, String> {
         ("response_type", "code"),
         ("client_id", CLIENT_ID),
         ("redirect_uri", redirect_uri.as_str()),
-        ("scope", requested_scopes(workers).as_str()),
+        ("scope", requested_scopes(workers, extra).as_str()),
         ("state", state.as_str()),
         ("code_challenge", challenge(&verifier).as_str()),
         ("code_challenge_method", "S256"),
@@ -252,6 +265,7 @@ pub async fn begin(workers: bool) -> Result<String, String> {
         verifier,
         redirect_uri,
         listener: Some(listener),
+        invalid_scope,
     });
     Ok(url.to_string())
 }
@@ -303,7 +317,7 @@ async fn read_target(stream: &mut tokio::net::TcpStream) -> Option<String> {
 /// the person granted. Tokens are kept in memory until `take` is called.
 pub async fn complete() -> Result<Vec<Account>, String> {
     let generation = GENERATION.load(std::sync::atomic::Ordering::SeqCst);
-    let (listener, state, verifier, redirect_uri) = {
+    let (listener, state, verifier, redirect_uri, invalid_scope) = {
         let mut pending = PENDING.lock().map_err(|e| e.to_string())?;
         let pending = pending.as_mut().ok_or("Start Connect Cloudflare again.")?;
         (
@@ -314,6 +328,7 @@ pub async fn complete() -> Result<Vec<Account>, String> {
             pending.state.clone(),
             pending.verifier.clone(),
             pending.redirect_uri.clone(),
+            pending.invalid_scope.clone(),
         )
     };
     let deadline = tokio::time::Instant::now() + SIGN_IN_TIMEOUT;
@@ -369,6 +384,7 @@ pub async fn complete() -> Result<Vec<Account>, String> {
             return Err(authorize_error(
                 error,
                 query.get("error_description").map(String::as_str),
+                invalid_scope.as_deref(),
             ));
         }
         let Some(code) = query.get("code").cloned() else {
@@ -510,9 +526,17 @@ mod tests {
 
     #[test]
     fn workers_scope_is_requested_only_for_swarm_setup() {
-        assert!(!requested_scopes(false).contains(WORKERS_SCOPE));
-        assert!(requested_scopes(true).ends_with(" workers-scripts.write"));
-        assert!(requested_scopes(true).contains("offline_access"));
+        assert!(!requested_scopes(false, &[]).contains(WORKERS_SCOPE));
+        assert!(requested_scopes(true, &[]).ends_with(" workers-scripts.write"));
+        assert!(requested_scopes(true, &[]).contains("offline_access"));
+    }
+
+    #[test]
+    fn resource_scopes_are_added_after_the_base_scopes() {
+        let scopes = requested_scopes(false, &["d1.write".into(), "queues.write".into()]);
+        assert!(scopes.starts_with(SCOPES));
+        assert!(scopes.ends_with(" d1.write queues.write"));
+        assert!(!scopes.contains(WORKERS_SCOPE));
     }
 
     #[test]
@@ -538,11 +562,15 @@ mod tests {
 
     #[test]
     fn unregistered_scopes_point_to_an_api_token() {
-        let message = authorize_error("invalid_scope", None);
+        let message = authorize_error("invalid_scope", None, None);
         assert!(message.contains("Workers Scripts: Edit"));
         assert_eq!(
-            authorize_error("access_denied", None),
+            authorize_error("access_denied", None, None),
             "Cloudflare access was not approved."
+        );
+        assert_eq!(
+            authorize_error("invalid_scope", None, Some("Use a token with D1: Edit.")),
+            "Use a token with D1: Edit."
         );
     }
 }

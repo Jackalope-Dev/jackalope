@@ -73,6 +73,7 @@ pub mod agent_screen;
 pub mod browser;
 pub mod browser_profiles;
 pub mod cloudflare_artifacts;
+pub mod cloudflare_resources;
 pub mod composio;
 pub mod computers;
 pub mod delivery;

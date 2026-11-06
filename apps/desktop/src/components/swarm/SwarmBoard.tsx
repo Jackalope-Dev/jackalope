@@ -10,7 +10,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
-import { navigateWorkspace, openSettings } from '../layout/navigation';
+import { navigateWorkspace, openCloudResources, openSettings } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
@@ -142,6 +142,18 @@ export function SwarmBoard() {
         </InlineNotice>
       )}
       {state?.error && <InlineNotice tone="warning">{state.error}</InlineNotice>}
+      {projectId && state?.configured && (
+        <InlineNotice
+          action={
+            <Button variant="outline" onClick={() => openCloudResources(projectId)}>
+              Cloud resources
+            </Button>
+          }
+        >
+          Create R2, D1, KV, Queues and other Cloudflare resources for this project and copy their
+          wrangler bindings.
+        </InlineNotice>
+      )}
       {state?.repo && (
         <p className="swarm-meta">
           <GitFork size={14} aria-hidden="true" />

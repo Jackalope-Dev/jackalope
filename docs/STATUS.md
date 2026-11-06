@@ -613,6 +613,14 @@ Swarm mirrors their snapshots to per-attempt forks, but hosted Artifacts, work r
 those forks and push-triggered automation are not implemented. Live
 Cloudflare account and installed acceptance remain open.
 
+Cloud resources (beta) set up R2, D1, KV, Queues, Hyperdrive and Turnstile in the connected
+Cloudflare account for a project, and declare Durable Objects and a Worker name, from Project
+settings or Project → Swarm. Each resource is found by name before it is created, with per-step
+progress and retry; the result is `.jackalope/cloudflare.json` (names, IDs and a wrangler
+bindings snippet, no secrets). See [cloud resources](ORCHESTRATION-CAPABILITIES.md#cloud-resources).
+Which product scopes Connect Cloudflare grants, and provisioning against a live account, are
+not yet accepted.
+
 Trusted hosts and a responsive phone companion are implemented for native validation.
 Settings → Remote access scopes paired devices to selected projects. Before it is on, every
 project starts selected and Pair a phone turns access on and creates the code in one step. A separate loopback

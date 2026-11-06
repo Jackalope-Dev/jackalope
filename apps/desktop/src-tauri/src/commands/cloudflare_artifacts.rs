@@ -669,10 +669,51 @@ async fn establish(connection: Connection, runtime: &TaskRuntime) -> Result<Stat
 }
 
 /// Starts Connect Cloudflare and returns the consent URL for the browser. `workers`
-/// also asks to deploy Workers, which Jackalope Swarm setup needs.
+/// also asks to deploy Workers, which Jackalope Swarm setup needs. `scopes` asks for
+/// the extra product scopes cloud resource setup needs; only known scopes are accepted.
+/// Extra scopes the saved sign-in already has are requested again so a reauthorization
+/// never drops them.
 #[tauri::command]
-pub async fn cloudflare_oauth_begin(workers: Option<bool>) -> Result<String, String> {
-    oauth::begin(workers.unwrap_or(false)).await
+pub async fn cloudflare_oauth_begin(
+    workers: Option<bool>,
+    scopes: Option<Vec<String>>,
+    state: State<'_, TaskRuntime>,
+) -> Result<String, String> {
+    let requested = scopes.unwrap_or_default();
+    let mut permissions = Vec::new();
+    for scope in &requested {
+        permissions.push(
+            super::cloudflare_resources::permission_for_scope(scope)
+                .ok_or_else(|| format!("{scope} is not a scope Jackalope asks Cloudflare for."))?,
+        );
+    }
+    let granted = saved(&state)
+        .ok()
+        .flatten()
+        .and_then(|connection| connection.oauth)
+        .and_then(|grant| grant.scopes)
+        .unwrap_or_default();
+    let mut extra: Vec<String> = Vec::new();
+    let mut workers = workers.unwrap_or(false);
+    for scope in granted.split_whitespace() {
+        if scope == oauth::WORKERS_SCOPE {
+            workers = true;
+        } else if super::cloudflare_resources::permission_for_scope(scope).is_some() {
+            extra.push(scope.to_owned());
+        }
+    }
+    for scope in requested {
+        if !extra.contains(&scope) {
+            extra.push(scope);
+        }
+    }
+    let invalid_scope = (!permissions.is_empty()).then(|| {
+        format!(
+            "Cloudflare does not let Jackalope create these resources through Connect Cloudflare yet. Connect with an API token that has {} and Artifacts: Edit instead.",
+            permissions.join(", ")
+        )
+    });
+    oauth::begin(workers, &extra, invalid_scope).await
 }
 
 /// Waits for the browser sign-in and returns the accounts the person shared.
@@ -761,6 +802,36 @@ fn workers_access_of(connection: Connection) -> WorkersAccess {
         namespace: connection.namespace,
         token: connection.token,
     }
+}
+
+/// The connected account and a fresh token for account-level product APIs.
+pub(in crate::commands) struct AccountAccess {
+    pub account_id: String,
+    pub token: String,
+    pub oauth: bool,
+    /// Scopes Cloudflare reported for an OAuth grant; `None` when unknown or an API token.
+    pub granted: Option<String>,
+}
+
+/// The saved connection with a fresh access token for account-level API calls.
+pub(in crate::commands) async fn account_access(
+    runtime: &TaskRuntime,
+) -> Result<AccountAccess, String> {
+    let connection = current(runtime).await?;
+    Ok(AccountAccess {
+        oauth: connection.oauth.is_some(),
+        granted: connection.oauth.and_then(|grant| grant.scopes),
+        account_id: connection.account_id,
+        token: connection.token,
+    })
+}
+
+/// Whether Cloudflare is connected, without refreshing.
+pub(in crate::commands) fn connected_account(runtime: &TaskRuntime) -> Option<String> {
+    saved(runtime)
+        .ok()
+        .flatten()
+        .map(|connection| connection.account_id)
 }
 
 /// The saved connection without refreshing, for status checks. The token may be stale.
