@@ -198,29 +198,6 @@ export interface Broadcast {
     status?: string;
     version?: string;
   }[];
-  monthly?: {
-    enabled: boolean;
-    autosend: boolean;
-    latest: {
-      month: string;
-      state: 'drafting' | 'failed' | 'skipped' | 'ready' | 'handed_off' | 'dismissed';
-      draft: {
-        subject: string;
-        preview: string;
-        headline: string;
-        intro: string;
-        outro: string;
-        entries: string[];
-        extras: { title: string; body: string }[];
-        action?: { label: string; url: string } | null;
-        tag: string;
-      } | null;
-      model: string | null;
-      reason: string | null;
-      updatedAt: number;
-      campaignUrl: string | null;
-    } | null;
-  };
 }
 
 export const date = (value?: number | null) =>
