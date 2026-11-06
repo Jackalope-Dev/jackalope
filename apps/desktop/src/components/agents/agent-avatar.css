@@ -1,52 +1,42 @@
+/* A provider mark on a quiet tile. The ring reflects live state only: working uses the
+   accent, waiting on the person uses the warning colour, idle keeps a hairline border. */
 .agent-avatar {
   display: grid;
   place-items: center;
   flex-shrink: 0;
   border-radius: var(--radius-2xl);
-  background: radial-gradient(
-    ellipse at 40% 30%,
-    var(--color-accent-subtle),
-    var(--color-surface-sunken)
-  );
-  color: var(--color-accent-ink);
+  background: var(--color-surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--color-border-subtle);
+  color: var(--color-text-primary);
+  transition: box-shadow var(--motion-base) var(--ease-out);
 }
 .agent-avatar svg {
-  overflow: visible;
+  display: block;
+}
+.agent-avatar[data-state="working"] {
+  box-shadow: inset 0 0 0 1.5px var(--color-accent);
+}
+.agent-avatar[data-state="waiting"] {
+  box-shadow: inset 0 0 0 1.5px var(--color-warning);
 }
 .agent-avatar[data-size="xs"] {
   width: 24px;
   height: 24px;
   border-radius: var(--radius-sm);
 }
-.agent-avatar[data-size="xs"] svg {
-  width: 20px;
-  height: 20px;
-}
 .agent-avatar[data-size="sm"] {
   width: 40px;
   height: 40px;
   border-radius: var(--radius-lg);
-}
-.agent-avatar[data-size="sm"] svg {
-  width: 32px;
-  height: 32px;
 }
 .agent-avatar[data-size="md"] {
   width: 48px;
   height: 48px;
   border-radius: var(--radius-xl);
 }
-.agent-avatar[data-size="md"] svg {
-  width: 40px;
-  height: 40px;
-}
 .agent-avatar[data-size="lg"] {
   width: 72px;
   height: 72px;
-}
-.agent-avatar[data-size="lg"] svg {
-  width: 64px;
-  height: 64px;
 }
 .agent-stack {
   display: flex;
@@ -54,9 +44,14 @@
   flex-shrink: 0;
 }
 .agent-stack .agent-avatar + .agent-avatar {
-  margin-left: -12px;
-  box-shadow: 0 0 0 2px var(--color-surface);
+  margin-left: -10px;
+  outline: 2px solid var(--color-surface);
 }
 .agent-stack .agent-avatar[data-size="xs"] + .agent-avatar {
   margin-left: -6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-avatar {
+    transition: none;
+  }
 }

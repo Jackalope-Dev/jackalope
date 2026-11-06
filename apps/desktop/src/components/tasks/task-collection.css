@@ -38,8 +38,8 @@
   border-radius: var(--radius-md);
 }
 .work-item .agent-avatar[data-size="sm"] svg {
-  width: 26px;
-  height: 26px;
+  width: 18px;
+  height: 18px;
 }
 .work-avatar-fallback {
   display: grid;

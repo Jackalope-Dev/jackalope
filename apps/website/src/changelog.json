@@ -1,5 +1,16 @@
 [
   {
+    "id": "see-which-agent-is-working",
+    "date": "2026-11-06",
+    "status": "In development",
+    "title": "See which agent is working",
+    "description": "Tasks show the logo of the agent that worked on them most recently.",
+    "items": [
+      "The sidebar, task lists and the phone companion show each task's agent by its product logo, with a ring while it works or waits for you.",
+      "Bots keep their own characters."
+    ]
+  },
+  {
     "id": "swarms-that-keep-going-until-the-work-is-done",
     "date": "2026-11-05",
     "status": "In development",
