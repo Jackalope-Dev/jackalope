@@ -1,4 +1,4 @@
-//! Attempts whose agent CLI runs on the project's computer.
+//! The runner on the project's computer.
 //!
 //! Workspace preparation, checks, checkpoints, review and integration stay on
 //! this device and are unchanged; only the agent process moves. The local
@@ -16,7 +16,7 @@
 //! device's copy stays identical to what they read.
 
 use super::*;
-use crate::commands::computers::{self, credentials, relay, runner, runs, Computer};
+use crate::commands::computers::{relay, runner};
 
 /// How long a run waits for its computer to start; a first image build is slow.
 const START_WAIT: Duration = Duration::from_secs(20 * 60);
@@ -34,38 +34,521 @@ struct Followed {
     lost: bool,
 }
 
-impl TaskRuntime {
-    /// Whether this project's attempts with `adapter` run on its computer, so
-    /// the agent CLI need not be installed on this device.
-    pub(in crate::commands) fn runs_remotely(&self, project_id: &str, adapter: &str) -> bool {
-        credentials::REMOTE_ADAPTERS.contains(&adapter)
-            && runs::project_computer(&self.computers_root(), project_id).is_some()
+/// An attempt whose agent CLI runs on the project's computer.
+pub(in crate::commands::tasks) struct RemoteRunner {
+    computer: Computer,
+    /// Selected stdio connections that may start with the run.
+    connections: Vec<crate::commands::mcp::ComputerConnection>,
+    read_only: bool,
+    access: relay::Access,
+    session: Option<runs::Session>,
+    /// The agent reaches this device's bridge through the relay.
+    relayed: bool,
+    /// The runner receives large bridge answers whole, as artifacts.
+    large_answers: bool,
+    argv: Vec<String>,
+    env: runs::Environment,
+    /// The `local` part of `run_start`: the tools the runner serves.
+    local: Option<serde_json::Value>,
+    /// The `mcp` part of `run_start`: connections that start with the run.
+    mcp: Option<serde_json::Value>,
+    /// When the upload began; the agent's first activity is timed from it.
+    launched: Option<std::time::Instant>,
+    /// The run's exit, when it ended as soon as it started.
+    immediate: Option<serde_json::Value>,
+    /// Contact was lost, so the agent's changes stay on the computer.
+    lost: bool,
+}
+
+impl RemoteRunner {
+    pub(in crate::commands::tasks) fn new(
+        computer: Computer,
+        connections: Vec<crate::commands::mcp::ComputerConnection>,
+        read_only: bool,
+    ) -> Self {
+        Self {
+            computer,
+            connections,
+            read_only,
+            access: relay::Access {
+                read_only,
+                ..Default::default()
+            },
+            session: None,
+            relayed: false,
+            large_answers: false,
+            argv: Vec::new(),
+            env: Vec::new(),
+            local: None,
+            mcp: None,
+            launched: None,
+            immediate: None,
+            lost: false,
+        }
     }
 
-    /// The computer this attempt's agent runs on, or `None` to run it here.
-    /// Read-only planning attempts follow the project like any other.
-    pub(super) fn remote_target(
-        &self,
-        id: &str,
-        req: &RunRequest,
-        adapter: &str,
-    ) -> Option<Computer> {
-        let computer = runs::project_computer(&self.computers_root(), &req.project_id)?;
-        if !credentials::REMOTE_ADAPTERS.contains(&adapter) {
-            self.update(id, |run| {
+    /// A runner that talks to the computer through `session`.
+    #[cfg(test)]
+    pub(in crate::commands::tasks) fn with_session(
+        computer: Computer,
+        read_only: bool,
+        session: runs::Session,
+    ) -> Self {
+        Self {
+            session: Some(session),
+            ..Self::new(computer, Vec::new(), read_only)
+        }
+    }
+
+    fn session(&mut self) -> &mut runs::Session {
+        self.session
+            .as_mut()
+            .expect("the run's session is open once prepared")
+    }
+}
+
+impl AttemptRunner for RemoteRunner {
+    fn access(&self) -> &relay::Access {
+        &self.access
+    }
+
+    fn prepare(&mut self, runtime: &TaskRuntime, launch: &mut Launch) -> Result<Step, String> {
+        let (id, req, adapter, workspace) =
+            (launch.id, launch.req, launch.adapter, launch.workspace);
+        let root = runtime.computers_root();
+        let computer = self.computer.clone();
+        let bridge = req.coordination.as_ref();
+        let read_only = self.read_only;
+        // Checks the sign-in before waiting for the computer.
+        runs::translate(
+            adapter,
+            &launch.cmd,
+            &root,
+            bridge.map(|b| b.endpoint.as_str()),
+        )?;
+        {
+            let inner = runtime.inner.lock().unwrap();
+            if inner.canceled.contains(id) {
+                drop(inner);
+                runtime.mark_stopped(id);
+                return Ok(Step::Stopped);
+            }
+            if workspace_in_use(&inner, id, workspace) {
+                return Err(WORKSPACE_IN_USE.into());
+            }
+        }
+        runtime.update_checked(id, |run| {
+            run.remote = Some(RemoteExecution {
+                computer_id: computer.id.clone(),
+                computer_name: computer.name.clone(),
+            })
+        })?;
+        runtime.remote_progress(id, &format!("Starting {}", computer.name), "");
+        let mut session = match self.session.take() {
+            // A session the caller opened, such as a test's stand-in runner.
+            Some(session) => session,
+            None => {
+                computers::ready_within(&root, &computer, START_WAIT)?;
+                computers::usage::note(&root, &computer.id);
+                runs::Session::open(&root, &computer, workspace)?
+            }
+        };
+        if read_only {
+            session.name = runs::read_only_run_name(workspace);
+        }
+        // An agent from before the relay answers no status and gets no bridge.
+        let status = session.status()?;
+        if let Some(status) = status.as_ref().filter(|status| status["exists"] == true) {
+            runtime.recover_remote(id, &mut session, status, workspace, &computer, read_only);
+        }
+        let relayed = bridge.filter(|_| status.is_some());
+        self.relayed = relayed.is_some();
+        // A runner with artifacts receives large bridge answers whole, so
+        // on-demand results need no preview.
+        let large_answers = session.capabilities.has(runner::ARTIFACTS);
+        self.large_answers = large_answers;
+        let brokered = if large_answers {
+            runtime.mcp_broker.set_result_limit(id, None)
+        } else {
+            runtime.mcp_broker.has_attempt(id)
+        };
+        let input = &mut launch.input;
+        if relayed.is_some() && brokered {
+            input.push_str(&if large_answers {
+                "\nAnswers from on-demand tools reach this computer in full, up to 1 MB as on the person's device; select output with output.jsonPointers, output.rows or output.maxChars when you need less.\n".to_string()
+            } else {
+                format!("\nAn answer from on-demand tools can reach this computer only up to about {} KB: select output with output.jsonPointers, output.rows or output.maxChars, and page captured results with read_tool_result.\n", crate::commands::mcp_broker::REMOTE_RESULT_LIMIT / 1024)
+            });
+        }
+        let (argv, mut env) = runs::translate(
+            adapter,
+            &launch.cmd,
+            &root,
+            relayed.map(|b| b.endpoint.as_str()),
+        )?;
+        let secrets = crate::commands::project_secrets::environment(
+            &runtime.project_secrets_root(),
+            &req.project_id,
+            crate::commands::project_secrets::Place::Computer,
+        )
+        .map_err(|error| format!("Project secrets could not be read: {error}"))?;
+        if !secrets.is_empty() {
+            let names: Vec<&str> = secrets.iter().map(|(name, _)| name.as_str()).collect();
+            runtime.update(id, |run| {
                 activity(
                     run,
                     &format!(
-                        "{} cannot run on {} yet, so it runs on this device.",
-                        req.agent, computer.name
+                        "Project secrets for the agent on {}: {}.",
+                        computer.name,
+                        names.join(", ")
                     ),
                 )
             });
-            return None;
         }
-        Some(computer)
+        runs::add_secrets(&mut env, secrets);
+        self.argv = argv;
+        self.env = env;
+        // Where each tool runs follows the runner's capabilities; desktop
+        // control acts on the computer itself.
+        self.access = relay::Access {
+            devtools: computers::provider(&computer.provider)
+                .ok()
+                .and_then(|provider| provider.devtools(&root, &computer))
+                .is_some(),
+            runner: runner::RunnerCapabilities::from_status(status.as_ref()),
+            read_only,
+        };
+        self.local = relayed
+            .and_then(|_| self.access.local_request(req.verify_command.as_deref()))
+            .map(without_disabled_tools);
+        if relayed.is_some() {
+            input.push_str(&self.access.instructions());
+        } else if bridge.is_some() {
+            input.push_str("\nJackalope's tools are not available on this computer, whose image predates them. Ignore instructions that mention them.\n");
+        }
+        self.mcp = runtime.computer_connections(
+            id,
+            adapter,
+            &computer,
+            status.as_ref(),
+            relayed.is_some(),
+            std::mem::take(&mut self.connections),
+            input,
+        );
+        let launched = std::time::Instant::now();
+        self.launched = Some(launched);
+        let label = format!("Sending files to {}", computer.name);
+        let progress = |sent: u64, total: u64| {
+            runtime.remote_progress(
+                id,
+                &label,
+                &format!("{} of {}", megabytes(sent), megabytes(total)),
+            );
+        };
+        let bundled = runs::uses_git_sync(&session.capabilities)
+            && runtime.send_bundle(
+                id,
+                &mut session,
+                workspace,
+                &req.setup_files,
+                &computer,
+                &progress,
+            );
+        if !bundled {
+            session.upload(Path::new(workspace), &req.setup_files, &progress)?;
+        }
+        runtime.update(id, |run| {
+            run.efficiency.timing("remoteUpload", launched.elapsed());
+        });
+        if runtime.inner.lock().unwrap().canceled.contains(id) {
+            session.remove();
+            session.shutdown();
+            runtime.mark_stopped(id);
+            return Ok(Step::Stopped);
+        }
+        self.session = Some(session);
+        Ok(Step::Ready)
     }
 
+    fn start(&mut self, runtime: &TaskRuntime, launch: &mut Launch) -> Result<Step, String> {
+        let id = launch.id;
+        let mut parts = serde_json::Map::new();
+        if let Some(connections) = self.mcp.take() {
+            parts.insert("mcp".into(), connections);
+        }
+        if let Some(local) = self.local.clone() {
+            parts.insert("local".into(), local);
+        }
+        let relayed = self.relayed;
+        let (argv, env) = (
+            std::mem::take(&mut self.argv),
+            std::mem::take(&mut self.env),
+        );
+        let started = self
+            .session()
+            .start(&argv, &env, &launch.input, relayed, &parts)?;
+        self.immediate = started.exit;
+        let computer = &self.computer;
+        if relayed {
+            let placement = placement_activity(
+                &self.access,
+                &computer.name,
+                self.local.as_ref(),
+                started.local_tools.as_deref(),
+            );
+            runtime.update(id, |run| activity(run, &placement));
+        }
+        for (name, reason) in &started.unavailable {
+            runtime.update(id, |run| {
+                activity(
+                    run,
+                    &format!("{name} could not start on {}: {reason}", computer.name),
+                )
+            });
+        }
+        let browser = !self.access.tool_unavailable("browser_navigate");
+        let read_only = self.read_only;
+        runtime.update_checked(id, |r| {
+            if r.status == "starting" {
+                r.status = "running".into();
+            }
+            r.progress = None;
+            activity(
+                r,
+                &if relayed {
+                    format!(
+                        "The agent runs on {} (beta). {}{}",
+                        computer.name,
+                        if browser {
+                            "Desktop control and the browser tools act on that computer."
+                        } else {
+                            "Desktop control acts on that computer; the browser tools are not available there."
+                        },
+                        if read_only {
+                            " The attempt is read-only, so nothing comes back from it."
+                        } else {
+                            ""
+                        }
+                    )
+                } else {
+                    format!(
+                        "The agent runs on {} (beta) without Jackalope's tools. Update its image to use them.",
+                        computer.name
+                    )
+                },
+            );
+        })?;
+        Ok(Step::Ready)
+    }
+
+    fn follow(
+        &mut self,
+        runtime: &TaskRuntime,
+        launch: &mut Launch,
+    ) -> Result<Option<Outcome>, String> {
+        let id = launch.id;
+        let bridge = launch.req.coordination.as_ref().filter(|_| self.relayed);
+        let mut relay = bridge.map(|b| {
+            relay::Relay::new(&b.endpoint, &b.token, self.access.clone()).with_answer_limit(
+                if self.large_answers {
+                    relay::LARGE_ANSWER_LIMIT
+                } else {
+                    relay::ANSWER_LIMIT
+                },
+            )
+        });
+        let launched = self.launched.unwrap_or_else(std::time::Instant::now);
+        let followed = match self.immediate.take() {
+            Some(exit) => Followed {
+                exit: Some(exit),
+                quota_stopped: false,
+                lost: false,
+            },
+            None => self.follow_run(runtime, id, launch.adapter, launched, &mut relay),
+        };
+        self.lost = followed.lost;
+        let computer = &self.computer;
+        let exit = followed.exit.as_ref();
+        let code = exit
+            .and_then(|exit| exit["code"].as_i64())
+            .map(|c| c as i32);
+        let ended_cleanly =
+            exit.is_some_and(|exit| exit["reason"].is_null() && exit["error"].is_null());
+        if let Some(error) = exit.and_then(|exit| exit["error"].as_str()) {
+            let error = error.to_string();
+            runtime.update(id, |run| {
+                run.error.get_or_insert(format!(
+                    "The agent could not start on {}: {error}",
+                    computer.name
+                ));
+            });
+        }
+        match exit.and_then(|exit| exit["reason"].as_str()) {
+            Some("timeout") => runtime.update(id, |run| {
+                run.error.get_or_insert("The agent exceeded the six-hour limit on its computer. Inspect the saved work and continue the task.".into());
+            }),
+            Some("orphaned" | "interrupted") => runtime.update(id, |run| {
+                run.error.get_or_insert(format!(
+                    "The agent on {} stopped before finishing because contact was lost or the computer restarted. The changes it made are brought back; continue the task to finish.",
+                    computer.name
+                ));
+            }),
+            _ => {}
+        }
+        Ok(Some(Outcome {
+            success: ended_cleanly && code == Some(0) && !followed.lost,
+            exit_code: code,
+            quota_stopped: followed.quota_stopped,
+        }))
+    }
+
+    fn stop(&mut self) -> Result<(), String> {
+        self.session().stop()
+    }
+
+    fn collect(&mut self, runtime: &TaskRuntime, launch: &mut Launch, _: &Outcome) {
+        let (id, workspace) = (launch.id, launch.workspace);
+        let computer = self.computer.clone();
+        let (lost, read_only) = (self.lost, self.read_only);
+        let session = self.session();
+        if !lost && read_only {
+            runtime.refuse_changes(id, session, &computer);
+            session.remove();
+        } else if !lost {
+            runtime.remote_progress(
+                id,
+                &format!("Bringing changes back from {}", computer.name),
+                "",
+            );
+            if runtime.bring_back(id, session, workspace, &computer, false) {
+                session.remove();
+            }
+        }
+        session.shutdown();
+        runtime.update(id, |run| run.progress = None);
+    }
+}
+
+impl RemoteRunner {
+    /// Reads the run until it ends, feeding output to the adapter's parser,
+    /// relaying bridge calls and stop and quota decisions. Contact that is lost
+    /// is retried, reconnecting every few failed reads, for [`LOST_WINDOW`].
+    fn follow_run(
+        &mut self,
+        runtime: &TaskRuntime,
+        id: &str,
+        adapter: &str,
+        launched: std::time::Instant,
+        relay: &mut Option<relay::Relay>,
+    ) -> Followed {
+        let root = runtime.computers_root();
+        let computer = self.computer.clone();
+        let mut out = 0u64;
+        let mut err = 0u64;
+        let mut stdout = runs::Lines::new(1_000_000);
+        let mut stderr = runs::Lines::new(6000);
+        let mut partials = super::super::claude_session::Partials::new(launched);
+        let mut stop_sent = false;
+        let mut quota_stopped = false;
+        let mut failures = 0u32;
+        let mut lost_since: Option<std::time::Instant> = None;
+        let mut reclaim = false;
+        let mut last_note = std::time::Instant::now();
+        let exit = loop {
+            let canceled = runtime.inner.lock().unwrap().canceled.contains(id);
+            let quota = runtime.quota_handoff(id);
+            if (canceled || quota) && !stop_sent {
+                quota_stopped = quota && !canceled;
+                stop_sent = self.stop().is_ok();
+            }
+            let session = self.session();
+            if last_note.elapsed() > Duration::from_secs(60) {
+                computers::usage::note(&root, &computer.id);
+                last_note = std::time::Instant::now();
+            }
+            if let Some(relay) = relay.as_mut() {
+                for answer in relay.answers() {
+                    let sent = lost_since.is_none() && session.answer(&answer).is_ok();
+                    relay.delivered(answer, sent);
+                }
+            }
+            match session.read(&mut out, &mut err, reclaim) {
+                Ok(page) => {
+                    failures = 0;
+                    reclaim = false;
+                    if lost_since.take().is_some() {
+                        runtime.update(id, |run| {
+                            activity(run, &format!("Contact with {} is back.", computer.name))
+                        });
+                    }
+                    if let Some(relay) = relay.as_mut() {
+                        relay.accept(&page.bridge);
+                    }
+                    for (line, truncated) in stdout.push(&page.stdout) {
+                        runtime.remote_event(id, adapter, &mut partials, launched, line, truncated);
+                    }
+                    for (line, truncated) in stderr.push(&page.stderr) {
+                        runtime.remote_diagnostic(id, line, truncated);
+                    }
+                    if page.exit.is_some() {
+                        break page.exit;
+                    }
+                }
+                Err(error) => {
+                    failures += 1;
+                    reclaim = true;
+                    let since = *lost_since.get_or_insert_with(std::time::Instant::now);
+                    if failures == 3 {
+                        runtime.update(id, |run| {
+                            activity(
+                                run,
+                                &format!(
+                                    "Lost contact with {}: {error}. Retrying for up to 30 minutes.",
+                                    computer.name
+                                ),
+                            )
+                        });
+                    }
+                    let gave_up = since.elapsed() > LOST_WINDOW
+                        || (canceled && since.elapsed() > Duration::from_secs(30));
+                    if gave_up {
+                        runtime.update(id, |run| {
+                            run.error.get_or_insert(format!(
+                                "Lost contact with {}: {error}. The agent there stops on its own after ten minutes; its changes stay there and come back when this task is continued.",
+                                computer.name
+                            ));
+                        });
+                        return Followed {
+                            exit: None,
+                            quota_stopped,
+                            lost: true,
+                        };
+                    }
+                    if failures % RECONNECT_EVERY == 0 {
+                        let _ = session.reconnect(&root, &computer);
+                    }
+                    std::thread::sleep(Duration::from_secs(2));
+                }
+            }
+        };
+        if let Some((line, truncated)) = stdout.finish() {
+            runtime.remote_event(id, adapter, &mut partials, launched, line, truncated);
+        }
+        if let Some((line, truncated)) = stderr.finish() {
+            runtime.remote_diagnostic(id, line, truncated);
+        }
+        if adapter == "claude" {
+            partials.complete(runtime, id);
+        }
+        Followed {
+            exit,
+            quota_stopped,
+            lost: false,
+        }
+    }
+}
+
+impl TaskRuntime {
     /// Records which selected stdio connections start with the run and tells
     /// the agent. Returns the `run_start` request for them.
     #[allow(clippy::too_many_arguments)]
@@ -87,289 +570,10 @@ impl TaskRuntime {
 
     fn remote_progress(&self, id: &str, label: &str, detail: &str) {
         self.update(id, |run| {
-            let mut step = super::preparation::StepProgress::new("agent", label, 1);
+            let mut step = super::super::preparation::StepProgress::new("agent", label, 1);
             step.detail = detail.into();
             run.progress = Some(step);
         });
-    }
-
-    fn remote_stopped(&self, id: &str) {
-        self.update(id, |r| {
-            r.status = "stopped".into();
-            r.ended_at = Some(Utc::now().to_rfc3339());
-        });
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub(super) fn run_remote(
-        &self,
-        id: &str,
-        req: &RunRequest,
-        adapter: &str,
-        cmd: Command,
-        mut input: String,
-        workspace: &str,
-        computer: Computer,
-        connections: Vec<crate::commands::mcp::ComputerConnection>,
-    ) -> Result<(), String> {
-        let root = self.computers_root();
-        let bridge = req.coordination.as_ref();
-        let read_only = crate::commands::planning::read_only(id);
-        // Checks the sign-in before waiting for the computer.
-        runs::translate(adapter, &cmd, &root, bridge.map(|b| b.endpoint.as_str()))?;
-        {
-            let inner = self.inner.lock().unwrap();
-            if inner.canceled.contains(id) {
-                drop(inner);
-                self.remote_stopped(id);
-                return Ok(());
-            }
-            if inner.runs.values().any(|r| {
-                r.id != id
-                    && r.workspace == workspace
-                    && ["starting", "running", "stopping"].contains(&r.status.as_str())
-            }) {
-                return Err(
-                    "Another attempt is using this workspace. Stop it or wait before continuing."
-                        .into(),
-                );
-            }
-        }
-        self.update_checked(id, |run| {
-            run.remote = Some(RemoteExecution {
-                computer_id: computer.id.clone(),
-                computer_name: computer.name.clone(),
-            })
-        })?;
-        self.remote_progress(id, &format!("Starting {}", computer.name), "");
-        computers::ready_within(&root, &computer, START_WAIT)?;
-        computers::usage::note(&root, &computer.id);
-        let mut session = runs::Session::open(&root, &computer, workspace)?;
-        if read_only {
-            session.name = runs::read_only_run_name(workspace);
-        }
-        // An agent from before the relay answers no status and gets no bridge.
-        let status = session.status()?;
-        if let Some(status) = status.as_ref().filter(|status| status["exists"] == true) {
-            self.recover_remote(id, &mut session, status, workspace, &computer, read_only);
-        }
-        let relayed = bridge.filter(|_| status.is_some());
-        // A runner with artifacts receives large bridge answers whole, so
-        // on-demand results need no preview.
-        let large_answers = session.capabilities.has(computers::runner::ARTIFACTS);
-        let brokered = if large_answers {
-            self.mcp_broker.set_result_limit(id, None)
-        } else {
-            self.mcp_broker.has_attempt(id)
-        };
-        if relayed.is_some() && brokered {
-            input.push_str(&if large_answers {
-                "\nAnswers from on-demand tools reach this computer in full, up to 1 MB as on the person's device; select output with output.jsonPointers, output.rows or output.maxChars when you need less.\n".to_string()
-            } else {
-                format!("\nAn answer from on-demand tools can reach this computer only up to about {} KB: select output with output.jsonPointers, output.rows or output.maxChars, and page captured results with read_tool_result.\n", crate::commands::mcp_broker::REMOTE_RESULT_LIMIT / 1024)
-            });
-        }
-        let (argv, mut env) =
-            runs::translate(adapter, &cmd, &root, relayed.map(|b| b.endpoint.as_str()))?;
-        let secrets = crate::commands::project_secrets::environment(
-            &self.project_secrets_root(),
-            &req.project_id,
-            crate::commands::project_secrets::Place::Computer,
-        )
-        .map_err(|error| format!("Project secrets could not be read: {error}"))?;
-        if !secrets.is_empty() {
-            let names: Vec<&str> = secrets.iter().map(|(name, _)| name.as_str()).collect();
-            self.update(id, |run| {
-                activity(
-                    run,
-                    &format!(
-                        "Project secrets for the agent on {}: {}.",
-                        computer.name,
-                        names.join(", ")
-                    ),
-                )
-            });
-        }
-        runs::add_secrets(&mut env, secrets);
-        // Where each tool runs follows the runner's capabilities; desktop
-        // control acts on the computer itself.
-        let capabilities = runner::RunnerCapabilities::from_status(status.as_ref());
-        let access = relay::Access {
-            devtools: computers::provider(&computer.provider)
-                .ok()
-                .and_then(|provider| provider.devtools(&root, &computer))
-                .is_some(),
-            runner: capabilities,
-            read_only,
-        };
-        let local = relayed
-            .and_then(|_| access.local_request(req.verify_command.as_deref()))
-            .map(without_disabled_tools);
-        if relayed.is_some() {
-            input.push_str(&access.instructions());
-        } else if bridge.is_some() {
-            input.push_str("\nJackalope's tools are not available on this computer, whose image predates them. Ignore instructions that mention them.\n");
-        }
-        let connections = self.computer_connections(
-            id,
-            adapter,
-            &computer,
-            status.as_ref(),
-            relayed.is_some(),
-            connections,
-            &mut input,
-        );
-        let launched = std::time::Instant::now();
-        let label = format!("Sending files to {}", computer.name);
-        let progress = |sent: u64, total: u64| {
-            self.remote_progress(
-                id,
-                &label,
-                &format!("{} of {}", megabytes(sent), megabytes(total)),
-            );
-        };
-        let bundled = runs::uses_git_sync(&session.capabilities)
-            && self.send_bundle(
-                id,
-                &mut session,
-                workspace,
-                &req.setup_files,
-                &computer,
-                &progress,
-            );
-        if !bundled {
-            session.upload(Path::new(workspace), &req.setup_files, &progress)?;
-        }
-        self.update(id, |run| {
-            run.efficiency.timing("remoteUpload", launched.elapsed());
-        });
-        if self.inner.lock().unwrap().canceled.contains(id) {
-            session.remove();
-            session.shutdown();
-            self.remote_stopped(id);
-            return Ok(());
-        }
-        let mut parts = serde_json::Map::new();
-        if let Some(connections) = connections {
-            parts.insert("mcp".into(), connections);
-        }
-        if let Some(local) = local.clone() {
-            parts.insert("local".into(), local);
-        }
-        runner::attach(id, access.clone());
-        let started = session.start(&argv, &env, &input, relayed.is_some(), &parts);
-        if started.is_err() {
-            runner::detach(id);
-        }
-        let started = started?;
-        let immediate = started.exit;
-        if relayed.is_some() {
-            let placement = placement_activity(
-                &access,
-                &computer.name,
-                local.as_ref(),
-                started.local_tools.as_deref(),
-            );
-            self.update(id, |run| activity(run, &placement));
-        }
-        for (name, reason) in &started.unavailable {
-            self.update(id, |run| {
-                activity(
-                    run,
-                    &format!("{name} could not start on {}: {reason}", computer.name),
-                )
-            });
-        }
-        self.update_checked(id, |r| {
-            if r.status == "starting" {
-                r.status = "running".into();
-            }
-            r.progress = None;
-            activity(
-                r,
-                &if relayed.is_some() {
-                    format!(
-                        "The agent runs on {} (beta). {}{}",
-                        computer.name,
-                        if !access.tool_unavailable("browser_navigate") {
-                            "Desktop control and the browser tools act on that computer."
-                        } else {
-                            "Desktop control acts on that computer; the browser tools are not available there."
-                        },
-                        if read_only {
-                            " The attempt is read-only, so nothing comes back from it."
-                        } else {
-                            ""
-                        }
-                    )
-                } else {
-                    format!(
-                        "The agent runs on {} (beta) without Jackalope's tools. Update its image to use them.",
-                        computer.name
-                    )
-                },
-            );
-        })?;
-        let mut relay = relayed.map(|b| {
-            relay::Relay::new(&b.endpoint, &b.token, access).with_answer_limit(if large_answers {
-                relay::LARGE_ANSWER_LIMIT
-            } else {
-                relay::ANSWER_LIMIT
-            })
-        });
-        let followed = match immediate {
-            Some(exit) => Followed {
-                exit: Some(exit),
-                quota_stopped: false,
-                lost: false,
-            },
-            None => self.follow_remote(id, adapter, &mut session, &computer, launched, &mut relay),
-        };
-        runner::detach(id);
-        let exit = followed.exit.as_ref();
-        let code = exit
-            .and_then(|exit| exit["code"].as_i64())
-            .map(|c| c as i32);
-        let ended_cleanly =
-            exit.is_some_and(|exit| exit["reason"].is_null() && exit["error"].is_null());
-        if let Some(error) = exit.and_then(|exit| exit["error"].as_str()) {
-            let error = error.to_string();
-            self.update(id, |run| {
-                run.error.get_or_insert(format!(
-                    "The agent could not start on {}: {error}",
-                    computer.name
-                ));
-            });
-        }
-        match exit.and_then(|exit| exit["reason"].as_str()) {
-            Some("timeout") => self.update(id, |run| {
-                run.error.get_or_insert("The agent exceeded the six-hour limit on its computer. Inspect the saved work and continue the task.".into());
-            }),
-            Some("orphaned" | "interrupted") => self.update(id, |run| {
-                run.error.get_or_insert(format!(
-                    "The agent on {} stopped before finishing because contact was lost or the computer restarted. The changes it made are brought back; continue the task to finish.",
-                    computer.name
-                ));
-            }),
-            _ => {}
-        }
-        if !followed.lost && read_only {
-            self.refuse_changes(id, &mut session, &computer);
-            session.remove();
-        } else if !followed.lost {
-            self.remote_progress(
-                id,
-                &format!("Bringing changes back from {}", computer.name),
-                "",
-            );
-            if self.bring_back(id, &mut session, workspace, &computer, false) {
-                session.remove();
-            }
-        }
-        session.shutdown();
-        self.update(id, |run| run.progress = None);
-        let success = ended_cleanly && code == Some(0) && !followed.lost;
-        self.complete_attempt(id, req, success, code, followed.quota_stopped)
     }
 
     /// Sends the workspace as a Git bundle of only what the computer lacks.
@@ -527,7 +731,7 @@ impl TaskRuntime {
                 shots.push(artifact.path.clone());
             }
         }
-        super::runner::record::register_screenshots(self, id, workspace, shots);
+        super::record::register_screenshots(self, id, workspace, shots);
         true
     }
 
@@ -535,7 +739,7 @@ impl TaskRuntime {
     /// on the computer anyway are reported, then removed with its run.
     fn refuse_changes(&self, id: &str, session: &mut runs::Session, computer: &Computer) {
         // Its screenshots are discarded with its run.
-        super::runner::record::take_screenshots(id);
+        super::record::take_screenshots(id);
         let files = session.collect().map_or(0, |patch| patch_files(&patch));
         if files > 0 {
             self.update(id, |run| {
@@ -587,135 +791,11 @@ impl TaskRuntime {
         }
     }
 
-    /// Reads the run until it ends, feeding output to the adapter's parser,
-    /// relaying bridge calls and stop and quota decisions. Contact that is lost
-    /// is retried, reconnecting every few failed reads, for [`LOST_WINDOW`].
-    fn follow_remote(
-        &self,
-        id: &str,
-        adapter: &str,
-        session: &mut runs::Session,
-        computer: &Computer,
-        launched: std::time::Instant,
-        relay: &mut Option<relay::Relay>,
-    ) -> Followed {
-        let root = self.computers_root();
-        let mut out = 0u64;
-        let mut err = 0u64;
-        let mut stdout = runs::Lines::new(1_000_000);
-        let mut stderr = runs::Lines::new(6000);
-        let mut partials = super::claude_session::Partials::new(launched);
-        let mut stop_sent = false;
-        let mut quota_stopped = false;
-        let mut failures = 0u32;
-        let mut lost_since: Option<std::time::Instant> = None;
-        let mut reclaim = false;
-        let mut last_note = std::time::Instant::now();
-        let exit = loop {
-            let (canceled, quota) = {
-                let inner = self.inner.lock().unwrap();
-                (
-                    inner.canceled.contains(id),
-                    inner
-                        .runs
-                        .get(id)
-                        .is_some_and(|run| run.routing.is_some() && run.quota_failure.is_some()),
-                )
-            };
-            if (canceled || quota) && !stop_sent {
-                quota_stopped = quota && !canceled;
-                stop_sent = session.stop().is_ok();
-            }
-            if last_note.elapsed() > Duration::from_secs(60) {
-                computers::usage::note(&root, &computer.id);
-                last_note = std::time::Instant::now();
-            }
-            if let Some(relay) = relay.as_mut() {
-                for answer in relay.answers() {
-                    let sent = lost_since.is_none() && session.answer(&answer).is_ok();
-                    relay.delivered(answer, sent);
-                }
-            }
-            match session.read(&mut out, &mut err, reclaim) {
-                Ok(page) => {
-                    failures = 0;
-                    reclaim = false;
-                    if lost_since.take().is_some() {
-                        self.update(id, |run| {
-                            activity(run, &format!("Contact with {} is back.", computer.name))
-                        });
-                    }
-                    if let Some(relay) = relay.as_mut() {
-                        relay.accept(&page.bridge);
-                    }
-                    for (line, truncated) in stdout.push(&page.stdout) {
-                        self.remote_event(id, adapter, &mut partials, launched, line, truncated);
-                    }
-                    for (line, truncated) in stderr.push(&page.stderr) {
-                        self.remote_diagnostic(id, line, truncated);
-                    }
-                    if page.exit.is_some() {
-                        break page.exit;
-                    }
-                }
-                Err(error) => {
-                    failures += 1;
-                    reclaim = true;
-                    let since = *lost_since.get_or_insert_with(std::time::Instant::now);
-                    if failures == 3 {
-                        self.update(id, |run| {
-                            activity(
-                                run,
-                                &format!(
-                                    "Lost contact with {}: {error}. Retrying for up to 30 minutes.",
-                                    computer.name
-                                ),
-                            )
-                        });
-                    }
-                    let gave_up = since.elapsed() > LOST_WINDOW
-                        || (canceled && since.elapsed() > Duration::from_secs(30));
-                    if gave_up {
-                        self.update(id, |run| {
-                            run.error.get_or_insert(format!(
-                                "Lost contact with {}: {error}. The agent there stops on its own after ten minutes; its changes stay there and come back when this task is continued.",
-                                computer.name
-                            ));
-                        });
-                        return Followed {
-                            exit: None,
-                            quota_stopped,
-                            lost: true,
-                        };
-                    }
-                    if failures % RECONNECT_EVERY == 0 {
-                        let _ = session.reconnect(&root, computer);
-                    }
-                    std::thread::sleep(Duration::from_secs(2));
-                }
-            }
-        };
-        if let Some((line, truncated)) = stdout.finish() {
-            self.remote_event(id, adapter, &mut partials, launched, line, truncated);
-        }
-        if let Some((line, truncated)) = stderr.finish() {
-            self.remote_diagnostic(id, line, truncated);
-        }
-        if adapter == "claude" {
-            partials.complete(self, id);
-        }
-        Followed {
-            exit,
-            quota_stopped,
-            lost: false,
-        }
-    }
-
     fn remote_event(
         &self,
         id: &str,
         adapter: &str,
-        partials: &mut super::claude_session::Partials,
+        partials: &mut super::super::claude_session::Partials,
         launched: std::time::Instant,
         line: String,
         truncated: bool,
@@ -724,7 +804,7 @@ impl TaskRuntime {
             return;
         }
         let _ = self.update_output(id, |r| {
-            if !truncated && super::efficiency::useful_event(&line, adapter) {
+            if !truncated && super::super::efficiency::useful_event(&line, adapter) {
                 r.efficiency.first_activity(launched.elapsed());
             }
             if truncated {

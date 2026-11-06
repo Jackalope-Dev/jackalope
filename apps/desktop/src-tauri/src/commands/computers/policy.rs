@@ -57,7 +57,9 @@ pub(crate) async fn decide(
     run: &TaskRun,
     body: Value,
 ) -> Result<Value, String> {
-    if run.remote.is_none() {
+    // This device's own runner resolves its policy in-process; only a
+    // runner elsewhere calls back, and only while its attempt runs.
+    if super::runner::for_run(&run.id).on_device() {
         return Err("Only an agent on a computer asks Jackalope this way.".into());
     }
     match Kind::parse(&body)? {

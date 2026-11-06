@@ -290,7 +290,8 @@ pub(super) async fn approve_computer_tool(
     run: &crate::commands::tasks::TaskRun,
     body: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
-    let request = computer_tool_request(run.remote.is_some(), body)?;
+    let remote = !super::computers::runner::for_run(&run.id).on_device();
+    let request = computer_tool_request(remote, body)?;
     Ok(permission_for(service, run, request).await)
 }
 

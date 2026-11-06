@@ -17,7 +17,6 @@ mod performance;
 pub(super) mod preparation;
 mod project_setup;
 mod prompt;
-mod remote;
 mod routing;
 pub(in crate::commands) mod runner;
 mod runners;

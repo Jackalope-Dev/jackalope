@@ -1,0 +1,286 @@
+//! One launch through both runners: this device's, with a real agent process,
+//! and a computer's, through a stand-in for the computer's runner.
+
+use super::*;
+use crate::commands::computers::runner::{
+    Access, Placement, Where, BROWSER, LOCAL_BRIDGE, POLICY_CALLBACKS, TOOLS, WORKSPACE_TOOLS,
+};
+use base64::Engine;
+use serde_json::json;
+use std::sync::atomic::AtomicBool;
+
+const EVENTS: &[&str] = &[
+    r#"{"type":"thread.started","thread_id":"fixture-session"}"#,
+    r#"{"type":"item.completed","item":{"type":"agent_message","text":"Fixture complete"}}"#,
+];
+const CAPABILITIES: &[&str] = &[LOCAL_BRIDGE, WORKSPACE_TOOLS, BROWSER, POLICY_CALLBACKS];
+
+/// Answers the run protocol like a protocol 4 runner whose agent prints
+/// [`EVENTS`] and changes nothing.
+struct StandIn {
+    started: Arc<Mutex<Option<serde_json::Value>>>,
+    read: bool,
+}
+
+impl computers::Transport for StandIn {
+    fn call(
+        &mut self,
+        payload: &serde_json::Value,
+        _: Duration,
+        _: &AtomicBool,
+    ) -> Result<serde_json::Value, String> {
+        let engine = base64::engine::general_purpose::STANDARD;
+        Ok(match payload["action"].as_str().unwrap() {
+            "run_status" => json!({"exists": false, "runs": 4, "capabilities": CAPABILITIES}),
+            "workspace_put" => json!({}),
+            "run_start" => {
+                *self.started.lock().unwrap() = Some(payload.clone());
+                json!({"started": true, "local": {"tools": payload["local"]["tools"]}})
+            }
+            "run_read" if !self.read => {
+                self.read = true;
+                let stdout = format!("{}\n", EVENTS.join("\n"));
+                json!({
+                    "stdout": engine.encode(&stdout),
+                    "stderr": "",
+                    "out": stdout.len(),
+                    "err": 0,
+                    "exit": {"code": 0},
+                })
+            }
+            "run_read" => json!({"stdout": "", "stderr": "", "exit": {"code": 0}}),
+            "workspace_diff" => json!({
+                "size": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            }),
+            "run_remove" => json!({}),
+            other => return Err(format!("Unsupported action {other}")),
+        })
+    }
+}
+
+fn request(id: &str, workspace: &Path) -> RunRequest {
+    RunRequest {
+        retry_of: None,
+        live_session_id: None,
+        effort: None,
+        codex_speed: None,
+        dependency_snapshot: Default::default(),
+        monitor_change: None,
+        context_selection: Default::default(),
+        context_receipt: Default::default(),
+        id: id.into(),
+        project_id: "fixture".into(),
+        project_name: "Fixture".into(),
+        project_path: workspace.to_string_lossy().into_owned(),
+        agent: "codex".into(),
+        agent_profile_id: None,
+        verify_command: Some("pnpm test".into()),
+        prepare_command: None,
+        setup_files: Vec::new(),
+        auto_verify: false,
+        target_branch: None,
+        account_binding: None,
+        model: None,
+        prompt: "Fixture only".into(),
+        isolated: false,
+        workspace_mode: None,
+        previous_run_id: None,
+        coordination: Some(CoordinationContext {
+            managed: false,
+            endpoint: "http://127.0.0.1:9".into(),
+            token: "bridge-token".into(),
+            instructions: String::new(),
+        }),
+        connection_ids: None,
+    }
+}
+
+/// Runs `runner` through the shared path up to, not including, the
+/// completion on this device, and returns how it ended and what it recorded.
+fn drive(
+    runtime: &TaskRuntime,
+    runner: &mut dyn AttemptRunner,
+    workspace: &Path,
+    cmd: Command,
+    input: &str,
+) -> (Outcome, TaskRun) {
+    let id = uuid::Uuid::new_v4().to_string();
+    let mut run = super::super::tests::sample("codex");
+    run.id = id.clone();
+    run.status = "starting".into();
+    run.workspace = workspace.to_string_lossy().into_owned();
+    runtime.inner.lock().unwrap().runs.insert(id.clone(), run);
+    let req = request(&id, workspace);
+    let mut launch = Launch {
+        id: &id,
+        req: &req,
+        adapter: "codex",
+        cmd,
+        input: input.into(),
+        workspace: &workspace.to_string_lossy(),
+    };
+    assert_eq!(runner.prepare(runtime, &mut launch).unwrap(), Step::Ready);
+    let outcome = runtime
+        .run_prepared(runner, &mut launch)
+        .unwrap()
+        .expect("the agent ran");
+    let recorded = runtime.inner.lock().unwrap().runs[&id].clone();
+    (outcome, recorded)
+}
+
+#[test]
+fn both_runners_place_tools_from_one_table() {
+    let local = local::LocalRunner::new(false, None, None, None, Vec::new(), None, None);
+    let remote = Access {
+        runner: computers::runner::RunnerCapabilities::from_status(Some(
+            &json!({"runs": 4, "capabilities": CAPABILITIES}),
+        )),
+        devtools: false,
+        read_only: false,
+    };
+    for tool in TOOLS {
+        let (here, there) = (local.access().tool(tool.name), remote.tool(tool.name));
+        match tool.placement {
+            // Only tools that need this device's own workspace or sign-ins differ.
+            Placement::DeviceOnly => {
+                assert_eq!(
+                    (here, there),
+                    (Where::Runner, Where::Unavailable),
+                    "{}",
+                    tool.name
+                )
+            }
+            Placement::Workspace(_) => {
+                assert_eq!(
+                    (here, there),
+                    (Where::Runner, Where::Runner),
+                    "{}",
+                    tool.name
+                )
+            }
+            Placement::Control => {
+                assert_eq!(
+                    (here, there),
+                    (Where::Device, Where::Device),
+                    "{}",
+                    tool.name
+                )
+            }
+        }
+    }
+    let names = TOOLS.iter().map(|tool| tool.name);
+    assert_eq!(
+        computers::runner::offered(local.access(), names.clone()),
+        names.clone().collect::<Vec<_>>()
+    );
+    assert_eq!(
+        computers::runner::offered(&remote, names.clone()),
+        names
+            .filter(
+                |name| !["browser_open_profile", "peer_adopt", "permission_prompt"].contains(name)
+            )
+            .collect::<Vec<_>>()
+    );
+    // An agent on this device is told nothing about where its tools act.
+    assert!(local.access().instructions().is_empty());
+}
+
+#[test]
+fn one_launch_records_the_same_result_through_both_runners() {
+    let folder = std::env::temp_dir().join(format!("jackalope-runners-{}", uuid::Uuid::new_v4()));
+    let (here, there) = (folder.join("local"), folder.join("remote"));
+    for workspace in [&here, &there] {
+        std::fs::create_dir_all(workspace).unwrap();
+        std::fs::write(workspace.join("README.md"), "fixture\n").unwrap();
+    }
+    let script = folder.join("agent.cjs");
+    std::fs::write(
+        &script,
+        format!(
+            "let input = '';\nprocess.stdin.setEncoding('utf8');\nprocess.stdin.on('data', chunk => input += chunk);\nprocess.stdin.on('end', () => {{\n  require('node:fs').writeFileSync('input.txt', input);\n  for (const line of {}) console.log(line);\n}});\n",
+            serde_json::to_string(EVENTS).unwrap()
+        ),
+    )
+    .unwrap();
+    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    credentials::set(
+        &runtime.computers_root(),
+        "openai-key",
+        Some("sk-fixture-0123456789abcdef"),
+    )
+    .unwrap();
+    let input = "Task:\nFixture only\n";
+
+    let mut local = local::LocalRunner::new(false, None, None, None, Vec::new(), None, None);
+    let mut agent = Command::new("node");
+    agent.arg(&script);
+    let (local_outcome, local_run) = drive(&runtime, &mut local, &here, agent, input);
+
+    let started = Arc::new(Mutex::new(None));
+    let computer = Computer {
+        id: "computer-1".into(),
+        name: "Box".into(),
+        owner_kind: "project".into(),
+        owner_id: "fixture".into(),
+        provider: "remote-machine".into(),
+        machine_id: None,
+        decisions: "fixture".into(),
+        created_at: String::new(),
+        last_used_at: None,
+        settings: Default::default(),
+    };
+    let session = runs::Session::with_transport(
+        Box::new(StandIn {
+            started: started.clone(),
+            read: false,
+        }),
+        runs::run_name(&there.to_string_lossy()),
+    );
+    let mut remote = remote::RemoteRunner::with_session(computer, false, session);
+    let mut codex = Command::new("codex");
+    codex.args(["exec", "--json", "-"]);
+    let (remote_outcome, remote_run) = drive(&runtime, &mut remote, &there, codex, input);
+
+    // The same turn, recorded the same way.
+    for outcome in [&local_outcome, &remote_outcome] {
+        assert!(outcome.success);
+        assert_eq!(outcome.exit_code, Some(0));
+        assert!(!outcome.quota_stopped);
+    }
+    assert_eq!(local_run.result, "Fixture complete");
+    assert_eq!(local_run.result, remote_run.result);
+    assert_eq!(local_run.session_id.as_deref(), Some("fixture-session"));
+    assert_eq!(local_run.session_id, remote_run.session_id);
+    assert_eq!(local_run.status, remote_run.status);
+    assert_eq!(local_run.error, None);
+    assert_eq!(remote_run.error, None);
+    assert!(local_run.remote.is_none());
+    assert_eq!(remote_run.remote.as_ref().unwrap().computer_name, "Box");
+
+    // The agent received the same input; the computer's also says where its
+    // tools act, from the same table.
+    let delivered = std::fs::read_to_string(here.join("input.txt")).unwrap();
+    assert_eq!(delivered, input);
+    let start = started.lock().unwrap().clone().unwrap();
+    assert_eq!(
+        start["stdin"].as_str().unwrap(),
+        format!("{input}{}", remote.access().instructions())
+    );
+    // The tools the computer's runner serves are those served in-process here.
+    let served: Vec<&str> = start["local"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|tool| tool.as_str().unwrap())
+        .collect();
+    assert!(served.contains(&"computer_verify") && served.contains(&"browser_navigate"));
+    for tool in &served {
+        assert_eq!(local.access().tool(tool), Where::Runner, "{tool}");
+    }
+    assert_eq!(start["local"]["check"], "pnpm test");
+    assert_eq!(start["argv"][0], "codex");
+
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(folder);
+}

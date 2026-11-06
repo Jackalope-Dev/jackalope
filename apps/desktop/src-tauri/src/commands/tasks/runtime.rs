@@ -919,7 +919,8 @@ impl TaskRuntime {
         // An agent on a computer uses selected on-demand connections through the
         // bridge relay; the broker, its credentials and OAuth stay on this
         // device. A writing agent's stdio connections run on the computer, in
-        // the workspace it edits, and start with the run (see run_remote).
+        // the workspace it edits, and start with the run (see
+        // `runner::remote::RemoteRunner`).
         let mut remote_connections = String::new();
         let mut computer_mcp = Vec::new();
         if let Some(computer) = &remote {
@@ -971,7 +972,7 @@ impl TaskRuntime {
             }
             if !discovered_mcp.is_empty() {
                 // The answer limit depends on the computer's runner and is
-                // added once the run knows it (see run_remote).
+                // added once the runner has reported its capabilities.
                 remote_connections.push_str("\nSelected connections' on-demand tools run on the person's device and reach you through Jackalope. A call's arguments can be at most 60 KB.\n");
             }
         }
@@ -1296,326 +1297,39 @@ impl TaskRuntime {
             std::fs::write(self.directory.join(format!("{id}.input")), &input)
                 .map_err(|e| e.to_string())?;
         }
-        if let Some(computer) = remote {
-            drop(runner_lease);
-            return self.run_remote(
-                id,
-                req,
-                &adapter,
-                cmd,
-                input,
-                &workspace,
-                computer,
-                computer_mcp,
-            );
-        }
-        if persistent {
-            let outcome = self.run_claude_session(super::claude_session::Launch {
-                id,
-                request: req,
-                cmd,
-                input,
-                workspace: workspace.clone(),
-                previous_session: previous.and_then(|old| old.session_id),
-                settings: claude.unwrap_or_default(),
-                final_check,
-                context_by_hook: claude.is_some_and(|settings| settings.hooks.context),
+        let mut runner: Box<dyn super::runner::AttemptRunner> = match remote {
+            Some(computer) => {
+                drop(runner_lease);
+                Box::new(super::runner::remote::RemoteRunner::new(
+                    computer,
+                    computer_mcp,
+                    read_only,
+                ))
+            }
+            None => Box::new(super::runner::local::LocalRunner::new(
+                read_only,
+                previous.and_then(|old| old.session_id),
+                selected_model,
+                opencode_connection,
+                acp_servers,
+                persistent.then(|| super::runner::local::Persistent {
+                    settings: claude.unwrap_or_default(),
+                    final_check,
+                }),
                 runner_lease,
-            })?;
-            let Some(outcome) = outcome else {
-                return Ok(());
-            };
-            return self.complete_attempt(
+            )),
+        };
+        self.run_attempt(
+            runner.as_mut(),
+            super::runner::Launch {
                 id,
                 req,
-                outcome.success,
-                outcome.exit_code,
-                outcome.quota_stopped,
-            );
-        }
-        cmd.current_dir(&workspace)
-            .stdin(Stdio::piped())
-            .stdout(if opencode_connection.is_some() {
-                Stdio::null()
-            } else {
-                Stdio::piped()
-            })
-            .stderr(Stdio::piped());
-        let mut inner = self.inner.lock().unwrap();
-        if inner.canceled.contains(id) {
-            drop(inner);
-            self.update(id, |r| {
-                r.status = "stopped".into();
-                r.ended_at = Some(Utc::now().to_rfc3339());
-            });
-            return Ok(());
-        }
-        if inner.runs.values().any(|r| {
-            r.id != id
-                && r.workspace == workspace
-                && ["starting", "running", "stopping"].contains(&r.status.as_str())
-        }) {
-            return Err(
-                "Another attempt is using this workspace. Stop it or wait before continuing."
-                    .into(),
-            );
-        }
-        let launched = std::time::Instant::now();
-        if let Some(connection) = &mut opencode_connection {
-            connection.release_port();
-        }
-        let spawned = spawn_agent(&mut cmd, &req.agent);
-        let spawn_elapsed = launched.elapsed();
-        let (mut child, spawn_attempts) = spawned?;
-        let tree = match crate::commands::process_control::ProcessTree::attach(&child) {
-            Ok(tree) => tree,
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(error);
-            }
-        };
-        let mut stdin = child.stdin.take().ok_or("Missing agent input")?;
-        let stdout = child.stdout.take();
-        if stdout.is_none() && opencode_connection.is_none() {
-            tree.terminate();
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err("Missing agent output".into());
-        }
-        let stderr = child.stderr.take().ok_or("Missing agent diagnostics")?;
-        let process = Arc::new(Mutex::new(child));
-        inner.processes.insert(id.into(), process.clone());
-        drop(inner);
-        self.update_checked(id, |r| {
-            r.efficiency.timing("processSpawn", spawn_elapsed);
-            r.process_contained = cfg!(windows);
-            if r.status == "starting" {
-                r.status = "running".into();
-            }
-            // The agent is live now; its own activity replaces the startup step.
-            r.progress = None;
-            if spawn_attempts > 1 {
-                activity(
-                    r,
-                    &format!("The agent process started after {spawn_attempts} attempts."),
-                );
-            }
-        })?;
-        let server_transport = opencode_connection.is_some();
-        let input_result =
-            if adapter == "grok" || adapter == "kimi" || adapter == "acp" || server_transport {
-                Ok(())
-            } else {
-                stdin.write_all(input.as_bytes())
-            };
-        let mut acp_input = (adapter == "kimi" || adapter == "acp").then_some(stdin);
-        if let Err(error) = input_result {
-            let _ = self.stop(id);
-            return Err(format!("Could not deliver task: {error}"));
-        }
-        let runtime = self.clone();
-        let event_id = id.to_string();
-        let output_adapter = adapter.clone();
-        let resumed_session = previous.as_ref().and_then(|run| run.session_id.clone());
-        let acp_success = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let reader_success = acp_success.clone();
-        let usage_probe = Arc::new(Mutex::new(None));
-        let reader_probe = usage_probe.clone();
-        let acp_workspace = workspace.clone();
-        let task_effort = req.effort;
-        let reader = std::thread::spawn(move || {
-            if let Some(connection) = opencode_connection {
-                match connection.drive(
-                    &runtime,
-                    &event_id,
-                    &acp_workspace,
-                    resumed_session.as_deref(),
-                    selected_model.as_deref(),
-                    task_effort,
-                    &input,
-                    launched,
-                ) {
-                    Ok(()) => reader_success.store(true, std::sync::atomic::Ordering::SeqCst),
-                    Err(error) => runtime.update(&event_id, |run| {
-                        run.error.get_or_insert(error);
-                    }),
-                }
-                return;
-            }
-            let stdout = stdout.unwrap();
-            if output_adapter == "kimi" || output_adapter == "acp" {
-                let result = kimi::drive_with_servers(
-                    BufReader::new(stdout),
-                    &mut acp_input.take().unwrap(),
-                    &acp_workspace,
-                    resumed_session.as_deref(),
-                    selected_model.as_deref(),
-                    &input,
-                    &acp_servers,
-                    |update| {
-                        if update["sessionUpdate"] == "jackalope_usage_probe" {
-                            *reader_probe.lock().unwrap() = (update["active"] == true)
-                                .then(|| (std::time::Instant::now(), update["afterTurn"] == true));
-                        } else {
-                            let _ = runtime.update_output(&event_id, |run| {
-                                if matches!(
-                                    update["sessionUpdate"].as_str(),
-                                    Some("agent_message_chunk" | "tool_call")
-                                ) {
-                                    run.efficiency.first_activity(launched.elapsed());
-                                }
-                                kimi::consume(run, update);
-                            });
-                        }
-                    },
-                    |params| kimi::permission(&runtime, &event_id, params),
-                );
-                match result {
-                    Ok(()) => reader_success.store(true, std::sync::atomic::Ordering::SeqCst),
-                    Err(error) => runtime.update(&event_id, |run| {
-                        run.error.get_or_insert(error);
-                    }),
-                }
-                return;
-            }
-            let mut gemini_stream = gemini::Stream::new(resumed_session.clone());
-            let mut stream = antigravity::Stream::new(resumed_session);
-            let mut partials = super::claude_session::Partials::new(launched);
-            if let Err(error) = crate::commands::process_control::bounded_lines(
-                BufReader::new(stdout),
-                1_000_000,
-                |line, truncated| {
-                    if output_adapter == "claude"
-                        && !truncated
-                        && partials.consume(&runtime, &event_id, &line)
-                    {
-                        return;
-                    }
-                    let _ = runtime.update_output(&event_id, |r| {
-                    if !truncated && super::efficiency::useful_event(&line, &output_adapter) {
-                        r.efficiency.first_activity(launched.elapsed());
-                    }
-                    if truncated {
-                        activity(r, "An oversized agent event was omitted. Inspect the agent session for full output.");
-                        if output_adapter == "antigravity" { r.error.get_or_insert("Antigravity returned an oversized protocol event; the result could not be fully verified.".into()); }
-                        if output_adapter == "gemini" { r.error.get_or_insert("Gemini CLI returned an oversized protocol event; the result could not be fully verified.".into()); }
-                    }
-                    else if output_adapter == "antigravity" { stream.consume(r, &line); }
-                    else if output_adapter == "gemini" { gemini_stream.consume(r, &line); }
-                    else { consume_adapter_event(r, &line, &output_adapter); }
-                });
-                },
-            ) {
-                let _ = runtime.update_output(&event_id, |r| {
-                    r.error = Some(format!("Agent output could not be read: {error}"))
-                });
-            }
-            if output_adapter == "claude" {
-                partials.complete(&runtime, &event_id);
-            }
-            if output_adapter == "antigravity" {
-                runtime.update(&event_id, |run| stream.finish(run));
-            }
-            if output_adapter == "gemini" {
-                runtime.update(&event_id, |run| gemini_stream.finish(run));
-            }
-        });
-        let runtime = self.clone();
-        let event_id = id.to_string();
-        let diagnostics_adapter = adapter.clone();
-        let diagnostics = std::thread::spawn(move || {
-            let _ = crate::commands::process_control::bounded_lines(
-                BufReader::new(stderr),
-                6000,
-                |mut line, truncated| {
-                    if truncated {
-                        line.push_str(" [truncated]");
-                    }
-                    let _ = runtime.update_output(&event_id, |r| {
-                        if diagnostics_adapter == "antigravity"
-                            && antigravity::permission_denied(&line)
-                        {
-                            antigravity::mark_permission_denied(r);
-                        }
-                        r.diagnostics.push(line);
-                    });
-                },
-            );
-        });
-        let started = std::time::Instant::now();
-        let mut timed_out = false;
-        let mut quota_stopped = false;
-        let exit = loop {
-            if let Some(exit) = process
-                .lock()
-                .unwrap()
-                .try_wait()
-                .map_err(|e| e.to_string())?
-            {
-                break exit;
-            }
-            if (adapter == "kimi" || adapter == "acp" || server_transport) && reader.is_finished() {
-                tree.terminate();
-                let mut child = process.lock().unwrap();
-                let _ = child.kill();
-                break child.wait().map_err(|error| error.to_string())?;
-            }
-            if let Some((began, after_turn)) = *usage_probe.lock().unwrap() {
-                if began.elapsed() > Duration::from_secs(15) {
-                    if !after_turn {
-                        self.update(id, |run| run.error = Some("Kimi's usage command timed out before the task started. Update the CLI and retry.".into()));
-                    }
-                    tree.terminate();
-                    let _ = process.lock().unwrap().kill();
-                }
-            }
-            if (matches!(adapter.as_str(), "antigravity" | "kimi" | "acp" | "gemini")
-                || server_transport)
-                && !timed_out
-                && started.elapsed() > antigravity::TIMEOUT
-            {
-                timed_out = true;
-                self.update(id, |run| run.error = Some(format!("{adapter} exceeded the 30-minute attempt limit. Inspect the saved work and continue the task.")));
-                tree.terminate();
-                let _ = process.lock().unwrap().kill();
-            }
-            std::thread::sleep(Duration::from_millis(100));
-            if !quota_stopped
-                && self
-                    .inner
-                    .lock()
-                    .unwrap()
-                    .runs
-                    .get(id)
-                    .is_some_and(|run| run.routing.is_some() && run.quota_failure.is_some())
-            {
-                quota_stopped = true;
-                tree.terminate();
-                let _ = process.lock().unwrap().kill();
-            }
-        };
-        tree.terminate();
-        let _ = reader.join();
-        let _ = diagnostics.join();
-        if adapter == "gemini" && !exit.success() {
-            self.update(id, |run| {
-                for line in run.diagnostics.clone() {
-                    gemini::diagnostic(run, &line);
-                }
-            });
-        }
-        // ACP completion is the turn receipt; its persistent server is stopped by the owner.
-        let success = if adapter == "kimi" || adapter == "acp" || server_transport {
-            acp_success.load(std::sync::atomic::Ordering::SeqCst) && !timed_out
-        } else {
-            exit.success()
-        };
-        if adapter == "grok" {
-            let _ = std::fs::remove_file(self.directory.join(format!("{id}.prompt")));
-        }
-        self.inner.lock().unwrap().processes.remove(id);
-        self.complete_attempt(id, req, success, exit.code(), quota_stopped)
+                adapter: &adapter,
+                cmd,
+                input,
+                workspace: &workspace,
+            },
+        )
     }
 
     /// Checks, checkpoints and records the outcome of an agent turn that has ended.
