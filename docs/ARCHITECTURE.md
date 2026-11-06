@@ -81,7 +81,8 @@ names; changes must preserve both sides and old saved records.
 | desktop_control.rs, desktop_control/, resources/gnome-extension/ | Attempt-scoped window, app and desktop grants, remembered project permissions, resident native helpers, accessibility refs, capture and guarded Windows/macOS/X11/GNOME 46 Wayland input |
 | computers.rs, computers/, desktop_control/computer.rs, resources/computer/ | Bot, task and project computers: provider trait, local Docker sandboxes, paired cloud machines, Agent37 machines, the in-sandbox agent image, run routing for desktop and browser tools, and the run protocol, command translation and sign-ins for agents on a computer |
 | computers/runner.rs, computers/policy.rs | The control plane / runner boundary for agents on a computer: runner capability negotiation, the table of where each bridge tool executes, and the device's answers to the runner's policy callbacks and events |
-| tasks/remote.rs | The attempt side of an agent on a project computer: upload, output relay, stop and quota, and applying its changes before the local completion path |
+| computers/sync.rs, computers/artifacts.rs | How workspaces and files travel to a runner with `git-sync` and `artifacts`: Git bundles against a per-project repository on the computer, and chunked, content-addressed, resumable transfers for bundles, saved output and large bridge answers |
+| tasks/remote.rs | The attempt side of an agent on a project computer: upload (bundle or tar), output relay, stop and quota, and applying its changes before the local completion path |
 | knowledge.rs, monitors.rs | Project lessons/workflows, immutable task context receipts and local Git change checks |
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |

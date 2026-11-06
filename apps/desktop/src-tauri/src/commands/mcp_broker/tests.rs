@@ -162,6 +162,16 @@ async fn results_too_large_for_a_computer_are_captured_with_a_preview() {
         .insert("value".into(), json!("x".repeat(61_000)));
     let error = broker.read("remote", oversized).await.unwrap_err();
     assert!(error.contains("nothing ran"), "{error}");
+
+    // A computer that receives large answers as artifacts gets the whole result.
+    assert!(broker.set_result_limit("remote", None));
+    assert!(!broker.set_result_limit("missing", None));
+    let mut input = execute(handle);
+    input
+        .arguments
+        .insert("value".into(), json!("source-data".repeat(2000)));
+    let (whole, _) = broker.read("remote", input).await.unwrap();
+    assert!(serde_json::to_vec(&whole).unwrap().len() > 20_000);
     broker.close("remote");
     broker.close("local");
     remove_fixture(path).await;

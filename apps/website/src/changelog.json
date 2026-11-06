@@ -12,6 +12,18 @@
     ]
   },
   {
+    "id": "faster-workspaces-for-agents-on-a-computer",
+    "date": "2026-11-06",
+    "title": "Faster workspaces for agents on a computer",
+    "description": "Agents on a project computer now receive the workspace as a Git bundle of only what the computer lacks, and bring results, screenshots and large tool answers back in resumable, checked transfers.",
+    "items": [
+      "Retries and later attempts send only what changed, and the agent on the computer sees the project's Git history.",
+      "Screenshots and other saved output come back as content-checked transfers that resume after a dropped connection.",
+      "On-demand tool results up to 1 MB reach an agent on a computer whole instead of as a preview.",
+      "Computers on older images, and repositories a bundle cannot carry such as LFS or shallow clones, keep sending files as before."
+    ]
+  },
+  {
     "id": "agents-get-your-project-s-context-automatically",
     "date": "2026-11-06",
     "title": "Agents get your project's context automatically",

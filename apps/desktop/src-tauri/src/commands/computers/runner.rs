@@ -28,6 +28,12 @@ pub(crate) const BROWSER: &str = "browser";
 pub(crate) const WORKSPACE_TOOLS: &str = "workspace-tools";
 /// The runner asks this device before opening a website (`POST /v1/policy`).
 pub(crate) const POLICY_CALLBACKS: &str = "policy-callbacks";
+/// Workspaces travel as Git bundles against a per-project repository on the
+/// computer (`sync_*`, see [`super::sync`]).
+pub(crate) const GIT_SYNC: &str = "git-sync";
+/// Content-addressed, chunked and resumable transfers (`artifact_*`, see
+/// [`super::artifacts`]).
+pub(crate) const ARTIFACTS: &str = "artifacts";
 
 /// What a computer's runner reported it can do.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -333,8 +339,11 @@ mod tests {
         let missing = RunnerCapabilities::from_status(Some(&json!({"exists": false})));
         assert_eq!(missing, RunnerCapabilities::default());
         // Unknown names from a newer runner are kept and ignored.
-        let newer = runner(5, &[LOCAL_BRIDGE, "git-sync"]);
-        assert!(newer.has("git-sync") && newer.has(LOCAL_BRIDGE) && !newer.has(BROWSER));
+        let newer = runner(5, &[LOCAL_BRIDGE, "later"]);
+        assert!(newer.has("later") && newer.has(LOCAL_BRIDGE) && !newer.has(BROWSER));
+        let sync = runner(4, &[GIT_SYNC, ARTIFACTS]);
+        assert!(sync.has(GIT_SYNC) && sync.has(ARTIFACTS));
+        assert!(!runner(3, &[GIT_SYNC, ARTIFACTS]).has(GIT_SYNC));
     }
 
     #[test]

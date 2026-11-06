@@ -190,7 +190,18 @@ struct Attempt {
     closed: watch::Sender<bool>,
     workspace: PathBuf,
     account: Option<(String, PathBuf)>,
-    delivery: Delivery,
+    /// Set at preparation; the result limit can be lifted once the run knows
+    /// its computer receives large answers (see [`Broker::set_result_limit`]).
+    delivery: Mutex<Delivery>,
+}
+
+impl Attempt {
+    fn delivery(&self) -> Delivery {
+        *self
+            .delivery
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+    }
 }
 #[derive(Clone, Default)]
 pub struct Broker {
@@ -268,7 +279,7 @@ impl Broker {
             closed,
             workspace,
             account,
-            delivery,
+            delivery: Mutex::new(delivery),
         });
         if let Some(old) = self
             .attempts
@@ -290,7 +301,19 @@ impl Broker {
     /// Whether `execute_tool` must be approved at the bridge for this attempt.
     pub fn approves_executes(&self, run: &str) -> bool {
         self.attempt(run)
-            .is_ok_and(|attempt| attempt.delivery.approve_executes)
+            .is_ok_and(|attempt| attempt.delivery().approve_executes)
+    }
+
+    /// Changes the largest result this attempt's agent receives in full; `None`
+    /// removes the limit, for an agent on a computer whose runner receives
+    /// large answers as artifacts. Returns whether the attempt has a broker.
+    pub fn set_result_limit(&self, run: &str, limit: Option<usize>) -> bool {
+        self.attempt(run).is_ok_and(|attempt| {
+            if let Ok(mut delivery) = attempt.delivery.lock() {
+                delivery.result_limit = limit;
+            }
+            true
+        })
     }
 
     /// The connection and tool name a handle refers to, for an approval question.
@@ -393,7 +416,7 @@ impl Broker {
         }
         let size = serde_json::to_vec(&result).map_or(0, |value| value.len());
         if attempt
-            .delivery
+            .delivery()
             .result_limit
             .is_some_and(|limit| size > limit)
         {
@@ -670,12 +693,13 @@ async fn execute_catalog(
     }
     *catalog.usage.result_bytes_received.get_or_insert(0) +=
         serde_json::to_vec(&result).map_or(0, |value| value.len()) as u64;
-    let original = attempt.delivery.result_limit.map(|_| result.clone());
+    let result_limit = attempt.delivery().result_limit;
+    let original = result_limit.map(|_| result.clone());
     let (selected, stats) =
         results::select_measured(result, input.output.as_ref(), &mut catalog.results);
     result = selected;
     catalog.usage.selection(stats);
-    if let (Some(limit), Some(original)) = (attempt.delivery.result_limit, original) {
+    if let (Some(limit), Some(original)) = (result_limit, original) {
         if serde_json::to_vec(&result).map_or(usize::MAX, |value| value.len()) > limit {
             result = match results::bounded(original, &mut catalog.results) {
                 Some(preview) => preview,

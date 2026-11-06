@@ -29,6 +29,9 @@ use std::{
 const REQUEST_LIMIT: usize = 64 * 1024;
 /// Raw bytes per answer, which keeps each `run_answer` under the agent's 1 MB body limit.
 pub(crate) const ANSWER_LIMIT: usize = 512 * 1024;
+/// The largest answer for a runner with `artifacts`, which receives a larger
+/// one as an artifact (`RELAY_ARTIFACT_LIMIT` in agent.py).
+pub(crate) const LARGE_ANSWER_LIMIT: usize = 16 * 1024 * 1024;
 /// Calls forwarded at once; more are refused until one finishes.
 const IN_FLIGHT_LIMIT: usize = 32;
 /// Told to an agent whose call is too large to relay; nothing was forwarded.
@@ -86,6 +89,7 @@ pub(crate) struct Relay {
     endpoint: String,
     token: String,
     access: Access,
+    answer_limit: usize,
     in_flight: HashSet<String>,
     ready: Vec<Answer>,
     sender: Sender<Answer>,
@@ -99,11 +103,19 @@ impl Relay {
             endpoint: endpoint.trim_end_matches('/').to_string(),
             token: token.to_string(),
             access,
+            answer_limit: ANSWER_LIMIT,
             in_flight: HashSet::new(),
             ready: Vec::new(),
             sender,
             receiver,
         }
+    }
+
+    /// Accepts answers up to `limit` bytes, for a runner that receives those
+    /// above [`ANSWER_LIMIT`] as artifacts.
+    pub fn with_answer_limit(mut self, limit: usize) -> Self {
+        self.answer_limit = limit;
+        self
     }
 
     /// Starts forwarding requests from a read. A request already being
@@ -129,15 +141,17 @@ impl Relay {
                 ));
                 continue;
             }
-            let (endpoint, token, sender, access) = (
+            let (endpoint, token, sender, access, limit) = (
                 self.endpoint.clone(),
                 self.token.clone(),
                 self.sender.clone(),
                 self.access.clone(),
+                self.answer_limit,
             );
             let call = call.clone();
             std::thread::spawn(move || {
-                let answer = super::remote::block(forward(&endpoint, &token, &id, &call, &access));
+                let answer =
+                    super::remote::block(forward(&endpoint, &token, &id, &call, &access, limit));
                 let _ = sender.send(answer);
             });
         }
@@ -216,7 +230,14 @@ fn screen(id: &str, call: &Value, access: &Access) -> Option<Answer> {
     Some(Answer::refused(id, request.as_ref(), 403, message))
 }
 
-async fn forward(endpoint: &str, token: &str, id: &str, call: &Value, access: &Access) -> Answer {
+async fn forward(
+    endpoint: &str,
+    token: &str,
+    id: &str,
+    call: &Value,
+    access: &Access,
+    limit: usize,
+) -> Answer {
     let request = decoded_json(call);
     let failed = |message: &str| Answer::refused(id, request.as_ref(), 502, message);
     let method = match call["method"].as_str() {
@@ -283,8 +304,12 @@ async fn forward(endpoint: &str, token: &str, id: &str, call: &Value, access: &A
     } else {
         body
     };
-    if body.len() > ANSWER_LIMIT {
-        return failed(ANSWER_TOO_LARGE);
+    if body.len() > limit {
+        return failed(&if limit == ANSWER_LIMIT {
+            ANSWER_TOO_LARGE.to_string()
+        } else {
+            ANSWER_TOO_LARGE.replace("512 KB", &format!("{} MB", limit / (1024 * 1024)))
+        });
     }
     Answer {
         call: id.into(),
@@ -539,51 +564,56 @@ mod tests {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let endpoint = format!("http://{}", listener.local_addr().unwrap());
         let server = std::thread::spawn(move || {
-            let (stream, _) = listener.accept().unwrap();
-            let mut reader = BufReader::new(stream.try_clone().unwrap());
-            let mut length = 0;
-            loop {
-                let mut line = String::new();
-                reader.read_line(&mut line).unwrap();
-                if line.trim().is_empty() {
-                    break;
+            for _ in 0..2 {
+                let (stream, _) = listener.accept().unwrap();
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut length = 0;
+                loop {
+                    let mut line = String::new();
+                    reader.read_line(&mut line).unwrap();
+                    if line.trim().is_empty() {
+                        break;
+                    }
+                    if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                        length = value.trim().parse().unwrap();
+                    }
                 }
-                if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
-                    length = value.trim().parse().unwrap();
-                }
-            }
-            let mut body = vec![0; length];
-            reader.read_exact(&mut body).unwrap();
-            let reply = json!({"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"y".repeat(ANSWER_LIMIT)}]}}).to_string();
-            let mut stream = stream;
-            write!(
-                stream,
-                "HTTP/1.1 200 OK
+                let mut body = vec![0; length];
+                reader.read_exact(&mut body).unwrap();
+                let reply = json!({"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"y".repeat(ANSWER_LIMIT)}]}}).to_string();
+                let mut stream = stream;
+                write!(
+                    stream,
+                    "HTTP/1.1 200 OK
 content-type: application/json
 content-length: {}
 connection: close
 
 {reply}",
-                reply.len()
-            )
-            .unwrap();
+                    reply.len()
+                )
+                .unwrap();
+            }
         });
-        let mut relay = Relay::new(&endpoint, "token", writer());
-        relay.accept(&[call(
-            "POST",
-            "/mcp",
-            &json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"read_tool","arguments":{"handle":"h"}}}),
-        )]);
-        let deadline = std::time::Instant::now() + Duration::from_secs(20);
-        let mut answers = Vec::new();
-        while answers.is_empty() && std::time::Instant::now() < deadline {
-            answers = relay.answers();
-            std::thread::sleep(Duration::from_millis(20));
-        }
-        server.join().unwrap();
-        assert_eq!(answers.len(), 1);
-        assert!(answers[0].body.len() < 4096);
-        let body: Value = serde_json::from_slice(&answers[0].body).unwrap();
+        let answer = |relay: Relay| {
+            let mut relay = relay;
+            relay.accept(&[call(
+                "POST",
+                "/mcp",
+                &json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"read_tool","arguments":{"handle":"h"}}}),
+            )]);
+            let deadline = std::time::Instant::now() + Duration::from_secs(20);
+            let mut answers = Vec::new();
+            while answers.is_empty() && std::time::Instant::now() < deadline {
+                answers = relay.answers();
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            assert_eq!(answers.len(), 1);
+            answers.remove(0)
+        };
+        let refused = answer(Relay::new(&endpoint, "token", writer()));
+        assert!(refused.body.len() < 4096);
+        let body: Value = serde_json::from_slice(&refused.body).unwrap();
         assert_eq!(body["id"], 4);
         assert_eq!(body["result"]["isError"], true);
         let text = body["result"]["content"][0]["text"].as_str().unwrap();
@@ -591,6 +621,13 @@ connection: close
             text.contains("512 KB") && text.contains("read_tool_result"),
             "{text}"
         );
+        // A runner with artifacts receives the whole answer.
+        let full =
+            answer(Relay::new(&endpoint, "token", writer()).with_answer_limit(LARGE_ANSWER_LIMIT));
+        server.join().unwrap();
+        assert!(full.body.len() > ANSWER_LIMIT);
+        let body: Value = serde_json::from_slice(&full.body).unwrap();
+        assert!(body["result"]["isError"].is_null());
     }
 
     #[test]

@@ -24,10 +24,10 @@ use std::{
 };
 
 /// Raw bytes per upload chunk; base64 keeps each request under the agent's 1 MB body limit.
-const CHUNK: usize = 512 * 1024;
-const UPLOAD_LIMIT: u64 = 512 * 1024 * 1024;
-const PATCH_LIMIT: usize = 256 * 1024 * 1024;
-const CALL_TIMEOUT: Duration = Duration::from_secs(120);
+pub(super) const CHUNK: usize = 512 * 1024;
+pub(super) const UPLOAD_LIMIT: u64 = 512 * 1024 * 1024;
+pub(super) const PATCH_LIMIT: usize = 256 * 1024 * 1024;
+pub(super) const CALL_TIMEOUT: Duration = Duration::from_secs(120);
 /// How long a run's agent waits for new output before answering a read.
 pub(crate) const READ_WAIT_MS: u64 = 1000;
 
@@ -265,6 +265,17 @@ pub(crate) struct Session {
     transport: Box<dyn Transport>,
     pub name: String,
     canceled: AtomicBool,
+    /// What the computer's runner supports, from its last [`Session::status`].
+    pub capabilities: super::runner::RunnerCapabilities,
+    /// The run's workspace was checked out from a Git bundle, so its result
+    /// comes back as one (see [`super::sync`]).
+    pub synced: bool,
+}
+
+/// Whether a runner takes workspaces as Git bundles. Bundles travel as
+/// artifacts, so both are needed; anything else keeps the tar and patch.
+pub(crate) fn uses_git_sync(capabilities: &super::runner::RunnerCapabilities) -> bool {
+    capabilities.has(super::runner::GIT_SYNC) && capabilities.has(super::runner::ARTIFACTS)
 }
 
 /// Output since the previous read.
@@ -297,22 +308,30 @@ impl Session {
             transport,
             name,
             canceled: AtomicBool::new(false),
+            capabilities: Default::default(),
+            synced: false,
         }
     }
 
-    fn call(&mut self, mut payload: Value, timeout: Duration) -> Result<Value, String> {
+    pub(super) fn call(&mut self, mut payload: Value, timeout: Duration) -> Result<Value, String> {
         payload["run"] = json!(self.name);
         self.transport.call(&payload, timeout, &self.canceled)
     }
 
     /// Whether this run exists on the computer and how far it got, or `None`
-    /// when the computer's agent predates the bridge relay and recovery.
+    /// when the computer's agent predates the bridge relay and recovery. Also
+    /// records the runner's capabilities and whether the run was synced.
     pub fn status(&mut self) -> Result<Option<Value>, String> {
-        match self.call(json!({"action":"run_status"}), CALL_TIMEOUT) {
-            Ok(status) => Ok(Some(status)),
-            Err(error) if error.contains("Unsupported action") => Ok(None),
-            Err(error) => Err(error),
-        }
+        let status = match self.call(json!({"action":"run_status"}), CALL_TIMEOUT) {
+            Ok(status) => Some(status),
+            Err(error) if error.contains("Unsupported action") => None,
+            Err(error) => return Err(error),
+        };
+        self.capabilities = super::runner::RunnerCapabilities::from_status(status.as_ref());
+        self.synced = status
+            .as_ref()
+            .is_some_and(|status| status["synced"] == true);
+        Ok(status)
     }
 
     /// Uploads the workspace's files: tracked and untracked ones Git does not
@@ -443,19 +462,24 @@ impl Session {
         Ok(page)
     }
 
-    /// Sends one bridge answer to the waiting agent.
+    /// Sends one bridge answer to the waiting agent. One above the relay's
+    /// answer limit is uploaded as an artifact first, when the runner has them.
     pub fn answer(&mut self, answer: &super::relay::Answer) -> Result<(), String> {
-        self.call(
-            json!({
-                "action": "run_answer",
-                "call": answer.call,
-                "status": answer.status,
-                "contentType": answer.content_type,
-                "body": base64::engine::general_purpose::STANDARD.encode(&answer.body),
-            }),
-            CALL_TIMEOUT,
-        )
-        .map(|_| ())
+        let mut request = json!({
+            "action": "run_answer",
+            "call": answer.call,
+            "status": answer.status,
+            "contentType": answer.content_type,
+        });
+        if answer.body.len() > super::relay::ANSWER_LIMIT
+            && self.capabilities.has(super::runner::ARTIFACTS)
+        {
+            let digest = self.put_artifact(&mut std::io::Cursor::new(&answer.body), &|_, _| {})?;
+            request["artifact"] = json!(digest.sha256);
+        } else {
+            request["body"] = json!(base64::engine::general_purpose::STANDARD.encode(&answer.body));
+        }
+        self.call(request, CALL_TIMEOUT).map(|_| ())
     }
 
     pub fn stop(&mut self) -> Result<(), String> {
@@ -608,8 +632,19 @@ fn setup_files(
 /// context placed in it, in a temporary file.
 pub(crate) fn archive(workspace: &Path, setup: &[String]) -> Result<std::fs::File, String> {
     let mut files = listed(workspace).unwrap_or_else(|| walked(workspace));
-    let mut known: HashSet<String> = files.iter().map(|(path, _)| path.clone()).collect();
-    files.extend(setup_files(workspace, setup, &known)?);
+    files.extend(ignored_inputs(workspace, setup, &files)?);
+    write_archive(workspace, files)
+}
+
+/// The copied setup files and Jackalope context that the listing left out
+/// because Git ignores them.
+fn ignored_inputs(
+    workspace: &Path,
+    setup: &[String],
+    listing: &[(String, bool)],
+) -> Result<Vec<(String, bool)>, String> {
+    let mut known: HashSet<String> = listing.iter().map(|(path, _)| path.clone()).collect();
+    let mut files = setup_files(workspace, setup, &known)?;
     known.extend(files.iter().map(|(path, _)| path.clone()));
     // Git ignores context in the workspace, so the listing leaves it out.
     files.extend(
@@ -618,6 +653,25 @@ pub(crate) fn archive(workspace: &Path, setup: &[String]) -> Result<std::fs::Fil
             .filter(|path| !known.contains(path))
             .map(|path| (path, false)),
     );
+    Ok(files)
+}
+
+/// The side tar of a Git-synced workspace: only the copied setup files and
+/// Jackalope context, which a bundle cannot carry because Git ignores them.
+/// `None` when there are none.
+pub(crate) fn extras_archive(
+    workspace: &Path,
+    setup: &[String],
+) -> Result<Option<std::fs::File>, String> {
+    let listing = listed(workspace).unwrap_or_default();
+    let files = ignored_inputs(workspace, setup, &listing)?;
+    if files.is_empty() {
+        return Ok(None);
+    }
+    write_archive(workspace, files).map(Some)
+}
+
+fn write_archive(workspace: &Path, files: Vec<(String, bool)>) -> Result<std::fs::File, String> {
     let file = tempfile_in_temp()?;
     let mut builder = tar::Builder::new(file);
     builder.follow_symlinks(false);
@@ -665,6 +719,14 @@ pub(crate) fn archive(workspace: &Path, setup: &[String]) -> Result<std::fs::Fil
 
 /// An anonymous read-write file, deleted as soon as it is created where the
 /// platform allows and otherwise when it is closed.
+/// A fresh path in the temporary folder for a downloaded file.
+pub(super) fn tempfile_path(extension: &str) -> std::path::PathBuf {
+    std::env::temp_dir().join(format!(
+        "jackalope-download-{}.{extension}",
+        uuid::Uuid::new_v4().simple()
+    ))
+}
+
 fn tempfile_in_temp() -> Result<std::fs::File, String> {
     let path = std::env::temp_dir().join(format!(
         "jackalope-upload-{}.tar",
