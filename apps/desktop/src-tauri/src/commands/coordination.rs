@@ -48,6 +48,7 @@ mod tests;
 
 use eligibility::*;
 
+use super::tasks::runner::record::{record, ToolEvent};
 use super::tasks::{CoordinationContext, RunRequest, TaskRuntime};
 use axum::{
     extract::{DefaultBodyLimit, Query, State as WebState},
@@ -406,9 +407,7 @@ pub(super) async fn bridge_browser_navigate(
     let result = super::browser::browser_navigate(&run.id, &req.url)
         .await
         .map_err(browser_error)?;
-    service.runtime.update(&run.id, |r| {
-        super::previews::review::record_visit(r, &req.url)
-    });
+    record(&service.runtime, &run.id, None, ToolEvent::Visited(req.url));
     Ok(Json(result))
 }
 
@@ -424,11 +423,12 @@ pub(super) async fn bridge_browser_screenshot(
     let screenshot = super::browser::browser_screenshot(&run.id, &workspace, req.name, req.url)
         .await
         .map_err(browser_error)?;
-    service.runtime.update(&run.id, |r| {
-        r.screenshots.push(screenshot.clone());
-        r.activity
-            .push(format!("Captured browser screenshot: {}", screenshot.name));
-    });
+    record(
+        &service.runtime,
+        &run.id,
+        None,
+        ToolEvent::Screenshot(screenshot.clone()),
+    );
     Ok(Json(screenshot))
 }
 
@@ -458,9 +458,15 @@ pub(super) async fn bridge_browser_interact(
     let result = super::browser::browser_interact(&run.id, req)
         .await
         .map_err(browser_error)?;
-    service.runtime.update(&run.id, |r| {
-        r.activity.push(format!("Browser action: {action_desc}"));
-    });
+    record(
+        &service.runtime,
+        &run.id,
+        None,
+        ToolEvent::Interaction {
+            label: "Browser action",
+            summary: action_desc,
+        },
+    );
     Ok(Json(result))
 }
 
@@ -495,11 +501,12 @@ pub(super) async fn bridge_browser_inspect(
     let value = super::browser::browser_inspect(&run.id, req)
         .await
         .map_err(browser_error)?;
-    if let Some(step) = super::browser::accessibility_checkpoint(&value) {
-        service
-            .runtime
-            .update(&run.id, |r| r.validation_steps.push(step));
-    }
+    record(
+        &service.runtime,
+        &run.id,
+        None,
+        ToolEvent::Inspected(value.clone()),
+    );
     Ok(Json(value))
 }
 
@@ -517,9 +524,7 @@ pub(super) async fn bridge_browser_tabs(
     let value = super::browser::browser_tabs(&run.id, req)
         .await
         .map_err(browser_error)?;
-    service.runtime.update(&run.id, |r| {
-        r.activity.push("Updated task browser tabs".into())
-    });
+    record(&service.runtime, &run.id, None, ToolEvent::Tabs);
     Ok(Json(value))
 }
 

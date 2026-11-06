@@ -19,6 +19,7 @@ mod project_setup;
 mod prompt;
 mod remote;
 mod routing;
+pub(in crate::commands) mod runner;
 mod runners;
 mod runtime;
 mod snapshots;

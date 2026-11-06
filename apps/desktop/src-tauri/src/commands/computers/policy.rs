@@ -14,13 +14,12 @@
 use crate::commands::{
     coordination::Coordinator,
     harness::ScreenshotArtifact,
-    tasks::{events::activity, TaskRun, TaskRuntime},
+    tasks::{
+        runner::record::{record, ToolEvent},
+        TaskRun, TaskRuntime,
+    },
 };
 use serde_json::{json, Value};
-use std::{
-    collections::HashMap,
-    sync::{Mutex, OnceLock},
-};
 
 /// What a runner may ask about.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -105,21 +104,6 @@ fn secret(root: &std::path::Path, project_id: &str, name: &str) -> Value {
     }
 }
 
-type Pending = Mutex<HashMap<String, Vec<ScreenshotArtifact>>>;
-static SCREENSHOTS: OnceLock<Pending> = OnceLock::new();
-
-fn pending() -> std::sync::MutexGuard<'static, HashMap<String, Vec<ScreenshotArtifact>>> {
-    SCREENSHOTS
-        .get_or_init(Default::default)
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-}
-
-/// Screenshots a run's runner reported, for when its changes come back.
-pub(crate) fn take_screenshots(run_id: &str) -> Vec<ScreenshotArtifact> {
-    pending().remove(run_id).unwrap_or_default()
-}
-
 /// Untrusted text from the computer, made fit for one activity line.
 fn short(value: &Value, limit: usize) -> String {
     value
@@ -131,7 +115,8 @@ fn short(value: &Value, limit: usize) -> String {
         .collect()
 }
 
-/// Records what one workspace tool did on the computer in the attempt.
+/// Records what one workspace tool did on the computer in the attempt, the
+/// same way as the tool on this device ([`record`]).
 pub(crate) fn record_event(
     runtime: &TaskRuntime,
     run: &TaskRun,
@@ -142,10 +127,16 @@ pub(crate) fn record_event(
         .as_ref()
         .map(|remote| remote.computer_name.clone())
         .ok_or("Only an agent on a computer reports runner events.")?;
-    match event["tool"].as_str().unwrap_or_default() {
+    record(runtime, &run.id, Some(&computer), parse_event(event)?);
+    Ok(())
+}
+
+/// Reads a runner's untrusted event.
+fn parse_event(event: &Value) -> Result<ToolEvent, String> {
+    Ok(match event["tool"].as_str().unwrap_or_default() {
         "computer_verify" => {
             let check = &event["check"];
-            let outcome = if check["reused"] == true {
+            ToolEvent::Checked(if check["reused"] == true {
                 "reused an unchanged passing result".to_string()
             } else if check["success"] == true {
                 "passed".to_string()
@@ -156,20 +147,9 @@ pub(crate) fn record_event(
                     Some(code) => format!("failed with exit code {code}"),
                     None => "failed".to_string(),
                 }
-            };
-            runtime.update(&run.id, |run| {
-                activity(
-                    run,
-                    &format!("Ran the saved check on {computer}: {outcome}."),
-                )
-            });
+            })
         }
-        "browser_navigate" => {
-            let url = short(&event["url"], 2000);
-            runtime.update(&run.id, |run| {
-                crate::commands::previews::review::record_visit(run, &url)
-            });
-        }
+        "browser_navigate" => ToolEvent::Visited(short(&event["url"], 2000)),
         "browser_screenshot" => {
             let shot = &event["screenshot"];
             let artifact = ScreenshotArtifact {
@@ -184,36 +164,16 @@ pub(crate) fn record_event(
             if uuid::Uuid::parse_str(&artifact.id).is_err() {
                 return Err("Report a screenshot by its id.".into());
             }
-            runtime.update(&run.id, |run| {
-                activity(
-                    run,
-                    &format!(
-                        "Captured browser screenshot on {computer}: {}. It comes back with the agent's changes.",
-                        artifact.name
-                    ),
-                )
-            });
-            let mut pending = pending();
-            let shots = pending.entry(run.id.clone()).or_default();
-            if shots.len() < 200 {
-                shots.push(artifact);
-            }
+            ToolEvent::Screenshot(artifact)
         }
-        "browser_interact" => {
-            let summary = short(&event["summary"], 300);
-            runtime.update(&run.id, |run| {
-                activity(
-                    run,
-                    &format!("Browser interaction on {computer}: {summary}"),
-                )
-            });
-        }
-        "browser_tabs" => runtime.update(&run.id, |run| {
-            activity(run, &format!("Updated task browser tabs on {computer}"))
-        }),
+        "browser_interact" => ToolEvent::Interaction {
+            label: "Browser interaction",
+            summary: short(&event["summary"], 300),
+        },
+        "browser_tabs" => ToolEvent::Tabs,
         "browser_inspect" => {
             let audit = &event["audit"];
-            let value = json!({
+            ToolEvent::Inspected(json!({
                 "content": short(&audit["content"], 16000),
                 "truncated": audit["truncated"] == true,
                 "audit": {
@@ -221,14 +181,10 @@ pub(crate) fn record_event(
                     "counts": audit["counts"],
                     "scope": audit["scope"],
                 },
-            });
-            if let Some(step) = crate::commands::browser::accessibility_checkpoint(&value) {
-                runtime.update(&run.id, |run| run.validation_steps.push(step));
-            }
+            }))
         }
         _ => return Err("Unknown runner event.".into()),
-    }
-    Ok(())
+    })
 }
 
 /// New screenshots in a patch brought back from the computer: files added

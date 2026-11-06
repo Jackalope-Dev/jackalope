@@ -527,56 +527,15 @@ impl TaskRuntime {
                 shots.push(artifact.path.clone());
             }
         }
-        self.register_screenshots(id, workspace, shots);
+        super::runner::record::register_screenshots(self, id, workspace, shots);
         true
-    }
-
-    /// Lists browser screenshots the agent took on the computer with the
-    /// attempt, now that they are in the local workspace. Names and addresses
-    /// come from the runner's events; a capture whose event was lost is listed
-    /// as a browser capture.
-    fn register_screenshots(&self, id: &str, workspace: &str, shots: Vec<String>) {
-        let mut reported = computers::policy::take_screenshots(id);
-        for relative in shots {
-            let path = Path::new(workspace).join(&relative);
-            let Ok(bytes) = crate::commands::history::read_bounded(&path, 8 * 1024 * 1024) else {
-                continue;
-            };
-            let Ok((width, height)) = crate::commands::harness::png_dimensions(&bytes) else {
-                continue;
-            };
-            let stem = Path::new(&relative)
-                .file_stem()
-                .map(|stem| stem.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            let mut artifact = match reported.iter().position(|shot| shot.id == stem) {
-                Some(index) => reported.swap_remove(index),
-                None => crate::commands::harness::ScreenshotArtifact {
-                    id: stem,
-                    name: "Browser capture".into(),
-                    url: String::new(),
-                    file_path: String::new(),
-                    width,
-                    height,
-                    timestamp: Utc::now().to_rfc3339(),
-                },
-            };
-            artifact.file_path = path.to_string_lossy().into_owned();
-            artifact.width = width;
-            artifact.height = height;
-            self.update(id, |run| {
-                if !run.screenshots.iter().any(|shot| shot.id == artifact.id) {
-                    run.screenshots.push(artifact.clone());
-                }
-            });
-        }
     }
 
     /// A read-only attempt applies nothing to the workspace. Changes it made
     /// on the computer anyway are reported, then removed with its run.
     fn refuse_changes(&self, id: &str, session: &mut runs::Session, computer: &Computer) {
         // Its screenshots are discarded with its run.
-        computers::policy::take_screenshots(id);
+        super::runner::record::take_screenshots(id);
         let files = session.collect().map_or(0, |patch| patch_files(&patch));
         if files > 0 {
             self.update(id, |run| {

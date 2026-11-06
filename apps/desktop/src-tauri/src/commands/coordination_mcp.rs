@@ -1,4 +1,5 @@
 use super::coordination::{bridge_message, bridge_project, Coordinator, MessageRequest};
+use super::tasks::runner::record::{record, ToolEvent};
 use axum::{
     extract::{Request, State as WebState},
     http::{request::Parts, HeaderMap, StatusCode},
@@ -1017,9 +1018,12 @@ impl CoordinationTools {
         let result = super::browser::browser_navigate(&run.id, &input.url)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
-        self.service.runtime.update(&run.id, |r| {
-            super::previews::review::record_visit(r, &input.url)
-        });
+        record(
+            &self.service.runtime,
+            &run.id,
+            None,
+            ToolEvent::Visited(input.url),
+        );
         Ok(CallToolResult::structured(result))
     }
 
@@ -1046,11 +1050,12 @@ impl CoordinationTools {
             super::browser::browser_screenshot(&run.id, &workspace, input.name, input.url)
                 .await
                 .map_err(|e| ErrorData::internal_error(e, None))?;
-        self.service.runtime.update(&run.id, |r| {
-            r.screenshots.push(artifact.clone());
-            r.activity
-                .push(format!("Captured browser screenshot: {}", artifact.name));
-        });
+        record(
+            &self.service.runtime,
+            &run.id,
+            None,
+            ToolEvent::Screenshot(artifact.clone()),
+        );
         let value = serde_json::to_value(artifact)
             .map_err(|_| ErrorData::internal_error("Could not encode screenshot artifact", None))?;
         Ok(CallToolResult::structured(value))
@@ -1098,10 +1103,15 @@ impl CoordinationTools {
         let res = super::browser::browser_interact(&run.id, input)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
-        self.service.runtime.update(&run.id, |r| {
-            r.activity
-                .push(format!("Browser interaction: {action_desc}"));
-        });
+        record(
+            &self.service.runtime,
+            &run.id,
+            None,
+            ToolEvent::Interaction {
+                label: "Browser interaction",
+                summary: action_desc,
+            },
+        );
         Ok(CallToolResult::structured(res))
     }
 
@@ -1140,11 +1150,12 @@ impl CoordinationTools {
         let value = super::browser::browser_inspect(&run.id, input)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
-        if let Some(step) = super::browser::accessibility_checkpoint(&value) {
-            self.service
-                .runtime
-                .update(&run.id, |r| r.validation_steps.push(step));
-        }
+        record(
+            &self.service.runtime,
+            &run.id,
+            None,
+            ToolEvent::Inspected(value.clone()),
+        );
         Ok(CallToolResult::structured(value))
     }
 
@@ -1164,9 +1175,7 @@ impl CoordinationTools {
         let value = super::browser::browser_tabs(&run.id, input)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
-        self.service.runtime.update(&run.id, |r| {
-            r.activity.push("Updated task browser tabs".into())
-        });
+        record(&self.service.runtime, &run.id, None, ToolEvent::Tabs);
         Ok(CallToolResult::structured(value))
     }
 
