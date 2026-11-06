@@ -154,6 +154,21 @@ impl TaskRuntime {
             self.recover_remote(id, &mut session, status, workspace, &computer, read_only);
         }
         let relayed = bridge.filter(|_| status.is_some());
+        // A runner with artifacts receives large bridge answers whole, so
+        // on-demand results need no preview.
+        let large_answers = session.capabilities.has(computers::runner::ARTIFACTS);
+        let brokered = if large_answers {
+            self.mcp_broker.set_result_limit(id, None)
+        } else {
+            self.mcp_broker.has_attempt(id)
+        };
+        if relayed.is_some() && brokered {
+            input.push_str(&if large_answers {
+                "\nAnswers from on-demand tools reach this computer in full, up to 1 MB as on the person's device; select output with output.jsonPointers, output.rows or output.maxChars when you need less.\n".to_string()
+            } else {
+                format!("\nAn answer from on-demand tools can reach this computer only up to about {} KB: select output with output.jsonPointers, output.rows or output.maxChars, and page captured results with read_tool_result.\n", crate::commands::mcp_broker::REMOTE_RESULT_LIMIT / 1024)
+            });
+        }
         let (argv, mut env) =
             runs::translate(adapter, &cmd, &root, relayed.map(|b| b.endpoint.as_str()))?;
         let secrets = crate::commands::project_secrets::environment(
@@ -200,13 +215,25 @@ impl TaskRuntime {
         );
         let launched = std::time::Instant::now();
         let label = format!("Sending files to {}", computer.name);
-        session.upload(Path::new(workspace), &req.setup_files, &|sent, total| {
+        let progress = |sent: u64, total: u64| {
             self.remote_progress(
                 id,
                 &label,
                 &format!("{} of {}", megabytes(sent), megabytes(total)),
             );
-        })?;
+        };
+        let bundled = runs::uses_git_sync(&session.capabilities)
+            && self.send_bundle(
+                id,
+                &mut session,
+                workspace,
+                &req.setup_files,
+                &computer,
+                &progress,
+            );
+        if !bundled {
+            session.upload(Path::new(workspace), &req.setup_files, &progress)?;
+        }
         self.update(id, |run| {
             run.efficiency.timing("remoteUpload", launched.elapsed());
         });
@@ -257,7 +284,13 @@ impl TaskRuntime {
                 },
             );
         })?;
-        let mut relay = relayed.map(|b| relay::Relay::new(&b.endpoint, &b.token, access));
+        let mut relay = relayed.map(|b| {
+            relay::Relay::new(&b.endpoint, &b.token, access).with_answer_limit(if large_answers {
+                relay::LARGE_ANSWER_LIMIT
+            } else {
+                relay::ANSWER_LIMIT
+            })
+        });
         let followed = match immediate {
             Some(exit) => Followed {
                 exit: Some(exit),
@@ -312,9 +345,55 @@ impl TaskRuntime {
         self.complete_attempt(id, req, success, code, followed.quota_stopped)
     }
 
+    /// Sends the workspace as a Git bundle of only what the computer lacks.
+    /// Returns false, with the reason in the activity, when it must go as
+    /// files instead; a failed bundle never fails the attempt.
+    fn send_bundle(
+        &self,
+        id: &str,
+        session: &mut runs::Session,
+        workspace: &str,
+        setup: &[String],
+        computer: &Computer,
+        progress: &dyn Fn(u64, u64),
+    ) -> bool {
+        let line = match session.sync_upload(Path::new(workspace), setup, progress) {
+            Ok(computers::sync::Sent::Bundle { bytes, delta }) => {
+                self.update(id, |run| {
+                    activity(
+                        run,
+                        &format!(
+                            "Sent the workspace to {} as a {} Git bundle, {}.",
+                            computer.name,
+                            megabytes(bytes),
+                            if delta {
+                                "with only what changed since its last copy"
+                            } else {
+                                "with the repository's history"
+                            }
+                        ),
+                    )
+                });
+                return true;
+            }
+            Ok(computers::sync::Sent::Archive(reason)) => format!(
+                "The workspace goes to {} as files because {reason}.",
+                computer.name
+            ),
+            Err(error) => format!(
+                "The workspace could not go to {} as a Git bundle ({error}), so it goes as files.",
+                computer.name
+            ),
+        };
+        session.synced = false;
+        self.update(id, |run| activity(run, &line));
+        false
+    }
+
     /// Collects the run's changes and applies them to the local workspace.
-    /// A patch that does not apply is saved beside the attempt's history.
-    /// Returns whether the run's files on the computer may be removed.
+    /// A patch that does not apply is saved beside the attempt's history, with
+    /// the agent's saved output in a folder beside it. Returns whether the
+    /// run's files on the computer may be removed.
     fn bring_back(
         &self,
         id: &str,
@@ -328,8 +407,8 @@ impl TaskRuntime {
         } else {
             computer.name.clone()
         };
-        let patch = match session.collect() {
-            Ok(patch) => patch,
+        let collected = match session.collect_changes(Path::new(workspace)) {
+            Ok(collected) => collected,
             Err(error) => {
                 let message =
                     format!("The agent's changes could not be collected from {source}: {error}");
@@ -343,17 +422,26 @@ impl TaskRuntime {
                 return false;
             }
         };
-        let files = patch_files(&patch);
-        if let Err(error) = runs::apply(Path::new(workspace), &patch) {
-            let saved = self.directory.join(format!(
-                "{id}.{}patch",
-                if earlier { "recovered." } else { "remote." }
-            ));
-            let kept = std::fs::write(&saved, &patch).is_ok();
+        let patch = &collected.patch;
+        let files = patch_files(patch);
+        let kind = if earlier { "recovered" } else { "remote" };
+        if let Err(error) = runs::apply(Path::new(workspace), patch) {
+            let saved = self.directory.join(format!("{id}.{kind}.patch"));
+            let kept = std::fs::write(&saved, patch).is_ok();
+            let output = self.directory.join(format!("{id}.{kind}.artifacts"));
+            let output_kept = !collected.artifacts.is_empty()
+                && session
+                    .fetch_artifacts(&output, &collected.artifacts)
+                    .is_ok();
             let message = format!(
-                "The agent's changes from {source} could not be applied to the workspace: {error}{}",
+                "The agent's changes from {source} could not be applied to the workspace: {error}{}{}",
                 if kept {
                     format!(" They are saved at {}.", saved.display())
+                } else {
+                    String::new()
+                },
+                if output_kept {
+                    format!(" Its saved output is at {}.", output.display())
                 } else {
                     String::new()
                 }
@@ -366,6 +454,28 @@ impl TaskRuntime {
                 }
             });
             return kept;
+        }
+        // Saved output arrives once the changes applied, so a failure leaves
+        // the workspace as it was.
+        if !collected.artifacts.is_empty() || collected.truncated {
+            let line = match session.fetch_artifacts(Path::new(workspace), &collected.artifacts) {
+                Ok(written) if collected.truncated => format!(
+                    "Brought back {written} saved output file(s) from {source}; it listed only part of the output under {}.",
+                    computers::sync::ARTIFACT_FOLDER
+                ),
+                Ok(0) => String::new(),
+                Ok(written) => format!(
+                    "Brought back {written} saved output file{} from {source} under {}.",
+                    if written == 1 { "" } else { "s" },
+                    computers::sync::ARTIFACT_FOLDER
+                ),
+                Err(error) => {
+                    format!("The agent's saved output from {source} could not be brought back: {error}")
+                }
+            };
+            if !line.is_empty() {
+                self.update(id, |run| activity(run, &line));
+            }
         }
         if files > 0 {
             self.update(id, |run| {

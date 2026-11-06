@@ -18,13 +18,16 @@
 //! journals or the renderer except as a viewer URL fragment.
 
 pub(crate) mod agent37;
+pub(crate) mod artifacts;
 mod browser;
 pub(crate) mod credentials;
 pub(crate) mod docker;
 pub(crate) mod image;
 pub(crate) mod relay;
 pub(crate) mod remote;
+pub(crate) mod runner;
 pub(crate) mod runs;
+pub(crate) mod sync;
 #[cfg(test)]
 mod tests;
 pub(crate) mod usage;

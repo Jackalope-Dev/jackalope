@@ -970,7 +970,9 @@ impl TaskRuntime {
                 remote_connections.push_str(&format!("\nThese selected connections are not available to you on this computer: {summary}. Do not look for their tools.\n"));
             }
             if !discovered_mcp.is_empty() {
-                remote_connections.push_str(&format!("\nSelected connections' on-demand tools run on the person's device and reach you through Jackalope. An answer can reach this computer only up to about {} KB, and a call's arguments only up to 60 KB: select output with output.jsonPointers, output.rows or output.maxChars, and page captured results with read_tool_result.\n", crate::commands::mcp_broker::REMOTE_RESULT_LIMIT / 1024));
+                // The answer limit depends on the computer's runner and is
+                // added once the run knows it (see run_remote).
+                remote_connections.push_str("\nSelected connections' on-demand tools run on the person's device and reach you through Jackalope. A call's arguments can be at most 60 KB.\n");
             }
         }
         let has_discovery = !discovered_mcp.is_empty();

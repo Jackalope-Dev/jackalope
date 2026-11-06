@@ -624,6 +624,10 @@ class SyncProtocol(Harness):
         changed = git(path, "diff", "--name-status", "--no-renames", base, result["result"])
         self.assertEqual(sorted(changed.splitlines()),
                          ["A\tb.txt", "A\tnew.txt", "D\tgone.txt", "M\ta.txt"])
+        # Jackalope applies only the agent's work, compared with what it sent.
+        self.assertEqual(result["snapshot"], snapshot)
+        changed = git(path, "diff", "--name-status", "--no-renames", snapshot, result["result"])
+        self.assertEqual(sorted(changed.splitlines()), ["A\tb.txt", "M\ta.txt"])
         self.assertEqual(git(path, "show", f"{result['result']}:a.txt"), "three")
         # Later attempts send only what the computer does not have.
         self.assertEqual(self.call(action="sync_status", repo="p1")["have"], [base])

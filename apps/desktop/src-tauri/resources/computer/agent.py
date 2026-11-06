@@ -1519,8 +1519,9 @@ def collect_artifacts(workspace):
 
 def sync_result(request):
     """Bundles the run's result for Jackalope: a synthetic commit of the working
-    tree on top of whatever the agent committed, against the base Jackalope
-    already has. Copied setup files and Jackalope context stay out of it;
+    tree on top of whatever the agent committed, and the uploaded snapshot it
+    is compared with, against the base Jackalope already has. Copied setup
+    files and Jackalope context stay out of it;
     .jackalope/artifacts output is listed as artifacts."""
     directory = run_directory(request)
     if read_exit(directory) is None and os.path.exists(os.path.join(directory, "pid")):
@@ -1553,8 +1554,10 @@ def sync_result(request):
     with repository_lock(synced):
         ref = f"refs/jackalope/result/{run}"
         git(workspace, "update-ref", ref, result)
-        git(workspace, "bundle", "create", "-q", bundle, ref, "--not", synced["base"],
-            timeout=600)
+        # The snapshot goes back too: Jackalope diffs from what it uploaded, and
+        # dropped it from its own repository after sending.
+        git(workspace, "bundle", "create", "-q", bundle, ref,
+            f"refs/jackalope/incoming/{run}/snapshot", "--not", synced["base"], timeout=600)
     try:
         if os.path.getsize(bundle) > PATCH_LIMIT:
             raise Failure("The run changed more than 256 MB of files.")
@@ -1566,6 +1569,7 @@ def sync_result(request):
         "bundle": {"sha256": digest, "size": size},
         "result": result,
         "base": synced["base"],
+        "snapshot": synced["snapshot"],
         "artifacts": artifacts,
         "artifactsTruncated": truncated,
     }
