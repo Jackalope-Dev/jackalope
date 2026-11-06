@@ -828,6 +828,9 @@ async fn bridge_tool_execute(
     let run = service
         .authorized_run(&headers)
         .map_err(|status| (status, "Unauthorized".into()))?;
+    super::coordination_mcp::approve_remote_execute(&service, &run, &input)
+        .await
+        .map_err(|message| (StatusCode::FORBIDDEN, message))?;
     let (result, usage) = service
         .runtime
         .mcp_broker

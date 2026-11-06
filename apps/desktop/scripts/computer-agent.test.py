@@ -220,6 +220,29 @@ class RunProtocol(unittest.TestCase):
         self.assertFalse(self.call(action="run_answer", run="r7", call=call["id"],
                                    status=200, body="")["delivered"])
 
+    def test_relay_answers_an_oversized_tool_call_with_a_tool_error(self):
+        self.upload("r9", archive({"a.txt": b"x"}))
+        script = (
+            "import json,os,urllib.request;"
+            "url=os.environ['JACKALOPE_BRIDGE_URL'];token=os.environ['JACKALOPE_BRIDGE_TOKEN'];"
+            "body=json.dumps({'jsonrpc':'2.0','id':5,'method':'tools/call',"
+            "'params':{'name':'execute_tool','arguments':{'text':'x'*70000}}}).encode();"
+            "req=urllib.request.Request(url+'/mcp',data=body,method='POST',"
+            "headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'});"
+            "print(urllib.request.urlopen(req).read().decode())"
+        )
+        self.call(action="run_start", run="r9", argv=[sys.executable, "-c", script],
+                  env={"JACKALOPE_BRIDGE_URL": self.agent.RELAY_URL,
+                       "JACKALOPE_BRIDGE_TOKEN": self.agent.RELAY_TOKEN},
+                  relay=True)
+        exit, stdout, _ = self.finish("r9")
+        self.assertEqual(exit["code"], 0)
+        answer = json.loads(stdout)
+        self.assertEqual(answer["id"], 5)
+        self.assertTrue(answer["result"]["isError"])
+        self.assertIn("nothing ran", answer["result"]["content"][0]["text"])
+        self.assertEqual(self.call(action="run_read", run="r9", out=0, err=0)["bridge"], [])
+
     def test_status_reports_a_run_whose_supervisor_died(self):
         self.assertEqual(self.call(action="run_status", run="r8"), {"exists": False})
         self.upload("r8", archive({"a.txt": b"x"}))

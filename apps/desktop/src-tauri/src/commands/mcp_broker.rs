@@ -22,6 +22,20 @@ const MAX_TOOLS: usize = 1024;
 const MAX_CATALOG_BYTES: usize = 2_000_000;
 const MAX_SCHEMA_BYTES: usize = 32_000;
 const MAX_LEASES: usize = 32;
+/// The largest tool result an agent on a computer receives: the relay's answer
+/// limit less room for the JSON-RPC envelope and event-stream framing.
+pub const REMOTE_RESULT_LIMIT: usize = crate::commands::computers::relay::ANSWER_LIMIT - 32 * 1024;
+
+/// How an attempt's agent reaches the broker.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Delivery {
+    /// Results larger than this many serialized bytes are captured and
+    /// returned as a preview with a `resultHandle` instead.
+    pub result_limit: Option<usize>,
+    /// The agent's own permission prompt is not in the path, so `execute_tool`
+    /// asks for approval at the bridge before it runs.
+    pub approve_executes: bool,
+}
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -176,6 +190,7 @@ struct Attempt {
     closed: watch::Sender<bool>,
     workspace: PathBuf,
     account: Option<(String, PathBuf)>,
+    delivery: Delivery,
 }
 #[derive(Clone, Default)]
 pub struct Broker {
@@ -189,12 +204,24 @@ impl Broker {
             .is_ok_and(|attempts| attempts.contains_key(run))
     }
 
+    #[cfg(test)]
     pub fn prepare(
         &self,
         run: &str,
         connections: Vec<McpServerConfig>,
         workspace: PathBuf,
         account: Option<(String, PathBuf)>,
+    ) -> Result<(), String> {
+        self.prepare_with(run, connections, workspace, account, Delivery::default())
+    }
+
+    pub fn prepare_with(
+        &self,
+        run: &str,
+        connections: Vec<McpServerConfig>,
+        workspace: PathBuf,
+        account: Option<(String, PathBuf)>,
+        delivery: Delivery,
     ) -> Result<(), String> {
         if connections.len() > 16 {
             return Err("Select at most 16 on-demand connections per task.".into());
@@ -241,6 +268,7 @@ impl Broker {
             closed,
             workspace,
             account,
+            delivery,
         });
         if let Some(old) = self
             .attempts
@@ -257,6 +285,23 @@ impl Broker {
         if let Some(attempt) = self.attempts.lock().unwrap().remove(run) {
             attempt.closed.send_replace(true);
         }
+    }
+
+    /// Whether `execute_tool` must be approved at the bridge for this attempt.
+    pub fn approves_executes(&self, run: &str) -> bool {
+        self.attempt(run)
+            .is_ok_and(|attempt| attempt.delivery.approve_executes)
+    }
+
+    /// The connection and tool name a handle refers to, for an approval question.
+    pub async fn describe(&self, run: &str, handle: &str) -> Option<(String, String)> {
+        let attempt = self.attempt(run).ok()?;
+        let catalog = attempt.catalog.lock().await;
+        catalog
+            .leases
+            .iter()
+            .find(|lease| lease.handle == handle)
+            .map(|lease| (lease.server.clone(), lease.tool.name.to_string()))
     }
 
     fn attempt(&self, run: &str) -> Result<Arc<Attempt>, String> {
@@ -346,9 +391,16 @@ impl Broker {
                 fallbacks: 0,
             });
         }
+        let size = serde_json::to_vec(&result).map_or(0, |value| value.len());
+        if attempt
+            .delivery
+            .result_limit
+            .is_some_and(|limit| size > limit)
+        {
+            return Err(format!("This page of the captured result is {} KB, more than an agent on a computer can receive. Ask for fewer rows or columns, or a smaller limit.", size / 1024));
+        }
         *catalog.usage.result_reads.get_or_insert(0) += 1;
-        *catalog.usage.result_bytes_returned.get_or_insert(0) +=
-            serde_json::to_vec(&result).map_or(0, |value| value.len()) as u64;
+        *catalog.usage.result_bytes_returned.get_or_insert(0) += size as u64;
         Ok((result, catalog.usage.clone()))
     }
 
@@ -381,7 +433,7 @@ impl Broker {
                 .len()
                 > 60_000
         {
-            return Err("Tool arguments exceed the request limit.".into());
+            return Err("Tool arguments are limited to 60 KB, so this call was not sent and nothing ran. Send smaller arguments, for example over several calls.".into());
         }
         let attempt = self.attempt(run)?;
         let mut closed = attempt.closed.subscribe();
@@ -618,10 +670,19 @@ async fn execute_catalog(
     }
     *catalog.usage.result_bytes_received.get_or_insert(0) +=
         serde_json::to_vec(&result).map_or(0, |value| value.len()) as u64;
+    let original = attempt.delivery.result_limit.map(|_| result.clone());
     let (selected, stats) =
         results::select_measured(result, input.output.as_ref(), &mut catalog.results);
     result = selected;
     catalog.usage.selection(stats);
+    if let (Some(limit), Some(original)) = (attempt.delivery.result_limit, original) {
+        if serde_json::to_vec(&result).map_or(usize::MAX, |value| value.len()) > limit {
+            result = match results::bounded(original, &mut catalog.results) {
+                Some(preview) => preview,
+                None => CallToolResult::error(vec![rmcp::model::ContentBlock::text(format!("The tool completed, but its result is larger than the {} KB an agent on a computer can receive and cannot be previewed. Do not repeat a write operation; request a smaller result, for example with output.jsonPointers or output.rows.", limit / 1024))]),
+            };
+        }
+    }
     *catalog.usage.result_bytes_returned.get_or_insert(0) +=
         serde_json::to_vec(&result).map_or(0, |value| value.len()) as u64;
     Ok((result, catalog.usage.clone()))

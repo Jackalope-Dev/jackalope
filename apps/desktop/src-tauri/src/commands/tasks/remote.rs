@@ -134,8 +134,28 @@ impl TaskRuntime {
             self.recover_remote(id, &mut session, status, workspace, &computer, read_only);
         }
         let relayed = bridge.filter(|_| status.is_some());
-        let (argv, env) =
+        let (argv, mut env) =
             runs::translate(adapter, &cmd, &root, relayed.map(|b| b.endpoint.as_str()))?;
+        let secrets = crate::commands::project_secrets::environment(
+            &self.project_secrets_root(),
+            &req.project_id,
+            crate::commands::project_secrets::Place::Computer,
+        )
+        .map_err(|error| format!("Project secrets could not be read: {error}"))?;
+        if !secrets.is_empty() {
+            let names: Vec<&str> = secrets.iter().map(|(name, _)| name.as_str()).collect();
+            self.update(id, |run| {
+                activity(
+                    run,
+                    &format!(
+                        "Project secrets for the agent on {}: {}.",
+                        computer.name,
+                        names.join(", ")
+                    ),
+                )
+            });
+        }
+        runs::add_secrets(&mut env, secrets);
         // Desktop control and the browser tools act on the computer itself.
         let access = relay::Access {
             browser: computers::provider(&computer.provider)

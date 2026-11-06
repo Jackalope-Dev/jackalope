@@ -23,6 +23,7 @@ pub mod mcp_broker;
 pub mod platform;
 pub mod project_files;
 pub mod project_registry;
+pub mod project_secrets;
 pub mod pty;
 pub mod repo_todos;
 pub mod system;

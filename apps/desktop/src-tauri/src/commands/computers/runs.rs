@@ -105,7 +105,7 @@ pub(crate) fn translate(
         });
         match (adapter, arg.as_str()) {
             ("claude", "--mcp-config") | ("codex", "-c") if relayed.is_some() => {
-                argv.extend([arg.clone(), relayed.unwrap()]);
+                argv.extend([arg.clone(), bridge_only(adapter, &relayed.unwrap())?]);
                 index += 2;
                 continue;
             }
@@ -160,6 +160,53 @@ pub(crate) fn translate(
     }
     env.extend(credentials::environment(root, adapter)?);
     Ok((argv, env))
+}
+
+/// Adds project secrets to a run's environment. They replace a variable of the
+/// same name from the local command and are kept whatever they look like (the
+/// local-path check applies only to the translated command), but never replace
+/// an agent sign-in or one of Jackalope's own variables.
+pub(crate) fn add_secrets(env: &mut Environment, secrets: Environment) {
+    let owned = |name: &str| {
+        name.starts_with("JACKALOPE_")
+            || credentials::KINDS
+                .iter()
+                .any(|kind| kind.variables.contains(&name))
+    };
+    for (name, value) in secrets {
+        if owned(&name) {
+            continue;
+        }
+        env.retain(|(existing, _)| existing != &name);
+        env.push((name, value));
+    }
+}
+
+/// Keeps only the Jackalope bridge from an MCP configuration argument. Other
+/// entries name this device's programs, environment references and sign-ins,
+/// which never go to a computer; selected on-demand connections reach the
+/// agent through the bridge instead.
+fn bridge_only(adapter: &str, value: &str) -> Result<String, String> {
+    let unreadable = || {
+        format!("This task's {adapter} MCP configuration could not be read, so it cannot run on a computer.")
+    };
+    if adapter == "claude" {
+        let mut config: Value = serde_json::from_str(value).map_err(|_| unreadable())?;
+        let bridge = config["mcpServers"]["jackalope"].take();
+        if !bridge.is_object() {
+            return Err(unreadable());
+        }
+        return Ok(json!({"mcpServers":{"jackalope":bridge}}).to_string());
+    }
+    let parsed: toml::Table = toml::from_str(value).map_err(|_| unreadable())?;
+    let bridge = parsed
+        .get("mcp_servers")
+        .and_then(|servers| servers.get("jackalope"))
+        .cloned()
+        .ok_or_else(unreadable)?;
+    let mut servers = toml::Table::new();
+    servers.insert("jackalope".into(), bridge);
+    Ok(format!("mcp_servers={}", toml::Value::Table(servers)))
 }
 
 fn looks_local(value: &str) -> bool {
@@ -806,9 +853,12 @@ mod tests {
         )
         .unwrap();
         let endpoint = "http://127.0.0.1:4321";
-        let config = format!(
-            "{{\"mcpServers\":{{\"jackalope\":{{\"url\":\"{endpoint}/mcp\",\"headers\":{{\"Authorization\":\"Bearer ${{JACKALOPE_BRIDGE_TOKEN}}\"}}}}}}}}"
-        );
+        let config = json!({"mcpServers": {
+            "jackalope": {"url": format!("{endpoint}/mcp"), "headers": {"Authorization": "Bearer ${JACKALOPE_BRIDGE_TOKEN}"}},
+            "docs": {"url": "https://docs.example/mcp", "headers": {"Authorization": "Bearer ${DOCS_TOKEN}"}},
+            "files": {"command": "local-files", "env": {"ROOT": "/home/me"}}
+        }})
+        .to_string();
         let mut command = Command::new("claude");
         command
             .args(["--print", "--mcp-config", &config])
@@ -823,6 +873,16 @@ mod tests {
         assert_eq!(argv[2], "--mcp-config");
         assert!(argv[3].contains(&format!("{RELAY_URL}/mcp")));
         assert!(!argv[3].contains(endpoint));
+        let delivered: Value = serde_json::from_str(&argv[3]).unwrap();
+        assert_eq!(
+            delivered["mcpServers"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .collect::<Vec<_>>(),
+            ["jackalope"]
+        );
+        assert!(!argv[3].contains("DOCS_TOKEN") && !argv[3].contains("local-files"));
         assert!(!argv.iter().any(|arg| arg == "--permission-prompt-tool"));
         assert_eq!(argv[4..], ["--allowedTools", "mcp__jackalope__peers"]);
         let value = |name: &str| env.iter().find(|(k, _)| k == name).map(|(_, v)| v.as_str());
@@ -834,13 +894,61 @@ mod tests {
         command.args([
             "exec",
             "-c",
-            &format!("mcp_servers={{ jackalope = {{ url = \"{endpoint}/mcp\", bearer_token_env_var = \"JACKALOPE_BRIDGE_TOKEN\" }} }}"),
+            &format!("mcp_servers={{ jackalope = {{ url = \"{endpoint}/mcp\", bearer_token_env_var = \"JACKALOPE_BRIDGE_TOKEN\" }}, \"docs.server\" = {{ url = \"https://docs.example/mcp\", bearer_token_env_var = \"DOCS_TOKEN\" }} }}"),
             "-c",
             "mcp_servers.docs.command=\"x\"",
         ]);
         let (argv, _) = translate("codex", &command, root.path(), Some(endpoint)).unwrap();
         assert_eq!(argv.len(), 4);
         assert!(argv[3].contains(&format!("{RELAY_URL}/mcp")));
+        assert!(!argv[3].contains("DOCS_TOKEN") && !argv[3].contains("docs.server"));
+        let parsed: toml::Table = toml::from_str(&argv[3]).unwrap();
+        assert_eq!(
+            parsed["mcp_servers"]["jackalope"]["bearer_token_env_var"].as_str(),
+            Some("JACKALOPE_BRIDGE_TOKEN")
+        );
+    }
+
+    #[test]
+    fn project_secrets_join_the_run_without_replacing_sign_ins() {
+        let mut env: Environment = vec![
+            ("GIT_AUTHOR_NAME".into(), "Claude".into()),
+            ("SHARED".into(), "from-command".into()),
+            ("CLAUDE_CODE_OAUTH_TOKEN".into(), "sign-in".into()),
+            ("JACKALOPE_BRIDGE_TOKEN".into(), RELAY_TOKEN.into()),
+        ];
+        add_secrets(
+            &mut env,
+            vec![
+                ("HIGGSFIELD_API_KEY".into(), "hf-value".into()),
+                ("KEY_FILE".into(), "C:\\keys\\service.json".into()),
+                ("SHARED".into(), "from-secret".into()),
+                ("CLAUDE_CODE_OAUTH_TOKEN".into(), "not-a-sign-in".into()),
+                ("JACKALOPE_BRIDGE_TOKEN".into(), "not-the-relay".into()),
+            ],
+        );
+        let value = |name: &str| {
+            let found: Vec<&str> = env
+                .iter()
+                .filter(|(k, _)| k == name)
+                .map(|(_, v)| v.as_str())
+                .collect();
+            assert!(found.len() <= 1, "{name} appears more than once");
+            found.first().copied()
+        };
+        assert_eq!(value("HIGGSFIELD_API_KEY"), Some("hf-value"));
+        assert_eq!(value("KEY_FILE"), Some("C:\\keys\\service.json"));
+        assert_eq!(value("SHARED"), Some("from-secret"));
+        assert_eq!(value("CLAUDE_CODE_OAUTH_TOKEN"), Some("sign-in"));
+        assert_eq!(value("JACKALOPE_BRIDGE_TOKEN"), Some(RELAY_TOKEN));
+        assert_eq!(value("GIT_AUTHOR_NAME"), Some("Claude"));
+    }
+
+    #[test]
+    fn unreadable_bridge_configuration_is_refused() {
+        let endpoint = "http://127.0.0.1:4321";
+        assert!(bridge_only("claude", &format!("{{\"x\":\"{endpoint}\"}}")).is_err());
+        assert!(bridge_only("codex", "mcp_servers=not toml {").is_err());
     }
 
     #[test]

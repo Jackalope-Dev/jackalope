@@ -73,6 +73,8 @@ RELAY_URL = "@@JACKALOPE_RELAY_URL@@"
 RELAY_TOKEN = "@@JACKALOPE_RELAY_TOKEN@@"
 RELAY_BODY_LIMIT = 64 * 1024
 RELAY_ANSWER_LIMIT = 512 * 1024
+RELAY_TOO_LARGE = ("Jackalope tool calls from a computer are limited to 64 KB, so this call was "
+                   "not sent and nothing ran. Send smaller arguments, for example over several calls.")
 # Agent CLIs whose licenses do not allow shipping them in a published image are
 # installed into the bot's home on first use, from the package registry.
 ON_DEMAND = {"claude": "@anthropic-ai/claude-code"}
@@ -830,6 +832,22 @@ def relay(directory):
             self.close_connection = True
             self.reply(status, json.dumps({"error": message}).encode())
 
+        def oversized(self, length):
+            # A tool call gets a tool error the agent can act on, not a transport failure.
+            request = None
+            if length <= BODY_LIMIT:
+                try:
+                    request = json.loads(self.rfile.read(length))
+                except (ValueError, OSError):
+                    request = None
+            if (isinstance(request, dict) and request.get("jsonrpc") == "2.0"
+                    and request.get("id") is not None and request.get("method") == "tools/call"):
+                self.close_connection = True
+                result = {"content": [{"type": "text", "text": RELAY_TOO_LARGE}], "isError": True}
+                return self.reply(200, json.dumps(
+                    {"jsonrpc": "2.0", "id": request["id"], "result": result}).encode())
+            return self.failure(413, RELAY_TOO_LARGE)
+
         def forward(self):
             supplied = self.headers.get("Authorization", "")
             if not hmac.compare_digest(supplied.encode(), f"Bearer {secret}".encode()):
@@ -840,7 +858,7 @@ def relay(directory):
                 return self.failure(411, "Send a Content-Length.")
             length = int(self.headers.get("Content-Length") or 0)
             if length < 0 or length > RELAY_BODY_LIMIT:
-                return self.failure(413, "Bridge requests are limited to 64 KB.")
+                return self.oversized(length)
             body = self.rfile.read(length) if length else b""
             if not self.path.startswith("/") or len(self.path) > 2000:
                 return self.failure(400, "Unsupported bridge path.")
