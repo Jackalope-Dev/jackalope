@@ -91,10 +91,18 @@ billed by Composio to the person's project; Jackalope does not proxy or meter it
   [protocol](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/schema/2026-07-28/schema.json); this does not repeat the upstream operation.
 - The broker preserves configured `enabled_tools` and `disabled_tools` lists.
   Discovery is not permission to perform an action. Execution is deliberately
-  absent from Claude's automatically allowed harness tools. Codex's current
+  absent from Claude's automatically allowed harness tools, so Claude's permission
+  prompt (or, on a computer, the bridge) asks before it runs. Codex's current
   noninteractive approval policy also blocks writes that require confirmation; use
   direct delivery or explicitly configure the client's permissions for those tools.
   A denied CLI permission must not be bypassed using HTTP or another tool.
+
+An agent on a project's computer receives only on-demand connections, through the
+bridge relay, while the broker, credentials, OAuth and upstream processes stay on this
+device. Directly delivered connections are withheld there, stdio upstreams are kept only
+for read-only attempts, results are bounded to the relay's answer limit, and Claude
+Code's `execute_tool` calls are approved at the bridge because it runs without its
+permission prompt; see [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
 
 Catalogs, handles, processes and connection credentials are isolated by attempt.
 The selected agent account directory is applied to upstream stdio processes;
@@ -118,7 +126,8 @@ may already have taken effect.
 
 Limits: 16 selected discovery connections, 1,024 tools and 2 MB of definitions per
 connection, 32 KB per definition, 64 catalog pages, 15-second upstream discovery,
-45-second overall search, 60-second execution and 1 MB returned result. Excessive
+45-second overall search, 60-second execution, 60 KB of arguments and 1 MB returned
+result (about 480 KB for an agent on a computer, beyond which a preview is returned). Excessive
 catalogs fail explicitly; use direct delivery when these limits are unsuitable.
 Stopping/completing an attempt revokes access and terminates its owned MCP process
 trees. The broker persists only usage counters, not credentials or its catalog.

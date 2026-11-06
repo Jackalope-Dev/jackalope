@@ -1,5 +1,17 @@
 [
   {
+    "id": "connections-and-secrets-for-agents-on-a-computer",
+    "date": "2026-11-06",
+    "status": "In development",
+    "title": "Connections and secrets for agents on a computer.",
+    "description": "Agents running on a project's computer can now use the project's on-demand connections, and every project can give its agents their own API keys.",
+    "items": [
+      "On-demand connections reach agents on a computer through Jackalope, while credentials and sign-ins stay on this device.",
+      "Connections that cannot work on a computer are named in the task's activity instead of disappearing.",
+      "Project settings has a Secrets section for keys such as service API keys, available to agents on this device, on computers or both."
+    ]
+  },
+  {
     "id": "swarms-that-keep-going-until-the-work-is-done",
     "date": "2026-11-05",
     "status": "In development",

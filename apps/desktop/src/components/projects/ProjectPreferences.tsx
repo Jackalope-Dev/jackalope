@@ -23,6 +23,7 @@ import { DesktopProjectSettings } from './DesktopProjectSettings';
 import { FeatureMapSettings } from './FeatureMapSettings';
 import { ProjectGitSettings } from './ProjectGitSettings';
 import { ProjectPlanningSettings } from './ProjectPlanningSettings';
+import { ProjectSecretsSettings } from './ProjectSecretsSettings';
 import { RemoveProjectAction } from './RemoveProjectAction';
 import '../settings/settings.css';
 
@@ -289,6 +290,7 @@ export function ProjectPreferences({
             key={`computer-${project.id}`}
             project={{ id: project.id, name: project.name }}
           />
+          <ProjectSecretsSettings key={`secrets-${project.id}`} projectId={project.id} />
           <SettingGroup title="Workspace">
             {!project.plainFolder && (
               <Setting

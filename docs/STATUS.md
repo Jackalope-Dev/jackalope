@@ -395,12 +395,19 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   bridge tools reach it through a relay that keeps the bridge credential on this device;
   desktop control acts on that computer, and the browser tools drive its Chromium on a
   local sandbox with networking (unavailable on cloud and Agent37 computers). Tools that
-  read the local workspace work only for read-only attempts; `peer_adopt` and project
-  connections are unavailable. Plan-mode planners and swarm orchestrators run there
+  read the local workspace work only for read-only attempts; `peer_adopt` is
+  unavailable. Selected on-demand connections reach it through the broker on this
+  device (stdio ones only for read-only attempts), with Claude Code's `execute_tool`
+  approved at the bridge; directly delivered connections are withheld and named in the
+  attempt's activity. Plan-mode planners and swarm orchestrators run there
   read-only and bring nothing back. Lost contact is retried for 30 minutes, and changes
   left on the computer come back when the task continues. Such agents have their own
   concurrency limit (8 by default, up to 32, set in the project's queue); other agents
   stay local. See [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
+- Project secrets (Project settings → Secrets) give a project's task agents environment
+  variables such as service API keys, on this device, on its computer or both. Values
+  stay in protected storage and reach only agent processes; the app shows names and
+  save times. See [project secrets](AGENT-ACCOUNTS.md#project-secrets).
 - Task and chat Screen views poll the attempt's existing task browser viewport and
   desktop grant state without opening a browser, requesting access or saving an
   artifact. They list recent desktop actions with small after-action captures. People

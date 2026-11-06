@@ -97,6 +97,10 @@ const REQUEST_LIMIT: usize = 64 * 1024;
 pub(crate) const ANSWER_LIMIT: usize = 512 * 1024;
 /// Calls forwarded at once; more are refused until one finishes.
 const IN_FLIGHT_LIMIT: usize = 32;
+/// Told to an agent whose call is too large to relay; nothing was forwarded.
+const REQUEST_TOO_LARGE: &str = "Jackalope tool calls from a computer are limited to 64 KB, so this call was not sent and nothing ran. Send smaller arguments, for example over several calls.";
+/// Told to an agent whose answer is too large to relay. The call itself ran.
+const ANSWER_TOO_LARGE: &str = "The answer is larger than 512 KB, so it cannot reach this computer. The call itself ran: do not repeat a change. Ask for less, for example with output.jsonPointers, output.rows or output.maxChars, or page a captured result with read_tool_result.";
 const FORWARDED_HEADERS: &[&str] = &[
     "content-type",
     "accept",
@@ -256,7 +260,7 @@ fn screen(id: &str, call: &Value, access: Access) -> Option<Answer> {
             id,
             request.as_ref(),
             413,
-            "Bridge requests are limited to 64 KB.",
+            REQUEST_TOO_LARGE,
         ));
     }
     let unavailable = if route.starts_with("/mcp") {
@@ -346,9 +350,7 @@ async fn forward(endpoint: &str, token: &str, id: &str, call: &Value, access: Ac
         body
     };
     if body.len() > ANSWER_LIMIT {
-        return failed(
-            "The tool's answer is larger than 512 KB, so it cannot reach a computer. Ask for less.",
-        );
+        return failed(ANSWER_TOO_LARGE);
     }
     Answer {
         call: id.into(),
@@ -527,6 +529,83 @@ mod tests {
                 .unwrap()
                 .status,
             413
+        );
+    }
+
+    #[test]
+    fn oversized_calls_and_answers_are_clear_tool_errors() {
+        use std::io::{BufRead, BufReader, Read, Write};
+        let arguments = json!({"handle":"h","arguments":{"text":"x".repeat(REQUEST_LIMIT)}});
+        let large = call(
+            "POST",
+            "/mcp",
+            &json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"execute_tool","arguments":arguments}}),
+        );
+        let answer = screen("c", &large, WRITER).unwrap();
+        assert_eq!(answer.status, 200);
+        let body: Value = serde_json::from_slice(&answer.body).unwrap();
+        assert_eq!(body["id"], 3);
+        assert_eq!(body["result"]["isError"], true);
+        let text = body["result"]["content"][0]["text"].as_str().unwrap();
+        assert!(
+            text.contains("64 KB") && text.contains("nothing ran"),
+            "{text}"
+        );
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut length = 0;
+            loop {
+                let mut line = String::new();
+                reader.read_line(&mut line).unwrap();
+                if line.trim().is_empty() {
+                    break;
+                }
+                if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                    length = value.trim().parse().unwrap();
+                }
+            }
+            let mut body = vec![0; length];
+            reader.read_exact(&mut body).unwrap();
+            let reply = json!({"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"y".repeat(ANSWER_LIMIT)}]}}).to_string();
+            let mut stream = stream;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK
+content-type: application/json
+content-length: {}
+connection: close
+
+{reply}",
+                reply.len()
+            )
+            .unwrap();
+        });
+        let mut relay = Relay::new(&endpoint, "token", WRITER);
+        relay.accept(&[call(
+            "POST",
+            "/mcp",
+            &json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"read_tool","arguments":{"handle":"h"}}}),
+        )]);
+        let deadline = std::time::Instant::now() + Duration::from_secs(20);
+        let mut answers = Vec::new();
+        while answers.is_empty() && std::time::Instant::now() < deadline {
+            answers = relay.answers();
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        server.join().unwrap();
+        assert_eq!(answers.len(), 1);
+        assert!(answers[0].body.len() < 4096);
+        let body: Value = serde_json::from_slice(&answers[0].body).unwrap();
+        assert_eq!(body["id"], 4);
+        assert_eq!(body["result"]["isError"], true);
+        let text = body["result"]["content"][0]["text"].as_str().unwrap();
+        assert!(
+            text.contains("512 KB") && text.contains("read_tool_result"),
+            "{text}"
         );
     }
 

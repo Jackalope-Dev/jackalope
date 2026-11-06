@@ -226,6 +226,12 @@ API key (`CODEX_API_KEY` and `OPENAI_API_KEY`). They are stored in protected sto
 (`computers/secrets/agent-credentials.bin`), shown only as saved or not, and passed to
 the run's environment only. A missing sign-in fails the attempt with where to add it.
 
+[Project secrets](AGENT-ACCOUNTS.md#project-secrets) whose **Available to** includes agents on computers
+are added to the run's environment as well. They replace a variable of the same name
+from the translated command and are kept even when the value looks like a local path,
+but never replace a sign-in variable or one of Jackalope's own `JACKALOPE_*` variables.
+The attempt's activity names the secrets the agent received, never their values.
+
 The Jackalope bridge reaches agents on a computer through a relay (`computers/relay.rs`
 and the run's supervisor in `agent.py`). The supervisor serves the bridge on a free
 `127.0.0.1` port inside the computer with a random secret of its own, which replace
@@ -234,7 +240,10 @@ MCP configuration. Each request it receives (at most 64 KB, 32 waiting) is hande
 Jackalope by the next output read, which then returns early, and forwarded to the local
 bridge with the attempt's real credential on its own thread, so a long call such as
 `ask_user` does not stall output. Answers go back through `run_answer`, at most 512 KB
-each; a call unanswered for 40 minutes gets a timeout. The bridge credential never
+each; a call unanswered for 40 minutes gets a timeout. A larger MCP tool call, or an
+answer above 512 KB, comes back to the agent as a tool error that says nothing ran (for
+a request) or that the call ran and to ask for less (for an answer), not as a timeout or
+transport failure. The bridge credential never
 leaves this device, and requests carrying an `Origin` header are refused. Peers,
 messages, questions, `propose_subtask`, plan deviations, agreements, validation steps,
 decisions and Jev questions work as for a local agent. `desktop_control`, `computer_exec`
@@ -253,6 +262,9 @@ list, refused when called, and named in the agent's instructions:
 | `browser_open_profile` | Unavailable: persistent profiles hold this device's sign-ins |
 | `computer_verify`, `verification_output`, `read_context` | Read-only attempts only; otherwise unavailable |
 | `peer_adopt` | Unavailable |
+| On-demand connections over HTTP | `search_tools`, `read_tool`, `read_tool_result` and `execute_tool` reach them on this device |
+| On-demand stdio connections | Read-only attempts only; otherwise withheld |
+| Directly delivered connections | Withheld |
 
 `computer_verify`, `verification_output` and `read_context` work on this device's copy
 of the workspace. A writing agent changes its own copy on the computer, so that copy
@@ -261,7 +273,39 @@ read-only attempt changes nothing, so this device's copy is what it reads, and a
 orchestrator can run the plan's check. `peer_adopt` applies another attempt's changes to
 this device's copy while the agent edits the computer's, which would break the single
 writer of each workspace and be overwritten or conflict when the agent's patch comes
-back. Project connections are not delivered to agents on a computer.
+back.
+
+Connections selected for the task, project and managed all-project ones such as
+Composio alike, reach an agent on a computer only through on-demand tools. The broker
+keeps running on this device, so connection credentials, OAuth and upstream processes
+never go to the computer; the agent reaches the broker through the bridge relay. Before
+launch, `mcp::remote_delivery` withholds:
+
+- every directly delivered connection, whose command, environment references and CLI
+  sign-ins exist only on this device. As a second check, the translated command keeps
+  only the `jackalope` entry of Claude Code's `--mcp-config` or Codex's `mcp_servers`
+  override; a configuration it cannot read stops the launch;
+- on-demand stdio connections for a writing attempt, because the upstream process runs
+  in this device's copy of the workspace, which the agent is not editing. A read-only
+  attempt keeps them, since that copy is what it reads.
+
+Each withheld connection is named with its reason in the attempt's activity and in the
+agent's instructions. An agent that keeps on-demand connections is told the size limits.
+Results above about 480 KB are captured on this device and returned as a 2,000-character
+preview with a `resultHandle` for `read_tool_result`, so they fit the relay's answer limit;
+a result that cannot be previewed (an error or non-text content) returns a tool error
+asking for a smaller result. A `read_tool_result` page above the limit is refused with
+the same advice.
+
+Claude Code on a computer runs with `bypassPermissions` and without Jackalope's
+permission prompt tool, so for those attempts the bridge asks before `execute_tool`
+runs, over MCP or `POST /v1/tools/execute`, exactly as the local prompt would for
+`mcp__jackalope__execute_tool`: a project's "always allow" rule approves it, otherwise
+auto-approval decides as locally and records `Auto-approved` in the activity, and
+anything else becomes the same Allow once / Always allow / Deny question. A denial is
+returned as a tool error. `read_tool` and `search_tools` are not asked about, as
+locally. Codex keeps its own noninteractive approval policy on a computer, as on this
+device.
 
 A read-only attempt runs with the same read-only CLI settings as locally (Claude Code
 without edit tools and without its permission prompt, so tools needing approval are

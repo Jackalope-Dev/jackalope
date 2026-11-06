@@ -718,19 +718,6 @@ impl TaskRuntime {
         if !EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
             return Err(unimplemented_adapter(&adapter));
         }
-        // An agent on a project computer reaches the bridge through its relay,
-        // but this device's project connections are not delivered there.
-        let original = req;
-        let remote_request;
-        let req = if remote.is_some() {
-            remote_request = RunRequest {
-                connection_ids: Some(Vec::new()),
-                ..req.clone()
-            };
-            &remote_request
-        } else {
-            req
-        };
         let runner_lease = match remote {
             Some(_) => None,
             None => crate::commands::managed_runtime::acquire(&executable)?,
@@ -893,11 +880,33 @@ impl TaskRuntime {
         if let Some(settings) = &claude {
             super::claude_session::configure(&mut cmd, settings, selected_model.as_deref());
         }
-        let (mut project_mcp, discovered_mcp) = crate::commands::mcp::project_delivery(
+        let (mut project_mcp, mut discovered_mcp) = crate::commands::mcp::project_delivery(
             &req.project_id,
             req.connection_ids.as_deref(),
             &adapter,
         )?;
+        // An agent on a computer uses selected on-demand connections through the
+        // bridge relay; the broker, its credentials and OAuth stay on this device.
+        let mut remote_connections = String::new();
+        if let Some(computer) = &remote {
+            let (kept, withheld) =
+                crate::commands::mcp::remote_delivery(&project_mcp, discovered_mcp, read_only);
+            project_mcp.clear();
+            discovered_mcp = kept;
+            if !withheld.is_empty() {
+                let summary = crate::commands::mcp::withheld_summary(&withheld);
+                self.update_checked(id, |run| {
+                    activity(
+                        run,
+                        &format!("Connections not available on {}: {summary}.", computer.name),
+                    )
+                })?;
+                remote_connections.push_str(&format!("\nThese selected connections are not available to you on this computer: {summary}. Do not look for their tools.\n"));
+            }
+            if !discovered_mcp.is_empty() {
+                remote_connections.push_str(&format!("\nSelected connections' on-demand tools run on the person's device and reach you through Jackalope. An answer can reach this computer only up to about {} KB, and a call's arguments only up to 60 KB: select output with output.jsonPointers, output.rows or output.maxChars, and page captured results with read_tool_result.\n", crate::commands::mcp_broker::REMOTE_RESULT_LIMIT / 1024));
+            }
+        }
         let has_discovery = !discovered_mcp.is_empty();
         if has_discovery && req.coordination.is_none() {
             return Err("Task tool discovery requires the native bridge. Start the task again when the bridge is available.".into());
@@ -909,8 +918,21 @@ impl TaskRuntime {
                     .as_ref()
                     .map(|binding| (name.to_string(), binding.directory.clone()))
             });
-            self.mcp_broker
-                .prepare(id, discovered_mcp, PathBuf::from(&workspace), account)?;
+            // Claude Code on a computer runs without its permission prompt, so
+            // the bridge asks before execute_tool the way that prompt would.
+            let delivery = crate::commands::mcp_broker::Delivery {
+                result_limit: remote
+                    .is_some()
+                    .then_some(crate::commands::mcp_broker::REMOTE_RESULT_LIMIT),
+                approve_executes: remote.is_some() && adapter == "claude",
+            };
+            self.mcp_broker.prepare_with(
+                id,
+                discovered_mcp,
+                PathBuf::from(&workspace),
+                account,
+                delivery,
+            )?;
             if crate::commands::experiments::is("JACKALOPE_INITIAL_TOOLS", "small") {
                 let started = std::time::Instant::now();
                 let result = tauri::async_runtime::block_on(async {
@@ -1005,6 +1027,26 @@ impl TaskRuntime {
         };
         let commit_policy = crate::commands::project_git::read(Path::new(&req.project_path))?;
         commit_policy.environment(&mut cmd, &[req.agent.clone()]);
+        // Project secrets reach the agent process only; an agent on a computer
+        // receives its own set when its run starts there.
+        if remote.is_none() {
+            let secrets = crate::commands::project_secrets::environment(
+                &self.project_secrets_root(),
+                &req.project_id,
+                crate::commands::project_secrets::Place::Local,
+            )
+            .map_err(|error| format!("Project secrets could not be read: {error}"))?;
+            if !secrets.is_empty() {
+                let names: Vec<&str> = secrets.iter().map(|(name, _)| name.as_str()).collect();
+                self.update_checked(id, |run| {
+                    activity(
+                        run,
+                        &format!("Project secrets for the agent: {}.", names.join(", ")),
+                    )
+                })?;
+            }
+            cmd.envs(secrets);
+        }
         if req.previous_run_id.is_none() {
             // JACKALOPE_REPO_MAP=off removes the map without changing anything else, so a
             // run with and without it is otherwise identical and the difference is measurable.
@@ -1110,6 +1152,7 @@ impl TaskRuntime {
                 ]);
             }
         }
+        input.push_str(&remote_connections);
         input.push_str(&format!("\nTask:\n{}\n", req.prompt));
         if adapter == "grok" {
             std::fs::write(self.directory.join(format!("{id}.prompt")), &input)
@@ -1169,7 +1212,7 @@ impl TaskRuntime {
         }
         if let Some(computer) = remote {
             drop(runner_lease);
-            return self.run_remote(id, original, &adapter, cmd, input, &workspace, computer);
+            return self.run_remote(id, req, &adapter, cmd, input, &workspace, computer);
         }
         if persistent {
             let outcome = self.run_claude_session(super::claude_session::Launch {
@@ -1767,6 +1810,10 @@ impl TaskRuntime {
     /// Bot and task computers; never synced or exported.
     pub fn computers_root(&self) -> PathBuf {
         self.directory.join("computers")
+    }
+    /// Project secrets in protected storage; never synced or exported.
+    pub fn project_secrets_root(&self) -> PathBuf {
+        self.directory.join("project-secrets")
     }
     pub fn preferences_directory(&self) -> PathBuf {
         self.directory.join("preferences")

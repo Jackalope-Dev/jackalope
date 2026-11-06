@@ -775,6 +775,54 @@ mod tests {
     }
 
     #[test]
+    fn computers_receive_only_on_demand_connections_they_can_use() {
+        let global = json!({"mcpServers": {
+            "composio": {"url":"https://backend.composio.dev/mcp", "jackalopeManaged":true, "jackalopeDiscovery":true},
+            "managed-direct": {"command":"local-tool", "jackalopeManaged":true}
+        }});
+        let project = json!({"mcpServers": {
+            "remote-docs": {"name":"Docs", "url":"https://example.invalid/mcp", "jackalopeDiscovery":true},
+            "local-files": {"name":"Files", "command":"node", "jackalopeDiscovery":true},
+            "direct": {"url":"https://example.invalid/direct", "bearer_token_env_var":"DIRECT_TOKEN"}
+        }});
+        let selected: Vec<String> = ["remote-docs", "local-files", "direct"]
+            .map(String::from)
+            .to_vec();
+        let (direct, on_demand) =
+            delivery_from_configs("project:test", &global, &project, Some(&selected), "claude")
+                .unwrap();
+        let ids = |servers: &[McpServerConfig]| {
+            let mut ids: Vec<String> = servers.iter().map(|s| s.id.clone()).collect();
+            ids.sort();
+            ids
+        };
+        let names = |withheld: &[Withheld]| {
+            let mut names: Vec<String> = withheld.iter().map(|w| w.name.clone()).collect();
+            names.sort();
+            names
+        };
+
+        let (kept, withheld) = remote_delivery(&direct, on_demand.clone(), false);
+        assert_eq!(ids(&kept), ["composio", "remote-docs"]);
+        assert_eq!(names(&withheld), ["Files", "direct", "managed-direct"]);
+        assert!(withheld
+            .iter()
+            .find(|w| w.name == "Files")
+            .is_some_and(|w| w.reason == WITHHELD_STDIO));
+        assert!(withheld
+            .iter()
+            .filter(|w| w.name != "Files")
+            .all(|w| w.reason == WITHHELD_DIRECT));
+
+        let (kept, withheld) = remote_delivery(&direct, on_demand, true);
+        assert_eq!(ids(&kept), ["composio", "local-files", "remote-docs"]);
+        assert_eq!(names(&withheld), ["direct", "managed-direct"]);
+        let summary = withheld_summary(&withheld);
+        assert!(summary.contains("direct (it is delivered directly"));
+        assert!(!summary.contains("DIRECT_TOKEN"));
+    }
+
+    #[test]
     fn discovery_is_native_only_and_rejects_unsupported_adapters() {
         let scope = "project:test";
         let server = parse_server_spec(
@@ -945,6 +993,58 @@ fn delivery_from_configs(
         return Err("A selected project connection is disabled or missing. Review the task's tools before starting.".into());
     }
     Ok((result, optimized))
+}
+
+/// A selected connection an agent on a computer does not receive, and why.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct Withheld {
+    pub name: String,
+    pub reason: &'static str,
+}
+
+const WITHHELD_DIRECT: &str = "it is delivered directly to the agent, and its command, environment and sign-ins exist only on this device; turn on on-demand tools for it to use it on a computer";
+const WITHHELD_STDIO: &str = "it runs as a program on this device in this device's copy of the workspace, which a writing agent on a computer does not use";
+
+/// Narrows an attempt's connections for an agent on a computer. Direct entries
+/// (project or managed all-project ones) carry this device's commands,
+/// environment references and CLI sign-ins, so none are sent there. On-demand
+/// connections stay with the broker on this device, so their credentials and
+/// OAuth never leave it, and reach the agent through the bridge relay. A stdio
+/// upstream runs in this device's copy of the workspace, which matches the
+/// computer's only for a read-only attempt.
+pub(super) fn remote_delivery(
+    direct: &serde_json::Map<String, Value>,
+    on_demand: Vec<McpServerConfig>,
+    read_only: bool,
+) -> (Vec<McpServerConfig>, Vec<Withheld>) {
+    let mut withheld: Vec<Withheld> = direct
+        .keys()
+        .map(|id| Withheld {
+            name: id.clone(),
+            reason: WITHHELD_DIRECT,
+        })
+        .collect();
+    let mut kept = Vec::new();
+    for server in on_demand {
+        if server.transport == "http" || read_only {
+            kept.push(server);
+        } else {
+            withheld.push(Withheld {
+                name: server.name.clone(),
+                reason: WITHHELD_STDIO,
+            });
+        }
+    }
+    (kept, withheld)
+}
+
+/// One line naming each withheld connection with its reason.
+pub(super) fn withheld_summary(withheld: &[Withheld]) -> String {
+    withheld
+        .iter()
+        .map(|item| format!("{} ({})", item.name, item.reason))
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 /// Resolves one enabled connection a project's tasks would receive: its own or a managed global one.
