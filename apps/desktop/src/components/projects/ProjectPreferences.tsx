@@ -19,6 +19,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { ArtifactsProjectSettings } from './ArtifactsProjectSettings';
 import { BrowserProfileSettings } from './BrowserProfileSettings';
+import { CloudResourcesCard } from './CloudResourcesCard';
 import { DesktopProjectSettings } from './DesktopProjectSettings';
 import { FeatureMapSettings } from './FeatureMapSettings';
 import { ProjectGitSettings } from './ProjectGitSettings';
@@ -285,6 +286,11 @@ export function ProjectPreferences({
               projectName={project.name}
             />
           )}
+          <CloudResourcesCard
+            key={`cloud-${project.path}`}
+            projectId={project.id}
+            projectPath={project.path}
+          />
           <ProjectComputerSettings
             key={`computer-${project.id}`}
             project={{ id: project.id, name: project.name }}
