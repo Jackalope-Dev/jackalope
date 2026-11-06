@@ -47,7 +47,7 @@ def archive(files, links=None):
     return buffer.getvalue()
 
 
-class RunProtocol(unittest.TestCase):
+class Harness(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.agent = load(self.temp.name)
@@ -97,6 +97,8 @@ class RunProtocol(unittest.TestCase):
                 return page["exit"], stdout, stderr
         self.fail("The run did not finish.")
 
+
+class RunProtocol(Harness):
     def test_round_trip_returns_patch_of_changes(self):
         base = self.upload("r1", archive({"a.txt": b"one\n", "dir/b.txt": b"keep\n"}))
         self.assertEqual(len(base["base"]), 40)
@@ -245,7 +247,8 @@ class RunProtocol(unittest.TestCase):
 
     def test_status_reports_a_run_whose_supervisor_died(self):
         self.assertEqual(self.call(action="run_status", run="r8"),
-                         {"exists": False, "runs": self.agent.RUNS_PROTOCOL})
+                         {"exists": False, "runs": self.agent.RUNS_PROTOCOL,
+                          "capabilities": self.agent.CAPABILITIES})
         self.upload("r8", archive({"a.txt": b"x"}))
         self.assertFalse(self.call(action="run_status", run="r8")["started"])
         self.call(action="run_start", run="r8",
@@ -473,6 +476,214 @@ class RunProtocol(unittest.TestCase):
         server.server_close()
         # A bridge that cannot be reached denies the call.
         self.assertEqual(hook(event)["permissionDecision"], "deny")
+
+
+def git(cwd, *args, env=None):
+    done = subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.autocrlf=false", *args],
+        cwd=cwd, capture_output=True, env=dict(os.environ, **(env or {})),
+    )
+    if done.returncode != 0:
+        raise AssertionError(f"git {args}: {done.stderr.decode()}")
+    return done.stdout.decode().strip()
+
+
+class SyncProtocol(Harness):
+    """Artifacts and git-sync, with a local repository standing in for Jackalope."""
+
+    def put(self, data, step=5):
+        digest = hashlib.sha256(data).hexdigest()
+        offset = 0
+        while True:
+            piece = data[offset:offset + step]
+            result = self.call(action="artifact_put", sha256=digest, size=len(data),
+                               offset=offset, data=base64.b64encode(piece).decode())
+            offset += len(piece)
+            if result["complete"]:
+                return digest
+
+    def get(self, digest):
+        data = b""
+        while True:
+            page = self.call(action="artifact_get", sha256=digest, offset=len(data))
+            data += base64.b64decode(page["data"])
+            if len(data) >= page["size"]:
+                return data
+
+    def local(self):
+        """A person's repository: a base commit, then uncommitted changes, an
+        ignored setup file and Jackalope context."""
+        path = os.path.join(self.temp.name, "local")
+        os.makedirs(path)
+        git(path, "init", "-q", "-b", "main")
+        open(os.path.join(path, ".gitignore"), "w").write(".env.local\n.jackalope/\n")
+        open(os.path.join(path, "a.txt"), "w").write("one\n")
+        open(os.path.join(path, "gone.txt"), "w").write("bye\n")
+        open(os.path.join(path, "big.bin"), "wb").write(os.urandom(200000))
+        git(path, "add", "-A")
+        git(path, "commit", "-qm", "base")
+        open(os.path.join(path, "a.txt"), "w").write("two\n")
+        open(os.path.join(path, "new.txt"), "w").write("new\n")
+        os.remove(os.path.join(path, "gone.txt"))
+        open(os.path.join(path, ".env.local"), "w").write("KEY=1\n")
+        return path
+
+    def snapshot(self, path, known=()):
+        """What Jackalope sends: a bundle of a synthetic commit of the working tree
+        on the base, without the commits the computer already has."""
+        index = os.path.join(self.temp.name, "snapshot.index")
+        env = {"GIT_INDEX_FILE": index}
+        git(path, "read-tree", "HEAD", env=env)
+        git(path, "add", "-A", env=env)
+        tree = git(path, "write-tree", env=env)
+        base = git(path, "rev-parse", "HEAD")
+        commit = git(path, "commit-tree", tree, "-p", base, "-m", "snapshot")
+        git(path, "update-ref", "refs/heads/snapshot", commit)
+        bundle = os.path.join(self.temp.name, "upload.bundle")
+        git(path, "bundle", "create", "-q", bundle, "refs/heads/snapshot",
+            *(["--not", *known] if known else []))
+        git(path, "update-ref", "-d", "refs/heads/snapshot")
+        os.remove(index)
+        return base, commit, open(bundle, "rb").read()
+
+    def test_artifacts_resume_dedupe_and_check_their_hash(self):
+        data = os.urandom(23)
+        digest = hashlib.sha256(data).hexdigest()
+        self.assertEqual(self.call(action="artifact_stat", sha256=digest)["received"], 0)
+        self.call(action="artifact_put", sha256=digest, size=23, offset=0,
+                  data=base64.b64encode(data[:10]).decode())
+        # A lost chunk is refused; the transfer resumes from what arrived.
+        self.assertIn("does not follow", self.fails(
+            action="artifact_put", sha256=digest, size=23, offset=15,
+            data=base64.b64encode(data[15:]).decode()))
+        stat = self.call(action="artifact_stat", sha256=digest)
+        self.assertEqual((stat["complete"], stat["received"]), (False, 10))
+        done = self.call(action="artifact_put", sha256=digest, size=23, offset=10,
+                         data=base64.b64encode(data[10:]).decode())
+        self.assertTrue(done["complete"])
+        self.assertEqual(self.get(digest), data)
+        # A stored artifact is not sent again.
+        self.assertTrue(self.call(action="artifact_put", sha256=digest, size=23, offset=0,
+                                  data="")["complete"])
+        wrong = hashlib.sha256(b"other").hexdigest()
+        self.assertIn("SHA-256 mismatch", self.fails(
+            action="artifact_put", sha256=wrong, size=5, offset=0,
+            data=base64.b64encode(b"bytes").decode()))
+        self.assertEqual(self.call(action="artifact_stat", sha256=wrong)["received"], 0)
+        self.assertIn("not on this computer", self.fails(action="artifact_get", sha256=wrong))
+        self.assertIn("SHA-256", self.fails(action="artifact_stat", sha256="../x"))
+        big = os.urandom(self.agent.CHUNK_LIMIT * 2 + 3)
+        self.assertEqual(self.get(self.put(big, step=self.agent.CHUNK_LIMIT)), big)
+
+    def test_git_sync_round_trip_keeps_context_out_and_returns_artifacts(self):
+        status = self.call(action="run_status", run="s1")
+        self.assertIn("git-sync", status["capabilities"])
+        self.assertIn("artifacts", status["capabilities"])
+        self.assertEqual(status["runs"], 4)
+        path = self.local()
+        self.assertEqual(self.call(action="sync_status", repo="p1")["have"], [])
+        base, snapshot, bundle = self.snapshot(path)
+        extras = archive({".env.local": b"KEY=1\n", ".jackalope/cloudflare.json": b"{}"})
+        self.call(action="sync_checkout", run="s1", repo="p1", bundle=self.put(bundle, 4096),
+                  base=base, snapshot=snapshot, extras=self.put(extras))
+        workspace = os.path.join(self.temp.name, "s1", "workspace")
+        read = lambda name: open(os.path.join(workspace, name)).read()  # noqa: E731
+        self.assertEqual(read("a.txt"), "two\n")
+        self.assertEqual(read("new.txt"), "new\n")
+        self.assertEqual(read(".env.local"), "KEY=1\n")
+        self.assertEqual(read(".jackalope/cloudflare.json"), "{}")
+        self.assertFalse(os.path.exists(os.path.join(workspace, "gone.txt")))
+        # The agent sees the person's history, with their changes uncommitted.
+        self.assertEqual(git(workspace, "rev-parse", "HEAD"), base)
+        status = subprocess.run(["git", "status", "--porcelain"], cwd=workspace,
+                                capture_output=True, check=True).stdout.decode()
+        self.assertEqual(sorted(status.splitlines()), [" D gone.txt", " M a.txt", "?? new.txt"])
+        self.assertTrue(self.call(action="run_status", run="s1")["synced"])
+        script = (
+            "import os,subprocess;"
+            "g=lambda *a:subprocess.run(['git','-c','user.name=x','-c','user.email=x@x',*a],check=True);"
+            "open('a.txt','w').write('three\\n');g('commit','-qam','agent');"
+            "open('b.txt','w').write('b\\n');open('.env.local','w').write('KEY=2\\n');"
+            "open('.jackalope/cloudflare.json','w').write('changed');"
+            "os.makedirs('.jackalope/artifacts/screenshots');"
+            "open('.jackalope/artifacts/screenshots/s.png','wb').write(b'PNG')"
+        )
+        self.call(action="run_start", run="s1", argv=[sys.executable, "-c", script])
+        self.assertEqual(self.finish("s1")[0]["code"], 0)
+        result = self.call(action="sync_result", run="s1")
+        self.assertEqual(result["base"], base)
+        self.assertEqual(result["artifacts"], [{
+            "path": ".jackalope/artifacts/screenshots/s.png", "size": 3,
+            "sha256": hashlib.sha256(b"PNG").hexdigest()}])
+        self.assertEqual(self.get(result["artifacts"][0]["sha256"]), b"PNG")
+        returned = os.path.join(self.temp.name, "result.bundle")
+        open(returned, "wb").write(self.get(result["bundle"]["sha256"]))
+        # The result needs only the base, which Jackalope has.
+        git(path, "bundle", "verify", "-q", returned)
+        git(path, "fetch", "-q", returned, "+refs/*:refs/incoming/*")
+        changed = git(path, "diff", "--name-status", "--no-renames", base, result["result"])
+        self.assertEqual(sorted(changed.splitlines()),
+                         ["A\tb.txt", "A\tnew.txt", "D\tgone.txt", "M\ta.txt"])
+        self.assertEqual(git(path, "show", f"{result['result']}:a.txt"), "three")
+        # Later attempts send only what the computer does not have.
+        self.assertEqual(self.call(action="sync_status", repo="p1")["have"], [base])
+        _, again, delta = self.snapshot(path, known=[base])
+        self.assertLess(len(delta), len(bundle) // 4)
+        self.call(action="sync_checkout", run="s2", repo="p1", bundle=self.put(delta, 4096),
+                  base=base, snapshot=again)
+        self.assertEqual(open(os.path.join(self.temp.name, "s2", "workspace", "a.txt")).read(),
+                         "two\n")
+        repo = os.path.join(self.temp.name, ".repos", "p1.git")
+        self.call(action="run_remove", run="s1")
+        self.assertNotIn("jackalope/s1", git(repo, "branch", "--list"))
+        self.assertEqual(git(repo, "for-each-ref", "refs/jackalope/result/"), "")
+        self.assertNotIn("s1", git(repo, "worktree", "list"))
+        self.assertIn("s2", git(repo, "worktree", "list"))
+
+    def test_sync_checkout_refuses_a_mismatched_snapshot(self):
+        path = self.local()
+        base, snapshot, bundle = self.snapshot(path)
+        digest = self.put(bundle, 4096)
+        self.assertIn("does not hold", self.fails(
+            action="sync_checkout", run="s3", repo="p1", bundle=digest,
+            base=snapshot, snapshot=snapshot))
+        self.assertIn("Name the repository", self.fails(
+            action="sync_checkout", run="s3", repo="../x", bundle=digest,
+            base=base, snapshot=snapshot))
+        self.assertIn("first", self.fails(
+            action="sync_checkout", run="s3", repo="p1", bundle="0" * 64,
+            base=base, snapshot=snapshot))
+        self.assertIn("not checked out", self.fails(action="sync_result", run="s3"))
+
+    def test_large_bridge_answers_arrive_from_an_artifact(self):
+        self.upload("s4", archive({"a.txt": b"x"}))
+        script = (
+            "import os,urllib.request;"
+            "url=os.environ['JACKALOPE_BRIDGE_URL'];token=os.environ['JACKALOPE_BRIDGE_TOKEN'];"
+            "req=urllib.request.Request(url+'/mcp',data=b'{}',method='POST',"
+            "headers={'Authorization':'Bearer '+token});"
+            "data=urllib.request.urlopen(req).read();print(len(data),data[:3].decode())"
+        )
+        self.call(action="run_start", run="s4", argv=[sys.executable, "-c", script],
+                  env={"JACKALOPE_BRIDGE_URL": self.agent.RELAY_URL,
+                       "JACKALOPE_BRIDGE_TOKEN": self.agent.RELAY_TOKEN},
+                  relay=True)
+        deadline = time.time() + 20
+        calls = []
+        while not calls and time.time() < deadline:
+            calls = self.call(action="run_read", run="s4", out=0, err=0, wait_ms=500)["bridge"]
+        answer = b"abc" + b"x" * (self.agent.RELAY_ANSWER_LIMIT * 2)
+        self.assertIn("Upload the answer", self.fails(
+            action="run_answer", run="s4", call=calls[0]["id"], status=200,
+            artifact=hashlib.sha256(answer).hexdigest()))
+        digest = self.put(answer, step=self.agent.CHUNK_LIMIT)
+        self.assertTrue(self.call(action="run_answer", run="s4", call=calls[0]["id"],
+                                  status=200, artifact=digest)["delivered"])
+        exit, stdout, _ = self.finish("s4")
+        self.assertEqual(exit["code"], 0)
+        self.assertEqual(stdout.decode().split(), [str(len(answer)), "abc"])
+        queue = os.listdir(os.path.join(self.temp.name, "s4", "bridge"))
+        self.assertFalse([name for name in queue if name.endswith(".body")])
 
 
 if __name__ == "__main__":

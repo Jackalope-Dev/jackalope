@@ -39,9 +39,22 @@ CLI's configuration or the patch; the CLI's entry starts the server through
 through the relay before each of their tools runs. Missing uv is installed
 into the bot's home; a connection whose program is still missing is reported
 and left out.
+
+Runs protocol 4 adds capabilities, listed in CAPABILITIES and reported by hello
+and run_status. With `artifacts`, files of any size travel in both directions
+as content-addressed (SHA-256) objects in CHUNK_LIMIT pieces that resume from
+the last stored byte (artifact_stat, artifact_put, artifact_get), and a bridge
+answer above RELAY_ANSWER_LIMIT is delivered from one. With `git-sync`, each
+project has a persistent bare repository here: Jackalope asks which of its
+commits it holds (sync_status), uploads a Git bundle of only what is missing
+plus a side tar of copied setup files and Jackalope context as artifacts, and
+the run's workspace is checked out from them (sync_checkout); at the end the
+result comes back as a bundle and a manifest of .jackalope/artifacts output
+(sync_result). Runs without either use the tar upload and patch above.
 """
 
 import base64
+import contextlib
 import fcntl
 import hashlib
 import hmac
@@ -65,7 +78,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PROTOCOL = 1
 # Agent runs, reported by hello and run_status as `runs`.
-RUNS_PROTOCOL = 3
+RUNS_PROTOCOL = 4
+# Runner capabilities, one per line, reported by hello and run_status.
+CAPABILITIES = [
+    "git-sync",
+    "artifacts",
+]
 OUTPUT_LIMIT = 64 * 1024
 BODY_LIMIT = 1024 * 1024
 DEVTOOLS = "http://127.0.0.1:9222"
@@ -83,7 +101,24 @@ ORPHAN_SECONDS = int(os.environ.get("JACKALOPE_RUN_ORPHAN_SECONDS") or 600)
 RUN_ACTIONS = {
     "workspace_put", "run_start", "run_read", "run_stop",
     "workspace_diff", "workspace_get", "run_remove", "run_status", "run_answer",
+    "artifact_stat", "artifact_put", "artifact_get",
+    "sync_status", "sync_checkout", "sync_result",
 }
+# Content-addressed transfers and the per-project repositories of git-sync.
+# Neither name can be a run's, which starts with a letter or digit.
+ARTIFACTS = os.path.join(RUNS, ".artifacts")
+REPOS = os.path.join(RUNS, ".repos")
+SHA256 = re.compile(r"[0-9a-f]{64}")
+OBJECT_ID = re.compile(r"[0-9a-f]{40}")
+REPO_ID = re.compile(r"[a-z0-9]{1,64}")
+ARTIFACT_LIMIT = 1024 * 1024 * 1024
+ARTIFACT_KEEP_SECONDS = 24 * 3600
+# Bridge answers delivered from an artifact.
+RELAY_ARTIFACT_LIMIT = 16 * 1024 * 1024
+# Base commits a project's repository reports, newest first.
+KNOWN_BASES = 64
+RESULT_ARTIFACTS = 2000
+RESULT_ARTIFACT_BYTES = 256 * 1024 * 1024
 RELAY_URL = "@@JACKALOPE_RELAY_URL@@"
 RELAY_TOKEN = "@@JACKALOPE_RELAY_TOKEN@@"
 RELAY_BODY_LIMIT = 64 * 1024
@@ -503,7 +538,9 @@ def inside(root, target):
 
 
 def extract(archive, workspace):
-    """Extracts regular files, directories and in-tree symbolic links only."""
+    """Extracts regular files, directories and in-tree symbolic links only, and
+    returns the files and links it wrote."""
+    written = []
     with tarfile.open(archive, "r:") as bundle:
         for member in bundle:
             name = member.name
@@ -518,17 +555,22 @@ def extract(archive, workspace):
             elif member.isfile():
                 os.makedirs(os.path.dirname(destination), exist_ok=True)
                 source = bundle.extractfile(member)
+                if os.path.islink(destination):
+                    os.unlink(destination)
                 with open(destination, "wb") as handle:
                     shutil.copyfileobj(source, handle)
                 os.chmod(destination, 0o755 if member.mode & 0o100 else 0o644)
+                written.append(name)
             elif member.issym():
                 target = os.path.join(os.path.dirname(destination), member.linkname)
                 if os.path.isabs(member.linkname) or not inside(workspace, target):
                     raise Failure(f"The workspace upload links outside itself: {name[:200]}")
                 os.makedirs(os.path.dirname(destination), exist_ok=True)
                 os.symlink(member.linkname, destination)
+                written.append(name)
             else:
                 raise Failure(f"The workspace upload has an unsupported entry: {name[:200]}")
+    return written
 
 
 def workspace_put(request):
@@ -557,6 +599,9 @@ def workspace_put(request):
     if expected and expected != digest:
         raise Failure("The workspace upload was corrupted. Try again.")
     workspace = os.path.join(directory, "workspace")
+    for marker in ("synced", "extras.json"):
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(os.path.join(directory, marker))
     if os.path.exists(workspace):
         shutil.rmtree(workspace)
     os.makedirs(workspace)
@@ -930,13 +975,16 @@ def run_status(request):
         raise Failure("Name the run with letters, digits, - or _.")
     directory = os.path.join(RUNS, name)
     if not os.path.isdir(directory):
-        return {"exists": False, "runs": RUNS_PROTOCOL}
+        return {"exists": False, "runs": RUNS_PROTOCOL, "capabilities": CAPABILITIES}
     supervisor_gone(directory)
     started = any(os.path.exists(os.path.join(directory, f)) for f in ("pid", "exit.json"))
     return {
         "runs": RUNS_PROTOCOL,
+        "capabilities": CAPABILITIES,
         "exists": True,
         "uploaded": os.path.isfile(os.path.join(directory, "base")),
+        # Checked out from a bundle, so its result comes back with sync_result.
+        "synced": os.path.isfile(os.path.join(directory, "synced")),
         "started": started,
         "exit": read_exit(directory),
     }
@@ -1026,13 +1074,25 @@ def run_answer(request):
     content_type = request.get("contentType") or "application/json"
     if not isinstance(content_type, str) or len(content_type) > 200:
         raise Failure("Answer with a content type.")
-    body = request.get("body") or ""
-    if not isinstance(body, str) or len(body) > (RELAY_ANSWER_LIMIT * 4) // 3 + 4:
-        raise Failure("The bridge answer is too large.")
-    base64.b64decode(body, validate=True)
+    record = {"status": status, "contentType": content_type}
+    if request.get("artifact") is not None:
+        # A larger answer was uploaded as an artifact first.
+        source, _ = artifact_path(request, "artifact")
+        if not os.path.isfile(source):
+            raise Failure("Upload the answer before sending it.")
+        if os.path.getsize(source) > RELAY_ARTIFACT_LIMIT:
+            raise Failure("The bridge answer is too large.")
+        shutil.copyfile(source, os.path.join(queue, call + ".body"))
+        record["file"] = call + ".body"
+    else:
+        body = request.get("body") or ""
+        if not isinstance(body, str) or len(body) > (RELAY_ANSWER_LIMIT * 4) // 3 + 4:
+            raise Failure("The bridge answer is too large.")
+        base64.b64decode(body, validate=True)
+        record["body"] = body
     temporary = os.path.join(queue, call + ".res.tmp")
     with open(temporary, "w", encoding="utf-8") as handle:
-        json.dump({"status": status, "contentType": content_type, "body": body}, handle)
+        json.dump(record, handle)
     os.replace(temporary, os.path.join(queue, call + ".res"))
     return {"delivered": True}
 
@@ -1045,7 +1105,7 @@ def relay(directory):
     secret = secrets.token_hex(32)
 
     def forget(call):
-        for kind in (".req", ".taken", ".res"):
+        for kind in (".req", ".taken", ".res", ".body"):
             try:
                 os.unlink(os.path.join(queue, call + kind))
             except FileNotFoundError:
@@ -1124,9 +1184,14 @@ def relay(directory):
             try:
                 with open(answer, encoding="utf-8") as handle:
                     result = json.load(handle)
+                if result.get("file") == call + ".body":
+                    with open(os.path.join(queue, call + ".body"), "rb") as handle:
+                        data = handle.read()
+                else:
+                    data = base64.b64decode(result["body"])
             finally:
                 forget(call)
-            self.reply(int(result["status"]), base64.b64decode(result["body"]),
+            self.reply(int(result["status"]), data,
                        result.get("contentType") or "application/json")
 
         do_GET = forward
@@ -1194,8 +1259,316 @@ def run_remove(request):
         deadline = time.time() + 15
         while read_exit(directory) is None and time.time() < deadline:
             time.sleep(0.2)
+    synced = read_synced(directory)
+    if synced:
+        # The project's repository keeps the commits; the run's worktree,
+        # branch and refs go with it.
+        run = os.path.basename(directory)
+        with repository_lock(synced) as repo:
+            if os.path.isdir(repo):
+                discard_worktree(repo, os.path.join(directory, "workspace"))
+                with contextlib.suppress(Failure):
+                    git(repo, "branch", "-q", "-D", f"jackalope/{run}")
+                refs = git(repo, "for-each-ref", "--format=%(refname)",
+                           f"refs/jackalope/incoming/{run}/", f"refs/jackalope/result/{run}")
+                for ref in refs.decode().split():
+                    git(repo, "update-ref", "-d", ref)
     shutil.rmtree(directory, ignore_errors=True)
     return {"removed": True}
+
+
+# ---- artifacts: content-addressed, chunked and resumable ----
+
+
+def artifact_path(request, key="sha256"):
+    digest = request.get(key)
+    if not isinstance(digest, str) or not SHA256.fullmatch(digest):
+        raise Failure("Name the artifact by its SHA-256.")
+    return os.path.join(ARTIFACTS, digest), digest
+
+
+def file_digest(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def prune_artifacts():
+    """Drops stored and partial artifacts unused for ARTIFACT_KEEP_SECONDS."""
+    cutoff = time.time() - ARTIFACT_KEEP_SECONDS
+    try:
+        names = os.listdir(ARTIFACTS)
+    except FileNotFoundError:
+        return
+    for name in names[:10000]:
+        with contextlib.suppress(OSError):
+            path = os.path.join(ARTIFACTS, name)
+            if os.path.getmtime(path) < cutoff:
+                os.unlink(path)
+
+
+def artifact_stat(request):
+    """Whether an artifact is stored here, or how much of it has arrived, so a
+    transfer resumes where it stopped and a stored one is not sent again."""
+    path, _ = artifact_path(request)
+    if os.path.isfile(path):
+        os.utime(path)
+        size = os.path.getsize(path)
+        return {"complete": True, "received": size, "size": size}
+    part = path + ".part"
+    return {"complete": False, "received": os.path.getsize(part) if os.path.isfile(part) else 0}
+
+
+def artifact_put(request):
+    """Appends one chunk at `offset` (0 restarts the transfer). The chunk that
+    completes `size` bytes checks the SHA-256 the artifact is named by."""
+    path, digest = artifact_path(request)
+    size = request.get("size")
+    if not isinstance(size, int) or isinstance(size, bool) or not 0 <= size <= ARTIFACT_LIMIT:
+        raise Failure("Artifacts are limited to 1 GB.")
+    os.makedirs(ARTIFACTS, mode=0o700, exist_ok=True)
+    if os.path.isfile(path):
+        os.utime(path)
+        return {"received": size, "complete": True}
+    offset = int(request.get("offset") or 0)
+    raw = chunk(request)
+    part = path + ".part"
+    if offset == 0:
+        prune_artifacts()
+        with open(part, "wb"):
+            pass
+    current = os.path.getsize(part) if os.path.isfile(part) else 0
+    if offset != current:
+        raise Failure(f"Artifact offset {offset} does not follow {current}.")
+    if current + len(raw) > size:
+        raise Failure("The artifact is larger than announced.")
+    with open(part, "ab") as handle:
+        handle.write(raw)
+    received = current + len(raw)
+    if received < size:
+        return {"received": received, "complete": False}
+    if file_digest(part) != digest:
+        os.unlink(part)
+        raise Failure("The artifact was corrupted in transfer (SHA-256 mismatch). Send it again.")
+    os.replace(part, path)
+    return {"received": received, "complete": True}
+
+
+def artifact_get(request):
+    path, _ = artifact_path(request)
+    if not os.path.isfile(path):
+        raise Failure("That artifact is not on this computer.")
+    offset = max(int(request.get("offset") or 0), 0)
+    data, after = read_from(path, offset, CHUNK_LIMIT)
+    return {"data": base64.b64encode(data).decode(), "offset": after, "size": os.path.getsize(path)}
+
+
+def store_artifact(source):
+    """Adds a file to the artifact store for Jackalope to fetch. Returns its
+    SHA-256 and size."""
+    os.makedirs(ARTIFACTS, mode=0o700, exist_ok=True)
+    digest = file_digest(source)
+    path = os.path.join(ARTIFACTS, digest)
+    if os.path.isfile(path):
+        os.utime(path)
+    else:
+        temporary = f"{path}.{secrets.token_hex(4)}.tmp"
+        shutil.copyfile(source, temporary)
+        os.replace(temporary, path)
+    return digest, os.path.getsize(path)
+
+
+# ---- git-sync: persistent project repositories and bundles ----
+
+
+@contextlib.contextmanager
+def repository_lock(request):
+    """Serializes changes to one project's repository; runs of the same project
+    may sync at once. Yields the bare repository's path."""
+    name = request.get("repo")
+    if not isinstance(name, str) or not REPO_ID.fullmatch(name):
+        raise Failure("Name the repository with lowercase letters and digits.")
+    os.makedirs(REPOS, mode=0o700, exist_ok=True)
+    descriptor = os.open(os.path.join(REPOS, name + ".lock"), os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        yield os.path.join(REPOS, name + ".git")
+    finally:
+        os.close(descriptor)
+
+
+def read_synced(directory):
+    path = os.path.join(directory, "synced")
+    if not os.path.isfile(path):
+        return None
+    with open(path) as handle:
+        return json.load(handle)
+
+
+def literal(env=None):
+    """Paths named after `--` are files, never pathspec patterns."""
+    return dict(env or {}, GIT_LITERAL_PATHSPECS="1")
+
+
+def discard_worktree(repo, workspace):
+    if os.path.lexists(workspace):
+        with contextlib.suppress(Failure):
+            git(repo, "worktree", "remove", "--force", "--force", workspace)
+        shutil.rmtree(workspace, ignore_errors=True)
+    git(repo, "worktree", "prune")
+
+
+def sync_status(request):
+    """Base commits this computer's repository for the project already holds,
+    newest first, so Jackalope bundles only what is missing."""
+    with repository_lock(request) as repo:
+        if not os.path.isdir(repo):
+            return {"have": []}
+        listed = git(repo, "for-each-ref", "--sort=-committerdate", f"--count={KNOWN_BASES}",
+                     "--format=%(objectname)", "refs/jackalope/base/")
+    return {"have": [line for line in listed.decode().split() if OBJECT_ID.fullmatch(line)]}
+
+
+def sync_checkout(request):
+    """Fetches an uploaded bundle into the project's repository and checks out
+    the run's workspace from it: HEAD at the task's base commit, the
+    workspace's uncommitted state (the bundle's snapshot commit, whose parent is
+    the base) as uncommitted changes, then the side tar of copied setup files
+    and Jackalope context, which Git ignores, on top."""
+    directory = run_directory(request, create=True)
+    run = os.path.basename(directory)
+    bundle, _ = artifact_path(request, "bundle")
+    if not os.path.isfile(bundle):
+        raise Failure("Upload the workspace bundle first.")
+    base, snapshot = request.get("base"), request.get("snapshot")
+    if not all(isinstance(value, str) and OBJECT_ID.fullmatch(value) for value in (base, snapshot)):
+        raise Failure("Name the base and snapshot commits.")
+    extras = None
+    if request.get("extras") is not None:
+        extras, _ = artifact_path(request, "extras")
+        if not os.path.isfile(extras):
+            raise Failure("Upload the setup files first.")
+    workspace = os.path.join(directory, "workspace")
+    for marker in ("base", "synced", "extras.json"):
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(os.path.join(directory, marker))
+    with repository_lock(request) as repo:
+        if not os.path.isdir(repo):
+            git(REPOS, "init", "-q", "--bare", repo)
+        exclude = os.path.join(repo, "info", "exclude")
+        os.makedirs(os.path.dirname(exclude), exist_ok=True)
+        with open(exclude, "w") as handle:
+            # Jackalope's own folder: context arrives in the side tar and
+            # output returns as artifacts, so neither enters the result.
+            handle.write("/.jackalope/\n")
+        git(repo, "bundle", "verify", "-q", bundle, timeout=600)
+        git(repo, "fetch", "-q", "--no-tags", bundle,
+            f"+refs/heads/*:refs/jackalope/incoming/{run}/*", timeout=600)
+        parent = git(repo, "rev-parse", "--verify", "-q", f"{snapshot}^1").decode().strip()
+        if parent != base:
+            raise Failure("The workspace bundle does not hold the named snapshot.")
+        git(repo, "update-ref", f"refs/jackalope/base/{base}", base)
+        known = git(repo, "for-each-ref", "--sort=-committerdate", "--format=%(refname)",
+                    "refs/jackalope/base/").decode().split()
+        for ref in known[KNOWN_BASES:]:
+            git(repo, "update-ref", "-d", ref)
+        discard_worktree(repo, workspace)
+        git(repo, "worktree", "add", "-q", "-f", "-B", f"jackalope/{run}", workspace, base,
+            timeout=600)
+        with contextlib.suppress(Failure):
+            git(repo, "gc", "--auto", "--quiet", timeout=600)
+    git(workspace, "read-tree", "-u", "--reset", snapshot, timeout=600)
+    git(workspace, "reset", "-q", timeout=600)
+    names = extract(extras, workspace) if extras else []
+    with open(os.path.join(directory, "extras.json"), "w") as handle:
+        json.dump(names, handle)
+    with open(os.path.join(directory, "synced"), "w") as handle:
+        json.dump({"repo": request["repo"], "base": base, "snapshot": snapshot}, handle)
+    # workspace_diff compares with the snapshot, as with an uploaded tar.
+    with open(os.path.join(directory, "base"), "w") as handle:
+        handle.write(snapshot)
+    return {"workspace": workspace, "base": snapshot}
+
+
+def collect_artifacts(workspace):
+    """Stores the run's .jackalope/artifacts output and lists it for Jackalope,
+    without following links."""
+    root = os.path.join(workspace, ".jackalope", "artifacts")
+    found, total, truncated = [], 0, False
+    if (os.path.islink(os.path.join(workspace, ".jackalope")) or os.path.islink(root)
+            or not os.path.isdir(root)):
+        return found, truncated
+    for folder, directories, files in os.walk(root):
+        directories[:] = sorted(d for d in directories
+                                if not os.path.islink(os.path.join(folder, d)))
+        for name in sorted(files):
+            path = os.path.join(folder, name)
+            if os.path.islink(path) or not os.path.isfile(path):
+                continue
+            size = os.path.getsize(path)
+            if len(found) >= RESULT_ARTIFACTS or total + size > RESULT_ARTIFACT_BYTES:
+                return found, True
+            digest, size = store_artifact(path)
+            total += size
+            relative = os.path.relpath(path, workspace).replace(os.sep, "/")
+            found.append({"path": relative, "size": size, "sha256": digest})
+    return found, truncated
+
+
+def sync_result(request):
+    """Bundles the run's result for Jackalope: a synthetic commit of the working
+    tree on top of whatever the agent committed, against the base Jackalope
+    already has. Copied setup files and Jackalope context stay out of it;
+    .jackalope/artifacts output is listed as artifacts."""
+    directory = run_directory(request)
+    if read_exit(directory) is None and os.path.exists(os.path.join(directory, "pid")):
+        raise Failure("Wait for the run to finish before collecting its changes.")
+    synced = read_synced(directory)
+    if not synced:
+        raise Failure("This run was not checked out from a bundle.")
+    run = os.path.basename(directory)
+    workspace = os.path.join(directory, "workspace")
+    index = os.path.join(directory, "result.index")
+    with contextlib.suppress(FileNotFoundError):
+        os.unlink(index)
+    env = {"GIT_INDEX_FILE": index}
+    git(workspace, "read-tree", "HEAD", env=env)
+    git(workspace, "add", "-A", env=env, timeout=600)
+    with open(os.path.join(directory, "extras.json")) as handle:
+        extras = json.load(handle)
+    if extras:
+        tracked = git(workspace, "ls-tree", "-r", "-z", "--name-only", "HEAD", "--", *extras,
+                      env=literal()).decode("utf-8", "replace").split("\0")
+        dropped = [name for name in extras if name not in tracked]
+        if dropped:
+            git(workspace, "rm", "--cached", "-q", "--ignore-unmatch", "--", *dropped,
+                env=literal(env))
+    tree = git(workspace, "write-tree", env=env).decode().strip()
+    result = git(workspace, "commit-tree", tree, "-p", "HEAD", "-m",
+                 "Jackalope run result").decode().strip()
+    os.unlink(index)
+    bundle = os.path.join(directory, "result.bundle")
+    with repository_lock(synced):
+        ref = f"refs/jackalope/result/{run}"
+        git(workspace, "update-ref", ref, result)
+        git(workspace, "bundle", "create", "-q", bundle, ref, "--not", synced["base"],
+            timeout=600)
+    try:
+        if os.path.getsize(bundle) > PATCH_LIMIT:
+            raise Failure("The run changed more than 256 MB of files.")
+        digest, size = store_artifact(bundle)
+    finally:
+        os.unlink(bundle)
+    artifacts, truncated = collect_artifacts(workspace)
+    return {
+        "bundle": {"sha256": digest, "size": size},
+        "result": result,
+        "base": synced["base"],
+        "artifacts": artifacts,
+        "artifactsTruncated": truncated,
+    }
 
 
 def supervise(directory):
@@ -1292,6 +1665,12 @@ def handle_run(request):
         "run_remove": run_remove,
         "run_status": run_status,
         "run_answer": run_answer,
+        "artifact_stat": artifact_stat,
+        "artifact_put": artifact_put,
+        "artifact_get": artifact_get,
+        "sync_status": sync_status,
+        "sync_checkout": sync_checkout,
+        "sync_result": sync_result,
     }[action](request)
 
 
@@ -1302,8 +1681,8 @@ def handle(request):
     if action == "hello":
         wait_for_display()
         width, height = screen_size()
-        return {"protocol": PROTOCOL, "runs": RUNS_PROTOCOL, "screen": [width, height],
-                "browser": browser_running()}
+        return {"protocol": PROTOCOL, "runs": RUNS_PROTOCOL, "capabilities": CAPABILITIES,
+                "screen": [width, height], "browser": browser_running()}
     wait_for_display()
     if action in ("snapshot", "screenshot"):
         return observe(request, action)
