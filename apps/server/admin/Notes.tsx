@@ -1,4 +1,4 @@
-import { Button, Checkbox, FormField, InlineNotice, Input, Panel, Textarea } from '@jackalope/ui';
+import { Button, Checkbox, FormField, Input, Panel, Textarea } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { type Broadcast, message, post, useResource } from './api';
 import { ErrorNotice, Heading, Refresh, SelectField } from './components';
@@ -25,42 +25,7 @@ export function Notes() {
   const pendingFocus = useRef<string | null>(null);
   const [error, setError] = useState('');
   const [result, setResult] = useState<{ url?: string } | null>(null);
-  // The monthly draft loaded into the form, so sending it marks it as handled.
-  const [draftMonth, setDraftMonth] = useState('');
   const dirty = JSON.stringify(note) !== saved;
-  const monthly = request.data?.monthly?.latest;
-  function loadMonthly() {
-    const loaded = monthly?.draft;
-    if (!loaded || !monthly) return;
-    setNote({
-      subject: loaded.subject,
-      preview: loaded.preview,
-      headline: loaded.headline,
-      intro: loaded.intro,
-      outro: loaded.outro,
-      tag: loaded.tag,
-      actionLabel: loaded.action?.label ?? '',
-      actionUrl: loaded.action?.url ?? '',
-      entries: loaded.entries,
-      extras: loaded.extras.map((extra) => ({ ...extra, id: crypto.randomUUID() })),
-    });
-    setDraftMonth(monthly.month);
-    setResult(null);
-    setError('');
-  }
-  async function dismissMonthly() {
-    if (!monthly || busy) return;
-    setBusy(true);
-    try {
-      await post('/admin/api/access/product-notes', { month: monthly.month, action: 'dismiss' });
-      if (draftMonth === monthly.month) setDraftMonth('');
-      request.reload();
-    } catch (error) {
-      setError(message(error));
-    } finally {
-      setBusy(false);
-    }
-  }
   useEffect(() => {
     if (!dirty) return;
     const guard = (event: BeforeUnloadEvent) => {
@@ -133,17 +98,8 @@ export function Notes() {
     setResult(null);
     const snapshot = JSON.stringify(note);
     try {
-      setResult(
-        await post('/admin/api/access/broadcast', {
-          ...draft(),
-          ...(draftMonth ? { draftMonth } : {}),
-        }),
-      );
+      setResult(await post('/admin/api/access/broadcast', draft()));
       setSaved(snapshot);
-      if (draftMonth) {
-        setDraftMonth('');
-        request.reload();
-      }
     } catch (error) {
       setError(message(error));
     } finally {
@@ -193,13 +149,6 @@ export function Notes() {
               : 'Changes could not be loaded. Reload changes to try again.'}
         </p>
         <ErrorNotice>{request.error}</ErrorNotice>
-        <MonthlyNotice
-          monthly={request.data?.monthly}
-          loaded={!!monthly && draftMonth === monthly.month}
-          busy={busy}
-          onLoad={loadMonthly}
-          onDismiss={() => void dismissMonthly()}
-        />
         <div className="compose">
           {field('subject', 'Subject', 150, 'What shipped in Jackalope this month')}
           {field('preview', 'Preview text', 150, 'Shown after the subject in the inbox')}
@@ -393,77 +342,6 @@ export function Notes() {
         </p>
       </Panel>
     </>
-  );
-}
-
-const monthName = (month: string) =>
-  new Date(`${month}-01T00:00:00Z`).toLocaleString('en-US', {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-
-/** Where this month's drafted note stands, with the one action that fits. */
-function MonthlyNotice({
-  monthly,
-  loaded,
-  busy,
-  onLoad,
-  onDismiss,
-}: {
-  monthly: Broadcast['monthly'];
-  loaded: boolean;
-  busy: boolean;
-  onLoad: () => void;
-  onDismiss: () => void;
-}) {
-  const latest = monthly?.latest;
-  if (!latest || latest.state === 'dismissed' || latest.state === 'drafting') return null;
-  const name = monthName(latest.month);
-  const dismiss = (
-    <Button variant="ghost" disabled={busy} onClick={onDismiss}>
-      Dismiss
-    </Button>
-  );
-  if (latest.state === 'ready' && latest.draft)
-    return (
-      <InlineNotice
-        action={
-          <>
-            <Button variant="secondary" disabled={busy || loaded} onClick={onLoad}>
-              {loaded ? 'Loaded below' : 'Load draft'}
-            </Button>
-            {dismiss}
-          </>
-        }
-      >
-        Claude drafted the {name} note from the changelog. Load it to review and edit. Nothing is
-        sent until you create the Sequenzy draft and send it there.
-      </InlineNotice>
-    );
-  if (latest.state === 'handed_off')
-    return (
-      <InlineNotice tone="success">
-        The {name} note is in Sequenzy
-        {latest.reason === 'schedule_failed' ? ', but scheduling failed. Send it there.' : '.'}{' '}
-        {latest.campaignUrl?.startsWith('https://') && (
-          <a href={latest.campaignUrl} target="_blank" rel="noreferrer">
-            Open it in Sequenzy
-          </a>
-        )}
-      </InlineNotice>
-    );
-  if (latest.state === 'skipped')
-    return (
-      <InlineNotice action={dismiss}>
-        No app changes landed or moved into a release in {name}, so no note was drafted.
-      </InlineNotice>
-    );
-  return (
-    <InlineNotice tone="warning" action={dismiss}>
-      The {name} note could not be drafted ({latest.reason ?? 'unknown reason'}). Compose it by hand
-      below.
-    </InlineNotice>
   );
 }
 

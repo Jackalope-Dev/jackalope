@@ -197,7 +197,7 @@ Repeat `--item` for additional bullets. Use optional `--note` only for useful
 context or a specific limitation, without repeating a development-release disclaimer.
 Optional `--id` and `--date`
 flags override the generated ID and today's date; `--kind website` marks a change
-to the website itself, which the monthly product notes leave out. Do not write a
+to the website itself rather than the app. Do not write a
 status: the website build reads it from release tags, so an entry reads Coming soon
 once merged, In beta once a `beta-v*` tag contains it and Released once a
 `stable-v*` tag does. The website changelog and LLM-readable discovery output both

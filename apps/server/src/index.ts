@@ -2,7 +2,6 @@ import { deviceRoutes } from './access/devices';
 import { pruneFeedbackInvitations } from './access/feedback';
 import { deliverAccessMail } from './access/mail';
 import { syncNewsletter } from './access/newsletter';
-import { runMonthlyProductNotes } from './access/product-notes';
 import { accessRoutes } from './access/routes';
 import { pruneAccess } from './access/service';
 import { admin } from './admin';
@@ -242,10 +241,6 @@ export default {
     }
   },
   async scheduled(_controller, env) {
-    // Independent of retention: a slow or failed draft never holds up cleanup.
-    const productNotes = runMonthlyProductNotes(env).catch(() =>
-      console.log(JSON.stringify({ event: 'product_notes_error' })),
-    );
     try {
       if (env.EARLY_ACCESS_ENABLED === 'true') {
         await Promise.all([deliverAccessMail(env), syncNewsletter(env)]);
@@ -256,9 +251,7 @@ export default {
       console.log(JSON.stringify({ event: 'retention_complete', ...(await prune(env)) }));
     } catch {
       console.log(JSON.stringify({ event: 'retention_failed' }));
-      await productNotes;
       throw new Error('retention_failed');
     }
-    await productNotes;
   },
 } satisfies ExportedHandler<Env>;

@@ -41,12 +41,7 @@
     "ACCESS_STORE_URL": "",
     "ACCESS_MAC_CHANNELS": "",
     "ACCESS_LINUX_CHANNELS": "",
-    "ACCESS_AUDIENCE_LIST": "",
-    "PRODUCT_NOTES_ENABLED": "false",
-    "PRODUCT_NOTES_AUTOSEND": "false",
-    "PRODUCT_NOTES_MODEL": "",
-    "PRODUCT_NOTES_PROMPT": "",
-    "PRODUCT_NOTES_ADMIN_URL": ""
+    "ACCESS_AUDIENCE_LIST": ""
   },
   "d1_databases": [
     {
@@ -117,12 +112,7 @@
         "ACCESS_STORE_URL": "",
         "ACCESS_MAC_CHANNELS": "",
         "ACCESS_LINUX_CHANNELS": "",
-        "ACCESS_AUDIENCE_LIST": "",
-        "PRODUCT_NOTES_ENABLED": "false",
-        "PRODUCT_NOTES_AUTOSEND": "false",
-        "PRODUCT_NOTES_MODEL": "",
-        "PRODUCT_NOTES_PROMPT": "",
-        "PRODUCT_NOTES_ADMIN_URL": "https://staging-api.jackalope.dev/admin/access#notes"
+        "ACCESS_AUDIENCE_LIST": ""
       },
       "d1_databases": [
         {
@@ -202,12 +192,7 @@
         "ACCESS_STORE_URL": "https://apps.microsoft.com/detail/9NM89QFJQ244",
         "ACCESS_MAC_CHANNELS": "stable,beta",
         "ACCESS_LINUX_CHANNELS": "stable,beta",
-        "ACCESS_AUDIENCE_LIST": "",
-        "PRODUCT_NOTES_ENABLED": "false",
-        "PRODUCT_NOTES_AUTOSEND": "false",
-        "PRODUCT_NOTES_MODEL": "",
-        "PRODUCT_NOTES_PROMPT": "",
-        "PRODUCT_NOTES_ADMIN_URL": "https://api.jackalope.dev/admin/access#notes"
+        "ACCESS_AUDIENCE_LIST": ""
       },
       "d1_databases": [
         {

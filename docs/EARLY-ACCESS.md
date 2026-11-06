@@ -48,7 +48,7 @@ The additive migration creates access members, invitations, tokens, sessions and
 an encrypted email outbox. Existing telemetry and feedback tables are unchanged.
 Apply outstanding migrations 0004 (desktop accounts), 0005 (mail delivery
 references), 0006 (referral progress), 0007 (waitlist insights), 0008 (referrals)
-and 0009 (explicit waitlist join time), plus 0020 (monthly product notes), before deploying the current Worker. Migrations preserve existing data;
+and 0009 (explicit waitlist join time) before deploying the current Worker. Migrations preserve existing data;
 older mail remains readable without a delivery lookup reference.
 
 | Setting | Value / purpose |
@@ -66,12 +66,6 @@ older mail remains readable without a delivery lookup reference.
 | `SEQUENZY_API_KEY` | Worker secret with `transactional:send`; verify minimum permission for email-send lookups before enabling admin delivery checks |
 | `VITE_ACCESS_API` | Website build variable, `https://api.jackalope.dev` |
 | `VITE_TURNSTILE_SITE_KEY` | Website build variable: the public key of a managed Turnstile widget for the website's hostname. Unset shows no challenge |
-| `PRODUCT_NOTES_ENABLED` | `true` turns on the monthly product-notes draft; default `false`. Requires `ADMIN_EMAIL`, `ACCESS_EMAIL_FROM`, `SEQUENZY_API_KEY` and `ANTHROPIC_API_KEY` |
-| `PRODUCT_NOTES_AUTOSEND` | `true` hands each monthly draft to Sequenzy and schedules it two hours out instead of waiting for review; default `false`. Requires `ACCESS_AUDIENCE_LIST` |
-| `PRODUCT_NOTES_MODEL` | Claude model for drafting; empty uses `claude-sonnet-5` |
-| `PRODUCT_NOTES_PROMPT` | Optional replacement for the built-in voice prompt; release rules and the output format always apply |
-| `PRODUCT_NOTES_ADMIN_URL` | Composer link in the owner's notice; tracked per environment |
-| `ANTHROPIC_API_KEY` | Worker secret for drafting product notes; required by the deployment only when `PRODUCT_NOTES_ENABLED` is `true` |
 | `TURNSTILE_SECRET` | Optional Worker secret for that widget. When set, signup requires a Siteverify-confirmed token for the `signup` action from the `ACCESS_WEB_ORIGIN` hostname and fails closed otherwise. Set the site key and secret together |
 
 The shared deployment helper reads individual `STAGING_` / `PRODUCTION_` settings
@@ -145,24 +139,8 @@ For unsynced newsletter consent, an operator may reset `newsletter_attempts` and
 `newsletter_next_at` for the affected consenting member after correcting the cause.
 Never reset `newsletter_synced_at` to resubscribe someone who opted out.
 
-### Monthly product notes
-
-With `PRODUCT_NOTES_ENABLED`, the first cron run of each month (UTC) gathers the
-previous month's app changes from the published `/changelog.json`: entries added
-that month or moved into a beta or stable release that month. Website entries are
-left out. Claude picks three to five and writes the subject, preview, headline,
-opening and closing; ids it returns are checked against the month's changes, and
-a draft with no real change or with fields the composer would refuse is rejected.
-A month with no app changes is recorded as skipped.
-
-Migration 0020 adds `product_note_drafts`, one row per month, which is both the
-once-a-month guard and the stored draft. A failed draft is retried later, up to
-three attempts in all. The owner gets one email at `ADMIN_EMAIL` linking to
-**Product notes** in the admin, where **Load draft** fills the composer for review
-and editing. Creating the Sequenzy draft from it marks the month as handed off;
-**Dismiss** sets it aside. Nothing goes to subscribers unless
-`PRODUCT_NOTES_AUTOSEND` is on. With the flag off the job does nothing; with the
-flag on and a setting missing it logs `product_notes_inactive` once per isolate.
+Recurring product update emails are drafted and sent from LopeBase, which reads
+the website's public changelog feed. The admin composer remains for one-off notes.
 
 ## Private installers and rollout
 
