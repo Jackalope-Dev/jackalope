@@ -117,7 +117,10 @@ formatting and Rust tests run only when files the native build reads changed
 Cargo settings and the JavaScript lockfiles), and the JavaScript and shared checks run
 only when something outside `src-tauri` changed. `scripts/change-scope.mjs` holds these
 path rules for both the hook and CI. When the comparison is unavailable it runs
-everything; CI always runs the full gate. Allow many minutes when Rust tests run.
+everything; CI always runs the full gate. `--changed` also leaves the builds and the
+website deploy dry-run to CI, which runs them on every push to master and every pull
+request, and runs only the server tests that import a changed file, with at most four
+Vitest workers. Allow many minutes when Rust tests run.
 TypeScript runs early so type failures stop before native compilation. Check timings
 are printed. Use `pnpm exec lefthook run pre-push` to exercise the checks without
 publishing.

@@ -51,8 +51,9 @@ function changedScope() {
     git('rev-parse', '--verify', '--quiet', '@{upstream}').status === 0
       ? '@{upstream}'
       : 'origin/master';
-  const base = git('merge-base', 'HEAD', upstream);
-  const files = base.status === 0 ? changedFiles(base.stdout.trim()) : null;
+  const merge = git('merge-base', 'HEAD', upstream);
+  const base = merge.status === 0 ? merge.stdout.trim() : null;
+  const files = base ? changedFiles(base) : null;
   const { shared, native } = affected(files);
   if (files)
     console.log(
@@ -63,9 +64,14 @@ function changedScope() {
         .filter(Boolean)
         .join(' and ')}.`,
     );
-  return { shared, native };
+  return { shared, native, base };
 }
 const scope = changedScope();
+// The pre-push hook (--changed) leaves builds and deploy dry-runs to CI, which
+// runs the full gate on every push to master and every pull request, and runs
+// only the server tests that import a changed file.
+const pushing = args.includes('--changed');
+const serverTests = pushing && scope.base ? ['--changed', scope.base, '--maxWorkers=4'] : [];
 
 const sharedChecks = [
   [process.execPath, ['scripts/evaluation/website.mjs', '--check']],
@@ -81,13 +87,15 @@ const sharedChecks = [
   [process.execPath, [pnpm, 'check:swarm-bundle']],
   [process.execPath, [pnpm, 'check:changelog']],
   [process.execPath, [pnpm, 'test:release']],
-  [process.execPath, [pnpm, 'ui:build']],
+  ...(pushing ? [] : [[process.execPath, [pnpm, 'ui:build']]]),
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'types']],
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'typecheck']],
-  [process.execPath, [pnpm, '--filter', '@jackalope/server', 'test']],
+  [process.execPath, [pnpm, '--filter', '@jackalope/server', 'test', ...serverTests]],
+  [process.execPath, [pnpm, '--filter', '@jackalope/mobile', 'test']],
+];
+const sharedBuilds = [
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'build']],
   [process.execPath, [pnpm, 'build']],
-  [process.execPath, [pnpm, '--filter', '@jackalope/mobile', 'test']],
   [process.execPath, [pnpm, '--filter', '@jackalope/mobile', 'build']],
   [
     process.execPath,
@@ -127,6 +135,7 @@ const desktopScripts = nativeChecks.shift();
 const checks = [
   [process.execPath, ['scripts/security/dependencies.mjs', '--patch-only']],
   ...(!nativeOnly && scope.shared ? sharedChecks : []),
+  ...(!nativeOnly && scope.shared && !pushing ? sharedBuilds : []),
   ...(scope.shared || nativeOnly ? [desktopScripts] : []),
   ...(scope.native ? nativeChecks : []),
 ];
