@@ -1,5 +1,17 @@
 [
   {
+    "id": "swarms-spread-across-your-computers",
+    "date": "2026-11-06",
+    "title": "Swarms spread across your computers",
+    "description": "A swarm can now run its tasks across this device and your computers at once, each placed where it can run and where there is room.",
+    "items": [
+      "Choose where a project's swarms run under Swarms run on in Project settings: anywhere, computers only or this device only, and add other computers to share the work.",
+      "Each task goes to a host that has what it needs, such as the browser tools, a secret it names or a connection it was given, and its activity says why it went there.",
+      "The swarm board, round view and task details show where each task runs and how busy each host is; a task whose computer stops answering is retried once on another host."
+    ],
+    "note": "Beta. Not yet tested across real computers in the installed app."
+  },
+  {
     "id": "agents-on-a-computer-keep-their-tools-there",
     "date": "2026-11-06",
     "title": "Agents on a computer keep their tools there",

@@ -216,9 +216,13 @@ not merely when no gaps are open. Attempts that have a check keep every check ga
 
 A swarm runs in rounds. Each round is a managed task with the same checks, agent and
 independent review as planned subtasks. A round may run as many assignments as the
-slots where the project's agents run (local concurrency, or the computer's concurrency
-when the project's agents run on a computer), at least 8 and at most 24; other shapes
-keep their limits. A connected swarm Worker still mirrors attempts but is not required.
+hosts in the project's capacity pool can run at once, at least 8 and at most 24: its
+computers (the project's own and any added under **Swarms run on**, within the limit on
+agents on computers), plus local concurrency when the project has no computer of its own,
+or only local concurrency when its swarms run on this device only; other shapes keep their
+limits. Each assignment of every shape is placed on a host of that pool (see
+[swarms across hosts](BOT-COMPUTERS.md#swarms-across-hosts)), and the Rounds section shows
+each host's load. A connected swarm Worker still mirrors attempts but is not required.
 
 When a round's combined result is merged, by the person in result review or by the
 autonomy policy, Jackalope starts a read-only orchestrator attempt on the target branch
@@ -415,6 +419,8 @@ cargo test --lib planning          # document, interview, store, hand-off, round
 cargo test --lib agent_decider     # policy, decider replies, limits, round validator, human actions
 cargo test --lib question_risk     # question classifier
 cargo test --lib coordination::managed
+cargo test --lib computers::pool   # where each fork runs, limits, lost hosts
+cargo test --lib coordination::hosts # retrying a fork whose host was lost
 cargo test --bin jackalope plan    # terminal commands, panel and protocol
 cd .. && node --test scripts/plan-mode.test.mjs
 ```

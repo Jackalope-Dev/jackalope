@@ -204,7 +204,11 @@ when the plan asks first, or for a deciding agent once the merged round passed i
 when the project lets agents approve rounds. Up to 4 orchestrators can review a large plan's areas in
 parallel; their verdicts merge into one (done only when every area is done, next
 assignments deduplicated and sequenced where scopes overlap). A round runs at least 8 and at most 24
-assignments, sized to the slots where the project's agents run. Rounds stop at the
+assignments, sized to the slots of the project's capacity pool. Every planned or swarm
+fork is placed on one host of that pool (this device or one of the person's computers) by
+what it needs, the project's **Swarms run on** choice and which host has room; the reason
+is recorded in its activity and a fork whose host is lost is retried once elsewhere (see
+[swarms across hosts](BOT-COMPUTERS.md#swarms-across-hosts)). Rounds stop at the
 plan's round limit (default 5), pause and stop with the plan, start paused after a
 restart, and never assign `.jackalope/**`. A swarm Worker is optional. See
 [plan mode](PLAN-MODE.md#swarm-rounds-beta).

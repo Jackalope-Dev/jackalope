@@ -81,6 +81,7 @@ names; changes must preserve both sides and old saved records.
 | desktop_control.rs, desktop_control/, resources/gnome-extension/ | Attempt-scoped window, app and desktop grants, remembered project permissions, resident native helpers, accessibility refs, capture and guarded Windows/macOS/X11/GNOME 46 Wayland input |
 | computers.rs, computers/, desktop_control/computer.rs, resources/computer/ | Bot, task and project computers: provider trait, local Docker sandboxes, paired cloud machines, Agent37 machines, the in-sandbox agent image, run routing for desktop and browser tools, and the run protocol, command translation and sign-ins for agents on a computer |
 | computers/runner.rs, computers/policy.rs | The control plane / runner boundary: runner capability negotiation, the table of where each bridge tool executes for any runner (this device's included) and each running attempt's attached placement, and the device's answers to a computer runner's policy callbacks and events |
+| computers/pool.rs, coordination/hosts.rs | The capacity pool of execution hosts (this device and the person's computers): per-project host choices, limits, health, the deterministic placer for planned and swarm forks, and the one retry of a fork whose host was lost |
 | computers/sync.rs, computers/artifacts.rs | How workspaces and files travel to a runner with `git-sync` and `artifacts`: Git bundles against a per-project repository on the computer, and chunked, content-addressed, resumable transfers for bundles, saved output and large bridge answers |
 | tasks/runner.rs, tasks/runner/ | The runner of every attempt: one path through prepare, start, follow, stop and collect for the local runner (the agent CLI in this device's worktree, its process ownership and persistent Claude Code sessions) and the remote runner (upload as a bundle or tar, output relay, stop and quota, and applying its changes), and one record of what workspace tools did |
 | knowledge.rs, monitors.rs | Project lessons/workflows, immutable task context receipts and local Git change checks |
@@ -131,6 +132,16 @@ capability, so its tool list comes from the same `computers::runner::TOOLS` tabl
 bridge applies each attempt's attached placement to `tools/list`. Tool events from the
 bridge's own handlers and from a runner's `/v1/runner/event` are recorded by one function.
 See [the runner](BOT-COMPUTERS.md#the-runner).
+
+Which runner an attempt gets is decided on this device. When the coordinator's dispatch
+reserves planned or swarm work, the capacity pool's placer (`computers/pool.rs`) picks one
+host from this device and the computers the project may use, by the fork's needs, the
+project's choice of hosts and free capacity, under the coordinator lock and before the
+execution guard; the choice reaches the attempt when it is created and is saved on it.
+Attempts the queue does not dispatch, continuations included, keep the project's computer
+rule or their earlier host. A fork whose host was lost is retried once on another host
+through the same dispatch path, so reservations, quota handoff and the lock order are
+unchanged. See [swarms across hosts](BOT-COMPUTERS.md#swarms-across-hosts).
 
 `desktop_control.rs` separately owns explicit window, app and desktop grants, the
 session's resident helper process and a single desktop input lease. Both transports share task authorization, cancellation and snapshot

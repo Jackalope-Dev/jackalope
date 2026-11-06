@@ -436,6 +436,18 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   left on the computer come back when the task continues. Such agents have their own
   concurrency limit (8 by default, up to 32, set in the project's queue); other agents
   stay local. See [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
+- Planned and swarm work spreads across a capacity pool (beta): this device, the project's
+  computer and other computers the person adds under **Swarms run on** in Project
+  settings, which also chooses anywhere (the default), computers only or this device only.
+  A deterministic placer puts each fork on a host by its needs (agents that cannot run on a
+  computer, secrets available to only one place, selected connections that cannot reach a
+  computer, browser-checked criteria), the project's choice and free capacity, preferring
+  the project's computer, and records why in its activity. Each host has a concurrency
+  limit (computers take two runs unless their runner reports more) and health from its
+  runs; a fork whose host was lost is retried once on another host. Without added
+  computers, forks run where they did before. The swarm board, map, round view and task
+  details show each fork's host and each host's load; the phone companion shows the host.
+  See [swarms across hosts](BOT-COMPUTERS.md#swarms-across-hosts).
 - Project secrets (Project settings → Secrets) give a project's task agents environment
   variables such as service API keys, on this device, on its computer or both. Values
   stay in protected storage and reach only agent processes; the app shows names and
@@ -705,6 +717,9 @@ recovery against a real computer, Git-synced workspaces and artifacts against a 
 image from Windows and macOS hosts, the template build and instances on a live Agent37
 account, and gVisor support for the image's desktop are unverified, and Agent37
 computers have no viewer. The image workflow has not run, so no image is published yet.
+Placing swarm forks across hosts is covered by unit tests of the placer, the dispatcher and
+the lost-host retry; no swarm has yet run across this device and real computers, and host
+health is learned only from runs and resets when the app restarts.
 
 Installed provider, accessibility, recovery, performance, signed installation and
 update acceptance remain platform-specific requirements. Real-model quality and

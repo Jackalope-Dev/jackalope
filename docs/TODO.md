@@ -47,6 +47,14 @@ release dates.
   `.jackalope/artifacts` screenshots coming back, a conflicting result leaving the
   workspace unchanged with its patch and output saved, two concurrent runs of one
   project, and an on-demand tool result between 512 KB and 1 MB reaching the agent whole.
+- [ ] Accept swarms across hosts in the installed app on Windows and macOS: a swarm round
+  spread across this device, the project's computer and an added local sandbox, cloud
+  machine and Agent37 computer, with each fork's placement reason, the hosts' load on the
+  swarm board and round view, forks waiting when every host is full, a browser-checked
+  fork and one naming a device-only secret placed correctly, each **Swarms run on**
+  choice, a computer stopped mid-round (the fork retried once elsewhere and the lost host
+  skipped until it answers again), a restart mid-round, and the phone companion showing
+  the host. Decide whether runners should report `slots` from their machine size.
 - [ ] Publish the first computer image from `beta`, make its package public, and accept
   a local pull, a cloud machine started from it and an Agent37 registry import.
 - [ ] Give Agent37 computers a viewer through signed port URLs, sizes beyond the default

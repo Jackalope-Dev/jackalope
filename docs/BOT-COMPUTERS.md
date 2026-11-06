@@ -183,7 +183,9 @@ Running a project's agents on a computer, Agent37 computers and agent sign-ins f
 computers are beta and marked **Beta** wherever the app shows them. A project whose
 **Agents run on** names a computer runs its Claude Code and Codex task agents there,
 including read-only planning attempts (plan mode's planner and a swarm round's
-orchestrator). Other agents run on this device and say so in the attempt's activity. Workspace preparation, checks, the checkpoint, review and integration stay on
+orchestrator). Other agents run on this device and say so in the attempt's activity.
+Planned and swarm work can also spread to other computers and this device (see
+[swarms across hosts](#swarms-across-hosts)). Workspace preparation, checks, the checkpoint, review and integration stay on
 this device and are unchanged, so the coordinator, execution guard and runtime lock
 order, reservations and Git safeguards apply as for a local attempt:
 
@@ -261,6 +263,68 @@ The command itself still differs where the hosts do: an agent on this device use
 account profiles, project secrets for this device, directly delivered connections and,
 for Claude Code, a persistent session; one on a computer uses the sign-ins and connections
 described in this section.
+
+### Swarms across hosts
+
+Planned and swarm work (each assignment of an approved plan or automatic subtasks, its
+combined review and a swarm round's work) is placed across a capacity pool: this device
+and the computers that support runs (local sandboxes, cloud machines and Agent37
+computers). The pool holds the project's own computer, which the project pins, and any
+other computers the person adds under **Swarms run on** in Project settings (saved per
+project in `computers/pool.json`). **Swarms run on** chooses **Anywhere**, **Computers
+only** or **This device only**; a project that never chose runs anywhere, which without
+added computers places every fork where it ran before the pool existed: on the project's
+computer when it has one, otherwise on this device. The choice is offered once there is
+a computer to run on.
+
+Each host has a concurrency limit. This device keeps the queue's limit of one to six;
+computers together keep the queue's limit on agents on computers (8 by default); the
+project's computer may take up to that limit, and an added computer takes two runs at a
+time unless its runner reports `slots` (1 to 32) in `hello` or `run_status`. Health comes
+from runs: a computer is last seen when a run's status or output read succeeds, and lost
+when it cannot be started or reached or contact is lost. A lost computer gets no new work
+for ten minutes unless it is reached again first. Health is kept in memory, so it starts
+empty after a restart.
+
+When the queue reserves a fork, the placer (`computers::pool::place`) decides, the same
+way every time for the same hosts, loads and needs:
+
+1. Hard boundaries come first. The project's choice limits the hosts. A fork that can only
+   run on this device never goes to a computer: its agent is not Claude Code or Codex, its
+   instructions name a [project secret](AGENT-ACCOUNTS.md#project-secrets) available only
+   to this device, or a connection selected for its plan cannot reach a computer (see the
+   connection rules above). A fork that names a secret available only to computers never
+   runs here. A fork with a browser-checked criterion needs the browser tools: this device,
+   a computer whose runner reported `browser`, or the project's computer until a run shows
+   it lacks them. A fork no host can take stops with the reason, like any dispatch error,
+   and pauses the project's queue.
+2. Computers out of contact are skipped; if that leaves none, the fork waits.
+3. The fork's home host takes it while it has a free slot: the project's computer when it
+   pins one, otherwise this device.
+4. Otherwise the host with the most free slots takes it (then the fewest running, this
+   device, the name and the id). A project that pins a computer keeps forks off this
+   device while that computer is in contact, so adding computers is what spreads its work.
+5. With no free slot anywhere, the fork waits.
+
+The chosen host and the reason are saved on the attempt (`host`) and its activity says
+`Placement: …`. Other queued tasks keep to their project's computer or this device under
+the same limits. Plan-mode planners, swarm orchestrators and deciders stay where the
+project's agents run, except that **This device only** keeps them here too. A continuation
+returns to its earlier attempt's host, where its agent session and anything left behind
+are.
+
+A fork whose attempt failed because its host was lost (the computer could not be started
+or reached before the agent ran, contact was lost for the whole 30-minute window, or the
+computer no longer exists) is retried once while its plan's dispatch runs, as a new
+attempt on another host it may use, this device included. The failed attempt's activity
+says where the retry went, or why there was none; a retry that loses its host too is not
+retried again. Changes the lost run left on that computer are not brought back by the
+retry. An agent that fails on a host that answered is an agent failure and is not
+retried.
+
+The swarm board, its map and a plan's round view name each fork's host and show a line
+per host with its running attempts against its limit, or lost contact. Task details show
+the host and why it was chosen, and the phone companion shows the host in task details.
 
 ### How workspaces travel
 
@@ -530,7 +594,8 @@ run left behind by lost contact is discarded the same way when planning continue
 machine on an old image) runs the agent without the bridge and says so.
 
 Agents on project computers have their own concurrency limit (8 by default, up to 32),
-separate from this device's one to six. The project's queue shows it as **On
+separate from this device's one to six, shared by every computer in the
+[capacity pool](#swarms-across-hosts). The project's queue shows it as **On
 computers** beside **Concurrent tasks** when the project has a computer, and sets it
 through `queue_dispatch`'s `remoteConcurrency`. A run holds its computer against the
 idle stop, and the attempt's details show the computer it ran on. On the computer, a run
@@ -591,7 +656,9 @@ unavailable. A provider implements the `Provider` trait:
 `computers/agent37.rs` (`agent37`) are the implementations; a VM API provider adds a
 module and a branch in `provider`. `computers/runs.rs` is the run protocol client,
 command translation and patch handling, `computers/relay.rs` the bridge relay,
-`computers/runner.rs` runner capabilities and tool placement, `computers/policy.rs` the
+`computers/runner.rs` runner capabilities and tool placement, `computers/pool.rs` the
+capacity pool, host health and the placer (with `coordination/hosts.rs` refreshing it,
+working out each fork's needs and retrying lost hosts), `computers/policy.rs` the
 answers to the runner's policy callbacks and events, `computers/sync.rs` the Git bundles
 of `git-sync`, `computers/artifacts.rs` the artifact transfers,
 `computers/credentials.rs` the agent sign-ins for computers, and
@@ -710,7 +777,14 @@ syncs and brings back saved output, and older runners keeping the tar and patch;
 resumed downloads, hash mismatches and large bridge answers; `mcp_broker` covers
 lifting the result limit;
 `coordination::eligibility` covers the
-separate concurrency for computer projects; `computers::agent37` covers keys, instance
+separate concurrency for computer projects and planned work spread across the pool while
+other queued work keeps its host; `computers::pool` covers placement by requirements,
+secrets and connection boundaries, the project's choice, load balancing with a pinned
+computer, per-host and shared limits, lost hosts and retries, the default matching the
+placement from before the pool, saved choices and health; `coordination::hosts` covers
+which failed forks are retried after a lost host and where the retry goes; `tasks::runner`
+also covers recording the chosen host once, continuations returning to their host and a
+computer that does not answer becoming a lost host; `computers::agent37` covers keys, instance
 creation bodies, states, errors and the template build context.
 `computers::image` covers the published reference and the definition hash shared with
 `node --test scripts/release/computer-image.test.mjs`; `computers::agent37` also covers
@@ -737,5 +811,5 @@ operating system, Docker variant or cloud provider, real Claude Code or Codex ru
 computer, bridge tools used by a real agent there, stdio connections and their approval
 hook in a real Claude Code or Codex run there, the runner's local bridge and agent-browser
 in a built image, lost-contact recovery against a real computer, Git-synced workspaces
-and artifact transfers against a built image from Windows and macOS hosts, or a live
-Agent37 account.
+and artifact transfers against a built image from Windows and macOS hosts, a swarm spread
+across this device and several real computers, or a live Agent37 account.
