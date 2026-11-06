@@ -2,7 +2,6 @@
   {
     "id": "see-which-agent-is-working",
     "date": "2026-11-06",
-    "status": "In development",
     "title": "See which agent is working",
     "description": "Tasks show the logo of the agent that worked on them most recently.",
     "items": [
@@ -13,7 +12,6 @@
   {
     "id": "cloud-resources-for-your-projects",
     "date": "2026-11-06",
-    "status": "In development",
     "title": "Cloud resources for your projects",
     "description": "Create R2 storage, a D1 database, KV, Queues, Hyperdrive and Turnstile in your own Cloudflare account from Project settings, with wrangler bindings ready to copy.",
     "items": [
@@ -25,7 +23,6 @@
   {
     "id": "connections-and-secrets-for-agents-on-a-computer",
     "date": "2026-11-06",
-    "status": "In development",
     "title": "Connections and secrets for agents on a computer",
     "description": "Agents running on a project's computer use the project's on-demand connections, and every project can give its agents their own API keys.",
     "items": [
@@ -37,7 +34,6 @@
   {
     "id": "agents-decide-the-routine-you-decide-what-matters",
     "date": "2026-11-06",
-    "status": "In development",
     "title": "Agents decide the routine, you decide what matters",
     "description": "On approved plans, agents can answer routine questions, approve checked swarm rounds and accept small in-scope changes for you, so a long build keeps moving.",
     "items": [
