@@ -95,6 +95,26 @@ pub async fn repo_todos_read(project_path: String) -> Result<Vec<TodoDocument>, 
     .map_err(|e| e.to_string())?
 }
 
+/// Moves the finished file over the list. Windows refuses the replace while another
+/// process, such as an antivirus or search indexer scanning the just-written file, holds
+/// it open, so a refusal is retried briefly before it is reported.
+fn replace(temporary: &Path, path: &Path) -> std::io::Result<()> {
+    let mut attempt = 0;
+    loop {
+        match std::fs::rename(temporary, path) {
+            Err(error)
+                if cfg!(windows)
+                    && error.kind() == std::io::ErrorKind::PermissionDenied
+                    && attempt < 10 =>
+            {
+                attempt += 1;
+                std::thread::sleep(std::time::Duration::from_millis(25 * attempt));
+            }
+            result => return result,
+        }
+    }
+}
+
 fn save_document(
     root: &Path,
     relative: &str,
@@ -144,7 +164,7 @@ fn save_document(
             // Publish the complete file exclusively; never replace a concurrently created list.
             std::fs::hard_link(&temporary, &path).map_err(|e| e.to_string())?;
         } else {
-            std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
+            replace(&temporary, &path).map_err(|e| e.to_string())?;
         }
         Ok(())
     })();
