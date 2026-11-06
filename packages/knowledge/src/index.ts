@@ -7,7 +7,9 @@ export function guideMarkdown(guide: KnowledgeGuide, origin: string) {
     .map((section) =>
       [
         `## ${section.question}`,
-        ...section.paragraphs,
+        ...section.paragraphs.map((paragraph) =>
+          paragraph.replace(/\]\((\/[^)\s]*)\)/g, (_, href) => `](${new URL(href, origin).href})`),
+        ),
         section.bullets?.map((item) => `- ${item}`).join('\n'),
         section.steps?.map((item, index) => `${index + 1}. ${item}`).join('\n'),
         section.codeBox && `${section.codeBox.title}\n\n\`\`\`\n${section.codeBox.code}\n\`\`\``,
