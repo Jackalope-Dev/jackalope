@@ -690,7 +690,7 @@ impl TaskRuntime {
         // An agent on the project's computer uses the CLI installed there.
         let adapter = policy.adapter(&req.agent)?;
         let remote = if EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
-            self.remote_target(id, req, &adapter)
+            self.placed_target(id, req, &adapter, previous.as_ref())?
         } else {
             None
         };
@@ -1862,7 +1862,7 @@ impl TaskRuntime {
                 .0
         } else {
             let adapter = policy.adapter(&request.agent)?;
-            if !self.runs_remotely(&request.project_id, &adapter) {
+            if !self.runs_remotely(&request.id, &request.project_id, &adapter) {
                 policy.resolve(&request.agent)?;
             }
             adapter
@@ -2053,6 +2053,15 @@ impl TaskRuntime {
                     &context_receipt,
                 )?
             };
+            // The host the capacity pool chose at dispatch, if it chose one.
+            let host = crate::commands::computers::pool::take(&request.id);
+            let mut notes: Vec<String> =
+                crate::commands::first_commit::take_note(&request.project_path)
+                    .into_iter()
+                    .collect();
+            if let Some(host) = &host {
+                notes.push(super::runner::host_activity(host));
+            }
             let run = TaskRun {
                 archived_at: None,
                 live_session_id: request.live_session_id.clone(),
@@ -2100,6 +2109,7 @@ impl TaskRuntime {
                 target_branch: request.target_branch.clone(),
                 process_contained: false,
                 remote: None,
+                host,
                 verify_command: request.verify_command.clone(),
                 prepare_command: request.prepare_command.clone(),
                 setup_files: request.setup_files.clone(),
@@ -2116,9 +2126,7 @@ impl TaskRuntime {
                 result: String::new(),
                 streaming: String::new(),
                 details_omitted: false,
-                activity: crate::commands::first_commit::take_note(&request.project_path)
-                    .into_iter()
-                    .collect(),
+                activity: notes,
                 diagnostics: vec![],
                 error: None,
                 persistence_error: None,

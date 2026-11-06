@@ -101,6 +101,10 @@ pub struct TaskRun {
     /// The computer the agent ran on, when it did not run on this device.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub remote: Option<RemoteExecution>,
+    /// The execution host chosen for the attempt and why, from the capacity
+    /// pool. Attempts saved before it existed have none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<crate::commands::computers::pool::RunHost>,
     #[serde(default)]
     pub verify_command: Option<String>,
     #[serde(default)]
@@ -350,6 +354,7 @@ impl TaskRun {
             target_branch: self.target_branch.clone(),
             process_contained: self.process_contained.clone(),
             remote: self.remote.clone(),
+            host: self.host.clone(),
             verify_command: self.verify_command.clone(),
             prepare_command: self.prepare_command.clone(),
             setup_files: self.setup_files.clone(),

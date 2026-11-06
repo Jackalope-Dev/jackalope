@@ -284,3 +284,126 @@ fn one_launch_records_the_same_result_through_both_runners() {
     drop(runtime);
     let _ = std::fs::remove_dir_all(folder);
 }
+
+/// A computer that never answers.
+struct Unreachable;
+
+impl computers::Transport for Unreachable {
+    fn call(
+        &mut self,
+        _: &serde_json::Value,
+        _: Duration,
+        _: &AtomicBool,
+    ) -> Result<serde_json::Value, String> {
+        Err("connection refused".into())
+    }
+}
+
+fn insert_run(runtime: &TaskRuntime, workspace: &Path) -> String {
+    let id = uuid::Uuid::new_v4().to_string();
+    let mut run = super::super::tests::sample("codex");
+    run.id = id.clone();
+    run.project_id = "fixture".into();
+    run.status = "starting".into();
+    run.workspace = workspace.to_string_lossy().into_owned();
+    runtime.inner.lock().unwrap().runs.insert(id.clone(), run);
+    id
+}
+
+#[test]
+fn placement_is_recorded_once_and_continuations_keep_their_host() {
+    let folder = std::env::temp_dir().join(format!("jackalope-placed-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&folder).unwrap();
+    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let id = insert_run(&runtime, &folder);
+    let req = request(&id, &folder);
+    // A project without a computer runs here, and says so once.
+    for _ in 0..2 {
+        assert!(runtime
+            .placed_target(&id, &req, "codex", None)
+            .unwrap()
+            .is_none());
+    }
+    let run = runtime.run_snapshot(&id).unwrap();
+    assert!(run.host.as_ref().unwrap().is_device());
+    let lines: Vec<_> = run
+        .activity
+        .iter()
+        .filter(|line| line.starts_with("Placement:"))
+        .collect();
+    assert_eq!(lines, ["Placement: Runs on this device."]);
+
+    // A continuation goes back to its earlier attempt's host; one that is
+    // gone fails the attempt as a lost host, which a retry can move.
+    let mut earlier = run.clone();
+    earlier.host = Some(RunHost {
+        id: "gone".into(),
+        name: "Lab".into(),
+        reason: "Placed on Lab.".into(),
+        ..Default::default()
+    });
+    let next = insert_run(&runtime, &folder);
+    let error = runtime
+        .placed_target(&next, &request(&next, &folder), "codex", Some(&earlier))
+        .unwrap_err();
+    assert_eq!(error, "Lab is no longer available to run agents.");
+    let host = runtime.run_snapshot(&next).unwrap().host.unwrap();
+    assert_eq!(host.id, "gone");
+    assert_eq!(host.lost.as_deref(), Some(error.as_str()));
+    assert!(host.reason.starts_with("Continues on Lab"));
+    assert!(pool::health("gone").unavailable());
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(folder);
+}
+
+#[test]
+fn a_computer_that_does_not_answer_is_a_lost_host() {
+    let folder = std::env::temp_dir().join(format!("jackalope-lost-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("README.md"), "fixture\n").unwrap();
+    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    credentials::set(
+        &runtime.computers_root(),
+        "openai-key",
+        Some("sk-fixture-0123456789abcdef"),
+    )
+    .unwrap();
+    let computer = Computer {
+        id: format!("lost{}", uuid::Uuid::new_v4().simple()),
+        name: "Box".into(),
+        owner_kind: "project".into(),
+        owner_id: "fixture".into(),
+        provider: "remote-machine".into(),
+        machine_id: None,
+        decisions: "fixture".into(),
+        created_at: String::new(),
+        last_used_at: None,
+        settings: Default::default(),
+    };
+    let session = runs::Session::with_transport(
+        Box::new(Unreachable),
+        runs::run_name(&folder.to_string_lossy()),
+    );
+    let mut remote = remote::RemoteRunner::with_session(computer.clone(), false, session);
+    let id = insert_run(&runtime, &folder);
+    let req = request(&id, &folder);
+    let mut codex = Command::new("codex");
+    codex.args(["exec", "--json", "-"]);
+    let workspace = folder.to_string_lossy().into_owned();
+    let mut launch = Launch {
+        id: &id,
+        req: &req,
+        adapter: "codex",
+        cmd: codex,
+        input: String::new(),
+        workspace: &workspace,
+    };
+    let error = remote.prepare(&runtime, &mut launch).unwrap_err();
+    assert!(error.starts_with("Box did not answer:"), "{error}");
+    let host = runtime.run_snapshot(&id).unwrap().host.unwrap();
+    assert_eq!(host.id, computer.id);
+    assert_eq!(host.lost.as_deref(), Some(error.as_str()));
+    assert!(pool::health(&computer.id).unavailable());
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(folder);
+}

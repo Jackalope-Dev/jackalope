@@ -54,6 +54,9 @@ pub(crate) struct RunnerCapabilities {
     /// The runs protocol, 0 for an agent from before runs.
     pub protocol: u64,
     names: BTreeSet<String>,
+    /// Runs the runner reports it takes at once (`slots`), for the capacity
+    /// pool; unreported means the pool's default.
+    pub slots: Option<usize>,
 }
 
 impl RunnerCapabilities {
@@ -75,7 +78,14 @@ impl RunnerCapabilities {
         } else {
             BTreeSet::new()
         };
-        Self { protocol, names }
+        let slots = (protocol >= CAPABILITIES_PROTOCOL)
+            .then(|| super::pool::reported_slots(status))
+            .flatten();
+        Self {
+            protocol,
+            names,
+            slots,
+        }
     }
 
     /// The local runner: this device, with every workspace capability.
@@ -92,6 +102,7 @@ impl RunnerCapabilities {
             .into_iter()
             .map(str::to_string)
             .collect(),
+            slots: None,
         }
     }
 

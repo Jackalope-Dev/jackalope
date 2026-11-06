@@ -24,6 +24,7 @@ pub(crate) mod credentials;
 pub(crate) mod docker;
 pub(crate) mod image;
 pub(crate) mod policy;
+pub(crate) mod pool;
 pub(crate) mod relay;
 pub(crate) mod remote;
 pub(crate) mod runner;

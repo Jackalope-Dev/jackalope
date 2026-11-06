@@ -41,16 +41,6 @@ pub(crate) fn project_computer(root: &Path, project_id: &str) -> Option<Computer
     super::find(root, PROJECT, project_id).filter(supports_runs)
 }
 
-/// Projects whose agents run on a computer, for scheduling.
-pub(crate) fn run_projects(root: &Path) -> HashSet<String> {
-    super::list(root)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|computer| computer.owner_kind == PROJECT && supports_runs(computer))
-        .map(|computer| computer.owner_id)
-        .collect()
-}
-
 /// The run's name inside the computer. It follows the local workspace, so a
 /// continuation of the same task reuses the same folder and agent sessions
 /// resume there.

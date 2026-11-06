@@ -33,6 +33,7 @@ mod eligibility;
 #[cfg(test)]
 mod evaluation_trial;
 pub mod followups;
+pub mod hosts;
 #[cfg(test)]
 mod native_mcp_trial;
 #[cfg(test)]
@@ -82,6 +83,8 @@ struct Inner {
     remote_concurrency: usize,
     /// Projects whose agents run on a computer, refreshed each dispatch tick.
     remote_projects: HashSet<String>,
+    /// The hosts planned work may use, refreshed each dispatch tick.
+    pool: super::computers::pool::Pool,
     grants: HashMap<String, (String, String)>,
     url: Option<String>,
     error: Option<String>,

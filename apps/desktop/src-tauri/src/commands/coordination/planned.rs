@@ -198,15 +198,18 @@ impl Coordinator {
         cloud::configured(&self.runtime)
     }
 
-    /// Assignments one swarm round of the project may run: more when its
-    /// agents run on a computer with more slots, or local concurrency allows.
+    /// Assignments one swarm round of the project may run: as many as the
+    /// hosts in its capacity pool can run at once, within the round limits.
     pub(crate) fn swarm_limit(&self, project_id: &str) -> usize {
         let inner = self.inner.lock().unwrap();
-        let slots = if inner.remote_projects.contains(project_id) {
-            inner.remote_concurrency
-        } else {
-            inner.concurrency
-        };
+        let slots = inner.pool.slots(
+            project_id,
+            inner.remote_projects.contains(project_id),
+            crate::commands::computers::pool::Limits {
+                device: inner.concurrency,
+                remote: inner.remote_concurrency,
+            },
+        );
         managed::swarm_assignment_limit(slots)
     }
 

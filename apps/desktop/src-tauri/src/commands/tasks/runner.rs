@@ -28,7 +28,11 @@
 //! [`computers::policy`]: crate::commands::computers::policy
 
 use super::*;
-use crate::commands::computers::{self, credentials, runs, Computer};
+use crate::commands::computers::{
+    self, credentials,
+    pool::{self, RunHost},
+    runs, Computer,
+};
 
 pub(super) mod local;
 pub(in crate::commands) mod record;
@@ -144,36 +148,130 @@ impl TaskRuntime {
         });
     }
 
-    /// Whether this project's attempts with `adapter` run on its computer, so
-    /// the agent CLI need not be installed on this device.
-    pub(in crate::commands) fn runs_remotely(&self, project_id: &str, adapter: &str) -> bool {
+    /// Whether attempt `id` of this project, with `adapter`, runs on a
+    /// computer, so the agent CLI need not be installed on this device.
+    pub(in crate::commands) fn runs_remotely(
+        &self,
+        id: &str,
+        project_id: &str,
+        adapter: &str,
+    ) -> bool {
         credentials::REMOTE_ADAPTERS.contains(&adapter)
-            && runs::project_computer(&self.computers_root(), project_id).is_some()
+            && match pool::peek(id) {
+                Some(host) => !host.is_device(),
+                None => self.project_target(id, project_id).is_some(),
+            }
     }
 
-    /// The computer this attempt's agent runs on, or `None` to run it here.
-    /// Read-only planning attempts follow the project like any other.
-    pub(super) fn remote_target(
+    /// The project's computer for an attempt the capacity pool did not place:
+    /// every attempt of a project with a computer runs there, except read-only
+    /// planning attempts of a project whose swarms run only on this device.
+    fn project_target(&self, id: &str, project_id: &str) -> Option<Computer> {
+        let root = self.computers_root();
+        runs::project_computer(&root, project_id).filter(|_| {
+            !(crate::commands::planning::read_only(id)
+                && pool::settings(&root, project_id).swarm_hosts == Some(pool::SwarmHosts::Device))
+        })
+    }
+
+    /// The computer this attempt's agent runs on, or `None` to run it here,
+    /// with the host recorded on the attempt. The host the capacity pool
+    /// chose at dispatch comes first; a continuation stays on its earlier
+    /// attempt's host, where its session and anything left behind are; any
+    /// other attempt follows the project's computer, as read-only planners
+    /// and orchestrators always have. A computer that is gone fails the
+    /// attempt as a lost host.
+    pub(super) fn placed_target(
         &self,
         id: &str,
         req: &RunRequest,
         adapter: &str,
-    ) -> Option<Computer> {
-        let computer = runs::project_computer(&self.computers_root(), &req.project_id)?;
-        if !credentials::REMOTE_ADAPTERS.contains(&adapter) {
-            self.update(id, |run| {
-                activity(
-                    run,
-                    &format!(
-                        "{} cannot run on {} yet, so it runs on this device.",
-                        req.agent, computer.name
-                    ),
-                )
-            });
-            return None;
+        previous: Option<&TaskRun>,
+    ) -> Result<Option<Computer>, String> {
+        let root = self.computers_root();
+        let current = self.run_snapshot(id).and_then(|run| run.host);
+        let host = current.clone().or_else(|| {
+            previous
+                .and_then(|old| old.host.clone())
+                .map(|old| RunHost {
+                    reason: format!("Continues on {}, where the earlier attempt ran.", old.name),
+                    id: old.id,
+                    name: old.name,
+                    ..Default::default()
+                })
+        });
+        let computer = match &host {
+            Some(host) if host.is_device() => None,
+            Some(host) => {
+                let found = computers::list(&root)
+                    .ok()
+                    .and_then(|list| list.into_iter().find(|c| c.id == host.id))
+                    .filter(runs::supports_runs);
+                match found {
+                    Some(computer) => Some(computer),
+                    None => {
+                        let reason = format!("{} is no longer available to run agents.", host.name);
+                        self.record_host(id, host.clone());
+                        self.host_lost(id, &host.id, &host.name, &reason);
+                        return Err(reason);
+                    }
+                }
+            }
+            None => self.project_target(id, &req.project_id),
+        };
+        let mut host = host.unwrap_or_else(|| match &computer {
+            Some(computer) => RunHost {
+                id: computer.id.clone(),
+                name: computer.name.clone(),
+                reason: format!("The project's agents run on {}.", computer.name),
+                ..Default::default()
+            },
+            None => RunHost::device("Runs on this device.".into()),
+        });
+        let computer = match computer {
+            Some(computer) if !credentials::REMOTE_ADAPTERS.contains(&adapter) => {
+                host = RunHost::device(format!(
+                    "{} cannot run on {} yet, so it runs on this device.",
+                    req.agent, computer.name
+                ));
+                None
+            }
+            other => other,
+        };
+        if current.as_ref().map(|old| (&old.id, &old.reason)) != Some((&host.id, &host.reason)) {
+            self.record_host(id, host);
         }
-        Some(computer)
+        Ok(computer)
     }
+
+    /// Saves where the attempt runs and says why in its activity.
+    fn record_host(&self, id: &str, host: RunHost) {
+        let line = host_activity(&host);
+        self.update(id, |run| {
+            run.host = Some(host);
+            activity(run, &line);
+        });
+    }
+
+    /// Records that the attempt's host was lost, on the attempt and in the
+    /// pool's health, and returns `reason` for the attempt's error.
+    pub(super) fn host_lost(&self, id: &str, host_id: &str, name: &str, reason: &str) -> String {
+        pool::lost(host_id, reason);
+        self.update(id, |run| {
+            let host = run.host.get_or_insert_with(|| RunHost {
+                id: host_id.into(),
+                name: name.into(),
+                ..Default::default()
+            });
+            host.lost = Some(reason.chars().take(500).collect());
+        });
+        reason.into()
+    }
+}
+
+/// The activity line naming an attempt's host and why it runs there.
+pub(super) fn host_activity(host: &RunHost) -> String {
+    format!("Placement: {}", host.reason)
 }
 
 /// Whether another active attempt is using `workspace`. Only one writer

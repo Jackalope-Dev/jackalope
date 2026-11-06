@@ -16,7 +16,7 @@
 //! device's copy stays identical to what they read.
 
 use super::*;
-use crate::commands::computers::{relay, runner};
+use crate::commands::computers::{pool, relay, runner};
 
 /// How long a run waits for its computer to start; a first image build is slow.
 const START_WAIT: Duration = Duration::from_secs(20 * 60);
@@ -148,16 +148,35 @@ impl AttemptRunner for RemoteRunner {
             // A session the caller opened, such as a test's stand-in runner.
             Some(session) => session,
             None => {
-                computers::ready_within(&root, &computer, START_WAIT)?;
+                let lost = |error: String| {
+                    runtime.host_lost(
+                        id,
+                        &computer.id,
+                        &computer.name,
+                        &format!("{} could not be reached: {error}", computer.name),
+                    )
+                };
+                computers::ready_within(&root, &computer, START_WAIT).map_err(lost)?;
                 computers::usage::note(&root, &computer.id);
-                runs::Session::open(&root, &computer, workspace)?
+                runs::Session::open(&root, &computer, workspace).map_err(lost)?
             }
         };
         if read_only {
             session.name = runs::read_only_run_name(workspace);
         }
         // An agent from before the relay answers no status and gets no bridge.
-        let status = session.status()?;
+        let status = session.status().map_err(|error| {
+            runtime.host_lost(
+                id,
+                &computer.id,
+                &computer.name,
+                &format!("{} did not answer: {error}", computer.name),
+            )
+        })?;
+        pool::seen(
+            &computer.id,
+            Some(&runner::RunnerCapabilities::from_status(status.as_ref())),
+        );
         if let Some(status) = status.as_ref().filter(|status| status["exists"] == true) {
             runtime.recover_remote(id, &mut session, status, workspace, &computer, read_only);
         }
@@ -476,6 +495,7 @@ impl RemoteRunner {
                 Ok(page) => {
                     failures = 0;
                     reclaim = false;
+                    pool::seen(&computer.id, None);
                     if lost_since.take().is_some() {
                         runtime.update(id, |run| {
                             activity(run, &format!("Contact with {} is back.", computer.name))
@@ -512,6 +532,12 @@ impl RemoteRunner {
                     let gave_up = since.elapsed() > LOST_WINDOW
                         || (canceled && since.elapsed() > Duration::from_secs(30));
                     if gave_up {
+                        runtime.host_lost(
+                            id,
+                            &computer.id,
+                            &computer.name,
+                            &format!("Lost contact with {}: {error}", computer.name),
+                        );
                         runtime.update(id, |run| {
                             run.error.get_or_insert(format!(
                                 "Lost contact with {}: {error}. The agent there stops on its own after ten minutes; its changes stay there and come back when this task is continued.",

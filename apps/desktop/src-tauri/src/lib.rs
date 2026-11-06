@@ -525,6 +525,8 @@ pub fn run(launch: Launch) {
             queue_add,
             queue_import,
             queue_dispatch,
+            commands::coordination::hosts::queue_hosts,
+            commands::coordination::hosts::queue_set_hosts,
             queue_cancel,
             queue_release,
             queue_cancel_agreement,
