@@ -48,6 +48,8 @@
     "ui:dev": "pnpm --filter @jackalope/ui dev",
     "ui:build": "pnpm --filter @jackalope/ui build",
     "ui:test": "node scripts/verification/verify-ui.mjs",
+    "worktree": "node scripts/worktree.mjs new",
+    "sync": "node scripts/worktree.mjs sync",
     "worktrees": "node scripts/worktree-report.mjs"
   },
   "keywords": [
