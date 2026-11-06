@@ -778,14 +778,15 @@ img[src="/mascot.svg"] {
 }
 
 /* Frosted window (lib/window-glass.tsx sets data-window-glass once the OS effect is on).
-   Tints are the lowest that keep text at 4.5:1 over any backdrop, black to white, in both
-   themes: 85% panes carry primary, secondary and accent text, 90% panes also muted text.
-   The backdrop tint only colours the clear glass between panes, which holds no text. */
+   85% is the lowest tint that keeps primary, secondary and accent text at 4.5:1 over any
+   backdrop, black to white, in both themes, and 90% also muted text. Tints sit a step
+   above those floors so busy windows behind stay quiet: 90% panes, 94% dense panes and
+   pages. The backdrop tint only colours the clear glass between panes, which holds no text. */
 html[data-window-glass] {
-  --glass-backdrop: color-mix(in srgb, var(--color-bg) 20%, transparent);
-  --glass-pane: color-mix(in srgb, var(--color-surface-elevated) 85%, transparent);
-  --glass-pane-dense: color-mix(in srgb, var(--color-surface-elevated) 90%, transparent);
-  --glass-page: color-mix(in srgb, var(--color-bg) 90%, transparent);
+  --glass-backdrop: color-mix(in srgb, var(--color-bg) 30%, transparent);
+  --glass-pane: color-mix(in srgb, var(--color-surface-elevated) 90%, transparent);
+  --glass-pane-dense: color-mix(in srgb, var(--color-surface-elevated) 94%, transparent);
+  --glass-page: color-mix(in srgb, var(--color-bg) 94%, transparent);
   --glass-edge: color-mix(in srgb, var(--color-text-primary) 10%, transparent);
   --glass-shadow: 0 16px 60px color-mix(in srgb, var(--color-text-primary) 12%, transparent);
   background: transparent;
