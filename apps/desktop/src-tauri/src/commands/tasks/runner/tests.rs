@@ -317,21 +317,39 @@ fn placement_is_recorded_once_and_continuations_keep_their_host() {
     let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
     let id = insert_run(&runtime, &folder);
     let req = request(&id, &folder);
-    // A project without a computer runs here, and says so once.
+    // A project without a computer runs here, as before, with nothing to
+    // record.
+    assert!(runtime
+        .placed_target(&id, &req, "codex", None)
+        .unwrap()
+        .is_none());
+    let run = runtime.run_snapshot(&id).unwrap();
+    assert!(run.host.is_none());
+    assert!(!run
+        .activity
+        .iter()
+        .any(|line| line.starts_with("Placement:")));
+    // A host the pool chose is said once, however often the launch repeats.
+    let placed = insert_run(&runtime, &folder);
+    let host = RunHost::device("Placed on this device (0 of 2 in use).".into());
+    runtime.update(&placed, |run| {
+        run.host = Some(host.clone());
+        run.activity.push(host_activity(&host));
+    });
     for _ in 0..2 {
         assert!(runtime
-            .placed_target(&id, &req, "codex", None)
+            .placed_target(&placed, &request(&placed, &folder), "codex", None)
             .unwrap()
             .is_none());
     }
-    let run = runtime.run_snapshot(&id).unwrap();
-    assert!(run.host.as_ref().unwrap().is_device());
-    let lines: Vec<_> = run
+    let lines: Vec<_> = runtime
+        .run_snapshot(&placed)
+        .unwrap()
         .activity
-        .iter()
+        .into_iter()
         .filter(|line| line.starts_with("Placement:"))
         .collect();
-    assert_eq!(lines, ["Placement: Runs on this device."]);
+    assert_eq!(lines, ["Placement: Placed on this device (0 of 2 in use)."]);
 
     // A continuation goes back to its earlier attempt's host; one that is
     // gone fails the attempt as a lost host, which a retry can move.

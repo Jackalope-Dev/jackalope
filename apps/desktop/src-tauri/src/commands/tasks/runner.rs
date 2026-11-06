@@ -219,15 +219,18 @@ impl TaskRuntime {
             }
             None => self.project_target(id, &req.project_id),
         };
-        let mut host = host.unwrap_or_else(|| match &computer {
-            Some(computer) => RunHost {
+        let mut host = match (host, &computer) {
+            (Some(host), _) => host,
+            (None, Some(computer)) => RunHost {
                 id: computer.id.clone(),
                 name: computer.name.clone(),
                 reason: format!("The project's agents run on {}.", computer.name),
                 ..Default::default()
             },
-            None => RunHost::device("Runs on this device.".into()),
-        });
+            // Nothing was chosen: the attempt runs here as every attempt of a
+            // project without a computer does.
+            (None, None) => return Ok(None),
+        };
         let computer = match computer {
             Some(computer) if !credentials::REMOTE_ADAPTERS.contains(&adapter) => {
                 host = RunHost::device(format!(
