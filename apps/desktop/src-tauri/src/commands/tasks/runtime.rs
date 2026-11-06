@@ -887,13 +887,48 @@ impl TaskRuntime {
             &adapter,
         )?;
         // An agent on a computer uses selected on-demand connections through the
-        // bridge relay; the broker, its credentials and OAuth stay on this device.
+        // bridge relay; the broker, its credentials and OAuth stay on this
+        // device. A writing agent's stdio connections run on the computer, in
+        // the workspace it edits, and start with the run (see run_remote).
         let mut remote_connections = String::new();
+        let mut computer_mcp = Vec::new();
         if let Some(computer) = &remote {
-            let (kept, withheld) =
-                crate::commands::mcp::remote_delivery(&project_mcp, discovered_mcp, read_only);
+            let secrets = if read_only {
+                Vec::new()
+            } else {
+                crate::commands::project_secrets::environment(
+                    &self.project_secrets_root(),
+                    &req.project_id,
+                    crate::commands::project_secrets::Place::Computer,
+                )
+                .map_err(|error| format!("Project secrets could not be read: {error}"))?
+            };
+            let roots = [Path::new(&workspace), Path::new(&req.project_path)];
+            let delivery = crate::commands::mcp::remote_delivery(
+                &project_mcp,
+                discovered_mcp,
+                &crate::commands::mcp::RemoteContext {
+                    read_only,
+                    roots: &roots,
+                    secrets: &secrets,
+                },
+            );
             project_mcp.clear();
-            discovered_mcp = kept;
+            discovered_mcp = delivery.broker;
+            computer_mcp = delivery.computer;
+            if !delivery.on_device.is_empty() {
+                let summary = crate::commands::mcp::withheld_summary(&delivery.on_device);
+                self.update_checked(id, |run| {
+                    activity(
+                        run,
+                        &format!(
+                            "Connections that run on this device instead of {}: {summary}.",
+                            computer.name
+                        ),
+                    )
+                })?;
+            }
+            let withheld = delivery.withheld;
             if !withheld.is_empty() {
                 let summary = crate::commands::mcp::withheld_summary(&withheld);
                 self.update_checked(id, |run| {
@@ -1213,7 +1248,16 @@ impl TaskRuntime {
         }
         if let Some(computer) = remote {
             drop(runner_lease);
-            return self.run_remote(id, req, &adapter, cmd, input, &workspace, computer);
+            return self.run_remote(
+                id,
+                req,
+                &adapter,
+                cmd,
+                input,
+                &workspace,
+                computer,
+                computer_mcp,
+            );
         }
         if persistent {
             let outcome = self.run_claude_session(super::claude_session::Launch {

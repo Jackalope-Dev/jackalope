@@ -22,12 +22,13 @@ release dates.
 ## Agents and task execution
 
 - [ ] Extend agents on a computer: the browser tools on cloud and Agent37 computers,
-  on-demand stdio connections and `computer_verify` and `read_context` against the
-  remote copy for writing agents, and automatic routing that does not require the CLI
-  here.
+  `computer_verify` and `read_context` against the remote copy for writing agents, and
+  automatic routing that does not require the CLI here.
 - [ ] Accept agents on a computer end to end: real Claude Code and Codex runs on a local
   sandbox and on a live Agent37 account (template build under gVisor, auto sleep and
-  wake, spend), bridge tools, on-demand connections, `execute_tool` approvals and project
+  wake, spend), bridge tools, on-demand connections, stdio connections running on the
+  computer (npx and uvx servers, the uv install, Claude Code's approval hook and Codex's
+  `mcp_servers` overrides), `execute_tool` approvals and project
   secrets through the relay, desktop control and the browser tools on
   the agent's computer, read-only planners and swarm orchestrators there, stop, quota
   handoff, lost contact, reattach and restart recovery.

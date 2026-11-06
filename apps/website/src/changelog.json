@@ -1,5 +1,16 @@
 [
   {
+    "id": "local-tools-for-agents-on-a-computer",
+    "date": "2026-11-06",
+    "title": "Local tools for agents on a computer",
+    "description": "Agents writing code on a project's computer can use the project's on-demand connections that run as programs, such as npx and uvx servers, right in the workspace they edit.",
+    "items": [
+      "Each connection starts on the computer with its saved settings and any project secrets it refers to, sent as privately as project secrets.",
+      "Missing uv is installed automatically. A connection the computer cannot run, such as one using Docker, runs on this device when it does not need the workspace, and the task says why when it cannot be used.",
+      "Claude Code still asks before these tools run, using your project's approval rules."
+    ]
+  },
+  {
     "id": "see-which-agent-is-working",
     "date": "2026-11-06",
     "title": "See which agent is working",

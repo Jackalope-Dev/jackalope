@@ -277,6 +277,40 @@ pub(super) async fn approve_remote_execute(
     }
 }
 
+/// Approves a tool of a connection that runs on the computer of a Claude Code
+/// attempt. Claude Code runs there with `bypassPermissions`, so the
+/// computer's agent installs a `PreToolUse` hook for those tools (see
+/// `resources/computer/agent.py`, `mcp-approve`) that asks here through the
+/// bridge relay. The request goes through the same rules, auto-approval and
+/// question as Claude Code's permission prompt for that tool on this device.
+/// Returns the prompt tool's answer: `behavior` is `allow` or `deny`.
+pub(super) async fn approve_computer_tool(
+    service: &Coordinator,
+    run: &crate::commands::tasks::TaskRun,
+    body: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let request = computer_tool_request(run.remote.is_some(), body)?;
+    Ok(permission_for(service, run, request).await)
+}
+
+fn computer_tool_request(
+    remote: bool,
+    body: serde_json::Value,
+) -> Result<PermissionPromptInput, String> {
+    if !remote {
+        return Err("Only an agent on a computer asks for tool approval this way.".into());
+    }
+    let request: PermissionPromptInput =
+        serde_json::from_value(body).map_err(|_| "Send tool_name and input.".to_string())?;
+    let name = request.tool_name.as_str();
+    if !name.starts_with("mcp__") || name.starts_with("mcp__jackalope__") || name.len() > 300 {
+        return Err(
+            "Only tools of connections that run on the computer are approved this way.".into(),
+        );
+    }
+    Ok(request)
+}
+
 #[derive(Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct HarnessDiscoveryInput {
@@ -1633,6 +1667,19 @@ mod tests {
             assert!(!schema.to_string().contains("\"rows\""));
             assert!(schema.to_string().contains("jsonPointers"));
         }
+    }
+
+    #[test]
+    fn computer_tool_approvals_accept_only_computer_connection_tools() {
+        let body = |name: &str| serde_json::json!({"tool_name": name, "input": {"q": 1}});
+        let request = computer_tool_request(true, body("mcp__linear__create_issue")).unwrap();
+        assert_eq!(request.tool_name, "mcp__linear__create_issue");
+        assert_eq!(request.input["q"], 1);
+        assert!(computer_tool_request(false, body("mcp__linear__create_issue")).is_err());
+        for name in ["Bash", "mcp__jackalope__ask_user", "mcp_", ""] {
+            assert!(computer_tool_request(true, body(name)).is_err(), "{name}");
+        }
+        assert!(computer_tool_request(true, serde_json::json!({"input": {}})).is_err());
     }
 
     #[test]

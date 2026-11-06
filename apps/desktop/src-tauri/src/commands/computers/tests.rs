@@ -533,7 +533,9 @@ fn local_docker_computer_round_trip() {
                 ],
                 "hello\n",
                 true,
+                None,
             )?
+            .exit
             .is_none());
         let (mut out, mut err) = (0, 0);
         let (mut stdout, mut stderr) = (Vec::new(), Vec::new());

@@ -9,6 +9,9 @@ Speaks the desktop helper's JSON-lines protocol: requests are
                           JACKALOPE_COMPUTER_TOKEN as a bearer secret
   agent.py browser        start Chromium if it is not running
   agent.py supervise DIR  internal: owns one agent run started by run_start
+  agent.py mcp-launch FILE  internal: starts one connection's MCP server
+  agent.py mcp-approve    internal: Claude Code's hook that asks Jackalope
+                          before a connection's tool runs
 
 Coordinates are screen pixels. Element refs are resolved by Jackalope, which
 sends coordinates. Screenshots are returned as base64 PNG.
@@ -26,6 +29,16 @@ own, substituted for RELAY_URL and RELAY_TOKEN in the command and environment.
 Each request becomes a file that run_read hands to Jackalope, which forwards it
 to the bridge on its own device with the run's credential and answers through
 run_answer, so the bridge credential never reaches the computer.
+
+A run started with `mcp` (runs protocol 3, reported by run_status) also gets
+the selected stdio connections Jackalope resolved on its own device. Each
+connection's command, arguments and environment, which can hold credentials,
+go to a private file beside the workspace, never into the command line, the
+CLI's configuration or the patch; the CLI's entry starts the server through
+`mcp-launch`. With `approve`, Claude Code's PreToolUse hook asks Jackalope
+through the relay before each of their tools runs. Missing uv is installed
+into the bot's home; a connection whose program is still missing is reported
+and left out.
 """
 
 import base64
@@ -35,8 +48,10 @@ import hmac
 import io
 import json
 import os
+import platform
 import re
 import secrets
+import shlex
 import shutil
 import signal
 import subprocess
@@ -49,8 +64,8 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PROTOCOL = 1
-# Agent runs, reported by hello as `runs`.
-RUNS_PROTOCOL = 2
+# Agent runs, reported by hello and run_status as `runs`.
+RUNS_PROTOCOL = 3
 OUTPUT_LIMIT = 64 * 1024
 BODY_LIMIT = 1024 * 1024
 DEVTOOLS = "http://127.0.0.1:9222"
@@ -88,6 +103,16 @@ RELAY_PENDING_LIMIT = 32
 RELAY_TIMEOUT = int(os.environ.get("JACKALOPE_RELAY_TIMEOUT") or 2400)
 RELAY_HEADERS = ("content-type", "accept", "mcp-protocol-version", "mcp-session-id", "last-event-id")
 CALL_ID = re.compile(r"[0-9a-f]{16,48}")
+# Selected stdio connections of a run.
+CONNECTION_LIMIT = 16
+CONNECTION_KEY = re.compile(r"[A-Za-z0-9_-]{1,64}")
+ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,127}")
+PROGRAM = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}")
+UV_RELEASE = ("https://github.com/astral-sh/uv/releases/latest/download/"
+              "uv-{arch}-unknown-linux-gnu.tar.gz")
+UV_LIMIT = 128 * 1024 * 1024
+# Longer than Jackalope waits for the person to answer an approval.
+APPROVAL_SECONDS = 1900
 GIT_IDENTITY = [
     "-c", "user.name=Jackalope", "-c", "user.email=jackalope@agents.jackalope.invalid",
     "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false",
@@ -578,6 +603,203 @@ def ensure_program(name):
         raise Failure(f"{name} could not be installed in this computer: {detail}")
 
 
+def install_uv():
+    """Installs uv and uvx into the home volume from uv's published release."""
+    machine = platform.machine().lower()
+    arch = {"x86_64": "x86_64", "amd64": "x86_64", "aarch64": "aarch64",
+            "arm64": "aarch64"}.get(machine)
+    if not arch:
+        raise Failure(f"uv has no build for this computer's {machine} processor.")
+    url = UV_RELEASE.format(arch=arch)
+    try:
+        with urllib.request.urlopen(url, timeout=INSTALL_SECONDS) as response:
+            data = response.read(UV_LIMIT + 1)
+        with urllib.request.urlopen(url + ".sha256", timeout=30) as response:
+            expected = response.read(4096).decode("ascii", "replace").split()[0]
+    except (OSError, IndexError) as error:
+        raise Failure(f"uv could not be downloaded to this computer: {error}"[:300])
+    if len(data) > UV_LIMIT or hashlib.sha256(data).hexdigest() != expected.lower():
+        raise Failure("The uv download was incomplete or corrupted.")
+    directory = os.path.join(LOCAL_PREFIX, "bin")
+    os.makedirs(directory, exist_ok=True)
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as bundle:
+        for member in bundle.getmembers():
+            name = os.path.basename(member.name)
+            if member.isfile() and name in ("uv", "uvx"):
+                target = os.path.join(directory, name)
+                with open(target + ".tmp", "wb") as handle:
+                    shutil.copyfileobj(bundle.extractfile(member), handle)
+                os.chmod(target + ".tmp", 0o755)
+                os.replace(target + ".tmp", target)
+
+
+def ensure_runtime(command):
+    """The program a connection starts with: python3 stands in for python, and
+    uv is installed into the home when it is missing."""
+    local_path()
+    if command == "python" and not shutil.which("python"):
+        command = "python3"
+    if command in ("uv", "uvx") and not shutil.which(command):
+        install_uv()
+    program = shutil.which(command)
+    if not program:
+        raise Failure(f"{command} is not installed in this computer.")
+    return program
+
+
+def connection_specs(request):
+    """The run's selected stdio connections, validated, or None."""
+    value = request.get("mcp")
+    if value is None:
+        return None
+    servers = value.get("servers") if isinstance(value, dict) else None
+    if (
+        servers is None
+        or value.get("config") not in ("claude", "codex")
+        or not isinstance(servers, list)
+        or len(servers) > CONNECTION_LIMIT
+    ):
+        raise Failure("Supply connections as a config and at most 16 servers.")
+    keys = set()
+    for server in servers:
+        valid = (
+            isinstance(server, dict)
+            and isinstance(server.get("key"), str)
+            and CONNECTION_KEY.fullmatch(server["key"])
+            and server["key"] != "jackalope"
+            and server["key"] not in keys
+            and isinstance(server.get("name"), str) and len(server["name"]) <= 200
+            and isinstance(server.get("command"), str)
+            and PROGRAM.fullmatch(server["command"])
+            and isinstance(server.get("args"), list) and len(server["args"]) <= 200
+            and all(isinstance(arg, str) and len(arg) <= 100000 for arg in server["args"])
+            and isinstance(server.get("env"), dict) and len(server["env"]) <= 200
+            and all(isinstance(k, str) and ENV_NAME.fullmatch(k)
+                    and isinstance(v, str) and len(v) <= 100000
+                    for k, v in server["env"].items())
+        )
+        if not valid:
+            raise Failure("Supply each connection's key, name, command, arguments and environment.")
+        keys.add(server["key"])
+    return value
+
+
+def connections(value, directory, workspace, argv, relay):
+    """Writes each connection's launch file and adds it to the CLI's MCP
+    configuration. Returns the command and the connections that could not
+    start, with why."""
+    unavailable = []
+    started = []
+    folder = os.path.join(directory, "mcp")
+    for server in value["servers"]:
+        if value.get("approve") and not relay:
+            unavailable.append({"name": server["name"], "reason":
+                                "Its tool approvals need Jackalope's bridge, which this run does not have."})
+            continue
+        try:
+            program = ensure_runtime(server["command"])
+        except Failure as error:
+            unavailable.append({"name": server["name"], "reason": str(error)})
+            continue
+        os.makedirs(folder, mode=0o700, exist_ok=True)
+        path = os.path.join(folder, server["key"] + ".json")
+        # Holds credentials: private to the bot, outside the workspace, and
+        # removed when the run ends.
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, "w") as handle:
+            json.dump({"command": program, "args": server["args"], "env": server["env"],
+                       "cwd": workspace}, handle)
+        started.append((server["key"], [os.path.abspath(__file__), "mcp-launch", path]))
+    if not started:
+        return argv, unavailable
+    argv = list(argv)
+    if value["config"] == "claude":
+        entries = {key: {"type": "stdio", "command": sys.executable, "args": args}
+                   for key, args in started}
+        if "--mcp-config" in argv[:-1]:
+            index = argv.index("--mcp-config") + 1
+            try:
+                config = json.loads(argv[index])
+            except ValueError:
+                raise Failure("The agent's MCP configuration could not be read.")
+            config.setdefault("mcpServers", {}).update(entries)
+            argv[index] = json.dumps(config)
+        else:
+            argv += ["--mcp-config", json.dumps({"mcpServers": entries})]
+        if value.get("approve"):
+            hook = {"type": "command", "timeout": APPROVAL_SECONDS,
+                    "command": shlex.join([sys.executable, os.path.abspath(__file__), "mcp-approve"])}
+            matcher = "mcp__(" + "|".join(key for key, _ in started) + ")__.*"
+            argv += ["--settings", json.dumps(
+                {"hooks": {"PreToolUse": [{"matcher": matcher, "hooks": [hook]}]}})]
+        return argv, unavailable
+    # Codex: each value is TOML; JSON strings and arrays of strings are valid
+    # TOML. They follow the bridge's own mcp_servers table, which they extend.
+    position = next((i + 2 for i in range(len(argv) - 2, -1, -1)
+                     if argv[i] == "-c" and argv[i + 1].startswith("mcp_servers")), None)
+    if position is None:
+        position = argv.index("exec") + 1 if "exec" in argv else 1
+    overrides = []
+    for key, args in started:
+        overrides += [
+            "-c", f"mcp_servers.{key}.command={json.dumps(sys.executable)}",
+            "-c", f"mcp_servers.{key}.args={json.dumps(args)}",
+            "-c", f"mcp_servers.{key}.startup_timeout_sec=120",
+        ]
+    argv[position:position] = overrides
+    return argv, unavailable
+
+
+def launch_connection(path):
+    """Starts one connection's server in the run's workspace with its own
+    environment, without the run's bridge secret."""
+    with open(path) as handle:
+        spec = json.load(handle)
+    environment = dict(os.environ)
+    for name in ("JACKALOPE_BRIDGE_URL", "JACKALOPE_BRIDGE_TOKEN", "JACKALOPE_COMPUTER_TOKEN"):
+        environment.pop(name, None)
+    environment.update(spec["env"])
+    os.chdir(spec["cwd"])
+    os.execve(spec["command"], [spec["command"], *spec["args"]], environment)
+
+
+def approve_tool():
+    """Claude Code's PreToolUse hook for connections that run on this computer.
+    Claude Code runs here without its permission prompt, so this asks
+    Jackalope through the run's relay, which decides the way Claude Code's
+    permission prompt does on the person's device. Anything but an explicit
+    allow denies, including any failure to ask."""
+    def decide(decision, reason):
+        sys.stdout.write(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse", "permissionDecision": decision,
+            "permissionDecisionReason": reason}}) + "\n")
+
+    try:
+        event = json.load(sys.stdin)
+        name = event.get("tool_name")
+        body = json.dumps({"tool_name": name, "input": event.get("tool_input")}).encode()
+        if len(body) > RELAY_BODY_LIMIT - 1024:
+            # The relay carries at most 64 KB, so a large call is judged from a preview.
+            preview = json.dumps(event.get("tool_input"))[:4000]
+            body = json.dumps({"tool_name": name,
+                               "input": {"truncated": True, "preview": preview}}).encode()
+        request = urllib.request.Request(
+            os.environ["JACKALOPE_BRIDGE_URL"] + "/v1/tools/approve", data=body, method="POST",
+            headers={"Authorization": "Bearer " + os.environ["JACKALOPE_BRIDGE_TOKEN"],
+                     "Content-Type": "application/json"})
+        with urllib.request.urlopen(request, timeout=APPROVAL_SECONDS) as response:
+            answer = json.loads(response.read(RELAY_ANSWER_LIMIT))
+        allowed = isinstance(answer, dict) and answer.get("behavior") == "allow"
+        message = answer.get("message") if isinstance(answer, dict) else None
+    except BaseException as error:  # Never let a failure allow the call.
+        return decide("deny", "Jackalope could not approve this tool call "
+                              f"({type(error).__name__}), so it did not run. Report what is blocked.")
+    if allowed:
+        return decide("allow", "Approved in Jackalope.")
+    decide("deny", message if isinstance(message, str) and message
+           else "The person denied this action in Jackalope. Do not retry it.")
+
+
 # Started supervisors, polled so finished ones do not linger as zombies.
 SUPERVISORS = []
 
@@ -608,9 +830,22 @@ def run_start(request):
     ):
         raise Failure("Supply the environment as names and text values.")
     stdin = request.get("stdin") or ""
+    relay_requested = bool(request.get("relay"))
+    selected = connection_specs(request)
+    unavailable = []
+    if selected:
+        try:
+            argv, unavailable = connections(selected, directory, workspace, argv, relay_requested)
+        except BaseException:
+            shutil.rmtree(os.path.join(directory, "mcp"), ignore_errors=True)
+            raise
+    if unavailable:
+        stdin += ("\nThese selected connections could not start on this computer: "
+                  + "; ".join(f"{item['name']} ({item['reason']})" for item in unavailable)
+                  + " Do not look for their tools.\n")
     timeout = min(max(int(request.get("timeout_s") or 3600), 10), 6 * 3600)
     spec = {"argv": argv, "env": env, "timeout": timeout, "workspace": workspace,
-            "relay": bool(request.get("relay"))}
+            "relay": relay_requested}
     # The spec can hold credentials; only the supervisor reads it, then deletes it.
     descriptor = os.open(os.path.join(directory, "spec.json"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w") as handle:
@@ -624,12 +859,13 @@ def run_start(request):
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         start_new_session=True, cwd=directory,
     ))
+    report = {"mcp": {"unavailable": unavailable}} if selected else {}
     deadline = time.time() + 15
     while time.time() < deadline:
         if os.path.exists(os.path.join(directory, "pid")):
-            return {"started": True}
+            return {"started": True, **report}
         if os.path.exists(os.path.join(directory, "exit.json")):
-            return {"started": False, "exit": read_exit(directory)}
+            return {"started": False, "exit": read_exit(directory), **report}
         time.sleep(0.05)
     raise Failure("The run did not start.")
 
@@ -694,10 +930,11 @@ def run_status(request):
         raise Failure("Name the run with letters, digits, - or _.")
     directory = os.path.join(RUNS, name)
     if not os.path.isdir(directory):
-        return {"exists": False}
+        return {"exists": False, "runs": RUNS_PROTOCOL}
     supervisor_gone(directory)
     started = any(os.path.exists(os.path.join(directory, f)) for f in ("pid", "exit.json"))
     return {
+        "runs": RUNS_PROTOCOL,
         "exists": True,
         "uploaded": os.path.isfile(os.path.join(directory, "base")),
         "started": started,
@@ -721,6 +958,7 @@ def supervisor_gone(directory):
         except BlockingIOError:
             return False
         if read_exit(directory) is None:
+            shutil.rmtree(os.path.join(directory, "mcp"), ignore_errors=True)
             write_exit(directory, {"code": None, "signal": None, "reason": "interrupted"})
         return True
     finally:
@@ -993,6 +1231,7 @@ def supervise(directory):
                 stdin=stdin, stdout=stdout, stderr=stderr, start_new_session=True,
             )
     except OSError as error:
+        shutil.rmtree(os.path.join(directory, "mcp"), ignore_errors=True)
         write_exit(directory, {"code": None, "error": str(error)[:500], "reason": "spawn"})
         return
     finally:
@@ -1014,6 +1253,8 @@ def supervise(directory):
             terminate(process)
             break
     code = process.wait()
+    # The connections' credentials leave with the run.
+    shutil.rmtree(os.path.join(directory, "mcp"), ignore_errors=True)
     write_exit(directory, {"code": code if code >= 0 else None,
                            "signal": -code if code < 0 else None, "reason": reason})
 
@@ -1223,6 +1464,10 @@ if __name__ == "__main__":
         http(sys.argv[2] if len(sys.argv) > 2 else "0.0.0.0:8765")
     elif mode == "supervise" and len(sys.argv) > 2:
         supervise(sys.argv[2])
+    elif mode == "mcp-launch" and len(sys.argv) > 2:
+        launch_connection(sys.argv[2])
+    elif mode == "mcp-approve":
+        approve_tool()
     elif mode == "browser":
         wait_for_display()
         start_browser()

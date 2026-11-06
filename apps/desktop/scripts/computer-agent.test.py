@@ -244,7 +244,8 @@ class RunProtocol(unittest.TestCase):
         self.assertEqual(self.call(action="run_read", run="r9", out=0, err=0)["bridge"], [])
 
     def test_status_reports_a_run_whose_supervisor_died(self):
-        self.assertEqual(self.call(action="run_status", run="r8"), {"exists": False})
+        self.assertEqual(self.call(action="run_status", run="r8"),
+                         {"exists": False, "runs": self.agent.RUNS_PROTOCOL})
         self.upload("r8", archive({"a.txt": b"x"}))
         self.assertFalse(self.call(action="run_status", run="r8")["started"])
         self.call(action="run_start", run="r8",
@@ -296,6 +297,182 @@ class RunProtocol(unittest.TestCase):
                 self.agent.ensure_program("not-on-demand-xyz")
         finally:
             os.environ["PATH"] = path
+
+    def test_connections_start_from_private_files_and_leave_no_credentials(self):
+        self.upload("m1", archive({"a.txt": b"x"}))
+        server = ("import os;print(os.environ['CONN_TOKEN']=='conn-secret', os.getcwd(),"
+                  "'JACKALOPE_BRIDGE_TOKEN' in os.environ)")
+        # A stand-in CLI: prints its command line, then starts the connection
+        # from its MCP configuration the way Claude Code would.
+        script = (
+            "import json,os,stat,subprocess,sys;"
+            "print(json.dumps(sys.argv[1:]));"
+            "config=json.loads(sys.argv[sys.argv.index('--mcp-config')+1]);"
+            "entry=config['mcpServers']['docs'];"
+            "print(oct(stat.S_IMODE(os.stat(entry['args'][-1]).st_mode)));"
+            "out=subprocess.run([entry['command'],*entry['args']],capture_output=True,text=True);"
+            "print(out.stdout.strip());print(sys.stdin.read())"
+        )
+        bridge = json.dumps({"mcpServers": {"jackalope": {"type": "http", "url": "x"}}})
+        mcp = {"config": "claude", "approve": True, "servers": [
+            {"key": "docs", "name": "Docs", "command": "python3", "args": ["-c", server],
+             "env": {"CONN_TOKEN": "conn-secret"}},
+            {"key": "gone", "name": "Gone", "command": "no-such-runtime-xyz", "args": [], "env": {}},
+        ]}
+        started = self.call(
+            action="run_start", run="m1", argv=[sys.executable, "-c", script, "--mcp-config", bridge],
+            env={"JACKALOPE_BRIDGE_URL": self.agent.RELAY_URL,
+                 "JACKALOPE_BRIDGE_TOKEN": self.agent.RELAY_TOKEN},
+            stdin="task", relay=True, mcp=mcp)
+        self.assertEqual(started["mcp"]["unavailable"], [
+            {"name": "Gone", "reason": "no-such-runtime-xyz is not installed in this computer."}])
+        exit, stdout, _ = self.finish("m1")
+        self.assertEqual(exit["code"], 0)
+        lines = stdout.decode().splitlines()
+        argv = json.loads(lines[0])
+        config = json.loads(argv[argv.index("--mcp-config") + 1])
+        self.assertEqual(sorted(config["mcpServers"]), ["docs", "jackalope"])
+        settings = json.loads(argv[argv.index("--settings") + 1])
+        rule = settings["hooks"]["PreToolUse"][0]
+        self.assertEqual(rule["matcher"], "mcp__(docs)__.*")
+        self.assertIn("mcp-approve", rule["hooks"][0]["command"])
+        self.assertEqual(lines[1], "0o600")
+        workspace = os.path.realpath(os.path.join(self.temp.name, "m1", "workspace"))
+        self.assertEqual(lines[2], f"True {workspace} False")
+        self.assertIn("could not start on this computer: Gone (no-such-runtime-xyz", stdout.decode())
+        # The credential reached only the server: not the command line, the
+        # run's files once it ended, or the patch.
+        self.assertFalse(os.path.exists(os.path.join(self.temp.name, "m1", "mcp")))
+        self.assertEqual(self.call(action="workspace_diff", run="m1")["fileCount"], 0)
+        for folder, _, files in os.walk(os.path.join(self.temp.name, "m1")):
+            for name in files:
+                with open(os.path.join(folder, name), "rb") as handle:
+                    self.assertNotIn(b"conn-secret", handle.read(), name)
+
+    def test_codex_connections_extend_the_bridge_table(self):
+        self.upload("m2", archive({"a.txt": b"x"}))
+        bridge = 'mcp_servers={ jackalope = { url = "x" } }'
+        mcp = {"config": "codex", "servers": [
+            {"key": "docs", "name": "Docs", "command": "python3", "args": [], "env": {"K": "v-secret"}}]}
+        self.call(action="run_start", run="m2", mcp=mcp, argv=[
+            sys.executable, "-c", "import json,sys;print(json.dumps(sys.argv[1:]))",
+            "exec", "-c", bridge, "--json", "-"])
+        exit, stdout, _ = self.finish("m2")
+        self.assertEqual(exit["code"], 0)
+        self.assertNotIn(b"v-secret", stdout)
+        args = json.loads(stdout)
+        index = args.index(bridge)
+        self.assertEqual(args[index + 1:index + 3],
+                         ["-c", f"mcp_servers.docs.command={json.dumps(sys.executable)}"])
+        self.assertTrue(args[index + 4].startswith("mcp_servers.docs.args=["))
+        self.assertEqual(args[index + 6], "mcp_servers.docs.startup_timeout_sec=120")
+        self.assertEqual(args[-2:], ["--json", "-"])
+
+    def test_connection_requests_are_validated(self):
+        self.upload("m3", archive({"a.txt": b"x"}))
+        for server in (
+            {"key": "jackalope", "name": "x", "command": "python3", "args": [], "env": {}},
+            {"key": "x", "name": "x", "command": "/usr/bin/python3", "args": [], "env": {}},
+            {"key": "x", "name": "x", "command": "python3", "args": [], "env": {"1BAD": "v"}},
+        ):
+            self.assertIn("Supply each connection", self.fails(
+                action="run_start", run="m3", argv=[sys.executable, "-c", "pass"],
+                mcp={"config": "claude", "servers": [server]}))
+        self.assertIn("Supply connections", self.fails(
+            action="run_start", run="m3", argv=[sys.executable, "-c", "pass"],
+            mcp={"config": "gemini", "servers": []}))
+        # Claude Code's approvals need the relay; without it nothing starts.
+        started = self.call(
+            action="run_start", run="m3", argv=[sys.executable, "-c", "pass"],
+            mcp={"config": "claude", "approve": True, "servers": [
+                {"key": "x", "name": "X", "command": "python3", "args": [], "env": {"T": "s"}}]})
+        self.assertIn("bridge", started["mcp"]["unavailable"][0]["reason"])
+        self.assertFalse(os.path.exists(os.path.join(self.temp.name, "m3", "mcp")))
+
+    def test_missing_uv_is_installed_and_python_means_python3(self):
+        tools = os.path.join(self.temp.name, "tools")
+        os.makedirs(tools)
+        with open(os.path.join(tools, "python3"), "w") as handle:
+            handle.write("#!/bin/sh\nexit 0\n")
+        os.chmod(os.path.join(tools, "python3"), 0o755)
+        path = os.environ.get("PATH", "")
+        os.environ["PATH"] = tools
+        local = os.path.join(self.temp.name, "home-local")
+        installed = []
+
+        def fake_install():
+            os.makedirs(os.path.join(local, "bin"), exist_ok=True)
+            for name in ("uv", "uvx"):
+                target = os.path.join(local, "bin", name)
+                with open(target, "w") as handle:
+                    handle.write("#!/bin/sh\nexit 0\n")
+                os.chmod(target, 0o755)
+            installed.append(True)
+
+        try:
+            self.agent.LOCAL_PREFIX = local
+            self.agent.install_uv = fake_install
+            self.assertEqual(self.agent.ensure_runtime("python"), os.path.join(tools, "python3"))
+            self.assertEqual(self.agent.ensure_runtime("uvx"), os.path.join(local, "bin", "uvx"))
+            self.assertEqual(self.agent.ensure_runtime("uv"), os.path.join(local, "bin", "uv"))
+            self.assertEqual(installed, [True])
+            with self.assertRaises(self.agent.Failure):
+                self.agent.ensure_runtime("docker")
+        finally:
+            os.environ["PATH"] = path
+
+    def test_approval_hook_allows_only_an_explicit_allow(self):
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        import threading
+        answers = []
+        seen = []
+
+        class Bridge(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_POST(self):
+                body = self.rfile.read(int(self.headers["Content-Length"]))
+                seen.append((self.path, self.headers.get("Authorization"), body))
+                data = json.dumps(answers.pop(0)).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Bridge)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        url = f"http://127.0.0.1:{server.server_address[1]}"
+
+        def hook(event, answer=None):
+            if answer is not None:
+                answers.append(answer)
+            done = subprocess.run(
+                [sys.executable, AGENT, "mcp-approve"], input=json.dumps(event),
+                capture_output=True, text=True, timeout=30,
+                env=dict(os.environ, JACKALOPE_BRIDGE_URL=url, JACKALOPE_BRIDGE_TOKEN="relay-secret"))
+            self.assertEqual(done.returncode, 0, done.stderr)
+            return json.loads(done.stdout)["hookSpecificOutput"]
+
+        event = {"tool_name": "mcp__docs__write", "tool_input": {"text": "hi"}}
+        self.assertEqual(hook(event, {"behavior": "allow"})["permissionDecision"], "allow")
+        denied = hook(event, {"behavior": "deny", "message": "No."})
+        self.assertEqual((denied["permissionDecision"], denied["permissionDecisionReason"]),
+                         ("deny", "No."))
+        self.assertEqual(hook(event, {"unexpected": True})["permissionDecision"], "deny")
+        large = hook({"tool_name": "mcp__docs__write", "tool_input": {"text": "x" * 70000}},
+                     {"behavior": "allow"})
+        self.assertEqual(large["permissionDecision"], "allow")
+        path, authorization, body = seen[0]
+        self.assertEqual((path, authorization), ("/v1/tools/approve", "Bearer relay-secret"))
+        self.assertEqual(json.loads(body), {"tool_name": "mcp__docs__write", "input": {"text": "hi"}})
+        self.assertLess(len(seen[-1][2]), self.agent.RELAY_BODY_LIMIT)
+        self.assertTrue(json.loads(seen[-1][2])["input"]["truncated"])
+        server.shutdown()
+        server.server_close()
+        # A bridge that cannot be reached denies the call.
+        self.assertEqual(hook(event)["permissionDecision"], "deny")
 
 
 if __name__ == "__main__":

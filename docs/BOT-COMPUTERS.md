@@ -263,7 +263,7 @@ list, refused when called, and named in the agent's instructions:
 | `computer_verify`, `verification_output`, `read_context` | Read-only attempts only; otherwise unavailable |
 | `peer_adopt` | Unavailable |
 | On-demand connections over HTTP | `search_tools`, `read_tool`, `read_tool_result` and `execute_tool` reach them on this device |
-| On-demand stdio connections | Read-only attempts only; otherwise withheld |
+| On-demand stdio connections | Writing attempts: run on the computer as the agent's own MCP servers; read-only attempts: on this device through on-demand tools |
 | Directly delivered connections | Withheld |
 
 `computer_verify`, `verification_output` and `read_context` work on this device's copy
@@ -276,21 +276,56 @@ writer of each workspace and be overwritten or conflict when the agent's patch c
 back.
 
 Connections selected for the task, project and managed all-project ones such as
-Composio alike, reach an agent on a computer only through on-demand tools. The broker
-keeps running on this device, so connection credentials, OAuth and upstream processes
-never go to the computer; the agent reaches the broker through the bridge relay. Before
-launch, `mcp::remote_delivery` withholds:
+Composio alike, reach an agent on a computer only when they are on-demand. Before
+launch, `mcp::remote_delivery` decides for each:
 
-- every directly delivered connection, whose command, environment references and CLI
-  sign-ins exist only on this device. As a second check, the translated command keeps
-  only the `jackalope` entry of Claude Code's `--mcp-config` or Codex's `mcp_servers`
-  override; a configuration it cannot read stops the launch;
-- on-demand stdio connections for a writing attempt, because the upstream process runs
-  in this device's copy of the workspace, which the agent is not editing. A read-only
-  attempt keeps them, since that copy is what it reads.
+- every directly delivered connection is withheld: its command, environment references
+  and CLI sign-ins exist only on this device. As a second check, the translated command
+  keeps only the `jackalope` entry of Claude Code's `--mcp-config` or Codex's
+  `mcp_servers` override; a configuration it cannot read stops the launch;
+- on-demand HTTP connections, and every on-demand connection of a read-only attempt,
+  stay with the broker on this device and reach the agent through the bridge relay, so
+  their credentials, OAuth and processes never go to the computer. A read-only attempt
+  changes nothing, so this device's copy of the workspace is what its agent reads;
+- on-demand stdio connections of a writing attempt run on the computer, in the workspace
+  the agent edits, as entries of the agent's own MCP configuration (see below);
+- a stdio connection that cannot run there falls back to the broker on this device only
+  when it does not use the workspace, and is withheld otherwise.
 
-Each withheld connection is named with its reason in the attempt's activity and in the
-agent's instructions. An agent that keeps on-demand connections is told the size limits.
+A stdio connection runs on the computer when its command is a runtime the image has or
+installs: `npx`, `node`, `npm`, `python3`, `python` (run as `python3`), `uvx` and `uv`
+(installed into `~/.local` on first use), `git`, `sh` or `bash`; a Windows extension such
+as `npx.cmd` is dropped. Docker, Podman, Windows shells, paths to programs and other
+programs installed on this device cannot run there. Its arguments and environment are
+resolved on this device: a value naming the attempt's workspace or the project folder, or
+a path inside them, becomes the same path relative to the computer's workspace (the
+server's working directory); `${NAME}` is replaced with the project secret of that name
+when the secret is available to computers; a value naming another file on this device,
+or a `${NAME}` without such a secret, keeps the connection off the computer. A
+connection uses the workspace when an argument or value names it or a relative path
+(`.`, `./…`, `${workspaceFolder}`, `$PWD`), or when its command or arguments contain a
+word such as `filesystem`, `file`, `git`, `repo`, `workspace`, `lsp`, `serena` or
+`shell`; such a connection is withheld rather than run against this device's stale copy.
+
+The resolved command, arguments and environment are treated like project secrets
+available to computers: they go to the computer only in the run's `run_start` request,
+never in the agent's command line, its MCP configuration, logs or activity. The
+computer's agent writes each connection to a private file in the run folder, outside the
+workspace and so outside the patch, and removes the files when the run ends. The agent's
+MCP configuration starts each server through `agent.py mcp-launch <file>`, which runs the
+command in the workspace with the connection's environment and without the bridge
+variables: Claude Code gets the entries in its `--mcp-config`, Codex gets
+`mcp_servers.<name>` overrides after the bridge's own table (with a two-minute startup
+timeout for first downloads). Entry names are the connection IDs with only letters,
+digits, `-` and `_`. A connection whose program is still missing on the computer (an
+unknown command, or uv that cannot be downloaded) is left out and named, with its
+reason, in the activity and in the agent's input. A computer whose agent predates these
+connections (`run_status` without `runs: 3`) runs without them and the activity says to
+update its image.
+
+Activity names every connection that runs on the computer, falls back to this device or
+is withheld, with its reason and never its values, and the agent's instructions say the
+same. An agent that keeps on-demand connections is told the size limits.
 Results above about 480 KB are captured on this device and returned as a 2,000-character
 preview with a `resultHandle` for `read_tool_result`, so they fit the relay's answer limit;
 a result that cannot be previewed (an error or non-text content) returns a tool error
@@ -306,6 +341,17 @@ anything else becomes the same Allow once / Always allow / Deny question. A deni
 returned as a tool error. `read_tool` and `search_tools` are not asked about, as
 locally. Codex keeps its own noninteractive approval policy on a computer, as on this
 device.
+
+Tools of stdio connections that run on the computer are not behind the bridge, so for
+Claude Code the computer's agent adds a `PreToolUse` hook for them (`--settings`,
+matching `mcp__<entry>__.*`). The hook (`agent.py mcp-approve`) sends the tool name and
+input through the relay to `POST /v1/tools/approve`, which decides with the same project
+rules, auto-approval and question as Claude Code's permission prompt for that tool on
+this device and records the outcome in the activity. Anything but an explicit allow,
+including a bridge that cannot be reached, denies the call. An input above the relay's
+64 KB limit is judged from a 4,000-character preview. Without the bridge relay these
+connections do not start for Claude Code. `mcp__jackalope__*` tools and other names are
+refused by that route.
 
 A read-only attempt runs with the same read-only CLI settings as locally (Claude Code
 without edit tools and without its permission prompt, so tools needing approval are
@@ -389,13 +435,15 @@ and `scrot`. It answers the helper protocol's `hello` (`protocol: 1`) and `list`
 `snapshot` (AT-SPI elements with screen bounds, at most 300, password text protected),
 `screenshot` (base64 PNG, optional `thumb` width), `click`, `double_click`, `right_click`,
 `drag`, `scroll`, `type`, `set_value`, `press` (`chord` with modifiers and key), `focus`,
-`open_app`, `clipboard_read`, `clipboard_write`, `open_url` and `exec`. `hello` also
-reports `runs: 2` for the run actions, which need no display: `workspace_put` (one
+`open_app`, `clipboard_read`, `clipboard_write`, `open_url` and `exec`. `hello` and
+`run_status` also report `runs: 3` for the run actions, which need no display: `workspace_put` (one
 base64 chunk at a byte offset; the final chunk carries the archive's SHA-256, unpacks
 it rejecting absolute, `..`, `.git` and outside-pointing link entries, and commits it as
 the base), `run_start` (a command with environment and standard input under a detached
-`agent.py supervise` process, optionally with the bridge relay; the specification
-holding credentials is deleted once read), `run_read` (output after byte offsets and up
+`agent.py supervise` process, optionally with the bridge relay and with `mcp`, the
+selected stdio connections, at most 16; the specification holding credentials is
+deleted once read, and the result lists connections that could not start),
+`run_read` (output after byte offsets and up
 to eight waiting bridge requests, each handed over once unless `reclaim` asks again,
 waiting up to five seconds, with the exit once both streams are read), `run_answer`
 (one bridge answer), `run_status` (whether the run exists, was uploaded and started,
@@ -403,7 +451,8 @@ and its exit), `run_stop`, `workspace_diff` and `workspace_get` (the binary patc
 the base, including anything the agent committed) and `run_remove`. The supervisor
 holds a lock on the run's `owner` file for its life; a started run whose lock is free and
 which has no exit (its computer restarted) is recorded as `interrupted`. An agent from
-before these actions reports `runs: 1` and answers `run_status` as unsupported. Run
+before these actions reports `runs: 1` and answers `run_status` as unsupported; one from
+before stdio connections reports `runs: 2` and no `runs` in `run_status`. Run
 actions keep their state in files under `~/.jackalope-runs` and do not take the HTTP
 agent's lock that serializes desktop actions. Snapshots and
 screenshots report the active window and, when Chromium is in front, its current page
@@ -418,7 +467,10 @@ packages, including Chromium, Xvfb, Openbox, x11vnc, noVNC and websockify, under
 own licenses, plus Git and Node with the Codex CLI from npm for agents on a computer.
 Claude Code's license does not allow redistributing it, so it is not in the image: the
 first run that needs it installs `@anthropic-ai/claude-code` from npm into the home
-volume (`~/.local`, first on `PATH`) within 100 seconds, which needs networking.
+volume (`~/.local`, first on `PATH`) within 100 seconds, which needs networking. The
+first run with a connection that needs `uvx` or `uv` installs uv the same way, from
+uv's latest GitHub release for the computer's processor, checked against its published
+SHA-256. The image has no Docker.
 
 `.github/workflows/computer-image.yml` publishes the image for linux/amd64 to
 `ghcr.io/jackalope-dev/jackalope-computer` on every push to `beta` or `stable` and on
@@ -448,7 +500,12 @@ tasks::remote` covers command translation with and without the bridge relay,
 credentials, the workspace archive with copied setup files, chunked upload and patch
 checks, line splitting, patch application, the read-only run name, and the relay's
 refusals, tool-list filtering by the computer's browser and read-only access, and
-forwarding with the attempt's credential; `coordination::eligibility` covers the
+forwarding with the attempt's credential; `tasks::remote` also covers when stdio
+connections start with a run and that activity and instructions carry no values;
+`mcp::tests` covers the connection policy for computers (where each connection runs,
+command and path translation, `${NAME}` secrets, fallback and withheld reasons, values
+kept out of `Debug`); `coordination_mcp` covers which tools the approval route accepts;
+`coordination::eligibility` covers the
 separate concurrency for computer projects; `computers::agent37` covers keys, instance
 creation bodies, states, errors and the template build context.
 `computers::image` covers the published reference and the definition hash shared with
@@ -456,12 +513,16 @@ creation bodies, states, errors and the template build context.
 the template import body and its fallback.
 `python3 apps/desktop/scripts/computer-agent.test.py` (POSIX, for example in WSL) covers
 the on-demand CLI install and the run actions: upload, run, read, stop, the orphan stop, committed changes, unsafe
-uploads, the bridge relay's hand-over and answers, and a run whose supervisor died. The
+uploads, the bridge relay's hand-over and answers, a run whose supervisor died, stdio
+connections (private launch files, Claude Code and Codex configuration, values absent
+from the command line, run files and patch, request validation, uv install and the
+`python` stand-in) and the approval hook. The
 opt-in `local_docker_computer_round_trip -- --ignored --nocapture` builds the image,
 starts a computer, takes a screenshot and snapshot, runs a command, checks the home
 volume survives a restart, runs a stand-in agent on an uploaded workspace with a copied
 setup file and one relayed bridge call, applies its changes, and deletes everything; it
 needs Docker and network access. These do not establish installed-app acceptance on each
 operating system, Docker variant or cloud provider, real Claude Code or Codex runs on a
-computer, bridge tools used by a real agent there, lost-contact recovery against a real
+computer, bridge tools used by a real agent there, stdio connections and their approval
+hook in a real Claude Code or Codex run there, lost-contact recovery against a real
 computer, or a live Agent37 account.

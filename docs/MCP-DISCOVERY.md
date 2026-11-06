@@ -97,12 +97,19 @@ billed by Composio to the person's project; Jackalope does not proxy or meter it
   direct delivery or explicitly configure the client's permissions for those tools.
   A denied CLI permission must not be bypassed using HTTP or another tool.
 
-An agent on a project's computer receives only on-demand connections, through the
-bridge relay, while the broker, credentials, OAuth and upstream processes stay on this
-device. Directly delivered connections are withheld there, stdio upstreams are kept only
-for read-only attempts, results are bounded to the relay's answer limit, and Claude
-Code's `execute_tool` calls are approved at the bridge because it runs without its
-permission prompt; see [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
+An agent on a project's computer receives only on-demand connections. Directly delivered
+connections are withheld there. HTTP connections, and every connection of a read-only
+attempt, stay with the broker on this device and reach the agent through the bridge
+relay, so their credentials, OAuth and processes stay here; results are bounded to the
+relay's answer limit, and Claude Code's `execute_tool` calls are approved at the bridge
+because it runs without its permission prompt. A writing attempt's stdio connections run
+on the computer instead, in the workspace the agent edits, as the agent's own MCP
+servers: Jackalope resolves their command, arguments and environment (including
+`${NAME}` project secrets available to computers) on this device and sends them with the
+run like project secrets, and Claude Code asks the bridge before each of their tools
+runs. One whose program cannot run there falls back to the broker only when it does not
+use the workspace and is withheld otherwise; see [agents on a
+computer](BOT-COMPUTERS.md#agents-on-a-computer).
 
 Catalogs, handles, processes and connection credentials are isolated by attempt.
 The selected agent account directory is applied to upstream stdio processes;

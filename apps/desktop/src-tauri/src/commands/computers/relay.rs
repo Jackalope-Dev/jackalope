@@ -517,6 +517,8 @@ mod tests {
             );
         }
         assert!(screen("c", &call("POST", "/v1/subtasks", &json!({})), WRITER).is_none());
+        // Approvals for tools of connections that run on the computer.
+        assert!(screen("c", &call("POST", "/v1/tools/approve", &json!({})), WRITER).is_none());
         assert!(screen(
             "c",
             &call("GET", "/v1/messages?after=3", &json!({})),
