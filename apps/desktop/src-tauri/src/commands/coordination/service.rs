@@ -458,6 +458,8 @@ impl Coordinator {
                         .route("/v1/tools/search", post(bridge_tool_search))
                         .route("/v1/tools/execute", post(bridge_tool_execute))
                         .route("/v1/tools/approve", post(bridge_tool_approve))
+                        .route("/v1/policy", post(bridge_policy))
+                        .route("/v1/runner/event", post(bridge_runner_event))
                         .route("/v1/tools/read", post(bridge_tool_read))
                         .route("/v1/tools/result", post(bridge_tool_result))
                         .route("/v1/messages", post(bridge_message))

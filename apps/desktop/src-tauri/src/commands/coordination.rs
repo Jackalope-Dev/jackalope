@@ -886,6 +886,37 @@ async fn bridge_tool_approve(
         .map_err(|message| (StatusCode::BAD_REQUEST, message))
 }
 
+/// Policy callbacks from a computer's runner: whether it may run a gated tool
+/// (`tool`, as `/v1/tools/approve`), use a website (`site`) or use a project
+/// secret (`secret`); see `computers::policy`.
+async fn bridge_policy(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let run = service
+        .authorized_run(&headers)
+        .map_err(|status| (status, "Unauthorized".into()))?;
+    super::computers::policy::decide(&service, &run, body)
+        .await
+        .map(Json)
+        .map_err(|message| (StatusCode::BAD_REQUEST, message))
+}
+
+/// What a computer's runner did with a workspace tool, for the attempt.
+async fn bridge_runner_event(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let run = service
+        .authorized_run(&headers)
+        .map_err(|status| (status, "Unauthorized".into()))?;
+    super::computers::policy::record_event(&service.runtime, &run, &body)
+        .map(|()| Json(serde_json::json!({"recorded": true})))
+        .map_err(|message| (StatusCode::BAD_REQUEST, message))
+}
+
 async fn bridge_tool_read(
     WebState(service): WebState<Coordinator>,
     headers: HeaderMap,

@@ -256,6 +256,8 @@ pub(crate) struct Started {
     pub exit: Option<Value>,
     /// Connections the computer could not start, as name and reason.
     pub unavailable: Vec<(String, String)>,
+    /// The tools the runner serves for the run, when it was asked to.
+    pub local_tools: Option<Vec<String>>,
 }
 
 /// One run's conversation with a computer's agent.
@@ -369,29 +371,39 @@ impl Session {
         }
     }
 
-    /// Starts the agent, with the bridge relay when `relay` is set and the
-    /// selected stdio connections in `connections` (see [`connections_request`]).
+    /// Starts the agent, with the bridge relay when `relay` is set. `parts`
+    /// adds the optional parts of `run_start`, each only when the runner
+    /// supports it: `mcp`, the selected stdio connections (see
+    /// [`connections_request`]), and `local`, the tools the runner serves
+    /// itself (see [`super::runner::Access::local_request`]).
     pub fn start(
         &mut self,
         argv: &[String],
         env: &[(String, String)],
         stdin: &str,
         relay: bool,
-        connections: Option<&Value>,
+        parts: &serde_json::Map<String, Value>,
     ) -> Result<Started, String> {
         let env: HashMap<&str, &str> = env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
         let mut request = json!({"action":"run_start","argv":argv,"env":env,"stdin":stdin,"timeout_s":6 * 3600,"relay":relay});
-        if let Some(connections) = connections {
-            request["mcp"] = connections.clone();
+        for (name, value) in parts {
+            request[name] = value.clone();
         }
         // Installing a connection's runtime can add a minute or two.
-        let timeout = if connections.is_some() {
+        let timeout = if parts.contains_key("mcp") {
             CALL_TIMEOUT * 3
         } else {
             CALL_TIMEOUT
         };
         let result = self.call(request, timeout)?;
         Ok(Started {
+            local_tools: result["local"]["tools"].as_array().map(|tools| {
+                tools
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect()
+            }),
             exit: (result["started"] != true).then(|| result["exit"].clone()),
             unavailable: result["mcp"]["unavailable"]
                 .as_array()

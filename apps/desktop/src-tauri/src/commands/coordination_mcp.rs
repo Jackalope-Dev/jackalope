@@ -1653,6 +1653,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn every_bridge_tool_declares_where_it_executes() {
+        let placed: std::collections::HashSet<&str> = crate::commands::computers::runner::TOOLS
+            .iter()
+            .map(|tool| tool.name)
+            .collect();
+        for tool in CoordinationTools::platform_router().list_all() {
+            assert!(
+                placed.contains(tool.name.as_ref()),
+                "{} has no placement in computers::runner::TOOLS",
+                tool.name
+            );
+        }
+    }
+
+    #[test]
     fn ordinary_read_schemas_omit_experimental_row_fields_and_references() {
         let router = CoordinationTools::platform_router();
         for tool in router

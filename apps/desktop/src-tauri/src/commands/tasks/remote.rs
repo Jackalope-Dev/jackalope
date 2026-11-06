@@ -16,7 +16,7 @@
 //! device's copy stays identical to what they read.
 
 use super::*;
-use crate::commands::computers::{self, credentials, relay, runs, Computer};
+use crate::commands::computers::{self, credentials, relay, runner, runs, Computer};
 
 /// How long a run waits for its computer to start; a first image build is slow.
 const START_WAIT: Duration = Duration::from_secs(20 * 60);
@@ -176,14 +176,20 @@ impl TaskRuntime {
             });
         }
         runs::add_secrets(&mut env, secrets);
-        // Desktop control and the browser tools act on the computer itself.
+        // Where each tool runs follows the runner's capabilities; desktop
+        // control acts on the computer itself.
+        let capabilities = runner::RunnerCapabilities::from_status(status.as_ref());
         let access = relay::Access {
-            browser: computers::provider(&computer.provider)
+            devtools: computers::provider(&computer.provider)
                 .ok()
                 .and_then(|provider| provider.devtools(&root, &computer))
                 .is_some(),
+            runner: capabilities,
             read_only,
         };
+        let local = relayed
+            .and_then(|_| access.local_request(req.verify_command.as_deref()))
+            .map(without_disabled_tools);
         if relayed.is_some() {
             input.push_str(&access.instructions());
         } else if bridge.is_some() {
@@ -216,9 +222,24 @@ impl TaskRuntime {
             self.remote_stopped(id);
             return Ok(());
         }
-        let started =
-            session.start(&argv, &env, &input, relayed.is_some(), connections.as_ref())?;
+        let mut parts = serde_json::Map::new();
+        if let Some(connections) = connections {
+            parts.insert("mcp".into(), connections);
+        }
+        if let Some(local) = local.clone() {
+            parts.insert("local".into(), local);
+        }
+        let started = session.start(&argv, &env, &input, relayed.is_some(), &parts)?;
         let immediate = started.exit;
+        if relayed.is_some() {
+            let placement = placement_activity(
+                &access,
+                &computer.name,
+                local.as_ref(),
+                started.local_tools.as_deref(),
+            );
+            self.update(id, |run| activity(run, &placement));
+        }
         for (name, reason) in &started.unavailable {
             self.update(id, |run| {
                 activity(
@@ -238,7 +259,7 @@ impl TaskRuntime {
                     format!(
                         "The agent runs on {} (beta). {}{}",
                         computer.name,
-                        if access.browser {
+                        if !access.tool_unavailable("browser_navigate") {
                             "Desktop control and the browser tools act on that computer."
                         } else {
                             "Desktop control acts on that computer; the browser tools are not available there."
@@ -378,12 +399,56 @@ impl TaskRuntime {
                 )
             });
         }
+        self.register_screenshots(id, workspace, &patch);
         true
+    }
+
+    /// Lists browser screenshots the agent took on the computer with the
+    /// attempt, now that they are in the local workspace. Names and addresses
+    /// come from the runner's events; a capture whose event was lost is listed
+    /// as a browser capture.
+    fn register_screenshots(&self, id: &str, workspace: &str, patch: &[u8]) {
+        let mut reported = computers::policy::take_screenshots(id);
+        for relative in computers::policy::patch_screenshots(patch) {
+            let path = Path::new(workspace).join(&relative);
+            let Ok(bytes) = crate::commands::history::read_bounded(&path, 8 * 1024 * 1024) else {
+                continue;
+            };
+            let Ok((width, height)) = crate::commands::harness::png_dimensions(&bytes) else {
+                continue;
+            };
+            let stem = Path::new(&relative)
+                .file_stem()
+                .map(|stem| stem.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let mut artifact = match reported.iter().position(|shot| shot.id == stem) {
+                Some(index) => reported.swap_remove(index),
+                None => crate::commands::harness::ScreenshotArtifact {
+                    id: stem,
+                    name: "Browser capture".into(),
+                    url: String::new(),
+                    file_path: String::new(),
+                    width,
+                    height,
+                    timestamp: Utc::now().to_rfc3339(),
+                },
+            };
+            artifact.file_path = path.to_string_lossy().into_owned();
+            artifact.width = width;
+            artifact.height = height;
+            self.update(id, |run| {
+                if !run.screenshots.iter().any(|shot| shot.id == artifact.id) {
+                    run.screenshots.push(artifact.clone());
+                }
+            });
+        }
     }
 
     /// A read-only attempt applies nothing to the workspace. Changes it made
     /// on the computer anyway are reported, then removed with its run.
     fn refuse_changes(&self, id: &str, session: &mut runs::Session, computer: &Computer) {
+        // Its screenshots are discarded with its run.
+        computers::policy::take_screenshots(id);
         let files = session.collect().map_or(0, |patch| patch_files(&patch));
         if files > 0 {
             self.update(id, |run| {
@@ -651,6 +716,56 @@ fn connection_plan(
     })
 }
 
+/// Leaves tools whose experiment is off out of the runner's `local` request,
+/// as this device leaves them out of the tool list.
+fn without_disabled_tools(mut local: serde_json::Value) -> serde_json::Value {
+    if !crate::commands::experiments::is("JACKALOPE_CONTEXT_READ", "on") {
+        if let Some(tools) = local["tools"].as_array_mut() {
+            tools.retain(|tool| tool != "read_context");
+        }
+    }
+    local
+}
+
+/// The activity line recording where the run's tools execute: the runner's
+/// protocol and capabilities, what it serves, and what it could not.
+fn placement_activity(
+    access: &relay::Access,
+    computer: &str,
+    local: Option<&serde_json::Value>,
+    served: Option<&[String]>,
+) -> String {
+    let served = served.unwrap_or_default();
+    let names: Vec<&str> = served.iter().map(String::as_str).collect();
+    let mut text = access.activity(computer, &names);
+    let missing: Vec<&str> = local
+        .and_then(|local| local["tools"].as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(serde_json::Value::as_str)
+        .filter(|tool| !names.contains(tool))
+        .collect();
+    if !missing.is_empty() {
+        text.push_str(&format!(
+            " {computer} could not run {}; update its image.",
+            missing.join(", ")
+        ));
+    }
+    if access.runner.protocol >= runner::CAPABILITIES_PROTOCOL {
+        let capabilities: Vec<&str> = access.runner.names().collect();
+        text.push_str(&format!(
+            " Runner protocol {} ({}).",
+            access.runner.protocol,
+            if capabilities.is_empty() {
+                "no capabilities".to_string()
+            } else {
+                capabilities.join(", ")
+            }
+        ));
+    }
+    text
+}
+
 fn megabytes(bytes: u64) -> String {
     format!("{:.1} MB", bytes as f64 / 1_000_000.0)
 }
@@ -726,6 +841,32 @@ mod tests {
             );
             assert!(!old.activity.contains("lin-secret-value"));
         }
+    }
+
+    #[test]
+    fn activity_records_where_tools_run_and_what_the_runner_dropped() {
+        use crate::commands::computers::runner::RunnerCapabilities;
+        let current = crate::commands::computers::relay::Access {
+            runner: RunnerCapabilities::from_status(Some(&json!({
+                "runs": 4,
+                "capabilities": ["local-bridge", "browser", "workspace-tools", "policy-callbacks"],
+            }))),
+            devtools: false,
+            read_only: false,
+        };
+        let local = current.local_request(Some("pnpm test")).unwrap();
+        let served = vec!["computer_verify".to_string(), "verification_output".to_string()];
+        let text = super::placement_activity(&current, "Box", Some(&local), Some(&served));
+        assert!(text.contains("Run on Box: computer_verify, verification_output."), "{text}");
+        assert!(text.contains("could not run read_context, browser_navigate"), "{text}");
+        assert!(text.contains("Runner protocol 4 (browser, local-bridge, policy-callbacks, workspace-tools)."), "{text}");
+        let older = crate::commands::computers::relay::Access {
+            runner: RunnerCapabilities::from_status(Some(&json!({"runs": 3}))),
+            ..current
+        };
+        let text = super::placement_activity(&older, "Box", None, None);
+        assert!(text.contains("reach this device") && text.contains("Not available there"), "{text}");
+        assert!(!text.contains("Runner protocol"), "{text}");
     }
 
     #[test]

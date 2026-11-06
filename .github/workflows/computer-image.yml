@@ -63,6 +63,7 @@ jobs:
             done
             test "$(ls /usr/share/doc/*/copyright | wc -l)" -gt 100
             test -d /usr/local/lib/node_modules/@openai/codex
+            test -x /usr/local/lib/node_modules/agent-browser/bin/agent-browser-linux-x64
             ! command -v claude'
       - name: Publish
         env:

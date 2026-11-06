@@ -1,5 +1,17 @@
 [
   {
+    "id": "agents-on-a-computer-keep-their-tools-there",
+    "date": "2026-11-06",
+    "title": "Agents on a computer keep their tools there",
+    "description": "A project's agents on a computer now run Jackalope's workspace tools next to their files, on every kind of computer.",
+    "items": [
+      "Saved checks, check output and source reads run in the computer's copy of the workspace for writing agents.",
+      "Browser tools run on the computer itself on local sandboxes, cloud machines and Agent37, so a dev server the agent starts is reachable at localhost. Each website is still asked about on this device first.",
+      "Browser screenshots are saved in the computer's workspace, where the agent can open them, and appear with the attempt and its review when the changes come back.",
+      "Computers on an older image keep working as before; update the image to use the new tools."
+    ]
+  },
+  {
     "id": "agents-get-your-project-s-context-automatically",
     "date": "2026-11-06",
     "title": "Agents get your project's context automatically",

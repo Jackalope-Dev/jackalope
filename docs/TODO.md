@@ -21,10 +21,16 @@ release dates.
 
 ## Agents and task execution
 
-- [ ] Extend agents on a computer: the browser tools on cloud and Agent37 computers,
-  `computer_verify` and `read_context` against the remote copy for writing agents,
-  `browser_screenshot` captures the agent can open on the computer, and automatic routing
-  that does not require the CLI here.
+- [ ] Extend agents on a computer: automatic routing that does not require the CLI here,
+  and `read_context` repository search on the computer with the same symbol ranking as
+  this device (it ranks by plain text there).
+- [ ] Accept the runner's local bridge in real runs: a protocol 4 image built and run on a
+  local sandbox, a cloud machine and a live Agent37 account, with a real Claude Code and
+  Codex agent using `computer_verify`, `verification_output`, `read_context` and every
+  browser tool there (a dev server the agent starts reached at `localhost`, a site
+  question answered, declined and remembered, a sign-in page paused, a screenshot opened
+  by the agent and listed in the attempt and review after its changes come back), and a
+  protocol 3 image on the same app keeping its earlier tool list.
 - [ ] Accept agents on a computer end to end: real Claude Code and Codex runs on a local
   sandbox and on a live Agent37 account (template build under gVisor, auto sleep and
   wake, spend), bridge tools, on-demand connections, stdio connections running on the

@@ -408,12 +408,18 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   files are uploaded, the agent runs there with a Claude Code token or API key saved for
   computers and without the CLI installed on this device, its output feeds the usual
   parsers and its changes come back as a patch applied to the local workspace before
-  checks, checkpoint, review and integration, which stay on this device. Jackalope's
-  bridge tools reach it through a relay that keeps the bridge credential on this device;
-  desktop control acts on that computer, and the browser tools drive its Chromium on a
-  local sandbox with networking (unavailable on cloud and Agent37 computers). Tools that
-  read the local workspace work only for read-only attempts; `peer_adopt` is
-  unavailable. Selected on-demand HTTP connections, and every on-demand connection of a
+  checks, checkpoint, review and integration, which stay on this device. This device is
+  the control plane and the computer's agent is the run's runner: from runs protocol 4
+  it reports capabilities and serves the tools that touch the workspace itself, so for
+  writing agents on every computer type `computer_verify`, `verification_output`,
+  `read_context` and the browser tools (agent-browser on the computer's Chromium) run
+  there, screenshots land in the computer's workspace and are listed with the attempt
+  when its changes come back, and each website is asked about on this device first.
+  Control tools reach this device through a relay that keeps the bridge credential here;
+  desktop control acts on that computer. An image on protocol 3 or older keeps the
+  earlier tools: browser tools only on a local sandbox with networking and
+  workspace-reading tools only for read-only attempts. `peer_adopt` and
+  `browser_open_profile` are unavailable. Selected on-demand HTTP connections, and every on-demand connection of a
   read-only attempt, reach it through the broker on this device, with Claude Code's
   `execute_tool` approved at the bridge. A writing attempt's on-demand stdio connections
   run on the computer in the workspace the agent edits, with their command and
@@ -682,13 +688,13 @@ fixture. XWayland alone is insufficient. Worktrees separate Git changes; agent p
 configured tools still run with local OS privileges.
 
 Bot computers have unit coverage and an opt-in Docker trial; no image build, container,
-viewer or cloud machine has been accepted in an installed app on any platform. Cloud
-machines reach desktop control and commands but not the browser tools, and the
-in-sandbox agent has no accessibility actions. The idle stop, start on demand and quit
+viewer or cloud machine has been accepted in an installed app on any platform. A bot's
+or task's cloud machine reaches desktop control and commands but not the browser tools,
+and the in-sandbox agent has no accessibility actions. The idle stop, start on demand and quit
 stop are covered by unit tests only. Agents on a computer are covered by unit tests, the
-agent's POSIX run and relay tests and the opt-in Docker trial with a stand-in agent;
+agent's POSIX run, relay and runner tests and the opt-in Docker trial with a stand-in agent;
 real Claude Code or Codex runs there, bridge, desktop and browser tools used by a real
-agent, planning there, lost-contact
+agent, the runner's local bridge and agent-browser in a built image, planning there, lost-contact
 recovery against a real computer, the template build and instances on a live Agent37
 account, and gVisor support for the image's desktop are unverified, and Agent37
 computers have no viewer. The image workflow has not run, so no image is published yet.
