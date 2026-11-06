@@ -86,6 +86,8 @@ pub struct PlanView {
     pub progress: Option<Progress>,
     /// Swarm rounds, for plans approved as a swarm.
     pub rounds: Option<rounds::RoundsView>,
+    /// What agents decided for the person, when the project lets them.
+    pub autonomy: Option<crate::commands::agent_decider::AutonomyView>,
     pub criteria: Vec<handoff::CriterionState>,
     pub deviations: Vec<Deviation>,
     /// How approving now would verify the work.
@@ -204,8 +206,17 @@ pub fn summary(record: &PlanRecord) -> PlanSummary {
         status: record.status(),
         revision: record.latest().map(|revision| revision.number),
         updated_at: record.updated_at.clone(),
-        needs_you: pending_deviation(record).is_some() || rounds::awaiting(record),
+        needs_you: needs_person(record),
     }
+}
+
+/// A deviation or a proposed round waits on the person rather than an agent.
+pub fn needs_person(record: &PlanRecord) -> bool {
+    record
+        .deviations
+        .iter()
+        .any(|deviation| deviation.status == "pending" && !deviation.agent_deciding)
+        || rounds::awaiting(record)
 }
 
 /// The oldest deviation still waiting on the person.
@@ -217,7 +228,7 @@ pub fn pending_deviation(record: &PlanRecord) -> Option<&Deviation> {
 }
 
 /// A planning request: read-only, isolated, unchecked and without outcomes.
-pub(super) fn planning_request(
+pub(in crate::commands) fn planning_request(
     template: &RunRequest,
     settings: &PlanSettings,
     prompt: String,
@@ -276,6 +287,9 @@ pub fn start(
     if goal.is_empty() || goal.len() > 20_000 {
         return Err("Describe what to plan in up to 20,000 characters.".into());
     }
+    // A project without commits gets its first one so planning can run in a
+    // worktree; a failure here surfaces again at approval.
+    let _ = crate::commands::first_commit::ensure_first_commit(&template.project_path, true);
     let store = store(coordinator);
     let settings = store.settings(&template.project_id);
     let prompt = interview::interview_prompt(
@@ -314,6 +328,7 @@ pub fn start(
         error: None,
         reflected: false,
         archived: false,
+        autonomy: vec![],
     };
     store.create(&record)?;
     super::register_run(&request.id, &record.id, settings.question_cap, 0);
@@ -478,6 +493,7 @@ pub fn create_manual(
         error: None,
         reflected: false,
         archived: false,
+        autonomy: vec![],
     };
     record.push_revision(doc, "you", "Written by you", None)?;
     store.create(&record)?;
@@ -719,7 +735,8 @@ fn detected(progress: &Progress) -> Vec<(String, String)> {
 pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
     let store = store(coordinator);
     let runs = coordinator.runtime.integration_runs()?;
-    let mut record = ingest(&store, &store.load(id)?, &runs)?;
+    let mut record =
+        crate::commands::agent_decider::reconcile(&store, ingest(&store, &store.load(id)?, &runs)?);
     let doc = record.document();
     let planner = planning_run(&record, &runs);
     let planning = planner.is_some_and(|run| active(&run.status) || run.finishing);
@@ -757,6 +774,8 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
                                 status: "pending".into(),
                                 created_at: Utc::now().to_rfc3339(),
                                 resolved_at: None,
+                                agent_deciding: false,
+                                resolved_by: None,
                             });
                         }
                         if finished {
@@ -776,6 +795,34 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
     }
     let doc = record.document();
     let rounds_view = rounds::view(coordinator, &record, &runs);
+    let plan_runs: Vec<&str> = progress_view
+        .as_ref()
+        .map(|progress| {
+            progress
+                .tasks
+                .iter()
+                .chain(progress.review.iter())
+                .filter_map(|task| task.run_id.as_deref())
+                .collect()
+        })
+        .unwrap_or_default();
+    let waiting = runs
+        .iter()
+        .filter(|run| plan_runs.contains(&run.id.as_str()))
+        .map(|run| {
+            run.prompts
+                .iter()
+                .filter(|prompt| prompt.status == "pending")
+                .count()
+        })
+        .sum::<usize>()
+        + record
+            .deviations
+            .iter()
+            .filter(|deviation| deviation.status == "pending" && !deviation.agent_deciding)
+            .count()
+        + usize::from(rounds::awaiting(&record));
+    let autonomy_view = crate::commands::agent_decider::view(&store, &record, waiting);
     let latest = record.latest();
     let previous = record
         .revisions
@@ -834,6 +881,7 @@ pub fn view(coordinator: &Coordinator, id: &str) -> Result<PlanView, String> {
         swarm_connected: coordinator.swarm_connected(),
         progress: progress_view,
         rounds: rounds_view,
+        autonomy: autonomy_view,
         criteria,
         deviations: record.deviations.clone(),
         criteria_check: doc
@@ -1049,6 +1097,7 @@ pub fn approve(
         }
     }
     let assignments = handoff::assignments(&doc, shape)?;
+    crate::commands::first_commit::ensure_first_commit(&record.project_path, true)?;
     let source_head = crate::commands::task_strategy::source_head(&record.request)?;
     let approved_by = approver(&record, surface);
     let approved_at = Utc::now().to_rfc3339();
@@ -1204,17 +1253,31 @@ pub fn declare_deviation(
         .plan_of_run(&run.id)
         .ok_or("This attempt is not working on an approved plan.")?;
     let store = store(coordinator);
-    let (_, deviation) = store.update(&plan_id, |saved| {
-        if saved
+    let too_many = |saved: &PlanRecord| {
+        saved
             .deviations
             .iter()
             .filter(|deviation| deviation.run_id.as_ref() == Some(&run.id))
             .count()
             >= 5
-        {
+    };
+    let record = store.load(&plan_id)?;
+    if too_many(&record) {
+        return Err("This attempt already reported five deviations.".into());
+    }
+    let deviation = Uuid::new_v4().to_string();
+    let job = crate::commands::agent_decider::route_deviation(
+        coordinator,
+        &record,
+        &deviation,
+        summary,
+        amendment.trim(),
+    );
+    let deciding = job.is_ok();
+    let saved = store.update(&plan_id, |saved| {
+        if too_many(saved) {
             return Err("This attempt already reported five deviations.".into());
         }
-        let deviation = Uuid::new_v4().to_string();
         saved.deviations.push(Deviation {
             id: deviation.clone(),
             run_id: Some(run.id.clone()),
@@ -1224,12 +1287,63 @@ pub fn declare_deviation(
             status: "pending".into(),
             created_at: Utc::now().to_rfc3339(),
             resolved_at: None,
+            agent_deciding: deciding,
+            resolved_by: None,
         });
-        Ok(deviation)
-    })?;
-    crate::commands::notifications::plan_decision_needed(&plan_id, &deviation);
+        Ok(())
+    });
+    if let Err(error) = saved {
+        if let Ok(job) = job {
+            job.abandon();
+        }
+        return Err(error);
+    }
     coordinator.plan_dispatch(&managed, "pause")?;
+    match job {
+        Ok(job) => crate::commands::agent_decider::spawn_deviation(coordinator.clone(), job),
+        Err(_) => crate::commands::notifications::plan_decision_needed(&plan_id, &deviation),
+    }
     Ok(deviation)
+}
+
+/// Accepts a deviation as the agent deciding it for the person, unless the
+/// person already resolved it.
+pub(in crate::commands) fn accept_by_agent(
+    coordinator: &Coordinator,
+    id: &str,
+    deviation_id: &str,
+    agent: &str,
+) -> Result<(), String> {
+    let deciding = store(coordinator)
+        .load(id)?
+        .deviations
+        .iter()
+        .any(|deviation| {
+            deviation.id == deviation_id
+                && deviation.status == "pending"
+                && deviation.agent_deciding
+        });
+    if !deciding {
+        return Err(format!("The deviation changed before {agent} decided."));
+    }
+    resolve_deviation(
+        coordinator,
+        id,
+        deviation_id,
+        "accept",
+        &format!("decided by {agent}"),
+    )?;
+    store(coordinator).update(id, |saved| {
+        if let Some(deviation) = saved
+            .deviations
+            .iter_mut()
+            .find(|deviation| deviation.id == deviation_id)
+        {
+            deviation.resolved_by = Some(agent.into());
+        }
+        Ok(())
+    })?;
+    Ok(())
 }
 
 pub fn resolve_deviation(
@@ -1325,6 +1439,7 @@ fn mark(record: &mut PlanRecord, deviation_id: &str, status: &str) {
         .find(|deviation| deviation.id == deviation_id)
     {
         deviation.status = status.into();
+        deviation.agent_deciding = false;
         deviation.resolved_at = Some(Utc::now().to_rfc3339());
     }
 }

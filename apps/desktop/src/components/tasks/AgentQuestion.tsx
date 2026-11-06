@@ -4,16 +4,16 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { PendingUserPrompt } from '../../lib/task-runtime';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
+import {
+  AgentDecisionChip,
+  AgentDecisionReason,
+  deciderName,
+  EscalationNote,
+} from './AgentDecision';
+import { HumanActionCard } from './HumanActionCard';
 import './task-experience.css';
 
-export function AgentQuestion({
-  prompt,
-  active,
-  agentName,
-  agentDetail,
-  onAnswer,
-  onContinue,
-}: {
+export function AgentQuestion(props: {
   prompt: PendingUserPrompt;
   active: boolean;
   agentName?: string;
@@ -21,7 +21,32 @@ export function AgentQuestion({
   onAnswer: (answer: string) => Promise<void>;
   /** Answers after the attempt ended, by continuing the task with the answer. */
   onContinue?: (answer: string) => Promise<void>;
+  /** Replaces an agent's answer with the person's; omitted where overriding is unavailable. */
+  onOverride?: (answer: string) => Promise<void>;
+  onOpenLink?: (url: string) => void;
 }) {
+  if (props.prompt.humanAction)
+    return (
+      <HumanActionCard
+        prompt={props.prompt}
+        active={props.active}
+        agentName={props.agentName}
+        onAnswer={props.onAnswer}
+        onOpenLink={props.onOpenLink}
+      />
+    );
+  return <QuestionCard {...props} />;
+}
+
+function QuestionCard({
+  prompt,
+  active,
+  agentName,
+  agentDetail,
+  onAnswer,
+  onContinue,
+  onOverride,
+}: Parameters<typeof AgentQuestion>[0]) {
   const id = useId();
   const multiple = prompt.inputType === 'multiChoice';
   const [selected, setSelected] = useState<string[]>([]);
@@ -42,6 +67,8 @@ export function AgentQuestion({
   const inFlight = useRef(false);
   const answerRef = useRef<HTMLParagraphElement>(null);
   const answered = prompt.status === 'answered' || sent !== null;
+  const decidedBy = sent === null ? prompt.answeredBy : undefined;
+  const deciding = prompt.status === 'deciding' && active && sent === null;
   const continuing = !active && !!onContinue;
   useEffect(() => {
     if (sent !== null) answerRef.current?.focus();
@@ -89,16 +116,30 @@ export function AgentQuestion({
           <MessageCircle size={18} aria-hidden="true" />
         </span>
         <span>
-          {answered
-            ? 'Your response'
-            : active
-              ? `${agentName ?? 'The agent'} needs your input`
-              : continuing
-                ? 'Answer to continue'
-                : 'Unanswered question'}
+          {decidedBy
+            ? `${agentName ?? 'The agent'} asked`
+            : answered
+              ? 'Your response'
+              : deciding
+                ? 'An agent is deciding for you'
+                : active
+                  ? `${agentName ?? 'The agent'} needs your input`
+                  : continuing
+                    ? 'Answer to continue'
+                    : 'Unanswered question'}
         </span>
         <span className="task-experience-meta">
-          {answered ? 'Answered' : active ? 'Awaiting response' : 'Task ended'}
+          {decidedBy ? (
+            <AgentDecisionChip agent={decidedBy.agent} confidence={decidedBy.confidence} />
+          ) : answered ? (
+            'Answered'
+          ) : deciding ? (
+            'You can still answer'
+          ) : active ? (
+            'Awaiting response'
+          ) : (
+            'Task ended'
+          )}
         </span>
       </div>
       {agentDetail && <p className="agent-question-identity">{agentDetail}</p>}
@@ -110,7 +151,23 @@ export function AgentQuestion({
       {prompt.whyAsk && !answered && (
         <p className="task-experience-muted">Why ask: {prompt.whyAsk}</p>
       )}
-      {answered ? (
+      {prompt.escalation && !answered && (
+        <EscalationNote category={prompt.escalation.category} reason={prompt.escalation.reason} />
+      )}
+      {decidedBy ? (
+        <>
+          <p ref={answerRef} tabIndex={-1} className="agent-question-answer" role="status">
+            <Check size={18} aria-hidden="true" />
+            <span>{displayAnswer(decidedBy.answer, multiple)}</span>
+          </p>
+          <AgentDecisionReason
+            agent={decidedBy.agent}
+            rationale={decidedBy.rationale}
+            evidence={decidedBy.evidence}
+          />
+          {onOverride && <OverrideAnswer agent={decidedBy.agent} onOverride={onOverride} />}
+        </>
+      ) : answered ? (
         <p ref={answerRef} tabIndex={-1} className="agent-question-answer" role="status">
           <Check size={18} aria-hidden="true" />
           <span>{displayAnswer(prompt.answer ?? sent, multiple)}</span>
@@ -206,7 +263,9 @@ export function AgentQuestion({
             <span className="task-experience-muted">
               {continuing
                 ? 'The agent stopped before you answered. Sending continues the task.'
-                : 'Review your answer before sending.'}
+                : deciding
+                  ? 'Another agent is answering this for you. Sending your answer takes priority.'
+                  : 'Review your answer before sending.'}
             </span>
             <Button
               type="submit"
@@ -221,6 +280,80 @@ export function AgentQuestion({
         </form>
       )}
     </section>
+  );
+}
+
+/** Sends the person's corrected answer to an agent that relied on another agent's. */
+export function OverrideAnswer({
+  agent,
+  onOverride,
+}: {
+  agent: string;
+  onOverride: (answer: string) => Promise<void>;
+}) {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
+  const field = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (open) field.current?.focus();
+  }, [open]);
+  if (done)
+    return (
+      <p className="task-experience-muted" role="status">
+        Your answer was sent. The agent revisits work that relied on {deciderName(agent)}'s.
+      </p>
+    );
+  if (!open)
+    return (
+      <div className="agent-question-footer">
+        <Button variant="outline" onClick={() => setOpen(true)}>
+          Override
+        </Button>
+      </div>
+    );
+  return (
+    <form
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (!text.trim() || sending) return;
+        setSending(true);
+        setError('');
+        try {
+          await onOverride(text.trim());
+          setDone(true);
+        } catch (cause) {
+          setError(String(cause));
+        } finally {
+          setSending(false);
+        }
+      }}
+    >
+      <label className="agent-question-custom" htmlFor={`${id}-override`}>
+        Your answer instead
+      </label>
+      <Textarea
+        id={`${id}-override`}
+        ref={field}
+        rows={2}
+        maxLength={4000}
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        disabled={sending}
+      />
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <div className="agent-question-footer">
+        <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={sending}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={!text.trim()} loading={sending} loadingLabel="Sending…">
+          Send my answer
+        </Button>
+      </div>
+    </form>
   );
 }
 

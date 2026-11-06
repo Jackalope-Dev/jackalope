@@ -35,6 +35,19 @@
     ]
   },
   {
+    "id": "agents-decide-the-routine-you-decide-what-matters",
+    "date": "2026-11-06",
+    "status": "In development",
+    "title": "Agents decide the routine, you decide what matters",
+    "description": "On approved plans, agents can answer routine questions, approve checked swarm rounds and accept small in-scope changes for you, so a long build keeps moving.",
+    "items": [
+      "A local check sends sign-ins, payment, secrets, publishing, deletes and changes of direction to you; everything else goes to an agent from another model family, whose answer stands only when it is confident.",
+      "Every agent decision shows who decided, why and how sure, with Override, and anything sent to you says why.",
+      "Agents ask for steps only you can take, such as signing in or adding a secret, with a clear Needs you card.",
+      "A new repository without commits gets its first commit automatically when work starts."
+    ]
+  },
+  {
     "id": "swarms-that-keep-going-until-the-work-is-done",
     "date": "2026-11-05",
     "title": "Swarms that keep going until the work is done",

@@ -115,8 +115,13 @@ release dates.
 - [ ] Accept multi-round swarms with installed providers: orchestrator verdict accuracy
   (false done, missed criteria), rounds and cost to completion, round sizes on agents on a
   computer, recovery after a restart mid-review, how often people edit proposed rounds,
-  and whether parallel area orchestrators catch more than one. Consider making round
-  approval an autonomy-policy option and showing proposals in the phone companion.
+  and whether parallel area orchestrators catch more than one. Consider showing
+  proposals in the phone companion.
+- [ ] Accept agent decisions with installed agents on Windows and macOS: a swarm build
+  where a decider from another model family answers routine questions, approves checked
+  rounds and accepts in-scope deviations, with escalation rates by category, answers people
+  overrode, decider time and cost, restart while deciding, and `request_human_action`
+  steps for a sign-in and a secret.
 - [ ] Accept automatic delivery end to end in the installed app: a swarm goal on a new
   Artifacts project merges under a committed policy, pushes the branch to Artifacts and
   deploys to a Workers preview, including a failing check that rolls back and pauses merging.

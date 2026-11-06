@@ -746,6 +746,7 @@ fn request_blocking(
                 allow_other: Some(false),
                 ..Default::default()
             },
+            autonomy: Default::default(),
         };
         let mut pushed = false;
         runtime.update_checked(&run.id, |r| {

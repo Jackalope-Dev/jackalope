@@ -143,6 +143,10 @@ pub struct Round {
     /// whole plan. Their verdicts combine into the round's verdict.
     #[serde(default)]
     pub areas: Vec<AreaReview>,
+    /// An agent is deciding the proposal for the person. Cleared when it
+    /// approves or hands the proposal to the person.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub agent_deciding: bool,
 }
 
 /// One orchestrator's review of an area of the plan within a round.
@@ -195,6 +199,67 @@ pub struct Deviation {
     pub created_at: String,
     #[serde(default)]
     pub resolved_at: Option<String>,
+    /// An agent is deciding whether to accept it for the person.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub agent_deciding: bool,
+    /// Who accepted it, when that was an agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_by: Option<String>,
+}
+
+/// One decision agents made, or tried to make, for the person on this plan:
+/// a question, a swarm round or a deviation. Kept so the person can see,
+/// question and override every one.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutonomyEntry {
+    pub id: String,
+    /// `question`, `round` or `deviation`.
+    pub kind: String,
+    /// The question, `Round n` or the deviation summary.
+    pub subject: String,
+    /// The execution it counts against, by its start time.
+    #[serde(default)]
+    pub execution: String,
+    #[serde(default)]
+    pub run_id: Option<String>,
+    #[serde(default)]
+    pub prompt_id: Option<String>,
+    #[serde(default)]
+    pub deviation_id: Option<String>,
+    /// `deciding`, `decided`, `escalated` or `person` (the person answered first).
+    pub outcome: String,
+    #[serde(default)]
+    pub answer: Option<String>,
+    #[serde(default)]
+    pub decider: Option<String>,
+    #[serde(default)]
+    pub decider_run_id: Option<String>,
+    #[serde(default)]
+    pub rationale: String,
+    #[serde(default)]
+    pub confidence: Option<f64>,
+    #[serde(default)]
+    pub evidence: Vec<String>,
+    /// Why it went to the person: a question category, `decider`, `limit`,
+    /// `checks` or `interrupted`.
+    #[serde(default)]
+    pub category: Option<String>,
+    #[serde(default)]
+    pub reason: Option<String>,
+    pub created_at: String,
+    #[serde(default)]
+    pub decided_at: Option<String>,
+    #[serde(default)]
+    pub overridden: Option<AutonomyOverride>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutonomyOverride {
+    pub answer: String,
+    pub by: String,
+    pub at: String,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -248,6 +313,9 @@ pub struct PlanRecord {
     pub reflected: bool,
     #[serde(default)]
     pub archived: bool,
+    /// Decisions agents made or handed to the person, oldest first.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub autonomy: Vec<AutonomyEntry>,
 }
 
 impl PlanRecord {
@@ -324,6 +392,54 @@ pub struct PlanSettings {
     /// The most orchestrators reviewing a swarm round in parallel.
     #[serde(default = "default_orchestrators")]
     pub orchestrators: u32,
+    /// What agents may decide for the person in this project's plans.
+    #[serde(default)]
+    pub decide: DecideSettings,
+}
+
+/// The project's Autonomy settings. Everything is off until the person turns
+/// it on; a committed `.jackalope/autonomy.json` can only make it stricter.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DecideSettings {
+    /// Agents answer routine questions from plan work.
+    #[serde(default)]
+    pub questions: bool,
+    /// Agents approve proposed swarm rounds after a checked merge.
+    #[serde(default)]
+    pub rounds: bool,
+    /// Agents accept deviations that stay within the plan's scopes.
+    #[serde(default)]
+    pub deviations: bool,
+    #[serde(default = "default_max_decisions")]
+    pub max_agent_decisions: u32,
+    /// `auto` (another model family than the asking agent where one is
+    /// installed) or an agent ID.
+    #[serde(default = "default_decider")]
+    pub decider: String,
+}
+
+pub const DEFAULT_MAX_DECISIONS: u32 = 50;
+pub const MAX_DECISIONS: u32 = 500;
+
+fn default_max_decisions() -> u32 {
+    DEFAULT_MAX_DECISIONS
+}
+
+fn default_decider() -> String {
+    "auto".into()
+}
+
+impl Default for DecideSettings {
+    fn default() -> Self {
+        Self {
+            questions: false,
+            rounds: false,
+            deviations: false,
+            max_agent_decisions: DEFAULT_MAX_DECISIONS,
+            decider: default_decider(),
+        }
+    }
 }
 
 fn default_orchestrators() -> u32 {
@@ -348,6 +464,7 @@ impl Default for PlanSettings {
             max_rounds: default_rounds(),
             ask_before_rounds: false,
             orchestrators: default_orchestrators(),
+            decide: DecideSettings::default(),
         }
     }
 }
@@ -373,6 +490,18 @@ impl PlanSettings {
             ));
         }
         relative_path(&self.export_path.replace("{slug}", "plan"))?;
+        if !(1..=MAX_DECISIONS).contains(&self.decide.max_agent_decisions) {
+            return Err(format!(
+                "Allow between 1 and {MAX_DECISIONS} agent decisions per plan."
+            ));
+        }
+        let decider = self.decide.decider.trim();
+        if decider.is_empty()
+            || decider.len() > 80
+            || decider.chars().any(|c| c.is_whitespace() || c.is_control())
+        {
+            return Err("Choose Automatic or an installed agent to decide.".into());
+        }
         Ok(())
     }
 }

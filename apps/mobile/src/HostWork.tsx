@@ -193,7 +193,8 @@ function Conversation({
             </p>
           )}
           {detail?.prompts
-            .filter((prompt) => prompt.status === 'pending')
+            // Answers an agent gave on your behalf show read-only beside questions waiting on you.
+            .filter((prompt) => prompt.status !== 'answered' || prompt.answeredBy)
             .map((prompt) => (
               <AgentQuestion
                 key={prompt.id}

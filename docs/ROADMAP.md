@@ -36,7 +36,9 @@ representative benefit and installed-platform acceptance remain open.
 - Projects, saved tasks, chat sessions and reviewed plans with isolated Git worktrees.
   Plan mode interviews read-only, then runs an approved plan as one agent, planned
   subtasks or a swarm with an independent review against it. A swarm (beta) runs in
-  rounds until an orchestrator finds every acceptance criterion met.
+  rounds until an orchestrator finds every acceptance criterion met. Agents can decide
+  routine questions, checked rounds and in-scope deviations for the person, who is asked
+  only for sign-ins, payment, secrets and changes of direction.
   Follow-ups, previews, recorded checks and guarded integration keep work reviewable.
   Saved line comments, visual element selection, a conversation beside review and
   GitHub/Linear/Jira issue intake keep corrections and source work together.
