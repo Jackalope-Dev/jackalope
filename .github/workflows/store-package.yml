@@ -48,6 +48,8 @@ jobs:
       STORE_PUBLISHER_DISPLAY_NAME: ${{ vars.STORE_PUBLISHER_DISPLAY_NAME }}
       RELEASE_MODE: ${{ needs.plan.outputs.mode == 'rehearsal' && 'rehearsal' || 'submission' }}
       RELEASE_CHANNEL: ${{ needs.plan.outputs.channel }}
+      # Each run builds from a clean checkout, so incremental data only enlarges the cache.
+      CARGO_INCREMENTAL: '0'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -60,9 +62,24 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt
       - run: rustup override set 1.98.1
+      # Keyed the same way as Verify's windows cache (the lockfile blob this commit
+      # builds from), so a release branch whose lockfile matches master's restores
+      # that already-pruned dependency build instead of paying for a separate one.
+      - name: Resolve the lockfile this build starts from
+        id: lock
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD:apps/desktop/src-tauri/Cargo.lock)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        id: rust-cache
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/desktop/src-tauri/target
+          key: rust-windows-1.98.1-${{ steps.lock.outputs.sha }}
+          restore-keys: rust-windows-1.98.1-
       # Verify platforms runs the repository checks and the Store feature tests on
       # this same commit, and submission requires them (scripts/release/source-checks.mjs).
-      # The package build starts from a clean target directory instead of a shared cache.
       - id: package
         shell: pwsh
         run: ./scripts/release/store.ps1 -Mode $env:RELEASE_MODE -Channel $env:RELEASE_CHANNEL
@@ -77,6 +94,15 @@ jobs:
             output/store/**/submission.json
           if-no-files-found: error
           retention-days: 30
+      - name: Keep only dependency builds in the Rust cache
+        if: steps.rust-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          cd apps/desktop/src-tauri/target
+          rm -rf release/bundle
+          for profile in debug release; do
+            if [ -d "$profile" ]; then find "$profile" -maxdepth 2 -name '*jackalope*' -prune -exec rm -rf {} +; fi
+          done
   submit:
     needs: [plan, package]
     if: needs.plan.outputs.mode == 'submission'
