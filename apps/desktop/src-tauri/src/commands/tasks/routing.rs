@@ -466,6 +466,14 @@ fn ranked_fallback<'a>(
     Err("The default agent has no quota available to reroute, and none of its previously ranked fallbacks remain eligible. Progress is preserved; review accounts or wait for quota to reset.".into())
 }
 
+/// Whether routing may offer an agent with `adapter`: Jackalope can run it,
+/// and when the attempt must run on a computer, it runs there.
+fn routable(adapter: &str, computers_only: bool) -> bool {
+    super::runtime::EXECUTABLE_ADAPTERS.contains(&adapter)
+        && (!computers_only
+            || crate::commands::computers::credentials::REMOTE_ADAPTERS.contains(&adapter))
+}
+
 impl TaskRuntime {
     fn routing_candidates(
         &self,
@@ -489,6 +497,12 @@ impl TaskRuntime {
         };
         agents.sort();
         agents.dedup();
+        // A placed fork of a project whose swarms run only on computers may
+        // use only agents that run there; the routing agent itself runs here.
+        let computers_only = !orchestrator
+            && self
+                .computers_only_host(&req.id, &req.project_id, req.previous_run_id.as_deref())
+                .is_some();
         let runs = self.integration_runs()?;
         let started = std::time::Instant::now();
         let mut candidates = vec![];
@@ -503,7 +517,7 @@ impl TaskRuntime {
             let Ok((adapter, _)) = policy.resolve(&agent) else {
                 continue;
             };
-            if !super::runtime::EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
+            if !routable(&adapter, computers_only) {
                 continue;
             }
             if !orchestrator
@@ -698,6 +712,15 @@ impl TaskRuntime {
         let mut candidates = self.routing_candidates(req, &policy, false)?;
         candidates.retain(|candidate| eligible(candidate, &history.handoffs));
         if candidates.is_empty() {
+            if let Some(host) = self.computers_only_host(
+                &req.id,
+                &req.project_id,
+                req.previous_run_id.as_deref(),
+            ) {
+                let reason = super::runner::no_computer_agent(&host);
+                self.update(&req.id, |run| activity(run, &format!("Placement: {reason}")));
+                return Err(reason);
+            }
             return Err("No enabled agent, model and account combination has sufficient available quota. Review Agents settings or wait for quota to reset.".into());
         }
         use crate::commands::decisions::{

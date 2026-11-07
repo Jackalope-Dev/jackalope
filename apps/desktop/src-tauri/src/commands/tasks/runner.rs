@@ -174,6 +174,34 @@ impl TaskRuntime {
         })
     }
 
+    /// Whether the project's swarms run only on computers.
+    fn computers_only_project(&self, project_id: &str) -> bool {
+        pool::settings(&self.computers_root(), project_id).swarm_hosts
+            == Some(pool::SwarmHosts::Computers)
+    }
+
+    /// The computer a placed attempt must run on, when its project's swarms
+    /// run only on computers: the host the pool chose for it, or the host of
+    /// the attempt it continues. Automatic routing then offers only agents
+    /// that run on a computer. `None` leaves routing unrestricted.
+    pub(super) fn computers_only_host(
+        &self,
+        id: &str,
+        project_id: &str,
+        previous: Option<&str>,
+    ) -> Option<RunHost> {
+        let host = self
+            .run_snapshot(id)
+            .and_then(|run| run.host)
+            .or_else(|| pool::peek(id))
+            .or_else(|| {
+                previous
+                    .and_then(|previous| self.run_snapshot(previous))
+                    .and_then(|run| run.host)
+            })?;
+        (!host.is_device() && self.computers_only_project(project_id)).then_some(host)
+    }
+
     /// The computer this attempt's agent runs on, or `None` to run it here,
     /// with the host recorded on the attempt. The host the capacity pool
     /// chose at dispatch comes first; a continuation stays on its earlier
@@ -200,6 +228,8 @@ impl TaskRuntime {
                     ..Default::default()
                 })
         });
+        // A host the pool chose, or the one a continuation returns to.
+        let placed = host.is_some();
         let computer = match &host {
             Some(host) if host.is_device() => None,
             Some(host) => {
@@ -232,6 +262,23 @@ impl TaskRuntime {
             (None, None) => return Ok(None),
         };
         let computer = match computer {
+            Some(computer)
+                if !credentials::REMOTE_ADAPTERS.contains(&adapter)
+                    && placed
+                    && self.computers_only_project(&req.project_id) =>
+            {
+                let reason = format!(
+                    "{} cannot run on {}, and this project's swarms run only on computers, so it did not run on this device. {}",
+                    req.agent,
+                    computer.name,
+                    COMPUTERS_ONLY_FIX
+                );
+                if current.as_ref().map(|old| &old.id) != Some(&host.id) {
+                    self.record_host(id, host);
+                }
+                self.update(id, |run| activity(run, &format!("Placement: {reason}")));
+                return Err(reason);
+            }
             Some(computer) if !credentials::REMOTE_ADAPTERS.contains(&adapter) => {
                 host = RunHost::device(format!(
                     "{} cannot run on {} yet, so it runs on this device.",
@@ -270,6 +317,19 @@ impl TaskRuntime {
         });
         reason.into()
     }
+}
+
+/// What the person can change when work that must run on a computer has no
+/// agent that runs there.
+pub(super) const COMPUTERS_ONLY_FIX: &str = "Only Claude Code and Codex run on computers: allow one of them for this project, or change Swarms run on in Project settings.";
+
+/// Why automatic routing found no agent for an attempt that must run on
+/// `host`.
+pub(super) fn no_computer_agent(host: &RunHost) -> String {
+    format!(
+        "No enabled agent that can run on {} has an account with available quota, and this project's swarms run only on computers, so it did not run on this device. {COMPUTERS_ONLY_FIX}",
+        host.name
+    )
 }
 
 /// The activity line naming an attempt's host and why it runs there.

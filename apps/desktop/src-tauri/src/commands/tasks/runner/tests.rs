@@ -374,6 +374,149 @@ fn placement_is_recorded_once_and_continuations_keep_their_host() {
     let _ = std::fs::remove_dir_all(folder);
 }
 
+fn fixture_computer(id: &str) -> Computer {
+    Computer {
+        id: id.into(),
+        name: "Box".into(),
+        owner_kind: "project".into(),
+        owner_id: "fixture".into(),
+        provider: "remote-machine".into(),
+        machine_id: None,
+        decisions: "fixture".into(),
+        created_at: String::new(),
+        last_used_at: None,
+        settings: Default::default(),
+    }
+}
+
+fn save_computer(runtime: &TaskRuntime, computer: &Computer) {
+    let root = runtime.computers_root();
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(
+        root.join("computers.json"),
+        serde_json::to_vec(&json!({ "computers": [computer] })).unwrap(),
+    )
+    .unwrap();
+}
+
+/// An attempt the pool placed on `computer`.
+fn placed_on(runtime: &TaskRuntime, workspace: &Path, computer: &Computer) -> String {
+    let id = insert_run(runtime, workspace);
+    let host = RunHost {
+        id: computer.id.clone(),
+        name: computer.name.clone(),
+        reason: "Placed on Box, the project's computer (0 of 2 in use).".into(),
+        ..Default::default()
+    };
+    runtime.update(&id, |run| {
+        run.host = Some(host.clone());
+        run.activity.push(host_activity(&host));
+    });
+    id
+}
+
+#[test]
+fn computers_only_never_runs_a_placed_fork_on_this_device() {
+    let folder = std::env::temp_dir().join(format!("jackalope-strict-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&folder).unwrap();
+    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let computer = fixture_computer(&format!("strict{}", uuid::Uuid::new_v4().simple()));
+    save_computer(&runtime, &computer);
+    let gemini = |id: &str| RunRequest {
+        agent: "gemini".into(),
+        ..request(id, &folder)
+    };
+
+    // Anywhere, the default: an agent that cannot run on the computer still
+    // runs here, as before.
+    let anywhere = placed_on(&runtime, &folder, &computer);
+    assert!(runtime
+        .computers_only_host(&anywhere, "fixture", None)
+        .is_none());
+    assert!(runtime
+        .placed_target(&anywhere, &gemini(&anywhere), "gemini", None)
+        .unwrap()
+        .is_none());
+    let host = runtime.run_snapshot(&anywhere).unwrap().host.unwrap();
+    assert!(host.is_device(), "{host:?}");
+    assert!(host.reason.contains("cannot run on Box yet"), "{}", host.reason);
+
+    // Computers only: the fork fails with the reason and never runs here.
+    pool::save(
+        &runtime.computers_root(),
+        "fixture",
+        pool::ProjectHosts {
+            swarm_hosts: Some(pool::SwarmHosts::Computers),
+            computers: Vec::new(),
+        },
+    )
+    .unwrap();
+    let strict = placed_on(&runtime, &folder, &computer);
+    let error = runtime
+        .placed_target(&strict, &gemini(&strict), "gemini", None)
+        .unwrap_err();
+    assert!(
+        error.contains("swarms run only on computers") && error.contains(COMPUTERS_ONLY_FIX),
+        "{error}"
+    );
+    let run = runtime.run_snapshot(&strict).unwrap();
+    assert_eq!(run.host.unwrap().id, computer.id);
+    assert!(run
+        .activity
+        .iter()
+        .any(|line| line == &format!("Placement: {error}")));
+
+    // Routing for it offers only agents that run there; with none enabled it
+    // fails with the same advice instead of choosing one for this device.
+    assert_eq!(
+        runtime
+            .computers_only_host(&strict, "fixture", None)
+            .map(|host| host.id),
+        Some(computer.id.clone())
+    );
+    let mut policy = crate::commands::agent_policy::AgentPolicy::default();
+    for agent in super::super::BUILTIN_AGENTS {
+        policy.enabled_agents.insert((*agent).into(), *agent == "gemini");
+    }
+    let policy_path = runtime.policy_path();
+    std::fs::create_dir_all(policy_path.parent().unwrap()).unwrap();
+    std::fs::write(policy_path, serde_json::to_vec(&policy).unwrap()).unwrap();
+    let routed = placed_on(&runtime, &folder, &computer);
+    let mut auto = RunRequest {
+        agent: "auto".into(),
+        ..request(&routed, &folder)
+    };
+    let error = runtime.route(&mut auto).unwrap_err();
+    assert!(
+        error.starts_with("No enabled agent that can run on Box") && error.contains(COMPUTERS_ONLY_FIX),
+        "{error}"
+    );
+    assert_eq!(auto.agent, "auto");
+
+    // An agent that runs on computers still goes there, and a fork placed
+    // on this device is not restricted.
+    let codex = placed_on(&runtime, &folder, &computer);
+    assert_eq!(
+        runtime
+            .placed_target(&codex, &request(&codex, &folder), "codex", None)
+            .unwrap()
+            .map(|target| target.id),
+        Some(computer.id.clone())
+    );
+    let here = insert_run(&runtime, &folder);
+    runtime.update(&here, |run| {
+        run.host = Some(RunHost::device("Placed on this device.".into()))
+    });
+    assert!(runtime.computers_only_host(&here, "fixture", None).is_none());
+    // A continuation follows the attempt it continues.
+    let next = insert_run(&runtime, &folder);
+    assert!(runtime
+        .computers_only_host(&next, "fixture", Some(&codex))
+        .is_some());
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(folder);
+}
+
 #[test]
 fn a_computer_that_does_not_answer_is_a_lost_host() {
     let folder = std::env::temp_dir().join(format!("jackalope-lost-{}", uuid::Uuid::new_v4()));
