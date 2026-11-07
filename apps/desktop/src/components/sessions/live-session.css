@@ -171,9 +171,6 @@
     transition: none;
   }
 }
-.work-context-path {
-  user-select: text;
-}
 .live-message > p {
   white-space: pre-wrap;
   font-size: var(--text-sm);
