@@ -125,7 +125,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
       disposed = true;
       clearTimeout(timer);
     };
-  }, [desktop]);
+  }, [desktop, setError]);
   const items = queue.items.filter((i) => i.projectId === project.id && !i.canceled);
   const enabled = queue.enabledProjects.includes(project.id);
   const act = async (command: QueueCommand | 'task_stop', args: Record<string, unknown>) => {

@@ -127,7 +127,7 @@ export function PlanPage() {
       setError(describeError(cause));
       setPlans([]);
     }
-  }, [project]);
+  }, [project, setError]);
   useEffect(() => {
     void loadList();
   }, [loadList]);
@@ -145,7 +145,7 @@ export function PlanPage() {
     } finally {
       loading.current = false;
     }
-  }, [current]);
+  }, [current, setError]);
   // Planning and delivery move with task attempts, so re-read when runs change.
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs is the change signal
   useEffect(() => {
