@@ -1,8 +1,8 @@
 import { readFile, stat, writeFile } from 'node:fs/promises';
-import { basename, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { basename } from 'node:path';
 import { httpsUrl, SEMVER } from '../packages/contracts/src/platform.ts';
 import { windowsInstallerName, windowsMsiName } from '../packages/contracts/src/release.ts';
+import { isMain } from './lib/cli.mjs';
 
 export async function makeManifest({ version, baseUrl, notes, nsis, msi }) {
   if (!SEMVER.test(version)) throw new Error('Use a stable major.minor.patch release version.');
@@ -28,7 +28,7 @@ export async function makeManifest({ version, baseUrl, notes, nsis, msi }) {
   return { version, notes, pub_date: new Date().toISOString(), platforms };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta)) {
   const [version, baseUrl, notesPath, nsis, msi, output] = process.argv.slice(2);
   if (!output)
     throw new Error(

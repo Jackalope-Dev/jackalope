@@ -1,5 +1,5 @@
 import { writeFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { isMain } from '../lib/cli.mjs';
 
 const xml = (value) =>
   value
@@ -56,7 +56,7 @@ export function storeManifest({ name, publisher, publisherDisplayName, version }
 `;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta)) {
   const [destination, name, publisher, publisherDisplayName, version] = process.argv.slice(2);
   const manifest = storeManifest({ name, publisher, publisherDisplayName, version });
   writeFileSync(destination, manifest);

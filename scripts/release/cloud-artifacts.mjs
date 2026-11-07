@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { windowsInstallerName } from '../../packages/contracts/src/release.ts';
+import { isMain } from '../lib/cli.mjs';
 import { assertVersions, channel, readNotes, root, sha256, version } from './catalog.mjs';
 import { cloudAssets, cloudFiles, targets } from './cloud-targets.mjs';
 import { application, cloudConfig } from './crabnebula-config.mjs';
@@ -142,4 +142,4 @@ async function main() {
   console.log(`Recorded ${mode} ${selectedChannel} ${v} artifact checksums`);
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
+if (isMain(import.meta)) await main();

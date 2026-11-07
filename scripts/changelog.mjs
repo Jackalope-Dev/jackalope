@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { root } from './lib/paths.mjs';
 
 const file = fileURLToPath(new URL('../apps/website/src/changelog.json', import.meta.url));
 
@@ -98,7 +99,7 @@ if (command === 'check') {
       `--stdin-file-path=${file}`,
     ],
     {
-      cwd: fileURLToPath(new URL('..', import.meta.url)),
+      cwd: root,
       input: `${JSON.stringify(next, null, 2)}\n`,
       encoding: 'utf8',
       maxBuffer: 16 * 1024 * 1024,

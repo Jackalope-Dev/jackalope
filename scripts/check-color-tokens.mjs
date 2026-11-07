@@ -3,9 +3,8 @@
 // properties render as nothing, and fixed palette shades only suit one theme.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { root } from './lib/paths.mjs';
 
-const root = fileURLToPath(new URL('..', import.meta.url));
 const sources = ['apps/desktop/src', 'packages/ui/src', 'packages/brand/src'];
 const extensions = /\.(css|ts|tsx)$/;
 const palette =

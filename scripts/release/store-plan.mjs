@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { isMain } from '../lib/cli.mjs';
 import { assertVersions, readNotes, root } from './catalog.mjs';
 
 export function storePlan(env, inputs, notes) {
@@ -54,7 +54,7 @@ async function main() {
   );
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
+if (isMain(import.meta))
   main().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;

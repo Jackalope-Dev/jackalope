@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { windowsInstallerName, windowsMsiName } from '../../packages/contracts/src/release.ts';
+import { isMain } from '../lib/cli.mjs';
 import { channel, origin, readNotes, releasePlan, root, sha256, version } from './catalog.mjs';
 
 export async function publish({ receipt, notes, base, store, publicRead }) {
@@ -43,7 +43,7 @@ export async function publish({ receipt, notes, base, store, publicRead }) {
   await store.put(`${c}/latest.json`, encode(plan.manifest));
   return plan;
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta)) {
   const base = origin(process.env.UPDATE_BASE_URL);
   const environment = process.env.DEPLOY_ENV;
   if (!['staging', 'production'].includes(environment))
@@ -79,7 +79,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     execFileSync(
       process.execPath,
       [
-        resolve(root, 'apps/server/node_modules/wrangler/bin/wrangler.js'),
+        resolve(root, 'scripts/run-bin.mjs'),
+        'wrangler',
         'r2',
         'object',
         'put',
