@@ -53,6 +53,7 @@ pub mod openai_endpoint;
 mod retrieval;
 
 pub mod history;
+mod http;
 pub mod reset;
 
 pub mod artifacts;
@@ -76,6 +77,7 @@ pub mod schedules;
 pub mod agent_screen;
 pub mod browser;
 pub mod browser_profiles;
+pub mod cloudflare;
 pub mod cloudflare_artifacts;
 pub mod cloudflare_resources;
 pub mod composio;

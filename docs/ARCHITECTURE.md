@@ -88,7 +88,9 @@ names; changes must preserve both sides and old saved records.
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |
 | issues.rs, github_workflows.rs | Read-only issue intake and protected Linear/Jira connections |
-| cloudflare_artifacts.rs | Protected Cloudflare Artifacts connection, repository creation, host-scoped token pushes and review snapshots |
+| cloudflare.rs, cloudflare/ | The protected Cloudflare connection and Connect Cloudflare sign-in, the product scopes it may request, and the v4 account API client shared by Artifacts, cloud resources and Swarm setup |
+| cloudflare_artifacts.rs, cloudflare_resources.rs | Artifacts repository creation, host-scoped token pushes and review snapshots; per-project cloud resources and their manifest |
+| http.rs | Outbound HTTP clients that refuse redirects, shared per timeout, and bounded response reads |
 | remote.rs, remote/ | Project-scoped pairing API, protected host connections, SSH forwarding and companion assets |
 | verification.rs, artifacts.rs, release.rs | Saved checks, artifacts, diagnostics and signed updater |
 

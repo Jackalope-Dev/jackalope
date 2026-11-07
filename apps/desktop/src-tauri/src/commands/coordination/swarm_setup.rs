@@ -10,7 +10,13 @@
 
 use super::cloud::{self, Connection, Deployment};
 use super::Coordinator;
-use crate::commands::cloudflare_artifacts::{self, WorkersAccess};
+use crate::commands::{
+    cloudflare::{
+        api::{self, Body, Reply},
+        connection::{self, WorkersAccess},
+    },
+    http,
+};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -22,11 +28,11 @@ use tauri::{AppHandle, Emitter, State};
 
 const WORKER: &str = include_str!("../../../resources/swarm-worker/worker.js");
 const MANIFEST: &str = include_str!("../../../resources/swarm-worker/manifest.json");
-const API_ROOT: &str = "https://api.cloudflare.com/client/v4/accounts";
 const PROGRESS_EVENT: &str = "swarm-setup-progress";
 /// A first workers.dev publish can take a little while to answer everywhere.
 const HEALTH_ATTEMPTS: u32 = 20;
 const HEALTH_WAIT: Duration = Duration::from_secs(3);
+const SETUP_TIMEOUT: Duration = Duration::from_secs(120);
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -120,23 +126,16 @@ fn permission_failure(step: Step, oauth: bool) -> Failure {
     }
 }
 
-/// Maps a Workers API refusal to a step failure. Permission errors (401/403, or
-/// Cloudflare's 10000 authentication error) lead to reconnecting or a new token.
-fn api_failure(step: Step, status: u16, body: &Value, oauth: bool) -> Failure {
-    let code = body["errors"][0]["code"].as_u64().unwrap_or_default();
-    if matches!(status, 401 | 403) || code == 10000 {
+/// Maps a Workers API refusal to a step failure. Permission errors lead to
+/// reconnecting or a new token.
+fn api_failure(step: Step, reply: &Reply, oauth: bool) -> Failure {
+    if reply.refused_access() {
         return permission_failure(step, oauth);
     }
+    let (status, detail) = (reply.status, reply.detail());
     if status == 429 {
         return Failure::new(step, "Cloudflare is rate limiting requests. Retry shortly.");
     }
-    let detail: String = body["errors"][0]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .chars()
-        .filter(|c| !c.is_control())
-        .take(300)
-        .collect();
     Failure::new(
         step,
         if detail.is_empty() {
@@ -245,38 +244,29 @@ fn worker_url(script: &str, subdomain: &str) -> String {
     format!("https://{script}.{subdomain}.workers.dev")
 }
 
+/// The Workers API of the connected account.
 struct Api<'a> {
     access: &'a WorkersAccess,
-    client: reqwest::Client,
+    cloudflare: api::Api,
 }
 
-impl Api<'_> {
+impl<'a> Api<'a> {
+    fn new(access: &'a WorkersAccess, timeout: Duration) -> Result<Self, String> {
+        Ok(Self {
+            access,
+            cloudflare: api::Api::new(&access.account_id, &access.token, timeout)?,
+        })
+    }
+
     async fn send(
         &self,
         method: reqwest::Method,
         route: &str,
-        body: Option<(String, Vec<u8>)>,
-    ) -> Result<(u16, Value), String> {
-        let mut request = self
-            .client
-            .request(
-                method,
-                format!("{API_ROOT}/{}/workers{route}", self.access.account_id),
-            )
-            .bearer_auth(&self.access.token);
-        if let Some((content_type, bytes)) = body {
-            request = request.header("content-type", content_type).body(bytes);
-        }
-        let response = request
-            .send()
+        body: Body<'_>,
+    ) -> Result<Reply, String> {
+        self.cloudflare
+            .send(method, &format!("/workers{route}"), body)
             .await
-            .map_err(|_| "Could not reach Cloudflare. Check your connection and retry.")?;
-        let status = response.status().as_u16();
-        let bytes = response.bytes().await.unwrap_or_default();
-        Ok((
-            status,
-            serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-        ))
     }
 
     async fn expect(
@@ -284,30 +274,26 @@ impl Api<'_> {
         step: Step,
         method: reqwest::Method,
         route: &str,
-        body: Option<(String, Vec<u8>)>,
+        body: Body<'_>,
     ) -> Result<Value, Failure> {
-        let (status, value) = self
+        let reply = self
             .send(method, route, body)
             .await
             .map_err(|message| Failure::new(step, message))?;
-        if !(200..300).contains(&status) || value["success"] != true {
-            return Err(api_failure(step, status, &value, self.access.oauth));
+        if !reply.ok() {
+            return Err(api_failure(step, &reply, self.access.oauth));
         }
-        Ok(value["result"].clone())
-    }
-
-    fn json(value: &Value) -> Option<(String, Vec<u8>)> {
-        Some(("application/json".into(), value.to_string().into_bytes()))
+        Ok(reply.body["result"].clone())
     }
 }
 
 /// The account's workers.dev subdomain. Cloudflare reports 10007 when there is none.
 async fn subdomain(api: &Api<'_>) -> Result<String, Failure> {
-    let (status, value) = api
-        .send(reqwest::Method::GET, "/subdomain", None)
+    let reply = api
+        .send(reqwest::Method::GET, "/subdomain", Body::Empty)
         .await
         .map_err(|message| Failure::new(Step::Account, message))?;
-    if value["errors"][0]["code"] == 10007 {
+    if reply.code() == 10007 {
         return Err(Failure {
             step: Step::Account,
             message: "This Cloudflare account has no workers.dev subdomain yet. Choose one, then try again.".into(),
@@ -318,10 +304,10 @@ async fn subdomain(api: &Api<'_>) -> Result<String, Failure> {
             )),
         });
     }
-    if !(200..300).contains(&status) || value["success"] != true {
-        return Err(api_failure(Step::Account, status, &value, api.access.oauth));
+    if !reply.ok() {
+        return Err(api_failure(Step::Account, &reply, api.access.oauth));
     }
-    value["result"]["subdomain"]
+    reply.body["result"]["subdomain"]
         .as_str()
         .filter(|name| {
             !name.is_empty()
@@ -340,19 +326,22 @@ async fn subdomain(api: &Api<'_>) -> Result<String, Failure> {
 
 /// The migration tag of an existing script, or None when it does not exist yet.
 async fn migration_tag(api: &Api<'_>, script: &str) -> Result<Option<String>, Failure> {
-    let (status, value) = api
-        .send(reqwest::Method::GET, &format!("/services/{script}"), None)
+    let reply = api
+        .send(
+            reqwest::Method::GET,
+            &format!("/services/{script}"),
+            Body::Empty,
+        )
         .await
         .map_err(|message| Failure::new(Step::Account, message))?;
-    let code = value["errors"][0]["code"].as_u64().unwrap_or_default();
-    if status == 404 || matches!(code, 10007 | 10090 | 10092) {
+    if reply.status == 404 || matches!(reply.code(), 10007 | 10090 | 10092) {
         return Ok(None);
     }
-    if !(200..300).contains(&status) || value["success"] != true {
-        return Err(api_failure(Step::Account, status, &value, api.access.oauth));
+    if !reply.ok() {
+        return Err(api_failure(Step::Account, &reply, api.access.oauth));
     }
     Ok(
-        value["result"]["default_environment"]["script"]["migration_tag"]
+        reply.body["result"]["default_environment"]["script"]["migration_tag"]
             .as_str()
             .filter(|tag| !tag.is_empty())
             .map(str::to_owned),
@@ -412,21 +401,14 @@ async fn run(app: &AppHandle, service: &Coordinator) -> Result<Value, Failure> {
     };
     let manifest = manifest();
     progress(Step::Account);
-    let access = cloudflare_artifacts::workers_access(&service.runtime)
+    let access = connection::workers_access(&service.runtime)
         .await
         .map_err(|message| Failure::new(Step::Account, message))?;
     if access.workers_allowed == Some(false) {
         return Err(permission_failure(Step::Account, true));
     }
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(120))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|e| Failure::new(Step::Account, e.to_string()))?;
-    let api = Api {
-        access: &access,
-        client: client.clone(),
-    };
+    let client = http::client(SETUP_TIMEOUT).map_err(|e| Failure::new(Step::Account, e))?;
+    let api = Api::new(&access, SETUP_TIMEOUT).map_err(|e| Failure::new(Step::Account, e))?;
     let subdomain = subdomain(&api).await?;
     let current_tag = migration_tag(&api, &manifest.script).await?;
     let url = worker_url(&manifest.script, &subdomain);
@@ -451,7 +433,7 @@ async fn run(app: &AppHandle, service: &Coordinator) -> Result<Value, Failure> {
         Step::Deploy,
         reqwest::Method::PUT,
         &format!("/scripts/{}", manifest.script),
-        Some((format!("multipart/form-data; boundary={boundary}"), body)),
+        Body::Raw(format!("multipart/form-data; boundary={boundary}"), body),
     )
     .await?;
 
@@ -460,7 +442,7 @@ async fn run(app: &AppHandle, service: &Coordinator) -> Result<Value, Failure> {
         Step::Publish,
         reqwest::Method::POST,
         &format!("/scripts/{}/subdomain", manifest.script),
-        Api::json(&json!({"enabled": true, "previews_enabled": false})),
+        Body::Json(&json!({"enabled": true, "previews_enabled": false})),
     )
     .await?;
 
@@ -512,15 +494,14 @@ fn delete_route(script: &str) -> String {
     format!("/scripts/{script}?force=true")
 }
 
-fn removal(status: u16, body: &Value, oauth: bool, dashboard: &str) -> Removal {
-    let code = body["errors"][0]["code"].as_u64().unwrap_or_default();
-    if (200..300).contains(&status) && body["success"] != false {
+fn removal(reply: &Reply, oauth: bool, dashboard: &str) -> Removal {
+    if (200..300).contains(&reply.status) && reply.body["success"] != false {
         return Removal::Deleted;
     }
-    if status == 404 || matches!(code, 10007 | 10090 | 10092) {
+    if reply.status == 404 || matches!(reply.code(), 10007 | 10090 | 10092) {
         return Removal::AlreadyGone;
     }
-    let reason = if matches!(status, 401 | 403) || code == 10000 {
+    let reason = if reply.refused_access() {
         if oauth {
             "Cloudflare did not allow Jackalope to delete Workers."
         } else {
@@ -528,7 +509,7 @@ fn removal(status: u16, body: &Value, oauth: bool, dashboard: &str) -> Removal {
         }
         .to_string()
     } else {
-        api_failure(Step::Deploy, status, body, oauth).message
+        api_failure(Step::Deploy, reply, oauth).message
     };
     Removal::Kept(format!(
         "{reason} The Worker is still deployed; delete it in the Cloudflare dashboard: {dashboard}"
@@ -545,7 +526,7 @@ pub(super) async fn delete_worker(
         "https://dash.cloudflare.com/{}/workers/services/view/{}",
         deployment.account_id, deployment.script
     );
-    let access = match cloudflare_artifacts::workers_access(runtime).await {
+    let access = match connection::workers_access(runtime).await {
         Ok(access) if access.account_id == deployment.account_id => access,
         Ok(_) => {
             return Removal::Kept(format!(
@@ -558,28 +539,20 @@ pub(super) async fn delete_worker(
             ))
         }
     };
-    let Ok(client) = reqwest::Client::builder()
-        .timeout(Duration::from_secs(60))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-    else {
+    let Ok(api) = Api::new(&access, Duration::from_secs(60)) else {
         return Removal::Kept(format!(
             "Delete the Worker in the Cloudflare dashboard: {dashboard}"
         ));
-    };
-    let api = Api {
-        access: &access,
-        client,
     };
     match api
         .send(
             reqwest::Method::DELETE,
             &delete_route(&deployment.script),
-            None,
+            Body::Empty,
         )
         .await
     {
-        Ok((status, body)) => removal(status, &body, access.oauth, &dashboard),
+        Ok(reply) => removal(&reply, access.oauth, &dashboard),
         Err(message) => Removal::Kept(format!(
             "{message} The Worker is still deployed; delete it in the Cloudflare dashboard: {dashboard}"
         )),
@@ -709,19 +682,25 @@ mod tests {
         );
     }
 
+    fn reply(status: u16, body: Value) -> Reply {
+        Reply { status, body }
+    }
+
     #[test]
     fn permission_errors_lead_to_reconnecting_or_a_new_token() {
         let refused = json!({"success": false, "errors": [{"code": 10000, "message": "Authentication error"}]});
-        let oauth = api_failure(Step::Deploy, 403, &refused, true);
+        let oauth = api_failure(Step::Deploy, &reply(403, refused.clone()), true);
         assert_eq!(oauth.recovery, Some(Recovery::Reauthorize));
         assert_eq!(oauth.step, Step::Deploy);
-        let token = api_failure(Step::Account, 400, &refused, false);
+        let token = api_failure(Step::Account, &reply(400, refused), false);
         assert_eq!(token.recovery, Some(Recovery::Token));
         assert!(token.message.contains("Workers Scripts → Edit"));
         let other = api_failure(
             Step::Deploy,
-            400,
-            &json!({"errors": [{"code": 10021, "message": "Uncaught Error\n at worker.js"}]}),
+            &reply(
+                400,
+                json!({"errors": [{"code": 10021, "message": "Uncaught Error\n at worker.js"}]}),
+            ),
             true,
         );
         assert_eq!(other.recovery, None);
@@ -730,7 +709,7 @@ mod tests {
             "Cloudflare returned 400: Uncaught Error at worker.js"
         );
         assert_eq!(
-            api_failure(Step::Publish, 429, &Value::Null, true).recovery,
+            api_failure(Step::Publish, &reply(429, Value::Null), true).recovery,
             None
         );
     }
@@ -759,25 +738,35 @@ mod tests {
     fn worker_removal_treats_missing_scripts_as_gone_and_refusals_as_kept() {
         let dash = "https://dash.cloudflare.com/a/workers/services/view/jackalope-swarm";
         assert_eq!(
-            removal(200, &json!({"success": true}), true, dash),
+            removal(&reply(200, json!({"success": true})), true, dash),
             Removal::Deleted
         );
-        assert_eq!(removal(404, &Value::Null, true, dash), Removal::AlreadyGone);
         assert_eq!(
-            removal(400, &json!({"errors": [{"code": 10007}]}), false, dash),
+            removal(&reply(404, Value::Null), true, dash),
             Removal::AlreadyGone
         );
-        let Removal::Kept(oauth) = removal(403, &Value::Null, true, dash) else {
+        assert_eq!(
+            removal(
+                &reply(400, json!({"errors": [{"code": 10007}]})),
+                false,
+                dash
+            ),
+            Removal::AlreadyGone
+        );
+        let Removal::Kept(oauth) = removal(&reply(403, Value::Null), true, dash) else {
             panic!("a refusal keeps the Worker");
         };
         assert!(oauth.contains("did not allow Jackalope"));
         assert!(oauth.ends_with(dash));
-        let Removal::Kept(token) = removal(400, &json!({"errors": [{"code": 10000}]}), false, dash)
-        else {
+        let Removal::Kept(token) = removal(
+            &reply(400, json!({"errors": [{"code": 10000}]})),
+            false,
+            dash,
+        ) else {
             panic!("a refusal keeps the Worker");
         };
         assert!(token.contains("API token cannot delete Workers"));
-        let Removal::Kept(other) = removal(500, &Value::Null, false, dash) else {
+        let Removal::Kept(other) = removal(&reply(500, Value::Null), false, dash) else {
             panic!("a server error keeps the Worker");
         };
         assert!(other.starts_with("Cloudflare returned 500"));

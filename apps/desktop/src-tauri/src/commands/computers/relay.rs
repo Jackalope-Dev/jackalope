@@ -238,13 +238,9 @@ async fn forward(endpoint: &str, token: &str, id: &str, call: &Value, limit: usi
         Some("DELETE") => reqwest::Method::DELETE,
         _ => reqwest::Method::POST,
     };
-    let Ok(client) = reqwest::Client::builder()
-        .timeout(Duration::from_secs(
-            crate::commands::verification::BRIDGE_TIMEOUT_SECS + 60,
-        ))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-    else {
+    let Ok(client) = crate::commands::http::client(Duration::from_secs(
+        crate::commands::verification::BRIDGE_TIMEOUT_SECS + 60,
+    )) else {
         return failed("Jackalope could not reach its bridge.");
     };
     let mut builder = client

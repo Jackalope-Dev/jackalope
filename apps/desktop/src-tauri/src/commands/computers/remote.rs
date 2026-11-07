@@ -5,7 +5,7 @@
 //! forgets the pairing. The secret is kept in protected storage.
 
 use super::{Computer, MachineState, Provider, Transport};
-use crate::commands::account_storage;
+use crate::commands::{account_storage, http};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -120,14 +120,6 @@ pub(crate) fn token(root: &Path, id: &str) -> Result<String, String> {
         .map_err(|_| "This machine's pairing secret could not be read. Pair it again.".into())
 }
 
-fn client(timeout: Duration) -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .timeout(timeout)
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|e| e.to_string())
-}
-
 /// Health of a paired machine, as Settings → Computers shows it.
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -147,7 +139,7 @@ pub(crate) async fn hello_with(
     token: &str,
     headers: &[(&'static str, String)],
 ) -> Result<Value, String> {
-    let mut request = client(Duration::from_secs(15))?
+    let mut request = http::client(Duration::from_secs(15))?
         .get(format!("{url}/v1/health"))
         .bearer_auth(token);
     for (name, value) in headers {
@@ -347,7 +339,10 @@ impl Transport for Http {
         let token = self.token.clone();
         let headers = self.headers.clone();
         let body: Value = block(async move {
-            let mut post = client(timeout)?.post(url).bearer_auth(token).json(&request);
+            let mut post = http::client(timeout)?
+                .post(url)
+                .bearer_auth(token)
+                .json(&request);
             for (name, value) in headers {
                 post = post.header(name, value);
             }
