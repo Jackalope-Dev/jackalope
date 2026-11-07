@@ -4,17 +4,16 @@ import {
   Checkbox,
   ConfirmDialog,
   FormField,
+  InlineNotice,
   Input,
   LinkButton,
+  SettingGroup,
+  SettingRow,
   Stepper,
 } from '@jackalope/ui';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  beginCloudflareSignIn,
-  cancelCloudflareSignIn,
-  completeCloudflareSignIn,
-  reauthorizeCloudflare,
-} from '../../lib/cloudflare-artifacts';
+import { useCallback, useEffect, useState } from 'react';
+import { cancelCloudflareSignIn, reauthorizeCloudflare } from '../../lib/cloudflare-artifacts';
+import { openExternalUrl } from '../../lib/native/env';
 import {
   type SwarmConnection as Connection,
   onSwarmSetupProgress,
@@ -25,10 +24,9 @@ import {
   setupSwarm,
   swarmConnection,
 } from '../../lib/swarm';
-import { openExternalUrl } from '../../lib/tauri-bridge';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Setting, SettingGroup } from './Setting';
 import './swarm-connection.css';
+import { describeError } from '../../lib/errors';
+import { useCloudflareSignIn } from '../../lib/useCloudflareSignIn';
 
 type Phase = 'allow' | SwarmSetupStep;
 
@@ -78,19 +76,13 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
   const [error, setError] = useState('');
   const [deleteWorker, setDeleteWorker] = useState(true);
   const [warning, setWarning] = useState('');
-  const signingIn = useRef(false);
+  const cloudflareSignIn = useCloudflareSignIn();
   const refresh = useCallback(async () => setStatus(await swarmConnection()), []);
   useEffect(() => {
-    void refresh().catch((cause) => setError(String(cause)));
+    void refresh().catch((cause) => setError(describeError(cause)));
   }, [refresh]);
-  useEffect(
-    () => () => {
-      if (signingIn.current) void cancelCloudflareSignIn().catch(() => {});
-    },
-    [],
-  );
   const open = (link: string) =>
-    void openExternalUrl(link).catch((cause) => setError(String(cause)));
+    void openExternalUrl(link).catch((cause) => setError(describeError(cause)));
 
   const act = async (work: () => Promise<unknown>) => {
     setBusy(true);
@@ -99,7 +91,7 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
       await work();
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -107,15 +99,8 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
 
   /** Connect Cloudflare again, asking for Workers access, for the same account. */
   const allowWorkers = async () => {
-    signingIn.current = true;
-    try {
-      const consent = await beginCloudflareSignIn({ workers: true });
-      await openExternalUrl(consent);
-      await completeCloudflareSignIn();
-      await reauthorizeCloudflare();
-    } finally {
-      signingIn.current = false;
-    }
+    await cloudflareSignIn({ workers: true });
+    await reauthorizeCloudflare();
   };
 
   const setUp = async (allowFirst = false) => {
@@ -166,7 +151,7 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
         return;
       }
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
       setRun(null);
     } finally {
       stop?.();
@@ -180,7 +165,7 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
 
   return (
     <SettingGroup>
-      <Setting
+      <SettingRow
         title={
           <span className="inline-flex items-center gap-2">
             Jackalope Swarm <Badge variant="accent">Beta</Badge>
@@ -189,7 +174,7 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
         description="Gives each agent on an Artifacts project its own fork and flags overlapping edits while they work, even across computers."
       />
       {status.configured ? (
-        <Setting title="Your swarm Worker" description={status.url}>
+        <SettingRow title="Your swarm Worker" description={status.url}>
           <div className="swarm-actions">
             {status.updateAvailable && (
               <Button
@@ -245,7 +230,7 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
               </Button>
             )}
           </div>
-        </Setting>
+        </SettingRow>
       ) : manual ? (
         <form
           className="space-y-3 px-5 py-4"
@@ -299,7 +284,7 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
         </form>
       ) : (
         !run && (
-          <Setting
+          <SettingRow
             title="Set up Swarm"
             description="Deploys the Swarm Worker to your Cloudflare account and connects it."
           >
@@ -316,7 +301,7 @@ export function SwarmConnection({ artifactsConnected }: { artifactsConnected: bo
                 Use an existing Worker
               </LinkButton>
             </div>
-          </Setting>
+          </SettingRow>
         )
       )}
       {run && (

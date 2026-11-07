@@ -1,3 +1,4 @@
+import { Button } from '@jackalope/ui';
 import { Eye, MousePointer2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
@@ -6,10 +7,10 @@ import {
   embeddableViewer,
   holdComputerViewer,
 } from '../../lib/computers';
-import { openExternalUrl } from '../../lib/tauri-bridge';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { openExternalUrl } from '../../lib/native/env';
 import './computers.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 /** An open embedded viewer renews its hold well inside the 90 second lease. */
 const LEASE_RENEW_MS = 30_000;
@@ -51,7 +52,7 @@ export function ComputerViewer({ computer }: { computer: ComputerStatus }) {
       else await openExternalUrl(url);
     } catch (cause) {
       if (!view) void holdComputerViewer(computer.id, lease, false).catch(() => undefined);
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -98,7 +99,7 @@ export function ComputerViewer({ computer }: { computer: ComputerStatus }) {
           Your mouse and keyboard now reach {computer.name}. The agent may act at the same time.
         </p>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {view && (
         <iframe
           key={view.url}

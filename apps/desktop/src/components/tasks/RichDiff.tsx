@@ -1,11 +1,10 @@
+import { Button, InlineNotice } from '@jackalope/ui';
 import { type FileDiffMetadata, parsePatchFiles } from '@pierre/diffs';
 import { FileDiff, Virtualizer, WorkerPoolContextProvider } from '@pierre/diffs/react';
 import DiffHighlightWorker from '@pierre/diffs/worker/worker.js?worker';
 import { useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from '../../hooks/useColorScheme';
 import { reviewExcerpt } from '../../lib/review-feedback';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import { useReviewFeedback } from './ReviewFeedback';
 import './rich-content.css';
 

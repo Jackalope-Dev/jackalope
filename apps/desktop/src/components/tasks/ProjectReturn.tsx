@@ -1,14 +1,13 @@
-import { Badge, Panel } from '@jackalope/ui';
+import { Badge, Button, Panel } from '@jackalope/ui';
 import { ArrowRight } from 'lucide-react';
+import { navigateWorkspace } from '../../lib/app-events';
 import { projectTaskPresence } from '../../lib/project-return';
 import type { QueueView } from '../../lib/queue';
+import type { TaskRun } from '../../lib/run-types';
 import type { WorkItem } from '../../lib/task-collection';
-import type { TaskRun } from '../../lib/task-runtime';
 import { selectWork } from '../../lib/work-selection';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AgentStack } from '../agents/AgentAvatar';
-import { navigateWorkspace } from '../layout/navigation';
-import { Button } from '../ui/button';
 
 export function ProjectReturn({
   items,

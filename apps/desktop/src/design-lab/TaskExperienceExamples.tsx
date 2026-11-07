@@ -1,4 +1,4 @@
-import { Checkbox } from '@jackalope/ui';
+import { Button, Checkbox, Select, SelectItem } from '@jackalope/ui';
 import { useState } from 'react';
 import { AgentQuestion } from '../components/tasks/AgentQuestion';
 import { DecisionTrail } from '../components/tasks/DecisionTrail';
@@ -7,10 +7,8 @@ import { TaskActivity } from '../components/tasks/TaskActivity';
 import { TaskContextPanel } from '../components/tasks/TaskContextPanel';
 import TaskMarkdown from '../components/tasks/TaskMarkdown';
 import { TaskOutcomes } from '../components/tasks/TaskOutcomes';
-import { Button } from '../components/ui/button';
-import { Select, SelectItem } from '../components/ui/Select';
+import type { PendingUserPrompt } from '../lib/run-types';
 import { assemblePrompt } from '../lib/skills/context-assembler';
-import type { PendingUserPrompt } from '../lib/task-runtime';
 import '../components/tasks/task-workspace.css';
 
 const patch =

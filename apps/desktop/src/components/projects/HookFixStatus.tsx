@@ -1,6 +1,6 @@
-import { isActive, type TaskRun } from '../../lib/task-runtime';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { Button, InlineNotice } from '@jackalope/ui';
+import { isActive } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 
 /** A commit refused by a hook, with the output needed to fix it. */
 export interface HookFailure {

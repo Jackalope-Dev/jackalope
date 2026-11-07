@@ -1,32 +1,28 @@
-import { DiscordIcon, FormField, Textarea } from '@jackalope/ui';
+import {
+  Button,
+  DiscordIcon,
+  FormField,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Textarea,
+} from '@jackalope/ui';
 import { LifeBuoy } from 'lucide-react';
 import { useState } from 'react';
 import { DISCORD_URL } from '../../lib/community';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
-import { Button } from '../ui/button';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import { useAction } from '../../lib/useAction';
+import { openHelp } from '../layout/navigation';
 import { FeedbackForm } from './FeedbackForm';
-import { Setting, SettingActions, SettingBody, SettingGroup } from './Setting';
 import { UpdateSettings } from './UpdateSettings';
 
 export function ReleaseSupport() {
   const [diagnostics, setDiagnostics] = useState<Record<string, unknown> | null>(null);
   const [feedback, setFeedback] = useState('');
-  const [message, setMessage] = useState('');
-  const [busy, setBusy] = useState(false);
+  const { run: act, busy, error: message, setError: setMessage } = useAction();
   const desktop = isTauriEnvironment();
-  const act = async (action: () => Promise<void>) => {
-    if (busy) return;
-    setBusy(true);
-    setMessage('');
-    try {
-      await action();
-    } catch (error) {
-      setMessage(String(error));
-    } finally {
-      setBusy(false);
-    }
-  };
   const copy = async () => {
     if (!diagnostics) return;
     await navigator.clipboard.writeText(
@@ -39,19 +35,16 @@ export function ReleaseSupport() {
       <UpdateSettings />
       <FeedbackForm />
       <SettingGroup aria-label="Help and community">
-        <Setting
+        <SettingRow
           title="Documentation & guides"
           description="Architecture guides, agent configuration, worktree workflows and troubleshooting recipes in the online Knowledgebase."
         >
-          <Button
-            variant="outline"
-            onClick={() => void openExternalUrl('https://jackalope.dev/knowledge/')}
-          >
+          <Button variant="outline" onClick={() => void openHelp()}>
             <LifeBuoy className="size-4 mr-2" />
             Browse Knowledgebase
           </Button>
-        </Setting>
-        <Setting
+        </SettingRow>
+        <SettingRow
           title="Community"
           description="Ask questions, share workflows and hear about new releases first in the Jackalope Discord."
         >
@@ -59,7 +52,7 @@ export function ReleaseSupport() {
             <DiscordIcon className="size-4 mr-2" />
             Join the Discord
           </Button>
-        </Setting>
+        </SettingRow>
       </SettingGroup>
       <SettingGroup
         aria-label="Support report"
@@ -71,7 +64,7 @@ export function ReleaseSupport() {
             disabled={!desktop || busy}
             onClick={() =>
               void act(async () =>
-                setDiagnostics(await nativeTask<Record<string, unknown>>('app_diagnostics')),
+                setDiagnostics(await invokeNative<Record<string, unknown>>('app_diagnostics')),
               )
             }
           >

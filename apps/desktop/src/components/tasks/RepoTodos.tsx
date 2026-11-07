@@ -1,17 +1,28 @@
 import {
+  Button,
   Checkbox,
   Disclosure,
   DisclosureSummary,
+  EmptyState,
   IconButton,
+  Input,
+  LoadingState,
   RefreshIcon,
   SearchField,
+  SegmentedControl,
+  Select,
+  SelectItem,
   Textarea,
+  Tooltip,
+  useDialogFocus,
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check, Circle, FileText, ListTodo, Pencil, Play, Plus, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useShallow } from 'zustand/react/shallow';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import {
   appendRepoTodo,
   parseRepoTodos,
@@ -20,24 +31,16 @@ import {
   TODO_FILES,
   updateRepoTodo,
 } from '../../lib/repo-todos';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { workspaceModeFor } from '../../lib/workspace-mode';
 import { useContextMemoryStore } from '../../stores/contextMemoryStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject } from '../../stores/projectStore';
 import { todoDraftKey, useRepoTodoStore } from '../../stores/repoTodoStore';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { Input } from '../ui/input';
-import { LoadingState } from '../ui/LoadingState';
-import { Select, SelectItem } from '../ui/Select';
-import { Tooltip } from '../ui/Tooltip';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
-import { FilterGroup, WorkspaceToolbar } from '../ui/WorkspaceToolbar';
+import { WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import './repo-todos.css';
+import { describeError } from '../../lib/errors';
 
 export function RepoTodos({
   onOpenProject,
@@ -46,10 +49,7 @@ export function RepoTodos({
   onOpenProject: () => void;
   onCapture: (draftKey: string) => void;
 }) {
-  const { projects, activeProjectId } = useProjectStore(
-    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
-  );
-  const project = projects.find((item) => item.id === activeProjectId);
+  const project = useActiveProject();
   const [documents, setDocuments] = useState<RepoTodoDocument[]>([]);
   const [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(true);
@@ -105,7 +105,7 @@ export function RepoTodos({
     setLoading(true);
     setError('');
     try {
-      const files = await nativeTask<RepoTodoDocument[]>('repo_todos_read', {
+      const files = await invokeNative<RepoTodoDocument[]>('repo_todos_read', {
         projectPath,
       });
       if (version !== request.current) return;
@@ -120,7 +120,7 @@ export function RepoTodos({
           '',
       );
     } catch (cause) {
-      if (version === request.current) setError(String(cause));
+      if (version === request.current) setError(describeError(cause));
     } finally {
       if (version === request.current) setLoading(false);
     }
@@ -155,7 +155,7 @@ export function RepoTodos({
     setSaving(key, true);
     setError('');
     try {
-      await nativeTask('repo_todos_save', {
+      await invokeNative('repo_todos_save', {
         projectPath: project.path,
         relativePath: selected,
         expectedContent: draft.base,
@@ -176,7 +176,7 @@ export function RepoTodos({
         .refreshMemory(project, { silent: true })
         .catch(() => {});
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setSaving(key, false);
     }
@@ -361,7 +361,7 @@ export function RepoTodos({
                     ) : (
                       <>
                         <WorkspaceToolbar className="repo-todo-toolbar">
-                          <FilterGroup
+                          <SegmentedControl
                             label="Filter TODOs"
                             value={filter}
                             onChange={setFilter}
@@ -491,7 +491,7 @@ export function RepoTodos({
                               setQuery('');
                               addInput.current?.focus();
                             } catch (cause) {
-                              setError(String(cause));
+                              setError(describeError(cause));
                             }
                           }}
                         >

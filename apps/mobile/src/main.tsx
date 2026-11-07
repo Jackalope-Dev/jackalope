@@ -1,8 +1,7 @@
 import { applyThemeTokens, DEFAULT_THEME } from '@jackalope/brand/theme';
-import { Button } from '@jackalope/ui';
+import { Button, InlineNotice } from '@jackalope/ui';
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { InlineNotice } from '../../desktop/src/components/ui/InlineNotice';
 import { moveNewWorkDraft } from './drafts';
 import { Hosts } from './Hosts';
 import { HostWork, type Opening } from './HostWork';
@@ -12,7 +11,7 @@ import { Splash } from './Splash';
 import { useComputers } from './useComputers';
 import { Work } from './Work';
 import '../../desktop/src/index.css';
-import '../../desktop/src/components/ui/experience.css';
+import '@jackalope/ui/styles.css';
 import '../../desktop/src/components/tasks/task-workspace.css';
 import './mobile.css';
 

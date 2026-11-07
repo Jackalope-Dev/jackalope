@@ -1,5 +1,5 @@
+import { Button } from '@jackalope/ui';
 import { X } from 'lucide-react';
-import { Button } from './button';
 
 /** Close control for a notice the user can clear, placed in InlineNotice's action slot. */
 export function DismissButton({

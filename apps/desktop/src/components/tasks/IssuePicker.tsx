@@ -1,11 +1,11 @@
-import { Button, Checkbox, Input, Select, SelectItem } from '@jackalope/ui';
+import { Button, Checkbox, InlineNotice, Input, Select, SelectItem } from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { openSettings } from '../../lib/app-events';
 import { type Issue, type IssuePage, issuePrompt, issueUrl } from '../../lib/issues';
-import { nativeTask } from '../../lib/task-runtime';
-import { openExternalUrl } from '../../lib/tauri-bridge';
-import { openSettings } from '../layout/navigation';
-import { InlineNotice } from '../ui/InlineNotice';
+import { openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import './issue-picker.css';
+import { describeError } from '../../lib/errors';
 
 export function IssuePicker({
   projectPath,
@@ -35,7 +35,7 @@ export function IssuePicker({
         setNext(null);
       }
       try {
-        const result = await nativeTask<IssuePage>('project_issues', {
+        const result = await invokeNative<IssuePage>('project_issues', {
           projectPath,
           provider,
           kind: provider === 'github' ? kind : 'issue',
@@ -51,7 +51,7 @@ export function IssuePicker({
         ]);
         setNext(result.next);
       } catch (cause) {
-        if (current === revision.current) setError(String(cause));
+        if (current === revision.current) setError(describeError(cause));
       } finally {
         if (current === revision.current) setBusy(false);
       }
@@ -153,7 +153,7 @@ export function IssuePicker({
                   try {
                     onDraft(issuePrompt(selected));
                   } catch (cause) {
-                    setError(String(cause));
+                    setError(describeError(cause));
                   }
                 }}
               >
@@ -165,7 +165,7 @@ export function IssuePicker({
                   try {
                     await openExternalUrl(issueUrl(selected.url));
                   } catch (cause) {
-                    setError(String(cause));
+                    setError(describeError(cause));
                   }
                 }}
               >

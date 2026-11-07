@@ -1,9 +1,7 @@
+import { Button, FormField, InlineNotice, Input } from '@jackalope/ui';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { Button } from '../ui/button';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
+import { describeError } from '../../lib/errors';
+import { invokeNative } from '../../lib/native/transport';
 
 interface BetaRequest {
   kind: 'join' | 'leave';
@@ -38,13 +36,13 @@ export function BetaProgram({ onBeta }: { onBeta: boolean }) {
     setBusy(true);
     setError('');
     try {
-      const view = await nativeTask<{ request: BetaRequest | null }>('app_account_beta', {
+      const view = await invokeNative<{ request: BetaRequest | null }>('app_account_beta', {
         action,
       });
       setRequest(view.request);
       setLoaded(true);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       busyRef.current = false;
       setBusy(false);

@@ -41,7 +41,14 @@ Project readiness uses isolated gix metadata reads with Git fallback. Review ren
 uses Pierre Diffs and task-result rendering uses Streamdown; neither owns integration
 approval or native execution. See [dependency integration contracts](DEPENDENCY-INTEGRATIONS.md).
 Shell selects Tasks, Project or Agents. Agents groups runners, usage and quota,
-and MCP connections and marketplace. Zustand stores keep
+and MCP connections and marketplace. Workspace views are registered once in
+layout/navigation.ts (label, group, icon, telemetry feature, search keywords) with
+their pages in layout/workspace-views.tsx; Shell, its subnavigation and command search
+read that registry. Commands shared by keyboard shortcuts, the tray and window menus,
+command search and the shortcut sheet live in layout/commands.ts. Work is read through
+lib/work-selection.ts (`useWorkspaceWork`, `useAllRuns`) and opened with `openWork`,
+`openRun` or `openConversation`, which clear the other selections and focus the
+project. Zustand stores keep
 selection, drafts and preferences; they do not establish that native work ran.
 
 ~~~text
@@ -55,12 +62,20 @@ Composer / saved idea / queue / native schedule
   → prepared integration receipt → explicit application
 ~~~
 
-executionStore.start synchronizes agent policy and invokes task_start. Clients in
-lib/queue.ts synchronize policy before queue creation/dispatch. Native commands
+The webview owns the agent policy (stores/agentConfigStore.ts). The main window
+saves it to the native side on every change, and the transport saves it again
+before each command that reads it (task starts, discovery, queue creation and
+dispatch, schedules, Chat and others listed there), so no caller syncs by hand.
+Native commands
 are registered in src-tauri/src/lib.rs, the authoritative command inventory.
-lib/task-runtime.ts, lib/queue.ts, lib/agent-profiles.ts, lib/codebase.ts and
-lib/tauri-bridge.ts hold feature contracts/clients. DTOs follow Rust serde field
-names; changes must preserve both sides and old saved records.
+Every webview call goes through invokeNative in lib/native/transport.ts, which
+rejects in the browser preview and reports operation telemetry and timing;
+lib/native/env.ts detects the desktop app and opens links. lib/run-types.ts holds
+the attempt DTOs and lib/run-status.ts the named status predicates and labels.
+Per-domain clients (lib/task-client.ts, lib/queue.ts, lib/agent-profiles.ts,
+lib/git-worktrees.ts, lib/mcp-client.ts, lib/system-info.ts, lib/codebase.ts and
+others) own their command names and DTOs. DTOs follow Rust serde field names;
+changes must preserve both sides and old saved records.
 
 ## Native modules
 
@@ -193,18 +208,24 @@ not change native task, update or recovery state. Keep action-local errors inlin
 
 components/tasks separates collection/composer, detail/result review, queue/add-work
 and integration review. Browser-safe controls live in packages/ui, consumed as
-@jackalope/ui by desktop, website and admin. Desktop components/ui retains
-compatibility exports and app-specific compositions such as workspace navigation
-and task state mapping. System information belongs to Settings; saved task editing
+@jackalope/ui by desktop, website and admin; desktop imports them from there directly.
+Desktop components/ui holds only app-specific compositions such as workspace navigation
+and error boundaries. System information belongs to Settings; saved task editing
 belongs to Tasks. TaskDetail composes TaskRunDetails, TaskFollowUpPanel and the
 useTaskFollowUps queue hook; OnboardingFlow composes one component per step.
 
-Subscribe to native events with hooks/useTauriEvent and to app `jackalope:*` window
-events with hooks/useWindowEvent; both handle late-resolving cleanup and stale
-handlers. Open links through openInBrowser in lib/tauri-bridge, which reports
+Subscribe to native events with hooks/useTauriEvent. Requests between parts of a
+window (navigate, open settings or the Agents page, open a helper draft, attach to the
+composer, changes or feedback saved) are typed events in lib/app-events: send them with
+its helpers or emitAppEvent and listen with useAppEvent. Settings categories, their
+groups, icons and search words are one registry in components/settings/categories.ts;
+the in-app helper's page names are lib/helper-destinations.json, which the native
+helper validates against and workspace views name with `helper`. The mascot's mood is
+derived in stores/mascotStore from activity sources (running work, a requested
+repository scan) rather than set by callers. Open links through openInBrowser in lib/native/env, which reports
 failures to the caller. Select store fields with useShallow rather than
 subscribing to a whole store. PROMPT_MAX_CHARS bounds task, follow-up and
-schedule instructions.
+schedule instructions in the composer; the native side accepts longer ones.
 
 The UI package owns portable styling, accessible controls, overlays, feedback
 states and basic layout/data primitives. It has no native bridge, stores, routing

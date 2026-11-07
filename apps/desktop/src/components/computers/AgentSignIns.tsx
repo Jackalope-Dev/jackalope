@@ -1,10 +1,16 @@
-import { Badge, Input } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  InlineNotice,
+  Input,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { type AgentCredential, agentCredentials, setAgentCredential } from '../../lib/computers';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { describeError } from '../../lib/errors';
+import { isTauriEnvironment } from '../../lib/native/env';
 
 const HINTS: Record<string, string> = {
   'claude-token':
@@ -24,7 +30,7 @@ export function AgentSignIns() {
     if (!isTauriEnvironment()) return;
     void agentCredentials()
       .then(setCredentials)
-      .catch((cause) => setError(String(cause)));
+      .catch((cause) => setError(describeError(cause)));
   }, []);
 
   const save = async (id: string, value: string | null) => {
@@ -34,7 +40,7 @@ export function AgentSignIns() {
       setCredentials(await setAgentCredential(id, value));
       setDrafts((current) => ({ ...current, [id]: '' }));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy('');
     }
@@ -58,7 +64,7 @@ export function AgentSignIns() {
         const inputId = `agent-credential-${credential.id}`;
         const draft = drafts[credential.id] ?? '';
         return (
-          <Setting
+          <SettingRow
             key={credential.id}
             title={
               <span className="inline-flex items-center gap-2">
@@ -109,7 +115,7 @@ export function AgentSignIns() {
                 </Button>
               </form>
             )}
-          </Setting>
+          </SettingRow>
         );
       })}
     </SettingGroup>

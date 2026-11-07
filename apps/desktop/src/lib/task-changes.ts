@@ -1,4 +1,4 @@
-import type { TaskRun } from './task-runtime';
+import type { TaskRun } from './run-types';
 
 export interface TaskChanges {
   revision: number;

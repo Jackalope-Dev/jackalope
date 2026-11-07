@@ -1,8 +1,8 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import type { QueueCommand, QueueView } from '../../lib/queue';
-import type { TaskRun } from '../../lib/task-runtime';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { isLive } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
+import { ActionError } from '../ui/ActionError';
 
 export function CoordinationDecisions({
   queue,
@@ -26,13 +26,12 @@ export function CoordinationDecisions({
     <div className="coordination-decisions">
       {audits.map((audit) => {
         const run = runs.find((r) => r.id === audit.runId);
-        const active =
-          run && ['starting', 'running', 'stopping', 'interrupted'].includes(run.status);
+        const active = run && isLive(run);
         const accepted = audit.tree && audit.tree === audit.acceptedTree;
         return (
           <article className="queue-message" key={audit.runId}>
             <h3>Changed files · {title(audit.taskId)}</h3>
-            {audit.error && <InlineNotice tone="error">{audit.error}</InlineNotice>}
+            <ActionError error={audit.error} />
             {audit.overlaps.length > 0 && (
               <InlineNotice tone="error">
                 These files also changed in another task. Reconcile the edits before merging.

@@ -1,12 +1,12 @@
-import { Badge } from '@jackalope/ui';
+import { Badge, Button } from '@jackalope/ui';
 import { ArrowUpRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import { taskAgents } from '../../lib/agent-provider';
-import { isActive, type TaskRun } from '../../lib/task-runtime';
+import { isActive } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 import { taskDecision } from '../../lib/task-workflow';
 import { AgentStack } from '../agents/AgentAvatar';
-import { Button } from '../ui/button';
 import { TaskLiveActivity } from './TaskLiveActivity';
 export function TaskProgress({
   run,

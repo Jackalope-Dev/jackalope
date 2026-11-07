@@ -1,6 +1,5 @@
-import { Input } from '@jackalope/ui';
+import { Button, Input } from '@jackalope/ui';
 import { useId, useState } from 'react';
-import { Button } from '../ui/button';
 
 export function OutcomeEditor({
   label = 'What should be true when this is done?',

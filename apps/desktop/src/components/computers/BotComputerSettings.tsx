@@ -1,4 +1,18 @@
-import { Badge, FormField, Input, SegmentedControl } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  FormField,
+  InlineNotice,
+  Input,
+  SegmentedControl,
+  Select,
+  SelectItem,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type CloudMachine,
@@ -18,18 +32,13 @@ import {
   startComputer,
   stopComputer,
 } from '../../lib/computers';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
-import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { Agent37KeyForm, useAgent37 } from './Agent37Connect';
 import { ComputerViewer } from './ComputerViewer';
 import { IdleStopSelect } from './IdleStopSelect';
 import '../settings/settings.css';
 import './computers.css';
+import { describeError } from '../../lib/errors';
 import { PairMachineForm } from './PairMachineForm';
 
 type Kind = 'none' | 'local-docker' | 'remote-machine' | 'agent37';
@@ -164,7 +173,7 @@ function OwnerComputerSettings({
       setStatus(next);
       if (next && !edited.current) setSettings(next.settings);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setLoaded(true);
     }
@@ -198,7 +207,7 @@ function OwnerComputerSettings({
       await action();
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy('');
     }
@@ -245,7 +254,7 @@ function OwnerComputerSettings({
       )}
       {status ? (
         <>
-          <Setting
+          <SettingRow
             title={
               <span className="inline-flex items-center gap-2">
                 {status.name}
@@ -290,19 +299,19 @@ function OwnerComputerSettings({
                 Start
               </Button>
             ) : null}
-          </Setting>
+          </SettingRow>
           {(status.state === 'running' || status.state === 'stopped') && (
             <SettingBody>
               <ComputerViewer computer={status} />
             </SettingBody>
           )}
           {status.provider === 'local-docker' && (
-            <Setting
+            <SettingRow
               title="Stop when idle"
               description="Stops the sandbox after this long with no agent work and no open viewer. Its files are kept, and it starts again when an agent or viewer needs it."
             >
               <IdleStopSelect computer={status} disabled={!!busy} onChanged={setStatus} />
-            </Setting>
+            </SettingRow>
           )}
           {status.provider === 'local-docker' && (
             <SettingBody>
@@ -332,7 +341,7 @@ function OwnerComputerSettings({
               </p>
             </SettingBody>
           )}
-          <Setting
+          <SettingRow
             title="Delete computer"
             description={
               status.provider === 'agent37'
@@ -342,7 +351,7 @@ function OwnerComputerSettings({
                   : 'Removes the computer and everything stored in it, including its browser sign-ins.'
             }
           >
-            <ConfirmAction
+            <ConfirmDialog
               trigger={
                 <Button variant="outline" disabled={!!busy || status.state === 'starting'}>
                   Delete computer…
@@ -363,11 +372,11 @@ function OwnerComputerSettings({
                   setStatus(null);
                   setKind('none');
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 }
               }}
             />
-          </Setting>
+          </SettingRow>
         </>
       ) : (
         <SettingBody>

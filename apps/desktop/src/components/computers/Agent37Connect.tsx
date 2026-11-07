@@ -1,10 +1,18 @@
-import { Badge, FormField, Input } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  FormField,
+  InlineNotice,
+  Input,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { agent37Status, agent37Usage, setAgent37Key } from '../../lib/computers';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
-import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { describeError } from '../../lib/errors';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { ActionError } from '../ui/ActionError';
 
 const KEYS_URL = 'https://www.agent37.com/';
 
@@ -44,7 +52,7 @@ export function Agent37KeyForm({
             setKey('');
             onConnected();
           })
-          .catch((cause) => setError(String(cause)))
+          .catch((cause) => setError(describeError(cause)))
           .finally(() => setBusy(false));
       }}
     >
@@ -69,7 +77,7 @@ export function Agent37KeyForm({
           onChange={(event) => setKey(event.target.value)}
         />
       </FormField>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <div className="flex flex-wrap gap-2">
         <Button type="submit" loading={busy} loadingLabel="Connecting…" disabled={!key.trim()}>
           Connect
@@ -105,7 +113,7 @@ export function Agent37Settings() {
       }
     >
       {connected ? (
-        <Setting
+        <SettingRow
           title={
             <span className="inline-flex items-center gap-2">
               Agent37 <Badge variant="accent">Connected</Badge>
@@ -126,13 +134,13 @@ export function Agent37Settings() {
               setError('');
               void setAgent37Key(null)
                 .then(() => setConnected(false))
-                .catch((cause) => setError(String(cause)))
+                .catch((cause) => setError(describeError(cause)))
                 .finally(() => setBusy(false));
             }}
           >
             Disconnect
           </Button>
-        </Setting>
+        </SettingRow>
       ) : (
         <SettingBody>
           <Agent37KeyForm onConnected={() => setConnected(true)} />

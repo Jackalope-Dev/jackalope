@@ -3,10 +3,10 @@ import { useContextMemoryStore } from '../stores/contextMemoryStore';
 import { useExecutionStore } from '../stores/executionStore';
 import { useMcpStore } from '../stores/mcpStore';
 import { type Project, useProjectStore } from '../stores/projectStore';
+import { agentModels } from './agent-models';
 import { prepareCodebase } from './codebase';
-import { projectGitState } from './project-setup';
-import { nativeTask } from './task-runtime';
-import { isTauriEnvironment } from './tauri-bridge';
+import { isTauriEnvironment } from './native/env';
+import { projectGitState, validateProject } from './project-setup';
 
 export interface PreparationJob {
   id: string;
@@ -68,7 +68,7 @@ export function prepareWorkspace(
             (runner) => runner.available && ['codex', 'claude', 'opencode'].includes(runner.id),
           );
         const results = await Promise.allSettled(
-          runners.map((runner) => nativeTask('agent_models', { agent: runner.id, refresh: false })),
+          runners.map((runner) => agentModels(runner.id, { refresh: false })),
         );
         if (results.some((result) => result.status === 'rejected'))
           throw new Error(
@@ -82,10 +82,7 @@ export function prepareWorkspace(
     const key = `${project.id}:${project.path}`;
     jobs.push(
       job(`project:${key}`, 'Checking the project folder', async () => {
-        const info = await nativeTask<{ branch: string; repository: boolean }>(
-          'task_validate_project',
-          { path: project.path },
-        );
+        const info = await validateProject(project.path);
         const current = useProjectStore.getState().projects.find((item) => item.id === project.id);
         if (current?.path === project.path)
           useProjectStore.getState().updateProject(project.id, projectGitState(info));

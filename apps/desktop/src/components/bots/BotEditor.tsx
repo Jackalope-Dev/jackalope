@@ -1,4 +1,17 @@
-import { Checkbox, FormField, Input, Switch, Textarea } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  DialogCloseButton,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  FormField,
+  Input,
+  Select,
+  SelectItem,
+  Switch,
+  Textarea,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -16,10 +29,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { BotComputerSettings } from '../computers/BotComputerSettings';
 import { BrowserProfileSettings } from '../projects/BrowserProfileSettings';
 import { ComposerAgentPicker } from '../sessions/ComposerAgentPicker';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
+import { ActionError } from '../ui/ActionError';
 import { BotAppearancePicker } from './BotAppearancePicker';
 import { BotWakes } from './BotWakes';
 
@@ -399,7 +409,7 @@ export function BotEditor({
                 </>
               )}
             </div>
-            {error && <InlineNotice tone="error">{error}</InlineNotice>}
+            <ActionError error={error} />
           </form>
           {bot && <BrowserProfileSettings owner={{ kind: 'bot', id: bot.id, name: bot.name }} />}
           {bot && <BotComputerSettings bot={{ id: bot.id, name: bot.name }} />}

@@ -1,9 +1,10 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { useState } from 'react';
-import { nativeTask, type TaskRun, type Verification } from '../../lib/task-runtime';
+import { describeError } from '../../lib/errors';
+import { invokeNative } from '../../lib/native/transport';
+import type { TaskRun, Verification } from '../../lib/run-types';
 import { useExecutionStore } from '../../stores/executionStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { ActionError } from '../ui/ActionError';
 
 export function ProjectVerification({
   run,
@@ -28,9 +29,9 @@ export function ProjectVerification({
     setBusy(true);
     setError('');
     try {
-      setResult(await nativeTask<Verification>('task_verify', { id: run.id, command: selected }));
+      setResult(await invokeNative<Verification>('task_verify', { id: run.id, command: selected }));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       await useExecutionStore.getState().refresh();
       setBusy(false);
@@ -61,7 +62,7 @@ export function ProjectVerification({
           Automatic checks could not finish: {run.verificationError}
         </InlineNotice>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {check ? (
         <div className="space-y-2">
           <p
@@ -105,7 +106,7 @@ export function ProjectVerification({
                   );
                   document.getElementById('task-reply')?.focus();
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 } finally {
                   setCorrecting(false);
                 }

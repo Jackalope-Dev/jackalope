@@ -1,11 +1,10 @@
+import { Input, Select, SelectItem } from '@jackalope/ui';
 import { useState } from 'react';
 import {
   parseScheduleTiming,
   scheduleHourIntervals,
   scheduleTimingExpression,
 } from '../../lib/schedules';
-import { Input } from '../ui/input';
-import { Select, SelectItem } from '../ui/Select';
 
 export function ScheduleTiming({
   expression,

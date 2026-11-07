@@ -1,18 +1,14 @@
 import { useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { navigateWorkspace } from '../../lib/app-events';
+import { describeError } from '../../lib/errors';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { listSchedules, type SavedSchedule } from '../../lib/schedules';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { navigateWorkspace } from '../layout/navigation';
 import { useCompanionNotices } from '../mascot/useCompanionNotices';
 
-interface ScheduleStatus {
-  lastNotice?: { dueAt: string; runId: string | null; outcome: string } | null;
-  definition: { id: string; name: string; request: { projectId: string } };
-  history: { dueAt: string; runId: string | null; outcome: string }[];
-}
 export function ScheduleNotice() {
-  const [schedules, setSchedules] = useState<ScheduleStatus[]>([]);
+  const [schedules, setSchedules] = useState<SavedSchedule[]>([]);
   const [error, setError] = useState('');
   const [dismissed, setDismissed] = useState<string[]>(() => {
     try {
@@ -29,7 +25,7 @@ export function ScheduleNotice() {
     if (!isTauriEnvironment()) return;
     let active = true;
     const refresh = () =>
-      nativeTask<{ schedules: ScheduleStatus[] }>('schedule_list')
+      listSchedules()
         .then((data) => {
           if (active) {
             setSchedules(data.schedules);
@@ -37,7 +33,7 @@ export function ScheduleNotice() {
           }
         })
         .catch((cause) => {
-          if (active) setError(String(cause));
+          if (active) setError(describeError(cause));
         });
     void refresh();
     const timer = setInterval(refresh, 15000);

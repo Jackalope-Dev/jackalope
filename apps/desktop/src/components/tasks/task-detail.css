@@ -55,39 +55,8 @@
 .task-progress-action {
   margin-left: auto;
 }
-.task-progress-steps {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border-top: 1px solid var(--color-border-subtle);
-  padding: 12px;
-  gap: 12px;
-  list-style: none;
-}
-.task-progress-steps[data-count="4"] {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-.task-progress-steps li {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  font-size: var(--text-sm);
-}
-.task-progress-steps svg {
-  margin-top: 3px;
-  flex-shrink: 0;
-  color: var(--color-text-muted);
-}
 .task-progress-activity svg {
   flex-shrink: 0;
-}
-.task-progress-steps [data-complete="true"] svg {
-  color: var(--color-success);
-}
-.task-progress-steps small {
-  display: block;
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  margin-top: 3px;
 }
 .task-progress .task-progress-activity {
   display: flex;
@@ -208,15 +177,6 @@
     width: auto;
     flex-basis: auto;
   }
-  .task-progress-steps,
-  .task-progress-steps[data-count="4"] {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding: 16px;
-    gap: 8px 12px;
-  }
-  .task-progress-steps li {
-    gap: 6px;
-  }
   .task-progress-action {
     margin-left: auto;
   }
@@ -327,27 +287,6 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
-}
-.task-heading-meta {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 10px;
-}
-/* Task context and workspace tools sit with the section tabs; the branch is in the top bar. */
-.task-view-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  /* Stays at the end of the row, even when it wraps beneath the tabs. */
-  margin-left: auto;
-}
-.task-view-tools > .work-toolbar {
-  margin: 0;
-}
-.task-view-tools .work-branch {
-  display: none;
 }
 .task-plan-notice {
   margin-bottom: 16px;

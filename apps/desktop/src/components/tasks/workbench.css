@@ -12,6 +12,7 @@
   font-size: 13px;
 }
 .work-context-path {
+  user-select: text;
   overflow-wrap: anywhere;
   color: var(--color-text-muted);
   font-family: var(--font-mono);

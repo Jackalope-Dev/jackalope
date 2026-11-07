@@ -1,13 +1,11 @@
-import { Checkbox, Input } from '@jackalope/ui';
+import { Button, Checkbox, Input, Select, SelectItem, useDialogFocus } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { type AgentProfile, saveAgentProfileKey } from '../../lib/agent-profiles';
 import { apiProviders } from '../../lib/api-providers';
+import { describeError } from '../../lib/errors';
 import { useManagedRuntime } from '../../lib/managed-runtime';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { useDialogFocus } from '../ui/useDialogFocus';
+import { ActionError } from '../ui/ActionError';
 import { ManagedRuntimeProgress } from './ManagedRuntimeProgress';
 
 export function AgentKeySignIn({
@@ -40,7 +38,7 @@ export function AgentKeySignIn({
     try {
       await onClose();
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setBusy(false);
     }
@@ -56,7 +54,8 @@ export function AgentKeySignIn({
         <Dialog.Overlay className="task-dialog-overlay" />
         <Dialog.Content
           {...focus}
-          className="task-dialog appearance-panel confirm-action-dialog"
+          data-layer="confirm"
+          className="task-dialog appearance-panel"
           onCloseAutoFocus={(event) => {
             if (returnFocus?.isConnected) {
               event.preventDefault();
@@ -87,7 +86,7 @@ export function AgentKeySignIn({
                 await onSaved(useForTasks);
                 await onClose();
               } catch (error) {
-                setError(String(error));
+                setError(describeError(error));
               } finally {
                 setBusy(false);
               }
@@ -135,10 +134,12 @@ export function AgentKeySignIn({
             {runner.preparing && (
               <ManagedRuntimeProgress
                 progress={runner.progress}
-                onCancel={() => void runner.cancel().catch((cause) => setError(String(cause)))}
+                onCancel={() =>
+                  void runner.cancel().catch((cause) => setError(describeError(cause)))
+                }
               />
             )}
-            {error && <InlineNotice tone="error">{error}</InlineNotice>}
+            <ActionError error={error} />
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" disabled={busy} onClick={() => void close()}>
                 Cancel

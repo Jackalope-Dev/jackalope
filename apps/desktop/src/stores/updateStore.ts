@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { nativeTask } from '../lib/task-runtime.ts';
-import { isTauriEnvironment } from '../lib/tauri-bridge.ts';
+import { isTauriEnvironment } from '../lib/native/env.ts';
+import { invokeNative } from '../lib/native/transport.ts';
 
 export interface ReleaseStatus {
   currentVersion: string;
@@ -243,19 +243,19 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
 }
 export const useUpdateStore = createUpdateStore({
   desktop: isTauriEnvironment,
-  status: (check) => nativeTask<ReleaseStatus>('app_release_status', { check }),
-  setChannel: (channel) => nativeTask('app_release_channel', { channel }),
+  status: (check) => invokeNative<ReleaseStatus>('app_release_status', { check }),
+  setChannel: (channel) => invokeNative('app_release_channel', { channel }),
   download: async (version, onProgress, channel) => {
     const { Channel } = await import('@tauri-apps/api/core');
     const progress = new Channel<UpdateProgress>();
     progress.onmessage = onProgress;
-    await nativeTask('app_download_update', { version, progress, channel });
+    await invokeNative('app_download_update', { version, progress, channel });
   },
   install: async (version, onProgress, channel) => {
     const { Channel } = await import('@tauri-apps/api/core');
     const progress = new Channel<UpdateProgress>();
     progress.onmessage = onProgress;
-    await nativeTask('app_install_update', { version, progress, channel });
+    await invokeNative('app_install_update', { version, progress, channel });
   },
   now: Date.now,
 });

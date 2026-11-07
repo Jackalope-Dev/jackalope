@@ -1,5 +1,5 @@
-import type { PendingUserPrompt, RunRequest } from './task-runtime';
-import { nativeTask } from './task-runtime.ts';
+import { invokeNative } from './native/transport.ts';
+import type { PendingUserPrompt, RunRequest } from './run-types';
 
 export type PlanShape = 'single' | 'subtasks' | 'swarm';
 export type PlanStatus = 'planning' | 'draft' | 'approved' | 'running' | 'done';
@@ -296,16 +296,16 @@ export interface ManualPlan {
 
 export const planCommands = {
   list: (projectId?: string) =>
-    nativeTask<{ plans: PlanSummary[]; problems: string[] }>('plan_list', { projectId }),
-  get: (id: string) => nativeTask<PlanView>('plan_get', { id }),
+    invokeNative<{ plans: PlanSummary[]; problems: string[] }>('plan_list', { projectId }),
+  get: (id: string) => invokeNative<PlanView>('plan_get', { id }),
   start: (request: RunRequest, goal: string) =>
-    nativeTask<PlanView>('plan_start', { request, goal }),
+    invokeNative<PlanView>('plan_start', { request, goal }),
   create: (request: RunRequest, plan: ManualPlan) =>
-    nativeTask<PlanView>('plan_create', { request, plan }),
+    invokeNative<PlanView>('plan_create', { request, plan }),
   keepPlanning: (id: string, comments: string) =>
-    nativeTask<void>('plan_keep_planning', { id, comments }),
+    invokeNative<void>('plan_keep_planning', { id, comments }),
   save: (id: string, markdown: string, baseRevision: number) =>
-    nativeTask<number>('plan_save', { id, markdown, baseRevision }),
+    invokeNative<number>('plan_save', { id, markdown, baseRevision }),
   approve: (
     id: string,
     revision: number,
@@ -313,28 +313,28 @@ export const planCommands = {
     shape: PlanShape,
     checks?: { verifyCommand?: string; prepareCommand?: string; setupFiles?: string[] },
     reviewer?: string,
-  ) => nativeTask<void>('plan_approve', { id, revision, hash, shape, checks, reviewer }),
-  replan: (id: string, comments: string) => nativeTask<void>('plan_replan', { id, comments }),
+  ) => invokeNative<void>('plan_approve', { id, revision, hash, shape, checks, reviewer }),
+  replan: (id: string, comments: string) => invokeNative<void>('plan_replan', { id, comments }),
   rounds: (
     id: string,
     action: 'pause' | 'resume' | 'stop' | 'approve' | 'ask' | 'auto',
     assignments?: RoundAssignment[],
-  ) => nativeTask<void>('plan_rounds', { id, action, assignments }),
+  ) => invokeNative<void>('plan_rounds', { id, action, assignments }),
   resolveDeviation: (id: string, deviationId: string, action: 'accept' | 'redo' | 'replan') =>
-    nativeTask<void>('plan_resolve_deviation', { id, deviationId, action }),
+    invokeNative<void>('plan_resolve_deviation', { id, deviationId, action }),
   /** Sends your answer in place of an agent's and records the override. */
   overrideDecision: (id: string, entryId: string, answer: string) =>
-    nativeTask<void>('plan_autonomy_override', { id, entryId, answer }),
+    invokeNative<void>('plan_autonomy_override', { id, entryId, answer }),
   overridePrompt: (runId: string, promptId: string, answer: string) =>
-    nativeTask<void>('task_prompt_override', { runId, promptId, answer }),
-  export: (id: string, path?: string) => nativeTask<string>('plan_export', { id, path }),
+    invokeNative<void>('task_prompt_override', { runId, promptId, answer }),
+  export: (id: string, path?: string) => invokeNative<string>('plan_export', { id, path }),
   diff: (id: string, from: number, to: number) =>
-    nativeTask<SectionChange[]>('plan_diff', { id, from, to }),
-  revision: (id: string, number: number) => nativeTask<string>('plan_revision', { id, number }),
-  archive: (id: string) => nativeTask<void>('plan_archive', { id }),
-  settings: (projectId: string) => nativeTask<PlanSettings>('plan_settings_get', { projectId }),
+    invokeNative<SectionChange[]>('plan_diff', { id, from, to }),
+  revision: (id: string, number: number) => invokeNative<string>('plan_revision', { id, number }),
+  archive: (id: string) => invokeNative<void>('plan_archive', { id }),
+  settings: (projectId: string) => invokeNative<PlanSettings>('plan_settings_get', { projectId }),
   saveSettings: (projectId: string, settings: PlanSettings) =>
-    nativeTask<void>('plan_settings_set', { projectId, settings }),
+    invokeNative<void>('plan_settings_set', { projectId, settings }),
 };
 
 /** Steps of a written plan as the plan document's tasks; dependencies become indexes. */

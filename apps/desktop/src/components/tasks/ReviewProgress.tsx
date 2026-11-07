@@ -1,9 +1,8 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-
+import { describeError } from '../../lib/errors';
+import { invokeNative } from '../../lib/native/transport';
+import { ActionError } from '../ui/ActionError';
 import { ChangedFiles } from './ChangedFiles';
 
 interface Progress {
@@ -22,9 +21,9 @@ export function ReviewProgress({ runId }: { runId: string }) {
     setBusy(true);
     setError('');
     try {
-      setProgress(await nativeTask<Progress>('task_review_progress', { id: runId, seenTree }));
+      setProgress(await invokeNative<Progress>('task_review_progress', { id: runId, seenTree }));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -41,7 +40,7 @@ export function ReviewProgress({ runId }: { runId: string }) {
           </Button>
         )}
       </div>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {progress && (
         <>
           <p className="task-muted">{progress.note}</p>

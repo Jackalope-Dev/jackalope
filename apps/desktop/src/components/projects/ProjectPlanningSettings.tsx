@@ -1,19 +1,26 @@
-import { Badge } from '@jackalope/ui';
+import {
+  Badge,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
 import { useEffect, useId, useState } from 'react';
 import { useAgentModels } from '../../lib/agent-models';
+import { describeError } from '../../lib/errors';
+import { isTauriEnvironment } from '../../lib/native/env';
 import {
   type DecideSettings,
   defaultDecideSettings,
   type PlanSettings,
   planCommands,
 } from '../../lib/plan-mode';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
-import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
+import { ActionError } from '../ui/ActionError';
 
 const QUESTION_LIMITS = Array.from({ length: 13 }, (_, limit) => limit);
 const ROUND_LIMITS = [1, 2, 3, 5, 8, 12, 20];
@@ -52,7 +59,7 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
         setSettings(value);
         setPath(value.exportPath);
       })
-      .catch((cause) => current && setError(String(cause)));
+      .catch((cause) => current && setError(describeError(cause)));
     return () => {
       current = false;
     };
@@ -73,7 +80,7 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
     } catch (cause) {
       setSettings(previous);
       setPath(previous.exportPath);
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   const agents = runners.filter((runner) => runner.available);
@@ -86,7 +93,7 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
         title="Planning"
         description="Applies to new plans in this project, whether you plan with an agent or write the plan yourself."
       >
-        <Setting
+        <SettingRow
           title="Most questions per plan"
           description="The planner asks only what the code cannot answer. With 0 it records its assumptions instead."
           descriptionId={`${id}-cap-description`}
@@ -103,8 +110,8 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
               </SelectItem>
             ))}
           </Select>
-        </Setting>
-        <Setting
+        </SettingRow>
+        <SettingRow
           title={
             <span className="inline-flex items-center gap-2">
               Most swarm rounds <Badge variant="accent">Beta</Badge>
@@ -127,8 +134,8 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
                 </SelectItem>
               ))}
           </Select>
-        </Setting>
-        <Setting
+        </SettingRow>
+        <SettingRow
           title={
             <span className="inline-flex items-center gap-2">
               Next swarm round <Badge variant="accent">Beta</Badge>
@@ -146,8 +153,8 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
             <SelectItem value="auto">Start automatically</SelectItem>
             <SelectItem value="ask">Ask me first</SelectItem>
           </Select>
-        </Setting>
-        <Setting
+        </SettingRow>
+        <SettingRow
           title={
             <span className="inline-flex items-center gap-2">
               Swarm orchestrators <Badge variant="accent">Beta</Badge>
@@ -168,8 +175,8 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
               </SelectItem>
             ))}
           </Select>
-        </Setting>
-        <Setting
+        </SettingRow>
+        <SettingRow
           title="Planning agent"
           description="Plans with this agent instead of the one chosen for the task."
           descriptionId={`${id}-agent-description`}
@@ -194,9 +201,9 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
               </SelectItem>
             ))}
           </Select>
-        </Setting>
+        </SettingRow>
         {settings.plannerAgent && (
-          <Setting
+          <SettingRow
             title="Planning model"
             description={
               models.loading
@@ -225,9 +232,9 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
                 </SelectItem>
               ))}
             </Select>
-          </Setting>
+          </SettingRow>
         )}
-        <Setting
+        <SettingRow
           title="Save to repo path"
           description="Where Save to repo writes a plan, relative to the project. {slug} becomes the plan title. Nothing is committed."
           controlId={`${id}-path`}
@@ -248,14 +255,14 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
               else setPath(settings.exportPath);
             }}
           />
-        </Setting>
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        </SettingRow>
+        <ActionError error={error} />
       </SettingGroup>
       <SettingGroup
         title="Autonomy"
         description="Let agents decide routine work on approved plans so a long build keeps moving. Every agent decision is shown on the plan with its reason, and you can override it."
       >
-        <Setting
+        <SettingRow
           title="Let agents decide routine questions"
           description="Another agent answers questions from plan work that the plan and code settle. When it is unsure, the question comes to you."
           descriptionId={`${id}-questions-description`}
@@ -266,8 +273,8 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
             checked={decide.questions}
             onCheckedChange={(questions) => setDecide({ questions })}
           />
-        </Setting>
-        <Setting
+        </SettingRow>
+        <SettingRow
           title="Let agents approve swarm rounds"
           description="With Ask me first, an agent approves the next round once the merged round passed its check."
           descriptionId={`${id}-rounds-auto-description`}
@@ -278,8 +285,8 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
             checked={decide.rounds}
             onCheckedChange={(rounds) => setDecide({ rounds })}
           />
-        </Setting>
-        <Setting
+        </SettingRow>
+        <SettingRow
           title="Let agents handle plan deviations within scope"
           description="An agent accepts small amendments that stay inside the plan's files. Anything else pauses the plan for you."
           descriptionId={`${id}-deviations-description`}
@@ -290,8 +297,8 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
             checked={decide.deviations}
             onCheckedChange={(deviations) => setDecide({ deviations })}
           />
-        </Setting>
-        <Setting
+        </SettingRow>
+        <SettingRow
           title="Deciding agent"
           description="Automatic picks an installed agent from another model family than the one asking."
           descriptionId={`${id}-decider-description`}
@@ -313,8 +320,8 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
               </SelectItem>
             ))}
           </Select>
-        </Setting>
-        <Setting
+        </SettingRow>
+        <SettingRow
           title="Most agent decisions per plan"
           description="After this many, everything comes to you until the plan is approved again."
           descriptionId={`${id}-limit-description`}
@@ -333,7 +340,7 @@ export function ProjectPlanningSettings({ projectId }: { projectId: string }) {
                 </SelectItem>
               ))}
           </Select>
-        </Setting>
+        </SettingRow>
         <SettingBody>
           <p className="task-muted">
             Always sent to you, whatever these settings say. A committed{' '}

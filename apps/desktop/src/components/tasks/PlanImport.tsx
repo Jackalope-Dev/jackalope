@@ -1,18 +1,26 @@
-import { Disclosure, DisclosureSummary, Textarea } from '@jackalope/ui';
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  Disclosure,
+  DisclosureSummary,
+  InlineNotice,
+  Textarea,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
+import { agentName } from '../../lib/agents';
+import { describeError } from '../../lib/errors';
 import { queueCommand } from '../../lib/queue';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import type { Project } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
-import { useDialogFocus } from '../ui/useDialogFocus';
 
 interface PlanEntry {
-  contextSelection?: import('../../lib/knowledge').ContextSelection;
+  contextSelection?: import('../../lib/knowledge-types').ContextSelection;
   key: string;
   title: string;
   prompt: string;
@@ -178,7 +186,7 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
       setPreview(parsePlan(text));
     } catch (cause) {
       setPreview(null);
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   const loadFile = async (file: File | undefined) => {
@@ -224,7 +232,7 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
       await onAdded();
       onClose();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       submitting.current = false;
       setBusy(false);
@@ -316,12 +324,7 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
                     {index + 1}. {item.title}
                   </p>
                   <p className="task-muted text-xs mt-1 break-words">
-                    {item.agent === 'claude'
-                      ? 'Claude Code'
-                      : item.agent === 'codex'
-                        ? 'Codex'
-                        : 'Grok'}{' '}
-                    · {item.scopes.join(', ')}
+                    {agentName(item.agent)} · {item.scopes.join(', ')}
                   </p>
                   <p className="task-muted text-xs mt-1">
                     {item.dependsOn.length

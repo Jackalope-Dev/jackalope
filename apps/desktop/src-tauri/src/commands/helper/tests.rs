@@ -396,3 +396,24 @@ fn sharpen_usage_joins_the_helper_report_and_an_unreadable_ledger_blocks_spendin
     assert!(error.contains("generated.json"), "{error}");
     assert_eq!(std::fs::read(&ledger).unwrap(), b"{");
 }
+
+#[test]
+fn navigate_tool_lists_every_destination_the_app_opens() {
+    let catalog = tools::catalog();
+    let navigate = catalog
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == "navigate")
+        .unwrap();
+    let listed = navigate["description"]
+        .as_str()
+        .unwrap()
+        .split_once("Destinations: ")
+        .unwrap()
+        .1
+        .trim_end_matches('.')
+        .split(", ")
+        .collect::<Vec<_>>();
+    assert_eq!(listed, tools::destinations());
+}

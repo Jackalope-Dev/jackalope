@@ -1,6 +1,9 @@
 import {
+  Button,
   Disclosure,
   DisclosureSummary,
+  EmptyState,
+  InlineNotice,
   DropdownMenu as Menu,
   SettingGroup,
   SettingRow,
@@ -17,53 +20,41 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { navigateWorkspace } from '../../lib/app-events';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { returnToProject } from '../../lib/project-return';
 import type { WorkItem } from '../../lib/task-collection';
-import { nativeTask } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { selectWork, workTarget } from '../../lib/work-selection';
+import { selectWork, useAllRuns, workTarget } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
-import { navigateWorkspace } from '../layout/navigation';
 import { IssuePicker } from '../tasks/IssuePicker';
 import { ProjectReturn } from '../tasks/ProjectReturn';
-import type { Readiness } from '../tasks/WorkspaceReadiness';
-import { Button } from '../ui/button';
 import { DismissButton } from '../ui/DismissButton';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './project-overview.css';
+import { describeError } from '../../lib/errors';
+import { projectReadiness, type Readiness } from '../../lib/readiness';
 
 export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }) {
-  const project = useProjectStore((state) =>
-    state.projects.find((p) => p.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   const runs = useExecutionStore((state) => state.runs);
   const historyError = useExecutionStore((state) => state.historyError);
-  const {
-    sessions,
-    runs: sessionRuns,
-    error: sessionError,
-  } = useLiveSessionStore(
-    useShallow((s) => ({ sessions: s.sessions, runs: s.runs, error: s.error })),
+  const { sessions, error: sessionError } = useLiveSessionStore(
+    useShallow((s) => ({ sessions: s.sessions, error: s.error })),
   );
   const { queue, error: queueError } = useManagedTaskStore(
     useShallow((s) => ({ queue: s.queue, error: s.error })),
   );
   const ideas = useTaskStore((state) => state.tasks);
   const integrated = queue.mergedRunIds;
-  const allRuns = useMemo(
-    () => [...new Map([...runs, ...sessionRuns].map((run) => [run.id, run])).values()],
-    [runs, sessionRuns],
-  );
+  const allRuns = useAllRuns();
   const [readinessResult, setReadiness] = useState<{ path: string; value: Readiness } | null>(null);
   const readiness = readinessResult?.path === project?.path ? readinessResult?.value : null;
   const readinessRequest = useRef(0);
@@ -79,10 +70,10 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
     setReadiness(null);
     setReadinessError('');
     try {
-      const data = await nativeTask<Readiness>('project_readiness', { path });
+      const data = await projectReadiness(path);
       if (request === readinessRequest.current) setReadiness({ path, value: data });
     } catch (cause) {
-      if (request === readinessRequest.current) setReadinessError(String(cause));
+      if (request === readinessRequest.current) setReadinessError(describeError(cause));
     } finally {
       if (request === readinessRequest.current) setBusyReadiness(false);
     }
@@ -108,10 +99,8 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
   const openTask = (item: WorkItem) => {
     // A task opens through its list row rather than straight to its page.
     selectWork(item.run && !item.managed && !item.session ? {} : workTarget(item));
-    if (item.managed) {
+    if (item.managed || item.session) {
       navigateWorkspace('kanban');
-    } else if (item.session) {
-      navigateWorkspace('live-sessions');
     } else if (item.run) {
       useWorkViewStore.getState().open(item.run.id);
     } else {
@@ -160,7 +149,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   onClick={() => {
                     selectWork();
                     useProjectStore.getState().selectProject(project.id);
-                    navigateWorkspace('live-sessions');
+                    navigateWorkspace('kanban');
                   }}
                 >
                   <Plus size={14} />
@@ -223,7 +212,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   );
                 localStorage.setItem(key, combined);
                 selectWork();
-                navigateWorkspace('live-sessions');
+                navigateWorkspace('kanban');
               }}
             />
           </Disclosure>

@@ -1,9 +1,11 @@
-import { Checkbox, ConfirmDialog } from '@jackalope/ui';
+import { Button, Checkbox, ConfirmDialog } from '@jackalope/ui';
 import { GitCommitHorizontal, GitMerge } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { nativeTask, type TaskRun } from '../../lib/task-runtime';
-import { Button } from '../ui/button';
-import { DraftedMessageFields, errorMessage, useDraftedMessage } from './DraftedMessage';
+import { describeError } from '../../lib/errors';
+import { invokeNative } from '../../lib/native/transport';
+import { workingChanges } from '../../lib/project-git';
+import type { TaskRun } from '../../lib/run-types';
+import { DraftedMessageFields, useDraftedMessage } from './DraftedMessage';
 
 const files = (count: number) => `${count} changed ${count === 1 ? 'file' : 'files'}`;
 
@@ -31,7 +33,7 @@ export function LocalDelivery({
   const paths = useRef<string[]>([]);
   const checkout = { repoPath: run.projectPath, worktreePath: run.workspace };
   const message = useDraftedMessage(() =>
-    nativeTask<{ title: string; body: string }>('git_generate_commit_message', {
+    invokeNative<{ title: string; body: string }>('git_generate_commit_message', {
       ...checkout,
       paths: paths.current,
     }),
@@ -41,7 +43,7 @@ export function LocalDelivery({
     message.reset();
     setPush(false);
     setUncommitted(null);
-    void nativeTask<{ files: { path: string }[] }>('git_working_changes', checkout)
+    void workingChanges(checkout)
       .then((changes) => {
         paths.current = changes.files.map((file) => file.path);
         setUncommitted(paths.current);
@@ -55,7 +57,7 @@ export function LocalDelivery({
     const done: string[] = [];
     try {
       if (pending) {
-        await nativeTask('git_commit_changes', {
+        await invokeNative('git_commit_changes', {
           ...checkout,
           paths: uncommitted,
           title: message.title.trim(),
@@ -65,19 +67,19 @@ export function LocalDelivery({
         done.push(`Committed ${files(pending)} to ${mode === 'merge' ? run.branch : target}`);
       }
       if (mode === 'merge') {
-        await nativeTask<string>('task_merge_locally', { id: run.id, target });
+        await invokeNative<string>('task_merge_locally', { id: run.id, target });
         done.push(`merged ${run.branch} into ${target}`);
       }
       if (push) {
-        await nativeTask('git_push_changes', checkout);
+        await invokeNative('git_push_changes', checkout);
         done.push(`pushed ${target}`);
       }
     } catch (cause) {
       if (done.length) onDone(`${done.join(', ')}.`);
       throw new Error(
         done.length
-          ? `${done.join(', ')}, then stopped: ${errorMessage(cause)}`
-          : errorMessage(cause),
+          ? `${done.join(', ')}, then stopped: ${describeError(cause)}`
+          : describeError(cause),
       );
     }
     const summary = done.join(', ');

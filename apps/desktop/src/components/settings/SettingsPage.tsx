@@ -1,28 +1,22 @@
-import { FormField, Input, SearchField, SegmentedControl } from '@jackalope/ui';
 import {
-  Cloud,
-  Cpu,
-  Database,
-  FolderCog,
-  Gavel,
-  History,
-  KeyRound,
-  LifeBuoy,
-  type LucideIcon,
-  Monitor,
-  Palette,
-  Plug,
-  Radio,
-  Server,
-  Settings2,
-  Shield,
-  UserRound,
-  Zap,
-} from 'lucide-react';
+  Button,
+  FormField,
+  Input,
+  SearchField,
+  SegmentedControl,
+  Select,
+  SelectItem,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
+import { KeyRound } from 'lucide-react';
 
 import { useEffect, useRef, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -30,9 +24,6 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
 import { ProjectPreferences } from '../projects/ProjectPreferences';
-import { Button } from '../ui/button';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
@@ -44,13 +35,19 @@ import { PrivacySettings } from './PrivacySettings';
 import { ReferralSettings } from './ReferralSettings';
 import { ReleaseSupport } from './ReleaseSupport';
 import { RoutingPreferences } from './RoutingSetup';
-import { Setting, SettingActions, SettingBody, SettingGroup } from './Setting';
 import { SystemInfoView } from './SystemInfo';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
 import { useShallow } from 'zustand/react/shallow';
 import { ArtifactsConnection } from './ArtifactsConnection';
 import { ComputersSettings } from './ComputersSettings';
+import {
+  SETTINGS_CATEGORIES,
+  SETTINGS_GROUPS,
+  type SettingsCategory,
+  settingsCategory,
+  sidebarCategory,
+} from './categories';
 import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
 import { RemoteAccess } from './RemoteAccess';
@@ -62,61 +59,6 @@ interface SettingsPageProps {
   initialProjectId?: string;
   initialCategory?: SettingsCategory;
 }
-const categories = [
-  'Project',
-  'General',
-  'Appearance',
-  'Desktop',
-  'Saved actions',
-  'Decisions',
-  'Connected work',
-  'Computers',
-  'Cloudflare',
-  'Jackalope account',
-  'Invitations',
-  'Remote access',
-  'Privacy',
-  'Updates & support',
-  'System',
-  'Diagnostics',
-  'Data & reset',
-] as const;
-export type SettingsCategory = (typeof categories)[number];
-/**
- * Sidebar sections; categories keep the order above within each. Advanced holds
- * routing and diagnostics that most people never change.
- */
-const navigationGroups: { label: string; categories: SettingsCategory[] }[] = [
-  {
-    label: 'Workspace',
-    categories: ['Project', 'General', 'Appearance', 'Desktop', 'Saved actions'],
-  },
-  { label: 'Connections', categories: ['Connected work', 'Computers', 'Cloudflare'] },
-  { label: 'Account & access', categories: ['Jackalope account', 'Remote access', 'Privacy'] },
-  { label: 'Help & data', categories: ['Updates & support', 'Data & reset'] },
-  { label: 'Advanced', categories: ['Decisions', 'Diagnostics', 'System'] },
-];
-const navigationIcons: Partial<Record<SettingsCategory, LucideIcon>> = {
-  Project: FolderCog,
-  General: Settings2,
-  Appearance: Palette,
-  Desktop: Monitor,
-  'Saved actions': Zap,
-  Decisions: Gavel,
-  'Connected work': Plug,
-  Computers: Server,
-  Cloudflare: Cloud,
-  Diagnostics: History,
-  System: Cpu,
-  'Jackalope account': UserRound,
-  'Remote access': Radio,
-  Privacy: Shield,
-  'Updates & support': LifeBuoy,
-  'Data & reset': Database,
-};
-const settingsGroup = (category: SettingsCategory): SettingsCategory =>
-  category === 'Invitations' ? 'Jackalope account' : category;
-
 export function SettingsPage({
   onClose,
   initialScope = 'app',
@@ -138,17 +80,16 @@ export function SettingsPage({
     initialProjectId ?? activeProjectId ?? '',
   );
   const project = projects.find((project) => project.id === selectedProjectId);
-  const scopedCategories =
-    scope === 'project'
-      ? categories.filter((c) => ['Project', 'Appearance', 'Decisions'].includes(c))
-      : categories.filter((c) => c !== 'Project');
+  const scopedCategories = SETTINGS_CATEGORIES.filter((entry) =>
+    scope === 'project' ? 'project' in entry : !('app' in entry),
+  ).map((entry) => entry.id);
   const [category, setCategory] = useState<SettingsCategory>(
     initialCategory ?? (initialScope === 'project' ? 'Project' : 'General'),
   );
   const selectedSection = useRef<HTMLElement>(null);
   const content = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (settingsGroup(category) !== category)
+    if (sidebarCategory(category) !== category)
       selectedSection.current?.scrollIntoView({ block: 'start' });
     // The content panel scrolls on its own, so a new page starts at its top.
     else content.current?.scrollTo({ top: 0 });
@@ -158,39 +99,13 @@ export function SettingsPage({
   const [confirming, setConfirming] = useState(false);
   const [confirmation, setConfirmation] = useState('');
   const [resetting, setResetting] = useState(false);
-  const matches = (section: SettingsCategory, words: string) =>
+  const matches = (section: SettingsCategory) =>
     query.trim()
-      ? `${section} ${words}`.toLowerCase().includes(query.trim().toLowerCase())
-      : settingsGroup(section) === settingsGroup(category);
-  const visible = scopedCategories.filter((c) =>
-    matches(
-      c,
-      {
-        System: 'device computer operating system architecture git',
-        'Jackalope account':
-          'connect sign in email membership account invitations disconnect device',
-        Invitations: 'invite referral share link email accepted connected',
-        Diagnostics: 'activity log routing events errors codebase',
-        General:
-          'window close exit system tray background quit minimize launch login startup guided setup onboarding notifications system quiet test',
-        Desktop:
-          'keyboard shortcuts zoom terminal shell font editor keep awake sleep power WSL links running services previews ports disk worktrees',
-        'Saved actions': 'prompt presets commands shortcuts reuse global project',
-        Appearance: 'theme color light dark atmosphere picker toolbar companion mascot animations',
-        'Connected work': 'GitHub Linear Jira issues pull requests API token',
-        Computers: 'bot computer sandbox Docker Colima cloud machine VM remote desktop VNC hosted',
-        Cloudflare: 'Cloudflare Artifacts repository hosted cloud swarm worker forks beta',
-        'Remote access': 'hosts phone companion SSH pairing Tailscale device',
-        Decisions: 'Jackalope routing Jev TypeSafe API key automatic agent cost tokens capacity',
-        Privacy: 'marketplace MCP network telemetry crash reporting',
-        Project: 'repository name path agent instructions verification command',
-        'Updates & support':
-          'version automatic install release notes help feedback diagnostics report community discord',
-        'Data & reset':
-          'export clipboard erase delete nuke reset first time setup history local data',
-      }[c],
-    ),
-  );
+      ? `${section} ${settingsCategory(section).keywords}`
+          .toLowerCase()
+          .includes(query.trim().toLowerCase())
+      : sidebarCategory(section) === sidebarCategory(category);
+  const visible = scopedCategories.filter(matches);
   const exportConfig = async () => {
     try {
       await navigator.clipboard.writeText(
@@ -198,7 +113,7 @@ export function SettingsPage({
           {
             settings: JSON.parse(settings.exportSettings()),
             theme: currentTheme,
-            desktop: isTauriEnvironment() ? await nativeTask('desktop_settings') : undefined,
+            desktop: isTauriEnvironment() ? await invokeNative('desktop_settings') : undefined,
             agents: JSON.parse(JSON.stringify(agents)),
           },
           null,
@@ -215,7 +130,7 @@ export function SettingsPage({
     setResetting(true);
     setMessage('');
     try {
-      if (isTauriEnvironment()) await nativeTask('app_reset', { confirmation });
+      if (isTauriEnvironment()) await invokeNative('app_reset', { confirmation });
       else {
         for (const key of Object.keys(localStorage))
           if (key.startsWith('jackalope-')) localStorage.removeItem(key);
@@ -281,20 +196,26 @@ export function SettingsPage({
       </div>
       <div className="settings-body">
         <nav className="settings-sidebar" aria-label="Settings categories">
-          {navigationGroups.map((group) => {
-            const items = group.categories.filter((c) => scopedCategories.includes(c));
+          {SETTINGS_GROUPS.map((group) => {
+            const items = SETTINGS_CATEGORIES.filter(
+              (entry) =>
+                entry.group === group &&
+                !('within' in entry) &&
+                scopedCategories.includes(entry.id),
+            );
             if (!items.length) return null;
             return (
-              <div key={group.label} className="settings-nav-group">
-                <span className="settings-nav-label">{group.label}</span>
-                {items.map((c) => {
-                  const Icon = navigationIcons[c] ?? KeyRound;
+              <div key={group} className="settings-nav-group">
+                <span className="settings-nav-label">{group}</span>
+                {items.map((entry) => {
+                  const c = entry.id;
+                  const Icon = ('icon' in entry && entry.icon) || KeyRound;
                   return (
                     <button
                       key={c}
                       type="button"
-                      className={`settings-nav-item ${settingsGroup(category) === c && !query ? 'is-active' : ''}`}
-                      aria-current={settingsGroup(category) === c && !query ? 'page' : undefined}
+                      className={`settings-nav-item ${sidebarCategory(category) === c && !query ? 'is-active' : ''}`}
+                      aria-current={sidebarCategory(category) === c && !query ? 'page' : undefined}
                       onClick={() => {
                         setCategory(c);
                         setQuery('');
@@ -344,7 +265,7 @@ export function SettingsPage({
                   <WindowBehaviorSettings />
                   <NotificationSettings />
                   <SettingGroup>
-                    <Setting
+                    <SettingRow
                       title="Guided setup"
                       description="Walk through project and agent setup again. Your saved work stays."
                     >
@@ -357,7 +278,7 @@ export function SettingsPage({
                       >
                         Open guided setup
                       </Button>
-                    </Setting>
+                    </SettingRow>
                   </SettingGroup>
                 </>
               )}
@@ -368,7 +289,7 @@ export function SettingsPage({
                 <>
                   <PrivacySettings />
                   <SettingGroup>
-                    <Setting
+                    <SettingRow
                       title="Use MCP marketplace"
                       description="Allow searches and server details from allmcps.com."
                     >
@@ -377,7 +298,7 @@ export function SettingsPage({
                         checked={settings.useMcpMarketplace}
                         onCheckedChange={settings.setUseMcpMarketplace}
                       />
-                    </Setting>
+                    </SettingRow>
                     <SettingBody>
                       <p className="settings-row-description">
                         Publisher avatars load from GitHub. Marketplace searches go to AllMCPs,
@@ -397,14 +318,14 @@ export function SettingsPage({
               {c === 'Data & reset' && (
                 <>
                   <SettingGroup>
-                    <Setting
+                    <SettingRow
                       title="Preferences"
                       description="Copy this profile's preferences as JSON, for support or to compare settings."
                     >
                       <Button variant="outline" onClick={() => void exportConfig()}>
                         Copy preferences
                       </Button>
-                    </Setting>
+                    </SettingRow>
                   </SettingGroup>
                   <ArchivedHistory />
                   <SettingGroup

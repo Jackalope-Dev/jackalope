@@ -1,15 +1,21 @@
+import {
+  Button,
+  FormField,
+  InlineNotice,
+  Select,
+  SelectItem,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Switch,
+  Textarea,
+} from '@jackalope/ui';
 import { useEffect, useId, useRef, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import { useAction } from '../../lib/useAction';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useFeedbackStore } from '../../stores/feedbackStore';
-import { Button } from '../ui/button';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
-import { Textarea } from '../ui/Textarea';
-import { Setting, SettingBody, SettingGroup } from './Setting';
 
 type Counts = { attempts: number; reviewed: number; failed: number; historySaveFailures: number };
 type Report = {
@@ -37,25 +43,9 @@ export function FeedbackForm({
   const [message, setMessage] = useState('');
   const [include, setInclude] = useState(false);
   const [preview, setPreview] = useState<Report | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('');
-  const locked = useRef(false);
-  const act = async (action: () => Promise<void>) => {
-    if (locked.current) return;
-    locked.current = true;
-    setBusy(true);
-    setStatus('');
-    try {
-      await action();
-    } catch (error) {
-      setStatus(String(error));
-    } finally {
-      locked.current = false;
-      setBusy(false);
-    }
-  };
+  const { run: act, busy, error: status, setError: setStatus } = useAction();
   const review = async () => {
-    const diagnostics = include ? await nativeTask<Counts>('app_diagnostics') : undefined;
+    const diagnostics = include ? await invokeNative<Counts>('app_diagnostics') : undefined;
     setPreview({
       id: crypto.randomUUID(),
       kind,
@@ -74,7 +64,7 @@ export function FeedbackForm({
   };
   const send = async () => {
     if (!preview) return;
-    await nativeTask('app_submit_feedback', { request: preview });
+    await invokeNative('app_submit_feedback', { request: preview });
     void useFeedbackStore.getState().request({ action: 'completed' });
     onSubmitted?.();
     setPreview(null);
@@ -156,7 +146,7 @@ export function FeedbackForm({
               }
             />
           </FormField>
-          <Setting
+          <SettingRow
             title="Include task outcome counts"
             description="Preview before sending"
             controlId={`${id}-include`}
@@ -168,7 +158,7 @@ export function FeedbackForm({
               onCheckedChange={setInclude}
               disabled={busy}
             />
-          </Setting>
+          </SettingRow>
           <Button
             variant="outline"
             disabled={busy || !isTauriEnvironment() || !settings?.configured || !message.trim()}

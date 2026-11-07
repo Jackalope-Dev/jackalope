@@ -1,10 +1,11 @@
 import { DropdownMenu as Menu } from '@jackalope/ui';
 import { Ellipsis, ListTodo, Megaphone, Monitor, PauseCircle, SquareTerminal } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { navigateWorkspace } from '../../lib/app-events';
 import { setWakeUpsPaused, useBotHubStore } from '../../lib/bot-hub';
 import { openCliTerminal } from '../../lib/cli-terminal';
-import { isActive } from '../../lib/task-runtime';
-import { selectWork } from '../../lib/work-selection';
+import { isActive } from '../../lib/run-status';
+import { selectWork, useWorkspaceWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -13,10 +14,8 @@ import { Companion } from '../mascot/Companion';
 import { FeedbackDialog } from '../settings/FeedbackDialog';
 import { BranchIndicator, useFocusedWork } from './BranchIndicator';
 import { InvitationsMenuItem } from './InvitationsMenuItem';
-import { navigateWorkspace } from './navigation';
 import { StatusBarChanges } from './StatusBarChanges';
 import { StatusBarUsage } from './StatusBarUsage';
-import { useWorkspaceWork } from './WorkSidebar';
 
 export function WorkspaceStatusBar({
   onSearch,

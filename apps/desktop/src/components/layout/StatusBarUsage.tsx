@@ -1,16 +1,19 @@
-import { Popover, RefreshIcon } from '@jackalope/ui';
+import { Button, Popover, RefreshIcon } from '@jackalope/ui';
 import { Gauge } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { getAgentMetadata } from '../../lib/agent-catalog';
+import { navigateWorkspace } from '../../lib/app-events';
 import { capacityWindowDisplay, capacityWindowName } from '../../lib/capacity-display';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useCapacityStore } from '../../stores/capacityStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { isAgentAllowedForProject, useProjectStore } from '../../stores/projectStore';
+import {
+  isAgentAllowedForProject,
+  useActiveProject,
+  useProjectStore,
+} from '../../stores/projectStore';
 import { ProviderMark } from '../agents/ProviderMark';
-import { Button } from '../ui/button';
-import { navigateWorkspace } from './navigation';
 import './statusbar-usage.css';
 
 const agentName = (id: string) =>
@@ -72,9 +75,7 @@ export function StatusBarUsage({ remote }: { remote: boolean }) {
     };
   }, [fetch]);
   const projectId = useProjectStore((state) => state.activeProjectId);
-  const project = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   const enabledAgents = useAgentConfigStore((state) => state.enabledAgents);
   const runs = useExecutionStore((state) => state.runs);
   const projectAgents = new Set(

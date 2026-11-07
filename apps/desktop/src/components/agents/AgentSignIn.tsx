@@ -1,3 +1,11 @@
+import {
+  Button,
+  DialogContent,
+  DialogHeader,
+  InlineNotice,
+  Input,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -13,14 +21,10 @@ import {
   stopSignIn,
   writeSignIn,
 } from '../../lib/agent-profiles';
+import { openInBrowser } from '../../lib/native/env';
 import { isClaudeAuthorizationUrl, signInUrl, terminalSignInLinks } from '../../lib/sign-in-links';
-import { openInBrowser } from '../../lib/tauri-bridge';
-import { Button } from '../ui/button';
-import { DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import '@xterm/xterm/css/xterm.css';
+import { describeError } from '../../lib/errors';
 export function AgentSignIn({
   agentId,
   agentName,
@@ -170,7 +174,7 @@ export function AgentSignIn({
     const input = terminal.onData((data) => {
       if (id)
         void writeSignIn(id, data).catch((e) => {
-          if (!disposed) setError(String(e));
+          if (!disposed) setError(describeError(e));
         });
     });
     const verify = async () => {
@@ -182,7 +186,7 @@ export function AgentSignIn({
           report.current(status);
         }
       } catch (e) {
-        if (!disposed) setError(String(e));
+        if (!disposed) setError(describeError(e));
       } finally {
         if (!disposed) setChecking(false);
       }
@@ -213,7 +217,7 @@ export function AgentSignIn({
       } catch (e) {
         if (!disposed && !finishingSetup.current) {
           setRunning(false);
-          setError(String(e));
+          setError(describeError(e));
         }
         if (id) void stopSignIn(id).catch(() => {});
       }
@@ -236,7 +240,7 @@ export function AgentSignIn({
         if (!disposed) {
           finishingSetup.current = false;
           setChecking(false);
-          setError(String(e));
+          setError(describeError(e));
           timer = setTimeout(() => void poll(), 250);
         }
       }
@@ -257,7 +261,7 @@ export function AgentSignIn({
         if (!disposed) {
           setRunning(false);
           setStage('Could not start sign-in');
-          setError(String(e));
+          setError(describeError(e));
         }
       });
     return () => {
@@ -288,7 +292,7 @@ export function AgentSignIn({
       await onClose();
     } catch (e) {
       setRunning(false);
-      setError(String(e));
+      setError(describeError(e));
     } finally {
       setSaving(false);
     }
@@ -408,7 +412,7 @@ export function AgentSignIn({
                   session.current = null;
                   setAttempt((n) => n + 1);
                 } catch (e) {
-                  setError(String(e));
+                  setError(describeError(e));
                 }
               }}
             >
@@ -437,7 +441,7 @@ export function AgentSignIn({
                     await onUse();
                     await onClose();
                   } catch (e) {
-                    setError(String(e));
+                    setError(describeError(e));
                   } finally {
                     setSaving(false);
                   }

@@ -1,9 +1,10 @@
+import { Button, InlineNotice } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { useManagedRuntime } from '../../lib/managed-runtime';
-import { nativeTask } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
 import { useExecutionStore } from '../../stores/executionStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { ActionError } from '../ui/ActionError';
 import { ManagedRuntimeProgress } from './ManagedRuntimeProgress';
 
 interface RuntimeStatus {
@@ -23,11 +24,11 @@ export function ManagedRuntimeSettings() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const refresh = useCallback(
-    async () => setStatus(await nativeTask<RuntimeStatus>('managed_runtime_status')),
+    async () => setStatus(await invokeNative<RuntimeStatus>('managed_runtime_status')),
     [],
   );
   useEffect(() => {
-    void refresh().catch((cause) => setError(String(cause)));
+    void refresh().catch((cause) => setError(describeError(cause)));
   }, [refresh]);
   const run = async (action: 'prepare' | 'cleanup' | 'remove') => {
     setBusy(true);
@@ -36,7 +37,7 @@ export function ManagedRuntimeSettings() {
     try {
       if (action === 'prepare') await runner.prepare(false);
       else {
-        const result = await nativeTask<{ removed: number; retained: number }>(
+        const result = await invokeNative<{ removed: number; retained: number }>(
           'managed_runtime_cleanup',
           { removeActive: action === 'remove' },
         );
@@ -47,7 +48,7 @@ export function ManagedRuntimeSettings() {
       await refresh();
       await useExecutionStore.getState().discover();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -98,7 +99,7 @@ export function ManagedRuntimeSettings() {
       {runner.preparing && (
         <ManagedRuntimeProgress
           progress={runner.progress}
-          onCancel={() => void runner.cancel().catch((cause) => setError(String(cause)))}
+          onCancel={() => void runner.cancel().catch((cause) => setError(describeError(cause)))}
         />
       )}
       {notice && (
@@ -106,7 +107,7 @@ export function ManagedRuntimeSettings() {
           {notice}
         </p>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </section>
   );
 }

@@ -1,4 +1,16 @@
-import { Button, FormField, Input, Select, SelectItem, Textarea } from '@jackalope/ui';
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  FormField,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+  Textarea,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { MessageSquarePlus } from 'lucide-react';
 import { createContext, type ReactNode, useContext, useRef, useState } from 'react';
@@ -6,9 +18,9 @@ import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { type ReviewAnchor, type ReviewComment, reviewFeedback } from '../../lib/review-feedback';
 import { useReviewFeedbackStore } from '../../stores/reviewFeedbackStore';
-import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
 import './review-feedback.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 const FeedbackContext = createContext<{
   comments: ReviewComment[];
@@ -87,7 +99,7 @@ export function ReviewFeedback({
                   await onFeedback(reviewFeedback(comments, revision));
                   setNotice('Comments added to your follow-up.');
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 } finally {
                   setBusy(false);
                 }
@@ -146,7 +158,7 @@ export function ReviewFeedback({
                       save(taskId, { ...comment, resolved: !comment.resolved });
                       setError('');
                     } catch (cause) {
-                      setError(String(cause));
+                      setError(describeError(cause));
                     }
                   }}
                 >
@@ -159,7 +171,7 @@ export function ReviewFeedback({
                       remove(taskId, comment.id);
                       setError('');
                     } catch (cause) {
-                      setError(String(cause));
+                      setError(describeError(cause));
                     }
                   }}
                 >
@@ -201,7 +213,7 @@ export function ReviewFeedback({
                 }
               }}
             >
-              {error && <InlineNotice tone="error">{error}</InlineNotice>}
+              <ActionError error={error} />
               <div className="review-comment-location">
                 <FormField label="File">
                   <Select

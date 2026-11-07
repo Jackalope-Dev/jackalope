@@ -1,7 +1,21 @@
-import { Checkbox, Input, Textarea } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+  Textarea,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { navigateWorkspace } from '../../lib/app-events';
+import { describeError } from '../../lib/errors';
 import { featureDraftKey } from '../../lib/feature-draft';
 import { manualPlan, planCommands } from '../../lib/plan-mode';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -13,12 +27,6 @@ import {
   type Project,
   useProjectStore,
 } from '../../stores/projectStore';
-import { navigateWorkspace } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import { OutcomeEditor } from './OutcomeEditor';
 
 /** The most tasks a plan holds. */
@@ -153,7 +161,7 @@ export function FeaturePlanner({
       onClose();
       navigateWorkspace('plans');
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }

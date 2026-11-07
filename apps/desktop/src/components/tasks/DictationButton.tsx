@@ -1,11 +1,12 @@
+import { Button } from '@jackalope/ui';
 import { Mic, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { recordingWave } from '../../lib/dictation';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { describeError } from '../../lib/errors';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { ActionError } from '../ui/ActionError';
 
 export function DictationButton({
   onText,
@@ -72,7 +73,7 @@ export function DictationButton({
           .then((bytes) =>
             canceled.current
               ? null
-              : nativeTask<string>('desktop_transcribe', {
+              : invokeNative<string>('desktop_transcribe', {
                   endpoint,
                   model,
                   audio: Array.from(bytes),
@@ -82,7 +83,7 @@ export function DictationButton({
             if (!canceled.current && text) receiveText.current(text);
           })
           .catch((reason) => {
-            if (!canceled.current) setError(String(reason));
+            if (!canceled.current) setError(describeError(reason));
           })
           .finally(() => {
             recording.current = false;
@@ -111,7 +112,7 @@ export function DictationButton({
       });
       recording.current = false;
       if (!canceled.current) {
-        setError(String(reason));
+        setError(describeError(reason));
         setState('idle');
       }
     }
@@ -132,7 +133,7 @@ export function DictationButton({
             ? 'Transcribing locally…'
             : 'Dictate'}
       </Button>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </>
   );
 }

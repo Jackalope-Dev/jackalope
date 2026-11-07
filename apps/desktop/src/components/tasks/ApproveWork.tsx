@@ -1,41 +1,38 @@
-import { FormField, Textarea } from '@jackalope/ui';
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  FormField,
+  Textarea,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { useState } from 'react';
+import { describeError } from '../../lib/errors';
+import { invokeNative } from '../../lib/native/transport';
+import type { TaskRun } from '../../lib/run-types';
+import { useNativeResource } from '../../lib/useNativeResource';
 import { useExecutionStore } from '../../stores/executionStore';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
+import { ActionError } from '../ui/ActionError';
 
 export function ApproveWork({ run, onApproved }: { run: TaskRun; onApproved: () => void }) {
   const [open, setOpen] = useState(false);
-  const [tree, setTree] = useState<string | null>(null);
   const [note, setNote] = useState('');
-  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const requirements = run.contract?.requirements ?? [];
   const step = run.contract?.step ?? 0;
   const currentRequirements = requirements.filter(
     (item, index) => !item.checkpoint || index === step,
   );
-  useEffect(() => {
-    if (!open) return;
-    let alive = true;
-    setTree(null);
-    setError('');
-    void nativeTask<string>('task_outcome_snapshot', { id: run.id }).then(
-      (value) => {
-        if (alive) setTree(value);
-      },
-      (cause) => {
-        if (alive) setError(String(cause));
-      },
-    );
-    return () => {
-      alive = false;
-    };
-  }, [open, run.id]);
+  const snapshot = useNativeResource(
+    () => invokeNative<string>('task_outcome_snapshot', { id: run.id }),
+    [run.id],
+    { enabled: open },
+  );
+  const tree = snapshot.data ?? null;
+  const { error, setError } = snapshot;
   const approve = async () => {
     if (busy || !tree) return;
     setBusy(true);
@@ -43,7 +40,7 @@ export function ApproveWork({ run, onApproved }: { run: TaskRun; onApproved: () 
     try {
       for (const item of currentRequirements) {
         if (item.receipt?.accepted && item.receipt.tree === tree) continue;
-        await nativeTask('task_outcome_review', {
+        await invokeNative('task_outcome_review', {
           review: {
             runId: run.id,
             requirementId: item.id,
@@ -54,12 +51,12 @@ export function ApproveWork({ run, onApproved }: { run: TaskRun; onApproved: () 
           },
         });
       }
-      await nativeTask('task_mark_reviewed', { id: run.id });
+      await invokeNative('task_mark_reviewed', { id: run.id });
       await useExecutionStore.getState().refresh();
       setOpen(false);
       onApproved();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -114,7 +111,7 @@ export function ApproveWork({ run, onApproved }: { run: TaskRun; onApproved: () 
           </div>
         )}
         {!tree && !error && <p role="status">Checking the current files…</p>}
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
         <DialogFooter>
           <Button variant="outline" disabled={busy} onClick={() => setOpen(false)}>
             Cancel

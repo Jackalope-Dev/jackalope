@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { navigateWorkspace } from '../components/layout/navigation';
+import { navigateWorkspace } from '../lib/app-events';
 
 interface CommitReviewState {
   /** Which checkout the Changes page opens on; empty means the project folder itself. */

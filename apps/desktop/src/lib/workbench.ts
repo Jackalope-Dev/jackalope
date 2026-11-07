@@ -1,5 +1,5 @@
+import type { TaskRun } from './run-types.ts';
 import type { WorkItem } from './task-collection.ts';
-import type { TaskRun } from './task-runtime.ts';
 import { taskDecision } from './task-workflow.ts';
 
 export function workSummary(run: TaskRun) {

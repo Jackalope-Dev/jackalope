@@ -8,6 +8,12 @@ import {
 import { marketplaceSetup, safeMarketplaceUrl } from '../src/components/mcp/marketplace-info.ts';
 import { agentCapabilities, connectionSupport } from '../src/lib/agent-capabilities.ts';
 import {
+  deleteMcpServer,
+  listMcpServers,
+  probeMcpServer,
+  saveMcpServer,
+} from '../src/lib/mcp-client.ts';
+import {
   bearerToken,
   connectionFailure,
   effectiveConnections,
@@ -15,12 +21,6 @@ import {
   withBearerToken,
   withoutBearerToken,
 } from '../src/lib/mcp-connection.ts';
-import {
-  deleteMcpServer,
-  listMcpServers,
-  probeMcpServer,
-  saveMcpServer,
-} from '../src/lib/tauri-bridge.ts';
 import { useMcpStore } from '../src/stores/mcpStore.ts';
 import { useSettingsStore } from '../src/stores/settingsStore.ts';
 

@@ -1,8 +1,15 @@
-import { Badge, Disclosure, DisclosureBody, DisclosureSummary, Panel, Stat } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  Disclosure,
+  DisclosureBody,
+  DisclosureSummary,
+  Panel,
+  Stat,
+} from '@jackalope/ui';
 import { ArrowUpRight } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { UsageInsights as Insights } from '../../lib/usage-insights';
-import { Button } from '../ui/button';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './usage-insights.css';
 import { ProviderMark } from '../agents/ProviderMark';

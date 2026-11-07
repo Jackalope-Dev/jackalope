@@ -1,6 +1,6 @@
 import { hslToHex } from '@jackalope/brand/theme';
-import { nativeTask } from './task-runtime';
-import { isTauriEnvironment } from './tauri-bridge';
+import { isTauriEnvironment } from './native/env';
+import { invokeNative } from './native/transport';
 
 export function observeDesktopControlTheme() {
   if (!isTauriEnvironment()) return;
@@ -14,7 +14,7 @@ export function observeDesktopControlTheme() {
     if (!values.every(Number.isFinite)) return;
     const accent = hslToHex(values[0], values[1], values[2]);
     if (accent === previous) return;
-    void nativeTask('desktop_control_theme', { accent })
+    void invokeNative('desktop_control_theme', { accent })
       .then(() => {
         previous = accent;
       })

@@ -1,4 +1,22 @@
-import { Checkbox, DropdownMenu as Menu } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  ConfirmDialog,
+  DialogCloseButton,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  FormField,
+  InlineNotice,
+  Input,
+  DropdownMenu as Menu,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Textarea,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -12,20 +30,12 @@ import {
   parseSources,
   withoutMissingPaths,
 } from '../../lib/feature-map';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { type Project, useProjectStore } from '../../stores/projectStore';
-import { Setting, SettingActions, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { ConfirmAction } from '../ui/ConfirmAction';
-import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
 import { OptionsMenu } from '../ui/OptionsMenu';
-import { Textarea } from '../ui/Textarea';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import './feature-map.css';
+import { describeError } from '../../lib/errors';
 
 interface Draft {
   name: string;
@@ -248,7 +258,7 @@ export function FeatureMapSettings({ project }: { project: Project }) {
     if (!native || serialized === '[]') return;
     let current = true;
     const timer = window.setTimeout(() => {
-      nativeTask<FeatureDrift[]>('project_feature_drift', {
+      invokeNative<FeatureDrift[]>('project_feature_drift', {
         projectPath: project.path,
         features: JSON.parse(serialized),
       })
@@ -268,12 +278,12 @@ export function FeatureMapSettings({ project }: { project: Project }) {
     setSuggesting(true);
     setError('');
     try {
-      const found = await nativeTask<FeatureMapEntry[]>('project_feature_suggestions', {
+      const found = await invokeNative<FeatureMapEntry[]>('project_feature_suggestions', {
         projectPath: project.path,
       });
       setSuggestions(newSuggestions(entries, found));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setSuggesting(false);
     }
@@ -303,7 +313,7 @@ export function FeatureMapSettings({ project }: { project: Project }) {
       {entries.map((entry, index) => {
         const problem = drift.find((item) => item.index === index);
         return (
-          <Setting
+          <SettingRow
             // biome-ignore lint/suspicious/noArrayIndexKey: entries have no identity; names and pages can repeat.
             key={index}
             className="feature-map-row"
@@ -343,7 +353,7 @@ export function FeatureMapSettings({ project }: { project: Project }) {
                 Remove…
               </Menu.Item>
             </OptionsMenu>
-          </Setting>
+          </SettingRow>
         );
       })}
       {native && (
@@ -386,7 +396,7 @@ export function FeatureMapSettings({ project }: { project: Project }) {
           }}
         />
       )}
-      <ConfirmAction
+      <ConfirmDialog
         open={removingEntry !== undefined}
         onOpenChange={(open) => !open && setRemoving(null)}
         title={`Remove ${removingEntry?.name || 'this feature'}?`}

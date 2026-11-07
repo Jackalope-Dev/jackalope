@@ -1,12 +1,21 @@
-import { RefreshIcon } from '@jackalope/ui';
+import {
+  Button,
+  RefreshIcon,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
 import { Archive, Upload } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type ArchivedRun, nativeTask, statusLabel } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { describeError } from '../../lib/errors';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import { statusLabel } from '../../lib/run-status';
+import type { ArchivedRun } from '../../lib/run-types';
+import { restoreArchivedTask } from '../../lib/task-client';
 import { useExecutionStore } from '../../stores/executionStore';
-import { Setting, SettingActions, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { ActionError } from '../ui/ActionError';
 
 const PAGE = 20;
 
@@ -27,13 +36,13 @@ export function ArchivedHistory() {
     setLoading(true);
     setError('');
     try {
-      const list = await nativeTask<ArchivedRun[]>('task_archived_runs');
+      const list = await invokeNative<ArchivedRun[]>('task_archived_runs');
       if (id === request.current) {
         setRuns(list);
         setShown(PAGE);
       }
     } catch (cause) {
-      if (id === request.current) setError(String(cause));
+      if (id === request.current) setError(describeError(cause));
     } finally {
       if (id === request.current) setLoading(false);
     }
@@ -52,12 +61,12 @@ export function ArchivedHistory() {
     setError('');
     setNotice('');
     try {
-      await nativeTask('task_restore_archived', { id: run.id });
+      await restoreArchivedTask(run.id);
       setRuns((current) => current.filter((item) => item.id !== run.id));
       setNotice('Task restored to your loaded history.');
       await useExecutionStore.getState().refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusyId(null);
     }
@@ -69,14 +78,14 @@ export function ArchivedHistory() {
     setError('');
     setNotice('');
     try {
-      const id = await nativeTask<string | null>('task_import_recovery');
+      const id = await invokeNative<string | null>('task_import_recovery');
       if (id) {
         setNotice('Recovery copy imported into your history.');
         await useExecutionStore.getState().refresh();
         await load();
       }
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setImporting(false);
     }
@@ -113,7 +122,7 @@ export function ArchivedHistory() {
     >
       {(error || notice || (!loading && runs.length === 0)) && (
         <SettingBody>
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           {notice && (
             <p role="status" className="task-muted">
               {notice}
@@ -130,7 +139,7 @@ export function ArchivedHistory() {
         </SettingBody>
       )}
       {runs.slice(0, shown).map((run) => (
-        <Setting
+        <SettingRow
           key={run.id}
           title={<span className="block truncate">{run.prompt || 'Untitled task'}</span>}
           description={`${run.projectName} · ${run.agent} · ${statusLabel[run.status] ?? run.status} · ${new Date(
@@ -146,7 +155,7 @@ export function ArchivedHistory() {
           >
             Restore
           </Button>
-        </Setting>
+        </SettingRow>
       ))}
       {shown < runs.length && (
         <SettingActions>

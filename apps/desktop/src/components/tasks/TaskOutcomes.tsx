@@ -1,14 +1,20 @@
 import {
   Badge,
   type BadgeProps,
+  Button,
   Checkbox,
   Disclosure,
   DisclosureBody,
   DisclosureSummary,
   FormField,
+  Select,
+  SelectItem,
   Textarea,
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
+import { invokeNative } from '../../lib/native/transport';
+import type { TaskRun } from '../../lib/run-types';
 import {
   correctionPrompt,
   type EvidenceLevel,
@@ -20,11 +26,8 @@ import {
   requirementState,
   weakestEvidence,
 } from '../../lib/task-outcomes';
-import { nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
+import { ActionError } from '../ui/ActionError';
 import { ScreenshotPreview } from './ScreenshotPreview';
 
 type OutcomeRun = Pick<
@@ -58,16 +61,16 @@ export function TaskOutcomes({
     setTree(null);
     setError('');
     try {
-      setTree(await nativeTask<string>('task_outcome_snapshot', { id: run.id }));
+      setTree(await invokeNative<string>('task_outcome_snapshot', { id: run.id }));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   useEffect(() => {
     let alive = true;
     setTree(null);
     if (canReview && requirements.length)
-      void nativeTask<string>('task_outcome_snapshot', { id: run.id })
+      void invokeNative<string>('task_outcome_snapshot', { id: run.id })
         .then((value) => {
           if (alive) {
             setTree(value);
@@ -75,7 +78,7 @@ export function TaskOutcomes({
           }
         })
         .catch((cause) => {
-          if (alive) setError(String(cause));
+          if (alive) setError(describeError(cause));
         });
     return () => {
       alive = false;
@@ -87,7 +90,7 @@ export function TaskOutcomes({
     setBusy(true);
     setError('');
     try {
-      await nativeTask('task_outcome_review', {
+      await invokeNative('task_outcome_review', {
         review: {
           runId: run.id,
           requirementId: item.id,
@@ -101,7 +104,7 @@ export function TaskOutcomes({
       setEditing(null);
       setNote('');
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
       setTree(null);
     } finally {
       setBusy(false);
@@ -276,7 +279,7 @@ export function TaskOutcomes({
               try {
                 await onAdvance();
               } catch (cause) {
-                setError(String(cause));
+                setError(describeError(cause));
               } finally {
                 setBusy(false);
               }
@@ -298,7 +301,7 @@ export function TaskOutcomes({
           {selected.length === 1 ? 'requirement' : 'requirements'}
         </Button>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </section>
   );
 }

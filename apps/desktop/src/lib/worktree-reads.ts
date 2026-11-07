@@ -1,4 +1,4 @@
-import { listWorktrees, type WorktreeEntry } from './tauri-bridge.ts';
+import { listWorktrees, type WorktreeEntry } from './git-worktrees.ts';
 
 export function createWorktreeReader(
   read = listWorktrees,

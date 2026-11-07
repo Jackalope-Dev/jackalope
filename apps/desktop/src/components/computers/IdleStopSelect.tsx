@@ -1,8 +1,9 @@
+import { Select, SelectItem } from '@jackalope/ui';
 import { useState } from 'react';
 import { type ComputerStatus, IDLE_STOP_CHOICES, setComputerIdleStop } from '../../lib/computers';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import './computers.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 /** When an unused local sandbox stops. Applies at once. */
 export function IdleStopSelect({
@@ -25,7 +26,7 @@ export function IdleStopSelect({
           setError('');
           void setComputerIdleStop(computer.id, Number(value))
             .then(onChanged)
-            .catch((cause) => setError(String(cause)));
+            .catch((cause) => setError(describeError(cause)));
         }}
       >
         {IDLE_STOP_CHOICES.map((choice) => (
@@ -34,7 +35,7 @@ export function IdleStopSelect({
           </SelectItem>
         ))}
       </Select>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </div>
   );
 }

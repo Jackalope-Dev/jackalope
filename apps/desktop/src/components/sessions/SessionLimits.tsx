@@ -1,8 +1,8 @@
-import { Disclosure, DisclosureSummary, Input } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, Input } from '@jackalope/ui';
 import { useState } from 'react';
+import { describeError } from '../../lib/errors';
 import type { SessionLimits as Limits } from '../../lib/live-session';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { ActionError } from '../ui/ActionError';
 
 export function SessionLimits({
   initial,
@@ -38,7 +38,7 @@ export function SessionLimits({
       });
       setSaved(true);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -96,7 +96,7 @@ export function SessionLimits({
         Save limits
       </Button>
       {saved && <p role="status">Limits saved.</p>}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </div>
   );
   return embedded ? (

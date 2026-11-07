@@ -1,19 +1,15 @@
 import { listen } from '@tauri-apps/api/event';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ContextSelection } from '../lib/knowledge';
+import type { ContextSelection } from '../lib/knowledge-types';
+import { isTauriEnvironment } from '../lib/native/env';
+import { invokeNative } from '../lib/native/transport';
 import { observeRefresh } from '../lib/observe-refresh';
+import { isActive } from '../lib/run-status';
+import type { Runner, RunRequest, TaskRun } from '../lib/run-types';
 import { mergeTaskChanges, type TaskChanges } from '../lib/task-changes';
 import type { TaskEffort } from '../lib/task-effort';
-import {
-  isActive,
-  nativeTask,
-  type Runner,
-  type RunRequest,
-  type TaskRun,
-} from '../lib/task-runtime';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
-import { syncAgentConfig } from './agentConfigStore';
+import { windowKind } from '../lib/window-kind';
 import { useMascotStore } from './mascotStore';
 import type { TaskStatus } from './taskStore';
 
@@ -56,10 +52,7 @@ let revision: number | undefined;
 let previousDetailId: string | null = null;
 let refreshing: Promise<void> | undefined;
 let discovering: Promise<void> | undefined;
-const windowParameters = new URLSearchParams(
-  typeof window === 'undefined' ? '' : window.location.search,
-);
-const workPane = windowParameters.get('workPane');
+const root = windowKind();
 export const useExecutionStore = create<ExecutionState>()(
   persist(
     (set, get) => ({
@@ -90,7 +83,7 @@ export const useExecutionStore = create<ExecutionState>()(
         discovering = Promise.resolve().then(async () => {
           try {
             set({
-              runners: await nativeTask<Runner[]>('task_runners'),
+              runners: await invokeNative<Runner[]>('task_runners'),
               lastDiscovered: Date.now(),
               error: null,
               discoveryError: null,
@@ -111,7 +104,7 @@ export const useExecutionStore = create<ExecutionState>()(
           try {
             let runs = get().runs;
             if (isTauriEnvironment()) {
-              const changes = await nativeTask<TaskChanges>('task_changes', {
+              const changes = await invokeNative<TaskChanges>('task_changes', {
                 since: revision ?? null,
                 detailId,
                 previousDetailId,
@@ -120,12 +113,9 @@ export const useExecutionStore = create<ExecutionState>()(
               revision = changes.revision;
               previousDetailId = detailId;
             }
-            const working = runs.some(isActive);
-            const wasWorking = get().runs.some(isActive);
             if (runs !== get().runs || get().loading || get().error || get().historyError)
               set({ runs, loading: false, error: null, historyError: null });
-            if (working !== wasWorking)
-              useMascotStore.getState().setMood(working ? 'working' : 'idle');
+            useMascotStore.getState().setActivity('runs', runs.some(isActive));
           } catch (error) {
             set({ error: String(error), historyError: String(error), loading: false });
           } finally {
@@ -139,8 +129,7 @@ export const useExecutionStore = create<ExecutionState>()(
         if (get().submitting) throw new Error('A task is already being submitted.');
         set({ submitting: true });
         try {
-          await syncAgentConfig();
-          const id = await nativeTask<string>('task_start', {
+          const id = await invokeNative<string>('task_start', {
             request: { ...request, id: crypto.randomUUID() },
           });
           if (!options?.background) set({ selectedId: id });
@@ -152,9 +141,10 @@ export const useExecutionStore = create<ExecutionState>()(
       },
     }),
     {
-      name: workPane
-        ? `jackalope-execution-ui-v1:work-pane:${workPane}:${windowParameters.get('pane') ?? 'result'}`
-        : 'jackalope-execution-ui-v1',
+      name:
+        root.kind === 'workPane'
+          ? `jackalope-execution-ui-v1:work-pane:${root.id}:${root.pane}`
+          : 'jackalope-execution-ui-v1',
       partialize: (state) => ({ drafts: state.drafts, selectedId: state.selectedId }),
     },
   ),

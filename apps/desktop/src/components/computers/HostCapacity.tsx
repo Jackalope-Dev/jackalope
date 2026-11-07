@@ -1,8 +1,9 @@
 import { AlertTriangle, Laptop, Server } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { hostLoad, type ProjectHosts, projectHosts } from '../../lib/computers';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
 import './computers.css';
+import { describeError } from '../../lib/errors';
 
 /** How often an open capacity summary re-reads the pool. */
 const REFRESH_MS = 5000;
@@ -20,7 +21,7 @@ export function useProjectHosts(projectId: string | null | undefined, refreshMs 
       setHosts(await projectHosts(projectId));
       setError('');
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   }, [projectId]);
   useEffect(() => {

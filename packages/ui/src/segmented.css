@@ -53,7 +53,8 @@
   }
   :is(.ui-segment, .ui-segmented > .ui-tabs-trigger) {
     display: inline-flex;
-    flex-shrink: 0;
+    /* Containers set --ui-segment-flex: 1 to share the track width evenly. */
+    flex: var(--ui-segment-flex, 0 0 auto);
     align-items: center;
     justify-content: center;
     gap: 8px;

@@ -18,7 +18,6 @@ import '/src/components/settings/settings.css';
 import '/src/components/tasks/task-workspace.css';
 import '/src/components/tasks/task-experience.css';
 import '/src/components/tasks/project-queue.css';
-import '/src/components/ui/experience.css';
 const project = {id:'fixture',name:'Sample project',path:'C:/fixture/project',gitBranch:'main',agentProvider:'codex',worktrees:[]};
 const run = {id:'run-1',taskId:'task-1',projectId:project.id,projectPath:project.path,workspace:project.path+'/.worktrees/task',branch:'jackalope/task',agent:'codex',prompt:'Add keyboard search',result:'Added keyboard search.',status:'review',startedAt:'2026-09-09T12:00:00Z'};
 let policy = JSON.parse(localStorage.getItem('fixture-policy') || 'null') || {attribution:'user',name:'Sample User',email:'sample@example.test',cleanupAfterMerge:true,autoCheckpoint:true};

@@ -1,9 +1,10 @@
+import { InlineNotice } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { type QueueView, queueSnapshot } from '../../lib/queue';
-import type { TaskRun } from '../../lib/task-runtime';
+import type { TaskRun } from '../../lib/run-types';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { InlineNotice } from '../ui/InlineNotice';
 import { MergeReview } from './MergeReview';
 
 export function TaskIntegration({ run, onApplied }: { run: TaskRun; onApplied: () => void }) {
@@ -18,7 +19,7 @@ export function TaskIntegration({ run, onApplied }: { run: TaskRun; onApplied: (
       setError('');
       if (next.mergedRunIds.includes(run.id)) onApplied();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   }, [run.id, onApplied]);
   useEffect(() => {

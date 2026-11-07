@@ -1,20 +1,29 @@
-import { Checkbox, Disclosure, DisclosureBody, DisclosureSummary, FormField } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  Disclosure,
+  DisclosureBody,
+  DisclosureSummary,
+  FormField,
+  InlineNotice,
+  Input,
+} from '@jackalope/ui';
 import { ArrowRight, Check, GitMerge, GitPullRequest, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { isTauriEnvironment } from '../../lib/native/env';
 import type { IntegrationPlan, QueueItem } from '../../lib/queue';
 import { applyIntegration, integrationPlans, prepareIntegration } from '../../lib/queue';
-import type { TaskRun } from '../../lib/task-runtime';
+import type { TaskRun } from '../../lib/run-types';
 import { taskTitle } from '../../lib/task-title';
 import { mergeDestination } from '../../lib/task-workflow';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { ChangedFiles } from './ChangedFiles';
 import './project-queue.css';
+import { describeError } from '../../lib/errors';
+import { isFinished } from '../../lib/run-status';
+import { ActionError } from '../ui/ActionError';
 export function MergeReview({
   project,
   runs,
@@ -61,7 +70,7 @@ export function MergeReview({
       (!onlyRunId || r.id === onlyRunId) &&
       (!onlyRunIds || onlyRunIds.includes(r.id)) &&
       r.projectId === project.id &&
-      ['review', 'reviewed'].includes(r.status) &&
+      isFinished(r) &&
       r.workspace &&
       normalizePath(r.workspace) !== normalizePath(r.projectPath) &&
       !merged.includes(r.id) &&
@@ -110,7 +119,7 @@ export function MergeReview({
     }
   }, [onlyRunId, managedTitle, onlyRunIdsKey]);
   useEffect(() => {
-    void load().catch((error) => setError(String(error)));
+    void load().catch((error) => setError(describeError(error)));
   }, [load]);
   const prepare = async () => {
     setBusy(true);
@@ -122,7 +131,7 @@ export function MergeReview({
       setCleanup(next.commitPolicy?.cleanupAfterMerge ?? false);
       await load();
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setBusy(false);
     }
@@ -138,7 +147,7 @@ export function MergeReview({
       await onChanged();
       await load();
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setBusy(false);
       setApplying(false);
@@ -282,7 +291,7 @@ export function MergeReview({
             : 'Finished tasks arrive here with their results and changes.'}
         </p>
       ) : null}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {managedTitle && !plan && busy && (
         <p className="task-muted" role="status">
           Preparing the combined changes…

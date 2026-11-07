@@ -14,7 +14,6 @@ import { useAgentConfigStore } from '/src/stores/agentConfigStore.ts';
 import { applyThemeTokens, DEFAULT_THEME } from '/node_modules/@jackalope/brand/src/theme.ts';
 import '/src/index.css';
 import '/src/components/tasks/task-workspace.css';
-import '/src/components/ui/experience.css';
 const f = window.providerFixture = {
   profiles: [], calls: [], failModels: false, failDelete: false, activeId: null, failRunner: false, delayRunner: false, failSync: false,
   options: () => useAgentConfigStore.getState().runnerOptions,

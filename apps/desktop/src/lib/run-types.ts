@@ -1,10 +1,21 @@
-/** The longest instruction a task, follow-up or schedule accepts. */
+import type { DecisionReceipt } from './decisions.ts';
+import type { ContextReceipt, ContextSelection } from './knowledge-types.ts';
+import type { ReviewCaptures } from './review-captures.ts';
+import type { TaskEffort } from './task-effort.ts';
+import type { EvidenceLevel, GoalRestatement, SafetyFact, TaskContract } from './task-outcomes.ts';
+
+/** The longest instruction the composer accepts for a task, follow-up or schedule. */
 export const PROMPT_MAX_CHARS = 24_000;
 
-import type { EvidenceLevel, GoalRestatement, SafetyFact, TaskContract } from './task-outcomes.ts';
-import { isTauriEnvironment } from './tauri-bridge.ts';
-import { invokeNative } from './telemetry-client.ts';
-
+export type RunStatus =
+  | 'starting'
+  | 'running'
+  | 'stopping'
+  | 'stopped'
+  | 'interrupted'
+  | 'failed'
+  | 'review'
+  | 'reviewed';
 export interface Runner {
   desktopInstalled?: boolean;
   id: string;
@@ -25,7 +36,7 @@ export interface RunUsage {
 export interface TaskRun {
   archivedAt?: string | null;
   liveSessionId?: string | null;
-  effort?: import('./task-effort').TaskEffort | null;
+  effort?: TaskEffort | null;
   codexSpeed?: 'standard' | 'fast' | null;
   requestedServiceTier?: string | null;
   reasoningEffort?: string | null;
@@ -67,6 +78,7 @@ export interface TaskRun {
   };
   checkpoint?: { head: string; message: string } | null;
   checkpointError?: string | null;
+  quotaFailure?: { modelOnly: boolean; message: string } | null;
   routing?: {
     attempts?: {
       agent: string;
@@ -77,7 +89,7 @@ export interface TaskRun {
       recordedAt: string;
     }[];
     decisions: {
-      assessment?: import('./decisions').DecisionReceipt | null;
+      assessment?: DecisionReceipt | null;
       orchestrator: string;
       orchestratorModel: string | null;
       orchestratorAccount: string;
@@ -106,7 +118,7 @@ export interface TaskRun {
   /** The agent's own restatement of the task; absent when it never reported one. */
   understanding?: GoalRestatement | null;
   monitorChange?: { before: string; after: string; path: string; branch: string } | null;
-  contextReceipt?: import('./knowledge').ContextReceipt;
+  contextReceipt?: ContextReceipt;
   id: string;
   taskId: string;
   projectId: string;
@@ -119,6 +131,7 @@ export interface TaskRun {
   account: string;
   connectionIds?: string[] | null;
   targetBranch?: string | null;
+  processContained?: boolean;
   verifyCommand?: string | null;
   prepareCommand?: string | null;
   setupFiles?: string[];
@@ -164,15 +177,7 @@ export interface TaskRun {
   } | null;
   model: string | null;
   prompt: string;
-  status:
-    | 'starting'
-    | 'running'
-    | 'stopping'
-    | 'stopped'
-    | 'interrupted'
-    | 'failed'
-    | 'review'
-    | 'reviewed';
+  status: RunStatus;
   startedAt: string;
   endedAt: string | null;
   durationMs?: number;
@@ -211,8 +216,10 @@ export interface TaskRun {
   screenshots?: ScreenshotArtifact[];
   /** Desktop-control actions, newest last; summaries keep only the latest few. */
   desktopActions?: DesktopActionRecord[];
+  /** Local preview paths the agent opened in its task browser, newest last. */
+  visitedPages?: string[];
   /** Before/after screenshots Jackalope captured from the preview for review. */
-  reviewCaptures?: import('./review-captures.ts').ReviewCaptures | null;
+  reviewCaptures?: ReviewCaptures | null;
   /** Review screenshots are still being captured after the result was recorded. */
   reviewCapturing?: boolean;
   /** The result this attempt reviews, when it is an agent or Challenge reviewer. */
@@ -262,7 +269,7 @@ export interface ArchivedRun {
   projectName: string;
   agent: string;
   prompt: string;
-  status: TaskRun['status'];
+  status: RunStatus;
   startedAt: string;
   endedAt: string | null;
 }
@@ -366,9 +373,9 @@ export interface ScreenshotArtifact {
   timestamp: string;
 }
 export interface RunRequest {
-  effort?: import('./task-effort').TaskEffort;
+  effort?: TaskEffort;
   codexSpeed?: 'standard' | 'fast';
-  contextSelection?: import('./knowledge').ContextSelection;
+  contextSelection?: ContextSelection;
   connectionIds?: string[];
   model?: string;
   id: string;
@@ -388,6 +395,7 @@ export interface RunRequest {
   /** Overrides `isolated` for a new Git task; absent keeps the `isolated` choice. */
   workspaceMode?: 'worktree' | 'branch' | 'current' | 'ask';
   previousRunId?: string;
+  retryOf?: string;
   taskId?: string;
 }
 export interface Verification {
@@ -404,56 +412,13 @@ export interface Verification {
     durationMs: number;
   };
 }
+export interface ChangeStats {
+  files: number;
+  added: number;
+  removed: number;
+}
 export interface Review {
   files: string[];
   diff: string;
   note: string;
-}
-export const isActive = (run: TaskRun) => ['starting', 'running', 'stopping'].includes(run.status);
-/** An attempt that ended without finishing can be tried again from the same task. */
-export const canRetry = (run: TaskRun) => ['failed', 'stopped', 'interrupted'].includes(run.status);
-/** Start a fresh attempt at a task whose last attempt did not finish. */
-export async function retryTask(id: string): Promise<string> {
-  return nativeTask<string>('task_retry', { id });
-}
-/** A duration as its two largest units: `45s`, `2m 14s`, `3h 05m`, `2d 4h`. */
-export function durationLabel(totalSeconds: number): string {
-  const seconds = Math.max(0, Math.round(totalSeconds));
-  if (!Number.isFinite(seconds)) return '';
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-  if (days) return `${days}d ${hours % 24}h`;
-  if (hours) return `${hours}h ${String(minutes % 60).padStart(2, '0')}m`;
-  return minutes ? `${minutes}m ${seconds % 60}s` : `${seconds}s`;
-}
-/** How long the current step has been running, as a compact `2m 14s`. */
-export function elapsedLabel(since: string, now: number = Date.now()): string {
-  return durationLabel((now - Date.parse(since)) / 1000);
-}
-export const statusLabel: Record<TaskRun['status'], string> = {
-  starting: 'Preparing workspace',
-  running: 'Working',
-  stopping: 'Stopping',
-  stopped: 'Stopped',
-  interrupted: 'Interrupted',
-  failed: 'Needs attention',
-  review: 'Ready to review',
-  reviewed: 'Reviewed',
-};
-
-export async function nativeTask<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-  if (!isTauriEnvironment())
-    throw new Error(
-      'Open the desktop app to connect projects and run agents. This browser preview does not execute work.',
-    );
-  return invokeNative<T>(command, args);
-}
-
-export async function respondToPrompt(
-  runId: string,
-  promptId: string,
-  answer: string,
-): Promise<boolean> {
-  return nativeTask<boolean>('task_respond_prompt', { runId, promptId, answer });
 }

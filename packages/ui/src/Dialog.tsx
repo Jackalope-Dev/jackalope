@@ -10,13 +10,19 @@ export const DialogContent = forwardRef<
   ComponentPropsWithoutRef<typeof Primitive.Content> & {
     overlayClassName?: string;
     contained?: boolean;
+    /** `confirm` stacks above other dialogs and the command palette. */
+    layer?: 'confirm';
   }
->(({ className, overlayClassName, contained, ...props }, ref) => (
+>(({ className, overlayClassName, contained, layer, ...props }, ref) => (
   <Primitive.Portal>
-    <Primitive.Overlay className={cn('ui-dialog-overlay task-dialog-overlay', overlayClassName)} />
+    <Primitive.Overlay
+      data-layer={layer}
+      className={cn('ui-dialog-overlay task-dialog-overlay', overlayClassName)}
+    />
     <Primitive.Content
       ref={ref}
       data-contained={contained || undefined}
+      data-layer={layer}
       className={cn('ui-dialog task-dialog appearance-panel app-dialog', className)}
       {...props}
     />

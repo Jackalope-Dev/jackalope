@@ -5,33 +5,35 @@ import {
   DisclosureBody,
   DisclosureSummary,
   FormField,
+  InlineNotice,
   Input,
   LinkButton,
   Select,
   SelectItem,
+  SettingGroup,
+  SettingRow,
 } from '@jackalope/ui';
 import { Cloud as CloudIcon } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ARTIFACTS_DOCS_URL,
   ARTIFACTS_TOKEN_URL,
   type ArtifactsJurisdiction,
   type ArtifactsStatus,
   artifactsStatus,
-  beginCloudflareSignIn,
   type CloudflareAccount,
   cancelCloudflareSignIn,
   cloudflareTokenAccounts,
-  completeCloudflareSignIn,
   connectArtifacts,
   connectCloudflareAccount,
   disconnectArtifacts,
 } from '../../lib/cloudflare-artifacts';
-import { openExternalUrl } from '../../lib/tauri-bridge';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Setting, SettingGroup } from './Setting';
+import { openExternalUrl } from '../../lib/native/env';
 import { SwarmConnection } from './SwarmConnection';
 import './artifacts-connection.css';
+import { describeError } from '../../lib/errors';
+import { useCloudflareSignIn } from '../../lib/useCloudflareSignIn';
+import { ActionError } from '../ui/ActionError';
 
 export function ArtifactsTitle() {
   return (
@@ -71,15 +73,9 @@ export function ArtifactsConnectForm({
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const waiting = useRef(false);
-  const open = (url: string) => void openExternalUrl(url).catch((cause) => setError(String(cause)));
-  // Leaving the form abandons an unfinished browser sign-in and its listener.
-  useEffect(
-    () => () => {
-      if (waiting.current) void cancelCloudflareSignIn().catch(() => {});
-    },
-    [],
-  );
+  const cloudflareSignIn = useCloudflareSignIn();
+  const open = (url: string) =>
+    void openExternalUrl(url).catch((cause) => setError(describeError(cause)));
   const finish = async (accountId: string) =>
     onConnected(
       await connectCloudflareAccount({
@@ -92,24 +88,18 @@ export function ArtifactsConnectForm({
     setError('');
     setBusy(true);
     try {
-      const url = await beginCloudflareSignIn();
-      setStage({ kind: 'waiting', url });
-      waiting.current = true;
-      await openExternalUrl(url);
-      const accounts = await completeCloudflareSignIn();
-      waiting.current = false;
+      const accounts = await cloudflareSignIn({}, (url) => setStage({ kind: 'waiting', url }));
       const only = accounts.length === 1 ? accounts[0] : undefined;
       if (only) {
         try {
           await finish(only.id);
           return;
         } catch (cause) {
-          setError(String(cause));
+          setError(describeError(cause));
         }
       }
       setStage({ kind: 'choose', accounts, accountId: accounts[0]?.id ?? '' });
     } catch (cause) {
-      waiting.current = false;
       const message = String(cause);
       if (!message.includes('canceled')) setError(message);
       setStage({ kind: 'start' });
@@ -163,10 +153,7 @@ export function ArtifactsConnectForm({
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => {
-                  waiting.current = false;
-                  void cancelCloudflareSignIn().catch(() => {});
-                }}
+                onClick={() => void cancelCloudflareSignIn().catch(() => {})}
               >
                 Cancel
               </Button>
@@ -204,7 +191,7 @@ export function ArtifactsConnectForm({
           </div>
         )}
         {stage.kind === 'start' && fields}
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
       </div>
     );
   if (stage.kind === 'choose')
@@ -220,7 +207,7 @@ export function ArtifactsConnectForm({
           try {
             await finish(stage.accountId);
           } catch (cause) {
-            setError(String(cause));
+            setError(describeError(cause));
           } finally {
             setBusy(false);
           }
@@ -264,7 +251,7 @@ export function ArtifactsConnectForm({
             Start over
           </Button>
         </div>
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
       </form>
     );
   const tokenStage = stage;
@@ -308,7 +295,7 @@ export function ArtifactsConnectForm({
           setAccountId(accounts[0]?.id ?? '');
           setStage({ kind: 'token', accounts });
         } catch (cause) {
-          setError(String(cause));
+          setError(describeError(cause));
         } finally {
           setBusy(false);
         }
@@ -385,7 +372,7 @@ export function ArtifactsConnectForm({
           Connect Cloudflare instead
         </Button>
       </div>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </form>
   );
 }
@@ -398,17 +385,17 @@ export function ArtifactsConnection() {
     setStatus(await artifactsStatus());
   }, []);
   useEffect(() => {
-    void refresh().catch((cause) => setError(String(cause)));
+    void refresh().catch((cause) => setError(describeError(cause)));
   }, [refresh]);
   return (
     <>
       <SettingGroup>
-        <Setting
+        <SettingRow
           title={<ArtifactsTitle />}
           description="Create projects on Artifacts, or move an existing repository there from Project settings."
         />
         {status?.connected ? (
-          <Setting
+          <SettingRow
             title="Your Cloudflare account"
             description={`${status.method === 'oauth' ? 'Signed in with Cloudflare' : 'API token'} · Namespace ${status.namespace}${
               status.jurisdiction ? ` · ${status.jurisdiction.toUpperCase()} data location` : ''
@@ -426,7 +413,7 @@ export function ArtifactsConnection() {
                   await disconnectArtifacts();
                   await refresh();
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 } finally {
                   setBusy(false);
                 }
@@ -434,7 +421,7 @@ export function ArtifactsConnection() {
             >
               Disconnect
             </Button>
-          </Setting>
+          </SettingRow>
         ) : (
           status && <ArtifactsConnectForm onConnected={setStatus} />
         )}
@@ -446,7 +433,7 @@ export function ArtifactsConnection() {
       </SettingGroup>
       {status && <SwarmConnection artifactsConnected={status.connected} />}
       <SettingGroup aria-disabled="true">
-        <Setting
+        <SettingRow
           title={
             <span className="inline-flex items-center gap-2">
               Jackalope Cloud <Badge>Coming soon</Badge>

@@ -1,4 +1,4 @@
-import { Badge, IconButton, Panel } from '@jackalope/ui';
+import { Badge, Button, IconButton, Panel } from '@jackalope/ui';
 import { ArrowRight, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -8,16 +8,13 @@ import {
   type CatchUpPicture,
   type CatchUpRisk,
 } from '../../lib/catch-up';
+import { invokeNative } from '../../lib/native/transport';
 import { workPresence } from '../../lib/task-collection';
-import { nativeTask } from '../../lib/task-runtime';
+import { openWork, useAllRuns, useWorkspaceWork } from '../../lib/work-selection';
 import { compactElapsed } from '../../lib/work-signals';
-import { useExecutionStore } from '../../stores/executionStore';
-import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { usePresenceStore } from '../../stores/presenceStore';
 import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
-import { selectWorkItem, useWorkspaceWork } from '../layout/WorkSidebar';
-import { Button } from '../ui/button';
 import './work-catch-up.css';
 
 const PICTURE_LIMIT = 3;
@@ -50,7 +47,7 @@ function Picture({
   useEffect(() => {
     let canceled = false;
     let url = '';
-    nativeTask<number[]>('task_screenshot', {
+    invokeNative<number[]>('task_screenshot', {
       runId: picture.runId,
       screenshotId: picture.image.id,
     })
@@ -148,14 +145,9 @@ function Waiting({ item, onOpen }: { item: CatchUpDecision; onOpen: () => void }
 export function WorkCatchUp() {
   const since = usePresenceStore((state) => state.awaySince);
   const work = useWorkspaceWork();
-  const runs = useExecutionStore((state) => state.runs);
-  const sessionRuns = useLiveSessionStore((state) => state.runs);
   const queue = useManagedTaskStore((state) => state.queue);
   const seen = useWorkSignalsStore((state) => state.seen);
-  const allRuns = useMemo(
-    () => [...new Map([...runs, ...sessionRuns].map((run) => [run.id, run])).values()],
-    [runs, sessionRuns],
-  );
+  const allRuns = useAllRuns();
   const waitingRuns = since
     ? work
         .filter((item) => item.stage === 'attention' || item.stage === 'review')
@@ -211,7 +203,7 @@ export function WorkCatchUp() {
                     key={event.item.id}
                     picture={event.picture}
                     title={event.title}
-                    onOpen={() => selectWorkItem(event.item)}
+                    onOpen={() => openWork(event.item)}
                   />
                 ) : null,
               )}
@@ -219,11 +211,7 @@ export function WorkCatchUp() {
           )}
           <ul className="catch-up-events">
             {catchUp.happened.map((event) => (
-              <Happened
-                key={event.item.id}
-                event={event}
-                onOpen={() => selectWorkItem(event.item)}
-              />
+              <Happened key={event.item.id} event={event} onOpen={() => openWork(event.item)} />
             ))}
           </ul>
           {catchUp.moreHappened > 0 && (
@@ -239,7 +227,7 @@ export function WorkCatchUp() {
           <h3 id="catch-up-waiting">Waiting on you</h3>
           <ol className="catch-up-decisions">
             {catchUp.waiting.map((item) => (
-              <Waiting key={item.item.id} item={item} onOpen={() => selectWorkItem(item.item)} />
+              <Waiting key={item.item.id} item={item} onOpen={() => openWork(item.item)} />
             ))}
           </ol>
         </section>

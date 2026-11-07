@@ -1,35 +1,36 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import {
+  Button,
+  Disclosure,
+  DisclosureSummary,
+  InlineNotice,
+  Select,
+  SelectItem,
+  Switch,
+} from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { describeError } from '../../lib/errors';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import { useAction } from '../../lib/useAction';
 import { useHelperStore } from '../../stores/helperStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
 
 export function CompanionSettings() {
   const helper = useHelperStore();
   const settings = useSettingsStore();
   const supported = useNotificationStore((state) => state.status?.supported);
   const native = isTauriEnvironment();
-  const [localError, setLocalError] = useState('');
+  const {
+    run: action,
+    error: localError,
+    setError: setLocalError,
+  } = useAction(() => useHelperStore.getState().refresh());
   const [connection, setConnection] = useState<{ url: string; token: string }>();
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!helper.view.connected) setConnection(undefined);
   }, [helper.view.connected]);
-  const action = async (operation: () => Promise<unknown>) => {
-    setLocalError('');
-    try {
-      await operation();
-      await useHelperStore.getState().refresh();
-    } catch (error) {
-      setLocalError(String(error));
-    }
-  };
   return (
     <section className="helper-settings" aria-label="Helper settings">
       <section>
@@ -102,9 +103,9 @@ export function CompanionSettings() {
             onClick={() =>
               void action(async () => {
                 if (helper.view.connected) {
-                  await nativeTask('helper_connection', { enabled: false });
+                  await invokeNative('helper_connection', { enabled: false });
                   setConnection(undefined);
-                } else setConnection(await nativeTask('helper_connection', { enabled: true }));
+                } else setConnection(await invokeNative('helper_connection', { enabled: true }));
                 setCopied(false);
               })
             }
@@ -123,7 +124,7 @@ export function CompanionSettings() {
               size="sm"
               onClick={() =>
                 void action(async () => {
-                  setConnection(await nativeTask('helper_connection', { enabled: true }));
+                  setConnection(await invokeNative('helper_connection', { enabled: true }));
                   setCopied(false);
                 })
               }
@@ -164,7 +165,7 @@ export function CompanionSettings() {
             className="helper-text-button"
             onClick={() =>
               void openExternalUrl('https://jackalope.dev/knowledge/ask-jackalope/').catch(
-                (error) => setLocalError(String(error)),
+                (error) => setLocalError(describeError(error)),
               )
             }
           >

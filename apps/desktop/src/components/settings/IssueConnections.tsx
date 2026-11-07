@@ -1,9 +1,17 @@
-import { Button, FormField, Input, Select, SelectItem } from '@jackalope/ui';
+import {
+  Button,
+  FormField,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { openExternalUrl } from '../../lib/tauri-bridge';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Setting, SettingGroup } from './Setting';
+import { describeError } from '../../lib/errors';
+import { openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 
 export function IssueConnections() {
   const [connections, setConnections] = useState<
@@ -17,17 +25,17 @@ export function IssueConnections() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const refresh = useCallback(async () => {
-    setConnections(await nativeTask('issue_connections'));
+    setConnections(await invokeNative('issue_connections'));
     setLoaded(true);
   }, []);
   useEffect(() => {
-    void refresh().catch((cause) => setError(String(cause)));
+    void refresh().catch((cause) => setError(describeError(cause)));
   }, [refresh]);
   return (
     <SettingGroup title="Connected work">
-      <Setting title="GitHub" description="Uses your GitHub CLI sign-in (gh auth login)." />
+      <SettingRow title="GitHub" description="Uses your GitHub CLI sign-in (gh auth login)." />
       {connections.map((connection) => (
-        <Setting
+        <SettingRow
           key={connection.provider}
           title={connection.provider === 'linear' ? 'Linear' : 'Jira'}
           description={connection.site || 'Connected'}
@@ -39,10 +47,10 @@ export function IssueConnections() {
               setBusy(true);
               setError('');
               try {
-                await nativeTask('issue_connection_remove', { provider: connection.provider });
+                await invokeNative('issue_connection_remove', { provider: connection.provider });
                 await refresh();
               } catch (cause) {
-                setError(String(cause));
+                setError(describeError(cause));
               } finally {
                 setBusy(false);
               }
@@ -50,7 +58,7 @@ export function IssueConnections() {
           >
             Disconnect
           </Button>
-        </Setting>
+        </SettingRow>
       ))}
       <form
         className="space-y-3 px-5 py-4"
@@ -60,13 +68,13 @@ export function IssueConnections() {
           setBusy(true);
           setError('');
           try {
-            await nativeTask('issue_connection_save', {
+            await invokeNative('issue_connection_save', {
               connection: { provider, site: site.trim(), email: email.trim(), token: token.trim() },
             });
             setToken('');
             await refresh();
           } catch (cause) {
-            setError(String(cause));
+            setError(describeError(cause));
           } finally {
             setBusy(false);
           }
@@ -136,7 +144,7 @@ export function IssueConnections() {
                 provider === 'linear'
                   ? 'https://linear.app/settings/api'
                   : 'https://id.atlassian.com/manage-profile/security/api-tokens',
-              ).catch((cause) => setError(String(cause)))
+              ).catch((cause) => setError(describeError(cause)))
             }
           >
             Create API token
@@ -153,7 +161,7 @@ export function IssueConnections() {
               onClick={() =>
                 void refresh()
                   .then(() => setError(''))
-                  .catch((cause) => setError(String(cause)))
+                  .catch((cause) => setError(describeError(cause)))
               }
             >
               Retry

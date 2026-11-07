@@ -1,4 +1,4 @@
-import type { McpServerConfig } from './tauri-bridge.ts';
+import type { McpServerConfig } from './mcp-client.ts';
 
 export function bearerToken(extra: Record<string, unknown> = {}) {
   const headers = {

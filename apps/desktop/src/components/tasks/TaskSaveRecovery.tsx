@@ -1,12 +1,19 @@
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  InlineNotice,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
-import { nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { describeError } from '../../lib/errors';
+import { invokeNative } from '../../lib/native/transport';
+import type { TaskRun } from '../../lib/run-types';
 import { taskTitle } from '../../lib/task-title';
 import { useExecutionStore } from '../../stores/executionStore';
 import { returnToCompanion, useCompanionNotices } from '../mascot/useCompanionNotices';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
+import { ActionError } from '../ui/ActionError';
 
 export function UnsavedTasksNotice() {
   const runs = useExecutionStore((state) => state.runs);
@@ -60,16 +67,16 @@ export function TaskSaveRecovery({ run }: { run: TaskRun }) {
     setError('');
     try {
       if (copy) {
-        const path = await nativeTask<string | null>('task_export_recovery', { id: run.id });
+        const path = await invokeNative<string | null>('task_export_recovery', { id: run.id });
         if (path)
           setMessage(`Recovery copy saved to ${path}. The task history still needs to be saved.`);
       } else {
-        await nativeTask('task_retry_save', { id: run.id });
+        await invokeNative('task_retry_save', { id: run.id });
         setMessage('Task history saved.');
       }
       await useExecutionStore.getState().refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -109,7 +116,7 @@ export function TaskSaveRecovery({ run }: { run: TaskRun }) {
           {message}
         </InlineNotice>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </section>
   );
 }

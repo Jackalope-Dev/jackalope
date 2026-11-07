@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
 
 export function useManagedPreview(id: string | undefined, enabled: boolean) {
   const [running, setRunning] = useState(false);
@@ -12,7 +12,7 @@ export function useManagedPreview(id: string | undefined, enabled: boolean) {
       if (loading) return;
       loading = true;
       try {
-        const preview = await nativeTask<{ running: boolean } | null>('task_preview_status', {
+        const preview = await invokeNative<{ running: boolean } | null>('task_preview_status', {
           id,
         });
         if (alive) setRunning(preview?.running ?? false);

@@ -19,6 +19,9 @@ interface ContextMemoryState {
   removeMemory: (projectId: string) => void;
 }
 
+/** Scans someone asked for and is waiting on; silent background refreshes don't count. */
+let visibleScans = 0;
+
 export const useContextMemoryStore = create<ContextMemoryState>()(
   persist(
     (set, get) => ({
@@ -29,11 +32,10 @@ export const useContextMemoryStore = create<ContextMemoryState>()(
 
       refreshMemory: async (project, options = {}) => {
         const { id, name, path } = project;
-        const previousMood = useMascotStore.getState().mood;
-        const showActivity = !options.silent && previousMood !== 'working';
         set((state) => ({ scanning: { ...state.scanning, [id]: true } }));
-        if (showActivity) {
-          useMascotStore.getState().setMood('thinking');
+        if (!options.silent) {
+          visibleScans += 1;
+          useMascotStore.getState().setActivity('scan', true);
         }
 
         try {
@@ -86,12 +88,10 @@ export const useContextMemoryStore = create<ContextMemoryState>()(
           });
           throw error;
         } finally {
-          if (
-            showActivity &&
-            !Object.values(get().scanning).some(Boolean) &&
-            useMascotStore.getState().mood === 'thinking'
-          )
-            useMascotStore.getState().setMood(previousMood === 'thinking' ? 'idle' : previousMood);
+          if (!options.silent) {
+            visibleScans -= 1;
+            useMascotStore.getState().setActivity('scan', visibleScans > 0);
+          }
         }
       },
 

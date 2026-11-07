@@ -1,16 +1,15 @@
-import { Textarea } from '@jackalope/ui';
+import { Button, InlineNotice, Textarea } from '@jackalope/ui';
 import { ArrowRight } from 'lucide-react';
 import { useRef } from 'react';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import { appendAttachments } from '../../lib/prompt-attachments';
+import type { TaskRun } from '../../lib/run-types';
+import { PROMPT_MAX_CHARS } from '../../lib/run-types';
 import type { TaskFollowUp } from '../../lib/task-followups';
-import type { TaskRun } from '../../lib/task-runtime';
-import { PROMPT_MAX_CHARS } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
-import { Button } from '../ui/button';
+import { ActionError } from '../ui/ActionError';
 import { DismissButton } from '../ui/DismissButton';
-import { InlineNotice } from '../ui/InlineNotice';
 import { AttachButton } from './AttachButton';
 
 /** The task's single follow-up composer with its queued follow-ups. */
@@ -65,7 +64,7 @@ export function TaskFollowUpPanel({
   return (
     <div className="task-next">
       <h2 className="task-followup-heading">{integrated ? 'Start a follow-up' : 'Follow-up'}</h2>
-      {queueError && <InlineNotice tone="error">{queueError}</InlineNotice>}
+      <ActionError error={queueError} />
       {followups.length > 0 && (
         <ul className="task-followup-queue" aria-label="Queued follow-ups">
           {followups.map((item) => (

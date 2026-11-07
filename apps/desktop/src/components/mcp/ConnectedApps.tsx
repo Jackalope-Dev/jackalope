@@ -1,9 +1,12 @@
 import {
   Badge,
+  Button,
   ConfirmDialog,
   ExternalLinkIcon,
+  InlineNotice,
   Input,
   LinkButton,
+  LoadingState,
   DropdownMenu as Menu,
   SearchField,
   SegmentedControl,
@@ -25,14 +28,13 @@ import {
   removeComposioKey,
   saveComposioKey,
 } from '../../lib/composio';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { useMcpStore } from '../../stores/mcpStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import './connected-apps.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 const DASHBOARD = 'https://dashboard.composio.dev';
 const PRICING = 'https://composio.dev/pricing';
@@ -58,7 +60,7 @@ export function ConnectedApps() {
     try {
       setStatus(await composioStatus());
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   }, []);
   useEffect(() => {
@@ -70,7 +72,7 @@ export function ConnectedApps() {
       {!isTauriEnvironment() && (
         <InlineNotice>Connected apps are available in the desktop app.</InlineNotice>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {status === null ? (
         isTauriEnvironment() && <LoadingState compact label="Reading connected apps…" />
       ) : status.configured ? (
@@ -155,7 +157,7 @@ function KeySetup({ onSaved }: { onSaved: (status: ComposioStatus) => void }) {
                   onSaved(await saveComposioKey(key));
                   setKey('');
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 } finally {
                   setBusy(false);
                 }
@@ -182,7 +184,7 @@ function KeySetup({ onSaved }: { onSaved: (status: ComposioStatus) => void }) {
                 Save key
               </Button>
             </form>
-            {error && <InlineNotice tone="error">{error}</InlineNotice>}
+            <ActionError error={error} />
           </div>
         </li>
       </ol>
@@ -221,7 +223,7 @@ function AppCatalog({ status, onRemoved }: { status: ComposioStatus; onRemoved: 
         const [toolkits] = await Promise.all([composioCatalog(force), readAccounts()]);
         setCatalog(toolkits);
       } catch (cause) {
-        setError(String(cause));
+        setError(describeError(cause));
       } finally {
         setLoading(false);
       }
@@ -282,7 +284,7 @@ function AppCatalog({ status, onRemoved }: { status: ComposioStatus; onRemoved: 
       await openExternalUrl(url);
       setWaiting(toolkit.slug);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy('');
     }
@@ -295,7 +297,7 @@ function AppCatalog({ status, onRemoved }: { status: ComposioStatus; onRemoved: 
         await disconnectComposioAccount(account.id);
       await readAccounts();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy('');
     }
@@ -328,7 +330,7 @@ function AppCatalog({ status, onRemoved }: { status: ComposioStatus; onRemoved: 
           connection is ready.
         </InlineNotice>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <div className="connected-apps-toolbar">
         <SegmentedControl
           label="Apps to show"

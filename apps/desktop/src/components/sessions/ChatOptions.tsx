@@ -1,9 +1,13 @@
-import { DropdownMenu as Menu } from '@jackalope/ui';
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  DropdownMenu as Menu,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ChevronRight, MoreHorizontal, SlidersHorizontal } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 
 type MenuAction = { id: string; label: string; onSelect: () => void; disabled?: boolean };
 

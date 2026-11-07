@@ -1,4 +1,5 @@
-import { isActive, type TaskRun } from './task-runtime.ts';
+import { isActive, isFinished } from './run-status.ts';
+import type { TaskRun } from './run-types.ts';
 
 type ReviewSeverity = 'high' | 'medium' | 'low';
 
@@ -74,7 +75,7 @@ export type ReviewState = 'running' | 'finished' | 'failed';
 
 export function reviewState(reviewer: TaskRun): ReviewState {
   if (isActive(reviewer)) return 'running';
-  return ['review', 'reviewed'].includes(reviewer.status) ? 'finished' : 'failed';
+  return isFinished(reviewer) ? 'finished' : 'failed';
 }
 
 function clip(value: string, limit: number) {

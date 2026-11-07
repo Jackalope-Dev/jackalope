@@ -1,12 +1,21 @@
-import { DefinitionList, Disclosure, DisclosureSummary, DropdownMenu as Menu } from '@jackalope/ui';
+import {
+  Button,
+  DefinitionList,
+  Disclosure,
+  DisclosureSummary,
+  InlineNotice,
+  DropdownMenu as Menu,
+} from '@jackalope/ui';
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
-import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { describeError } from '../../lib/errors';
+import { openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import { isActive } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 import { mergeDestination } from '../../lib/task-workflow';
-import { openExternalUrl } from '../../lib/tauri-bridge';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { ActionError } from '../ui/ActionError';
 import { CreatePullRequest } from './CreatePullRequest';
 import { LocalDelivery } from './LocalDelivery';
 
@@ -91,14 +100,14 @@ export function TaskDelivery({
     setError('');
     try {
       setStatus(
-        await nativeTask<DeliveryStatus>('task_delivery_status', {
+        await invokeNative<DeliveryStatus>('task_delivery_status', {
           id: run.id,
           project: integrated,
           remote,
         }),
       );
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -108,7 +117,7 @@ export function TaskDelivery({
     try {
       await onHandoff(deliveryHandoff(run, integrated, goal));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   return (
@@ -182,7 +191,7 @@ export function TaskDelivery({
                 onSelect={() =>
                   void navigator.clipboard
                     .writeText(deliveryHandoff(run, integrated, 'a delivery handoff'))
-                    .catch((cause) => setError(String(cause)))
+                    .catch((cause) => setError(describeError(cause)))
                 }
               >
                 Copy delivery handoff
@@ -219,7 +228,7 @@ export function TaskDelivery({
                 variant="outline"
                 onClick={() =>
                   void openExternalUrl(status.pullRequest?.url ?? '').catch((cause) =>
-                    setError(String(cause)),
+                    setError(describeError(cause)),
                   )
                 }
               >
@@ -237,7 +246,7 @@ export function TaskDelivery({
                         onClick={() => {
                           setError('');
                           void Promise.resolve(onHandoff(ciRepairHandoff(run, url, failing))).catch(
-                            (cause) => setError(String(cause)),
+                            (cause) => setError(describeError(cause)),
                           );
                         }}
                       >
@@ -279,7 +288,7 @@ export function TaskDelivery({
           )}
         </>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <div className="space-y-2">
         {landed && <InlineNotice tone="success">{landed}</InlineNotice>}
         {created && (
@@ -289,7 +298,7 @@ export function TaskDelivery({
               <Button
                 variant="outline"
                 onClick={() =>
-                  void openExternalUrl(created).catch((cause) => setError(String(cause)))
+                  void openExternalUrl(created).catch((cause) => setError(describeError(cause)))
                 }
               >
                 Open pull request

@@ -1,12 +1,11 @@
-import { SegmentedControl } from '@jackalope/ui';
+import { Button, InlineNotice, SegmentedControl, Select, SelectItem } from '@jackalope/ui';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { invokeNative } from '../../lib/native/transport';
 import { capturedPages, capturePageName, type ReviewCaptures } from '../../lib/review-captures';
-import { nativeTask, type ScreenshotArtifact } from '../../lib/task-runtime';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
+import type { ScreenshotArtifact } from '../../lib/run-types';
 import './review-screenshots.css';
+import { describeError } from '../../lib/errors';
 
 type Mode = 'slider' | 'side';
 
@@ -19,14 +18,14 @@ function useScreenshot(runId: string, artifact: ScreenshotArtifact | null | unde
     if (!artifact) return;
     let canceled = false;
     let url = '';
-    nativeTask<number[]>('task_screenshot', { runId, screenshotId: artifact.id })
+    invokeNative<number[]>('task_screenshot', { runId, screenshotId: artifact.id })
       .then((bytes) => {
         if (canceled) return;
         url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
         setSource(url);
       })
       .catch((reason) => {
-        if (!canceled) setError(String(reason));
+        if (!canceled) setError(describeError(reason));
       });
     return () => {
       canceled = true;

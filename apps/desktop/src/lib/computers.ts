@@ -1,4 +1,4 @@
-import { nativeTask } from './task-runtime.ts';
+import { invokeNative } from './native/transport.ts';
 
 /** Where a bot computer runs. Unknown values come from newer builds. */
 export type ComputerProvider = 'local-docker' | 'remote-machine' | 'agent37' | 'jackalope-hosted';
@@ -85,9 +85,9 @@ export const DEFAULT_COMPUTER_SETTINGS: ComputerSettings = {
   idleStopMinutes: 10,
 };
 
-export const dockerStatus = () => nativeTask<DockerStatus>('computer_docker_status');
+export const dockerStatus = () => invokeNative<DockerStatus>('computer_docker_status');
 
-export const listComputers = () => nativeTask<ComputerStatus[]>('computer_list');
+export const listComputers = () => invokeNative<ComputerStatus[]>('computer_list');
 
 /**
  * Who a computer serves: a bot, whose desktop and browser tools act there, or a
@@ -100,7 +100,7 @@ export interface ComputerOwner {
 }
 
 export const ownerComputer = (owner: Pick<ComputerOwner, 'kind' | 'id'>) =>
-  nativeTask<ComputerStatus | null>('computer_status', {
+  invokeNative<ComputerStatus | null>('computer_status', {
     ownerKind: owner.kind,
     ownerId: owner.id,
   });
@@ -111,7 +111,7 @@ export const configureOwnerComputer = (
   machineId: string | null,
   settings: ComputerSettings,
 ) =>
-  nativeTask<ComputerStatus>('computer_configure', {
+  invokeNative<ComputerStatus>('computer_configure', {
     ownerKind: owner.kind,
     ownerId: owner.id,
     ownerName: owner.name,
@@ -120,15 +120,15 @@ export const configureOwnerComputer = (
     settings,
   });
 
-export const agent37Status = () => nativeTask<{ connected: boolean }>('computer_agent37');
+export const agent37Status = () => invokeNative<{ connected: boolean }>('computer_agent37');
 
 /** Saves the Agent37 API key after Agent37 accepts it, or removes it when `key` is null. */
 export const setAgent37Key = (key: string | null) =>
-  nativeTask<{ connected: boolean }>('computer_set_agent37_key', { key });
+  invokeNative<{ connected: boolean }>('computer_set_agent37_key', { key });
 
 /** This month's Agent37 spend in US dollars, overall and by computer id. */
 export const agent37Usage = () =>
-  nativeTask<{ total: number; computers: Record<string, number> }>('computer_agent37_usage');
+  invokeNative<{ total: number; computers: Record<string, number> }>('computer_agent37_usage');
 
 /** A sign-in agents use when they run on a computer. Values never reach the app. */
 export interface AgentCredential {
@@ -138,18 +138,18 @@ export interface AgentCredential {
   saved: boolean;
 }
 
-export const agentCredentials = () => nativeTask<AgentCredential[]>('computer_agent_credentials');
+export const agentCredentials = () => invokeNative<AgentCredential[]>('computer_agent_credentials');
 
 /** Saves a sign-in, or removes it when `value` is null. */
 export const setAgentCredential = (id: string, value: string | null) =>
-  nativeTask<AgentCredential[]>('computer_set_agent_credential', { id, value });
+  invokeNative<AgentCredential[]>('computer_set_agent_credential', { id, value });
 
 /** Starts in the background; poll the status for its phase. */
-export const startComputer = (id: string) => nativeTask<ComputerStatus>('computer_start', { id });
+export const startComputer = (id: string) => invokeNative<ComputerStatus>('computer_start', { id });
 
-export const stopComputer = (id: string) => nativeTask<ComputerStatus>('computer_stop', { id });
+export const stopComputer = (id: string) => invokeNative<ComputerStatus>('computer_stop', { id });
 
-export const deleteComputer = (id: string) => nativeTask<void>('computer_delete', { id });
+export const deleteComputer = (id: string) => invokeNative<void>('computer_delete', { id });
 
 /**
  * A viewer address for watching (`interactive` false) or taking over, starting
@@ -157,22 +157,22 @@ export const deleteComputer = (id: string) => nativeTask<void>('computer_delete'
  * is open; renew it with {@link holdComputerViewer}.
  */
 export const computerViewer = (id: string, interactive: boolean, lease: string) =>
-  nativeTask<string | null>('computer_viewer', { id, interactive, lease });
+  invokeNative<string | null>('computer_viewer', { id, interactive, lease });
 
 /** Renews (`open`) or releases an open viewer's hold on a computer. */
 export const holdComputerViewer = (id: string, lease: string, open: boolean) =>
-  nativeTask<void>('computer_viewer_lease', { id, lease, open });
+  invokeNative<void>('computer_viewer_lease', { id, lease, open });
 
 export const setComputerIdleStop = (id: string, minutes: number) =>
-  nativeTask<ComputerStatus>('computer_idle_timeout', { id, minutes });
+  invokeNative<ComputerStatus>('computer_idle_timeout', { id, minutes });
 
-export const computerPreferences = () => nativeTask<ComputerPreferences>('computer_preferences');
+export const computerPreferences = () => invokeNative<ComputerPreferences>('computer_preferences');
 
 export const setComputerPreferences = (preferences: ComputerPreferences) =>
-  nativeTask<ComputerPreferences>('computer_set_preferences', { preferences });
+  invokeNative<ComputerPreferences>('computer_set_preferences', { preferences });
 
 export const cloudMachines = () =>
-  nativeTask<{ machines: CloudMachine[]; hostedAvailable: boolean; image: string }>(
+  invokeNative<{ machines: CloudMachine[]; hostedAvailable: boolean; image: string }>(
     'computer_machines',
   );
 
@@ -181,13 +181,13 @@ export const addCloudMachine = (
   url: string,
   secret: string,
   viewerUrl: string | null,
-) => nativeTask<CloudMachine>('computer_machine_add', { name, url, secret, viewerUrl });
+) => invokeNative<CloudMachine>('computer_machine_add', { name, url, secret, viewerUrl });
 
 export const testCloudMachine = (id: string) =>
-  nativeTask<MachineHealth>('computer_machine_test', { id });
+  invokeNative<MachineHealth>('computer_machine_test', { id });
 
 export const removeCloudMachine = (id: string) =>
-  nativeTask<void>('computer_machine_remove', { id });
+  invokeNative<void>('computer_machine_remove', { id });
 
 export const providerLabel = (provider: string) =>
   provider === 'local-docker'
@@ -256,10 +256,10 @@ export interface ProjectHosts {
 }
 
 export const projectHosts = (projectId: string) =>
-  nativeTask<ProjectHosts>('queue_hosts', { projectId });
+  invokeNative<ProjectHosts>('queue_hosts', { projectId });
 
 export const setProjectHosts = (projectId: string, swarmHosts: SwarmHosts, computers: string[]) =>
-  nativeTask<ProjectHosts>('queue_set_hosts', { projectId, swarmHosts, computers });
+  invokeNative<ProjectHosts>('queue_set_hosts', { projectId, swarmHosts, computers });
 
 /** A host's load and health in a few words, such as "2 of 8 running" or "Lost contact". */
 export function hostLoad(host: PoolHost): string {

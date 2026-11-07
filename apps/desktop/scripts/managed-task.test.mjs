@@ -386,3 +386,33 @@ test('finished implementation moves to checks even when verification failed', ()
   assert.equal(managedTaskProgress(blocked, work).stage, 2);
   assert.equal(managedTaskProgress(task, managedTaskWork(task, queue, runs)).stage, 1);
 });
+
+test('command search lists worker runs, agent reviews and bot conversations on their own', () => {
+  const review = {
+    id: 'review',
+    taskId: 'review',
+    status: 'review',
+    startedAt: '2026-09-16T00:03:00Z',
+    projectId: 'project',
+    challengeOf: { kind: 'review', runId: 'new' },
+  };
+  const bot = {
+    id: 'bot',
+    title: 'Support bot',
+    persona: { name: 'Helper' },
+    request: { projectId: 'project' },
+    updatedAt: '2026-09-16',
+    messages: [],
+    batches: [],
+    closed: false,
+    paused: false,
+  };
+  const listed = (nested) =>
+    collectWorkspaceWork('project', [], [...runs, review], [bot], [], false, queue, nested).map(
+      (item) => item.id,
+    );
+  assert.deepEqual(listed(false), ['managed:parent']);
+  const everything = listed(true);
+  for (const id of ['managed:parent', 'old', 'new', 'review', 'session:bot'])
+    assert.ok(everything.includes(id), id);
+});

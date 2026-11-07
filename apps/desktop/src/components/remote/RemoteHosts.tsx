@@ -3,28 +3,27 @@ import {
   Disclosure,
   DisclosureSummary,
   FormField,
+  InlineNotice,
   Input,
   Select,
   SelectItem,
 } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
+import { describeError } from '../../lib/errors';
+import { invokeNative } from '../../lib/native/transport';
+import {
+  pairRemoteHost,
+  type RemoteHost,
+  remoteHosts,
+  removeRemoteHost,
+} from '../../lib/remote-hosts';
 import { useHostContextStore } from '../../stores/hostContextStore';
-import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { type RemoteAction, RemoteWorkspace } from './RemoteWorkspace';
 
-interface Host {
-  id: string;
-  name: string;
-  address: string;
-  ssh: boolean;
-  port: number;
-  wsl?: boolean;
-}
 export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
-  const [hosts, setHosts] = useState<Host[]>([]);
+  const [hosts, setHosts] = useState<RemoteHost[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState('');
   const [adding, setAdding] = useState(false);
@@ -48,12 +47,12 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
   useEffect(() => {
     if (method !== 'wsl') return;
     let disposed = false;
-    void nativeTask<string[]>('wsl_distributions').then(
+    void invokeNative<string[]>('wsl_distributions').then(
       (items) => {
         if (!disposed) setDistributions(items);
       },
       (reason) => {
-        if (!disposed) setError(String(reason));
+        if (!disposed) setError(describeError(reason));
       },
     );
     return () => {
@@ -62,14 +61,14 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
   }, [method]);
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
-      const next = await nativeTask<Host[]>('remote_hosts');
+      const next = await remoteHosts();
       if (!signal?.aborted) {
         setHosts(next);
         setLoaded(true);
         setError('');
       }
     } catch (cause) {
-      if (!signal?.aborted) setError(String(cause));
+      if (!signal?.aborted) setError(describeError(cause));
     }
   }, []);
   useEffect(() => {
@@ -78,7 +77,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
     return () => controller.abort();
   }, [load]);
   const request = useCallback(
-    <T,>(action: RemoteAction) => nativeTask<T>('remote_host_request', { id: host?.id, action }),
+    <T,>(action: RemoteAction) => invokeNative<T>('remote_host_request', { id: host?.id, action }),
     [host?.id],
   );
   return (
@@ -126,10 +125,10 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
                   setBusy(true);
                   setError('');
                   try {
-                    await nativeTask('remote_host_remove', { id: host.id });
-                    setHosts(await nativeTask<Host[]>('remote_hosts'));
+                    await removeRemoteHost(host.id);
+                    setHosts(await remoteHosts());
                   } catch (cause) {
-                    setError(String(cause));
+                    setError(describeError(cause));
                   } finally {
                     setBusy(false);
                   }
@@ -164,7 +163,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
               setBusy(true);
               setError('');
               try {
-                const paired = await nativeTask<Host>('remote_host_pair', {
+                const paired = await pairRemoteHost({
                   name,
                   address,
                   ssh: method === 'ssh',
@@ -172,12 +171,12 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
                   port,
                   code: code.trim(),
                 });
-                setHosts(await nativeTask<Host[]>('remote_hosts'));
+                setHosts(await remoteHosts());
                 setSelected(paired.id);
                 setAdding(false);
                 setCode('');
               } catch (cause) {
-                setError(String(cause));
+                setError(describeError(cause));
               } finally {
                 setBusy(false);
               }

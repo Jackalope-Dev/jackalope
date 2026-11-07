@@ -171,9 +171,6 @@
     transition: none;
   }
 }
-.work-context-path {
-  user-select: text;
-}
 .live-message > p {
   white-space: pre-wrap;
   font-size: var(--text-sm);
@@ -363,9 +360,6 @@
   border-radius: var(--radius-2xl);
   background: var(--color-surface-elevated);
   text-align: left;
-}
-.live-start-toolbar {
-  display: flex;
 }
 .chat-options-dialog {
   width: min(560px, calc(100vw - 32px));

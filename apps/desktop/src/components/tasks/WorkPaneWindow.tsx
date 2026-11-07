@@ -1,19 +1,16 @@
-import { applyThemeTokens, startThemeClock } from '@jackalope/brand/theme';
+import { Button, InlineNotice } from '@jackalope/ui';
 import { MotionConfig } from 'motion/react';
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { openExternalUrl } from '../../lib/tauri-bridge';
+import { openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { saveWorkFeedback } from '../../lib/work-feedback';
 import { observeExecution, useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { useThemeStore } from '../../stores/themeStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { bootstrapWindow, useWindowTheme } from '../../window-bootstrap';
 import { ResultReview } from './ResultReview';
 import { TaskPreview } from './TaskPreview';
 import { TaskTerminal } from './TaskTerminal';
 import './workbench.css';
-import '../ui/experience.css';
+import { describeError } from '../../lib/errors';
 
 const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
 export default function WorkPaneWindow({ id, pane }: { id: string; pane: string }) {
@@ -22,26 +19,12 @@ export default function WorkPaneWindow({ id, pane }: { id: string; pane: string 
   const loading = useExecutionStore((state) => state.loading);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
-  const appTheme = useThemeStore((state) => state.appTheme);
-  const theme = useProjectStore(
-    (state) => state.projects.find((project) => project.id === run?.projectId)?.preferences?.theme,
-  );
-  useEffect(startThemeClock, []);
+  useEffect(bootstrapWindow, []);
+  useWindowTheme(run?.projectId);
   useEffect(() => {
     useExecutionStore.getState().select(id);
     return observeExecution();
   }, [id]);
-  useEffect(() => {
-    applyThemeTokens(theme ?? appTheme);
-  }, [theme, appTheme]);
-  useEffect(() => {
-    const sync = (event: StorageEvent) => {
-      if (event.key === 'jackalope-theme') void useThemeStore.persist.rehydrate();
-      if (event.key === 'jackalope-projects') void useProjectStore.persist.rehydrate();
-    };
-    window.addEventListener('storage', sync);
-    return () => window.removeEventListener('storage', sync);
-  }, []);
   const feedback = async (text: string) => {
     if (!run) throw new Error('Task unavailable');
     saveWorkFeedback(run.taskId, run.id, text);
@@ -57,8 +40,8 @@ export default function WorkPaneWindow({ id, pane }: { id: string; pane: string 
           <Button
             variant="outline"
             onClick={() =>
-              void nativeTask('task_work_window', { id, pane, action: 'dock' }).catch((cause) =>
-                setError(String(cause)),
+              void invokeNative('task_work_window', { id, pane, action: 'dock' }).catch((cause) =>
+                setError(describeError(cause)),
               )
             }
           >
@@ -91,7 +74,7 @@ export default function WorkPaneWindow({ id, pane }: { id: string; pane: string 
                   active={false}
                   content={run.result || 'No result yet.'}
                   onOpenLink={(url) =>
-                    void openExternalUrl(url).catch((cause) => setError(String(cause)))
+                    void openExternalUrl(url).catch((cause) => setError(describeError(cause)))
                   }
                 />
               </Suspense>

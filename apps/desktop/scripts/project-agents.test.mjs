@@ -9,7 +9,7 @@ globalThis.window = {
     removeItem: (key) => values.delete(key),
   },
 };
-const { useAgentConfigStore: agents, syncAgentConfig } = await import(
+const { useAgentConfigStore: agents, agentPolicySaved } = await import(
   '../src/stores/agentConfigStore.ts'
 );
 const { useProjectStore: projects, isAgentAllowedForProject } = await import(
@@ -107,10 +107,30 @@ test('native policy receives each project list, default and account restrictions
     },
   };
   try {
-    await syncAgentConfig();
+    await agentPolicySaved();
     assert.deepEqual(saved.projects.work, work);
     assert.deepEqual(saved.projects.personal, { ...personal, disabledAccounts: {} });
     assert.equal(saved.defaultMetaAgent, 'codex');
+  } finally {
+    delete window.__TAURI_INTERNALS__;
+  }
+});
+
+test('commands that read the agent policy save the current policy first', async () => {
+  const { invokeNative } = await import('../src/lib/native/transport.ts');
+  const calls = [];
+  window.__TAURI_INTERNALS__ = {
+    invoke: async (command, args) => {
+      calls.push(
+        command === 'agent_save_policy' ? `${command}:${args.policy.defaultMetaAgent}` : command,
+      );
+    },
+  };
+  try {
+    agents.setState({ defaultMetaAgent: 'claude' });
+    await invokeNative('task_start', { request: {} });
+    await invokeNative('task_list');
+    assert.deepEqual(calls, ['agent_save_policy:claude', 'task_start', 'task_list']);
   } finally {
     delete window.__TAURI_INTERNALS__;
   }

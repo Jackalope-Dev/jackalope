@@ -1,4 +1,15 @@
-import { CopyButton, FormField, Input, Select, SelectItem } from '@jackalope/ui';
+import {
+  Button,
+  CopyButton,
+  FormField,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
 import {
   type ArtifactsProjectLink,
@@ -12,10 +23,8 @@ import {
   suggestRepoName,
   validRepoName,
 } from '../../lib/cloudflare-artifacts';
+import { describeError } from '../../lib/errors';
 import { ArtifactsConnectForm, ArtifactsTitle } from '../settings/ArtifactsConnection';
-import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import { FirstCommit } from './FirstCommit';
 
 type Busy = '' | 'convert' | 'push' | 'share';
@@ -44,7 +53,7 @@ export function ArtifactsProjectSettings({
     setLink(nextLink);
   }, [projectPath]);
   useEffect(() => {
-    void refresh().catch((cause) => setError(String(cause)));
+    void refresh().catch((cause) => setError(describeError(cause)));
   }, [refresh]);
   const run = async (kind: Busy, action: () => Promise<void>) => {
     if (busy) return;
@@ -54,7 +63,7 @@ export function ArtifactsProjectSettings({
     try {
       await action();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
       await refresh().catch(() => {});
     } finally {
       setBusy('');
@@ -68,7 +77,7 @@ export function ArtifactsProjectSettings({
           className="settings-block"
           onConnected={(next) => {
             setStatus(next);
-            void refresh().catch((cause) => setError(String(cause)));
+            void refresh().catch((cause) => setError(describeError(cause)));
           }}
         />
       )}
@@ -78,14 +87,14 @@ export function ArtifactsProjectSettings({
             <FirstCommit
               projectPath={projectPath}
               reason="Artifacts needs at least one commit."
-              onCommitted={() => void refresh().catch((cause) => setError(String(cause)))}
+              onCommitted={() => void refresh().catch((cause) => setError(describeError(cause)))}
             />
           ) : (
             <InlineNotice
               action={
                 <Button
                   variant="outline"
-                  onClick={() => void refresh().catch((cause) => setError(String(cause)))}
+                  onClick={() => void refresh().catch((cause) => setError(describeError(cause)))}
                 >
                   Check again
                 </Button>
@@ -135,9 +144,9 @@ export function ArtifactsProjectSettings({
       )}
       {linked && link && (
         <>
-          <Setting title={`Repository ${link.repo}`} description={link.remote ?? undefined}>
+          <SettingRow title={`Repository ${link.repo}`} description={link.remote ?? undefined}>
             <CopyButton text={link.remote ?? ''} label="Copy remote" variant="outline" />
-          </Setting>
+          </SettingRow>
           {link.foreign ? (
             <SettingBody>
               <InlineNotice tone="warning">
@@ -147,7 +156,7 @@ export function ArtifactsProjectSettings({
             </SettingBody>
           ) : (
             <>
-              <Setting
+              <SettingRow
                 title="Push branches and tags"
                 description="Sends local branches, tags and notes with a 15-minute token. Changes that are not fast-forwards are refused."
               >
@@ -164,8 +173,8 @@ export function ArtifactsProjectSettings({
                 >
                   Push to Artifacts
                 </Button>
-              </Setting>
-              <Setting
+              </SettingRow>
+              <SettingRow
                 title="Share a review snapshot"
                 description="Creates a read-only copy of what was last pushed and a clone link that expires. Anyone with the link can read the snapshot."
               >
@@ -194,7 +203,7 @@ export function ArtifactsProjectSettings({
                     Create link
                   </Button>
                 </div>
-              </Setting>
+              </SettingRow>
             </>
           )}
         </>

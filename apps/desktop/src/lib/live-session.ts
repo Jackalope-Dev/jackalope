@@ -1,5 +1,6 @@
-import type { RunRequest, TaskRun } from './task-runtime.ts';
-import { isActive, nativeTask } from './task-runtime.ts';
+import { invokeNative } from './native/transport.ts';
+import { isActive, isFinished } from './run-status.ts';
+import type { RunRequest, TaskRun } from './run-types.ts';
 
 export interface SessionMessage {
   id: string;
@@ -78,11 +79,11 @@ export interface SessionReview {
   verified: boolean;
 }
 export const sessionCommand = <T>(command: string, args?: Record<string, unknown>) =>
-  nativeTask<T>(`live_session_${command}`, args);
+  invokeNative<T>(`live_session_${command}`, args);
 
 export function sessionRunNeedsAttention(run: TaskRun) {
   return (
-    !['review', 'reviewed'].includes(run.status) ||
+    !isFinished(run) ||
     !!run.error ||
     !!run.persistenceError ||
     !!run.verificationError ||

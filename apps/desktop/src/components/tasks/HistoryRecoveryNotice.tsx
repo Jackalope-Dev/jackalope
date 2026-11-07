@@ -1,13 +1,18 @@
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  InlineNotice,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Copy } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { returnToCompanion, useCompanionNotices } from '../mascot/useCompanionNotices';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
 import './history-recovery.css';
+import { describeError } from '../../lib/errors';
 
 interface HistoryRecovery {
   directory: string;
@@ -27,13 +32,13 @@ export function HistoryRecoveryNotice() {
     const current = ++requestId.current;
     setLoading(true);
     try {
-      const result = await nativeTask<HistoryRecovery>('task_history_recovery');
+      const result = await invokeNative<HistoryRecovery>('task_history_recovery');
       if (current === requestId.current) {
         setRecovery(result);
         setError('');
       }
     } catch (error) {
-      if (current === requestId.current) setError(String(error));
+      if (current === requestId.current) setError(describeError(error));
     } finally {
       if (current === requestId.current) setLoading(false);
     }

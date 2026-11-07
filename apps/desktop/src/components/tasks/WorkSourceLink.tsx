@@ -1,9 +1,10 @@
 import { Button } from '@jackalope/ui';
 import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { workSource } from '../../lib/issues';
-import { openExternalUrl } from '../../lib/tauri-bridge';
-import { InlineNotice } from '../ui/InlineNotice';
+import { openExternalUrl } from '../../lib/native/env';
+import { ActionError } from '../ui/ActionError';
 
 export function WorkSourceLink({ prompts }: { prompts: string[] }) {
   const source = prompts.map(workSource).find(Boolean);
@@ -13,12 +14,14 @@ export function WorkSourceLink({ prompts }: { prompts: string[] }) {
     <>
       <Button
         variant="ghost"
-        onClick={() => void openExternalUrl(source).catch((cause) => setError(String(cause)))}
+        onClick={() =>
+          void openExternalUrl(source).catch((cause) => setError(describeError(cause)))
+        }
       >
         <ExternalLink size={15} aria-hidden="true" />
         Linked work
       </Button>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </>
   );
 }

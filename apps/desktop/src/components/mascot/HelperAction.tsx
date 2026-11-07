@@ -1,13 +1,18 @@
 import { applyThemeTokens, type ThemePalette } from '@jackalope/brand/theme';
+import { Button } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { navigateWorkspace, openHelperDraft } from '../../lib/app-events';
+import { describeError } from '../../lib/errors';
 import {
   helperPreferencePatch,
   helperTheme,
   sameHelperValue,
   type ThemeChange,
 } from '../../lib/helper-actions';
-import { nativeTask } from '../../lib/task-runtime';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { invokeNative } from '../../lib/native/transport';
+import { stopTask } from '../../lib/task-client';
+import { openRun } from '../../lib/work-selection';
+import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import {
   type HelperAction as Action,
@@ -17,22 +22,9 @@ import {
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
-import type { ActiveTab } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { helperView } from '../layout/navigation';
+import { ActionError } from '../ui/ActionError';
 
-const destinations: Record<string, ActiveTab> = {
-  tasks: 'live-sessions',
-  agents: 'agents',
-  'agent-settings': 'agent-settings',
-  mcp: 'mcps',
-  usage: 'usage',
-  settings: 'preferences',
-  schedules: 'schedules',
-  project: 'topology',
-  worktrees: 'worktrees',
-  knowledge: 'project-knowledge',
-};
 const labels: Record<string, string> = {
   open_task: 'Open task',
   stop_task: 'Stop task',
@@ -104,7 +96,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
         !useProjectStore.getState().projects.some((p) => p.id === input.project_id)
       )
         throw new Error('This project is no longer available.');
-      await nativeTask('helper_action', { id: action.id, decision: 'apply' });
+      await invokeNative('helper_action', { id: action.id, decision: 'apply' });
       claimed = true;
       if (theme) checkTheme();
       if (patch) {
@@ -176,7 +168,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
           throw new Error('This agent is no longer available or enabled.');
         config.setDefaultMetaAgent(agent);
         try {
-          await syncAgentConfig();
+          await agentPolicySaved();
         } catch (cause) {
           if (useAgentConfigStore.getState().defaultMetaAgent === agent)
             config.setDefaultMetaAgent(config.defaultMetaAgent);
@@ -187,24 +179,19 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
         const run = useExecutionStore.getState().runs.find((run) => run.id === input.run_id);
         if (!run) throw new Error('This task is no longer loaded.');
         if (action.operation === 'stop_task') {
-          await nativeTask('task_stop', { id: run.id });
+          await stopTask(run.id);
           result = { stopRequested: true, runId: run.id };
         } else {
-          useProjectStore.getState().selectProject(run.projectId);
-          useExecutionStore.getState().select(run.id);
+          openRun(run.id);
           onNavigate();
-          requestAnimationFrame(() =>
-            window.dispatchEvent(new CustomEvent('jackalope:navigate', { detail: 'kanban' })),
-          );
+          requestAnimationFrame(() => navigateWorkspace('kanban'));
           result = { openedRunId: run.id };
         }
       } else if (action.operation === 'navigate') {
-        const destination = destinations[String(input.destination)];
+        const destination = helperView(String(input.destination));
         if (!destination) throw new Error('Unknown destination.');
         onNavigate();
-        requestAnimationFrame(() =>
-          window.dispatchEvent(new CustomEvent('jackalope:navigate', { detail: destination })),
-        );
+        requestAnimationFrame(() => navigateWorkspace(destination));
       } else if (action.operation === 'prepare_task') {
         const key = `helper-${action.id}`;
         if (useExecutionStore.getState().drafts[key]?.prompt)
@@ -216,17 +203,15 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
           agent: '',
         });
         onNavigate();
-        requestAnimationFrame(() =>
-          window.dispatchEvent(new CustomEvent('jackalope:helper-draft', { detail: key })),
-        );
+        requestAnimationFrame(() => openHelperDraft(key));
         result = { draftPrepared: true, started: false };
       } else throw new Error('Unsupported action.');
-      await nativeTask('helper_action', { id: action.id, decision: 'complete', result });
+      await invokeNative('helper_action', { id: action.id, decision: 'complete', result });
       await useHelperStore.getState().refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
       if (claimed)
-        await nativeTask('helper_action', {
+        await invokeNative('helper_action', {
           id: action.id,
           decision: 'failed',
           result: { error: String(cause) },
@@ -263,7 +248,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
                   setPreview(checkTheme().theme);
                   setError('');
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 }
               }}
             >
@@ -290,9 +275,9 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
             disabled={busy}
             onClick={() => {
               setPreview(undefined);
-              void nativeTask('helper_action', { id: action.id, decision: 'dismiss' })
+              void invokeNative('helper_action', { id: action.id, decision: 'dismiss' })
                 .then(() => useHelperStore.getState().refresh())
-                .catch((cause) => setError(String(cause)));
+                .catch((cause) => setError(describeError(cause)));
             }}
           >
             Cancel
@@ -308,7 +293,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
             setBusy(true);
             try {
               undo();
-              await nativeTask('helper_action', {
+              await invokeNative('helper_action', {
                 id: action.id,
                 decision: 'undone',
                 result: { undone: true },
@@ -317,7 +302,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
               setError('');
               await useHelperStore.getState().refresh();
             } catch (cause) {
-              setError(String(cause));
+              setError(describeError(cause));
             } finally {
               setBusy(false);
             }
@@ -326,7 +311,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
           Undo change
         </button>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </article>
   );
 }

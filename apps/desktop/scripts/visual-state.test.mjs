@@ -160,21 +160,24 @@ test('switching appearance back restores every token without changing the select
 test('pet feedback returns to work and cannot overwrite a newer activity', (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const mascot = useMascotStore.getState;
-  mascot().setMood('working');
+  mascot().setActivity('scan', false);
+  mascot().setActivity('runs', true);
   mascot().pet();
   context.mock.timers.tick(2500);
   assert.equal(mascot().mood, 'working');
   assert.equal(mascot().message, null);
   mascot().pet();
-  mascot().setMood('thinking');
+  mascot().setActivity('runs', false);
+  mascot().setActivity('scan', true);
   context.mock.timers.tick(3000);
   assert.equal(mascot().mood, 'thinking');
+  mascot().setActivity('scan', false);
 });
 
 test('repeated pets extend feedback and retain the original activity', (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const mascot = useMascotStore.getState;
-  mascot().setMood('working');
+  mascot().setActivity('runs', true);
   mascot().pet();
   context.mock.timers.tick(2000);
   mascot().pet();
@@ -182,6 +185,19 @@ test('repeated pets extend feedback and retain the original activity', (context)
   assert.equal(mascot().mood, 'success');
   context.mock.timers.tick(1900);
   assert.equal(mascot().mood, 'working');
+  mascot().setActivity('runs', false);
+});
+
+test('mood follows activity, so a scan ending while work runs leaves the mascot working', () => {
+  const mascot = useMascotStore.getState;
+  mascot().setActivity('scan', true);
+  assert.equal(mascot().mood, 'thinking');
+  mascot().setActivity('runs', true);
+  assert.equal(mascot().mood, 'working');
+  mascot().setActivity('scan', false);
+  assert.equal(mascot().mood, 'working');
+  mascot().setActivity('runs', false);
+  assert.equal(mascot().mood, 'idle');
 });
 
 test('button labels keep at least 4.5:1 contrast across the custom color field', () => {

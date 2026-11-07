@@ -1,5 +1,5 @@
 import { agentFamily } from './agent-catalog.ts';
-import type { Runner, TaskRun } from './task-runtime';
+import type { Runner, TaskRun } from './run-types';
 
 const MODEL_FAMILIES: [RegExp, string][] = [
   [/claude|opus|sonnet|haiku|anthropic/, 'anthropic'],

@@ -1,18 +1,23 @@
-import { RefreshIcon } from '@jackalope/ui';
+import {
+  Button,
+  InlineNotice,
+  RefreshIcon,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+} from '@jackalope/ui';
 import { Monitor } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { describeError } from '../../lib/errors';
+import { isTauriEnvironment } from '../../lib/native/env';
 import {
   type DesktopPermission,
   getSystemInfo,
-  isTauriEnvironment,
   openDesktopPermissionSettings,
   requestDesktopControlPermissions,
   restartForDesktopPermissions,
   type SystemInfo,
-} from '../../lib/tauri-bridge';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Setting, SettingBody, SettingGroup } from './Setting';
+} from '../../lib/system-info';
 
 const PERMISSION_LABELS: Record<DesktopPermission, string> = {
   accessibility: 'Accessibility',
@@ -38,7 +43,7 @@ export function SystemInfoView() {
       const info = await getSystemInfo();
       if (id === request.current) setHost(info);
     } catch (error) {
-      if (id === request.current) setError(String(error));
+      if (id === request.current) setError(describeError(error));
     } finally {
       if (id === request.current) setLoading(false);
     }
@@ -51,7 +56,7 @@ export function SystemInfoView() {
       setHost((current) => (current ? { ...current, desktop_control: readiness } : current));
       setRequested(true);
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setRequestingPermissions(false);
     }
@@ -62,7 +67,7 @@ export function SystemInfoView() {
       await openDesktopPermissionSettings(permission);
       setRequested(true);
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     }
   };
   const restart = async () => {
@@ -71,7 +76,7 @@ export function SystemInfoView() {
     try {
       await restartForDesktopPermissions();
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
       setRestarting(false);
     }
   };
@@ -111,7 +116,7 @@ export function SystemInfoView() {
       )}
       {host ? (
         <>
-          <Setting
+          <SettingRow
             title="Git"
             description={
               host.git_available
@@ -120,7 +125,7 @@ export function SystemInfoView() {
             }
           />
           {host.desktop_control && (
-            <Setting title="Native window control" description={host.desktop_control.message}>
+            <SettingRow title="Native window control" description={host.desktop_control.message}>
               {host.desktop_control.can_request_permissions &&
                 (!host.desktop_control.available || host.os === 'linux') && (
                   <Button
@@ -135,7 +140,7 @@ export function SystemInfoView() {
                       : 'Set up macOS permissions'}
                   </Button>
                 )}
-            </Setting>
+            </SettingRow>
           )}
           {host.desktop_control &&
             !host.desktop_control.available &&

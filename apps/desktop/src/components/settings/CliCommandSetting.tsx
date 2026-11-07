@@ -1,10 +1,8 @@
-import { CopyButton } from '@jackalope/ui';
+import { Button, CopyButton, InlineNotice, SettingRow } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Setting } from './Setting';
+import { describeError } from '../../lib/errors';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 
 interface CommandStatus {
   command: string | null;
@@ -22,9 +20,9 @@ export function CliCommandSetting() {
   const [error, setError] = useState('');
   useEffect(() => {
     if (!isTauriEnvironment()) return;
-    nativeTask<CommandStatus>('cli_install_status')
+    invokeNative<CommandStatus>('cli_install_status')
       .then(setStatus)
-      .catch((cause) => setError(String(cause)));
+      .catch((cause) => setError(describeError(cause)));
   }, []);
   if (!isTauriEnvironment()) return null;
 
@@ -32,9 +30,9 @@ export function CliCommandSetting() {
     setInstalling(true);
     setError('');
     try {
-      setStatus(await nativeTask<CommandStatus>('cli_install_system'));
+      setStatus(await invokeNative<CommandStatus>('cli_install_system'));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setInstalling(false);
     }
@@ -51,7 +49,7 @@ export function CliCommandSetting() {
           ? 'The command is installed, but its folder is not on your terminal’s PATH yet.'
           : (status.skipped ?? 'The jackalope command is not installed.');
   return (
-    <Setting title="Command line tool" description={description}>
+    <SettingRow title="Command line tool" description={description}>
       <div className="flex flex-col items-end gap-2">
         {ready ? (
           <span className="flex items-center gap-2">
@@ -79,6 +77,6 @@ export function CliCommandSetting() {
           <InlineNotice tone="error">{error || status?.error}</InlineNotice>
         )}
       </div>
-    </Setting>
+    </SettingRow>
   );
 }

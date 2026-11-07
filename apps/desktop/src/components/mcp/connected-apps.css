@@ -90,7 +90,6 @@
   max-width: 560px;
   margin-top: 12px;
 }
-.connected-apps-key .ui-input,
 .connected-apps-key input {
   flex: 1;
   min-width: 0;

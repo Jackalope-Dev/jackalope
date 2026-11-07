@@ -1,14 +1,25 @@
-import { Checkbox, Disclosure, DisclosureSummary, Input, SearchField } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  DialogCloseButton,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  Disclosure,
+  DisclosureSummary,
+  Input,
+  SearchField,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useMemo, useState } from 'react';
+import { openHelperDraft } from '../../lib/app-events';
+import { describeError } from '../../lib/errors';
 import { type LiveSession, type SessionTopic, sessionCommand } from '../../lib/live-session';
 import { suggestTopics, topicDraft } from '../../lib/session-topics';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
+import { ActionError } from '../ui/ActionError';
 
 export function SessionTopics({
   session,
@@ -72,7 +83,7 @@ export function SessionTopics({
       await useLiveSessionStore.getState().refresh(session.id);
       setEditing(null);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -91,9 +102,9 @@ export function SessionTopics({
         });
       useProjectStore.getState().selectProject(session.request.projectId);
       setOpen(false);
-      window.dispatchEvent(new CustomEvent('jackalope:helper-draft', { detail: key }));
+      openHelperDraft(key);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   return (
@@ -127,7 +138,7 @@ export function SessionTopics({
             New topic
           </Button>
         </div>
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
         <div className="work-topics-layout">
           <nav className="work-topic-list" aria-label="Saved and suggested topics">
             {topics.map((topic) => (

@@ -1,5 +1,5 @@
 import { applyThemeTokens, DEFAULT_THEME, startThemeClock } from '@jackalope/brand/theme';
-import { Checkbox } from '@jackalope/ui';
+import { Button, Checkbox, Input, Select, SelectItem } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useShallow } from 'zustand/react/shallow';
@@ -8,15 +8,13 @@ import { LocalAiSetup } from './components/agents/LocalAiSetup';
 import { WelcomeDialog } from './components/layout/WelcomeDialog';
 import { JackalopeMascot } from './components/mascot/JackalopeMascot';
 import { ThemeEditor } from './components/theme/ThemeEditor';
-import { Button } from './components/ui/button';
-import { Input } from './components/ui/input';
-import { Select, SelectItem } from './components/ui/Select';
 import { WorkspaceHeading } from './components/ui/WorkspaceHeading';
 import { localAiFixture } from './design-lab/local-ai-fixture';
 import { TaskExperienceExamples } from './design-lab/TaskExperienceExamples';
 import { type MascotMood, useMascotStore } from './stores/mascotStore';
 import './index.css';
-import './components/ui/experience.css';
+import '@jackalope/ui/styles.css';
+import './components/layout/workspace-shell.css';
 import './components/agents/agents-workspace.css';
 
 function DesignLab() {
@@ -27,8 +25,8 @@ function DesignLab() {
   const [reduceMotion, setReduceMotion] = useState(false);
   const [period, setPeriod] = useState('30');
   const [agentState, setAgentState] = useState('idle');
-  const { mood, setMood } = useMascotStore(
-    useShallow((s) => ({ mood: s.mood, setMood: s.setMood })),
+  const { mood, previewMood } = useMascotStore(
+    useShallow((s) => ({ mood: s.mood, previewMood: s.previewMood })),
   );
   useEffect(() => applyThemeTokens(theme), [theme]);
 
@@ -83,7 +81,7 @@ function DesignLab() {
                     type="button"
                     aria-pressed={mood === state}
                     onClick={() => {
-                      setMood(state);
+                      previewMood(state);
                       setReplay((value) => value + 1);
                     }}
                     className="workspace-nav-item"

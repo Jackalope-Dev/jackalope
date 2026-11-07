@@ -1,13 +1,20 @@
+import {
+  Button,
+  InlineNotice,
+  Select,
+  SelectItem,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { nativeTask } from '../../lib/task-runtime';
+import { describeError } from '../../lib/errors';
+import { invokeNative } from '../../lib/native/transport';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
-import { Setting, SettingActions, SettingBody, SettingGroup } from './Setting';
 
 export function NotificationSettings() {
   const { status, error } = useNotificationStore(
@@ -26,17 +33,17 @@ export function NotificationSettings() {
     setBusy(true);
     setResult('');
     try {
-      await nativeTask('notification_test');
+      await invokeNative('notification_test');
       setResult('Sent to your desktop. If it did not appear, check system notification settings.');
     } catch (error) {
-      setResult(String(error));
+      setResult(describeError(error));
     } finally {
       setBusy(false);
     }
   };
   return (
     <SettingGroup title="Notifications">
-      <Setting
+      <SettingRow
         title="Which task updates to show"
         description="Applies to the in-app companion and to system notifications."
       >
@@ -49,8 +56,8 @@ export function NotificationSettings() {
           <SelectItem value="failures-only">Needs attention only</SelectItem>
           <SelectItem value="none">Quiet</SelectItem>
         </Select>
-      </Setting>
-      <Setting
+      </SettingRow>
+      <SettingRow
         title="System notifications"
         controlId="os-task-notifications"
         description={
@@ -66,7 +73,7 @@ export function NotificationSettings() {
           disabled={!status?.supported}
           onCheckedChange={(osNotifications) => updateSettings({ osNotifications })}
         />
-      </Setting>
+      </SettingRow>
       {status?.supported && (
         <SettingActions>
           <Button

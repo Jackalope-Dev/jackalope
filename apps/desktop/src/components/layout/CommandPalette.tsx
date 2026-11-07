@@ -1,33 +1,26 @@
-import { PRESET_THEMES } from '@jackalope/brand/theme';
+import { PRESET_THEMES, withPreset } from '@jackalope/brand/theme';
 import { SearchField } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import {
-  FileText,
-  Folder,
-  Keyboard,
-  LifeBuoy,
-  MessageSquare,
-  Paperclip,
-  Plus,
-  Settings2,
-  SquareTerminal,
-} from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { openCliTerminal } from '../../lib/cli-terminal';
+import { FileText, Folder, MessageSquare, Paperclip } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { emitAppEvent } from '../../lib/app-events';
+import { describeError } from '../../lib/errors';
 import { searchFiles } from '../../lib/file-search';
-import { ATTACH_TO_COMPOSER, attachmentReference } from '../../lib/prompt-attachments';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import { attachmentReference } from '../../lib/prompt-attachments';
+import { isSettled } from '../../lib/run-status';
 import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
-import { nativeTask } from '../../lib/task-runtime';
-import { taskTitle } from '../../lib/task-title';
+import { workShape } from '../../lib/task-collection';
 import { taskDecision } from '../../lib/task-workflow';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { showWork, useWorkspaceWork, workProjectId } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
-import { useLiveSessionStore } from '../../stores/liveSessionStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
+import { type Command, type CommandContext, matchingCommands } from './commands';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
 
 const fileCache = new Map<string, { files: string[]; loadedAt: number }>();
@@ -43,7 +36,7 @@ function useProjectFiles(projectPath: string | undefined, enabled: boolean) {
     if (cached) setFiles(cached.files);
     if (cached && Date.now() - cached.loadedAt < 30_000) return;
     let canceled = false;
-    nativeTask<string[]>('project_files_list', { projectPath })
+    invokeNative<string[]>('project_files_list', { projectPath })
       .then((list) => {
         fileCache.set(projectPath, { files: list, loadedAt: Date.now() });
         if (!canceled) setFiles(list);
@@ -62,16 +55,16 @@ export function CommandPalette({
   isOpen,
   onClose,
   onNavigate,
-  onOpenSettings,
-  onCapture,
   onSelectProject,
+  context,
+  onCommand,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onNavigate: (tab: ActiveTab) => void;
-  onOpenSettings?: () => void;
-  onCapture?: () => void;
-  onSelectProject?: (id: string) => void;
+  onSelectProject: (id: string) => void;
+  context: CommandContext;
+  onCommand: (command: Command) => void;
 }) {
   const [query, setQuery] = useState('');
   const shortcuts = useSettingsStore((state) => state.shortcuts);
@@ -80,43 +73,21 @@ export function CommandPalette({
   const search = query.trim().toLowerCase();
   const projects = useProjectStore((state) => state.projects);
   const runs = useExecutionStore((state) => state.runs);
-  const sessions = useLiveSessionStore((state) => state.sessions);
   const selected = useExecutionStore((state) => state.selectedId);
   const current = runs.find((run) => run.id === selected);
-  const latest = useMemo(() => {
-    const tasks = new Map<
-      string,
-      { run: (typeof runs)[number]; original: (typeof runs)[number] }
-    >();
-    for (const run of runs) {
-      if (run.liveSessionId) continue;
-      const task = tasks.get(run.taskId);
-      if (!task) tasks.set(run.taskId, { run, original: run });
-      else {
-        if (Date.parse(run.startedAt) > Date.parse(task.run.startedAt)) task.run = run;
-        if (Date.parse(run.startedAt) < Date.parse(task.original.startedAt)) task.original = run;
-      }
-    }
-    return [...tasks.values()];
-  }, [runs]);
-  const work = [
-    ...latest.map(({ run, original }) => ({
-      id: run.id,
-      title: taskTitle(original.prompt),
-      project: run.projectName,
-      date: run.startedAt,
-      state: taskDecision(run).label,
-    })),
-    ...sessions.map((session) => ({
-      id: `session:${session.id}`,
-      title: session.title,
-      project: session.request.projectName,
-      date: session.updatedAt,
-      state: session.persona ? `Bot · ${session.persona.name}` : 'Conversation',
-    })),
-  ]
-    .filter((item) => `${item.title} ${item.project} ${item.state}`.toLowerCase().includes(search))
-    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
+  const workspaceWork = useWorkspaceWork({ withoutDrafts: true, nested: true });
+  const work = workspaceWork
+    .map((item) => ({
+      item,
+      project: projects.find((project) => project.id === workProjectId(item))?.name ?? '',
+      state: item.session?.persona
+        ? `Bot · ${item.session.persona.name}`
+        : (item.statusLabel ?? workShape(item)),
+    }))
+    .filter(({ item, project, state }) =>
+      `${item.title} ${project} ${state}`.toLowerCase().includes(search),
+    )
+    .sort((a, b) => Date.parse(b.item.date) - Date.parse(a.item.date))
     .slice(0, 8);
   const matchingProjects = projects
     .filter((project) => `${project.name} ${project.path}`.toLowerCase().includes(search))
@@ -126,7 +97,7 @@ export function CommandPalette({
         { label: taskDecision(current).action, section: taskDecision(current).section },
         { label: 'Open conversation', section: 'result' },
         { label: 'Open task terminal and workspace tools', section: 'terminal' },
-        ...(['review', 'reviewed', 'failed', 'stopped'].includes(current.status)
+        ...(isSettled(current)
           ? [
               { label: 'Try result', section: 'preview' },
               { label: 'Review changes and checks', section: 'changes' },
@@ -135,34 +106,26 @@ export function CommandPalette({
           : []),
       ].filter((action) => action.label.toLowerCase().includes(search))
     : [];
-  const showSettings =
-    Boolean(onOpenSettings) &&
-    ('settings preferences options configuration project'
-      .split(' ')
-      .some((kw) => kw.includes(search)) ||
-      'settings & preferences'.includes(search));
-  const terminalProject = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const commands = matchingCommands(context, search);
+  const activeProject = useActiveProject();
   const remoteHost = useHostContextStore((state) => state.host);
-  const showTerminal =
-    Boolean(terminalProject) &&
-    !remoteHost &&
-    'terminal cli command shell console jackalope'.split(' ').some((kw) => kw.includes(search));
-  const showHelp =
-    'help docs documentation knowledgebase faq troubleshooting guides'
-      .split(' ')
-      .some((kw) => kw.includes(search)) || search.includes('help');
   const views = WORKSPACE_VIEWS.filter(
-    (item) =>
-      item.id !== 'live-sessions' &&
-      `${item.label} ${item.description}`.toLowerCase().includes(search),
+    (item: { label: string; description: string; keywords?: string }) =>
+      `${item.label} ${item.description} ${item.keywords ?? ''}`.toLowerCase().includes(search),
   );
   const themes = PRESET_THEMES.filter((item) => item.name.toLowerCase().includes(search));
   const preferredEditor = useSettingsStore((state) => state.preferredEditor);
-  const projectFiles = useProjectFiles(terminalProject?.path, isOpen && !remoteHost);
+  const projectFiles = useProjectFiles(activeProject?.path, isOpen && !remoteHost);
   const files = search.length >= 2 ? searchFiles(projectFiles, search, 8) : [];
   const [fileError, setFileError] = useState('');
+  const resultCount =
+    actions.length +
+    work.length +
+    matchingProjects.length +
+    files.length +
+    commands.length +
+    views.length +
+    themes.length;
 
   return (
     <Dialog.Root
@@ -244,14 +207,15 @@ export function CommandPalette({
             {work.length > 0 && (
               <p className="menu-label">{search ? 'Matching work' : 'Recent work'}</p>
             )}
-            {work.map((item) => (
+            {work.map(({ item, project, state }) => (
               <button
                 key={item.id}
                 data-command
                 type="button"
                 className="workspace-menu-item w-full text-left"
                 onClick={() => {
-                  useWorkViewStore.getState().open(item.id);
+                  showWork(item);
+                  onNavigate('kanban');
                   onClose();
                 }}
               >
@@ -259,7 +223,7 @@ export function CommandPalette({
                 <span className="min-w-0">
                   <span className="block truncate">{item.title}</span>
                   <small className="block text-[var(--color-text-secondary)]">
-                    {item.project} · {item.state}
+                    {[project, state].filter(Boolean).join(' · ')}
                   </small>
                 </span>
               </button>
@@ -272,8 +236,7 @@ export function CommandPalette({
                 type="button"
                 className="workspace-menu-item w-full text-left"
                 onClick={() => {
-                  if (onSelectProject) onSelectProject(project.id);
-                  else useProjectStore.getState().selectProject(project.id);
+                  onSelectProject(project.id);
                   useWorkViewStore.getState().setScope('project');
                   onNavigate('project-overview');
                   onClose();
@@ -283,15 +246,15 @@ export function CommandPalette({
                 <span>{project.name}</span>
               </button>
             ))}
-            {files.length > 0 && terminalProject && (
-              <p className="menu-label">Files in {terminalProject.name}</p>
+            {files.length > 0 && activeProject && (
+              <p className="menu-label">Files in {activeProject.name}</p>
             )}
             {fileError && (
               <p className="px-3 pb-2 text-xs text-[var(--color-danger)]" role="alert">
                 {fileError}
               </p>
             )}
-            {terminalProject &&
+            {activeProject &&
               files.map((file) => (
                 <div key={file} className="command-file-row">
                   <button
@@ -301,13 +264,13 @@ export function CommandPalette({
                     title={`Open in ${preferredEditor === 'cursor' ? 'Cursor' : 'VS Code'}`}
                     onClick={() => {
                       setFileError('');
-                      nativeTask('project_file_open', {
-                        projectPath: terminalProject.path,
+                      invokeNative('project_file_open', {
+                        projectPath: activeProject.path,
                         relativePath: file,
                         editor: preferredEditor,
                       })
                         .then(onClose)
-                        .catch((cause) => setFileError(String(cause)));
+                        .catch((cause) => setFileError(describeError(cause)));
                     }}
                   >
                     <FileText size={16} />
@@ -318,108 +281,48 @@ export function CommandPalette({
                       </small>
                     </span>
                   </button>
-                  {onCapture && (
-                    <button
-                      type="button"
-                      className="quiet-icon command-file-attach"
-                      aria-label={`Attach ${file} to new work`}
-                      title="Attach to new work"
-                      onClick={() => {
-                        onClose();
-                        onCapture();
-                        const reference = attachmentReference(
-                          `${terminalProject.path}/${file}`,
-                          terminalProject.path,
-                        );
-                        requestAnimationFrame(() =>
-                          window.dispatchEvent(
-                            new CustomEvent(ATTACH_TO_COMPOSER, { detail: [reference] }),
-                          ),
-                        );
-                      }}
-                    >
-                      <Paperclip size={16} />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="quiet-icon command-file-attach"
+                    aria-label={`Attach ${file} to new work`}
+                    title="Attach to new work"
+                    onClick={() => {
+                      onClose();
+                      context.focusComposer();
+                      const reference = attachmentReference(
+                        `${activeProject.path}/${file}`,
+                        activeProject.path,
+                      );
+                      requestAnimationFrame(() => emitAppEvent('attach-to-composer', [reference]));
+                    }}
+                  >
+                    <Paperclip size={16} />
+                  </button>
                 </div>
               ))}
-            <p className="menu-label">Commands</p>
-            {onCapture &&
-              ('new work task conversation capture idea'.includes(search) || !search) && (
-                <button
-                  data-command
-                  type="button"
-                  className="workspace-menu-item w-full"
-                  onClick={() => {
-                    onClose();
-                    onCapture();
-                  }}
-                >
-                  <Plus size={16} />
-                  <span>New work</span>
-                  <kbd>{displayShortcut(resolveShortcuts(shortcuts).newWork)}</kbd>
-                </button>
-              )}
-            {showTerminal && terminalProject && (
+            {commands.length + views.length > 0 && <p className="menu-label">Commands</p>}
+            {commands.map((command) => (
               <button
                 data-command
                 type="button"
-                className="workspace-menu-item w-full"
+                key={command.id}
+                className="workspace-menu-item w-full text-left"
                 onClick={() => {
                   onClose();
-                  void openCliTerminal(terminalProject.path).catch(() => {});
+                  onCommand(command);
                 }}
               >
-                <SquareTerminal size={16} />
-                <span>Open terminal in {terminalProject.name}</span>
-                <kbd>{displayShortcut(resolveShortcuts(shortcuts).terminal)}</kbd>
+                <command.icon className="size-4 text-[var(--color-accent-ink)]" />
+                <span>{command.label(context)}</span>
+                {(command.shortcut || command.key) && (
+                  <kbd>
+                    {command.shortcut
+                      ? displayShortcut(resolveShortcuts(shortcuts)[command.shortcut])
+                      : command.key}
+                  </kbd>
+                )}
               </button>
-            )}
-            {showSettings && (
-              <button
-                data-command
-                type="button"
-                className="workspace-menu-item w-full text-left hover:bg-[var(--color-surface-hover)]"
-                onClick={() => {
-                  onOpenSettings?.();
-                  onClose();
-                }}
-              >
-                <Settings2 className="size-4 text-[var(--color-accent-ink)]" />
-                <span>Settings & Preferences</span>
-              </button>
-            )}
-            {'keyboard shortcuts keys hotkeys'.split(' ').some((kw) => kw.includes(search)) && (
-              <button
-                data-command
-                type="button"
-                className="workspace-menu-item w-full text-left hover:bg-[var(--color-surface-hover)]"
-                onClick={() => {
-                  onClose();
-                  requestAnimationFrame(() =>
-                    window.dispatchEvent(new CustomEvent('jackalope:open-shortcuts')),
-                  );
-                }}
-              >
-                <Keyboard className="size-4 text-[var(--color-accent-ink)]" />
-                <span>Keyboard shortcuts</span>
-                <kbd>?</kbd>
-              </button>
-            )}
-            {showHelp && (
-              <button
-                data-command
-                type="button"
-                className="workspace-menu-item w-full text-left hover:bg-[var(--color-surface-hover)]"
-                onClick={() => {
-                  onClose();
-                  void openExternalUrl('https://jackalope.dev/knowledge/');
-                }}
-              >
-                <LifeBuoy className="size-4 text-[var(--color-accent-ink)]" />
-                <span>Help & Knowledgebase</span>
-              </button>
-            )}
+            ))}
             {views.map((item) => (
               <button
                 data-command
@@ -443,14 +346,7 @@ export function CommandPalette({
                 key={theme.id}
                 className="workspace-menu-item w-full hover:bg-[var(--color-surface-hover)]"
                 onClick={() => {
-                  const current = useThemeStore.getState().currentTheme;
-                  setTheme({
-                    ...theme,
-                    isDark: current.isDark,
-                    appearance: current.appearance,
-                    atmosphere: current.atmosphere,
-                    harmony: current.harmony,
-                  });
+                  setTheme(withPreset(theme, useThemeStore.getState().currentTheme));
                   onClose();
                 }}
               >
@@ -458,19 +354,11 @@ export function CommandPalette({
                 <span>{theme.name}</span>
               </button>
             ))}
-            {!views.length &&
-              !themes.length &&
-              !showSettings &&
-              !showHelp &&
-              !work.length &&
-              !files.length &&
-              !matchingProjects.length &&
-              !actions.length &&
-              !(onCapture && 'new task capture idea'.includes(search)) && (
-                <p className="p-6 text-sm text-[var(--color-text-secondary)]">
-                  No matches. Try a file name, “agents” or a color.
-                </p>
-              )}
+            {resultCount === 0 && (
+              <p className="p-6 text-sm text-[var(--color-text-secondary)]">
+                No matches. Try a file name, “agents” or a color.
+              </p>
+            )}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

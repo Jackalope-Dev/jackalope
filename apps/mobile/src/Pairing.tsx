@@ -5,11 +5,11 @@ import {
   DisclosureBody,
   DisclosureSummary,
   FormField,
+  InlineNotice,
   Input,
 } from '@jackalope/ui';
 import { ChevronLeft, QrCode } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { InlineNotice } from '../../desktop/src/components/ui/InlineNotice';
 import { type Host, pair, scanPairingCode } from './native';
 
 /** A starting name the person can keep: phones rarely need telling apart beyond their kind. */

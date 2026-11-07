@@ -1,3 +1,30 @@
+.queue-page .task-back {
+  margin-bottom: 4px;
+}
+.queue-heading .task-hero-title {
+  font-size: var(--text-2xl);
+}
+.queue-heading .workspace-actions {
+  flex-wrap: nowrap;
+}
+.queue-heading > .flex-col {
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+}
+.queue-select-all,
+.queue-dependencies label {
+  min-height: var(--control-height, 36px);
+}
+@media (max-width: 700px) {
+  .queue-heading,
+  .queue-controls {
+    flex-wrap: wrap;
+  }
+  .queue-form-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .queue-heading,
 .queue-section-heading {
   display: flex;
@@ -32,6 +59,12 @@
   background: var(--color-surface-sunken);
   border-radius: var(--radius-lg);
   margin: 28px 0 16px;
+}
+.queue-page .queue-flow {
+  margin: 16px 0 8px;
+}
+.queue-page .queue-controls {
+  margin-bottom: 8px;
 }
 .queue-flow button {
   flex: 1;

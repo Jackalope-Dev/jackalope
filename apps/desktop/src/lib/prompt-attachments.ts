@@ -1,6 +1,3 @@
-/** Window event asking the open new-work composer to add attachment lines (detail: string[]). */
-export const ATTACH_TO_COMPOSER = 'jackalope:attach-to-composer';
-
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']);
 const SEPARATORS = /[\\/]+/g;
 

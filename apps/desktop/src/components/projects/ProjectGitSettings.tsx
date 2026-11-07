@@ -1,11 +1,18 @@
+import {
+  Button,
+  InlineNotice,
+  Input,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+  SettingRow,
+  Switch,
+} from '@jackalope/ui';
 import { Bot, Check, UserRound, UsersRound } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
-import { Setting, SettingActions, SettingBody, SettingGroup } from '../settings/Setting';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
-import { Switch } from '../ui/Switch';
+import { ActionError } from '../ui/ActionError';
 
 const choices = [
   {
@@ -62,7 +69,7 @@ export function ProjectGitSettings({
         }
       })
       .catch((cause) => {
-        if (current) setError(String(cause));
+        if (current) setError(describeError(cause));
       });
     return () => {
       current = false;
@@ -82,7 +89,7 @@ export function ProjectGitSettings({
       setSaved(next);
       setNotice('Commit settings saved for this repository.');
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -138,20 +145,20 @@ export function ProjectGitSettings({
               </label>
             </div>
           </SettingBody>
-          <Setting title="Save checkpoints after successful tasks">
+          <SettingRow title="Save checkpoints after successful tasks">
             <Switch
               label="Save checkpoints after successful tasks"
               checked={policy.autoCheckpoint !== false}
               onCheckedChange={(autoCheckpoint) => setPolicy({ ...policy, autoCheckpoint })}
             />
-          </Setting>
-          <Setting title="Remove worktree and branch after approval">
+          </SettingRow>
+          <SettingRow title="Remove worktree and branch after approval">
             <Switch
               label="Remove worktree and branch after approval"
               checked={policy.cleanupAfterMerge}
               onCheckedChange={(cleanupAfterMerge) => setPolicy({ ...policy, cleanupAfterMerge })}
             />
-          </Setting>
+          </SettingRow>
         </fieldset>
       )}
       {(!policy || notice || error) && (
@@ -162,7 +169,7 @@ export function ProjectGitSettings({
             </p>
           )}
           {notice && <InlineNotice role="status">{notice}</InlineNotice>}
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           {!policy && error && (
             <div>
               <Button variant="outline" onClick={() => setRetry(retry + 1)}>

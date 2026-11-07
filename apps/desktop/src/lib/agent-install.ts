@@ -1,4 +1,4 @@
-import { nativeTask } from './task-runtime';
+import { invokeNative } from './native/transport';
 
 export interface AgentInstallPlan {
   /** The npm command Jackalope runs, or null when the agent installs another way. */
@@ -12,11 +12,11 @@ export interface AgentInstallPlan {
 export const NODE_DOWNLOAD_URL = 'https://nodejs.org/en/download';
 
 export const agentInstallPlan = (agent: string) =>
-  nativeTask<AgentInstallPlan>('agent_install_plan', { agent });
+  invokeNative<AgentInstallPlan>('agent_install_plan', { agent });
 
 /** Starts the install in a terminal; poll and stop it with the sign-in session commands. */
 export const startAgentInstall = (agent: string, cols = 100, rows = 20) =>
-  nativeTask<string>('agent_install', { agent, cols, rows });
+  invokeNative<string>('agent_install', { agent, cols, rows });
 
 const ESC = String.fromCharCode(27);
 const BEL = String.fromCharCode(7);

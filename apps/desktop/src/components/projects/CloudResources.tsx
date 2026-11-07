@@ -9,12 +9,14 @@ import {
   InlineNotice,
   Input,
   LinkButton,
+  LoadingState,
   Stepper,
   type StepperStep,
   Textarea,
 } from '@jackalope/ui';
 import { Cloud, MoreHorizontal } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { openProjectSettings, openSettings } from '../../lib/app-events';
 import {
   CLOUD_RESOURCES,
   type CloudResourceKind,
@@ -29,9 +31,7 @@ import {
 } from '../../lib/cloud-resources-plan';
 import {
   ARTIFACTS_TOKEN_URL,
-  beginCloudflareSignIn,
   cancelCloudflareSignIn,
-  completeCloudflareSignIn,
   reauthorizeCloudflare,
 } from '../../lib/cloudflare-artifacts';
 import {
@@ -46,14 +46,14 @@ import {
   provisionCloudResources,
   turnstileSecret,
 } from '../../lib/cloudflare-resources';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { type CloudResourcesDraft, useCloudResourcesStore } from '../../stores/cloudResourcesStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { openProjectSettings, openSettings } from '../layout/navigation';
-import { LoadingState } from '../ui/LoadingState';
+import { useActiveProject } from '../../stores/projectStore';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import './cloud-resources.css';
+import { describeError } from '../../lib/errors';
+import { useCloudflareSignIn } from '../../lib/useCloudflareSignIn';
 
 interface Run {
   kinds: CloudResourceKind[];
@@ -96,9 +96,7 @@ function runSteps(run: Run): StepperStep[] {
  * are kept across Back, retry and reload until setup succeeds.
  */
 export function CloudResources() {
-  const project = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   const savedDraft = useCloudResourcesStore((state) =>
     project ? state.drafts[project.id] : undefined,
   );
@@ -109,7 +107,7 @@ export function CloudResources() {
   const [run, setRun] = useState<Run | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const signingIn = useRef(false);
+  const cloudflareSignIn = useCloudflareSignIn();
   const projectPath = project?.path;
 
   const draft: CloudResourcesDraft = savedDraft ?? {
@@ -135,14 +133,8 @@ export function CloudResources() {
         const drafted = project?.id && useCloudResourcesStore.getState().drafts[project.id];
         setView((current) => current ?? (next?.manifest && !drafted ? 'result' : 'choose'));
       })
-      .catch((cause) => setError(String(cause)));
+      .catch((cause) => setError(describeError(cause)));
   }, [refresh, project?.id]);
-  useEffect(
-    () => () => {
-      if (signingIn.current) void cancelCloudflareSignIn().catch(() => {});
-    },
-    [],
-  );
 
   if (!project) {
     return (
@@ -154,7 +146,7 @@ export function CloudResources() {
   }
   const projectId = project.id;
   const open = (link: string) =>
-    void openExternalUrl(link).catch((cause) => setError(String(cause)));
+    void openExternalUrl(link).catch((cause) => setError(describeError(cause)));
 
   const kinds = orderedKinds(draft.kinds);
   const needsPostgres =
@@ -174,14 +166,8 @@ export function CloudResources() {
 
   /** Connect Cloudflare again for the same account, asking for `scopes` as well. */
   const allow = async (scopes: string[]) => {
-    signingIn.current = true;
-    try {
-      await openExternalUrl(await beginCloudflareSignIn({ scopes }));
-      await completeCloudflareSignIn();
-      await reauthorizeCloudflare();
-    } finally {
-      signingIn.current = false;
-    }
+    await cloudflareSignIn({ scopes });
+    await reauthorizeCloudflare();
   };
 
   const start = async (allowFirst?: string[]) => {
@@ -242,7 +228,7 @@ export function CloudResources() {
         return;
       }
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
       setRun(null);
       setView('choose');
     } finally {
@@ -258,7 +244,7 @@ export function CloudResources() {
       const next = await refresh();
       if (!next?.manifest) setView('choose');
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
 

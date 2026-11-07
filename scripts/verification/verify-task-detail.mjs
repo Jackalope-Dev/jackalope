@@ -15,7 +15,6 @@ import { applyThemeTokens, DEFAULT_THEME } from '/node_modules/@jackalope/brand/
 import '/src/index.css';
 import '/src/components/tasks/task-workspace.css';
 import '/src/components/tasks/core-workflow.css';
-import '/src/components/ui/experience.css';
 const base = {
  id: 'sample', taskId: 'task', projectId: 'atlas', projectName: 'Atlas',
  projectPath: 'C:/Projects/atlas', workspace: 'C:/Projects/atlas-task', branch: 'task/search',

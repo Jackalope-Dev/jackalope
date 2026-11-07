@@ -1,14 +1,13 @@
 import { FileDiff } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { isActive } from '../../lib/run-status';
 import type { WorkItem } from '../../lib/task-collection';
-import { isActive } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOpenWorkStore } from '../../stores/openWorkStore';
 import {
-  type ChangeStats,
   compactElapsed,
   isUnread,
   openSignalKey,
@@ -17,6 +16,7 @@ import {
   useWorkSignalsStore,
 } from '../../stores/workSignalsStore';
 import './work-signals.css';
+import type { ChangeStats } from '../../lib/run-types';
 
 /** Key of the work open in the main view. */
 export function useOpenSignalKey() {

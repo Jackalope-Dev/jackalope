@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
-import { nativeTask, type RunUsage } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { InlineNotice } from '../ui/InlineNotice';
+import { InlineNotice } from '@jackalope/ui';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import type { RunUsage } from '../../lib/run-types';
+import { useNativeResource } from '../../lib/useNativeResource';
 
 export interface JevConnectionTotals {
   calls: number;
@@ -10,22 +11,11 @@ export interface JevConnectionTotals {
 }
 
 export function JevConnectionUsage() {
-  const [totals, setTotals] = useState<JevConnectionTotals | null>(null);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    if (!isTauriEnvironment()) return;
-    let current = true;
-    void nativeTask<JevConnectionTotals>('routing_connection_usage')
-      .then((value) => {
-        if (current) setTotals(value);
-      })
-      .catch((error) => {
-        if (current) setError(String(error));
-      });
-    return () => {
-      current = false;
-    };
-  }, []);
+  const { data: totals, error } = useNativeResource(
+    () => invokeNative<JevConnectionTotals>('routing_connection_usage'),
+    [],
+    { enabled: isTauriEnvironment() },
+  );
   if (!error && !totals?.calls) return null;
   return (
     <dl className="flex flex-wrap items-baseline gap-x-4 gap-y-1" aria-label="Jev setup usage">

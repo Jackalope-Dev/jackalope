@@ -289,13 +289,6 @@
   gap: 12px;
 }
 
-.bots-switch {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: var(--control-height, 36px);
-}
-
 /* Every row takes the tallest card's height, so the grid reads as even tiles. */
 .bots-templates {
   display: grid;
@@ -488,18 +481,6 @@
   margin: 0;
   padding: 16px 32px 20px;
   border-top: 1px solid var(--color-border-subtle);
-}
-
-.bot-editor-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-@media (max-width: 640px) {
-  .bot-editor-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .bot-editor-field {

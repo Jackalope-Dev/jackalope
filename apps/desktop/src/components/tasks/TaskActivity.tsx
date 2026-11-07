@@ -1,7 +1,6 @@
-import { Disclosure, DisclosureSummary, SearchField } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, SearchField } from '@jackalope/ui';
 import { ListFilter } from 'lucide-react';
 import { useId, useState } from 'react';
-import { Button } from '../ui/button';
 import { CodeSurface } from './CodeSurface';
 import './task-experience.css';
 export function TaskActivity({ entries, active }: { entries: string[]; active: boolean }) {

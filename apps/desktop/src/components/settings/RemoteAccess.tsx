@@ -6,16 +6,18 @@ import {
   DisclosureBody,
   DisclosureSummary,
   FormField,
+  InlineNotice,
   Input,
+  SettingGroup,
+  SettingRow,
 } from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { nativeTask, type RunRequest } from '../../lib/task-runtime';
-import { syncAgentConfig } from '../../stores/agentConfigStore';
+import { invokeNative } from '../../lib/native/transport';
+import type { RunRequest } from '../../lib/run-types';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Setting, SettingGroup } from './Setting';
 import { TailscaleSetup } from './TailscaleSetup';
 import '../remote/remote.css';
+import { describeError } from '../../lib/errors';
 
 interface Status {
   enabled: boolean;
@@ -149,13 +151,13 @@ export function RemoteAccess() {
   const load = useCallback(
     async (signal?: AbortSignal) => {
       try {
-        const next = await nativeTask<Status>('remote_status');
+        const next = await invokeNative<Status>('remote_status');
         if (!signal?.aborted) {
           apply(next);
           setError('');
         }
       } catch (cause) {
-        if (!signal?.aborted) setError(String(cause));
+        if (!signal?.aborted) setError(describeError(cause));
       }
     },
     [apply],
@@ -172,10 +174,10 @@ export function RemoteAccess() {
     const poll = async () => {
       if (document.visibilityState === 'visible') {
         try {
-          const next = await nativeTask<Status>('remote_status');
+          const next = await invokeNative<Status>('remote_status');
           if (alive) setStatus(next);
         } catch (cause) {
-          if (alive) setError(String(cause));
+          if (alive) setError(describeError(cause));
         }
       }
       if (alive) timer = setTimeout(poll, 4000);
@@ -205,13 +207,12 @@ export function RemoteAccess() {
     try {
       await operation();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
   };
   const configure = async (allow: boolean) => {
-    await syncAgentConfig();
     const templates: RunRequest[] = projects
       .filter((p) => selected.includes(p.id))
       .map((project) => {
@@ -232,7 +233,7 @@ export function RemoteAccess() {
           autoVerify: project.preferences?.autoVerify ?? true,
         };
       });
-    const next = await nativeTask<Status>('remote_configure', {
+    const next = await invokeNative<Status>('remote_configure', {
       enabled: allow,
       port,
       publicOrigin: address,
@@ -243,7 +244,7 @@ export function RemoteAccess() {
     return next;
   };
   const createPairing = async (devices: Status['devices']) => {
-    const result = await nativeTask<PairingCode>('remote_pairing');
+    const result = await invokeNative<PairingCode>('remote_pairing');
     pairingDevices.current = new Set(devices.map((device) => device.id));
     setPair(result);
     setExpires(Date.now() + result.expiresIn * 1000);
@@ -251,7 +252,7 @@ export function RemoteAccess() {
   return (
     <SettingGroup title="Remote access">
       {status && !status.enabled && projects.length > 0 && (
-        <Setting
+        <SettingRow
           title="Pair a phone"
           description="Turns on remote access. Your phone can read work, start tasks and respond in the projects selected below."
         >
@@ -268,7 +269,7 @@ export function RemoteAccess() {
           >
             Pair a phone
           </Button>
-        </Setting>
+        </SettingRow>
       )}
       <form
         className="remote-setup px-5 py-4"
@@ -352,14 +353,14 @@ export function RemoteAccess() {
       {status?.listening && !status.publicOrigin && (
         <TailscaleSetup
           turnOn={async () => {
-            apply(await nativeTask<Status>('remote_private_https'));
+            apply(await invokeNative<Status>('remote_private_https'));
             setPair(null);
             setNotice('Private HTTPS is on. Create a pairing code for your phone.');
           }}
         />
       )}
       {status?.listening && (
-        <Setting
+        <SettingRow
           title="Pair a device"
           description={
             status.publicOrigin
@@ -374,7 +375,7 @@ export function RemoteAccess() {
           >
             {pair ? 'New code' : status.publicOrigin ? 'Pair a phone' : 'Create pairing code'}
           </Button>
-        </Setting>
+        </SettingRow>
       )}
       {pair && (
         <PairingView
@@ -387,7 +388,7 @@ export function RemoteAccess() {
       {!!status?.devices.length && (
         <div>
           {status.devices.map((device) => (
-            <Setting
+            <SettingRow
               key={device.id}
               title={device.name}
               description={`Paired ${new Date(device.pairedAt).toLocaleDateString()}`}
@@ -397,14 +398,14 @@ export function RemoteAccess() {
                 disabled={busy}
                 onClick={() =>
                   void perform(async () => {
-                    await nativeTask('remote_revoke', { id: device.id });
-                    setStatus(await nativeTask<Status>('remote_status'));
+                    await invokeNative('remote_revoke', { id: device.id });
+                    setStatus(await invokeNative<Status>('remote_status'));
                   })
                 }
               >
                 Revoke access
               </Button>
-            </Setting>
+            </SettingRow>
           ))}
         </div>
       )}

@@ -29,7 +29,6 @@ import {useThemeStore} from './src/stores/themeStore';
 import {useOnboardingStore} from './src/stores/onboardingStore';
 import './src/index.css';
 import './src/components/settings/settings.css';
-import './src/components/ui/experience.css';
 window.fixture={account:'disconnected',enabled:true,revision:1,settings:{version:1,accentHex:'#6366f1',isDark:true,appearance:'manual',atmosphere:12,harmony:'single',mascotReactions:true,notifications:'none',osNotifications:true},calls:[],fail:false};
 window.__TAURI_EVENT_PLUGIN_INTERNALS__={unregisterListener:()=>{}};
 window.projectStore=useProjectStore;window.onboardingStore=useOnboardingStore;window.agentStore=useAgentConfigStore;window.syncStore=useSettingsSyncStore;window.settingsStore=useSettingsStore;window.themeStore=useThemeStore;

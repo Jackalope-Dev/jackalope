@@ -1,8 +1,9 @@
-import { Button, Textarea } from '@jackalope/ui';
+import { Button, InlineNotice, Textarea } from '@jackalope/ui';
 import { MousePointer2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { nativeTask, type ScreenshotArtifact } from '../../lib/task-runtime';
-import { InlineNotice } from '../ui/InlineNotice';
+import { describeError } from '../../lib/errors';
+import { invokeNative } from '../../lib/native/transport';
+import type { ScreenshotArtifact } from '../../lib/run-types';
 import { ScreenshotPreview } from './ScreenshotPreview';
 
 interface Capture {
@@ -105,7 +106,7 @@ export function DesignPreview({
       if (pending) return;
       pending = true;
       try {
-        const capture = await nativeTask<Capture | null>('task_preview_design_capture', {
+        const capture = await invokeNative<Capture | null>('task_preview_design_capture', {
           id: runId,
         });
         if (
@@ -135,7 +136,7 @@ export function DesignPreview({
         }
       } catch (cause) {
         if (alive) {
-          setError(String(cause));
+          setError(describeError(cause));
           setWatching(false);
         }
       } finally {
@@ -167,13 +168,13 @@ export function DesignPreview({
                   (name) => [name, style.getPropertyValue(name).trim()],
                 ),
               );
-              await nativeTask('task_preview_design_open', { id: runId, path, theme });
+              await invokeNative('task_preview_design_open', { id: runId, path, theme });
               setWatching(true);
               setNotice(
                 'Select an element in the preview window. Its current page state is preserved.',
               );
             } catch (cause) {
-              setError(String(cause));
+              setError(describeError(cause));
             } finally {
               setBusy(false);
             }
@@ -210,7 +211,7 @@ export function DesignPreview({
                     : 'Feedback added. Selections were kept because storage is unavailable.',
                 );
               } catch (cause) {
-                setError(String(cause));
+                setError(describeError(cause));
               } finally {
                 setBusy(false);
               }

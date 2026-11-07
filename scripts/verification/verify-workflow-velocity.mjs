@@ -32,7 +32,6 @@ import {useProjectStore} from '../../src/stores/projectStore';
 import '../../src/index.css';
 import '../../src/components/tasks/task-workspace.css';
 import '../../src/components/tasks/task-detail.css';
-import '../../src/components/ui/experience.css';
 const patch=${JSON.stringify(patch)};
 const run={id:'fixture-run',taskId:'fixture-task',projectId:'fixture-project',projectName:'Atlas',projectPath:'C:/fixture',workspace:'C:/fixture/worktree',branch:'feature/focus',baseHead:'123456',agent:'codex',account:'Default',prompt:'Make the project settings easier to use.',status:'review',startedAt:'2026-09-18T00:00:00Z',endedAt:'2026-09-18T00:01:00Z',sessionId:'fixture-session',result:'## Changes ready\nThe settings form now keeps keyboard focus and uses a clearer action label.',activity:[],prompts:[],screenshots:[],validationSteps:[],diagnostics:[],usage:{input:0,output:0,reported:false},contract:{requirements:[]}};
 useExecutionStore.setState({runs:[run]});

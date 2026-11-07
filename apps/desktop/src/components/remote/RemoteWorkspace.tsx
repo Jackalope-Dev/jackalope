@@ -3,17 +3,19 @@ import {
   Disclosure,
   DisclosureSummary,
   FormField,
+  InlineNotice,
   Select,
   SelectItem,
   Textarea,
 } from '@jackalope/ui';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { isActive as active } from '../../lib/run-status';
 import { AgentQuestion } from '../tasks/AgentQuestion';
 import { ChangedFiles } from '../tasks/ChangedFiles';
-import { InlineNotice } from '../ui/InlineNotice';
-import { isActive as active, type RemoteRequest, useRemoteWorkspace } from './useRemoteWorkspace';
+import { type RemoteRequest, useRemoteWorkspace } from './useRemoteWorkspace';
 import './remote.css';
+import { ActionError } from '../ui/ActionError';
 
 export type { RemoteAction, RemoteRequest } from './useRemoteWorkspace';
 
@@ -69,8 +71,8 @@ export function RemoteWorkspace({
           New task
         </Button>
       </div>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
-      {connectionError && <InlineNotice tone="error">{connectionError}</InlineNotice>}
+      <ActionError error={error} />
+      <ActionError error={connectionError} />
       <div className="remote-layout">
         <nav className="remote-task-list" aria-label="Host tasks">
           {waitingSessions.map((session) => (

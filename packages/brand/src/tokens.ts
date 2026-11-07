@@ -81,6 +81,17 @@ export const PRESET_THEMES: ThemePalette[] = [
 
 export const DEFAULT_THEME = PRESET_THEMES[0];
 
+/** A preset's colors with `current`'s appearance, atmosphere and harmony kept. */
+export function withPreset(preset: ThemePalette, current: ThemePalette): ThemePalette {
+  return {
+    ...preset,
+    isDark: current.isDark,
+    appearance: current.appearance,
+    atmosphere: current.atmosphere,
+    harmony: current.harmony,
+  };
+}
+
 export function paletteColors(theme: ThemePalette) {
   const offsets =
     theme.harmony === 'trio' ? [0, 120, 240] : theme.harmony === 'duo' ? [0, 180] : [0];

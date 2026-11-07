@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { describeError } from '../../lib/errors.ts';
 import { prepareRemoteRequest } from '../../lib/remote-request.ts';
-import type { PendingUserPrompt, Review } from '../../lib/task-runtime';
+import type { PendingUserPrompt, Review } from '../../lib/run-types';
 
 export interface RemoteAction {
   action: string;
@@ -42,10 +43,6 @@ export interface Snapshot {
   projects: { id: string; name: string }[];
   tasks: RemoteTask[];
   sessions: RemoteSession[];
-}
-
-export function isActive(task: RemoteTask) {
-  return ['starting', 'running', 'stopping'].includes(task.status);
 }
 
 /** One row per conversation or task: the latest attempt stands for its thread. */
@@ -141,7 +138,7 @@ export function useRemoteWorkspace(
     } catch (cause) {
       if (revision.current === current) {
         setStatus('Disconnected');
-        setConnectionError(String(cause));
+        setConnectionError(describeError(cause));
       }
     }
   }, [request, selected]);
@@ -168,7 +165,7 @@ export function useRemoteWorkspace(
       await request(action);
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       inFlight.current = false;
       setBusy(false);
@@ -214,7 +211,7 @@ export function useRemoteWorkspace(
       }
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       inFlight.current = false;
       setBusy(false);
@@ -231,7 +228,7 @@ export function useRemoteWorkspace(
       setReview({ runId, value: next });
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       inFlight.current = false;
       setBusy(false);

@@ -1,15 +1,15 @@
-import { Disclosure, DisclosureSummary, Textarea } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice, Textarea } from '@jackalope/ui';
 import { Square } from 'lucide-react';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment, openInBrowser } from '../../lib/tauri-bridge';
+import { lazy, Suspense, useEffect, useRef } from 'react';
+import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useHelperStore } from '../../stores/helperStore';
 import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import { HelperAction } from './HelperAction';
 import './helper.css';
+import { describeError } from '../../lib/errors';
+import { useAction } from '../../lib/useAction';
 
 const Markdown = lazy(() => import('../tasks/TaskMarkdown'));
 async function openLink(url: string) {
@@ -20,7 +20,11 @@ async function openLink(url: string) {
 export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
   const helper = useHelperStore();
   const agent = useAgentConfigStore((state) => state.defaultMetaAgent);
-  const [localError, setLocalError] = useState('');
+  const {
+    run: action,
+    error: localError,
+    setError: setLocalError,
+  } = useAction(() => useHelperStore.getState().refresh());
   const input = useRef<HTMLTextAreaElement>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const working = helper.sending || helper.view.turns.some((turn) => turn.status === 'working');
@@ -29,15 +33,6 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
   useEffect(() => {
     if (count) scroll.current?.scrollTo({ top: scroll.current.scrollHeight });
   }, [count]);
-  const action = async (operation: () => Promise<unknown>) => {
-    setLocalError('');
-    try {
-      await operation();
-      await useHelperStore.getState().refresh();
-    } catch (error) {
-      setLocalError(String(error));
-    }
-  };
   return (
     <section className="helper-chat" aria-label="Ask Jackalope">
       <div className="helper-body" ref={scroll}>
@@ -98,7 +93,7 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
                       content={turn.answer}
                       active={false}
                       onOpenLink={(url) =>
-                        void openLink(url).catch((error) => setLocalError(String(error)))
+                        void openLink(url).catch((error) => setLocalError(describeError(error)))
                       }
                     />
                   </Suspense>
@@ -165,7 +160,7 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
               className="helper-text-button"
               disabled={working}
               title="Archive this conversation locally and start a new one"
-              onClick={() => void action(() => nativeTask('helper_new_conversation'))}
+              onClick={() => void action(() => invokeNative('helper_new_conversation'))}
             >
               New conversation
             </button>
@@ -175,7 +170,7 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
               type="button"
               size="sm"
               variant="secondary"
-              onClick={() => void action(() => nativeTask('helper_stop'))}
+              onClick={() => void action(() => invokeNative('helper_stop'))}
             >
               <Square size={14} /> Stop
             </Button>

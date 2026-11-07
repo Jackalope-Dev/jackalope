@@ -6,22 +6,25 @@ import {
   DisclosureBody,
   DisclosureSummary,
   FormField,
+  InlineNotice,
   Input,
   Select,
   SelectItem,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
 } from '@jackalope/ui';
 import { Check, ExternalLink, KeyRound, Route, SlidersHorizontal, Zap } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { JevFallback } from '../../lib/decisions';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import {
   type RoutingMode,
   type RoutingSettings,
   routingSettings,
 } from '../../lib/routing-settings';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
-import { InlineNotice } from '../ui/InlineNotice';
-import { SettingActions, SettingBody, SettingGroup } from './Setting';
 import './routing.css';
+import { describeError } from '../../lib/errors';
 import { DecisionOptions } from './DecisionOptions';
 
 function RoutingCircuit({ mode }: { mode: RoutingMode }) {
@@ -108,7 +111,7 @@ function RoutingSetup({
       setSettings(value);
       onChangeRef.current?.(value);
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setLoading(false);
     }
@@ -141,7 +144,7 @@ function RoutingSetup({
       setKey('');
       setReplacing(false);
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       operation.current = false;
       setPending(false);
@@ -159,7 +162,7 @@ function RoutingSetup({
       onModeChange(value.mode);
       setKey('');
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       operation.current = false;
       setPending(false);
@@ -420,7 +423,7 @@ export function RoutingPreferences({ projectId }: { projectId?: string }) {
       );
       setMessage('Routing preference saved.');
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setSaving(false);
     }
@@ -478,7 +481,7 @@ export function RoutingPreferences({ projectId }: { projectId?: string }) {
                       setJevFallback(value.jevFallback);
                       setMessage('Using the app default.');
                     })
-                    .catch((error) => setError(String(error)))
+                    .catch((error) => setError(describeError(error)))
                     .finally(() => setSaving(false));
                 }}
               >

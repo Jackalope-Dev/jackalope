@@ -1,21 +1,26 @@
 import {
+  Button,
   Disclosure,
   DisclosureBody,
   DisclosureSummary,
   FormField,
+  InlineNotice,
   Input,
+  Select,
+  SelectItem,
   Switch,
   Textarea,
 } from '@jackalope/ui';
 import { CalendarClock, GitCommitHorizontal, Plug } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { connectionTools, describeWake } from '../../lib/bot-hub';
+import { describeError } from '../../lib/errors';
+import { isTauriEnvironment } from '../../lib/native/env';
 import {
   parseScheduleTiming,
   scheduleHourIntervals,
   scheduleTimingExpression,
 } from '../../lib/schedules';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import {
   BOT_WAKES_MAX,
   type BotWake,
@@ -23,9 +28,7 @@ import {
   validateWake,
   WAKE_PROMPT_MAX,
 } from '../../stores/botStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
+import { ActionError } from '../ui/ActionError';
 
 const INTERVALS = [
   { value: 5, label: 'Every 5 minutes' },
@@ -277,7 +280,7 @@ function WakeForm({
           onChange={(event) => onChange({ ...wake, prompt: event.target.value })}
         />
       </FormField>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <div className="bots-composer-actions">
         <Button variant="ghost" type="button" onClick={onCancel}>
           Cancel
@@ -383,7 +386,7 @@ function ConnectionFields({
     if (!trigger.connectionId || !isTauriEnvironment()) return;
     connectionTools(projectId, trigger.connectionId)
       .then((found) => current && setTools(found))
-      .catch((cause) => current && setError(String(cause)));
+      .catch((cause) => current && setError(describeError(cause)));
     return () => {
       current = false;
     };

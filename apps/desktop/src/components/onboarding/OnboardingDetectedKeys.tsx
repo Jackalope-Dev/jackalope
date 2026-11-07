@@ -1,8 +1,9 @@
+import { Button, InlineNotice } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import { type DetectedKey, detectEnvKeys, importDetectedKey } from '../../lib/local-detection';
 import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { ActionError } from '../ui/ActionError';
 
 /**
  * Offers API keys found in the environment for installed agents that have no working
@@ -64,7 +65,7 @@ export function OnboardingDetectedKeys({
                   await useAgentAccountsStore.getState().load(agent.adapter, true);
                   onUse(agent.adapter, profile.id);
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 } finally {
                   setImporting('');
                 }
@@ -77,7 +78,7 @@ export function OnboardingDetectedKeys({
           Found {key.keyName} ({key.maskedPreview}). Use it for {agent.name}?
         </InlineNotice>
       ))}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
+import { isTauriEnvironment } from '../lib/native/env';
 import { observeRefresh } from '../lib/observe-refresh';
 import { type QueueView, queueSnapshot } from '../lib/queue';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
 
 const empty: QueueView = {
   items: [],

@@ -1,15 +1,15 @@
+import { Button, InlineNotice, Select, SelectItem } from '@jackalope/ui';
 import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
 import {
   type AccountStatus,
   accountStatusLabel,
   checkAgentProfile,
 } from '../../lib/agent-profiles';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { describeError } from '../../lib/errors';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { accountProfiles, profileId, useAgentAccountsStore } from '../../stores/agentAccountsStore';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
+import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { ActionError } from '../ui/ActionError';
 
 const AgentSignIn = lazy(() =>
   import('../agents/AgentSignIn').then((module) => ({ default: module.AgentSignIn })),
@@ -81,10 +81,10 @@ export function OnboardingAgentAccount({
     if (!before[agentId]?.length) return;
     useAgentConfigStore.setState({ disabledAccounts: { ...before, [agentId]: [] } });
     try {
-      await syncAgentConfig();
+      await agentPolicySaved();
     } catch (cause) {
       useAgentConfigStore.setState({ disabledAccounts: before });
-      setFailure(String(cause));
+      setFailure(describeError(cause));
     }
   };
   return (
@@ -168,7 +168,7 @@ export function OnboardingAgentAccount({
           </Button>
         </div>
       )}
-      {failure && <InlineNotice tone="error">{failure}</InlineNotice>}
+      <ActionError error={failure} />
       {signIn && (
         <Suspense fallback={null}>
           <AgentSignIn

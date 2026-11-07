@@ -1,5 +1,10 @@
 import {
+  Button,
   ConfirmDialog,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  InlineNotice,
   LinkButton,
   DropdownMenu as Menu,
   SearchField,
@@ -43,10 +48,9 @@ import {
 } from '../../lib/bot-hub';
 import { BOT_TEMPLATES, type BotTemplate } from '../../lib/bot-templates';
 import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/live-session';
-import type { TaskRun } from '../../lib/task-runtime';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import type { TaskRun } from '../../lib/run-types';
 import {
   BOT_STYLES,
   type Bot,
@@ -59,9 +63,6 @@ import {
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { agentAccountFor, type Project, useProjectStore } from '../../stores/projectStore';
 import { LiveSessionView } from '../sessions/LiveSessionView';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
 import { OptionsMenu } from '../ui/OptionsMenu';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -72,13 +73,10 @@ import { BotCardView } from './BotCardView';
 import { BotEditor } from './BotEditor';
 import { BotProjects } from './BotProjects';
 import './bots.css';
-
-interface ScheduleLedger {
-  schedules: {
-    definition: { id: string; name: string; enabled: boolean; expression: string };
-    nextAt: string;
-  }[];
-}
+import { agentAdapter } from '../../lib/agents';
+import { describeError } from '../../lib/errors';
+import { listSchedules, type ScheduleLedger } from '../../lib/schedules';
+import { ActionError } from '../ui/ActionError';
 
 function randomStyle() {
   return BOT_STYLES[Math.floor(Math.random() * BOT_STYLES.length)].id;
@@ -139,10 +137,7 @@ function proposalDraft(proposal: BotProposal, projectId: string): BotDraft {
 }
 
 function profileFor(bot: Bot, project: Project) {
-  const adapter =
-    useAgentConfigStore.getState().customAgents.find((agent) => agent.id === bot.agent)?.adapter ??
-    bot.agent;
-  return agentAccountFor(project, adapter);
+  return agentAccountFor(project, agentAdapter(bot.agent));
 }
 
 /** How a conversation started when the person did not start it. */
@@ -297,7 +292,7 @@ export function BotsWorkspace() {
       {!projects.length && (
         <InlineNotice>Add a project first. Each bot works inside one project.</InlineNotice>
       )}
-      {hub.error && <InlineNotice tone="error">{hub.error}</InlineNotice>}
+      <ActionError error={hub.error} />
       {bots.length === 0 ? (
         <BotTemplates disabled={!projects.length} onUse={(template) => startNew(template)} />
       ) : !scope ? (
@@ -695,7 +690,6 @@ function BotProfile({
           text: value,
         });
       else {
-        await syncAgentConfig();
         await sessionCommand('create', {
           id: attempt.id,
           request: botRequest(bot, project, attempt.id, value, true, profileFor(bot, project)),
@@ -710,7 +704,7 @@ function BotProfile({
       await useLiveSessionStore.getState().refresh(attempt.id);
       onOpen(attempt.id);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -766,7 +760,7 @@ function BotProfile({
             }
           }}
         />
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
         <div className="bots-composer-actions">
           <span className="bots-composer-thread" id={`bot-thread-${bot.id}`}>
             {continuing ? (
@@ -976,7 +970,7 @@ function BotMemory({
   const [error, setError] = useState('');
   return (
     <section className="workspace-stack" aria-label="Memory">
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {notes.length ? (
         <ul className="bots-list">
           {notes.map((note) => (
@@ -1007,7 +1001,7 @@ function BotMemory({
                     try {
                       await forgetNote(note.id);
                     } catch (cause) {
-                      setError(String(cause));
+                      setError(describeError(cause));
                     } finally {
                       setBusy(null);
                     }
@@ -1059,7 +1053,7 @@ function ProposalCard({
           · {proposal.wake.name}
         </p>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <footer className="bot-card-footer">
         <OptionsMenu label={`${proposal.name} suggestion options`} disabled={busy}>
           <Menu.Item className="workspace-menu-item" onSelect={onOpen}>
@@ -1073,7 +1067,7 @@ function ProposalCard({
               try {
                 await resolveProposal(proposal.id, 'dismiss');
               } catch (cause) {
-                setError(String(cause));
+                setError(describeError(cause));
               } finally {
                 setBusy(false);
               }
@@ -1151,7 +1145,7 @@ function BotWakeList({
   };
   return (
     <section className="workspace-stack" aria-label="Wake-ups">
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {bot.wakes.length ? (
         <ul className="bots-list">
           {bot.wakes.map((wake) => {
@@ -1190,7 +1184,7 @@ function BotWakeList({
                           onOpen(await wakeNow(bot.id, wake.id));
                           await useLiveSessionStore.getState().refresh(null);
                         } catch (cause) {
-                          setError(String(cause));
+                          setError(describeError(cause));
                         } finally {
                           setBusy(null);
                         }
@@ -1233,9 +1227,9 @@ function BotRoutines({ bot }: { bot: Bot }) {
   const read = useCallback(async () => {
     if (!isTauriEnvironment()) return;
     try {
-      setLedger(await nativeTask<ScheduleLedger>('schedule_list'));
+      setLedger(await listSchedules());
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   }, []);
   useEffect(() => {
@@ -1257,7 +1251,7 @@ function BotRoutines({ bot }: { bot: Bot }) {
         title="Routines"
         description="Manage timing and history in Schedules."
       />
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       <ul className="bots-list">
         {routines.map((routine) => (
           <li key={routine.definition.id} className="bots-routine">
@@ -1274,13 +1268,13 @@ function BotRoutines({ bot }: { bot: Bot }) {
               checked={routine.definition.enabled}
               onCheckedChange={async (next) => {
                 try {
-                  await nativeTask('schedule_set_enabled', {
+                  await invokeNative('schedule_set_enabled', {
                     id: routine.definition.id,
                     enabled: next,
                   });
                   await read();
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                 }
               }}
             />

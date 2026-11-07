@@ -1,6 +1,7 @@
-import { Disclosure, DisclosureSummary, Input } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, Input, Select, SelectItem } from '@jackalope/ui';
 import { useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
+import { describeError } from '../../lib/errors';
+import { invokeNative } from '../../lib/native/transport';
 import {
   type RecipeId,
   recipePrompt,
@@ -8,9 +9,7 @@ import {
   workflowRecipes,
 } from '../../lib/workflow-recipes';
 import { IssuePicker } from '../tasks/IssuePicker';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
+import { ActionError } from '../ui/ActionError';
 
 export function WorkflowStarter({
   projectPath,
@@ -35,14 +34,14 @@ export function WorkflowStarter({
       const context =
         kind === 'dependency'
           ? undefined
-          : await nativeTask<WorkflowContext>('project_github_context', {
+          : await invokeNative<WorkflowContext>('project_github_context', {
               projectPath,
               kind,
               number: value,
             });
       onDraft(recipePrompt(kind, value, context));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -103,7 +102,7 @@ export function WorkflowStarter({
           >
             Prepare task draft
           </Button>
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
         </>
       )}
     </div>

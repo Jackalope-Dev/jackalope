@@ -1,27 +1,26 @@
-import { Badge } from '@jackalope/ui';
+import { Badge, Button, InlineNotice, LoadingState } from '@jackalope/ui';
 import { AlertTriangle, GitFork, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { navigateWorkspace, openCloudResources, openSettings } from '../../lib/app-events';
 import { runHostName } from '../../lib/computers';
 import { type DeployStatus, deliveryPhase, deployStatus } from '../../lib/deploy';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { ago, type CloudState, cloudState, conflictSummary, fileStatus } from '../../lib/swarm';
 import { swarmMap } from '../../lib/swarm-map';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import { HostCapacity } from '../computers/HostCapacity';
-import { navigateWorkspace, openCloudResources, openSettings } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { SwarmDelivery } from './SwarmDelivery';
 import { SwarmMap } from './SwarmMap';
 import './swarm.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 const POLL_MS = 5000;
 const FILES_SHOWN = 8;
@@ -32,9 +31,7 @@ const FILES_SHOWN = 8;
  */
 export function SwarmBoard() {
   const projectId = useProjectStore((state) => state.activeProjectId);
-  const projectPath = useProjectStore(
-    (state) => state.projects.find((project) => project.id === state.activeProjectId)?.path,
-  );
+  const projectPath = useActiveProject()?.path;
   const runs = useExecutionStore((state) => state.runs);
   const queue = useManagedTaskStore((state) => state.queue);
   const [state, setState] = useState<CloudState | null>(null);
@@ -53,7 +50,7 @@ export function SwarmBoard() {
           setState(next);
           setError('');
         })
-        .catch((cause) => alive && setError(String(cause)));
+        .catch((cause) => alive && setError(describeError(cause)));
       if (projectPath)
         deployStatus(projectPath)
           .then((next) => alive && setDelivery(next))
@@ -122,7 +119,7 @@ export function SwarmBoard() {
       {!isTauriEnvironment() && (
         <InlineNotice>The swarm is available in the desktop app.</InlineNotice>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {!state && isTauriEnvironment() && !error && (
         <LoadingState compact label="Reading the swarm…" />
       )}

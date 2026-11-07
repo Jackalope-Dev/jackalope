@@ -1,6 +1,6 @@
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useRef } from 'react';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
+import { isTauriEnvironment } from '../lib/native/env';
 
 /**
  * Subscribes to a native event for the component's lifetime. The latest

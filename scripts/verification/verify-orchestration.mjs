@@ -75,7 +75,7 @@ try {
           body: `<!doctype html><html><head><meta charset="utf-8"><title>Orchestration browser fixture</title></head><body><p>Browser state only; no native tasks launched.</p><div id="root"></div><script type="module">
       import RefreshRuntime from '/@react-refresh'; RefreshRuntime.injectIntoGlobalHook(window); window.$RefreshReg$=()=>{}; window.$RefreshSig$=()=>type=>type; window.__vite_plugin_react_preamble_installed__=true;
       const source=await fetch('/src/components/tasks/FeaturePlanner.tsx').then(r=>r.text()); const reactUrl=source.split('"').find(url=>url.includes('/react.js?')); const {default:React}=await import(reactUrl); const mainSource=await fetch('/src/main.tsx').then(r=>r.text()); const domUrl=mainSource.split('"').find(url=>url.includes('/react-dom_client.js?')); const {default:ReactDOM}=await import(domUrl);
-      await import('/src/index.css'); await import('/src/components/ui/experience.css'); await import('/src/components/tasks/task-workspace.css');
+      await import('/src/index.css'); await import('/src/components/tasks/task-workspace.css');
       const {useThemeStore}=await import('/src/stores/themeStore.ts'); const theme=useThemeStore.getState(); theme.setAppTheme({...theme.appTheme,appearance:'manual',isDark:window.fixture.dark});
       const {useProjectStore}=await import('/src/stores/projectStore.ts'); const {useExecutionStore}=await import('/src/stores/executionStore.ts');
       const project={id:'fixture',name:'Fixture project',path:'C:/fixture',gitBranch:'main',worktrees:[],agentProvider:'codex',preferences:{verifyCommand:'node check.mjs',autoVerify:true}};

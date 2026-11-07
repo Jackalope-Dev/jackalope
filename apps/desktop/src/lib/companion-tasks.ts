@@ -1,6 +1,7 @@
 import type { CompanionNotice } from '../stores/companionStore.ts';
 import { getAgentMetadata } from './agent-catalog.ts';
-import { isActive, type TaskRun } from './task-runtime.ts';
+import { isActive } from './run-status.ts';
+import type { TaskRun } from './run-types.ts';
 import { taskTitle } from './task-title.ts';
 
 /** Notices for tasks that need the person; none for `viewing`, whose page already shows it. */

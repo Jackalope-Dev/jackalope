@@ -1,21 +1,23 @@
-import { selectWork, workTarget } from '../../lib/work-selection';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
+import { openWork, selectWork, useAllRuns, useWorkspaceWork } from '../../lib/work-selection';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
-import { DropdownMenu as Menu } from '@jackalope/ui';
+import {
+  Button,
+  EmptyState,
+  LoadingState,
+  DropdownMenu as Menu,
+  Select,
+  SelectItem,
+} from '@jackalope/ui';
 import { FolderOpen, ListTodo, MoreHorizontal, Plus, Radio, Workflow } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 
 import { useShallow } from 'zustand/react/shallow';
-import {
-  collectWorkspaceWork,
-  selectedManagedTask,
-  type WorkItem,
-} from '../../lib/task-collection';
-import { nativeTask } from '../../lib/task-runtime';
+import { navigateWorkspace } from '../../lib/app-events';
+import { invokeNative } from '../../lib/native/transport';
+import { selectedManagedTask, type WorkItem } from '../../lib/task-collection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
@@ -23,11 +25,8 @@ import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
-import { navigateWorkspace } from '../layout/navigation';
 import { type ComposerSeed, SessionStart } from '../sessions/SessionStart';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { Select, SelectItem } from '../ui/Select';
+import { ActionError } from '../ui/ActionError';
 import { WorkCatchUp } from './WorkCatchUp';
 
 const ManagedTaskView = lazy(() =>
@@ -75,10 +74,7 @@ export function TaskWorkspace({
   const sessions = useLiveSessionStore((state) => state.sessions);
   const selectedSessionId = useLiveSessionStore((state) => state.selectedId);
   const sessionRuns = useLiveSessionStore((state) => state.runs);
-  const allRuns = useMemo(
-    () => [...new Map([...runs, ...sessionRuns].map((run) => [run.id, run])).values()],
-    [runs, sessionRuns],
-  );
+  const allRuns = useAllRuns();
   const selectedId = useExecutionStore((state) => state.selectedId);
   const select = useExecutionStore((state) => state.select);
   const loading = useExecutionStore((state) => state.loading);
@@ -116,9 +112,14 @@ export function TaskWorkspace({
     if (previousProject.current === activeProjectId) return;
     previousProject.current = activeProjectId;
     setComposerExpanded(false);
+  }, [activeProjectId]);
+  const previousList = useRef(projectFilter);
+  useEffect(() => {
+    if (previousList.current === projectFilter) return;
+    previousList.current = projectFilter;
     setArchived(false);
     setParallel(false);
-  }, [activeProjectId]);
+  }, [projectFilter]);
   useEffect(() => {
     if (!composerFocus) return;
     setComposerExpanded(true);
@@ -150,8 +151,7 @@ export function TaskWorkspace({
   const openItem = useCallback(
     (item: WorkItem) => {
       lastOpened.current = item.id;
-      if (item.session) useProjectStore.getState().selectProject(item.session.request.projectId);
-      if (item.managed || item.session || item.run) selectWork(workTarget(item));
+      if (item.managed || item.session || item.run) openWork(item);
       else if (item.idea) {
         // A draft opens in the composer over whichever task was open.
         selectWork({ task: useExecutionStore.getState().selectedId ?? undefined });
@@ -171,26 +171,17 @@ export function TaskWorkspace({
   const project = projects.find(
     (p) => p.id === (projectFilter === 'all' ? activeProjectId : projectFilter),
   );
-  const items = useMemo(
-    () =>
-      collectWorkspaceWork(
-        projectFilter === 'all' ? null : projectFilter === 'unassigned' ? '' : projectFilter,
-        ideas,
-        allRuns,
-        sessions,
-        integratedIds,
-        archived,
-        managed.queue,
-      ),
-    [projectFilter, ideas, allRuns, sessions, integratedIds, archived, managed.queue],
-  );
+  const items = useWorkspaceWork({
+    projectId: projectFilter === 'all' ? null : projectFilter === 'unassigned' ? '' : projectFilter,
+    archived,
+  });
   const archiveItems = async (selected: WorkItem[], archive: boolean) => {
     const failures: string[] = [];
     const updatedRuns: string[] = [];
     for (const item of selected) {
       try {
         if (item.run) {
-          await nativeTask('task_set_archived', { id: item.run.id, archived: archive });
+          await invokeNative('task_set_archived', { id: item.run.id, archived: archive });
           updatedRuns.push(item.run.id);
         } else if (item.idea) {
           useTaskStore.getState().setArchived(item.idea.id, archive);
@@ -346,7 +337,7 @@ export function TaskWorkspace({
         </div>
       )}
       {loading && <LoadingState label={'Loading task history…'} />}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {hasWork && !archived && <WorkCatchUp />}
       {hasWork ? (
         <Suspense fallback={<LoadingState label="Loading work list…" />}>

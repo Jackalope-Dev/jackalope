@@ -1,13 +1,13 @@
-import { ErrorState } from '@jackalope/ui';
+import { Button, ErrorState } from '@jackalope/ui';
 import { Component, type ReactNode } from 'react';
+import { describeError } from '../../lib/errors';
 import type { Feature } from '../../lib/telemetry';
 import { telemetry } from '../../lib/telemetry-client';
-import { Button } from './button';
 import { WorkspacePage } from './WorkspacePage';
 
 /** The thrown error in words, so a crash can be reported and diagnosed. */
-export function errorMessage(error: unknown) {
-  const text = error instanceof Error ? error.message : String(error);
+export function crashMessage(error: unknown) {
+  const text = describeError(error);
   return text ? `Error: ${text.slice(0, 300)}` : '';
 }
 
@@ -18,7 +18,7 @@ export class PageErrorBoundary extends Component<
   state = { failed: false, message: '' };
 
   static getDerivedStateFromError(error: unknown) {
-    return { failed: true, message: errorMessage(error) };
+    return { failed: true, message: crashMessage(error) };
   }
 
   componentDidCatch() {

@@ -1,12 +1,11 @@
+import { Button, DialogCloseButton, DialogContent, DialogHeader } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { GitBranch } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
-import type { TaskRun } from '../../lib/task-runtime';
+import type { TaskRun } from '../../lib/run-types';
 import { workSummary } from '../../lib/workbench';
 import { useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { NextWorkAction } from './NextWorkAction';
 import { WorkTools } from './WorkTools';
 import './workbench.css';

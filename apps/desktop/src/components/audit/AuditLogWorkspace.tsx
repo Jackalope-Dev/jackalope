@@ -1,4 +1,12 @@
-import { Badge, EmptyState, SearchField, SegmentedControl } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  SearchField,
+  SegmentedControl,
+  Select,
+  SelectItem,
+} from '@jackalope/ui';
 import {
   AlertTriangle,
   Bot,
@@ -18,8 +26,6 @@ import { useShallow } from 'zustand/react/shallow';
 import type { AuditCategory, AuditSeverity } from '../../lib/audit';
 import { useAuditStore } from '../../stores/auditStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { Select, SelectItem } from '../ui/Select';
 
 export function AuditLogWorkspace() {
   const { entries, clearEntries, clearProjectEntries } = useAuditStore(

@@ -1,4 +1,16 @@
-import { RefreshIcon, SegmentedControl } from '@jackalope/ui';
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  EmptyState,
+  InlineNotice,
+  LoadingState,
+  RefreshIcon,
+  SegmentedControl,
+  Switch,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   ArrowRight,
@@ -14,32 +26,28 @@ import {
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
+import { openAgentConfiguration } from '../../lib/app-events';
 import { openCliTerminal } from '../../lib/cli-terminal';
-import { isActive, type Runner, type TaskRun } from '../../lib/task-runtime';
-import { isTauriEnvironment, openInBrowser } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
+import { isActive } from '../../lib/run-status';
+import type { Runner, TaskRun } from '../../lib/run-types';
 import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { accountForAgent, useCapacityStore } from '../../stores/capacityStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject } from '../../stores/projectStore';
 import { AddAgentForm } from '../agents/AddAgentForm';
 import { AgentDefaults } from '../agents/AgentDefaults';
 import { AgentInstallGuide } from '../agents/AgentInstallGuide';
 import { LocalAiSetup } from '../agents/LocalAiSetup';
 import { ProviderConnections } from '../agents/ProviderConnections';
 import { ProviderMark } from '../agents/ProviderMark';
-import { openAgentConfiguration } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
-import { Switch } from '../ui/Switch';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import '../agents/agents-workspace.css';
+import { agentAdapter } from '../../lib/agents';
+import { describeError } from '../../lib/errors';
 
 function SetupCommandBox({
   command,
@@ -127,10 +135,7 @@ export function RunnerConnections({
       toggleAgent: s.toggleAgent,
     })),
   );
-  const { projects, activeProjectId } = useProjectStore(
-    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
-  );
-  const project = projects.find((item) => item.id === activeProjectId);
+  const project = useActiveProject();
   // Enablement, defaults and account choices apply to this project or every project.
   const { scope, setScope } = useAgentScopeStore(
     useShallow((s) => ({ scope: s.scope, setScope: s.setScope })),
@@ -143,10 +148,7 @@ export function RunnerConnections({
     ...new Set(
       runners
         .filter((runner) => runner.available)
-        .map(
-          (runner) =>
-            config.customAgents.find((agent) => agent.id === runner.id)?.adapter ?? runner.id,
-        ),
+        .map((runner) => agentAdapter(runner.id, config.customAgents)),
     ),
   ]);
   const [adding, setAdding] = useState(false);
@@ -162,11 +164,9 @@ export function RunnerConnections({
   useEffect(() => {
     if (!desktop) return;
     let active = true;
-    void syncAgentConfig()
-      .then(() => discover(false))
-      .catch((cause) => {
-        if (active) setCheckError(String(cause));
-      });
+    void discover(false).catch((cause) => {
+      if (active) setCheckError(describeError(cause));
+    });
     return () => {
       active = false;
     };
@@ -175,12 +175,11 @@ export function RunnerConnections({
     setChecking(true);
     setCheckError('');
     try {
-      await syncAgentConfig();
       await discover();
       for (const agent of JSON.parse(accountAgents) as string[])
         void useAgentAccountsStore.getState().load(agent, true);
     } catch (error) {
-      setCheckError(String(error));
+      setCheckError(describeError(error));
     } finally {
       setChecking(false);
     }
@@ -400,7 +399,7 @@ export function RunnerConnections({
               onCheckedChange={(value) => {
                 setCheckError('');
                 config.toggleAgent(runner.id, value, scoped?.id);
-                void syncAgentConfig().catch((cause) => setCheckError(String(cause)));
+                void agentPolicySaved().catch((cause) => setCheckError(describeError(cause)));
               }}
               label={`Enable ${custom?.name ?? runner.name}${scoped ? ` for ${scoped.name}` : ' app-wide'}`}
             />

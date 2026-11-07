@@ -1,7 +1,9 @@
+import { Button } from '@jackalope/ui';
 import { Split } from 'lucide-react';
 import { useState } from 'react';
-import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
-import { Button } from '../ui/button';
+import { invokeNative } from '../../lib/native/transport';
+import { isActive } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 
 /** Lets the agent of a running isolated task spin off separable work as subtasks. */
 export function SplitTaskButton({
@@ -23,7 +25,7 @@ export function SplitTaskButton({
       onClick={async () => {
         setBusy(true);
         try {
-          await nativeTask('task_request_split', { runId: run.id });
+          await invokeNative('task_request_split', { runId: run.id });
           setAsked(true);
           onResult(
             'Asked the agent to split off independent work. New subtasks appear here when it creates them.',

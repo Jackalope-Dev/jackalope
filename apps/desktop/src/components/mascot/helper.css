@@ -134,8 +134,8 @@
   margin: 8px 20px 4px;
   flex-shrink: 0;
 }
-.helper-tabs > .ui-segment {
-  flex: 1;
+.helper-tabs {
+  --ui-segment-flex: 1;
 }
 /* Shared controls keep their own focus styles. */
 .companion-panel

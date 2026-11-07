@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { nativeTask } from '../lib/task-runtime';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
+import { isTauriEnvironment } from '../lib/native/env';
+import { invokeNative } from '../lib/native/transport';
 
 interface ReferralInvite {
   id: string;
@@ -52,7 +52,7 @@ export const useReferralStore = create<{
     }
     const version = generation;
     set({ loading: true, error: '' });
-    pending = nativeTask<ReferralView>('app_account_referrals')
+    pending = invokeNative<ReferralView>('app_account_referrals')
       .then((referrals) => {
         if (!referrals || !Number.isInteger(referrals.remaining) || referrals.remaining < 0)
           throw new Error('Invitation allowance unavailable.');

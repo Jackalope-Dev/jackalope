@@ -1,9 +1,16 @@
 import {
   Badge,
+  Button,
   Checkbox,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
   Disclosure,
   DisclosureSummary,
+  InlineNotice,
   DropdownMenu as Menu,
+  Select,
+  SelectItem,
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
@@ -18,32 +25,23 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { waitForStoppedAttempt } from '../../lib/continue-task';
+import { listMcpServers, type McpServerConfig } from '../../lib/mcp-client';
 import { projectConnections } from '../../lib/mcp-connection';
+import { openInBrowser } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { recoveryHandoff } from '../../lib/project-return';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
-import {
-  canRetry,
-  isActive,
-  nativeTask,
-  PROMPT_MAX_CHARS,
-  retryTask,
-  statusLabel,
-  type TaskRun,
-} from '../../lib/task-runtime';
+import { canRetry, isActive, isFinished, isWorking, statusLabel } from '../../lib/run-status';
+import { PROMPT_MAX_CHARS, type TaskRun } from '../../lib/run-types';
+import { retryTask, stopAndSettle, stopPreview as stopPreviewTask } from '../../lib/task-client';
 import { taskTitle } from '../../lib/task-title';
 import { latestAttempt, taskDecision } from '../../lib/task-workflow';
-import { listMcpServers, type McpServerConfig, openInBrowser } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
@@ -77,6 +75,8 @@ import { WorkSourceLink } from './WorkSourceLink';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
 import { useWorkspaceActions } from './WorkTools';
 import './task-detail.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
 const TaskTerminal = lazy(() =>
@@ -204,7 +204,7 @@ export function TaskDetail({
     !!run.workspace &&
     run.workspace.replaceAll('\\', '/').toLowerCase() !==
       run.projectPath.replaceAll('\\', '/').toLowerCase();
-  const finished = !active && ['review', 'reviewed'].includes(run.status);
+  const finished = !active && isFinished(run);
   const canContinue = isLatest && !!run.sessionId && run.status !== 'interrupted' && !integrated;
   const changes = useChangeStats([run])[run.id]?.value;
   const changedFiles = changes?.files;
@@ -257,7 +257,7 @@ export function TaskDetail({
         if (alive) setConnections(projectConnections(servers, run.projectId));
       })
       .catch((cause) => {
-        if (alive) setError(String(cause));
+        if (alive) setError(describeError(cause));
       });
     return () => {
       alive = false;
@@ -268,10 +268,10 @@ export function TaskDetail({
     setActing(true);
     setError('');
     try {
-      await nativeTask(command, { id: run.id });
+      await invokeNative(command, { id: run.id });
       await refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setActing(false);
     }
@@ -286,7 +286,7 @@ export function TaskDetail({
       await refresh();
       useExecutionStore.getState().select(id);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setRetrying(false);
     }
@@ -294,18 +294,16 @@ export function TaskDetail({
 
   /** Starts the next attempt from this one with `prompt`; throws when it cannot. */
   const startContinuation = async (prompt: string, stopPreview = false) => {
-    if (stopPreview) await nativeTask('task_preview_stop', { id: run.id });
-    if (active) {
-      await nativeTask('task_stop', { id: run.id });
-      await waitForStoppedAttempt(
+    if (stopPreview) await stopPreviewTask(run.id);
+    if (active)
+      await stopAndSettle(
         run.id,
         async () => {
           await refresh();
           return useExecutionStore.getState().runs.find((r) => r.id === run.id);
         },
-        () => new Promise((resolve) => setTimeout(resolve, 250)),
+        { saved: 'follow-up', resumable: true },
       );
-    }
     if (latestAttempt(useExecutionStore.getState().runs, run.taskId)?.id !== run.id)
       throw new Error('A newer attempt exists. Open the latest result before continuing.');
     await start({
@@ -329,7 +327,7 @@ export function TaskDetail({
       if (useExecutionStore.getState().drafts[key]?.prompt.trim() === prompt)
         draft(key, { prompt: '' });
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setActing(false);
     }
@@ -354,7 +352,7 @@ export function TaskDetail({
     try {
       await openInBrowser(href);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   }, []);
   const copyResult = async () => {
@@ -620,7 +618,7 @@ export function TaskDetail({
           />
         )}
       </div>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {notice && (
         <p role="status" className="task-muted">
           {notice}
@@ -660,7 +658,7 @@ export function TaskDetail({
               key={p.id}
               runId={run.id}
               prompt={p}
-              active={['starting', 'running'].includes(run.status)}
+              active={isWorking(run)}
               accountShown={active}
               onContinue={
                 canContinue && !active
@@ -925,7 +923,7 @@ export function TaskDetail({
               setToolsOpen(false);
               void listMcpServers(run.projectId)
                 .then((servers) => setConnections(projectConnections(servers, run.projectId)))
-                .catch((cause) => setError(String(cause)));
+                .catch((cause) => setError(describeError(cause)));
             }}
           />
         </Suspense>

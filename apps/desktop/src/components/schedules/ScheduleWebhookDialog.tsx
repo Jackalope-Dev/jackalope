@@ -1,10 +1,14 @@
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  FormField,
+  Input,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
-import { useDialogFocus } from '../ui/useDialogFocus';
+import { ActionError } from '../ui/ActionError';
 
 export interface WebhookState {
   id: string;
@@ -64,7 +68,7 @@ export function ScheduleWebhookDialog({
               : 'Create a link that runs this schedule when something on this computer calls it.'}
           </p>
         )}
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
         <div className="flex flex-wrap gap-2">
           {webhook?.token ? (
             <Button onClick={onClose}>Done</Button>

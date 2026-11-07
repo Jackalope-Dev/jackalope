@@ -1,8 +1,19 @@
-import { Checkbox, Input } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  FormField,
+  Input,
+  Select,
+  SelectItem,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { KeyRound } from 'lucide-react';
 import { useRef, useState } from 'react';
-import type { ModelCatalog } from '../../lib/agent-models';
+import { agentModels, type ModelCatalog } from '../../lib/agent-models';
 import {
   type AgentProfile,
   completeProviderProfile,
@@ -11,19 +22,15 @@ import {
   saveAgentProfileKey,
 } from '../../lib/agent-profiles';
 import { type ApiProvider, apiProviders } from '../../lib/api-providers';
+import { describeError } from '../../lib/errors';
 import { useManagedRuntime } from '../../lib/managed-runtime';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { useDialogFocus } from '../ui/useDialogFocus';
+import { ActionError } from '../ui/ActionError';
 import { ManagedRuntimeProgress } from './ManagedRuntimeProgress';
 
 function ConnectProvider({
@@ -63,15 +70,14 @@ function ConnectProvider({
       await useAgentAccountsStore.getState().load('opencode', true);
       onClose();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
   };
   const readModels = async () => {
     if (!profile.current) return;
-    const result = await nativeTask<ModelCatalog>('agent_models', {
-      agent: 'opencode',
+    const result = await agentModels('opencode', {
       agentProfileId: profile.current.id,
       refresh: true,
     });
@@ -86,7 +92,7 @@ function ConnectProvider({
         if (!open) void close();
       }}
     >
-      <DialogContent {...focus} className="confirm-action-dialog">
+      <DialogContent {...focus} layer="confirm">
         <DialogHeader
           title={`Connect ${provider.name}`}
           description={
@@ -135,7 +141,7 @@ function ConnectProvider({
                     },
                   });
                 }
-                await syncAgentConfig();
+                await agentPolicySaved();
               }
               await useAgentAccountsStore.getState().load('opencode', true);
               await useExecutionStore.getState().discover();
@@ -225,10 +231,10 @@ function ConnectProvider({
           {runner.preparing && (
             <ManagedRuntimeProgress
               progress={runner.progress}
-              onCancel={() => void runner.cancel().catch((cause) => setError(String(cause)))}
+              onCancel={() => void runner.cancel().catch((cause) => setError(describeError(cause)))}
             />
           )}
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           <DialogFooter>
             <Button type="button" variant="outline" disabled={busy} onClick={() => void close()}>
               {saved.current ? 'Close' : 'Cancel'}
@@ -272,7 +278,7 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
             setError('');
             try {
               if (!model) {
-                const found = await nativeTask<string[]>('openai_endpoint_models', {
+                const found = await invokeNative<string[]>('openai_endpoint_models', {
                   baseUrl,
                   apiKey: apiKey.trim() || null,
                 });
@@ -280,7 +286,7 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
                 setModel(found[0] ?? '');
                 return;
               }
-              await nativeTask('openai_endpoint_connect', {
+              await invokeNative('openai_endpoint_connect', {
                 name,
                 baseUrl,
                 model,
@@ -290,7 +296,7 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
               await useExecutionStore.getState().discover();
               onClose();
             } catch (cause) {
-              setError(String(cause));
+              setError(describeError(cause));
             } finally {
               setBusy(false);
             }
@@ -346,7 +352,7 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
               </Select>
             </FormField>
           )}
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel

@@ -1,10 +1,10 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { CloudUpload, Rocket } from 'lucide-react';
 import { useState } from 'react';
 import { DEPLOY_OUTCOME, type DeployStatus, deployAgain } from '../../lib/deploy';
+import { describeError } from '../../lib/errors';
 import { ago } from '../../lib/swarm';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { ActionError } from '../ui/ActionError';
 
 const short = (head?: string | null) => head?.slice(0, 7) ?? '';
 
@@ -29,7 +29,7 @@ export function SwarmDelivery({
       await deployAgain(path);
       onChange();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
@@ -87,7 +87,7 @@ export function SwarmDelivery({
           merging.
         </InlineNotice>
       )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {last && last.outcome !== 'deployed' && last.output && (
         <Disclosure>
           <DisclosureSummary>Deploy output</DisclosureSummary>

@@ -1,9 +1,9 @@
+import { Button, InlineNotice } from '@jackalope/ui';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { describeError } from '../../lib/errors';
 import { sessionCommand } from '../../lib/live-session';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 
 export function SessionRecovery() {
   const { error, refresh } = useLiveSessionStore(
@@ -28,7 +28,7 @@ export function SessionRecovery() {
               await sessionCommand('recover');
               await refresh();
             } catch (cause) {
-              setFailure(String(cause));
+              setFailure(describeError(cause));
             } finally {
               setBusy(false);
             }

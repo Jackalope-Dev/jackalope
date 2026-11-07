@@ -1,56 +1,27 @@
+import { Button } from '@jackalope/ui';
 import { useMemo } from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { collectWorkspaceWork } from '../../lib/task-collection';
-import type { TaskRun } from '../../lib/task-runtime';
+import { navigateWorkspace } from '../../lib/app-events';
+import type { TaskRun } from '../../lib/run-types';
 import { taskDecision } from '../../lib/task-workflow';
-import { selectWork, workTarget } from '../../lib/work-selection';
+import { showWork, useWorkspaceWork } from '../../lib/work-selection';
 import { attentionQueue } from '../../lib/workbench';
-import { useExecutionStore } from '../../stores/executionStore';
-import { useLiveSessionStore } from '../../stores/liveSessionStore';
-import { useManagedTaskStore } from '../../stores/managedTaskStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { useWorkViewStore } from '../../stores/workViewStore';
-import { navigateWorkspace } from '../layout/navigation';
-import { Button } from '../ui/button';
 
 export function NextWorkAction({ run }: { run: TaskRun }) {
-  const runs = useExecutionStore((state) => state.runs);
-  const { sessions, runs: sessionRuns } = useLiveSessionStore(
-    useShallow((s) => ({ sessions: s.sessions, runs: s.runs })),
-  );
-  const queue = useManagedTaskStore((state) => state.queue);
+  const work = useWorkspaceWork({ withoutDrafts: true });
   const next = useMemo(
     () =>
-      attentionQueue(
-        collectWorkspaceWork(
-          null,
-          [],
-          [...new Map([...runs, ...sessionRuns].map((run) => [run.id, run])).values()],
-          sessions,
-          queue.mergedRunIds,
-          false,
-          queue,
-        ),
-      ).find(
+      attentionQueue(work).find(
         (item) => item.run?.taskId !== run.taskId && item.session?.id !== (run.liveSessionId ?? ''),
       ),
-    [runs, sessionRuns, sessions, queue, run.taskId, run.liveSessionId],
+    [work, run.taskId, run.liveSessionId],
   );
   if (!next) return null;
   return (
     <Button
       variant="outline"
       onClick={() => {
-        const projectId =
-          next.managed?.request.projectId ?? next.session?.request.projectId ?? next.run?.projectId;
-        if (projectId) useProjectStore.getState().selectProject(projectId);
-        selectWork(workTarget(next));
-        if (next.managed) navigateWorkspace('kanban');
-        else if (next.session) navigateWorkspace('live-sessions');
-        else if (next.run) {
-          useWorkViewStore.getState().open(next.run.id, taskDecision(next.run).section);
-          navigateWorkspace('kanban');
-        }
+        showWork(next, next.run && taskDecision(next.run).section);
+        navigateWorkspace('kanban');
       }}
     >
       Next needs you · {next.title}

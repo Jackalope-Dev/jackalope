@@ -1,4 +1,4 @@
-import { RefreshIcon } from '@jackalope/ui';
+import { Button, EmptyState, LoadingState, RefreshIcon } from '@jackalope/ui';
 import {
   ArrowRight,
   BookOpen,
@@ -11,16 +11,14 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { navigateWorkspace } from '../../lib/app-events';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { useContextMemoryStore } from '../../stores/contextMemoryStore';
 import type { Project } from '../../stores/projectStore';
-import { navigateWorkspace } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
-import { InlineNotice } from '../ui/InlineNotice';
-import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import '../projects/project-context.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 export function CodebaseMemoryBar({ project }: { project: Project }) {
   const { memories, scanning, refreshMemory } = useContextMemoryStore(
@@ -42,7 +40,7 @@ export function CodebaseMemoryBar({ project }: { project: Project }) {
     try {
       await refreshMemory(project);
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     }
   };
   return (
@@ -62,7 +60,7 @@ export function CodebaseMemoryBar({ project }: { project: Project }) {
           </Button>
         }
       />
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {busy && <LoadingState label="Reading project files…" compact={!!memory} />}
       {!memory ? (
         !busy && (

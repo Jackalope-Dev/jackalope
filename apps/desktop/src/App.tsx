@@ -1,4 +1,3 @@
-import { startThemeClock } from '@jackalope/brand/theme';
 import { MotionConfig } from 'motion/react';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { AccessBoundary } from './components/account/AccessBoundary';
@@ -15,10 +14,8 @@ const WorkspaceTransition = lazy(() =>
   })),
 );
 
-import { observeTelemetry } from './lib/observe-telemetry';
+import { invokeNative } from './lib/native/transport';
 import { commitProjectSetup } from './lib/project-setup';
-import { nativeTask } from './lib/task-runtime';
-import { observeCommunity } from './stores/communityStore';
 import { observeExecution, useExecutionStore } from './stores/executionStore';
 import { observeFeedbackActivity } from './stores/feedbackStore';
 import { observeLessonSync } from './stores/lessonSyncStore';
@@ -26,20 +23,19 @@ import { observeNotifications } from './stores/notificationStore';
 import { useOnboardingStore } from './stores/onboardingStore';
 import { useProjectStore } from './stores/projectStore';
 import { observeSettingsSync } from './stores/settingsSyncStore';
+import { bootstrapWindow } from './window-bootstrap';
 import './components/tasks/task-workspace.css';
-import './components/ui/experience.css';
+import '@jackalope/ui/styles.css';
 
 export default function App() {
-  useEffect(startThemeClock, []);
   useEffect(observeDesktopControlTheme, []);
-  useEffect(observeTelemetry, []);
   useEffect(observeFeedbackActivity, []);
   useEffect(observeNotifications, []);
   useEffect(observeSettingsSync, []);
   useEffect(observeLessonSync, []);
   const [resetError, setResetError] = useState('');
   const [ready, setReady] = useState(!('__JACKALOPE_RESET__' in window));
-  useEffect(() => (ready ? observeCommunity() : undefined), [ready]);
+  useEffect(() => (ready ? bootstrapWindow() : undefined), [ready]);
   const [initialTaskAgent, setInitialTaskAgent] = useState<string>();
   const [initialDraftKey, setInitialDraftKey] = useState<string>();
   const [entry, setEntry] = useState<{
@@ -81,7 +77,7 @@ export default function App() {
     if (ready) {
       return observeExecution();
     }
-    nativeTask('app_finish_reset')
+    invokeNative('app_finish_reset')
       .then(() => setReady(true))
       .catch((error) => setResetError(String(error)));
   }, [ready]);

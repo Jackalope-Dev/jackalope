@@ -1,4 +1,4 @@
-import { ContextMenu, DropdownMenu as Menu } from '@jackalope/ui';
+import { ContextMenu, DropdownMenu as Menu, Tooltip } from '@jackalope/ui';
 import { ChevronRight, Copy, Ellipsis, Plus, Smile, Trash2, X } from 'lucide-react';
 import {
   type ComponentPropsWithoutRef,
@@ -7,12 +7,12 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { collectWorkspaceWork, type WorkItem, workPresence } from '../../lib/task-collection';
+import { type WorkItem, workPresence } from '../../lib/task-collection';
+import { openWork, useWorkspaceWork, workProjectId } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { type Project, useProjectStore } from '../../stores/projectStore';
-import { useTaskStore } from '../../stores/taskStore';
 import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { LatestAgent } from '../agents/AgentAvatar';
@@ -24,8 +24,7 @@ import {
   useWorkSignals,
   WorkSignals,
 } from '../tasks/WorkSignals';
-import { Tooltip } from '../ui/Tooltip';
-import { type ActiveTab, viewLabel, WORKSPACE_VIEWS } from './navigation';
+import { type ActiveTab, groupViews, viewLabel, workspaceView } from './navigation';
 
 /** Finished rows shown per project before the rest are left to the Work page. */
 const RECENT_PER_PROJECT = 3;
@@ -49,48 +48,7 @@ function closedState(item: WorkItem) {
   return [item.stage, item.date, item.run?.id, item.run?.status, questions].join('|');
 }
 
-function workProjectId(item: WorkItem) {
-  return (
-    item.run?.projectId ??
-    item.session?.request.projectId ??
-    item.managed?.request.projectId ??
-    item.idea?.projectId
-  );
-}
-
 const STAGE_ORDER: Record<string, number> = { attention: 0, review: 0, working: 1, finished: 2 };
-
-export function useWorkspaceWork() {
-  const runs = useExecutionStore((state) => state.runs);
-  const sessions = useLiveSessionStore((state) => state.sessions);
-  const sessionRuns = useLiveSessionStore((state) => state.runs);
-  const queue = useManagedTaskStore((state) => state.queue);
-  const ideas = useTaskStore((state) => state.tasks);
-  return useMemo(
-    () =>
-      collectWorkspaceWork(
-        null,
-        ideas,
-        [...new Map([...runs, ...sessionRuns].map((run) => [run.id, run])).values()],
-        sessions,
-        queue.mergedRunIds,
-        false,
-        queue,
-      ),
-    [runs, sessions, sessionRuns, queue, ideas],
-  );
-}
-
-/** Opens a work item in the main view, switching to its project. */
-export function selectWorkItem(item: WorkItem) {
-  useExecutionStore
-    .getState()
-    .select(item.run && !item.session && !item.managed ? item.run.id : null);
-  useLiveSessionStore.getState().select(item.session?.id ?? null);
-  useManagedTaskStore.getState().select(item.managed?.id ?? null);
-  const projectId = workProjectId(item);
-  if (projectId) useProjectStore.getState().selectProject(projectId);
-}
 
 /** Work started in the sidebar, grouped by project: what needs you, then running, then recent. */
 function useProjectWork() {
@@ -119,11 +77,10 @@ type ProjectActions = {
   onOpenProject: (projectId: string, view: ActiveTab) => void;
   onNewWork: (projectId: string) => void;
   onRemoveProject: (project: Project) => void;
+  onCopyPath: (project: Project) => void;
 };
 
-const projectViews = WORKSPACE_VIEWS.filter(
-  (view) => view.group === 'project' && view.id !== 'swarm' && view.id !== 'cloud-resources',
-);
+const projectViews = groupViews('project');
 
 /**
  * A project's actions, shared by its options button and its right-click menu so both
@@ -136,6 +93,7 @@ function ProjectMenuItems({
   onOpenProject,
   onNewWork,
   onRemoveProject,
+  onCopyPath,
 }: ProjectActions & {
   menu: typeof Menu | typeof ContextMenu;
   project: Project;
@@ -155,7 +113,7 @@ function ProjectMenuItems({
           onSelect={() => onOpenProject(project.id, view.id)}
         >
           <view.icon size={16} aria-hidden="true" />
-          {view.id === 'project-overview' ? 'Overview' : viewLabel(view.id)}
+          {viewLabel(view.id)}
         </M.Item>
       ))}
       <M.Separator className="menu-separator" />
@@ -163,10 +121,7 @@ function ProjectMenuItems({
         <Smile size={16} aria-hidden="true" />
         Set icon…
       </M.Item>
-      <M.Item
-        className="workspace-menu-item"
-        onSelect={() => void navigator.clipboard?.writeText(project.path).catch(() => {})}
-      >
+      <M.Item className="workspace-menu-item" onSelect={() => onCopyPath(project)}>
         <Copy size={16} aria-hidden="true" />
         Copy path
       </M.Item>
@@ -193,7 +148,16 @@ const ProjectContextMenu = forwardRef<
     }
 >(
   (
-    { children, project, onSetIcon, onOpenProject, onNewWork, onRemoveProject, ...trigger },
+    {
+      children,
+      project,
+      onSetIcon,
+      onOpenProject,
+      onNewWork,
+      onRemoveProject,
+      onCopyPath,
+      ...trigger
+    },
     ref,
   ) => (
     <ContextMenu.Root>
@@ -209,6 +173,7 @@ const ProjectContextMenu = forwardRef<
             onOpenProject={onOpenProject}
             onNewWork={onNewWork}
             onRemoveProject={onRemoveProject}
+            onCopyPath={onCopyPath}
           />
         </ContextMenu.Content>
       </ContextMenu.Portal>
@@ -220,19 +185,13 @@ ProjectContextMenu.displayName = 'ProjectContextMenu';
 export function WorkSidebar({
   activeTab,
   onOpen,
-  onOpenProject,
-  onNewWork,
-  onRemoveProject,
   onAddProject,
-}: {
+  ...actions
+}: ProjectActions & {
   activeTab: ActiveTab;
   onOpen: () => void;
-  onOpenProject: (projectId: string, view: ActiveTab) => void;
-  onNewWork: (projectId: string) => void;
-  onRemoveProject: (project: Project) => void;
   onAddProject: () => void;
 }) {
-  const actions = { onOpenProject, onNewWork, onRemoveProject };
   const [iconFor, setIconFor] = useState<Project | null>(null);
   const projects = useProjectStore((state) => state.projects);
   const activeProject = useProjectStore((state) => state.activeProjectId);
@@ -251,9 +210,9 @@ export function WorkSidebar({
       .map((item) => item.run),
   );
   const somethingOpen = Boolean(selectedRun || selectedSession || selectedManaged);
-  const projectView = WORKSPACE_VIEWS.find((view) => view.id === activeTab)?.group === 'project';
+  const projectView = workspaceView(activeTab).group === 'project';
   const open = (item: WorkItem) => {
-    selectWorkItem(item);
+    openWork(item);
     onOpen();
   };
   return (
@@ -308,7 +267,7 @@ export function WorkSidebar({
                   type="button"
                   className="project-tree-name"
                   aria-current={current ? 'page' : undefined}
-                  onClick={() => onOpenProject(project.id, 'kanban')}
+                  onClick={() => actions.onOpenProject(project.id, 'kanban')}
                   title={project.path}
                 >
                   <ProjectMark project={project} />
@@ -336,7 +295,7 @@ export function WorkSidebar({
                       type="button"
                       className="project-tree-action"
                       aria-label={`New work in ${project.name}`}
-                      onClick={() => onNewWork(project.id)}
+                      onClick={() => actions.onNewWork(project.id)}
                     >
                       <Plus size={14} aria-hidden="true" />
                     </button>

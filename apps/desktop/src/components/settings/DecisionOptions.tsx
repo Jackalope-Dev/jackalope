@@ -4,6 +4,7 @@ import {
   DisclosureBody,
   DisclosureSummary,
   FormField,
+  InlineNotice,
   Input,
   Select,
   SelectItem,
@@ -15,8 +16,8 @@ import type {
   ModelEvidence,
   DecisionOptions as Options,
 } from '../../lib/decisions';
-import { nativeTask } from '../../lib/task-runtime';
-import { InlineNotice } from '../ui/InlineNotice';
+import { describeError } from '../../lib/errors';
+import { invokeNative } from '../../lib/native/transport';
 
 const helpers = [
   [
@@ -77,14 +78,14 @@ export function DecisionOptions({ projectId }: { projectId?: string }) {
     setDraft(undefined);
     setPending(false);
     try {
-      const value = await nativeTask<DecisionOptionsView>('decision_options', { projectId });
+      const value = await invokeNative<DecisionOptionsView>('decision_options', { projectId });
       if (ticket === generation.current) {
         setView(value);
         setDraft(value.options);
         setModelKeys(value.options.models.map(() => crypto.randomUUID()));
       }
     } catch (cause) {
-      if (ticket === generation.current) setError(String(cause));
+      if (ticket === generation.current) setError(describeError(cause));
     }
   }, [projectId]);
   useEffect(() => {
@@ -100,7 +101,7 @@ export function DecisionOptions({ projectId }: { projectId?: string }) {
     setError('');
     setMessage('');
     try {
-      const value = await nativeTask<DecisionOptionsView>('decision_options_save', {
+      const value = await invokeNative<DecisionOptionsView>('decision_options_save', {
         projectId,
         revision: view.revision,
         options: inherit ? null : draft,
@@ -111,7 +112,7 @@ export function DecisionOptions({ projectId }: { projectId?: string }) {
       setModelKeys(value.options.models.map(() => crypto.randomUUID()));
       setMessage('Decision assistance saved.');
     } catch (cause) {
-      if (ticket === generation.current) setError(String(cause));
+      if (ticket === generation.current) setError(describeError(cause));
     } finally {
       if (ticket === generation.current) setPending(false);
     }

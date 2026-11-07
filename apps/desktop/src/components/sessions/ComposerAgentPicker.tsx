@@ -1,16 +1,14 @@
-import { Badge, Choice, Popover, Tabs } from '@jackalope/ui';
+import { Badge, Button, Choice, LoadingState, Popover, Tabs, Tooltip } from '@jackalope/ui';
 import { ChevronDown, GitCompareArrows, Sparkles } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAgentModels } from '../../lib/agent-models';
+import { agentAdapter } from '../../lib/agents';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { MAX_COMPARED_AGENTS } from '../../stores/compareStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { agentAccountFor, isAgentAllowedForProject, type Project } from '../../stores/projectStore';
 import { ProviderMark } from '../agents/ProviderMark';
-import { Button } from '../ui/button';
-import { LoadingState } from '../ui/LoadingState';
-import { Tooltip } from '../ui/Tooltip';
 
 /** A model chosen for one agent; the name keeps the label readable without a catalog read. */
 export interface ComposerModel {
@@ -34,7 +32,7 @@ function useRosterAgents(project: Project | undefined) {
   );
   return runners.map((runner) => ({
     ...runner,
-    adapter: config.customAgents.find((agent) => agent.id === runner.id)?.adapter ?? runner.id,
+    adapter: agentAdapter(runner.id, config.customAgents),
     unavailable: !runner.available
       ? runner.detail || 'Not installed or not signed in.'
       : !config.isAgentEnabled(runner.id)

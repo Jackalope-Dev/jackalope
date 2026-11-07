@@ -1,14 +1,12 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Button, Disclosure, DisclosureSummary, InlineNotice } from '@jackalope/ui';
 import { ArrowRight, Check, FileDiff, GitMerge, Images, ListChecks, RefreshCw } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { capturedPages, type ReviewCaptures } from '../../lib/review-captures';
 import { reviewFingerprint } from '../../lib/review-fingerprint';
-import { nativeTask, type Review, type TaskRun } from '../../lib/task-runtime';
+import type { Review, TaskRun } from '../../lib/run-types';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
 import { AgentReview } from './AgentReview';
 import { ApproveWork } from './ApproveWork';
@@ -20,6 +18,8 @@ import { ReviewActions } from './ReviewActions';
 import { ReviewFeedback } from './ReviewFeedback';
 import { ReviewScreenshots } from './ReviewScreenshots';
 import './result-review.css';
+import { describeError } from '../../lib/errors';
+import { taskReview } from '../../lib/task-client';
 
 export type ReviewSection = 'changes' | 'screenshots' | 'checks' | 'delivery';
 
@@ -95,9 +95,9 @@ export function ResultReview({
     setError('');
     try {
       if (suppliedReview) await onRefresh?.();
-      else setReview(await nativeTask<Review>('task_review', { id: run.id }));
+      else setReview(await taskReview(run.id));
     } catch (error) {
-      setError(String(error));
+      setError(describeError(error));
     } finally {
       setLoading(false);
     }

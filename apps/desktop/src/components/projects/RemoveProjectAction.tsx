@@ -1,8 +1,8 @@
+import { ConfirmDialog } from '@jackalope/ui';
 import type { ReactNode } from 'react';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
 import { type Project, useProjectStore } from '../../stores/projectStore';
-import { ConfirmAction } from '../ui/ConfirmAction';
 
 export function RemoveProjectAction({
   project,
@@ -16,7 +16,7 @@ export function RemoveProjectAction({
   onOpenChange?: (open: boolean) => void;
 }) {
   return (
-    <ConfirmAction
+    <ConfirmDialog
       trigger={trigger}
       open={open}
       onOpenChange={onOpenChange}

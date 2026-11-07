@@ -1,4 +1,4 @@
-import { FormField, RefreshIcon, Select, SelectItem } from '@jackalope/ui';
+import { Button, FormField, RefreshIcon, Select, SelectItem } from '@jackalope/ui';
 import {
   ArrowLeft,
   ArrowRight,
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { describeError } from '../../lib/errors';
 import {
   downloadPercent,
   formatMemory,
@@ -29,13 +30,12 @@ import {
   modelFit,
 } from '../../lib/local-ai';
 import { useManagedRuntime } from '../../lib/managed-runtime';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment, openInBrowser } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { agentPolicySaved, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
 
 const stages = ['Your computer', 'Choose a model', 'Install & download', 'Check & connect'];
 type SetupActivity = 'inspect' | 'ollama' | 'opencode' | 'model' | 'verify' | 'connect';
@@ -77,7 +77,7 @@ export function LocalAiSteps({
   const model = inspection?.models.find((m) => m.id === selected);
   const installed = inspection?.installedModels.includes(selected);
   const inspect = useCallback(async () => {
-    const found = await nativeTask<LocalInspection>('local_ai_inspect');
+    const found = await invokeNative<LocalInspection>('local_ai_inspect');
     if (active.current) setInspection(found);
     return found;
   }, []);
@@ -94,7 +94,7 @@ export function LocalAiSteps({
       try {
         await action();
       } catch (cause) {
-        if (active.current) setError(String(cause));
+        if (active.current) setError(describeError(cause));
       } finally {
         working.current = false;
         if (active.current) {
@@ -119,7 +119,7 @@ export function LocalAiSteps({
       });
     return () => {
       active.current = false;
-      if (working.current && desktop) void nativeTask('local_ai_cancel').catch(() => {});
+      if (working.current && desktop) void invokeNative('local_ai_cancel').catch(() => {});
     };
   }, [desktop, inspect, perform]);
   useEffect(() => {
@@ -132,14 +132,14 @@ export function LocalAiSteps({
     channel.onmessage = (event) => {
       if (active.current) setProgress(event);
     };
-    return nativeTask<T>(command, { modelId: selected, ...args, progress: channel });
+    return invokeNative<T>(command, { modelId: selected, ...args, progress: channel });
   };
   const openLink = async (url: string, target: SetupActivity) => {
     setActivity(target);
     try {
       await openInBrowser(url);
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   const install = (tool: 'ollama' | 'opencode') =>
@@ -154,7 +154,7 @@ export function LocalAiSteps({
     );
   const connect = () =>
     void perform('connect', 'Connecting your local agent…', async () => {
-      const profile = await nativeTask<{ id: string }>('local_ai_connect', {
+      const profile = await invokeNative<{ id: string }>('local_ai_connect', {
         modelId: selected,
         helperModelId: helperModel || null,
         activate: !projectId && !projectSetup,
@@ -180,7 +180,6 @@ export function LocalAiSteps({
         ...options,
         models: [...new Set([...options.models, id])],
       });
-      await syncAgentConfig();
       await useExecutionStore.getState().discover();
       if (
         !projectId &&
@@ -191,7 +190,7 @@ export function LocalAiSteps({
       ) {
         config.setDefaultMetaAgent('opencode');
       }
-      await syncAgentConfig();
+      await agentPolicySaved();
       await useAgentAccountsStore.getState().load('opencode', true);
       if (active.current) {
         await onConnected?.(profile.id);
@@ -213,9 +212,9 @@ export function LocalAiSteps({
                 setStopping(true);
                 try {
                   if (runner.preparing) await runner.cancel();
-                  else await nativeTask('local_ai_cancel');
+                  else await invokeNative('local_ai_cancel');
                 } catch (cause) {
-                  setError(String(cause));
+                  setError(describeError(cause));
                   setStopping(false);
                 }
               }

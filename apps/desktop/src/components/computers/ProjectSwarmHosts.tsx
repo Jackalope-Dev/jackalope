@@ -1,11 +1,10 @@
-import { Badge, Checkbox, Choice } from '@jackalope/ui';
+import { Badge, Checkbox, Choice, InlineNotice, SettingBody, SettingGroup } from '@jackalope/ui';
 import { useState } from 'react';
 import { providerLabel, type SwarmHosts, setProjectHosts } from '../../lib/computers';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { SettingBody, SettingGroup } from '../settings/Setting';
-import { InlineNotice } from '../ui/InlineNotice';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { HostCapacity, useProjectHosts } from './HostCapacity';
 import './computers.css';
+import { describeError } from '../../lib/errors';
 
 const CHOICES: { value: SwarmHosts; title: string; description: string }[] = [
   {
@@ -44,7 +43,7 @@ export function ProjectSwarmHosts({ projectId }: { projectId: string }) {
     try {
       setHosts(await setProjectHosts(projectId, swarmHosts, computers));
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }

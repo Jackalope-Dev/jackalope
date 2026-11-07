@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { navigateWorkspace, openSettings } from '../../lib/app-events';
 import { taskNotices } from '../../lib/companion-tasks';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { type PlanSummary, planCommands } from '../../lib/plan-mode';
-import type { TaskRun } from '../../lib/task-runtime';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import type { TaskRun } from '../../lib/run-types';
+import { openRun, selectWork } from '../../lib/work-selection';
 import { useBotStore } from '../../stores/botStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useNotificationStore } from '../../stores/notificationStore';
@@ -11,12 +13,10 @@ import { usePlanStore } from '../../stores/planStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useReferralStore } from '../../stores/referralStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
-import { navigateWorkspace, openSettings } from '../layout/navigation';
 import { useCompanionNotices } from './useCompanionNotices';
 
 export function openCompanionTask(run: TaskRun) {
-  useProjectStore.getState().selectProject(run.projectId);
-  useExecutionStore.getState().select(run.id);
+  openRun(run.id);
   navigateWorkspace('kanban');
   requestAnimationFrame(() => document.getElementById('workspace-content')?.focus());
 }
@@ -41,7 +41,7 @@ export function CompanionSources() {
   useEffect(() => {
     if (!isTauriEnvironment()) return;
     let alive = true;
-    void nativeTask<{ state: string; email: string | null }>('app_account_status')
+    void invokeNative<{ state: string; email: string | null }>('app_account_status')
       .then((account) => {
         if (alive && account.state === 'connected' && account.email)
           setReferralAccount(account.email);
@@ -61,7 +61,7 @@ export function CompanionSources() {
       opening = true;
       try {
         while (alive) {
-          const id = await nativeTask<string | null>('notification_take_open');
+          const id = await invokeNative<string | null>('notification_take_open');
           if (!id || !alive) return;
           // Bot cards and suggestions open their bot rather than a task.
           if (id.startsWith('bot:')) {
@@ -156,7 +156,10 @@ The work departed from the approved plan.`,
             detail: error,
             kind: 'attention',
             actionLabel: 'Open tasks',
-            onOpen: () => navigateWorkspace('live-sessions'),
+            onOpen: () => {
+              selectWork();
+              navigateWorkspace('kanban');
+            },
           },
         ]
       : [],

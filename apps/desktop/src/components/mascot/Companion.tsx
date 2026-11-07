@@ -2,9 +2,10 @@ import { Button, ExternalLinkIcon, Popover, SearchIcon, SegmentedNav } from '@ja
 import { ArrowLeft, Check, CircleCheck, CircleHelp, Info, Settings2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { isActive, nativeTask, statusLabel } from '../../lib/task-runtime';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import { isActive, statusLabel } from '../../lib/run-status';
 import { taskTitle } from '../../lib/task-title';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import {
   type CompanionNotice,
   shouldNotify,
@@ -72,7 +73,7 @@ export function Companion({
   const unreadCount = unread.length;
   useEffect(() => {
     if (isTauriEnvironment())
-      void nativeTask('desktop_unread_badge', { count: unreadCount }).catch(() => {});
+      void invokeNative('desktop_unread_badge', { count: unreadCount }).catch(() => {});
   }, [unreadCount]);
   const announce = unread.filter((notice) => shouldNotify(notice.kind, level));
   const announcementKey = JSON.stringify(

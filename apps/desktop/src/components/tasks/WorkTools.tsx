@@ -1,13 +1,19 @@
-import { DropdownMenu as Menu } from '@jackalope/ui';
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  DropdownMenu as Menu,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ChevronDown, SquareTerminal } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { sessionCommand } from '../../lib/live-session';
-import { nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
+import type { TaskRun } from '../../lib/run-types';
+import { useAction } from '../../lib/useAction';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
+import { ActionError } from '../ui/ActionError';
 
 const TaskTerminal = lazy(() =>
   import('./TaskTerminal').then((m) => ({ default: m.TaskTerminal })),
@@ -79,7 +85,7 @@ export function WorkTools({
           </Menu.Content>
         </Menu.Portal>
       </Menu.Root>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </>
   );
 }
@@ -88,17 +94,9 @@ type WorkspaceAction = { id: string; label: string; onSelect: () => void };
 
 /** Pop-out windows, then editors and the workspace path, for a run. */
 export function useWorkspaceActions(run?: TaskRun) {
-  const [error, setError] = useState('');
+  const { run: act, error } = useAction();
   const preferredEditor = useSettingsStore((state) => state.preferredEditor);
   if (!run) return { groups: [] as WorkspaceAction[][], error };
-  const act = async (action: () => Promise<unknown>) => {
-    setError('');
-    try {
-      await action();
-    } catch (cause) {
-      setError(String(cause));
-    }
-  };
   const windows: WorkspaceAction[] = (['result', 'changes', 'preview', 'terminal'] as const).map(
     (pane) => ({
       id: `pop-${pane}`,
@@ -107,7 +105,7 @@ export function useWorkspaceActions(run?: TaskRun) {
         void act(async () => {
           if (run.liveSessionId && ['changes', 'preview'].includes(pane))
             await sessionCommand('action', { id: run.liveSessionId, action: 'pause' });
-          await nativeTask('task_work_window', { id: run.id, pane, action: 'open' });
+          await invokeNative('task_work_window', { id: run.id, pane, action: 'open' });
         }),
     }),
   );
@@ -117,7 +115,7 @@ export function useWorkspaceActions(run?: TaskRun) {
       .map((editor) => ({
         id: editor,
         label: `Open in ${editor === 'vscode' ? 'VS Code' : 'Cursor'}${editor === preferredEditor ? ' (preferred)' : ''}`,
-        onSelect: () => void act(() => nativeTask('task_open_editor', { id: run.id, editor })),
+        onSelect: () => void act(() => invokeNative('task_open_editor', { id: run.id, editor })),
       })),
     {
       id: 'copy-path',

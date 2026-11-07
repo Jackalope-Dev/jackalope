@@ -524,6 +524,9 @@
   overflow-y: auto;
   scroll-padding-block: 24px 120px;
 }
+.mcp-workspace {
+  overflow-wrap: anywhere;
+}
 .mcp-workspace:has(.mcp-connection-form) {
   scroll-padding-block: 24px 120px;
 }

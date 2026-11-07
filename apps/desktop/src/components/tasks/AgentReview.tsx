@@ -1,4 +1,19 @@
-import { Badge, Checkbox, Disclosure, DisclosureSummary, Switch } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  DialogCloseButton,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  Disclosure,
+  DisclosureSummary,
+  InlineNotice,
+  Select,
+  SelectItem,
+  Switch,
+  Textarea,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check, Circle, CircleCheck, Loader2, ScanSearch, X } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
@@ -11,20 +26,19 @@ import {
   reviewState,
   taskReviews,
 } from '../../lib/agent-review';
+import { agentAdapter } from '../../lib/agents';
+import { invokeNative } from '../../lib/native/transport';
 import { authorOf, rankReviewers } from '../../lib/reviewer-choice';
+import { durationLabel, elapsedLabel } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 import { liveActivity } from '../../lib/task-live-activity';
-import { durationLabel, elapsedLabel, nativeTask, type TaskRun } from '../../lib/task-runtime';
-import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
-import { Textarea } from '../ui/Textarea';
-import { agentAdapter } from './CrossModelReviewPanel';
 import { TaskActivity } from './TaskActivity';
 import './agent-review.css';
+import { describeError } from '../../lib/errors';
+import { stopTask } from '../../lib/task-client';
+import { ActionError } from '../ui/ActionError';
 
 const SEVERITY = {
   high: { label: 'High', variant: 'danger' },
@@ -70,8 +84,7 @@ export function AgentReview({
     setError('');
     setOpen(true);
     try {
-      await syncAgentConfig();
-      await nativeTask<string>('task_start_agent_review', {
+      await invokeNative<string>('task_start_agent_review', {
         sourceRunId: run.id,
         request: {
           id: crypto.randomUUID(),
@@ -90,7 +103,7 @@ export function AgentReview({
       });
       await useExecutionStore.getState().refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setStarting(false);
     }
@@ -201,7 +214,7 @@ function useReviewReport(reviewer: TaskRun | undefined) {
   useEffect(() => {
     if (!finished || !id) return;
     let alive = true;
-    nativeTask<string>('task_challenge_reply', { id })
+    invokeNative<string>('task_challenge_reply', { id })
       .then((reply) => {
         if (alive) setReplies((current) => ({ ...current, [id]: reply }));
       })
@@ -295,10 +308,10 @@ function ReviewBody({
   const handoff = onApply ?? onCorrect;
   const stop = async () => {
     try {
-      await nativeTask('task_stop', { id: reviewer.id });
+      await stopTask(reviewer.id);
       await useExecutionStore.getState().refresh();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     }
   };
   const send = async () => {
@@ -312,7 +325,7 @@ function ReviewBody({
       await handoff(prompt);
       onDone();
     } catch (cause) {
-      setError(String(cause));
+      setError(describeError(cause));
     } finally {
       setSending(false);
     }
@@ -345,7 +358,7 @@ function ReviewBody({
               {elapsedLabel(reviewer.startedAt)} so far. You can close this; the review keeps going.
             </p>
           )}
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <ActionError error={error} />
           <ReviewerActivity reviewer={reviewer} />
         </div>
         <DialogFooter>
@@ -419,7 +432,7 @@ function ReviewBody({
             This attempt can’t take a follow-up, so fixes can’t be sent from here.
           </p>
         )}
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        <ActionError error={error} />
         <ReviewerActivity reviewer={reviewer} />
       </div>
       {handoff && (unreadable || findings.length > 0) && (

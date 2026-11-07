@@ -1,5 +1,5 @@
 import type { DecisionReceipt, DecisionRecord } from './decisions';
-import { nativeTask } from './task-runtime.ts';
+import { invokeNative } from './native/transport.ts';
 
 export interface TaskDecisionUsage {
   id: string;
@@ -10,8 +10,8 @@ export interface TaskDecisionUsage {
 
 export const readTaskDecisionUsage = async (): Promise<TaskDecisionUsage[]> => {
   const [strategies, decisions] = await Promise.all([
-    nativeTask<TaskDecisionUsage[]>('task_strategy_history'),
-    nativeTask<DecisionRecord[]>('decision_history'),
+    invokeNative<TaskDecisionUsage[]>('task_strategy_history'),
+    invokeNative<DecisionRecord[]>('decision_history'),
   ]);
   return [...strategies, ...decisions.filter((record) => !record.accountedElsewhere)];
 };

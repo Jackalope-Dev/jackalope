@@ -169,4 +169,10 @@
     box-shadow: var(--shadow-pop);
     color: var(--color-text-primary);
   }
+  :where(.ui-dialog-overlay[data-layer="confirm"]) {
+    z-index: 90;
+  }
+  :where(.ui-dialog[data-layer="confirm"]) {
+    z-index: 91;
+  }
 }

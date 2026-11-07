@@ -1,19 +1,24 @@
+import {
+  Button,
+  DialogCloseButton,
+  DialogContent,
+  DialogHeader,
+  FormField,
+  InlineNotice,
+  Input,
+  Select,
+  SelectItem,
+  Switch,
+  Textarea,
+  useDialogFocus,
+} from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
+import { PROMPT_MAX_CHARS } from '../../lib/run-types';
 import type { ScheduleTemplate } from '../../lib/schedule-templates';
 import type { ScheduleDefinition as Definition } from '../../lib/schedules';
-
-import { PROMPT_MAX_CHARS } from '../../lib/task-runtime';
 import { isAgentAllowedForProject, type Project } from '../../stores/projectStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
-import { Button } from '../ui/button';
-import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
-import { FormField } from '../ui/FormField';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
-import { Select, SelectItem } from '../ui/Select';
-import { Switch } from '../ui/Switch';
-import { Textarea } from '../ui/Textarea';
-import { useDialogFocus } from '../ui/useDialogFocus';
+import { ActionError } from '../ui/ActionError';
 import { ScheduleTiming } from './ScheduleTiming';
 
 export function ScheduleEditDialog({
@@ -320,7 +325,7 @@ export function ScheduleEditDialog({
               </div>
             </div>
             <div className="schedule-editor-footer">
-              {error && <InlineNotice tone="error">{error}</InlineNotice>}
+              <ActionError error={error} />
               {!projects.length && (
                 <InlineNotice>
                   Add a project in Projects, then return to configure this schedule.

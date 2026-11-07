@@ -4,7 +4,8 @@ import { isAgentReview } from './agent-review.ts';
 import { type LiveSession, sessionWork } from './live-session.ts';
 import { type ManagedTask, managedTaskWork } from './managed-task.ts';
 import type { QueueView } from './queue.ts';
-import { isActive, type TaskRun } from './task-runtime.ts';
+import { isActive, isSettled } from './run-status.ts';
+import type { TaskRun } from './run-types.ts';
 import { taskTitle } from './task-title.ts';
 import { taskDecision, taskNextAction } from './task-workflow.ts';
 
@@ -116,6 +117,7 @@ export function collectWorkspaceWork(
   integratedRunIds: string[] = [],
   archived = false,
   queue?: QueueView,
+  nested = false,
 ): WorkItem[] {
   const sessionIds = new Set(sessions.map((session) => session.id));
   const managedWork = (queue?.managedTasks ?? [])
@@ -127,10 +129,13 @@ export function collectWorkspaceWork(
     projectId,
     ideas.filter((idea) => !idea.runId || parentProjects.get(idea.runId) !== idea.projectId),
     runs.filter(
-      (run) => !childIds.has(run.id) && (!run.liveSessionId || !sessionIds.has(run.liveSessionId)),
+      (run) =>
+        (nested || !childIds.has(run.id)) &&
+        (!run.liveSessionId || !sessionIds.has(run.liveSessionId)),
     ),
     integratedRunIds,
     archived,
+    nested,
   );
   if (!archived)
     for (const { task, work } of managedWork) {
@@ -160,7 +165,7 @@ export function collectWorkspaceWork(
     for (const session of sessions) {
       if (projectId !== null && session.request.projectId !== projectId) continue;
       // Bot conversations live in the Bots view.
-      if (session.persona) continue;
+      if (session.persona && !nested) continue;
       const work = sessionWork(session, runs);
       items.push({
         id: `session:${session.id}`,
@@ -195,22 +200,19 @@ export function collectWork(
   runs: TaskRun[],
   integratedRunIds: string[] = [],
   archived = false,
+  withReviews = false,
 ): WorkItem[] {
   // Agent reviews belong to the task they review and open from its Review tab.
   const projectRuns = runs.filter(
-    (run) => (projectId === null || run.projectId === projectId) && !isAgentReview(run),
+    (run) =>
+      (projectId === null || run.projectId === projectId) && (withReviews || !isAgentReview(run)),
   );
   const byId = new Map(projectRuns.map((run) => [run.id, run]));
   const latest = new Map<string, TaskRun>();
   const original = new Map<string, TaskRun>();
   const blocked = new Set<string>();
   for (const run of projectRuns) {
-    if (
-      !['review', 'reviewed', 'failed', 'stopped'].includes(run.status) ||
-      run.finishing ||
-      run.liveSessionId ||
-      run.persistenceError
-    )
+    if (!isSettled(run) || run.finishing || run.liveSessionId || run.persistenceError)
       blocked.add(run.taskId);
     const newest = latest.get(run.taskId);
     const oldest = original.get(run.taskId);
@@ -239,7 +241,7 @@ export function collectWork(
   for (const run of latest.values()) {
     if (!!run.archivedAt !== archived) continue;
     const idea = linkedIdeas.get(run.taskId);
-    const active = ['starting', 'running', 'stopping'].includes(run.status);
+    const active = isActive(run);
     const pending = active && run.prompts?.some((prompt) => prompt.status === 'pending');
     items.push({
       id: idea?.id ?? run.taskId,

@@ -1,9 +1,10 @@
+import { Button } from '@jackalope/ui';
 import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
-import { openInBrowser } from '../../lib/tauri-bridge';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { openInBrowser } from '../../lib/native/env';
 import './agent-manager.css';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 export function AgentInstallGuide({
   desktopInstalled,
@@ -32,14 +33,14 @@ export function AgentInstallGuide({
           try {
             await openInBrowser(url);
           } catch (cause) {
-            setError(String(cause));
+            setError(describeError(cause));
           }
         }}
       >
         CLI setup guide
         <ExternalLink size={15} />
       </Button>
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
     </section>
   );
 }

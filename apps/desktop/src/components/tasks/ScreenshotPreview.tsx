@@ -1,7 +1,8 @@
+import { Button, InlineNotice } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-import { nativeTask, type ScreenshotArtifact } from '../../lib/task-runtime';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
+import { describeError } from '../../lib/errors';
+import { invokeNative } from '../../lib/native/transport';
+import type { ScreenshotArtifact } from '../../lib/run-types';
 
 export function ScreenshotPreview({
   runId,
@@ -17,14 +18,14 @@ export function ScreenshotPreview({
   useEffect(() => {
     let canceled = false;
     let url = '';
-    nativeTask<number[]>('task_screenshot', { runId, screenshotId: screenshot.id })
+    invokeNative<number[]>('task_screenshot', { runId, screenshotId: screenshot.id })
       .then((bytes) => {
         if (canceled) return;
         url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
         setSource(url);
       })
       .catch((error) => {
-        if (!canceled) setError(String(error));
+        if (!canceled) setError(describeError(error));
       });
     return () => {
       canceled = true;

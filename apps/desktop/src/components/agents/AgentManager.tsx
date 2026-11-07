@@ -1,17 +1,22 @@
-import { FormField, Input, DropdownMenu as Menu, SegmentedControl } from '@jackalope/ui';
+import {
+  Button,
+  FormField,
+  InlineNotice,
+  Input,
+  DropdownMenu as Menu,
+  SegmentedControl,
+  Switch,
+} from '@jackalope/ui';
 import { ArrowLeft, MoreHorizontal, Star } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { navigateWorkspace } from '../../lib/app-events';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { navigateWorkspace } from '../layout/navigation';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { Switch } from '../ui/Switch';
+import { useActiveProject } from '../../stores/projectStore';
 import { AgentAccounts } from './AgentAccounts';
 import { AgentInstallGuide } from './AgentInstallGuide';
 import { AgentModels } from './AgentModels';
@@ -21,13 +26,13 @@ import { ManagedRuntimeSettings } from './ManagedRuntimeSettings';
 import { ProviderMark } from './ProviderMark';
 import './agents-workspace.css';
 import './agent-manager.css';
+import { agentNames, canOrchestrate, ORCHESTRATING_AGENTS } from '../../lib/agents';
+import { describeError } from '../../lib/errors';
+import { ActionError } from '../ui/ActionError';
 
 export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
   const config = useAgentConfigStore();
-  const { projects, activeProjectId } = useProjectStore(
-    useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId })),
-  );
-  const activeProject = projects.find((item) => item.id === activeProjectId);
+  const activeProject = useActiveProject();
   const { scope, setScope } = useAgentScopeStore(
     useShallow((s) => ({ scope: s.scope, setScope: s.setScope })),
   );
@@ -70,14 +75,10 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
   const selectedRunner = runners.find((r) => r.id === selected?.id);
   const selectedEnabled = selected ? config.isAgentEnabled(selected.id, project?.id) : false;
   const isDefault = !!selected && defaultAgent === selected.id;
-  const orchestrates =
-    !!selected &&
-    ['codex', 'claude', 'grok', 'opencode', 'kimi'].includes(
-      ('adapter' in selected ? selected.adapter : undefined) ?? selected.id,
-    );
+  const orchestrates = !!selected && canOrchestrate(selected.id, config.customAgents);
   const defaultBlockedReason =
     !project && !orchestrates
-      ? `${selected?.name} cannot orchestrate routing. Choose Codex, Claude, Grok, OpenCode or Kimi Code.`
+      ? `${selected?.name} cannot orchestrate routing. Choose ${agentNames(ORCHESTRATING_AGENTS)}.`
       : !selectedEnabled
         ? `Enable ${selected?.name} before making it the default.`
         : !selectedRunner?.available
@@ -89,13 +90,12 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
     setError('');
     setSaved(false);
     try {
-      await syncAgentConfig();
       await discover();
       setSaved(true);
       setDirty(false);
       refreshModels();
     } catch (e) {
-      setError(String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }
@@ -318,7 +318,7 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
         </div>
       </div>
 
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <ActionError error={error} />
       {saved && (
         <InlineNotice tone="success">
           Agent settings saved. Existing runs keep their current configuration.

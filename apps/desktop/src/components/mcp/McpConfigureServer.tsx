@@ -1,9 +1,8 @@
+import { Button, InlineNotice } from '@jackalope/ui';
 import { ArrowLeft } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { AllMcpsServer } from '../../stores/mcpStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { recommendationFor } from './curated-servers';
 import { McpConnectionForm } from './McpConnectionForm';

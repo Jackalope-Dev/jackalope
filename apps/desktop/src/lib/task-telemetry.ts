@@ -1,4 +1,4 @@
-import type { TaskRun } from './task-runtime';
+import type { TaskRun } from './run-types';
 import { agents, type Metric, type TaskState, type TelemetryAgent } from './telemetry.ts';
 
 interface Snapshot {
