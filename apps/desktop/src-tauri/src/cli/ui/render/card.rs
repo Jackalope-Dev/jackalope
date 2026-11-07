@@ -11,7 +11,7 @@
 use super::duration;
 use super::transcript::{wrap, LineHit};
 use crate::brand;
-use crate::protocol::{self, RunStage, RunSummary, SessionView};
+use crate::protocol::{self, RunStage, RunStatus, RunSummary, SessionView};
 use crate::ui::App;
 use crate::ui::Click;
 use ratatui::style::{Color, Modifier, Style};
@@ -158,13 +158,10 @@ fn tone(view: &SessionView, run: &RunSummary, phase: Phase) -> Color {
         brand::accent()
     } else if protocol::present(view.error.as_deref()).is_some()
         || run.check.as_ref().is_some_and(|check| !check.passed)
-        || matches!(view.status.as_deref(), Some("failed" | "error"))
+        || view.status == Some(RunStatus::Failed)
     {
         brand::danger()
-    } else if matches!(
-        view.status.as_deref(),
-        Some("stopped" | "cancelled" | "canceled" | "interrupted")
-    ) {
+    } else if view.status.as_ref().is_some_and(RunStatus::is_stopped) {
         brand::muted()
     } else {
         brand::success()
@@ -177,23 +174,21 @@ fn state(view: &SessionView, run: &RunSummary, phase: Phase) -> &'static str {
         return "needs you";
     }
     if phase == Phase::Live {
-        return match view.status.as_deref() {
-            Some("routing") => "routing",
-            Some("queued") => "queued",
-            Some("starting") => "starting",
-            Some("stopping") => "stopping",
+        return match view.status {
+            Some(RunStatus::Starting) => "starting",
+            Some(RunStatus::Stopping) => "stopping",
             _ => "working",
         };
     }
     if view.merged {
         return "merged";
     }
-    match view.status.as_deref() {
-        Some("failed" | "error") => "failed",
-        Some("stopped" | "cancelled" | "canceled") => "stopped",
-        Some("interrupted") => "interrupted",
+    match view.status {
+        Some(RunStatus::Failed) => "failed",
+        Some(RunStatus::Stopped) => "stopped",
+        Some(RunStatus::Interrupted) => "interrupted",
         _ if run.check.as_ref().is_some_and(|check| !check.passed) => "check failed",
-        Some("reviewed") => "reviewed",
+        Some(RunStatus::Reviewed) => "reviewed",
         _ => "ready",
     }
 }
@@ -307,8 +302,8 @@ fn bottom(
     } else if view.merged {
         vec![("", "reply to keep going")]
     } else if matches!(
-        view.status.as_deref(),
-        Some("failed" | "error" | "interrupted")
+        view.status,
+        Some(RunStatus::Failed | RunStatus::Interrupted)
     ) {
         vec![("/retry", ""), ("", "or reply")]
     } else {

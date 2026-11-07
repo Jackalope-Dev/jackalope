@@ -365,19 +365,10 @@ impl Scheduler {
             }
             let runs = self.coordinator.runtime.integration_runs()?;
             let overlap = saved.last_run_id.iter().any(|id| {
-                runs.iter().any(|run| {
-                    (&run.id == id || &run.task_id == id)
-                        && ["starting", "running", "stopping", "interrupted"]
-                            .contains(&run.status.as_str())
-                })
+                runs.iter()
+                    .any(|run| (&run.id == id || &run.task_id == id) && run.status.is_live())
             });
-            let capacity_busy = runs
-                .iter()
-                .filter(|r| {
-                    ["starting", "running", "stopping", "interrupted"].contains(&r.status.as_str())
-                })
-                .count()
-                >= 3;
+            let capacity_busy = runs.iter().filter(|r| r.status.is_live()).count() >= 3;
             let access_denied = self.coordinator.runtime.access.ensure().is_err();
             let skip = access_denied
                 || overlap
@@ -775,11 +766,8 @@ impl Scheduler {
         }
         let runs = self.coordinator.runtime.integration_runs()?;
         let overlap = saved.last_run_id.iter().any(|run_id| {
-            runs.iter().any(|run| {
-                (&run.id == run_id || &run.task_id == run_id)
-                    && ["starting", "running", "stopping", "interrupted"]
-                        .contains(&run.status.as_str())
-            })
+            runs.iter()
+                .any(|run| (&run.id == run_id || &run.task_id == run_id) && run.status.is_live())
         });
         let mut request = saved.definition.request.clone();
         request.id = uuid::Uuid::new_v4().to_string();
@@ -914,6 +902,7 @@ mod monitor_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::tasks::RunStatus;
     #[test]
     fn a_webhook_request_needs_a_schedule_id_and_bearer_token() {
         let id = uuid::Uuid::new_v4();
@@ -1077,8 +1066,8 @@ mod tests {
         loop {
             let runs = scheduler.coordinator.runtime.integration_runs().unwrap();
             assert_eq!(runs.len(), 1);
-            if !["starting", "running"].contains(&runs[0].status.as_str()) {
-                assert_eq!(runs[0].status, "review", "{:?}", runs[0].error);
+            if !runs[0].status.is_running() {
+                assert_eq!(runs[0].status, RunStatus::Review, "{:?}", runs[0].error);
                 assert_eq!(runs[0].result, "Scheduled fixture complete");
                 assert_ne!(runs[0].workspace, repo.to_string_lossy());
                 break;

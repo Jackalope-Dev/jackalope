@@ -438,7 +438,7 @@ impl Coordinator {
             .integration_runs()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
             .iter()
-            .any(|r| &r.id == run_id && active(&r.status) && !r.finishing)
+            .any(|r| &r.id == run_id && r.status.is_active() && !r.finishing)
         {
             Ok(())
         } else {

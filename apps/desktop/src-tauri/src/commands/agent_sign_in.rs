@@ -327,7 +327,7 @@ fn start_sign_in(
     let _guard = super::integration::execution_guard()?;
     let binding = agent_profiles::bind_account(&runtime.profiles_root(), &agent, Some(&id))?;
     if runtime.integration_runs()?.iter().any(|run| {
-        ["starting", "running", "stopping"].contains(&run.status.as_str())
+        run.status.is_active()
             && run
                 .account_binding
                 .as_ref()

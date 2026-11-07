@@ -776,17 +776,14 @@ impl TaskRuntime {
         let mut inner = self.inner.lock().unwrap();
         if inner.canceled.contains(id) {
             drop(inner);
-            self.update(id, |run| {
-                run.status = "stopped".into();
-                run.ended_at = Some(Utc::now().to_rfc3339());
-            });
+            self.mark_stopped(id);
             return Ok(None);
         }
-        if inner.runs.values().any(|run| {
-            run.id != id
-                && run.workspace == workspace
-                && ["starting", "running", "stopping"].contains(&run.status.as_str())
-        }) {
+        if inner
+            .runs
+            .values()
+            .any(|run| run.id != id && run.workspace == workspace && run.status.is_active())
+        {
             return Err(
                 "Another attempt is using this workspace. Stop it or wait before continuing."
                     .into(),
@@ -878,8 +875,8 @@ impl TaskRuntime {
             run.efficiency.claude_transport = Some(transport.into());
             run.efficiency.timing("processSpawn", started.elapsed());
             run.process_contained = cfg!(windows);
-            if run.status == "starting" {
-                run.status = "running".into();
+            if run.status == RunStatus::Starting {
+                run.status = RunStatus::Running;
             }
             run.progress = None;
             if spawn_attempts > 1 {

@@ -13,6 +13,7 @@
 
 use super::*;
 use crate::commands::git_command::{command, Policy};
+use crate::commands::tasks::RunStatus;
 use crate::commands::tasks::TaskRun;
 use rmcp::schemars;
 use serde::Serialize;
@@ -71,7 +72,7 @@ pub struct Peer {
     pub run_id: String,
     pub title: String,
     pub agent: String,
-    pub status: String,
+    pub status: RunStatus,
     pub scopes: Vec<String>,
     pub tree: Option<String>,
     pub files: Vec<PeerFile>,
@@ -86,7 +87,7 @@ pub struct Peer {
 pub struct LiveRun {
     pub task_id: String,
     pub run_id: String,
-    pub status: String,
+    pub status: RunStatus,
     pub snapshot: bool,
     pub files: usize,
     pub added: u64,
@@ -148,7 +149,7 @@ fn candidates<'a>(runs: &'a [TaskRun], view: &QueueView, project_id: &str) -> Ve
             && !r.base_head.is_empty()
             && !r.workspace.is_empty()
             && r.workspace != r.project_path
-            && (active(&r.status) || ["review", "reviewed"].contains(&r.status.as_str()))
+            && (r.status.is_active() || r.status.is_done())
             && !view.merged_run_ids.contains(&r.id)
     }) {
         if runs
@@ -508,7 +509,7 @@ pub(super) fn notify_conflicts(ledger: &mut Ledger, runs: &[TaskRun], merged: &[
             .collect::<Vec<_>>();
         for (index, (left, left_tree)) in live.iter().enumerate() {
             for (right, right_tree) in &live[index + 1..] {
-                if !active(&left.status) && !active(&right.status) {
+                if !left.status.is_active() && !right.status.is_active() {
                     continue;
                 }
                 let Ok(paths) = conflicts((left, left_tree), (right, right_tree)) else {
@@ -527,7 +528,7 @@ pub(super) fn notify_conflicts(ledger: &mut Ledger, runs: &[TaskRun], merged: &[
                 );
                 if !ledger.live_conflicts.contains(&signature) {
                     for (run, other) in [(pair[0], pair[1]), (pair[1], pair[0])] {
-                        if !active(&run.status) {
+                        if !run.status.is_active() {
                             continue;
                         }
                         ledger.messages.push(CoordinationMessage {
@@ -979,7 +980,7 @@ mod tests {
         run.project_path = root.to_string_lossy().into();
         run.workspace = workspace.to_string_lossy().into();
         run.base_head = base;
-        run.status = "running".into();
+        run.status = RunStatus::Running;
         run.agent = "codex".into();
         run.started_at = "2026-10-01T00:00:00Z".into();
         (run, tree)
@@ -1242,7 +1243,7 @@ mod tests {
             .iter()
             .cloned()
             .map(|mut run| {
-                run.status = "review".into();
+                run.status = RunStatus::Review;
                 run
             })
             .collect::<Vec<_>>();

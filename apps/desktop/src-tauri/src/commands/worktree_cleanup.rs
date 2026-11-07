@@ -145,9 +145,7 @@ fn hard_block(
             return Err("Contains another worktree — kept.".into());
         }
     }
-    for run in runs.iter().filter(|run| {
-        ["starting", "running", "stopping", "interrupted"].contains(&run.status.as_str())
-    }) {
+    for run in runs.iter().filter(|run| run.status.is_live()) {
         let workspace = task_workspace(Path::new(&run.workspace))?;
         if workspace.starts_with(&path) || path.starts_with(&workspace) {
             return Err("In use by an active or interrupted task.".into());
@@ -978,9 +976,7 @@ fn orphans(repo_path: &str, runs: &[TaskRun]) -> Result<Vec<OrphanFolder>, Strin
                 .and_then(|()| super::verification::ensure_idle(&entry.path().to_string_lossy()))
                 .err()
         };
-        for run in runs.iter().filter(|run| {
-            ["starting", "running", "stopping", "interrupted"].contains(&run.status.as_str())
-        }) {
+        for run in runs.iter().filter(|run| run.status.is_live()) {
             let workspace = task_workspace(Path::new(&run.workspace))?;
             if workspace.starts_with(&path) || path.starts_with(&workspace) {
                 blocked = Some("In use by an active or interrupted task.".to_string());
@@ -1134,6 +1130,7 @@ pub async fn git_cleanup_worktree(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::tasks::RunStatus;
     use std::fs;
 
     struct Fixture {
@@ -1592,7 +1589,7 @@ mod tests {
         }
         let runs = [f.run("review")];
         f.remove(&before, &runs).unwrap();
-        assert_eq!(runs[0].status, "review");
+        assert_eq!(runs[0].status, RunStatus::Review);
     }
 
     #[test]

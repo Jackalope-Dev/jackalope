@@ -241,7 +241,7 @@ fn selected_runs(runs: &[TaskRun], ids: &[String]) -> Result<Vec<TaskRun>, Strin
                 "Save the task's latest history before preparing or applying integration.".into(),
             );
         }
-        if !["review", "reviewed"].contains(&run.status.as_str()) {
+        if !run.status.is_done() {
             return Err(
                 "Only completed tasks awaiting review or already reviewed can be integrated."
                     .into(),
@@ -262,9 +262,7 @@ fn selected_runs(runs: &[TaskRun], ids: &[String]) -> Result<Vec<TaskRun>, Strin
         if runs.iter().any(|other| {
             (other.task_id == run.task_id
                 || canonical(&other.workspace).ok().as_ref() == Some(&workspace))
-                && (["starting", "running", "stopping", "interrupted"]
-                    .contains(&other.status.as_str())
-                    || other.started_at > run.started_at)
+                && (other.status.is_live() || other.started_at > run.started_at)
         }) {
             return Err("This task has a newer, active, or interrupted attempt. Review its latest completed attempt first.".into());
         }
@@ -671,7 +669,7 @@ pub(in crate::commands) fn apply(
         }
     }
     if runs.iter().any(|run| {
-        ["starting", "running", "stopping", "interrupted"].contains(&run.status.as_str())
+        run.status.is_live()
             && canonical(&run.workspace)
                 .ok()
                 .is_some_and(|workspace| project.starts_with(&workspace))
@@ -1013,6 +1011,7 @@ pub async fn integration_plans(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::tasks::RunStatus;
 
     struct Fixture {
         root: PathBuf,
@@ -1724,7 +1723,7 @@ mod tests {
         let mut continuation = original.clone();
         continuation.id = "run-continue".into();
         continuation.started_at = "2026-09-04T01:00:00Z".into();
-        continuation.status = "running".into();
+        continuation.status = RunStatus::Running;
         continuation.workspace.clear();
         let ids = vec![original.id.clone()];
         assert!(prepare(&fixture.plans, &[original, continuation], &ids)

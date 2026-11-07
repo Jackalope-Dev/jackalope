@@ -447,7 +447,7 @@ impl AgentGuard {
         };
         let mut pushed = false;
         self.runtime.update_checked(&self.run_id, |run| {
-            if ["starting", "running"].contains(&run.status.as_str()) {
+            if run.status.is_running() {
                 run.prompts.push(prompt.clone());
                 pushed = true;
             }
@@ -463,7 +463,7 @@ impl AgentGuard {
         let run = self
             .runtime
             .run_snapshot(&self.run_id)
-            .filter(|run| ["starting", "running"].contains(&run.status.as_str()))
+            .filter(|run| run.status.is_running())
             .ok_or("This attempt has ended; its browser profile is closed.")?;
         let prompt = run
             .prompts

@@ -108,7 +108,7 @@ pub async fn task_agent_screen_revoke(
     tauri::async_runtime::spawn_blocking(move || {
         // A finished attempt keeps its history unchanged; revocation still applied above.
         let _ = runtime.update_checked(&run_id, |run| {
-            if ["starting", "running"].contains(&run.status.as_str()) {
+            if run.status.is_running() {
                 run.activity.push(note.into());
             }
         });

@@ -59,7 +59,7 @@ async fn installed_agents_share_live_work_and_split_off_subtasks() {
     while started.elapsed() < Duration::from_secs(timeout) {
         let runs = runtime.integration_runs().unwrap();
         let pair = runs.iter().filter(|r| r.id == api || r.id == ui);
-        if pair.clone().count() == 2 && pair.clone().all(|r| !active(&r.status)) {
+        if pair.clone().count() == 2 && pair.clone().all(|r| !r.status.is_active()) {
             break;
         }
         tokio::time::sleep(Duration::from_secs(1)).await;

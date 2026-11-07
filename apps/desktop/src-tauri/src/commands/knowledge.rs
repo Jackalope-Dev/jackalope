@@ -1,4 +1,5 @@
 use super::{history, tasks::TaskRuntime};
+use crate::commands::tasks::RunStatus;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -516,7 +517,7 @@ pub fn knowledge_save(
                 .find(|r| &r.id == id && r.project_id == entry.project_id)
                 .ok_or("Source task is unavailable in this project")?;
             if canonical(&run.project_path)? != canonical(&entry.project_path)?
-                || run.status != "reviewed"
+                || run.status != RunStatus::Reviewed
             {
                 return Err("Review the source task before saving knowledge from it.".into());
             }

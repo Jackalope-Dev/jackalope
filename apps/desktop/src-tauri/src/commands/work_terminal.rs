@@ -212,8 +212,7 @@ pub(super) fn start_with_shell(
     let workspace = dunce::canonicalize(&run.workspace).map_err(|e| e.to_string())?;
     if runs.iter().any(|other| {
         dunce::canonicalize(&other.workspace).ok().as_ref() == Some(&workspace)
-            && (["starting", "running", "stopping", "interrupted"].contains(&other.status.as_str())
-                || other.finishing)
+            && (other.status.is_live() || other.finishing)
     }) {
         return Err(
             "Finish active work and resolve interrupted ownership before opening a task terminal."

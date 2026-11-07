@@ -211,10 +211,10 @@ fn start_preview(
     }
     let runs = runtime.integration_runs()?;
     let run = runs.iter().find(|r| r.id == id).ok_or("Task not found")?;
-    if runs.iter().any(|r| {
-        r.workspace == run.workspace
-            && ["starting", "running", "stopping", "interrupted"].contains(&r.status.as_str())
-    }) {
+    if runs
+        .iter()
+        .any(|r| r.workspace == run.workspace && r.status.is_live())
+    {
         return Err("Finish active work and resolve interrupted ownership before starting a managed preview.".into());
     }
     ensure_idle(&run.workspace)?;

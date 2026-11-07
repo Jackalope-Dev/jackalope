@@ -8,6 +8,7 @@ use crate::commands::computers::{
     pool::{self, Decision, Needs},
 };
 use crate::commands::project_secrets::{self, Availability, Place};
+use crate::commands::tasks::RunStatus;
 use crate::commands::tasks::TaskRun;
 
 impl Coordinator {
@@ -267,7 +268,7 @@ pub(super) fn host_retries(
                 .iter()
                 .find(|run| Some(&run.id) == item.run_id.as_ref())?;
             let host = run.host.as_ref()?;
-            let eligible = run.status == "failed"
+            let eligible = run.status == RunStatus::Failed
                 && host.lost.is_some()
                 && host.retried_from.is_none()
                 && host.retry.is_none()
@@ -485,7 +486,7 @@ mod tests {
             id: id.into(),
             task_id: task.into(),
             project_id: "p".into(),
-            status: "failed".into(),
+            status: RunStatus::Failed,
             started_at: "2026-11-01T00:00:00Z".into(),
             host,
             ..Default::default()

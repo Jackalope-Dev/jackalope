@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::tasks::RunStatus;
 use crate::commands::tasks::TaskRun;
 use axum::{
     body::{to_bytes, Body, HttpBody},
@@ -80,12 +81,12 @@ fn excerpt(text: &str, limit: usize) -> String {
 }
 
 fn phase(run: &TaskRun) -> &str {
-    if active(&run.status) {
+    if run.status.is_active() {
         "active"
-    } else if run.status == "reviewed" {
+    } else if run.status == RunStatus::Reviewed {
         "review"
     } else {
-        &run.status
+        run.status.as_str()
     }
 }
 
@@ -277,7 +278,7 @@ impl Coordinator {
         }
         inner
             .delivered
-            .retain(|id, _| runs.iter().any(|r| &r.id == id && active(&r.status)));
+            .retain(|id, _| runs.iter().any(|r| &r.id == id && r.status.is_active()));
         let retained: HashSet<_> = inner.ledger.messages.iter().map(|m| m.id.clone()).collect();
         for ids in inner.delivered.values_mut() {
             ids.retain(|id| retained.contains(id));
@@ -304,7 +305,7 @@ impl Coordinator {
         let mut tasks = inventory(&inner.ledger.items, &runs, &merged, &request.project_id);
         tasks.retain(|t| {
             t["id"] != task
-                && (active(t["status"].as_str().unwrap_or(""))
+                && (RunStatus::from(t["status"].as_str().unwrap_or("")).is_active()
                     || t["status"] == "queued"
                     || t["status"] == "review"
                     || assigned
@@ -312,7 +313,7 @@ impl Coordinator {
         });
         tasks.sort_by_key(|t| {
             (
-                !active(t["status"].as_str().unwrap_or("")),
+                !RunStatus::from(t["status"].as_str().unwrap_or("")).is_active(),
                 !related(&inner.ledger.items, task, t["id"].as_str().unwrap_or("")),
                 t["id"].as_str().unwrap_or("").to_string(),
             )
@@ -399,7 +400,7 @@ impl Coordinator {
             .runtime
             .integration_runs()?
             .into_iter()
-            .find(|r| &r.id == run_id && active(&r.status))
+            .find(|r| &r.id == run_id && r.status.is_active())
             .ok_or("Coordination is unavailable for this attempt")?;
         self.reconcile_locked(&mut inner)?;
         let runs = self.runtime.integration_runs()?;

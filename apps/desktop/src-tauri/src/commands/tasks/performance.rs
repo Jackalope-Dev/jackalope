@@ -10,7 +10,7 @@ fn performance_baseline() {
         let mut run = tests::sample("codex");
         run.id = format!("benchmark-{index:08}");
         run.task_id = run.id.clone();
-        run.status = "review".into();
+        run.status = RunStatus::Review;
         run.result = "A".repeat(100_000);
         runtime.save(&run).unwrap();
         runtime

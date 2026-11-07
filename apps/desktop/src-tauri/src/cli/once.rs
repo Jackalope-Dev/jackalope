@@ -4,7 +4,7 @@
 
 use crate::connection::{short, Connection};
 use crate::host::{self, ColdStart};
-use crate::protocol::{self, SessionView};
+use crate::protocol::{self, RunStatus, SessionView};
 use crate::subcommands;
 use std::io::{IsTerminal, Read, Write};
 use std::time::{Duration, Instant};
@@ -50,11 +50,7 @@ pub fn run(message: String, options: Options) -> Result<i32, String> {
             }
         }
         if progress {
-            let step = view
-                .step
-                .clone()
-                .or_else(|| view.status.clone())
-                .unwrap_or_default();
+            let step = step(&view);
             if !step.is_empty() && step != last_step {
                 eprintln!("· {step}");
                 last_step = step;
@@ -114,11 +110,7 @@ fn compare(
             .collect::<Result<Vec<_>, _>>()?;
         if progress {
             for (index, view) in views.iter().enumerate() {
-                let step = view
-                    .step
-                    .clone()
-                    .or_else(|| view.status.clone())
-                    .unwrap_or_default();
+                let step = step(view);
                 if !step.is_empty() && step != steps[index] {
                     eprintln!("· {}: {step}", sessions[index].0);
                     steps[index] = step;
@@ -267,11 +259,7 @@ impl Events {
                 "sessionId": self.session_id,
             }));
         }
-        let step = view
-            .step
-            .clone()
-            .or_else(|| view.status.clone())
-            .unwrap_or_default();
+        let step = step(view);
         if !step.is_empty() && step != self.step {
             events.push(serde_json::json!({
                 "event": "step",
@@ -336,6 +324,14 @@ enum Outcome {
     TimedOut,
 }
 
+/// The step a run reports, or else its status, for progress lines.
+fn step(view: &SessionView) -> String {
+    view.step
+        .clone()
+        .or_else(|| view.status.as_ref().map(RunStatus::to_string))
+        .unwrap_or_default()
+}
+
 /// Whether the conversation has settled, and how.
 fn outcome(view: &SessionView) -> Option<Outcome> {
     if let Some(error) = protocol::present(view.error.as_deref()) {
@@ -344,7 +340,7 @@ fn outcome(view: &SessionView) -> Option<Outcome> {
     if let Some(question) = view.questions.first() {
         return Some(Outcome::Asked(question.question.clone()));
     }
-    let status = view.status.as_deref();
+    let status = view.status.as_ref();
     if protocol::working(status) {
         return None;
     }
@@ -359,12 +355,12 @@ fn outcome(view: &SessionView) -> Option<Outcome> {
         return None;
     }
     let status = status?;
-    if protocol::STOPPED.contains(&status) {
+    if status.is_stopped() {
         return Some(Outcome::Failed(
             "The work was stopped before it finished.".into(),
         ));
     }
-    if protocol::FAILED.contains(&status) {
+    if *status == RunStatus::Failed {
         return Some(Outcome::Failed(
             "The agent could not finish the work.".into(),
         ));
@@ -428,7 +424,7 @@ mod tests {
                 })
                 .collect(),
             run_id: None,
-            status: status.map(String::from),
+            status: status.map(RunStatus::from),
             agent: None,
             account: None,
             model: None,
@@ -539,7 +535,7 @@ mod tests {
 
     #[test]
     fn stopped_paused_and_silent_failures_do_not_wait_forever() {
-        for status in ["stopped", "cancelled", "canceled", "interrupted", "failed"] {
+        for status in ["stopped", "interrupted", "failed"] {
             assert!(
                 matches!(
                     outcome(&view(Some(status), &[("you", true)])),

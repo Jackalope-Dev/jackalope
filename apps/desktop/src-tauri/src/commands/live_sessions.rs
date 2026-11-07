@@ -878,14 +878,14 @@ impl LiveSessions {
             };
             if let Some(batch) = snapshot.batches.last().filter(|b| !b.settled) {
                 if let Some(run) = runs.iter().find(|r| r.id == batch.run_id) {
-                    if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
+                    if run.status.is_active() {
                         continue;
                     }
                     self.update(|ledger| {
                         let session = Self::session(ledger, &id)?;
                         let batch = session.batches.last_mut().ok_or("Batch not found")?;
                         batch.settled = true;
-                        if !["review", "reviewed"].contains(&run.status.as_str())
+                        if !run.status.is_done()
                             || run.verification_error.is_some()
                             || run.verification.as_ref().is_some_and(|v| !v.result.success)
                         {
@@ -1390,11 +1390,10 @@ impl LiveSessions {
                     .find(|r| r.id == batch.run_id && !r.workspace.is_empty())
             })
             .ok_or("No workspace is available yet")?;
-        if runs.iter().any(|other| {
-            other.workspace == run.workspace
-                && ["starting", "running", "stopping", "interrupted"]
-                    .contains(&other.status.as_str())
-        }) {
+        if runs
+            .iter()
+            .any(|other| other.workspace == run.workspace && other.status.is_live())
+        {
             return Err(
                 "Finish active work and resolve interrupted ownership before exporting changes."
                     .into(),

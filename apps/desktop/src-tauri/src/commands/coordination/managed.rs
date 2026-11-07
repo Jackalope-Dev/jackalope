@@ -351,7 +351,7 @@ fn auto_start_ready(ledger: &Ledger, runs: &[TaskRun]) -> Vec<(String, String)> 
         .filter(|task| task.auto_start && !task.started && task.error.is_none())
         .filter_map(|task| {
             let planner = latest_planner(task, runs)?;
-            (matches!(planner.status.as_str(), "review" | "reviewed")
+            (planner.status.is_done()
                 && !planner.finishing
                 && planner.error.is_none()
                 && planner.persistence_error.is_none())
@@ -468,13 +468,10 @@ impl Coordinator {
         let runs = self.runtime.integration_runs()?;
         let run = latest_planner(&task, &runs)
             .ok_or("The planning attempt is unavailable. Inspect task recovery before retrying.")?;
-        if active(&run.status) || run.finishing {
+        if run.status.is_active() || run.finishing {
             return Err("The lead is still preparing this plan.".into());
         }
-        if !matches!(run.status.as_str(), "review" | "reviewed")
-            || run.error.is_some()
-            || run.persistence_error.is_some()
-        {
+        if !run.status.is_done() || run.error.is_some() || run.persistence_error.is_some() {
             return Err("The planning attempt needs attention before work can start.".into());
         }
         let changed = crate::commands::tasks::git(&run.workspace, &["status", "--porcelain"])?;
@@ -644,7 +641,7 @@ impl Coordinator {
                 let runs = self.runtime.integration_runs()?;
                 if runs.iter().any(|run| {
                     (run.id == task.planner_run_id || task.run_ids.contains(&run.id))
-                        && (active(&run.status) || run.status == "interrupted" || run.finishing)
+                        && (run.status.is_live() || run.finishing)
                 }) {
                     return Err(
                         "Resolve active or interrupted planning attempts before retrying.".into(),
@@ -707,7 +704,7 @@ impl Coordinator {
                         .collect();
                     let active_ids: Vec<_> = runs
                         .iter()
-                        .filter(|run| task_ids.contains(&run.task_id) && active(&run.status))
+                        .filter(|run| task_ids.contains(&run.task_id) && run.status.is_active())
                         .map(|run| run.id.clone())
                         .collect();
                     for run_id in active_ids {

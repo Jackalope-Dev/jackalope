@@ -108,9 +108,7 @@ impl TaskRuntime {
                 id: run.id.clone(),
                 project_id: run.project_id.clone(),
                 tool_calls: run.efficiency.tool_calls.values().sum(),
-                finished: !run.finishing
-                    && !["starting", "running", "stopping", "routing", "queued"]
-                        .contains(&run.status.as_str()),
+                finished: !run.finishing && !run.status.is_active(),
             })
             .collect()
     }
@@ -583,11 +581,10 @@ pub async fn task_mark_reviewed(id: String, state: State<'_, TaskRuntime>) -> Re
             .find(|r| r.id == id)
             .ok_or("Attempt not found")?;
         if !current.contract.requirements.is_empty() {
-            if runs.iter().any(|r| {
-                r.workspace == current.workspace
-                    && ["starting", "running", "stopping", "interrupted"]
-                        .contains(&r.status.as_str())
-            }) {
+            if runs
+                .iter()
+                .any(|r| r.workspace == current.workspace && r.status.is_live())
+            {
                 return Err("Resolve active workspace ownership before completing review.".into());
             }
             let directory = state.integration_directory();
@@ -597,11 +594,11 @@ pub async fn task_mark_reviewed(id: String, state: State<'_, TaskRuntime>) -> Re
         }
         let mut inner = state.inner.lock().unwrap();
         let run = inner.runs.get_mut(&id).ok_or("Attempt not found")?;
-        if run.status != "review" {
+        if run.status != RunStatus::Review {
             return Err("Only a finished result can be marked reviewed.".into());
         }
         let mut updated = run.clone();
-        updated.status = "reviewed".into();
+        updated.status = RunStatus::Reviewed;
         state.save(&updated)?;
         updated.persistence_error = None;
         *run = updated.clone();

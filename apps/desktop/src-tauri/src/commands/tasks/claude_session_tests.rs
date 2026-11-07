@@ -187,8 +187,7 @@ impl Fixture {
         let deadline = std::time::Instant::now() + Duration::from_secs(60);
         loop {
             let run = self.runtime.run_snapshot(&id).unwrap();
-            if !["starting", "running", "stopping"].contains(&run.status.as_str()) && !run.finishing
-            {
+            if !run.status.is_active() && !run.finishing {
                 return run;
             }
             if std::time::Instant::now() > deadline {
@@ -233,9 +232,11 @@ fn follow_ups_reuse_the_warm_process_and_resume_when_it_is_gone() {
     let fixture = Fixture::new(project, persistent());
     let first = fixture.finish(fixture.request(project, "claude-turn-one", "First", None));
     assert_eq!(
-        first.status, "review",
+        first.status,
+        RunStatus::Review,
         "{:?} {:?}",
-        first.error, first.diagnostics
+        first.error,
+        first.diagnostics
     );
     assert_eq!(first.result, "Turn 1 done");
     assert_eq!(
@@ -253,7 +254,7 @@ fn follow_ups_reuse_the_warm_process_and_resume_when_it_is_gone() {
         "Second",
         Some("claude-turn-one"),
     ));
-    assert_eq!(second.status, "review", "{:?}", second.error);
+    assert_eq!(second.status, RunStatus::Review, "{:?}", second.error);
     assert_eq!(second.result, "Turn 2 done");
     assert_eq!(
         second.efficiency.claude_transport.as_deref(),
@@ -292,7 +293,7 @@ fn follow_ups_reuse_the_warm_process_and_resume_when_it_is_gone() {
         "Third",
         Some("claude-turn-two"),
     ));
-    assert_eq!(third.status, "review", "{:?}", third.error);
+    assert_eq!(third.status, RunStatus::Review, "{:?}", third.error);
     assert_eq!(
         third.efficiency.claude_transport.as_deref(),
         Some("resumed")
@@ -341,7 +342,7 @@ fn a_changed_launch_does_not_reuse_the_warm_process() {
     );
     follow_up.effort = Some(super::super::effort::TaskEffort::Thorough);
     let second = fixture.finish(follow_up);
-    assert_eq!(second.status, "review", "{:?}", second.error);
+    assert_eq!(second.status, RunStatus::Review, "{:?}", second.error);
     assert_eq!(
         second.efficiency.claude_transport.as_deref(),
         Some("resumed")
@@ -389,7 +390,7 @@ fn hook_callbacks_answer_through_the_control_protocol() {
     )
     .unwrap();
     let run = fixture.finish(fixture.request(project, "claude-hooks-run", "HOOKS", None));
-    assert_eq!(run.status, "review", "{:?}", run.error);
+    assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
     let registered = &fixture.lines("initialize.jsonl")[0];
     assert_eq!(
         registered["PreToolUse"][0]["hookCallbackIds"][0],
@@ -496,7 +497,7 @@ fn a_passing_stop_check_is_reused_by_the_final_check() {
     request.auto_verify = true;
     let run = fixture.finish(request);
     assert_eq!(fixture.json("stops.json"), json!([{}]));
-    assert_eq!(run.status, "review", "{:?}", run.error);
+    assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
     assert_eq!(run.efficiency.stop_check_rounds, 1);
     assert_eq!(run.efficiency.native_verification_calls, Some(1));
     assert_eq!(run.efficiency.verification_reuses, Some(1));
@@ -529,7 +530,7 @@ process.stdin.on('end', () => {
     )
     .unwrap();
     let run = fixture.finish(fixture.request(project, "claude-one-shot", "Task", None));
-    assert_eq!(run.status, "review", "{:?}", run.error);
+    assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
     assert_eq!(run.result, "Done");
     assert_eq!(run.efficiency.claude_transport, None);
     assert!(run.efficiency.first_token_ms.is_some());

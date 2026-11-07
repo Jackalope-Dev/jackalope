@@ -149,11 +149,10 @@ pub(in crate::commands) fn prepare(
 ) -> Result<PreparationRecord, String> {
     let guard = super::integration::execution_guard()?;
     let runs = runtime.integration_runs()?;
-    if runs.iter().any(|other| {
-        other.id != id
-            && other.workspace == workspace
-            && ["starting", "running", "stopping", "interrupted"].contains(&other.status.as_str())
-    }) {
+    if runs
+        .iter()
+        .any(|other| other.id != id && other.workspace == workspace && other.status.is_live())
+    {
         return Err("Another attempt owns this workspace. Resolve it before preparation.".into());
     }
     // A workspace whose dependency manifests still match a completed setup run does not need
@@ -232,7 +231,7 @@ pub(in crate::commands) fn prepare(
 }
 
 fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verification, String> {
-    let active = ["starting", "running"].contains(&run.status.as_str());
+    let active = run.status.is_running();
     let result = (|| {
         runtime.stage(&run.id, Some("verification_wait"));
         runtime.update(&run.id, |r| {
@@ -249,7 +248,7 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         let before = super::integration::workspace_tree(run, &directory)?;
         runtime.stage(&run.id, Some("verification"));
-        let agent_active = ["starting", "running"].contains(&run.status.as_str());
+        let agent_active = run.status.is_running();
         runtime.update(&run.id, |r| {
             r.progress = Some(StepProgress::new(
                 "verification",
@@ -304,11 +303,10 @@ pub(in crate::commands) fn finish(runtime: &TaskRuntime, id: &str) -> Result<(),
         .as_deref()
         .filter(|command| !command.trim().is_empty())
         .ok_or("No verification command was saved for this task.")?;
-    if runs.iter().any(|other| {
-        other.id != id
-            && other.workspace == run.workspace
-            && ["starting", "running", "stopping", "interrupted"].contains(&other.status.as_str())
-    }) {
+    if runs
+        .iter()
+        .any(|other| other.id != id && other.workspace == run.workspace && other.status.is_live())
+    {
         return Err("Checks could not start while another attempt owns this workspace.".into());
     }
     if reusable_check(runtime, run, command)?.is_some() {
@@ -493,7 +491,7 @@ pub async fn task_verify(
         let guard = super::integration::execution_guard()?;
         let runs = runtime.integration_runs()?;
         let run = runs.iter().find(|run| run.id == id).ok_or("Task not found")?;
-        if runs.iter().any(|other| other.workspace == run.workspace && ["starting", "running", "stopping", "interrupted"].contains(&other.status.as_str())) {
+        if runs.iter().any(|other| other.workspace == run.workspace && other.status.is_live()) {
             return Err("Stop active work and resolve interrupted attempts before verifying this workspace.".into());
         }
         if run.verify_command.as_ref().filter(|s| !s.trim().is_empty()).is_some_and(|saved| saved != &command) {

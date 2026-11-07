@@ -138,7 +138,7 @@ impl App {
                 && self
                     .sessions
                     .iter()
-                    .any(|session| crate::protocol::working(session.status.as_deref())))
+                    .any(|session| crate::protocol::working(session.status.as_ref())))
     }
 
     pub(super) fn run_shell(&mut self, command: &str) {

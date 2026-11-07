@@ -110,7 +110,7 @@ fn drive(
     let id = uuid::Uuid::new_v4().to_string();
     let mut run = super::super::tests::sample("codex");
     run.id = id.clone();
-    run.status = "starting".into();
+    run.status = RunStatus::Starting;
     run.workspace = workspace.to_string_lossy().into_owned();
     runtime.inner.lock().unwrap().runs.insert(id.clone(), run);
     let req = request(&id, workspace);
@@ -309,7 +309,7 @@ fn insert_run(runtime: &TaskRuntime, workspace: &Path) -> String {
     let mut run = super::super::tests::sample("codex");
     run.id = id.clone();
     run.project_id = "fixture".into();
-    run.status = "starting".into();
+    run.status = RunStatus::Starting;
     run.workspace = workspace.to_string_lossy().into_owned();
     runtime.inner.lock().unwrap().runs.insert(id.clone(), run);
     id
@@ -635,7 +635,7 @@ impl computers::Transport for Leftover {
 /// A failed attempt that lost `computer` mid-run, leaving its changes there.
 fn lost_attempt(runtime: &TaskRuntime, workspace: &Path, computer: &Computer) -> String {
     let id = placed_on(runtime, workspace, computer);
-    runtime.update(&id, |run| run.status = "failed".into());
+    runtime.update(&id, |run| run.status = RunStatus::Failed);
     runtime.host_lost(&id, &computer.id, &computer.name, "Lost contact with Box");
     runtime.changes_left(&id);
     id
@@ -677,7 +677,7 @@ fn changes_left_on_a_lost_computer_are_saved_when_it_answers_never_applied() {
     let retry = insert_run(&runtime, &folder);
     runtime.update(&retry, |run| {
         run.retry_of = Some(lost.clone());
-        run.status = "review".into();
+        run.status = RunStatus::Review;
     });
     let runs = all(&runtime);
     let due: Vec<&str> = recovery::waiting(&runs)
@@ -687,9 +687,9 @@ fn changes_left_on_a_lost_computer_are_saved_when_it_answers_never_applied() {
     assert_eq!(due, [lost.as_str()]);
     // Not while a run of the same workspace is active on that computer.
     let busy = placed_on(&runtime, &folder, &computer);
-    runtime.update(&busy, |run| run.status = "running".into());
+    runtime.update(&busy, |run| run.status = RunStatus::Running);
     assert!(recovery::waiting(&all(&runtime)).is_empty());
-    runtime.update(&busy, |run| run.status = "review".into());
+    runtime.update(&busy, |run| run.status = RunStatus::Review);
 
     let transport = Leftover::default();
     let mut session = runs::Session::with_transport(

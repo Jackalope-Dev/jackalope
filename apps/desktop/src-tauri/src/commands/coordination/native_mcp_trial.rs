@@ -1,3 +1,4 @@
+use crate::commands::tasks::RunStatus;
 use crate::commands::{
     coordination::Coordinator,
     mcp::{mcp_delete_server, mcp_save_server, McpServerConfig},
@@ -112,12 +113,12 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                     runtime.respond_prompt(&run.id, &question.id, "fixture-ack-731")?;
                 }
             }
-            if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+            if !run.status.is_active() {
                 println!(
                     "{agent}: status={}, MCP={:?}, result={}",
                     run.status, run.mcp_usage, run.result
                 );
-                if run.status != "review"
+                if run.status != RunStatus::Review
                     || run
                         .mcp_usage
                         .as_ref()

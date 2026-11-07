@@ -329,7 +329,7 @@ fn current(runtime: &TaskRuntime, id: &str) -> Result<TaskRun, String> {
     runtime
         .integration_runs()?
         .into_iter()
-        .find(|r| r.id == id && ["starting", "running"].contains(&r.status.as_str()))
+        .find(|r| r.id == id && r.status.is_running())
         .ok_or_else(|| "This attempt has ended or is stopping. Desktop access is revoked.".into())
 }
 
@@ -338,7 +338,7 @@ fn session(runtime: &TaskRuntime, id: &str, create: bool) -> Result<Arc<Session>
     let active: Vec<String> = runtime
         .integration_runs()?
         .into_iter()
-        .filter(|r| ["starting", "running"].contains(&r.status.as_str()))
+        .filter(|r| r.status.is_running())
         .map(|r| r.id)
         .collect();
     let mut entries = sessions().lock().map_err(|e| e.to_string())?;
@@ -622,7 +622,7 @@ impl Call<'_> {
     fn push_prompt(&self, prompt: &PendingUserPrompt) -> Result<(), String> {
         current(self.runtime, &self.run.id)?;
         self.runtime.update_checked(&self.run.id, |r| {
-            if ["starting", "running"].contains(&r.status.as_str()) {
+            if r.status.is_running() {
                 r.prompts.push(prompt.clone());
             }
         })?;

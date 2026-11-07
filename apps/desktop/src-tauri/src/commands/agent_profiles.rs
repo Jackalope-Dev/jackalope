@@ -913,7 +913,7 @@ pub(in crate::commands) fn delete_profile(
         return Err("Invalid account ID".into());
     }
     if runtime.integration_runs()?.iter().any(|run| {
-        ["starting", "running", "stopping"].contains(&run.status.as_str())
+        run.status.is_active()
             && run.account_binding.as_ref().is_some_and(|binding| {
                 binding.adapter == agent && binding.profile_id.as_deref() == Some(&id)
             })

@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::tasks::RunStatus;
 
 fn fixture() -> (PathBuf, Coordinator) {
     let root = std::env::temp_dir().join(format!("jackalope-followups-{}", Uuid::new_v4()));
@@ -12,7 +13,7 @@ fn fixture() -> (PathBuf, Coordinator) {
         project_path: root.to_string_lossy().into(),
         workspace: root.to_string_lossy().into(),
         agent: "codex".into(),
-        status: "review".into(),
+        status: RunStatus::Review,
         session_id: Some("bound-session".into()),
         started_at: "2026-09-17T00:00:00Z".into(),
         ..Default::default()
@@ -79,18 +80,18 @@ fn waits_for_running_and_finishing_work_and_pauses_after_failure() {
     let id = enqueue(&service, "Next");
     service
         .runtime
-        .update("source-run", |run| run.status = "running".into());
+        .update("source-run", |run| run.status = RunStatus::Running);
     service.dispatch_followups().unwrap();
     assert!(service.followups("task").unwrap()[0].run_id.is_none());
     service.runtime.update("source-run", |run| {
-        run.status = "review".into();
+        run.status = RunStatus::Review;
         run.finishing = true;
     });
     service.dispatch_followups().unwrap();
     assert!(!service.followups("task").unwrap()[0].paused);
     service.runtime.update("source-run", |run| {
         run.finishing = false;
-        run.status = "failed".into();
+        run.status = RunStatus::Failed;
     });
     service.dispatch_followups().unwrap();
     assert!(service.followups("task").unwrap()[0].paused);
@@ -105,7 +106,7 @@ fn waits_for_running_and_finishing_work_and_pauses_after_failure() {
     );
     service
         .runtime
-        .update("source-run", |run| run.status = "interrupted".into());
+        .update("source-run", |run| run.status = RunStatus::Interrupted);
     assert!(service.followup_action(&id, "resume").is_err());
     service.followup_action(&id, "cancel").unwrap();
     assert!(service.followups("task").unwrap().is_empty());
@@ -169,7 +170,7 @@ fn stop_and_send_precedes_queued_work_without_duplicating_or_relaxing_later_fail
     enqueue(&service, "Later");
     service
         .runtime
-        .update("source-run", |run| run.status = "running".into());
+        .update("source-run", |run| run.status = RunStatus::Running);
     let id = Uuid::new_v4().to_string();
     for _ in 0..2 {
         service
@@ -184,7 +185,7 @@ fn stop_and_send_precedes_queued_work_without_duplicating_or_relaxing_later_fail
     assert!(queued[1].allow_failure.is_none());
     assert_eq!(
         service.runtime.integration_runs().unwrap()[0].status,
-        "stopping"
+        RunStatus::Stopping
     );
     assert!(service
         .enqueue_followup(id, "source-run", "Now".into(), None, false)
@@ -278,7 +279,7 @@ async fn installed_agent_queues_and_interrupts_followups_once_in_the_bound_sessi
         tokio::time::sleep(Duration::from_millis(50)).await;
     };
     assert!(
-        matches!(first.status.as_str(), "starting" | "running"),
+        first.status.is_running(),
         "First attempt completed before the interruption trial"
     );
     let queued_id = Uuid::new_v4().to_string();
@@ -296,10 +297,9 @@ async fn installed_agent_queues_and_interrupts_followups_once_in_the_bound_sessi
     let runs = loop {
         let runs = runtime.integration_runs().unwrap();
         if runs.len() == 3
-            && runs.iter().all(|run| {
-                !run.finishing
-                    && !matches!(run.status.as_str(), "starting" | "running" | "stopping")
-            })
+            && runs
+                .iter()
+                .all(|run| !run.finishing && !run.status.is_active())
         {
             break runs;
         }
@@ -328,7 +328,7 @@ async fn installed_agent_queues_and_interrupts_followups_once_in_the_bound_sessi
     for (run, marker) in [(immediate, "IMMEDIATE"), (queued, "QUEUED")] {
         assert_eq!(
             run.status,
-            "review",
+            RunStatus::Review,
             "{:?}; retained {}",
             run.error,
             root.display()

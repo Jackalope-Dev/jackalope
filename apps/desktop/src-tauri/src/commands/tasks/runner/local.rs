@@ -136,8 +136,8 @@ impl AttemptRunner for LocalRunner {
         runtime.update_checked(id, |r| {
             r.efficiency.timing("processSpawn", spawn_elapsed);
             r.process_contained = cfg!(windows);
-            if r.status == "starting" {
-                r.status = "running".into();
+            if r.status == RunStatus::Starting {
+                r.status = RunStatus::Running;
             }
             // The agent is live now; its own activity replaces the startup step.
             r.progress = None;

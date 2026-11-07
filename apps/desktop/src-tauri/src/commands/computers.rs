@@ -755,7 +755,7 @@ fn request_blocking(
         };
         let mut pushed = false;
         runtime.update_checked(&run.id, |r| {
-            if ["starting", "running"].contains(&r.status.as_str()) {
+            if r.status.is_running() {
                 r.prompts.push(prompt.clone());
                 pushed = true;
             }

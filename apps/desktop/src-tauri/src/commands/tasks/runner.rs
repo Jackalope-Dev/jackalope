@@ -141,12 +141,8 @@ impl TaskRuntime {
             .is_some_and(|run| run.routing.is_some() && run.quota_failure.is_some())
     }
 
-    /// Marks an attempt stopped before its agent ran.
     pub(super) fn mark_stopped(&self, id: &str) {
-        self.update(id, |r| {
-            r.status = "stopped".into();
-            r.ended_at = Some(Utc::now().to_rfc3339());
-        });
+        self.update(id, TaskRun::mark_stopped);
     }
 
     /// Whether attempt `id` of this project, with `adapter`, runs on a
@@ -341,11 +337,10 @@ pub(super) fn host_activity(host: &RunHost) -> String {
 /// Whether another active attempt is using `workspace`. Only one writer
 /// owns a workspace at a time.
 pub(super) fn workspace_in_use(inner: &Inner, id: &str, workspace: &str) -> bool {
-    inner.runs.values().any(|r| {
-        r.id != id
-            && r.workspace == workspace
-            && ["starting", "running", "stopping"].contains(&r.status.as_str())
-    })
+    inner
+        .runs
+        .values()
+        .any(|r| r.id != id && r.workspace == workspace && r.status.is_active())
 }
 
 pub(super) const WORKSPACE_IN_USE: &str =

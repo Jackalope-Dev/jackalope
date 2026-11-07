@@ -54,7 +54,6 @@ pub struct ChallengeRerun {
     pub result: Option<CommandResult>,
 }
 
-const ACTIVE: [&str; 4] = ["starting", "running", "stopping", "interrupted"];
 const COMMAND_LIMIT: usize = 2_000;
 
 fn excerpt(text: &str, limit: usize) -> String {
@@ -225,7 +224,7 @@ pub(super) fn start(
             .ok_or("The result to review no longer exists.")?;
         if runs
             .iter()
-            .any(|run| run.workspace == author.workspace && ACTIVE.contains(&run.status.as_str()))
+            .any(|run| run.workspace == author.workspace && run.status.is_live())
         {
             return Err("Wait for this work to finish before reviewing it.".into());
         }
@@ -307,7 +306,7 @@ pub(super) fn rerun(
     }
     if runs
         .iter()
-        .any(|other| other.workspace == run.workspace && ACTIVE.contains(&other.status.as_str()))
+        .any(|other| other.workspace == run.workspace && other.status.is_live())
     {
         return Err("Wait for the reviewer to finish before running its findings again.".into());
     }

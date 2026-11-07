@@ -384,10 +384,6 @@ pub struct Attempts {
     pub plan_id: String,
 }
 
-fn running(status: &str) -> bool {
-    ["starting", "running", "stopping", "routing", "queued"].contains(&status)
-}
-
 impl Launcher for Attempts {
     fn run(&self, agent: &str, prompt: String) -> Result<(String, String), String> {
         let store = planning::session::store(&self.coordinator);
@@ -404,16 +400,14 @@ impl Launcher for Attempts {
             let snapshot = self.coordinator.runtime.run_snapshot(&request.id);
             if let Some(run) = snapshot
                 .as_ref()
-                .filter(|run| !running(&run.status) && !run.finishing)
+                .filter(|run| !run.status.is_active() && !run.finishing)
             {
-                return if matches!(run.status.as_str(), "review" | "reviewed")
-                    && run.error.is_none()
-                {
+                return if run.status.is_done() && run.error.is_none() {
                     Ok((run.result.clone(), run.id.clone()))
                 } else {
                     Err(format!(
                         "The deciding agent stopped without a decision ({}).",
-                        run.error.as_deref().unwrap_or(&run.status)
+                        run.error.as_deref().unwrap_or(run.status.as_str())
                     ))
                 };
             }
@@ -1558,7 +1552,7 @@ pub fn override_answer(
         }
         Ok(())
     })?;
-    if ["starting", "running"].contains(&run.status.as_str()) {
+    if run.status.is_running() {
         let _ = super::decision_trail::record(
             &coordinator.runtime,
             &run,

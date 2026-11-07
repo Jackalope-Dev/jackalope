@@ -497,7 +497,7 @@ fn session_view(session: &LiveSession, runs: &[TaskRun]) -> protocol::SessionVie
         .and_then(|run| run.routing.as_ref())
         .and_then(|routing| routing.decisions.last());
     let run_error = run
-        .filter(|run| !["review", "reviewed", "running", "starting"].contains(&run.status.as_str()))
+        .filter(|run| !run.status.is_done() && !run.status.is_running())
         .and_then(|run| {
             protocol::present(run.error.as_deref())
                 .or(protocol::present(run.verification_error.as_deref()))
@@ -1277,7 +1277,7 @@ fn reviewable_run(app: &AppHandle, session_id: &str) -> Result<TaskRun, String> 
     if protocol::working(Some(&run.status)) {
         return Err("Wait for the agent to finish first.".into());
     }
-    if !["review", "reviewed"].contains(&run.status.as_str()) {
+    if !run.status.is_done() {
         return Err("The latest attempt did not finish, so there is nothing to deliver.".into());
     }
     if session.integrated_run_id.as_deref() == Some(run.id.as_str()) {

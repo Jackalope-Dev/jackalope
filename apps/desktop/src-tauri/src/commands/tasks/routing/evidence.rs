@@ -120,7 +120,7 @@ pub(super) fn evidence(runs: &[TaskRun], request: &RunRequest) -> Value {
         BTreeMap::<(&str, Option<&str>, Option<&str>, Option<&str>, Option<&str>), Group>::new();
     for run in latest
         .values()
-        .filter(|r| ["review", "reviewed", "failed", "stopped"].contains(&r.status.as_str()))
+        .filter(|r| r.status.is_terminal())
         .filter(|r| r.routing.as_ref().is_none_or(|h| h.handoffs.is_empty()))
     {
         let requirements: Vec<_> = run
@@ -210,7 +210,7 @@ mod tests {
     #[test]
     fn evidence_never_labels_process_exit_as_acceptance() {
         let mut run = crate::commands::tasks::tests::sample("codex");
-        run.status = "review".into();
+        run.status = RunStatus::Review;
         let request: RunRequest = serde_json::from_value(serde_json::json!({"id":"request","projectId":run.project_id,"projectName":"Fixture","projectPath":run.project_path,"agent":"auto","prompt":"Work","isolated":true})).unwrap();
         let report = evidence(&[run], &request);
         assert_eq!(report["groups"][0]["accepted"], 0);

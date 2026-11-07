@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub use crate::cli_protocol::RunStatus;
+
 #[derive(Clone, Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Usage {
@@ -121,7 +123,7 @@ pub struct TaskRun {
     pub verification_error: Option<String>,
     pub model: Option<String>,
     pub prompt: String,
-    pub status: String,
+    pub status: RunStatus,
     pub started_at: String,
     pub ended_at: Option<String>,
     pub session_id: Option<String>,
@@ -167,6 +169,20 @@ pub struct TaskRun {
     /// The result this attempt challenges, when it is a Challenge reviewer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub challenge_of: Option<crate::commands::challenge_review::ChallengeSource>,
+}
+
+impl TaskRun {
+    pub fn mark_stopped(&mut self) {
+        self.status = RunStatus::Stopped;
+        self.ended_at = Some(chrono::Utc::now().to_rfc3339());
+    }
+
+    pub fn mark_failed(&mut self, error: String) {
+        self.status = RunStatus::Failed;
+        self.error = Some(error);
+        self.ended_at = Some(chrono::Utc::now().to_rfc3339());
+        self.progress = None;
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -283,7 +299,7 @@ pub struct ArchivedRun {
     pub project_name: String,
     pub agent: String,
     pub prompt: String,
-    pub status: String,
+    pub status: RunStatus,
     pub started_at: String,
     pub ended_at: Option<String>,
 }
@@ -371,7 +387,7 @@ impl TaskRun {
             result: Default::default(),
             streaming: String::new(),
             details_omitted: true,
-            activity: if ["starting", "running", "stopping"].contains(&self.status.as_str()) {
+            activity: if self.status.is_active() {
                 self.activity
                     .iter()
                     .rev()

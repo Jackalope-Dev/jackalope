@@ -164,7 +164,7 @@ pub fn stop(preference: Option<ColdStart>, prefix: &str) -> Result<(), String> {
     let view = connection.session(&id)?;
     match view
         .run_id
-        .filter(|_| protocol::working(view.status.as_deref()))
+        .filter(|_| protocol::working(view.status.as_ref()))
     {
         Some(run_id) => {
             connection.call(&Request::Stop { run_id })?;
@@ -259,7 +259,7 @@ pub fn merge(
     let mut connection = host::ensure(preference)?;
     let id = resolve(&connection.sessions()?, prefix)?;
     let view = connection.session(&id)?;
-    if protocol::working(view.status.as_deref()) {
+    if protocol::working(view.status.as_ref()) {
         return Err("The agent is still working. Merge once it finishes.".into());
     }
     if !view.paused {
@@ -361,7 +361,7 @@ pub fn pull_request(
     let mut connection = host::ensure(preference)?;
     let id = resolve(&connection.sessions()?, prefix)?;
     let view = connection.session(&id)?;
-    if protocol::working(view.status.as_deref()) {
+    if protocol::working(view.status.as_ref()) {
         return Err("The agent is still working. Open a pull request once it finishes.".into());
     }
     let title = title

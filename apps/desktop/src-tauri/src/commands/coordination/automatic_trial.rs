@@ -1,4 +1,5 @@
 use super::*;
+use crate::commands::tasks::RunStatus;
 use serde_json::json;
 use std::time::Instant;
 
@@ -58,7 +59,7 @@ async fn exercise(
         .find(|r| r.id == reader)
         .ok_or("Missing reader")?;
     println!("Reader result: {}", read.result);
-    if read.status != "review"
+    if read.status != RunStatus::Review
         || !read.result.contains("coordination-peer-731")
         || !read.result.to_lowercase().contains("review")
     {
@@ -110,8 +111,8 @@ async fn wait_for(
         if question && run.prompts.iter().any(|p| p.status == "pending") {
             return Ok(());
         }
-        if !active(&run.status) {
-            if !question && run.status == "review" {
+        if !run.status.is_active() {
+            if !question && run.status == RunStatus::Review {
                 return Ok(());
             }
             return Err(format!(

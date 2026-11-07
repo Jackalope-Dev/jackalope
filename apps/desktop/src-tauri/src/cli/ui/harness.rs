@@ -15,7 +15,7 @@ use super::{App, Click, Event, NextStart, Overview};
 use crate::connection::Connection;
 use crate::protocol::{
     AgentStatus, Handshake, Message, Project, Question, Request, Response, RunCheck, RunStage,
-    RunStep, RunSummary, SessionSummary, SessionView, VERSION,
+    RunStatus, RunStep, RunSummary, SessionSummary, SessionView, VERSION,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::backend::TestBackend;
@@ -143,7 +143,7 @@ pub fn conversation(id: &str, title: &str, messages: &[(&str, &str)]) -> Session
             })
             .collect(),
         run_id: Some(format!("run-{id}")),
-        status: Some("review".into()),
+        status: Some(RunStatus::Review),
         agent: Some("Claude Code".into()),
         account: None,
         model: None,
@@ -446,7 +446,7 @@ mod tests {
                 ("agent", "I looked at the schema and the nightly jobs."),
             ],
         );
-        view.status = Some("running".into());
+        view.status = Some(RunStatus::Running);
         view.questions = vec![question(
             &view,
             "Which database should the reporting service use?",
@@ -680,7 +680,7 @@ mod tests {
     fn running_work_shows_its_stages_and_newest_steps_live() {
         let mut harness = Harness::new();
         let mut view = conversation("c1", "Fix login", &[("you", "Fix the login redirect loop")]);
-        view.status = Some("running".into());
+        view.status = Some(RunStatus::Running);
         view.partial = "The redirect check runs before the session is cleared".into();
         view.run = Some(run_summary(None));
         harness.add(view);
@@ -722,12 +722,12 @@ mod tests {
         done.run = Some(run_summary(Some(220_000)));
         harness.add(done);
         let mut busy = conversation("c2", "Add search", &[("you", "Add search")]);
-        busy.status = Some("running".into());
+        busy.status = Some(RunStatus::Running);
         busy.agent = Some("Codex".into());
         busy.step = Some("Running checks".into());
         harness.add(busy);
         let mut asking = conversation("c3", "Pick a database", &[("you", "Set up reporting")]);
-        asking.status = Some("running".into());
+        asking.status = Some(RunStatus::Running);
         asking.questions = vec![question(
             &asking,
             "Postgres or SQLite?",

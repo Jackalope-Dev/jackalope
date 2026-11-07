@@ -160,7 +160,7 @@ impl Call<'_> {
         };
         let mut pushed = false;
         self.runtime.update_checked(&self.run.id, |r| {
-            if ["starting", "running"].contains(&r.status.as_str()) {
+            if r.status.is_running() {
                 r.prompts.push(prompt.clone());
                 pushed = true;
             }
