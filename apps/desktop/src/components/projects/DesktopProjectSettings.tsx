@@ -5,7 +5,7 @@ import {
   forgetDesktopPermission,
   type RememberedDesktopGrant,
 } from '../../lib/agent-screen';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';

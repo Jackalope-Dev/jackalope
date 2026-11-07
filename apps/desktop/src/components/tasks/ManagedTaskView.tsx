@@ -11,10 +11,13 @@ import {
   managedTaskWork,
   previewTaskPlan,
 } from '../../lib/managed-task';
+import { openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { queueCommand } from '../../lib/queue';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
-import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
-import { openExternalUrl } from '../../lib/tauri-bridge';
+import { isActive, isFinished } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
+import { stopPreview } from '../../lib/task-actions';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -137,13 +140,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
     setPlan([]);
     setPlanRunId('');
     setPlanPending(false);
-    if (
-      task.started ||
-      !plannerId ||
-      !plannerStatus ||
-      !['review', 'reviewed'].includes(plannerStatus)
-    )
-      return;
+    if (task.started || !plannerId || !plannerStatus || !isFinished(plannerStatus)) return;
     let alive = true;
     setPlanPending(true);
     void previewTaskPlan(task.id)
@@ -184,7 +181,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
       if (!seconds) return;
       const value = seconds;
       seconds = 0;
-      void nativeTask('task_plan_review_time', {
+      void invokeNative('task_plan_review_time', {
         id: task.id,
         sampleId: crypto.randomUUID(),
         seconds: value,
@@ -217,7 +214,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
   const continueRun = async (run: TaskRun, advanceWorkflow = false) => {
     if (!correction.trim()) return;
     await managedTaskCommand('action', { id: task.id, action: 'pause' });
-    if (previewRunning) await nativeTask('task_preview_stop', { id: run.id });
+    if (previewRunning) await stopPreview(run.id);
     const id = await start(
       {
         ...task.request,
@@ -479,7 +476,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
                       <Button
                         disabled={busy}
                         onClick={() => {
-                          if (work.planner && ['review', 'reviewed'].includes(work.planner.status))
+                          if (work.planner && isFinished(work.planner))
                             setPreviewRevision((value) => value + 1);
                           else
                             void act(() =>
@@ -487,7 +484,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
                             );
                         }}
                       >
-                        {work.planner && ['review', 'reviewed'].includes(work.planner.status)
+                        {work.planner && isFinished(work.planner)
                           ? 'Reload plan'
                           : 'Retry planning'}
                       </Button>
@@ -685,7 +682,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
                             Retry planning
                           </Button>
                         )}
-                      {['review', 'reviewed'].includes(detail.status) &&
+                      {isFinished(detail) &&
                         (detail.id === work.planner?.id ||
                           work.steps.some(({ run }) => run?.id === detail.id)) &&
                         (!task.started ||

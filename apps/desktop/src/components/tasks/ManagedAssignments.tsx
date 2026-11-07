@@ -1,7 +1,8 @@
 import { Panel } from '@jackalope/ui';
 import { getAgentMetadata } from '../../lib/agent-catalog';
 import type { managedTaskWork } from '../../lib/managed-task';
-import { isActive, type TaskRun } from '../../lib/task-runtime';
+import { isActive } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 import { taskDecision } from '../../lib/task-workflow';
 import { Button } from '../ui/button';
 import { LiveCombination } from './LiveCombination';

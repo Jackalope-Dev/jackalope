@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { createReadCache } from '../lib/read-cache.ts';
 import {
   deleteMcpServer,
   listMcpServers,
@@ -7,7 +6,8 @@ import {
   type McpServerConfig,
   probeMcpServer,
   saveMcpServer,
-} from '../lib/tauri-bridge.ts';
+} from '../lib/mcp-client.ts';
+import { createReadCache } from '../lib/read-cache.ts';
 import { useProjectStore } from './projectStore.ts';
 import { useSettingsStore } from './settingsStore.ts';
 

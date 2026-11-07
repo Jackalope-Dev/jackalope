@@ -2,7 +2,7 @@ import { IconButton, DropdownMenu as Menu } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { MoreHorizontal } from 'lucide-react';
 import { useRef, useState } from 'react';
-import type { Review, TaskRun } from '../../lib/task-runtime';
+import type { Review, TaskRun } from '../../lib/run-types';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { ChallengeDialog } from './ChallengeReview';
 import { ReviewProgress } from './ReviewProgress';

@@ -10,12 +10,12 @@ import { FolderOpen, ListTodo, MoreHorizontal, Plus, Radio, Workflow } from 'luc
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useShallow } from 'zustand/react/shallow';
+import { invokeNative } from '../../lib/native/transport';
 import {
   collectWorkspaceWork,
   selectedManagedTask,
   type WorkItem,
 } from '../../lib/task-collection';
-import { nativeTask } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
@@ -190,7 +190,7 @@ export function TaskWorkspace({
     for (const item of selected) {
       try {
         if (item.run) {
-          await nativeTask('task_set_archived', { id: item.run.id, archived: archive });
+          await invokeNative('task_set_archived', { id: item.run.id, archived: archive });
           updatedRuns.push(item.run.id);
         } else if (item.idea) {
           useTaskStore.getState().setArchived(item.idea.id, archive);

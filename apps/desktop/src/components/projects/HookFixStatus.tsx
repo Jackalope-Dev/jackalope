@@ -1,4 +1,5 @@
-import { isActive, type TaskRun } from '../../lib/task-runtime';
+import { isActive } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 

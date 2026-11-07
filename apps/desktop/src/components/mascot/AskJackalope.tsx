@@ -1,8 +1,8 @@
 import { Disclosure, DisclosureSummary, Textarea } from '@jackalope/ui';
 import { Square } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment, openInBrowser } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useHelperStore } from '../../stores/helperStore';
 import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
@@ -165,7 +165,7 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
               className="helper-text-button"
               disabled={working}
               title="Archive this conversation locally and start a new one"
-              onClick={() => void action(() => nativeTask('helper_new_conversation'))}
+              onClick={() => void action(() => invokeNative('helper_new_conversation'))}
             >
               New conversation
             </button>
@@ -175,7 +175,7 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
               type="button"
               size="sm"
               variant="secondary"
-              onClick={() => void action(() => nativeTask('helper_stop'))}
+              onClick={() => void action(() => invokeNative('helper_stop'))}
             >
               <Square size={14} /> Stop
             </Button>

@@ -29,8 +29,8 @@ import {
   modelFit,
 } from '../../lib/local-ai';
 import { useManagedRuntime } from '../../lib/managed-runtime';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment, openInBrowser } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -77,7 +77,7 @@ export function LocalAiSteps({
   const model = inspection?.models.find((m) => m.id === selected);
   const installed = inspection?.installedModels.includes(selected);
   const inspect = useCallback(async () => {
-    const found = await nativeTask<LocalInspection>('local_ai_inspect');
+    const found = await invokeNative<LocalInspection>('local_ai_inspect');
     if (active.current) setInspection(found);
     return found;
   }, []);
@@ -119,7 +119,7 @@ export function LocalAiSteps({
       });
     return () => {
       active.current = false;
-      if (working.current && desktop) void nativeTask('local_ai_cancel').catch(() => {});
+      if (working.current && desktop) void invokeNative('local_ai_cancel').catch(() => {});
     };
   }, [desktop, inspect, perform]);
   useEffect(() => {
@@ -132,7 +132,7 @@ export function LocalAiSteps({
     channel.onmessage = (event) => {
       if (active.current) setProgress(event);
     };
-    return nativeTask<T>(command, { modelId: selected, ...args, progress: channel });
+    return invokeNative<T>(command, { modelId: selected, ...args, progress: channel });
   };
   const openLink = async (url: string, target: SetupActivity) => {
     setActivity(target);
@@ -154,7 +154,7 @@ export function LocalAiSteps({
     );
   const connect = () =>
     void perform('connect', 'Connecting your local agent…', async () => {
-      const profile = await nativeTask<{ id: string }>('local_ai_connect', {
+      const profile = await invokeNative<{ id: string }>('local_ai_connect', {
         modelId: selected,
         helperModelId: helperModel || null,
         activate: !projectId && !projectSetup,
@@ -213,7 +213,7 @@ export function LocalAiSteps({
                 setStopping(true);
                 try {
                   if (runner.preparing) await runner.cancel();
-                  else await nativeTask('local_ai_cancel');
+                  else await invokeNative('local_ai_cancel');
                 } catch (cause) {
                   setError(String(cause));
                   setStopping(false);

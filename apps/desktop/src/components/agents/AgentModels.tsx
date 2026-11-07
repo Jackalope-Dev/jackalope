@@ -3,7 +3,7 @@ import { Check, Plus } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useAgentModels } from '../../lib/agent-models';
 import { completeProviderProfile } from '../../lib/agent-profiles';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';

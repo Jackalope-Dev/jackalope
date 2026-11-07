@@ -1,12 +1,12 @@
 import { Sparkles, Square, Undo2 } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { isTauriEnvironment } from '../../lib/native/env';
 import {
   canUndoSharpen,
   sharpenDraft,
   sharpenUnavailableReason,
   stopSharpen,
 } from '../../lib/sharpen';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';

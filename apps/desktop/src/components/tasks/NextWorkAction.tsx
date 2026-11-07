@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import type { TaskRun } from '../../lib/run-types';
 import { collectWorkspaceWork } from '../../lib/task-collection';
-import type { TaskRun } from '../../lib/task-runtime';
 import { taskDecision } from '../../lib/task-workflow';
 import { selectWork, workTarget } from '../../lib/work-selection';
 import { attentionQueue } from '../../lib/workbench';

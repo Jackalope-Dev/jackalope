@@ -25,7 +25,7 @@ import {
   removeComposioKey,
   saveComposioKey,
 } from '../../lib/composio';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { useMcpStore } from '../../stores/mcpStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';

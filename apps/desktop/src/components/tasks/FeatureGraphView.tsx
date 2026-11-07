@@ -20,7 +20,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { QueueItem } from '../../lib/queue';
-import { isActive } from '../../lib/task-runtime';
+import { isActive, isFinished, isUnfinished } from '../../lib/run-status';
 import { useExecutionStore } from '../../stores/executionStore';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import { Button } from '../ui/button';
@@ -59,14 +59,10 @@ export function FeatureGraphView({
       const original = runs.find((r) => r.id === item.runId);
       const run = original ? runs.find((r) => r.taskId === original.taskId) : undefined;
       if (item.runId && mergedRunIds.includes(item.runId)) return 'merged';
-      if (
-        item.error ||
-        run?.dependencyInvalidated ||
-        (run && ['failed', 'stopped', 'interrupted'].includes(run.status))
-      )
+      if (item.error || run?.dependencyInvalidated || (run && isUnfinished(run)))
         return 'attention';
       if (run && isActive(run)) return 'active';
-      if (run && ['review', 'reviewed'].includes(run.status)) return 'review';
+      if (run && isFinished(run)) return 'review';
       if (item.runId) return 'attention';
       return 'queued';
     },

@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { isTauriEnvironment } from '../lib/native/env';
+import { invokeNative } from '../lib/native/transport';
 import { observeRefresh } from '../lib/observe-refresh';
-import { nativeTask, type RunUsage } from '../lib/task-runtime';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
+import type { RunUsage } from '../lib/run-types';
 import { syncAgentConfig, useAgentConfigStore } from './agentConfigStore';
 import { useExecutionStore } from './executionStore';
 import { useProjectStore } from './projectStore';
@@ -58,7 +59,7 @@ async function syncHelperContext(force = false): Promise<void> {
   const context = helperContext();
   const signature = JSON.stringify(context);
   if (!force && signature === syncedContext && Date.now() - syncedAt < 8000) return;
-  syncing = nativeTask<void>('helper_sync', {
+  syncing = invokeNative<void>('helper_sync', {
     context: signature === syncedContext && !force ? null : context,
   });
   try {
@@ -84,7 +85,7 @@ export const useHelperStore = create<HelperState>()(
         if (!isTauriEnvironment()) return;
         try {
           await syncHelperContext();
-          const view = await nativeTask<HelperView>('helper_snapshot');
+          const view = await invokeNative<HelperView>('helper_snapshot');
           if (JSON.stringify(view) !== JSON.stringify(get().view) || get().syncError)
             set({ view, syncError: null });
         } catch (error) {
@@ -99,7 +100,7 @@ export const useHelperStore = create<HelperState>()(
         try {
           await syncAgentConfig();
           await syncHelperContext(true);
-          const view = await nativeTask<HelperView>('helper_send', { prompt });
+          const view = await invokeNative<HelperView>('helper_send', { prompt });
           set({ view, draft: '', error: null });
         } catch (error) {
           set({ error: String(error) });

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { prepareRemoteRequest } from '../../lib/remote-request.ts';
-import type { PendingUserPrompt, Review } from '../../lib/task-runtime';
+import type { PendingUserPrompt, Review } from '../../lib/run-types';
 
 export interface RemoteAction {
   action: string;
@@ -42,10 +42,6 @@ export interface Snapshot {
   projects: { id: string; name: string }[];
   tasks: RemoteTask[];
   sessions: RemoteSession[];
-}
-
-export function isActive(task: RemoteTask) {
-  return ['starting', 'running', 'stopping'].includes(task.status);
 }
 
 /** One row per conversation or task: the latest attempt stands for its thread. */

@@ -4,8 +4,8 @@ import { ArrowRight, FolderOpen, ShieldCheck } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { DISCORD_URL } from '../../lib/community';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { WindowGlass } from '../../lib/window-glass';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
@@ -61,7 +61,7 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
     const refresh = async () => {
       try {
         const value = isTauriEnvironment()
-          ? await nativeTask<AccessStatus>('app_execution_access')
+          ? await invokeNative<AccessStatus>('app_execution_access')
           : { required: true, allowed: false, validUntil: null };
         if (!canceled) {
           if (!value.allowed) wasDenied.current = true;

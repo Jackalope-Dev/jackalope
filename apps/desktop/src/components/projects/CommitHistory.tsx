@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './commit-history.css';
@@ -24,7 +24,7 @@ export function CommitHistory({ projectPath, version }: { projectPath: string; v
     if (!projectPath || !isTauriEnvironment()) return;
     setError('');
     try {
-      setLines(await nativeTask<GraphLine[]>('project_commit_graph', { projectPath, limit: 40 }));
+      setLines(await invokeNative<GraphLine[]>('project_commit_graph', { projectPath, limit: 40 }));
     } catch (cause) {
       setError(String(cause));
     }

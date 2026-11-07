@@ -26,9 +26,11 @@ import {
   sessionRunNeedsAttention,
   sessionWork,
 } from '../../lib/live-session';
-import { isActive, nativeTask, respondToPrompt, type TaskRun } from '../../lib/task-runtime';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { isActive } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
+import { respondToPrompt, stopTask } from '../../lib/task-actions';
 import { taskDecision } from '../../lib/task-workflow';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { selectWork } from '../../lib/work-selection';
 import { BOT_COLORS, useBotStore } from '../../stores/botStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -269,7 +271,7 @@ export function LiveSessionView({
     void act(async () => {
       if (!active) return;
       await sessionCommand('action', { id: session.id, action: 'pause' });
-      await nativeTask('task_stop', { id: active.id });
+      await stopTask(active.id);
     });
   const retryable = !active && !!session.batches.at(-1)?.error;
   const tools = (

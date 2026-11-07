@@ -1,3 +1,5 @@
+import type { ValidationStep } from './run-types.ts';
+
 interface OutcomeReceipt {
   accepted: boolean;
   evidence: string;
@@ -25,10 +27,7 @@ export function requirementState(item: Requirement, tree: string | null) {
 export function correctionPrompt(items: Requirement[]) {
   return `Address these requirements, then provide fresh evidence for review:\n\n${items.map((item) => `- ${item.title}${item.receipt?.note ? `\n  Review feedback: ${item.receipt.note}` : ''}`).join('\n')}\n\nPreserve the other agreed outcomes. Report anything you could not verify.`;
 }
-export function requirementAssessment(
-  steps: import('./task-runtime').ValidationStep[] | undefined,
-  id: string,
-) {
+export function requirementAssessment(steps: ValidationStep[] | undefined, id: string) {
   for (const step of [...(steps ?? [])].reverse()) {
     const answer = step.requirements?.find((item) => item.requirementId === id);
     if (answer) return { answer, timestamp: step.timestamp };
@@ -83,7 +82,7 @@ export function evidenceStrength(answer: Rated) {
 }
 /** The weakest checked level across requirements, and how many have no rated assessment. */
 export function weakestEvidence(
-  steps: import('./task-runtime').ValidationStep[] | undefined,
+  steps: ValidationStep[] | undefined,
   requirements: Pick<Requirement, 'id'>[],
 ) {
   let weakest: EvidenceLevel | null = null;
@@ -97,6 +96,6 @@ export function weakestEvidence(
   return { weakest, unrated };
 }
 /** The latest safety fact any report gave, if one did. */
-export function latestSafetyFact(steps: import('./task-runtime').ValidationStep[] | undefined) {
+export function latestSafetyFact(steps: ValidationStep[] | undefined) {
   return [...(steps ?? [])].reverse().find((step) => step.safetyFact)?.safetyFact ?? null;
 }

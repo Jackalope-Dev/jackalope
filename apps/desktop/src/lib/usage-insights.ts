@@ -1,5 +1,5 @@
 import { latestTaskRuns, recordedOutcome } from './agent-analytics.ts';
-import type { RunUsage, TaskRun } from './task-runtime.ts';
+import type { RunUsage, TaskRun } from './run-types.ts';
 import type { usageEntries } from './usage-entries.ts';
 
 export type UsageEntry = ReturnType<typeof usageEntries>[number];

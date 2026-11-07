@@ -15,7 +15,7 @@ import {
   setAgentProfileTag,
   setConfigDir,
 } from '../../lib/agent-profiles';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
 import {
   accountProfiles,
   CLI_ACCOUNT_ID,

@@ -3,9 +3,10 @@ import { ArrowRight, Check, FileDiff, GitMerge, Images, ListChecks, RefreshCw } 
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
+import { invokeNative } from '../../lib/native/transport';
 import { capturedPages, type ReviewCaptures } from '../../lib/review-captures';
 import { reviewFingerprint } from '../../lib/review-fingerprint';
-import { nativeTask, type Review, type TaskRun } from '../../lib/task-runtime';
+import type { Review, TaskRun } from '../../lib/run-types';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -95,7 +96,7 @@ export function ResultReview({
     setError('');
     try {
       if (suppliedReview) await onRefresh?.();
-      else setReview(await nativeTask<Review>('task_review', { id: run.id }));
+      else setReview(await invokeNative<Review>('task_review', { id: run.id }));
     } catch (error) {
       setError(String(error));
     } finally {

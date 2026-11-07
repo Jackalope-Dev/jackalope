@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { nativeTask } from '../src/lib/task-runtime.ts';
-import { createWorktree, getSystemInfo, listWorktrees } from '../src/lib/tauri-bridge.ts';
+import { createWorktree, listWorktrees } from '../src/lib/git-worktrees.ts';
+import { invokeNative } from '../src/lib/native/transport.ts';
+import { getSystemInfo } from '../src/lib/system-info.ts';
 
 const storage = new Map();
 globalThis.localStorage = {
@@ -68,14 +69,12 @@ const { useProjectStore } = await import('../src/stores/projectStore.ts');
 const { useTaskStore } = await import('../src/stores/taskStore.ts');
 const { useScheduleStore } = await import('../src/stores/scheduleStore.ts');
 
-test('native operations cannot fabricate worktrees, device details or processes', async () => {
+test('native operations cannot fabricate worktrees, device details or runs', async () => {
   for (const operation of [
     () => listWorktrees('/repo'),
     () => createWorktree('/repo', '.worktrees/test', 'test'),
     () => getSystemInfo(),
-    () => nativeTask('pty_spawn', { program: 'node', args: [], workingDir: '/repo' }),
-    () => nativeTask('pty_write', { sessionId: 'missing', data: 'test' }),
-    () => nativeTask('pty_kill', { sessionId: 'missing' }),
+    () => invokeNative('task_start', { request: { id: 'test' } }),
   ])
     await assert.rejects(operation, /desktop app/);
 });

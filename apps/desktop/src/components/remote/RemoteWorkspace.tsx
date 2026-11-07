@@ -9,10 +9,11 @@ import {
 } from '@jackalope/ui';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { isActive as active } from '../../lib/run-status';
 import { AgentQuestion } from '../tasks/AgentQuestion';
 import { ChangedFiles } from '../tasks/ChangedFiles';
 import { InlineNotice } from '../ui/InlineNotice';
-import { isActive as active, type RemoteRequest, useRemoteWorkspace } from './useRemoteWorkspace';
+import { type RemoteRequest, useRemoteWorkspace } from './useRemoteWorkspace';
 import './remote.css';
 
 export type { RemoteAction, RemoteRequest } from './useRemoteWorkspace';

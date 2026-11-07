@@ -10,12 +10,12 @@ import {
 import { CalendarClock, GitCommitHorizontal, Plug } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { connectionTools, describeWake } from '../../lib/bot-hub';
+import { isTauriEnvironment } from '../../lib/native/env';
 import {
   parseScheduleTiming,
   scheduleHourIntervals,
   scheduleTimingExpression,
 } from '../../lib/schedules';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import {
   BOT_WAKES_MAX,
   type BotWake,

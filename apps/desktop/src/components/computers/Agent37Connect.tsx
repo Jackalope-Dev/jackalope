@@ -1,7 +1,7 @@
 import { Badge, FormField, Input } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { agent37Status, agent37Usage, setAgent37Key } from '../../lib/computers';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';

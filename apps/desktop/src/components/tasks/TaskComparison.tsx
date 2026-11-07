@@ -12,14 +12,15 @@ import {
   pickJudgeAgent,
 } from '../../lib/compare-judge';
 import { startComparisonJudge } from '../../lib/compare-launch';
+import { invokeNative } from '../../lib/native/transport';
 import {
   durationLabel,
   elapsedLabel,
   isActive,
-  nativeTask,
+  isFinished,
   statusLabel,
-  type TaskRun,
-} from '../../lib/task-runtime';
+} from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 import { latestAttempt } from '../../lib/task-workflow';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { type Comparison, comparisonForTask, useCompareStore } from '../../stores/compareStore';
@@ -55,8 +56,6 @@ function plainText(markdown: string) {
     .replace(/\s+/g, ' ')
     .trim();
 }
-
-const isFinished = (run: TaskRun) => ['review', 'reviewed'].includes(run.status);
 
 function checkLabel(run: TaskRun) {
   if (!run.verification) return run.verifyCommand ? 'Not run' : 'No check';
@@ -197,7 +196,7 @@ function ComparisonDialog({
   useEffect(() => {
     if (!judgeDone) return;
     let canceled = false;
-    nativeTask<TaskRun[]>('task_runs', { detailId: judgeDone })
+    invokeNative<TaskRun[]>('task_runs', { detailId: judgeDone })
       .then((all) => {
         const result = all.find((item) => item.id === judgeDone)?.result ?? '';
         if (!canceled) setFetched({ id: judgeDone, result });
@@ -281,7 +280,7 @@ function ComparisonDialog({
     let canceled = false;
     const ids = finishedIds.split(',').filter(Boolean);
     if (ids.length)
-      nativeTask<Record<string, Stats>>('task_change_stats', { ids })
+      invokeNative<Record<string, Stats>>('task_change_stats', { ids })
         .then((result) => {
           if (!canceled) setStats(Object.fromEntries(ids.map((id) => [id, result[id] ?? 'error'])));
         })
@@ -299,7 +298,7 @@ function ComparisonDialog({
     for (const member of members) {
       if (member.taskId === winner.taskId || isActive(member) || member.archivedAt) continue;
       try {
-        await nativeTask('task_set_archived', { id: member.id, archived: true });
+        await invokeNative('task_set_archived', { id: member.id, archived: true });
       } catch (cause) {
         failures.push(`${name(member.agent)}: ${String(cause)}`);
       }

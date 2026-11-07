@@ -1,15 +1,15 @@
 import { RefreshIcon } from '@jackalope/ui';
 import { Monitor } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isTauriEnvironment } from '../../lib/native/env';
 import {
   type DesktopPermission,
   getSystemInfo,
-  isTauriEnvironment,
   openDesktopPermissionSettings,
   requestDesktopControlPermissions,
   restartForDesktopPermissions,
   type SystemInfo,
-} from '../../lib/tauri-bridge';
+} from '../../lib/system-info';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Setting, SettingBody, SettingGroup } from './Setting';

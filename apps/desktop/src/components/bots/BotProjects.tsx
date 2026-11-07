@@ -2,7 +2,7 @@ import { ChevronRight } from 'lucide-react';
 import { botActivity, botConversations } from '../../lib/bot-conversations';
 import { needsYou } from '../../lib/bot-hub';
 import type { LiveSession } from '../../lib/live-session';
-import type { TaskRun } from '../../lib/task-runtime';
+import type { TaskRun } from '../../lib/run-types';
 import { type Bot, botProjectIds, rosterOrder } from '../../stores/botStore';
 import type { Project } from '../../stores/projectStore';
 import { BotAvatar } from './BotAvatar';

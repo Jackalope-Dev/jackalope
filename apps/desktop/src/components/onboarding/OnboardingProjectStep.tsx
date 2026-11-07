@@ -8,8 +8,8 @@ import {
   suggestRepoName,
   validRepoName,
 } from '../../lib/cloudflare-artifacts';
+import { invokeNative } from '../../lib/native/transport';
 import { createProject, openProject } from '../../lib/project-setup';
-import { nativeTask } from '../../lib/task-runtime';
 import type { Project } from '../../stores/projectStore';
 import { ArtifactsConnectForm } from '../settings/ArtifactsConnection';
 import { Button } from '../ui/button';
@@ -57,7 +57,7 @@ export function OnboardingProjectStep({
   }, [desktop, projectMode]);
   useEffect(() => {
     if (!desktop || !creating) return;
-    void nativeTask<string>('task_project_directory')
+    void invokeNative<string>('task_project_directory')
       .then((directory) => {
         setDefaultDirectory(directory);
         setDirectoryError('');
@@ -230,7 +230,7 @@ export function OnboardingProjectStep({
                 disabled={!desktop || busy}
                 onClick={() =>
                   void attempt(async () => {
-                    const selected = await nativeTask<string | null>('task_pick_project');
+                    const selected = await invokeNative<string | null>('task_pick_project');
                     if (selected) {
                       setParentPath(selected);
                       setDirectoryError('');
@@ -271,7 +271,7 @@ export function OnboardingProjectStep({
                 disabled={!desktop || busy}
                 onClick={() =>
                   void attempt(async () => {
-                    const selected = await nativeTask<string | null>('task_pick_project');
+                    const selected = await invokeNative<string | null>('task_pick_project');
                     if (selected) setPath(selected);
                   })
                 }

@@ -1,12 +1,8 @@
 import { Badge, SearchField } from '@jackalope/ui';
 import { BookOpen, Lightbulb, Sparkles, Workflow } from 'lucide-react';
 import { useRef, useState } from 'react';
-import {
-  type KnowledgeEntry,
-  openKnowledgeTask,
-  prepareLessonCheck,
-  useKnowledge,
-} from '../../lib/knowledge';
+import { openKnowledgeTask, prepareLessonCheck, useKnowledge } from '../../lib/knowledge';
+import type { KnowledgeEntry } from '../../lib/knowledge-types';
 import {
   canRetireEnforced,
   learnedStatus,
@@ -15,8 +11,8 @@ import {
   lessonCheckOffer,
   statusLabel,
 } from '../../lib/learning';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -55,7 +51,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
   const setArchived = async (entry: KnowledgeEntry, archived: boolean) => {
     setActionError('');
     try {
-      await nativeTask('knowledge_set_archived', {
+      await invokeNative('knowledge_set_archived', {
         id: entry.id,
         revision: entry.revision,
         archived,
@@ -76,7 +72,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
   const retireEnforced = async (entry: KnowledgeEntry) => {
     setActionError('');
     try {
-      await nativeTask('knowledge_retire_enforced', { id: entry.id, revision: entry.revision });
+      await invokeNative('knowledge_retire_enforced', { id: entry.id, revision: entry.revision });
       await refresh();
     } catch (cause) {
       setActionError(String(cause));
@@ -292,7 +288,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                       description="Future tasks will stop using it. Existing task context and source history are kept."
                       onConfirm={async () => {
                         try {
-                          await nativeTask('knowledge_remove', {
+                          await invokeNative('knowledge_remove', {
                             id: entry.id,
                             revision: entry.revision,
                           });
@@ -380,7 +376,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
             setSearching(true);
             setActionError('');
             try {
-              setMatches(await nativeTask('knowledge_search', { projectId: project.id, query }));
+              setMatches(await invokeNative('knowledge_search', { projectId: project.id, query }));
             } catch (cause) {
               setActionError(String(cause));
             } finally {

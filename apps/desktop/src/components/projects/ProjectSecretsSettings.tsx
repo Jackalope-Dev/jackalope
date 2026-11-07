@@ -1,6 +1,7 @@
 import { Badge, Choice, Input } from '@jackalope/ui';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { type FormEvent, useEffect, useState } from 'react';
+import { isTauriEnvironment } from '../../lib/native/env';
 import {
   type ProjectSecret,
   projectSecrets,
@@ -10,7 +11,6 @@ import {
   type SecretAvailability,
   setProjectSecret,
 } from '../../lib/project-secrets';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { FormField } from '../ui/FormField';

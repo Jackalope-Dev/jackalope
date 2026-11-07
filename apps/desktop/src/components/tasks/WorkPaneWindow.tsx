@@ -1,8 +1,8 @@
 import { applyThemeTokens, startThemeClock } from '@jackalope/brand/theme';
 import { MotionConfig } from 'motion/react';
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { openExternalUrl } from '../../lib/tauri-bridge';
+import { openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { saveWorkFeedback } from '../../lib/work-feedback';
 import { observeExecution, useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -57,7 +57,7 @@ export default function WorkPaneWindow({ id, pane }: { id: string; pane: string 
           <Button
             variant="outline"
             onClick={() =>
-              void nativeTask('task_work_window', { id, pane, action: 'dock' }).catch((cause) =>
+              void invokeNative('task_work_window', { id, pane, action: 'dock' }).catch((cause) =>
                 setError(String(cause)),
               )
             }

@@ -6,7 +6,8 @@ import {
   sameHelperValue,
   type ThemeChange,
 } from '../../lib/helper-actions';
-import { nativeTask } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
+import { stopTask } from '../../lib/task-actions';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import {
@@ -104,7 +105,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
         !useProjectStore.getState().projects.some((p) => p.id === input.project_id)
       )
         throw new Error('This project is no longer available.');
-      await nativeTask('helper_action', { id: action.id, decision: 'apply' });
+      await invokeNative('helper_action', { id: action.id, decision: 'apply' });
       claimed = true;
       if (theme) checkTheme();
       if (patch) {
@@ -187,7 +188,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
         const run = useExecutionStore.getState().runs.find((run) => run.id === input.run_id);
         if (!run) throw new Error('This task is no longer loaded.');
         if (action.operation === 'stop_task') {
-          await nativeTask('task_stop', { id: run.id });
+          await stopTask(run.id);
           result = { stopRequested: true, runId: run.id };
         } else {
           useProjectStore.getState().selectProject(run.projectId);
@@ -221,12 +222,12 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
         );
         result = { draftPrepared: true, started: false };
       } else throw new Error('Unsupported action.');
-      await nativeTask('helper_action', { id: action.id, decision: 'complete', result });
+      await invokeNative('helper_action', { id: action.id, decision: 'complete', result });
       await useHelperStore.getState().refresh();
     } catch (cause) {
       setError(String(cause));
       if (claimed)
-        await nativeTask('helper_action', {
+        await invokeNative('helper_action', {
           id: action.id,
           decision: 'failed',
           result: { error: String(cause) },
@@ -290,7 +291,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
             disabled={busy}
             onClick={() => {
               setPreview(undefined);
-              void nativeTask('helper_action', { id: action.id, decision: 'dismiss' })
+              void invokeNative('helper_action', { id: action.id, decision: 'dismiss' })
                 .then(() => useHelperStore.getState().refresh())
                 .catch((cause) => setError(String(cause)));
             }}
@@ -308,7 +309,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
             setBusy(true);
             try {
               undo();
-              await nativeTask('helper_action', {
+              await invokeNative('helper_action', {
                 id: action.id,
                 decision: 'undone',
                 result: { undone: true },

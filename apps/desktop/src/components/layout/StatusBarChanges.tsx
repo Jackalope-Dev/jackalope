@@ -1,7 +1,7 @@
 import { GitCommitHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { openChanges } from '../../stores/commitReviewStore';
 
 /**
@@ -25,7 +25,7 @@ export function StatusBarChanges({
       // stack Git processes that each walk the whole checkout.
       if (document.hidden || reading) return;
       reading = true;
-      nativeTask<{ files: unknown[] }>('git_working_changes', {
+      invokeNative<{ files: unknown[] }>('git_working_changes', {
         repoPath: projectPath,
         worktreePath: checkout,
       })

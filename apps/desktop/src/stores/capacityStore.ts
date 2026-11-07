@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { nativeTask } from '../lib/task-runtime.ts';
+import { invokeNative } from '../lib/native/transport.ts';
 
 export interface CapacityWindow {
   poolId: string;
@@ -52,7 +52,9 @@ export const useCapacityStore = create<CapacityState>((set, get) => ({
     set({ loading: true, error: null, lastAttempted: now });
     inFlight = Promise.resolve().then(async () => {
       try {
-        const records = await nativeTask<CapacityRecord[]>('capacity_snapshot', { refresh: true });
+        const records = await invokeNative<CapacityRecord[]>('capacity_snapshot', {
+          refresh: true,
+        });
         set({ records, lastFetched: Date.now() });
       } catch (cause) {
         set({ error: String(cause) });

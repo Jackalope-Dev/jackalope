@@ -3,8 +3,9 @@ import { trailHandoff } from './decision-trail.ts';
 import { type LiveSession, sessionWork } from './live-session.ts';
 import { managedTaskWork } from './managed-task.ts';
 import type { QueueView } from './queue.ts';
+import { isActive } from './run-status.ts';
+import type { TaskRun } from './run-types.ts';
 import { collectWorkspaceWork, type WorkItem, workPresence } from './task-collection.ts';
-import { isActive, type TaskRun } from './task-runtime.ts';
 import { taskDecision } from './task-workflow.ts';
 
 export function returnToProject(

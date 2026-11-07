@@ -1,4 +1,4 @@
-import { nativeTask } from './task-runtime.ts';
+import { invokeNative } from './native/transport.ts';
 
 /** Who a persistent agent browser belongs to: a project, or a bot across projects. */
 export interface BrowserProfileOwner {
@@ -23,14 +23,14 @@ export interface BrowserProfileStatus {
 }
 
 export const browserProfileStatus = (owner: BrowserProfileOwner) =>
-  nativeTask<BrowserProfileStatus | null>('browser_profile_status', {
+  invokeNative<BrowserProfileStatus | null>('browser_profile_status', {
     ownerKind: owner.kind,
     ownerId: owner.id,
   });
 
 /** Opens the owner's profile in a visible window to sign in, creating it on first use. */
 export const openBrowserProfile = (owner: BrowserProfileOwner, url?: string) =>
-  nativeTask<BrowserProfileStatus>('browser_profile_open', {
+  invokeNative<BrowserProfileStatus>('browser_profile_open', {
     ownerKind: owner.kind,
     ownerId: owner.id,
     ownerName: owner.name,
@@ -38,13 +38,13 @@ export const openBrowserProfile = (owner: BrowserProfileOwner, url?: string) =>
   });
 
 export const closeBrowserProfile = (id: string) =>
-  nativeTask<BrowserProfileStatus>('browser_profile_close', { id });
+  invokeNative<BrowserProfileStatus>('browser_profile_close', { id });
 
 export const clearBrowserProfileSite = (id: string, site: string) =>
-  nativeTask<BrowserProfileStatus>('browser_profile_clear_site', { id, site });
+  invokeNative<BrowserProfileStatus>('browser_profile_clear_site', { id, site });
 
 export const deleteBrowserProfile = (id: string) =>
-  nativeTask<void>('browser_profile_delete', { id });
+  invokeNative<void>('browser_profile_delete', { id });
 
 /** Disk use as people read it: KB below 1 MB, one decimal in GB. */
 export function profileSize(bytes: number): string {

@@ -1,9 +1,11 @@
 import { DefinitionList, Disclosure, DisclosureSummary, DropdownMenu as Menu } from '@jackalope/ui';
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
-import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import { isActive } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 import { mergeDestination } from '../../lib/task-workflow';
-import { openExternalUrl } from '../../lib/tauri-bridge';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -91,7 +93,7 @@ export function TaskDelivery({
     setError('');
     try {
       setStatus(
-        await nativeTask<DeliveryStatus>('task_delivery_status', {
+        await invokeNative<DeliveryStatus>('task_delivery_status', {
           id: run.id,
           project: integrated,
           remote,

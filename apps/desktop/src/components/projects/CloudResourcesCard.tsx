@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { resourceOption } from '../../lib/cloud-resources-plan';
 import { type CloudResourcesStatus, cloudResourcesStatus } from '../../lib/cloudflare-resources';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { openCloudResources, openSettings } from '../layout/navigation';
 import { SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';

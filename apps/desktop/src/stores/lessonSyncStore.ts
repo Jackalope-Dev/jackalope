@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { EMPTY_LESSON_SYNC, type LessonSyncView, parseLessonSyncView } from '../lib/lesson-sync';
-import { nativeTask } from '../lib/task-runtime';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
+import { isTauriEnvironment } from '../lib/native/env';
+import { invokeNative } from '../lib/native/transport';
 import { useSettingsSyncStore } from './settingsSyncStore';
 
 interface LessonSyncState {
@@ -18,7 +18,7 @@ const SYNC_INTERVAL = 5 * 60_000;
 let running: Promise<void> | undefined;
 
 async function invoke(action: object) {
-  return parseLessonSyncView(await nativeTask<unknown>('app_lesson_sync', { action }));
+  return parseLessonSyncView(await invokeNative<unknown>('app_lesson_sync', { action }));
 }
 
 export const useLessonSyncStore = create<LessonSyncState>()((set, get) => {

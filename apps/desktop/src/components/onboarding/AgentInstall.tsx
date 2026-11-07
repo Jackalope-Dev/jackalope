@@ -9,7 +9,7 @@ import {
 } from '../../lib/agent-install';
 import { pollSignIn, stopSignIn } from '../../lib/agent-profiles';
 import { useManagedRuntime } from '../../lib/managed-runtime';
-import { openExternalUrl } from '../../lib/tauri-bridge';
+import { openExternalUrl } from '../../lib/native/env';
 import { ManagedRuntimeProgress } from '../agents/ManagedRuntimeProgress';
 
 type Run =

@@ -1,4 +1,4 @@
-import { nativeTask } from './task-runtime';
+import { invokeNative } from './native/transport';
 
 export interface CommitPolicy {
   attribution: 'agent' | 'coAuthor' | 'user';
@@ -9,7 +9,7 @@ export interface CommitPolicy {
 }
 
 export const projectGitPolicy = (projectPath: string, policy?: CommitPolicy) =>
-  nativeTask<CommitPolicy>('project_git_policy', { projectPath, policy });
+  invokeNative<CommitPolicy>('project_git_policy', { projectPath, policy });
 
 export interface FirstCommitPreview {
   /** Files the commit would include; ignored files are left out. */
@@ -19,7 +19,7 @@ export interface FirstCommitPreview {
 }
 
 export const firstCommitPreview = (projectPath: string) =>
-  nativeTask<FirstCommitPreview>('project_first_commit_preview', { projectPath });
+  invokeNative<FirstCommitPreview>('project_first_commit_preview', { projectPath });
 /** Commits as the configured Git identity; `files` is the approved count from the preview. */
 export const createFirstCommit = (projectPath: string, files: number) =>
-  nativeTask<void>('project_first_commit', { projectPath, files });
+  invokeNative<void>('project_first_commit', { projectPath, files });

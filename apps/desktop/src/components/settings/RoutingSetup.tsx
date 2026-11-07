@@ -13,12 +13,12 @@ import {
 import { Check, ExternalLink, KeyRound, Route, SlidersHorizontal, Zap } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { JevFallback } from '../../lib/decisions';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import {
   type RoutingMode,
   type RoutingSettings,
   routingSettings,
 } from '../../lib/routing-settings';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { InlineNotice } from '../ui/InlineNotice';
 import { SettingActions, SettingBody, SettingGroup } from './Setting';
 import './routing.css';

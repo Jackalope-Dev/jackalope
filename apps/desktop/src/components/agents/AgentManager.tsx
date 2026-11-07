@@ -3,7 +3,7 @@ import { ArrowLeft, MoreHorizontal, Star } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useAgentScopeStore } from '../../stores/agentScopeStore';
 import { useExecutionStore } from '../../stores/executionStore';

@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { type BuiltinAgentId, builtinAgents } from '../lib/agent-catalog.ts';
+import { invokeNative } from '../lib/native/transport.ts';
 import { createPersistStorage } from '../lib/persist-storage.ts';
-import { nativeTask } from '../lib/task-runtime.ts';
 import { isAgentAllowedForProject, useProjectStore } from './projectStore.ts';
 
 interface CustomAgentConfig {
@@ -208,7 +208,7 @@ async function syncAgentConfigNow() {
       },
     ]),
   );
-  await nativeTask('agent_save_policy', {
+  await invokeNative('agent_save_policy', {
     policy: {
       enabledAgents,
       allowedModels,

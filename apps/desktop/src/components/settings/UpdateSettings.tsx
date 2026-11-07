@@ -1,6 +1,7 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect, useId } from 'react';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { isLive } from '../../lib/run-status';
 import { useExecutionStore } from '../../stores/executionStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
 import { Badge } from '../ui/badge';
@@ -16,11 +17,7 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
   const channelId = useId();
   const runs = useExecutionStore((state) => state.runs);
   const desktop = isTauriEnvironment();
-  const blocked = runs.some(
-    (run) =>
-      run.persistenceError ||
-      ['starting', 'running', 'stopping', 'interrupted'].includes(run.status),
-  );
+  const blocked = runs.some((run) => run.persistenceError || isLive(run));
   useEffect(() => {
     void update.load();
   }, [update.load]);

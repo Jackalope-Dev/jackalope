@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { nativeTask } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';
 import { Button } from '../ui/button';
@@ -26,7 +26,7 @@ export function NotificationSettings() {
     setBusy(true);
     setResult('');
     try {
-      await nativeTask('notification_test');
+      await invokeNative('notification_test');
       setResult('Sent to your desktop. If it did not appear, check system notification settings.');
     } catch (error) {
       setResult(String(error));

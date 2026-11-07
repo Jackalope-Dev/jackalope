@@ -15,12 +15,13 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { searchFiles } from '../../lib/file-search';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { ATTACH_TO_COMPOSER, attachmentReference } from '../../lib/prompt-attachments';
+import { isSettled } from '../../lib/run-status';
 import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
-import { nativeTask } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
 import { taskDecision } from '../../lib/task-workflow';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -43,7 +44,7 @@ function useProjectFiles(projectPath: string | undefined, enabled: boolean) {
     if (cached) setFiles(cached.files);
     if (cached && Date.now() - cached.loadedAt < 30_000) return;
     let canceled = false;
-    nativeTask<string[]>('project_files_list', { projectPath })
+    invokeNative<string[]>('project_files_list', { projectPath })
       .then((list) => {
         fileCache.set(projectPath, { files: list, loadedAt: Date.now() });
         if (!canceled) setFiles(list);
@@ -126,7 +127,7 @@ export function CommandPalette({
         { label: taskDecision(current).action, section: taskDecision(current).section },
         { label: 'Open conversation', section: 'result' },
         { label: 'Open task terminal and workspace tools', section: 'terminal' },
-        ...(['review', 'reviewed', 'failed', 'stopped'].includes(current.status)
+        ...(isSettled(current)
           ? [
               { label: 'Try result', section: 'preview' },
               { label: 'Review changes and checks', section: 'changes' },
@@ -301,7 +302,7 @@ export function CommandPalette({
                     title={`Open in ${preferredEditor === 'cursor' ? 'Cursor' : 'VS Code'}`}
                     onClick={() => {
                       setFileError('');
-                      nativeTask('project_file_open', {
+                      invokeNative('project_file_open', {
                         projectPath: terminalProject.path,
                         relativePath: file,
                         editor: preferredEditor,

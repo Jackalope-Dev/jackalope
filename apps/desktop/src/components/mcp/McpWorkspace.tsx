@@ -3,9 +3,9 @@ import { Activity, CheckCircle, Globe, MoreHorizontal, Search, Server, X } from 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents } from '../../lib/agent-catalog';
+import type { McpServerConfig } from '../../lib/mcp-client';
 import { connectionFailure, redactConnection } from '../../lib/mcp-connection';
-import { nativeTask } from '../../lib/task-runtime';
-import type { McpServerConfig } from '../../lib/tauri-bridge';
+import { invokeNative } from '../../lib/native/transport';
 import { type AllMcpsServer, useMcpStore } from '../../stores/mcpStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -175,7 +175,7 @@ export function McpWorkspace({
   };
 
   const signIn = (server: McpServerConfig, agent: string) =>
-    void nativeTask('mcp_authenticate', {
+    void invokeNative('mcp_authenticate', {
       id: server.id,
       scope: server.scope,
       agent,

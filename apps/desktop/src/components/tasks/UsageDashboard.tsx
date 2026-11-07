@@ -3,9 +3,9 @@ import { ChartNoAxesColumn, Download } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { countedTaskDecisions } from '../../lib/decision-usage';
-import { nativeTask } from '../../lib/task-runtime';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { taskTitle } from '../../lib/task-title';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { usageEntries } from '../../lib/usage-entries';
 import {
   type HelperAccountingTurn,
@@ -69,7 +69,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
     await refreshHelper();
     if (!isTauriEnvironment()) return;
     try {
-      const report = await nativeTask<{ turns: HelperAccountingTurn[]; unavailable: string[] }>(
+      const report = await invokeNative<{ turns: HelperAccountingTurn[]; unavailable: string[] }>(
         'helper_usage',
       );
       setHelperReport(report);

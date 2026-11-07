@@ -56,9 +56,14 @@ Composer / saved idea / queue / native schedule
 executionStore.start synchronizes agent policy and invokes task_start. Clients in
 lib/queue.ts synchronize policy before queue creation/dispatch. Native commands
 are registered in src-tauri/src/lib.rs, the authoritative command inventory.
-lib/task-runtime.ts, lib/queue.ts, lib/agent-profiles.ts, lib/codebase.ts and
-lib/tauri-bridge.ts hold feature contracts/clients. DTOs follow Rust serde field
-names; changes must preserve both sides and old saved records.
+Every webview call goes through invokeNative in lib/native/transport.ts, which
+rejects in the browser preview and reports operation telemetry and timing;
+lib/native/env.ts detects the desktop app and opens links. lib/run-types.ts holds
+the attempt DTOs and lib/run-status.ts the named status predicates and labels.
+Per-domain clients (lib/task-actions.ts, lib/queue.ts, lib/agent-profiles.ts,
+lib/git-worktrees.ts, lib/mcp-client.ts, lib/system-info.ts, lib/codebase.ts and
+others) own their command names and DTOs. DTOs follow Rust serde field names;
+changes must preserve both sides and old saved records.
 
 ## Native modules
 
@@ -189,10 +194,10 @@ useTaskFollowUps queue hook; OnboardingFlow composes one component per step.
 
 Subscribe to native events with hooks/useTauriEvent and to app `jackalope:*` window
 events with hooks/useWindowEvent; both handle late-resolving cleanup and stale
-handlers. Open links through openInBrowser in lib/tauri-bridge, which reports
+handlers. Open links through openInBrowser in lib/native/env, which reports
 failures to the caller. Select store fields with useShallow rather than
 subscribing to a whole store. PROMPT_MAX_CHARS bounds task, follow-up and
-schedule instructions.
+schedule instructions in the composer; the native side accepts longer ones.
 
 The UI package owns portable styling, accessible controls, overlays, feedback
 states and basic layout/data primitives. It has no native bridge, stores, routing

@@ -22,6 +22,8 @@ import {
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { ownerComputer } from '../../lib/computers';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import {
   type QueueCommand,
   type QueueItem,
@@ -29,8 +31,7 @@ import {
   queueCommand,
   queueSnapshot,
 } from '../../lib/queue';
-import { isActive, nativeTask, statusLabel } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isActive, isFinished, isUnfinished, statusLabel } from '../../lib/run-status';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
@@ -120,7 +121,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
     setBusy(true);
     setError('');
     try {
-      if (command === 'task_stop') await nativeTask(command, args);
+      if (command === 'task_stop') await invokeNative(command, args);
       else await queueCommand(command, args);
       await load();
       await refresh();
@@ -134,14 +135,9 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
     const original = runs.find((r) => r.id === item.runId);
     const run = original ? runs.find((r) => r.taskId === original.taskId) : undefined;
     if (item.runId && queue.mergedRunIds.includes(item.runId)) return 'merged';
-    if (
-      item.error ||
-      run?.dependencyInvalidated ||
-      (run && ['failed', 'stopped', 'interrupted'].includes(run.status))
-    )
-      return 'attention';
+    if (item.error || run?.dependencyInvalidated || (run && isUnfinished(run))) return 'attention';
     if (run && isActive(run)) return 'active';
-    if (run && ['review', 'reviewed'].includes(run.status)) return 'review';
+    if (run && isFinished(run)) return 'review';
     if (item.runId) return 'attention';
     return 'queued';
   };

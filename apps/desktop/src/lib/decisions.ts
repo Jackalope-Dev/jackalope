@@ -1,4 +1,4 @@
-import type { RunUsage } from './task-runtime';
+import type { RunUsage } from './run-types';
 
 export type DecisionMode = 'deterministic' | 'agent' | 'jev';
 export type JevFallback = 'local' | 'agent';

@@ -4,7 +4,8 @@ import { usePromptAttachments } from '../../hooks/usePromptAttachments';
 import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/live-session';
 import { appendAttachments } from '../../lib/prompt-attachments';
 import { appendFeedbackDraft } from '../../lib/review-feedback';
-import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
+import type { TaskRun } from '../../lib/run-types';
+import { stopAndSettle, stopPreview } from '../../lib/task-actions';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { AttachButton } from '../tasks/AttachButton';
 import { DictationButton } from '../tasks/DictationButton';
@@ -138,35 +139,23 @@ export function SessionComposer({
       await draftSave.current;
       if (mode !== 'queue') {
         await sessionCommand('action', { id: session.id, action: 'pause' });
-        if (mode === 'preview' && latestRun)
-          await nativeTask('task_preview_stop', { id: latestRun.id });
-        if (mode === 'interrupt' && active) {
-          await nativeTask('task_stop', { id: active.id });
-          let stopped = false;
-          for (let attempt = 0; attempt < 120; attempt++) {
-            await onSent();
-            const state = useLiveSessionStore.getState();
-            const run = state.runs.find((run) => run.id === active.id);
-            if (!run || run.status === 'interrupted')
-              throw new Error(
-                'Inspect interrupted work before continuing. Your message is still saved.',
-              );
-            if (
-              !isActive(run) &&
-              state.sessions
-                .find((item) => item.id === session.id)
-                ?.batches.find((batch) => batch.runId === run.id)?.settled
-            ) {
-              stopped = true;
-              break;
-            }
-            await new Promise((resolve) => setTimeout(resolve, 250));
-          }
-          if (!stopped)
-            throw new Error(
-              'Work is still stopping. Your message is saved; send it after the attempt stops.',
-            );
-        }
+        if (mode === 'preview' && latestRun) await stopPreview(latestRun.id);
+        if (mode === 'interrupt' && active)
+          await stopAndSettle(
+            active.id,
+            async () => {
+              await onSent();
+              return useLiveSessionStore.getState().runs.find((run) => run.id === active.id);
+            },
+            {
+              saved: 'message',
+              settled: (run) =>
+                !!useLiveSessionStore
+                  .getState()
+                  .sessions.find((item) => item.id === session.id)
+                  ?.batches.find((batch) => batch.runId === run.id)?.settled,
+            },
+          );
       }
       const draft = await sessionCommand<SessionDraft>('send', {
         id: session.id,

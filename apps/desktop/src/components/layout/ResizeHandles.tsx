@@ -1,4 +1,4 @@
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
 
 // Not exported from @tauri-apps/api/window, so mirrored here — must match
 // the literal union `startResizeDragging` accepts.

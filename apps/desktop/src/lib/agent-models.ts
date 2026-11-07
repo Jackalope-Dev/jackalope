@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ModelEvidence } from './decisions';
-import { nativeTask } from './task-runtime';
-import { isTauriEnvironment } from './tauri-bridge';
+import { isTauriEnvironment } from './native/env';
+import { invokeNative } from './native/transport';
 
 export interface ModelCatalog {
   models: { id: string; name: string; isDefault: boolean; metadata?: ModelEvidence }[];
@@ -30,7 +30,7 @@ export function useAgentModels(agentId: string, revision = 0, agentProfileId?: s
       }
       setLoading(true);
       try {
-        const result = await nativeTask<ModelCatalog>('agent_models', {
+        const result = await invokeNative<ModelCatalog>('agent_models', {
           agent: agentId,
           agentProfileId,
           refresh: force,

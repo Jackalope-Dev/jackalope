@@ -15,7 +15,7 @@ import type {
   ModelEvidence,
   DecisionOptions as Options,
 } from '../../lib/decisions';
-import { nativeTask } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
 import { InlineNotice } from '../ui/InlineNotice';
 
 const helpers = [
@@ -77,7 +77,7 @@ export function DecisionOptions({ projectId }: { projectId?: string }) {
     setDraft(undefined);
     setPending(false);
     try {
-      const value = await nativeTask<DecisionOptionsView>('decision_options', { projectId });
+      const value = await invokeNative<DecisionOptionsView>('decision_options', { projectId });
       if (ticket === generation.current) {
         setView(value);
         setDraft(value.options);
@@ -100,7 +100,7 @@ export function DecisionOptions({ projectId }: { projectId?: string }) {
     setError('');
     setMessage('');
     try {
-      const value = await nativeTask<DecisionOptionsView>('decision_options_save', {
+      const value = await invokeNative<DecisionOptionsView>('decision_options_save', {
         projectId,
         revision: view.revision,
         options: inherit ? null : draft,

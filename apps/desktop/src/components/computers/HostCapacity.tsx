@@ -1,7 +1,7 @@
 import { AlertTriangle, Laptop, Server } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { hostLoad, type ProjectHosts, projectHosts } from '../../lib/computers';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
 import './computers.css';
 
 /** How often an open capacity summary re-reads the pool. */

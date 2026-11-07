@@ -1,8 +1,8 @@
 import { CheckCircle, CircleAlert, KeyRound, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import type { McpServerConfig } from '../../lib/mcp-client';
 import { connectionFailure } from '../../lib/mcp-connection';
-import { nativeTask } from '../../lib/task-runtime';
-import type { McpServerConfig } from '../../lib/tauri-bridge';
+import { invokeNative } from '../../lib/native/transport';
 import { useMcpStore } from '../../stores/mcpStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -83,7 +83,7 @@ export function McpConnectionResult({
                   onClick={async () => {
                     setBusy(true);
                     try {
-                      await nativeTask('mcp_authenticate', {
+                      await invokeNative('mcp_authenticate', {
                         id: server.id,
                         scope: server.scope,
                         agent,

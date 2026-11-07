@@ -15,9 +15,9 @@ const WorkspaceTransition = lazy(() =>
   })),
 );
 
+import { invokeNative } from './lib/native/transport';
 import { observeTelemetry } from './lib/observe-telemetry';
 import { commitProjectSetup } from './lib/project-setup';
-import { nativeTask } from './lib/task-runtime';
 import { observeCommunity } from './stores/communityStore';
 import { observeExecution, useExecutionStore } from './stores/executionStore';
 import { observeFeedbackActivity } from './stores/feedbackStore';
@@ -81,7 +81,7 @@ export default function App() {
     if (ready) {
       return observeExecution();
     }
-    nativeTask('app_finish_reset')
+    invokeNative('app_finish_reset')
       .then(() => setReady(true))
       .catch((error) => setResetError(String(error)));
   }, [ready]);

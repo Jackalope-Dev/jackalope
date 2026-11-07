@@ -1,7 +1,7 @@
 import { LifeBuoy, Minus, RotateCw, Settings2, Square, X } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { isMacPlatform } from '../../lib/platform-shortcuts';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
 import { ArcColorPicker } from '../theme/ArcColorPicker';

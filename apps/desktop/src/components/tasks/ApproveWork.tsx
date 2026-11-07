@@ -2,7 +2,8 @@ import { FormField, Textarea } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
+import type { TaskRun } from '../../lib/run-types';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
@@ -24,7 +25,7 @@ export function ApproveWork({ run, onApproved }: { run: TaskRun; onApproved: () 
     let alive = true;
     setTree(null);
     setError('');
-    void nativeTask<string>('task_outcome_snapshot', { id: run.id }).then(
+    void invokeNative<string>('task_outcome_snapshot', { id: run.id }).then(
       (value) => {
         if (alive) setTree(value);
       },
@@ -43,7 +44,7 @@ export function ApproveWork({ run, onApproved }: { run: TaskRun; onApproved: () 
     try {
       for (const item of currentRequirements) {
         if (item.receipt?.accepted && item.receipt.tree === tree) continue;
-        await nativeTask('task_outcome_review', {
+        await invokeNative('task_outcome_review', {
           review: {
             runId: run.id,
             requirementId: item.id,
@@ -54,7 +55,7 @@ export function ApproveWork({ run, onApproved }: { run: TaskRun; onApproved: () 
           },
         });
       }
-      await nativeTask('task_mark_reviewed', { id: run.id });
+      await invokeNative('task_mark_reviewed', { id: run.id });
       await useExecutionStore.getState().refresh();
       setOpen(false);
       onApproved();

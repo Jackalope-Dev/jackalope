@@ -1,5 +1,5 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
 import { Button } from '../ui/button';
 import { FormField } from '../ui/FormField';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -38,7 +38,7 @@ export function BetaProgram({ onBeta }: { onBeta: boolean }) {
     setBusy(true);
     setError('');
     try {
-      const view = await nativeTask<{ request: BetaRequest | null }>('app_account_beta', {
+      const view = await invokeNative<{ request: BetaRequest | null }>('app_account_beta', {
         action,
       });
       setRequest(view.request);

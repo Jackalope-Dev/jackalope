@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { scanCodebase } from '../../lib/codebase';
 import { affectedFiles } from '../../lib/codebase-impact';
-import type { TaskRun } from '../../lib/task-runtime';
+import type { TaskRun } from '../../lib/run-types';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 

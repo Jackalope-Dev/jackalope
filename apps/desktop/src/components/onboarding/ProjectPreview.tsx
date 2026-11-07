@@ -1,7 +1,7 @@
 import { FolderSearch, GitBranch, GitCommitHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { type CodebaseSnapshot, scanCodebase } from '../../lib/codebase';
-import { nativeTask } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
 
 interface ProjectInfo {
   path: string;
@@ -68,12 +68,12 @@ export function ProjectPreview({ path }: { path: string }) {
     // Typed paths settle before anything is read.
     const timer = window.setTimeout(async () => {
       try {
-        const project = await nativeTask<ProjectInfo>('task_validate_project', { path: target });
+        const project = await invokeNative<ProjectInfo>('task_validate_project', { path: target });
         if (!current) return;
         setInfo(project);
         setReading(true);
         const commits = project.repository
-          ? nativeTask<{ commit: Commit | null }[]>('project_commit_graph', {
+          ? invokeNative<{ commit: Commit | null }[]>('project_commit_graph', {
               projectPath: project.path,
               limit: 1,
             })

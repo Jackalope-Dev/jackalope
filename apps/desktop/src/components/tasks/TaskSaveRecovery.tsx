@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
-import { nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
+import type { TaskRun } from '../../lib/run-types';
 import { taskTitle } from '../../lib/task-title';
 import { useExecutionStore } from '../../stores/executionStore';
 import { returnToCompanion, useCompanionNotices } from '../mascot/useCompanionNotices';
@@ -60,11 +61,11 @@ export function TaskSaveRecovery({ run }: { run: TaskRun }) {
     setError('');
     try {
       if (copy) {
-        const path = await nativeTask<string | null>('task_export_recovery', { id: run.id });
+        const path = await invokeNative<string | null>('task_export_recovery', { id: run.id });
         if (path)
           setMessage(`Recovery copy saved to ${path}. The task history still needs to be saved.`);
       } else {
-        await nativeTask('task_retry_save', { id: run.id });
+        await invokeNative('task_retry_save', { id: run.id });
         setMessage('Task history saved.');
       }
       await useExecutionStore.getState().refresh();

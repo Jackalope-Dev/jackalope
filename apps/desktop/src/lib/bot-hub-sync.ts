@@ -2,8 +2,8 @@ import { useAgentConfigStore } from '../stores/agentConfigStore.ts';
 import { useBotStore } from '../stores/botStore.ts';
 import { agentAccountFor, useProjectStore } from '../stores/projectStore.ts';
 import { hubDirectory, observeBotHub } from './bot-hub.ts';
-import { nativeTask } from './task-runtime.ts';
-import { isTauriEnvironment } from './tauri-bridge.ts';
+import { isTauriEnvironment } from './native/env.ts';
+import { invokeNative } from './native/transport.ts';
 
 /** Waits for both stores so an early, empty directory never clears saved wake-up progress. */
 function hydrated(ready: () => void) {
@@ -44,7 +44,7 @@ export function observeBots() {
               customAgents.find((agent) => agent.id === bot.agent)?.adapter ?? bot.agent,
             ),
         );
-        await nativeTask('bot_hub_sync', { bots });
+        await invokeNative('bot_hub_sync', { bots });
       },
       (changed) => {
         const bots = useBotStore.subscribe((state, previous) => {

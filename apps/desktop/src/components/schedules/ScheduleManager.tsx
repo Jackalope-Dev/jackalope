@@ -3,10 +3,13 @@ import { Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { describeWake } from '../../lib/bot-hub';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import { isWorking } from '../../lib/run-status';
+import type { RunRequest } from '../../lib/run-types';
 import { type ScheduleTemplate, scheduleTemplateDraft } from '../../lib/schedule-templates';
 import { type ScheduleDefinition as Definition, savedPlanDraft } from '../../lib/schedules';
-import { nativeTask, type RunRequest } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { stopTask } from '../../lib/task-actions';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import {
@@ -14,7 +17,6 @@ import {
   isAgentAllowedForProject,
   useProjectStore,
 } from '../../stores/projectStore';
-
 import { type ScheduledTask, useScheduleStore } from '../../stores/scheduleStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { Button } from '../ui/button';
@@ -110,12 +112,12 @@ export function ScheduleManager(props: {
     }
   }, [busy, editing]);
   const desktop = isTauriEnvironment();
-  const refresh = async () => setLedger(await nativeTask<Ledger>('schedule_list'));
+  const refresh = async () => setLedger(await invokeNative<Ledger>('schedule_list'));
   useEffect(() => {
     if (!desktop) return;
     let alive = true;
     const read = () =>
-      nativeTask<Ledger>('schedule_list')
+      invokeNative<Ledger>('schedule_list')
         .then((data) => {
           if (alive) setLedger(data);
         })
@@ -234,7 +236,7 @@ export function ScheduleManager(props: {
       await syncAgentConfig();
       const adapter =
         useAgentConfigStore.getState().customAgents.find((a) => a.id === agent)?.adapter ?? agent;
-      await nativeTask('schedule_save', {
+      await invokeNative('schedule_save', {
         definition: {
           ...editing,
           rawPrompt,
@@ -308,7 +310,7 @@ export function ScheduleManager(props: {
                   checked={d.enabled}
                   disabled={busy}
                   onCheckedChange={(enabled) =>
-                    void act(() => nativeTask('schedule_set_enabled', { id: d.id, enabled }))
+                    void act(() => invokeNative('schedule_set_enabled', { id: d.id, enabled }))
                   }
                 />
                 <OptionsMenu label={`${d.name} options`} disabled={busy}>
@@ -364,7 +366,7 @@ export function ScheduleManager(props: {
                           disabled={busy}
                           onClick={() =>
                             void act(async () => {
-                              const text = await nativeTask<string>('schedule_inspect_change', {
+                              const text = await invokeNative<string>('schedule_inspect_change', {
                                 id: d.id,
                                 dueAt: event.dueAt,
                               });
@@ -390,11 +392,11 @@ export function ScheduleManager(props: {
                           View run
                         </Button>
                       )}
-                      {run && ['starting', 'running'].includes(run.status) && (
+                      {run && isWorking(run) && (
                         <Button
                           variant="ghost"
                           disabled={busy}
-                          onClick={() => void act(() => nativeTask('task_stop', { id: run.id }))}
+                          onClick={() => void act(() => stopTask(run.id))}
                         >
                           Stop run
                         </Button>
@@ -415,7 +417,7 @@ export function ScheduleManager(props: {
           title={`Delete ${deleting.name}?`}
           description="Future occurrences stop. Existing tasks and worktrees are kept."
           onConfirm={async () => {
-            await act(() => nativeTask('schedule_remove', { id: deleting.id }));
+            await act(() => invokeNative('schedule_remove', { id: deleting.id }));
             setDeleting(null);
           }}
         />
@@ -465,7 +467,7 @@ export function ScheduleManager(props: {
         onEnable={async () => {
           if (!webhook) return;
           await act(async () => {
-            const revealed = await nativeTask<{ url: string; token: string }>(
+            const revealed = await invokeNative<{ url: string; token: string }>(
               'schedule_webhook_enable',
               { id: webhook.id },
             );
@@ -475,15 +477,15 @@ export function ScheduleManager(props: {
               url: revealed.url,
               token: revealed.token,
             });
-            setLedger(await nativeTask<Ledger>('schedule_list'));
+            setLedger(await invokeNative<Ledger>('schedule_list'));
           });
         }}
         onDisable={async () => {
           if (!webhook) return;
           await act(async () => {
-            await nativeTask('schedule_webhook_disable', { id: webhook.id });
+            await invokeNative('schedule_webhook_disable', { id: webhook.id });
             setWebhook(null);
-            setLedger(await nativeTask<Ledger>('schedule_list'));
+            setLedger(await invokeNative<Ledger>('schedule_list'));
           });
         }}
       />

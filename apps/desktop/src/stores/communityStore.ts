@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { create } from 'zustand';
-import { nativeTask } from '../lib/task-runtime';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
+import { isTauriEnvironment } from '../lib/native/env';
+import { invokeNative } from '../lib/native/transport';
 import { telemetry } from '../lib/telemetry-client';
 import { useSettingsStore } from './settingsStore';
 
@@ -47,7 +47,7 @@ export const useCommunityStore = create<State>((set, get) => ({
     loaded = (async () => {
       const before = revision;
       try {
-        const settings = await nativeTask<CommunitySettings>('app_community_settings');
+        const settings = await invokeNative<CommunitySettings>('app_community_settings');
         if (before !== revision) return;
         set({ settings, error: null });
         activate(settings);
@@ -73,7 +73,7 @@ export const useCommunityStore = create<State>((set, get) => ({
     set({ busy: true, error: null });
     const before = revision;
     try {
-      const settings = await nativeTask<CommunitySettings>('app_community_configure', {
+      const settings = await invokeNative<CommunitySettings>('app_community_configure', {
         telemetry: usage,
         errors,
       });

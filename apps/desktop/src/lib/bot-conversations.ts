@@ -1,5 +1,5 @@
 import { type LiveSession, sessionWork } from './live-session.ts';
-import type { TaskRun } from './task-runtime.ts';
+import type { TaskRun } from './run-types.ts';
 
 /** A bot's conversations, newest first. */
 export function botConversations(sessions: LiveSession[], botId: string) {

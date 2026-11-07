@@ -17,9 +17,11 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { authorEvidence } from '../../lib/agent-review';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
-import { isActive, nativeTask, type RunRequest } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isActive } from '../../lib/run-status';
+import type { RunRequest } from '../../lib/run-types';
 import { useCommitReviewStore } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -37,6 +39,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { CommitHistory } from './CommitHistory';
 import './commit-review.css';
+import { stopTask } from '../../lib/task-actions';
 import { type ChangedFile, CommitFilesList, STATUS } from './CommitFilesList';
 import { failureOf, type HookFailure, HookFixStatus } from './HookFixStatus';
 
@@ -168,7 +171,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     setLoading(true);
     setError('');
     try {
-      const next = await nativeTask<WorkingChanges>('git_working_changes', {
+      const next = await invokeNative<WorkingChanges>('git_working_changes', {
         repoPath: projectPath,
         worktreePath: target,
       });
@@ -220,7 +223,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     if (!changes || !focused || !projectPath) return setPatch(null);
     let live = true;
     setPatchError('');
-    nativeTask<string>('git_working_file_diff', {
+    invokeNative<string>('git_working_file_diff', {
       repoPath: projectPath,
       worktreePath: checkout,
       path: focused,
@@ -259,7 +262,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     setFeedback('');
     setPushable(false);
     try {
-      await nativeTask('git_discard_changes', {
+      await invokeNative('git_discard_changes', {
         repoPath: projectPath,
         worktreePath: checkout,
         paths: [file.path],
@@ -277,7 +280,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     setGenerating(true);
     setGenerateError('');
     try {
-      const message = await nativeTask<{ title: string; body: string }>(
+      const message = await invokeNative<{ title: string; body: string }>(
         'git_generate_commit_message',
         {
           repoPath: projectPath,
@@ -299,7 +302,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     setPushing(true);
     setError('');
     try {
-      const result = await nativeTask<string>('git_push_changes', {
+      const result = await invokeNative<string>('git_push_changes', {
         repoPath: projectPath,
         worktreePath: checkout,
       });
@@ -320,7 +323,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
     setFeedback('');
     setPushable(false);
     try {
-      const sha = await nativeTask<string>('git_commit_changes', {
+      const sha = await invokeNative<string>('git_commit_changes', {
         repoPath: projectPath,
         worktreePath: checkout,
         paths: chosenFiles.map((file) => file.path),
@@ -393,7 +396,7 @@ export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
   const stopFix = async () => {
     if (!fixRun) return;
     try {
-      await nativeTask('task_stop', { id: fixRun.id });
+      await stopTask(fixRun.id);
     } catch (cause) {
       setFixError(failureOf(cause).message);
     }

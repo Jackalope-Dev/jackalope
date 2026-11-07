@@ -11,9 +11,11 @@ import {
   reviewState,
   taskReviews,
 } from '../../lib/agent-review';
+import { invokeNative } from '../../lib/native/transport';
 import { authorOf, rankReviewers } from '../../lib/reviewer-choice';
+import { durationLabel, elapsedLabel } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 import { liveActivity } from '../../lib/task-live-activity';
-import { durationLabel, elapsedLabel, nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
@@ -25,6 +27,7 @@ import { Textarea } from '../ui/Textarea';
 import { agentAdapter } from './CrossModelReviewPanel';
 import { TaskActivity } from './TaskActivity';
 import './agent-review.css';
+import { stopTask } from '../../lib/task-actions';
 
 const SEVERITY = {
   high: { label: 'High', variant: 'danger' },
@@ -71,7 +74,7 @@ export function AgentReview({
     setOpen(true);
     try {
       await syncAgentConfig();
-      await nativeTask<string>('task_start_agent_review', {
+      await invokeNative<string>('task_start_agent_review', {
         sourceRunId: run.id,
         request: {
           id: crypto.randomUUID(),
@@ -201,7 +204,7 @@ function useReviewReport(reviewer: TaskRun | undefined) {
   useEffect(() => {
     if (!finished || !id) return;
     let alive = true;
-    nativeTask<string>('task_challenge_reply', { id })
+    invokeNative<string>('task_challenge_reply', { id })
       .then((reply) => {
         if (alive) setReplies((current) => ({ ...current, [id]: reply }));
       })
@@ -295,7 +298,7 @@ function ReviewBody({
   const handoff = onApply ?? onCorrect;
   const stop = async () => {
     try {
-      await nativeTask('task_stop', { id: reviewer.id });
+      await stopTask(reviewer.id);
       await useExecutionStore.getState().refresh();
     } catch (cause) {
       setError(String(cause));

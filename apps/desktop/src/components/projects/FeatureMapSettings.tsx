@@ -12,8 +12,8 @@ import {
   parseSources,
   withoutMissingPaths,
 } from '../../lib/feature-map';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 import { Setting, SettingActions, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
@@ -248,7 +248,7 @@ export function FeatureMapSettings({ project }: { project: Project }) {
     if (!native || serialized === '[]') return;
     let current = true;
     const timer = window.setTimeout(() => {
-      nativeTask<FeatureDrift[]>('project_feature_drift', {
+      invokeNative<FeatureDrift[]>('project_feature_drift', {
         projectPath: project.path,
         features: JSON.parse(serialized),
       })
@@ -268,7 +268,7 @@ export function FeatureMapSettings({ project }: { project: Project }) {
     setSuggesting(true);
     setError('');
     try {
-      const found = await nativeTask<FeatureMapEntry[]>('project_feature_suggestions', {
+      const found = await invokeNative<FeatureMapEntry[]>('project_feature_suggestions', {
         projectPath: project.path,
       });
       setSuggestions(newSuggestions(entries, found));

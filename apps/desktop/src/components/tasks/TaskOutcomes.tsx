@@ -9,6 +9,8 @@ import {
   Textarea,
 } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { invokeNative } from '../../lib/native/transport';
+import type { TaskRun } from '../../lib/run-types';
 import {
   correctionPrompt,
   type EvidenceLevel,
@@ -20,7 +22,6 @@ import {
   requirementState,
   weakestEvidence,
 } from '../../lib/task-outcomes';
-import { nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -58,7 +59,7 @@ export function TaskOutcomes({
     setTree(null);
     setError('');
     try {
-      setTree(await nativeTask<string>('task_outcome_snapshot', { id: run.id }));
+      setTree(await invokeNative<string>('task_outcome_snapshot', { id: run.id }));
     } catch (cause) {
       setError(String(cause));
     }
@@ -67,7 +68,7 @@ export function TaskOutcomes({
     let alive = true;
     setTree(null);
     if (canReview && requirements.length)
-      void nativeTask<string>('task_outcome_snapshot', { id: run.id })
+      void invokeNative<string>('task_outcome_snapshot', { id: run.id })
         .then((value) => {
           if (alive) {
             setTree(value);
@@ -87,7 +88,7 @@ export function TaskOutcomes({
     setBusy(true);
     setError('');
     try {
-      await nativeTask('task_outcome_review', {
+      await invokeNative('task_outcome_review', {
         review: {
           runId: run.id,
           requirementId: item.id,

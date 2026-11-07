@@ -8,8 +8,10 @@ import {
   mergeFindings,
   reviewerReport,
 } from '../../lib/challenge-review';
+import { invokeNative } from '../../lib/native/transport';
 import { authorOf, rankReviewers } from '../../lib/reviewer-choice';
-import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { isActive, isFinished } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 import { selectWork } from '../../lib/work-selection';
 import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -70,7 +72,7 @@ export function ChallengeDialog({
       await syncAgentConfig();
       for (const agent of agents)
         try {
-          await nativeTask<string>('task_start_challenge', {
+          await invokeNative<string>('task_start_challenge', {
             sourceRunId: run.id,
             request: {
               id: crypto.randomUUID(),
@@ -201,7 +203,7 @@ function FindingCard({
   const reviewerRunId = finding.sources[0].runId;
   useEffect(() => {
     let current = true;
-    nativeTask<Rerun[]>('task_challenge_reruns', { id: reviewerRunId })
+    invokeNative<Rerun[]>('task_challenge_reruns', { id: reviewerRunId })
       .then((saved) => {
         const latest = saved.find((entry) => entry.command === finding.command.trim());
         if (current && latest) setRerun((shown) => shown ?? latest);
@@ -216,7 +218,7 @@ function FindingCard({
     setError('');
     try {
       setRerun(
-        await nativeTask<Rerun>('task_challenge_rerun', {
+        await invokeNative<Rerun>('task_challenge_rerun', {
           id: reviewerRunId,
           command: finding.command,
         }),
@@ -318,7 +320,7 @@ export function ChallengeFindings({
     let alive = true;
     for (const entry of finishedKey.split('|')) {
       const id = entry.slice(0, entry.indexOf(':'));
-      nativeTask<string>('task_challenge_reply', { id })
+      invokeNative<string>('task_challenge_reply', { id })
         .then((reply) => {
           if (alive) setReplies((current) => ({ ...current, [id]: reply }));
         })
@@ -329,9 +331,7 @@ export function ChallengeFindings({
     };
   }, [finishedKey]);
   const agentName = (agent: string) => runners.find((runner) => runner.id === agent)?.name ?? agent;
-  const finished = reviewers.filter(
-    (reviewer) => !isActive(reviewer) && ['review', 'reviewed'].includes(reviewer.status),
-  );
+  const finished = reviewers.filter((reviewer) => !isActive(reviewer) && isFinished(reviewer));
   const reports = finished.map((reviewer) => ({
     run: reviewer,
     report: reviewerReport(reviewer, replies[reviewer.id]),
@@ -383,7 +383,7 @@ export function ChallengeFindings({
                 {' · '}
                 {isActive(reviewer)
                   ? 'Reviewing…'
-                  : ['review', 'reviewed'].includes(reviewer.status)
+                  : isFinished(reviewer)
                     ? 'Finished'
                     : `Did not finish${reviewer.error ? `: ${reviewer.error}` : ''}`}
               </span>

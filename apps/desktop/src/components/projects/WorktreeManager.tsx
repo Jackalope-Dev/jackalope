@@ -21,17 +21,17 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { isRetainedWorkspace, retainedWorkspaces } from '../../lib/compare-judge';
-import { nativeTask } from '../../lib/task-runtime';
 import {
   archiveWorktree,
   cleanupWorktree,
-  isTauriEnvironment,
   listWorktreeOrphans,
   pruneWorktrees,
   removeWorktreeOrphan,
   type WorktreeEntry,
   type WorktreeOrphan,
-} from '../../lib/tauri-bridge';
+} from '../../lib/git-worktrees';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { openChanges } from '../../stores/commitReviewStore';
 import { useCompareStore } from '../../stores/compareStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -161,7 +161,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     if (!projectPath || measuring) return;
     setMeasuring(path);
     try {
-      const value = await nativeTask<{
+      const value = await invokeNative<{
         bytes: number;
         files: number;
         partial: boolean;

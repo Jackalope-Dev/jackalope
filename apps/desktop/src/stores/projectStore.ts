@@ -2,9 +2,10 @@ import type { ThemePalette } from '@jackalope/brand/theme';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { type FeatureMapEntry, featureMapForRegistry } from '../lib/feature-map.ts';
+import { createWorktree, type WorktreeEntry } from '../lib/git-worktrees.ts';
+import { isTauriEnvironment } from '../lib/native/env.ts';
+import { invokeNative } from '../lib/native/transport.ts';
 import { reviewPagesForRegistry } from '../lib/review-captures.ts';
-import { nativeTask } from '../lib/task-runtime.ts';
-import { createWorktree, isTauriEnvironment, type WorktreeEntry } from '../lib/tauri-bridge.ts';
 import { WORKSPACE_MODES, type WorkspaceMode } from '../lib/workspace-mode.ts';
 import { readWorktrees } from '../lib/worktree-reads.ts';
 
@@ -401,7 +402,7 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
 export async function mergeProjectRegistry() {
   if (!isTauriEnvironment()) return;
   try {
-    const records = await nativeTask<ProjectRecord[]>('project_registry_list', {});
+    const records = await invokeNative<ProjectRecord[]>('project_registry_list', {});
     const state = useProjectStore.getState();
     const known = new Set(state.projects.map((project) => projectPathKey(project.path)));
     const added = records
@@ -482,7 +483,7 @@ function mirrorProjects(projects: Project[]) {
   mirrorSync = mirrorSync
     .then(async () => {
       if (encoded === mirrored) return;
-      await nativeTask('project_registry_save', { projects: records });
+      await invokeNative('project_registry_save', { projects: records });
       mirrored = encoded;
     })
     .catch(() => {

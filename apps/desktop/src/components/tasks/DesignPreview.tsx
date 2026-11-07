@@ -1,7 +1,8 @@
 import { Button, Textarea } from '@jackalope/ui';
 import { MousePointer2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { nativeTask, type ScreenshotArtifact } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
+import type { ScreenshotArtifact } from '../../lib/run-types';
 import { InlineNotice } from '../ui/InlineNotice';
 import { ScreenshotPreview } from './ScreenshotPreview';
 
@@ -105,7 +106,7 @@ export function DesignPreview({
       if (pending) return;
       pending = true;
       try {
-        const capture = await nativeTask<Capture | null>('task_preview_design_capture', {
+        const capture = await invokeNative<Capture | null>('task_preview_design_capture', {
           id: runId,
         });
         if (
@@ -167,7 +168,7 @@ export function DesignPreview({
                   (name) => [name, style.getPropertyValue(name).trim()],
                 ),
               );
-              await nativeTask('task_preview_design_open', { id: runId, path, theme });
+              await invokeNative('task_preview_design_open', { id: runId, path, theme });
               setWatching(true);
               setNotice(
                 'Select an element in the preview window. Its current page state is preserved.',

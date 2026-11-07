@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { isActive } from '../../lib/task-runtime';
+import { isActive } from '../../lib/run-status';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useFeedbackStore } from '../../stores/feedbackStore';

@@ -21,8 +21,8 @@ import {
 } from 'lucide-react';
 
 import { useEffect, useRef, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -198,7 +198,7 @@ export function SettingsPage({
           {
             settings: JSON.parse(settings.exportSettings()),
             theme: currentTheme,
-            desktop: isTauriEnvironment() ? await nativeTask('desktop_settings') : undefined,
+            desktop: isTauriEnvironment() ? await invokeNative('desktop_settings') : undefined,
             agents: JSON.parse(JSON.stringify(agents)),
           },
           null,
@@ -215,7 +215,7 @@ export function SettingsPage({
     setResetting(true);
     setMessage('');
     try {
-      if (isTauriEnvironment()) await nativeTask('app_reset', { confirmation });
+      if (isTauriEnvironment()) await invokeNative('app_reset', { confirmation });
       else {
         for (const key of Object.keys(localStorage))
           if (key.startsWith('jackalope-')) localStorage.removeItem(key);

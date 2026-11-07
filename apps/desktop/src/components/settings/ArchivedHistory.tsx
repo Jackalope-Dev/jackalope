@@ -1,8 +1,10 @@
 import { RefreshIcon } from '@jackalope/ui';
 import { Archive, Upload } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type ArchivedRun, nativeTask, statusLabel } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import { statusLabel } from '../../lib/run-status';
+import type { ArchivedRun } from '../../lib/run-types';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Setting, SettingActions, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
@@ -27,7 +29,7 @@ export function ArchivedHistory() {
     setLoading(true);
     setError('');
     try {
-      const list = await nativeTask<ArchivedRun[]>('task_archived_runs');
+      const list = await invokeNative<ArchivedRun[]>('task_archived_runs');
       if (id === request.current) {
         setRuns(list);
         setShown(PAGE);
@@ -52,7 +54,7 @@ export function ArchivedHistory() {
     setError('');
     setNotice('');
     try {
-      await nativeTask('task_restore_archived', { id: run.id });
+      await invokeNative('task_restore_archived', { id: run.id });
       setRuns((current) => current.filter((item) => item.id !== run.id));
       setNotice('Task restored to your loaded history.');
       await useExecutionStore.getState().refresh();
@@ -69,7 +71,7 @@ export function ArchivedHistory() {
     setError('');
     setNotice('');
     try {
-      const id = await nativeTask<string | null>('task_import_recovery');
+      const id = await invokeNative<string | null>('task_import_recovery');
       if (id) {
         setNotice('Recovery copy imported into your history.');
         await useExecutionStore.getState().refresh();

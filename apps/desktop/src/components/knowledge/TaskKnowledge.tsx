@@ -1,8 +1,9 @@
 import { Checkbox, Disclosure, DisclosureSummary, Textarea } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-import { type ContextReceipt, type ContextSelection, useKnowledge } from '../../lib/knowledge';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { useKnowledge } from '../../lib/knowledge';
+import type { ContextReceipt, ContextSelection } from '../../lib/knowledge-types';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -35,7 +36,7 @@ export function TaskKnowledge({
     setReceipt(null);
     if (!isTauriEnvironment()) return;
     const timer = setTimeout(() => {
-      nativeTask<ContextReceipt>('knowledge_preview', {
+      invokeNative<ContextReceipt>('knowledge_preview', {
         projectId,
         projectPath,
         prompt,

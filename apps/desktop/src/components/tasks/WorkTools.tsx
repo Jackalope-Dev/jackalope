@@ -3,7 +3,8 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { ChevronDown, SquareTerminal } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { sessionCommand } from '../../lib/live-session';
-import { nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
+import type { TaskRun } from '../../lib/run-types';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
@@ -107,7 +108,7 @@ export function useWorkspaceActions(run?: TaskRun) {
         void act(async () => {
           if (run.liveSessionId && ['changes', 'preview'].includes(pane))
             await sessionCommand('action', { id: run.liveSessionId, action: 'pause' });
-          await nativeTask('task_work_window', { id: run.id, pane, action: 'open' });
+          await invokeNative('task_work_window', { id: run.id, pane, action: 'open' });
         }),
     }),
   );
@@ -117,7 +118,7 @@ export function useWorkspaceActions(run?: TaskRun) {
       .map((editor) => ({
         id: editor,
         label: `Open in ${editor === 'vscode' ? 'VS Code' : 'Cursor'}${editor === preferredEditor ? ' (preferred)' : ''}`,
-        onSelect: () => void act(() => nativeTask('task_open_editor', { id: run.id, editor })),
+        onSelect: () => void act(() => invokeNative('task_open_editor', { id: run.id, editor })),
       })),
     {
       id: 'copy-path',

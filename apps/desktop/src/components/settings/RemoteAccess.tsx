@@ -9,7 +9,8 @@ import {
   Input,
 } from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { nativeTask, type RunRequest } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
+import type { RunRequest } from '../../lib/run-types';
 import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -149,7 +150,7 @@ export function RemoteAccess() {
   const load = useCallback(
     async (signal?: AbortSignal) => {
       try {
-        const next = await nativeTask<Status>('remote_status');
+        const next = await invokeNative<Status>('remote_status');
         if (!signal?.aborted) {
           apply(next);
           setError('');
@@ -172,7 +173,7 @@ export function RemoteAccess() {
     const poll = async () => {
       if (document.visibilityState === 'visible') {
         try {
-          const next = await nativeTask<Status>('remote_status');
+          const next = await invokeNative<Status>('remote_status');
           if (alive) setStatus(next);
         } catch (cause) {
           if (alive) setError(String(cause));
@@ -232,7 +233,7 @@ export function RemoteAccess() {
           autoVerify: project.preferences?.autoVerify ?? true,
         };
       });
-    const next = await nativeTask<Status>('remote_configure', {
+    const next = await invokeNative<Status>('remote_configure', {
       enabled: allow,
       port,
       publicOrigin: address,
@@ -243,7 +244,7 @@ export function RemoteAccess() {
     return next;
   };
   const createPairing = async (devices: Status['devices']) => {
-    const result = await nativeTask<PairingCode>('remote_pairing');
+    const result = await invokeNative<PairingCode>('remote_pairing');
     pairingDevices.current = new Set(devices.map((device) => device.id));
     setPair(result);
     setExpires(Date.now() + result.expiresIn * 1000);
@@ -352,7 +353,7 @@ export function RemoteAccess() {
       {status?.listening && !status.publicOrigin && (
         <TailscaleSetup
           turnOn={async () => {
-            apply(await nativeTask<Status>('remote_private_https'));
+            apply(await invokeNative<Status>('remote_private_https'));
             setPair(null);
             setNotice('Private HTTPS is on. Create a pairing code for your phone.');
           }}
@@ -397,8 +398,8 @@ export function RemoteAccess() {
                 disabled={busy}
                 onClick={() =>
                   void perform(async () => {
-                    await nativeTask('remote_revoke', { id: device.id });
-                    setStatus(await nativeTask<Status>('remote_status'));
+                    await invokeNative('remote_revoke', { id: device.id });
+                    setStatus(await invokeNative<Status>('remote_status'));
                   })
                 }
               >

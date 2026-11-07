@@ -1,7 +1,8 @@
 import { Checkbox, ConfirmDialog } from '@jackalope/ui';
 import { GitPullRequestCreate } from 'lucide-react';
 import { useState } from 'react';
-import { nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
+import type { TaskRun } from '../../lib/run-types';
 import { Button } from '../ui/button';
 import { DraftedMessageFields, errorMessage, useDraftedMessage } from './DraftedMessage';
 
@@ -25,7 +26,7 @@ export function CreatePullRequest({
   const [uncommitted, setUncommitted] = useState<string[] | null>(null);
   const checkout = { repoPath: run.projectPath, worktreePath: run.workspace };
   const message = useDraftedMessage(() =>
-    nativeTask<{ title: string; body: string }>('git_generate_pull_request', {
+    invokeNative<{ title: string; body: string }>('git_generate_pull_request', {
       ...checkout,
       base: run.baseHead,
     }),
@@ -37,7 +38,7 @@ export function CreatePullRequest({
     setDraft(true);
     message.write(false);
     setUncommitted(null);
-    void nativeTask<{ files: { path: string }[] }>('git_working_changes', checkout)
+    void invokeNative<{ files: { path: string }[] }>('git_working_changes', checkout)
       .then((changes) => setUncommitted(changes.files.map((file) => file.path)))
       .catch(() => setUncommitted([]));
   };
@@ -45,16 +46,16 @@ export function CreatePullRequest({
     if (!title.trim()) throw new Error('Write a pull request title.');
     try {
       if (uncommitted?.length)
-        await nativeTask('git_commit_changes', {
+        await invokeNative('git_commit_changes', {
           ...checkout,
           paths: uncommitted,
           title: title.trim(),
           body: '',
           agents: run.agent ? [run.agent] : [],
         });
-      await nativeTask('git_push_changes', checkout);
+      await invokeNative('git_push_changes', checkout);
       onCreated(
-        await nativeTask<string>('task_pull_request_create', {
+        await invokeNative<string>('task_pull_request_create', {
           id: run.id,
           title: title.trim(),
           body: message.body,

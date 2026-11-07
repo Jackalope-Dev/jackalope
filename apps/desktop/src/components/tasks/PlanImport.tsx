@@ -12,7 +12,7 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { useDialogFocus } from '../ui/useDialogFocus';
 
 interface PlanEntry {
-  contextSelection?: import('../../lib/knowledge').ContextSelection;
+  contextSelection?: import('../../lib/knowledge-types').ContextSelection;
   key: string;
   title: string;
   prompt: string;

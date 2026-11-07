@@ -1,9 +1,9 @@
 import { listen } from '@tauri-apps/api/event';
 import { create } from 'zustand';
 import { type SessionSnapshot, sessionCommand } from '../lib/live-session';
+import { isTauriEnvironment } from '../lib/native/env';
 import { observeRefresh } from '../lib/observe-refresh';
 import { knownSessionRevisions, mergeSessionChanges } from '../lib/session-changes';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
 
 interface SessionsState extends SessionSnapshot {
   selectedId: string | null;

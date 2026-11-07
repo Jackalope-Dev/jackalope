@@ -1,7 +1,7 @@
 import { DefinitionList, Disclosure, DisclosureBody, DisclosureSummary } from '@jackalope/ui';
 import { useState } from 'react';
 import { learningMetricRows, type LearningMetrics as Metrics } from '../../lib/learning';
-import { nativeTask } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
 
 /** Local learning counts for this project, loaded when opened. */
 export function LearningMetrics({
@@ -18,7 +18,7 @@ export function LearningMetrics({
       onToggle={(event) => {
         if (!event.currentTarget.open) return;
         setError('');
-        nativeTask<Metrics>('knowledge_learning_metrics', { projectId, projectPath })
+        invokeNative<Metrics>('knowledge_learning_metrics', { projectId, projectPath })
           .then(setMetrics)
           .catch((cause) => setError(String(cause)));
       }}

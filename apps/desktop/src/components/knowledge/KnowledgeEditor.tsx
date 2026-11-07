@@ -2,8 +2,8 @@ import { Checkbox, Textarea } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { useState } from 'react';
-import type { KnowledgeEntry } from '../../lib/knowledge';
-import { nativeTask } from '../../lib/task-runtime';
+import type { KnowledgeEntry } from '../../lib/knowledge-types';
+import { invokeNative } from '../../lib/native/transport';
 import { OutcomeEditor } from '../tasks/OutcomeEditor';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -57,7 +57,7 @@ export function KnowledgeEditor({
               setBusy(true);
               setError('');
               try {
-                await nativeTask('knowledge_save', {
+                await invokeNative('knowledge_save', {
                   entry: {
                     ...value,
                     keywords: phrases

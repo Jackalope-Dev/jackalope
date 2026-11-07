@@ -1,4 +1,5 @@
-import { nativeTask, type Runner } from './task-runtime.ts';
+import { invokeNative } from './native/transport.ts';
+import type { Runner } from './run-types.ts';
 
 /** Agents that can answer a tool-free helper request, as the native helper picks them. */
 const HELPER_ADAPTERS = ['claude', 'codex', 'opencode', 'grok', 'kimi'];
@@ -36,7 +37,7 @@ export function sharpenDraft(
   options: { maxChars: number; project?: { id: string; name: string } },
 ): Promise<string> {
   const { maxChars, project } = options;
-  return nativeTask<string>('helper_sharpen', {
+  return invokeNative<string>('helper_sharpen', {
     draft,
     operationId,
     maxChars,
@@ -46,7 +47,7 @@ export function sharpenDraft(
 }
 
 export function stopSharpen(operationId: string): Promise<void> {
-  return nativeTask<void>('helper_sharpen_cancel', { operationId });
+  return invokeNative<void>('helper_sharpen_cancel', { operationId });
 }
 
 /** One-step undo: available only while the draft still holds the untouched rewrite. */

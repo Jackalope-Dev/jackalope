@@ -1,6 +1,6 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { RotateCw } from 'lucide-react';
-import type { PreparationRecord } from '../../lib/task-runtime';
+import type { PreparationRecord } from '../../lib/run-types';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 

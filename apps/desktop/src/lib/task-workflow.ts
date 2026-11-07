@@ -1,11 +1,12 @@
-import type { TaskRun } from './task-runtime.ts';
+import { isActive, isFinished } from './run-status.ts';
+import type { TaskRun } from './run-types.ts';
 
 /**
  * The task's headline state and next action. Checks surface inside review, not here.
  * `changedFiles`, when known, keeps an attempt that changed nothing from offering a merge.
  */
 export function taskDecision(run: TaskRun, integrated = false, changedFiles?: number) {
-  const active = ['starting', 'running', 'stopping'].includes(run.status);
+  const active = isActive(run);
   const state = (
     label: string,
     action: string,
@@ -31,7 +32,7 @@ export function taskDecision(run: TaskRun, integrated = false, changedFiles?: nu
     return state('Work interrupted', 'Inspect interrupted work', 'activity', 'warning');
   if (run.status === 'review' && run.prompts?.some((p) => p.status === 'pending'))
     return state('Question left open', 'Answer question', 'question', 'warning');
-  if (!['review', 'reviewed'].includes(run.status))
+  if (!isFinished(run))
     return state(
       run.status === 'stopped' ? 'Work stopped' : 'Work needs attention',
       'Inspect and continue',

@@ -4,8 +4,10 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
 import { useEffect, useRef, useState } from 'react';
 import { sessionCommand } from '../../lib/live-session';
-import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import { isActive } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 import { saveWorkFeedback } from '../../lib/work-feedback';
 import { useSavedActionsStore } from '../../stores/savedActionsStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -166,7 +168,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
       if (disposed || !host.current?.clientWidth) return;
       fit.fit();
       if (writable)
-        void nativeTask('task_terminal_resize', {
+        void invokeNative('task_terminal_resize', {
           id: terminalId,
           generation,
           cols: terminal.cols,
@@ -201,7 +203,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
     });
     const input = terminal.onData((input) => {
       if (writable)
-        void nativeTask('task_terminal_write', { id: terminalId, generation, input }).catch(
+        void invokeNative('task_terminal_write', { id: terminalId, generation, input }).catch(
           (cause) => {
             if (!disposed) setError(String(cause));
           },
@@ -213,14 +215,14 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
       if (loading || disposed || document.hidden) return;
       loading = true;
       try {
-        let view = await nativeTask<TerminalView | null>('task_terminal_status', {
+        let view = await invokeNative<TerminalView | null>('task_terminal_status', {
           id: terminalId,
           cursor,
           generation,
         });
         if (!view && !restored && useSettingsStore.getState().retainTerminalOutput) {
           restored = true;
-          view = await nativeTask<TerminalView | null>('task_terminal_restore', {
+          view = await invokeNative<TerminalView | null>('task_terminal_restore', {
             id: run.taskId,
             slot,
           });
@@ -286,7 +288,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
     try {
       if (!running && run.liveSessionId)
         await sessionCommand('action', { id: run.liveSessionId, action: 'pause' });
-      await nativeTask(running ? 'task_terminal_stop' : 'task_terminal_start', {
+      await invokeNative(running ? 'task_terminal_stop' : 'task_terminal_start', {
         id: running ? terminalId : run.id,
         slot,
         retainOutput: useSettingsStore.getState().retainTerminalOutput,
@@ -350,7 +352,7 @@ function TerminalPane({ run, slot }: { run: TaskRun; slot: 'main' | 'split' }) {
             onClick={() => {
               if (!command) return;
               setBusy(true);
-              void nativeTask('task_terminal_write', {
+              void invokeNative('task_terminal_write', {
                 id: terminalId,
                 generation: generationRef.current,
                 input: `${command.body}\r`,

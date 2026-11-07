@@ -1,7 +1,7 @@
 import { LinkButton, Textarea } from '@jackalope/ui';
 import { Check, Hand } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
-import type { PendingUserPrompt } from '../../lib/task-runtime';
+import type { PendingUserPrompt } from '../../lib/run-types';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import './agent-decision.css';

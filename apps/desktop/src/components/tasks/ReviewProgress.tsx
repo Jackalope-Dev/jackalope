@@ -1,6 +1,6 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 
@@ -22,7 +22,7 @@ export function ReviewProgress({ runId }: { runId: string }) {
     setBusy(true);
     setError('');
     try {
-      setProgress(await nativeTask<Progress>('task_review_progress', { id: runId, seenTree }));
+      setProgress(await invokeNative<Progress>('task_review_progress', { id: runId, seenTree }));
     } catch (cause) {
       setError(String(cause));
     } finally {

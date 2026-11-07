@@ -11,8 +11,8 @@ import {
   X,
 } from 'lucide-react';
 import { useState } from 'react';
+import type { ScreenshotArtifact, ValidationStep } from '../../lib/run-types';
 import { evidenceStrength } from '../../lib/task-outcomes';
-import type { ScreenshotArtifact, ValidationStep } from '../../lib/task-runtime';
 import { Badge } from '../ui/badge';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { ScreenshotPreview } from './ScreenshotPreview';

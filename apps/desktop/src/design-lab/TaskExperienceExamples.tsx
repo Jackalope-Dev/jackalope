@@ -9,8 +9,8 @@ import TaskMarkdown from '../components/tasks/TaskMarkdown';
 import { TaskOutcomes } from '../components/tasks/TaskOutcomes';
 import { Button } from '../components/ui/button';
 import { Select, SelectItem } from '../components/ui/Select';
+import type { PendingUserPrompt } from '../lib/run-types';
 import { assemblePrompt } from '../lib/skills/context-assembler';
-import type { PendingUserPrompt } from '../lib/task-runtime';
 import '../components/tasks/task-workspace.css';
 
 const patch =

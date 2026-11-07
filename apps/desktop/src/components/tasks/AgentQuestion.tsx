@@ -1,7 +1,7 @@
 import { Textarea } from '@jackalope/ui';
 import { Check, MessageCircle, Send } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
-import type { PendingUserPrompt } from '../../lib/task-runtime';
+import type { PendingUserPrompt } from '../../lib/run-types';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import {

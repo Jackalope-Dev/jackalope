@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import type { TaskRun } from '../../lib/run-types';
 import type { TaskFollowUp } from '../../lib/task-followups';
-import { nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { latestAttempt } from '../../lib/task-workflow';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 
 // Follow-ups can be queued from other windows and the terminal, so the queue is
@@ -49,7 +50,7 @@ export function useTaskFollowUps({
       if (pending) return;
       pending = true;
       try {
-        const value = await nativeTask<TaskFollowUp[]>('task_followup_snapshot', {
+        const value = await invokeNative<TaskFollowUp[]>('task_followup_snapshot', {
           taskId: run.taskId,
         });
         if (alive) {
@@ -97,7 +98,7 @@ export function useTaskFollowUps({
       if (queueRequest.current?.key !== requestKey)
         queueRequest.current = { key: requestKey, id: crypto.randomUUID() };
       try {
-        await nativeTask('task_followup_queue', {
+        await invokeNative('task_followup_queue', {
           id: queueRequest.current.id,
           runId: run.id,
           prompt,
@@ -109,7 +110,7 @@ export function useTaskFollowUps({
           draft(draftKey, { prompt: '' });
         queueRequest.current = null;
         setFollowups(
-          (await nativeTask<TaskFollowUp[]>('task_followup_snapshot', { taskId: run.taskId })) ??
+          (await invokeNative<TaskFollowUp[]>('task_followup_snapshot', { taskId: run.taskId })) ??
             [],
         );
         await refresh();
@@ -128,10 +129,10 @@ export function useTaskFollowUps({
       setQueueing(true);
       onError('');
       try {
-        await nativeTask('task_followup_action', { id, action });
+        await invokeNative('task_followup_action', { id, action });
         if (action === 'resume') queuedHere.current = true;
         const remaining =
-          (await nativeTask<TaskFollowUp[]>('task_followup_snapshot', { taskId: run.taskId })) ??
+          (await invokeNative<TaskFollowUp[]>('task_followup_snapshot', { taskId: run.taskId })) ??
           [];
         if (action === 'cancel' && !remaining.length) queuedHere.current = false;
         setFollowups(remaining);

@@ -1,7 +1,8 @@
 import { Activity, CircleAlert, FilePenLine, FileSearch, Search, Terminal } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { elapsedLabel, isActive } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 import { liveActivity } from '../../lib/task-live-activity';
-import { elapsedLabel, isActive, type TaskRun } from '../../lib/task-runtime';
 import './task-live-activity.css';
 
 const icons = {

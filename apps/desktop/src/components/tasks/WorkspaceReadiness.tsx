@@ -1,7 +1,7 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -45,7 +45,7 @@ export function WorkspaceReadiness({
     setBusy(true);
     setError('');
     try {
-      const value = await nativeTask<Readiness>('project_readiness', { path });
+      const value = await invokeNative<Readiness>('project_readiness', { path });
       if (version === request.current) setResult(value);
     } catch (cause) {
       if (version === request.current) setError(String(cause));

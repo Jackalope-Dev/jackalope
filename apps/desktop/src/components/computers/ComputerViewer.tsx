@@ -6,7 +6,7 @@ import {
   embeddableViewer,
   holdComputerViewer,
 } from '../../lib/computers';
-import { openExternalUrl } from '../../lib/tauri-bridge';
+import { openExternalUrl } from '../../lib/native/env';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import './computers.css';

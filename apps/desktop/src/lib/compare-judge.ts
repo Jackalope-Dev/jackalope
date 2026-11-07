@@ -1,5 +1,6 @@
 import type { Comparison } from '../stores/compareStore.ts';
 import { getAgentMetadata } from './agent-catalog.ts';
+import { isLive } from './run-status.ts';
 
 /** One finished attempt as the judge sees it, labelled A, B, C… in launch order. */
 export interface JudgedAttempt {
@@ -248,9 +249,7 @@ export function retainedWorkspaces(
     const followUp = runs
       .filter((run) => run.taskId === combine.baseTaskId && Date.parse(run.startedAt) > drafted)
       .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))[0];
-    const pending = followUp
-      ? ['starting', 'running', 'stopping', 'interrupted'].includes(followUp.status)
-      : !!draftText(combine.baseTaskId).trim();
+    const pending = followUp ? isLive(followUp) : !!draftText(combine.baseTaskId).trim();
     if (pending) for (const source of combine.sources) retained.add(pathKey(source.workspace));
   }
   return retained;

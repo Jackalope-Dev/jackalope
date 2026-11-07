@@ -1,7 +1,7 @@
 import { Disclosure, DisclosureBody, DisclosureSummary } from '@jackalope/ui';
 import { useState } from 'react';
 import { type LedgerRecord, ledgerActionLabel } from '../../lib/learning';
-import { nativeTask } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
 
 /** Why a learned lesson exists and how it changed, loaded when opened. */
 export function LearnedHistory({ projectId, entryId }: { projectId: string; entryId: string }) {
@@ -12,7 +12,7 @@ export function LearnedHistory({ projectId, entryId }: { projectId: string; entr
       onToggle={(event) => {
         if (!event.currentTarget.open) return;
         setError('');
-        nativeTask<LedgerRecord[]>('knowledge_history', { projectId, entryId })
+        invokeNative<LedgerRecord[]>('knowledge_history', { projectId, entryId })
           .then(setRecords)
           .catch((cause) => setError(String(cause)));
       }}

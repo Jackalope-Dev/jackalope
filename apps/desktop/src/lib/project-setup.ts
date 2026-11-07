@@ -2,7 +2,7 @@ import { syncAgentConfig } from '../stores/agentConfigStore';
 import { useContextMemoryStore } from '../stores/contextMemoryStore';
 import { type Project, projectPathKey, useProjectStore } from '../stores/projectStore';
 import { missingProjectDefaults } from './context/project-defaults';
-import { nativeTask } from './task-runtime';
+import { invokeNative } from './native/transport';
 
 interface ProjectInfo {
   path: string;
@@ -16,7 +16,7 @@ export async function openProject(
   options: { provisional?: boolean; pending?: Project | null } = {},
 ) {
   await syncAgentConfig();
-  const info = await nativeTask<ProjectInfo>('task_validate_project', { path: path.trim() });
+  const info = await invokeNative<ProjectInfo>('task_validate_project', { path: path.trim() });
   const project = projectFromInfo(info, options.pending);
   return options.provisional ? project : commitProjectSetup(project);
 }
@@ -27,7 +27,7 @@ export async function createProject(
   options: { provisional?: boolean } = {},
 ) {
   await syncAgentConfig();
-  const info = await nativeTask<ProjectInfo>('task_create_project', {
+  const info = await invokeNative<ProjectInfo>('task_create_project', {
     name: name.trim(),
     parentPath,
   });

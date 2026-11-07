@@ -1,7 +1,7 @@
 import { CopyButton } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Setting } from './Setting';
@@ -22,7 +22,7 @@ export function CliCommandSetting() {
   const [error, setError] = useState('');
   useEffect(() => {
     if (!isTauriEnvironment()) return;
-    nativeTask<CommandStatus>('cli_install_status')
+    invokeNative<CommandStatus>('cli_install_status')
       .then(setStatus)
       .catch((cause) => setError(String(cause)));
   }, []);
@@ -32,7 +32,7 @@ export function CliCommandSetting() {
     setInstalling(true);
     setError('');
     try {
-      setStatus(await nativeTask<CommandStatus>('cli_install_system'));
+      setStatus(await invokeNative<CommandStatus>('cli_install_system'));
     } catch (cause) {
       setError(String(cause));
     } finally {

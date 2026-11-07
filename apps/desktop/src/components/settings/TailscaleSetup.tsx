@@ -1,9 +1,9 @@
 import { Button } from '@jackalope/ui';
 import { Check } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { type TailscaleStatus, tailscaleEnableLink } from '../../lib/tailscale-setup';
-import { nativeTask } from '../../lib/task-runtime';
-import { openExternalUrl } from '../../lib/tauri-bridge';
 import { InlineNotice } from '../ui/InlineNotice';
 
 const DOWNLOAD = 'https://tailscale.com/download';
@@ -29,7 +29,7 @@ export function TailscaleSetup({ turnOn }: { turnOn: () => Promise<void> }) {
   const check = useCallback(async () => {
     setChecking(true);
     try {
-      setStatus(await nativeTask<TailscaleStatus>('remote_tailscale_status'));
+      setStatus(await invokeNative<TailscaleStatus>('remote_tailscale_status'));
     } catch (cause) {
       setFailure(String(cause));
     } finally {

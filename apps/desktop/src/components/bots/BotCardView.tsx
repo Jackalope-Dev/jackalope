@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { answerCard, type BotCard, dismissCard } from '../../lib/bot-hub';
-import { openExternalUrl } from '../../lib/tauri-bridge';
+import { openExternalUrl } from '../../lib/native/env';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { OptionsMenu } from '../ui/OptionsMenu';

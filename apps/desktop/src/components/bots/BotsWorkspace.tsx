@@ -43,9 +43,9 @@ import {
 } from '../../lib/bot-hub';
 import { BOT_TEMPLATES, type BotTemplate } from '../../lib/bot-templates';
 import { type LiveSession, type SessionDraft, sessionCommand } from '../../lib/live-session';
-import type { TaskRun } from '../../lib/task-runtime';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import type { TaskRun } from '../../lib/run-types';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import {
   BOT_STYLES,
@@ -1233,7 +1233,7 @@ function BotRoutines({ bot }: { bot: Bot }) {
   const read = useCallback(async () => {
     if (!isTauriEnvironment()) return;
     try {
-      setLedger(await nativeTask<ScheduleLedger>('schedule_list'));
+      setLedger(await invokeNative<ScheduleLedger>('schedule_list'));
     } catch (cause) {
       setError(String(cause));
     }
@@ -1274,7 +1274,7 @@ function BotRoutines({ bot }: { bot: Bot }) {
               checked={routine.definition.enabled}
               onCheckedChange={async (next) => {
                 try {
-                  await nativeTask('schedule_set_enabled', {
+                  await invokeNative('schedule_set_enabled', {
                     id: routine.definition.id,
                     enabled: next,
                   });

@@ -1,18 +1,14 @@
 import { listen } from '@tauri-apps/api/event';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ContextSelection } from '../lib/knowledge';
+import type { ContextSelection } from '../lib/knowledge-types';
+import { isTauriEnvironment } from '../lib/native/env';
+import { invokeNative } from '../lib/native/transport';
 import { observeRefresh } from '../lib/observe-refresh';
+import { isActive } from '../lib/run-status';
+import type { Runner, RunRequest, TaskRun } from '../lib/run-types';
 import { mergeTaskChanges, type TaskChanges } from '../lib/task-changes';
 import type { TaskEffort } from '../lib/task-effort';
-import {
-  isActive,
-  nativeTask,
-  type Runner,
-  type RunRequest,
-  type TaskRun,
-} from '../lib/task-runtime';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
 import { syncAgentConfig } from './agentConfigStore';
 import { useMascotStore } from './mascotStore';
 import type { TaskStatus } from './taskStore';
@@ -90,7 +86,7 @@ export const useExecutionStore = create<ExecutionState>()(
         discovering = Promise.resolve().then(async () => {
           try {
             set({
-              runners: await nativeTask<Runner[]>('task_runners'),
+              runners: await invokeNative<Runner[]>('task_runners'),
               lastDiscovered: Date.now(),
               error: null,
               discoveryError: null,
@@ -111,7 +107,7 @@ export const useExecutionStore = create<ExecutionState>()(
           try {
             let runs = get().runs;
             if (isTauriEnvironment()) {
-              const changes = await nativeTask<TaskChanges>('task_changes', {
+              const changes = await invokeNative<TaskChanges>('task_changes', {
                 since: revision ?? null,
                 detailId,
                 previousDetailId,
@@ -140,7 +136,7 @@ export const useExecutionStore = create<ExecutionState>()(
         set({ submitting: true });
         try {
           await syncAgentConfig();
-          const id = await nativeTask<string>('task_start', {
+          const id = await invokeNative<string>('task_start', {
             request: { ...request, id: crypto.randomUUID() },
           });
           if (!options?.background) set({ selectedId: id });

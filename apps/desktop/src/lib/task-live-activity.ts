@@ -1,4 +1,5 @@
-import { isActive, type TaskRun } from './task-runtime.ts';
+import { isActive } from './run-status.ts';
+import type { TaskRun } from './run-types.ts';
 
 const ansiEscape = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*[A-Za-z]`, 'g');
 

@@ -1,6 +1,7 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useState } from 'react';
-import { nativeTask, type TaskRun, type Verification } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
+import type { TaskRun, Verification } from '../../lib/run-types';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -28,7 +29,7 @@ export function ProjectVerification({
     setBusy(true);
     setError('');
     try {
-      setResult(await nativeTask<Verification>('task_verify', { id: run.id, command: selected }));
+      setResult(await invokeNative<Verification>('task_verify', { id: run.id, command: selected }));
     } catch (cause) {
       setError(String(cause));
     } finally {

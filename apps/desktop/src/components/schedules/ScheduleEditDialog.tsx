@@ -1,8 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
+import { PROMPT_MAX_CHARS } from '../../lib/run-types';
 import type { ScheduleTemplate } from '../../lib/schedule-templates';
 import type { ScheduleDefinition as Definition } from '../../lib/schedules';
-
-import { PROMPT_MAX_CHARS } from '../../lib/task-runtime';
 import { isAgentAllowedForProject, type Project } from '../../stores/projectStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { Button } from '../ui/button';

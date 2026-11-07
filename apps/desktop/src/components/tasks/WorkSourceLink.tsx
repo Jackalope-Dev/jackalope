@@ -2,7 +2,7 @@ import { Button } from '@jackalope/ui';
 import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { workSource } from '../../lib/issues';
-import { openExternalUrl } from '../../lib/tauri-bridge';
+import { openExternalUrl } from '../../lib/native/env';
 import { InlineNotice } from '../ui/InlineNotice';
 
 export function WorkSourceLink({ prompts }: { prompts: string[] }) {

@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { agentProvider, taskAgents } from '../src/lib/agent-provider.ts';
 import { taskNotices } from '../src/lib/companion-tasks.ts';
-import { waitForStoppedAttempt } from '../src/lib/continue-task.ts';
 import { planningDraft } from '../src/lib/planning.ts';
 import { returnToProject } from '../src/lib/project-return.ts';
+import { waitForStoppedAttempt } from '../src/lib/task-actions.ts';
 import {
   collectWork,
   collectWorkspaceWork,
@@ -265,43 +265,40 @@ test('stop and send waits for actual termination and refuses interrupted or miss
   const finished = await waitForStoppedAttempt(
     'run',
     async () => ({ ...run, status: ++reads < 3 ? 'stopping' : 'stopped' }),
-    async () => {
-      waits++;
-    },
+    { saved: 'follow-up', resumable: true, wait: async () => void waits++ },
   );
   assert.equal(finished.status, 'stopped');
   assert.equal(waits, 2);
   await assert.rejects(
-    waitForStoppedAttempt(
-      'run',
-      async () => ({ ...run, status: 'interrupted' }),
-      async () => {},
-    ),
+    waitForStoppedAttempt('run', async () => ({ ...run, status: 'interrupted' }), {
+      saved: 'follow-up',
+      resumable: true,
+      wait: async () => {},
+    }),
     /ownership/,
   );
   await assert.rejects(
-    waitForStoppedAttempt(
-      'run',
-      async () => undefined,
-      async () => {},
-    ),
+    waitForStoppedAttempt('run', async () => undefined, {
+      saved: 'follow-up',
+      resumable: true,
+      wait: async () => {},
+    }),
     /unavailable/,
   );
   await assert.rejects(
-    waitForStoppedAttempt(
-      'run',
-      async () => ({ ...run, sessionId: null }),
-      async () => {},
-    ),
+    waitForStoppedAttempt('run', async () => ({ ...run, sessionId: null }), {
+      saved: 'follow-up',
+      resumable: true,
+      wait: async () => {},
+    }),
     /resumable/,
   );
   await assert.rejects(
-    waitForStoppedAttempt(
-      'run',
-      async () => ({ ...run, status: 'stopping' }),
-      async () => {},
-      2,
-    ),
+    waitForStoppedAttempt('run', async () => ({ ...run, status: 'stopping' }), {
+      saved: 'follow-up',
+      wait: async () => {},
+      attempts: 2,
+    }),
     /still stopping/,
   );
 });

@@ -1,6 +1,6 @@
 import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
-import { openInBrowser } from '../../lib/tauri-bridge';
+import { openInBrowser } from '../../lib/native/env';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import './agent-manager.css';

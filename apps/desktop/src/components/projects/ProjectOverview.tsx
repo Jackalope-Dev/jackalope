@@ -17,11 +17,11 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { returnToProject } from '../../lib/project-return';
 import type { WorkItem } from '../../lib/task-collection';
-import { nativeTask } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { selectWork, workTarget } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -79,7 +79,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
     setReadiness(null);
     setReadinessError('');
     try {
-      const data = await nativeTask<Readiness>('project_readiness', { path });
+      const data = await invokeNative<Readiness>('project_readiness', { path });
       if (request === readinessRequest.current) setReadiness({ path, value: data });
     } catch (cause) {
       if (request === readinessRequest.current) setReadinessError(String(cause));

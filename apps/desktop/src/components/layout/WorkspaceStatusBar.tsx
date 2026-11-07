@@ -3,7 +3,7 @@ import { Ellipsis, ListTodo, Megaphone, Monitor, PauseCircle, SquareTerminal } f
 import { useRef, useState } from 'react';
 import { setWakeUpsPaused, useBotHubStore } from '../../lib/bot-hub';
 import { openCliTerminal } from '../../lib/cli-terminal';
-import { isActive } from '../../lib/task-runtime';
+import { isActive } from '../../lib/run-status';
 import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';

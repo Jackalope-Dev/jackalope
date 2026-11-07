@@ -8,7 +8,7 @@ import {
   SelectItem,
 } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
@@ -48,7 +48,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
   useEffect(() => {
     if (method !== 'wsl') return;
     let disposed = false;
-    void nativeTask<string[]>('wsl_distributions').then(
+    void invokeNative<string[]>('wsl_distributions').then(
       (items) => {
         if (!disposed) setDistributions(items);
       },
@@ -62,7 +62,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
   }, [method]);
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
-      const next = await nativeTask<Host[]>('remote_hosts');
+      const next = await invokeNative<Host[]>('remote_hosts');
       if (!signal?.aborted) {
         setHosts(next);
         setLoaded(true);
@@ -78,7 +78,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
     return () => controller.abort();
   }, [load]);
   const request = useCallback(
-    <T,>(action: RemoteAction) => nativeTask<T>('remote_host_request', { id: host?.id, action }),
+    <T,>(action: RemoteAction) => invokeNative<T>('remote_host_request', { id: host?.id, action }),
     [host?.id],
   );
   return (
@@ -126,8 +126,8 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
                   setBusy(true);
                   setError('');
                   try {
-                    await nativeTask('remote_host_remove', { id: host.id });
-                    setHosts(await nativeTask<Host[]>('remote_hosts'));
+                    await invokeNative('remote_host_remove', { id: host.id });
+                    setHosts(await invokeNative<Host[]>('remote_hosts'));
                   } catch (cause) {
                     setError(String(cause));
                   } finally {
@@ -164,7 +164,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
               setBusy(true);
               setError('');
               try {
-                const paired = await nativeTask<Host>('remote_host_pair', {
+                const paired = await invokeNative<Host>('remote_host_pair', {
                   name,
                   address,
                   ssh: method === 'ssh',
@@ -172,7 +172,7 @@ export function RemoteHosts({ onSetup }: { onSetup: () => void }) {
                   port,
                   code: code.trim(),
                 });
-                setHosts(await nativeTask<Host[]>('remote_hosts'));
+                setHosts(await invokeNative<Host[]>('remote_hosts'));
                 setSelected(paired.id);
                 setAdding(false);
                 setCode('');

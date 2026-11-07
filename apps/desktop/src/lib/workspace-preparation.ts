@@ -4,9 +4,9 @@ import { useExecutionStore } from '../stores/executionStore';
 import { useMcpStore } from '../stores/mcpStore';
 import { type Project, useProjectStore } from '../stores/projectStore';
 import { prepareCodebase } from './codebase';
+import { isTauriEnvironment } from './native/env';
+import { invokeNative } from './native/transport';
 import { projectGitState } from './project-setup';
-import { nativeTask } from './task-runtime';
-import { isTauriEnvironment } from './tauri-bridge';
 
 export interface PreparationJob {
   id: string;
@@ -68,7 +68,9 @@ export function prepareWorkspace(
             (runner) => runner.available && ['codex', 'claude', 'opencode'].includes(runner.id),
           );
         const results = await Promise.allSettled(
-          runners.map((runner) => nativeTask('agent_models', { agent: runner.id, refresh: false })),
+          runners.map((runner) =>
+            invokeNative('agent_models', { agent: runner.id, refresh: false }),
+          ),
         );
         if (results.some((result) => result.status === 'rejected'))
           throw new Error(
@@ -82,7 +84,7 @@ export function prepareWorkspace(
     const key = `${project.id}:${project.path}`;
     jobs.push(
       job(`project:${key}`, 'Checking the project folder', async () => {
-        const info = await nativeTask<{ branch: string; repository: boolean }>(
+        const info = await invokeNative<{ branch: string; repository: boolean }>(
           'task_validate_project',
           { path: project.path },
         );

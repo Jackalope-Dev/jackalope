@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import type { RunRequest } from '../../lib/task-runtime';
+import type { RunRequest } from '../../lib/run-types';
 import { Select, SelectItem } from '../ui/Select';
 
 export function CodexSpeedSelect({

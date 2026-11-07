@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useManagedRuntime } from '../../lib/managed-runtime';
-import { nativeTask } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -23,7 +23,7 @@ export function ManagedRuntimeSettings() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const refresh = useCallback(
-    async () => setStatus(await nativeTask<RuntimeStatus>('managed_runtime_status')),
+    async () => setStatus(await invokeNative<RuntimeStatus>('managed_runtime_status')),
     [],
   );
   useEffect(() => {
@@ -36,7 +36,7 @@ export function ManagedRuntimeSettings() {
     try {
       if (action === 'prepare') await runner.prepare(false);
       else {
-        const result = await nativeTask<{ removed: number; retained: number }>(
+        const result = await invokeNative<{ removed: number; retained: number }>(
           'managed_runtime_cleanup',
           { removeActive: action === 'remove' },
         );

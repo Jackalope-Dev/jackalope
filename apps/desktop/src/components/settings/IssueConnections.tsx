@@ -1,7 +1,7 @@
 import { Button, FormField, Input, Select, SelectItem } from '@jackalope/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { openExternalUrl } from '../../lib/tauri-bridge';
+import { openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Setting, SettingGroup } from './Setting';
 
@@ -17,7 +17,7 @@ export function IssueConnections() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const refresh = useCallback(async () => {
-    setConnections(await nativeTask('issue_connections'));
+    setConnections(await invokeNative('issue_connections'));
     setLoaded(true);
   }, []);
   useEffect(() => {
@@ -39,7 +39,7 @@ export function IssueConnections() {
               setBusy(true);
               setError('');
               try {
-                await nativeTask('issue_connection_remove', { provider: connection.provider });
+                await invokeNative('issue_connection_remove', { provider: connection.provider });
                 await refresh();
               } catch (cause) {
                 setError(String(cause));
@@ -60,7 +60,7 @@ export function IssueConnections() {
           setBusy(true);
           setError('');
           try {
-            await nativeTask('issue_connection_save', {
+            await invokeNative('issue_connection_save', {
               connection: { provider, site: site.trim(), email: email.trim(), token: token.trim() },
             });
             setToken('');

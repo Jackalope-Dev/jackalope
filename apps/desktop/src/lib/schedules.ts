@@ -1,5 +1,5 @@
 import type { ScheduledTask } from '../stores/scheduleStore.ts';
-import type { Runner, RunRequest } from './task-runtime.ts';
+import type { Runner, RunRequest } from './run-types.ts';
 
 export const scheduleHourIntervals = ['1', '2', '3', '4', '6', '8', '12'];
 

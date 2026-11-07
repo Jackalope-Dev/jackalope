@@ -1,5 +1,5 @@
+import type { TaskRun } from './run-types';
 import type { WorkItem } from './task-collection';
-import type { TaskRun } from './task-runtime';
 
 /** Read-state fields used to decide whether work is unread. */
 export interface ReadState {

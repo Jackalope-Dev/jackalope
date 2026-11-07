@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { isTauriEnvironment } from '../lib/native/env';
+import { invokeNative } from '../lib/native/transport';
 import {
   portableSettings,
   type SyncedSettings,
@@ -8,8 +10,6 @@ import {
   syncDecision,
   syncedTheme,
 } from '../lib/settings-sync';
-import { nativeTask } from '../lib/task-runtime';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
 import { useSettingsStore } from './settingsStore';
 import { useThemeStore } from './themeStore';
 
@@ -34,7 +34,7 @@ let paused = false;
 let retryAction: 'sync' | 'enable' | 'disable' | 'delete' = 'sync';
 const snapshot = () =>
   portableSettings(useThemeStore.getState().appTheme, useSettingsStore.getState());
-const invoke = (action: object) => nativeTask<SyncView>('app_settings_sync', { action });
+const invoke = (action: object) => invokeNative<SyncView>('app_settings_sync', { action });
 function apply(settings: SyncedSettings) {
   useThemeStore.getState().setAppTheme(syncedTheme(settings));
   useSettingsStore.getState().updateSettings({

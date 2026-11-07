@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { navigateWorkspace } from '../layout/navigation';
@@ -29,7 +29,7 @@ export function ScheduleNotice() {
     if (!isTauriEnvironment()) return;
     let active = true;
     const refresh = () =>
-      nativeTask<{ schedules: ScheduleStatus[] }>('schedule_list')
+      invokeNative<{ schedules: ScheduleStatus[] }>('schedule_list')
         .then((data) => {
           if (active) {
             setSchedules(data.schedules);

@@ -4,7 +4,7 @@ import {
   accountStatusLabel,
   checkAgentProfile,
 } from '../../lib/agent-profiles';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { accountProfiles, profileId, useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { Button } from '../ui/button';

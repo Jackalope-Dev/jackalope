@@ -1,5 +1,5 @@
 import { Disclosure, DisclosureBody, DisclosureSummary } from '@jackalope/ui';
-import type { TaskRun } from '../../lib/task-runtime';
+import type { TaskRun } from '../../lib/run-types';
 
 export function DecisionAdvice({ run }: { run: TaskRun }) {
   const advice = run.activity.filter((line) => line.startsWith('Jev advisory '));

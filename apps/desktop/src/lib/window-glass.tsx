@@ -1,8 +1,8 @@
 import { refreshThemeAppearance, themeFollowsSystem } from '@jackalope/brand/theme';
 import { useEffect } from 'react';
 import { useSettingsStore } from '../stores/settingsStore';
+import { isTauriEnvironment } from './native/env';
 import { isMacPlatform } from './platform-shortcuts';
-import { isTauriEnvironment } from './tauri-bridge';
 
 type ClientHints = {
   platform: string;

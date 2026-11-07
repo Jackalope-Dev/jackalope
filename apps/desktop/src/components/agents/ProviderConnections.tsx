@@ -12,8 +12,8 @@ import {
 } from '../../lib/agent-profiles';
 import { type ApiProvider, apiProviders } from '../../lib/api-providers';
 import { useManagedRuntime } from '../../lib/managed-runtime';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -70,7 +70,7 @@ function ConnectProvider({
   };
   const readModels = async () => {
     if (!profile.current) return;
-    const result = await nativeTask<ModelCatalog>('agent_models', {
+    const result = await invokeNative<ModelCatalog>('agent_models', {
       agent: 'opencode',
       agentProfileId: profile.current.id,
       refresh: true,
@@ -272,7 +272,7 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
             setError('');
             try {
               if (!model) {
-                const found = await nativeTask<string[]>('openai_endpoint_models', {
+                const found = await invokeNative<string[]>('openai_endpoint_models', {
                   baseUrl,
                   apiKey: apiKey.trim() || null,
                 });
@@ -280,7 +280,7 @@ function ConnectEndpoint({ onClose }: { onClose: () => void }) {
                 setModel(found[0] ?? '');
                 return;
               }
-              await nativeTask('openai_endpoint_connect', {
+              await invokeNative('openai_endpoint_connect', {
                 name,
                 baseUrl,
                 model,

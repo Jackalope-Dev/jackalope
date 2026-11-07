@@ -16,7 +16,7 @@ import {
   openBrowserProfile,
   profileSize,
 } from '../../lib/browser-profiles';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
 import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';

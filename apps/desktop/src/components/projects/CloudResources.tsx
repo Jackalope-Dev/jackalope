@@ -46,7 +46,7 @@ import {
   provisionCloudResources,
   turnstileSecret,
 } from '../../lib/cloudflare-resources';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { type CloudResourcesDraft, useCloudResourcesStore } from '../../stores/cloudResourcesStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { openProjectSettings, openSettings } from '../layout/navigation';

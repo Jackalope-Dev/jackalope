@@ -5,9 +5,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { builtinAgents, getAgentMetadata } from '../../lib/agent-catalog';
 import { missingProjectDefaults, type ProjectDefaults } from '../../lib/context/project-defaults';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { STARTER_PROMPTS } from '../../lib/starter-prompts';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { WindowGlass } from '../../lib/window-glass';
 import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -108,7 +108,7 @@ export function OnboardingFlow({
   useEffect(() => {
     if (!desktop || !previewProjectId || !projectPath) return;
     let canceled = false;
-    void nativeTask<ProjectDefaults>('project_readiness', { path: projectPath })
+    void invokeNative<ProjectDefaults>('project_readiness', { path: projectPath })
       .then((defaults) => {
         if (canceled) return;
         const current = useOnboardingStore.getState();

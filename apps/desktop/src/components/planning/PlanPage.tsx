@@ -26,7 +26,7 @@ import {
   taskWaves,
 } from '../../lib/plan-mode';
 import { planReviewer } from '../../lib/reviewer-choice';
-import { respondToPrompt } from '../../lib/task-runtime';
+import { respondToPrompt } from '../../lib/task-actions';
 import { selectWork } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { usePlanStore } from '../../stores/planStore';

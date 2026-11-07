@@ -27,7 +27,7 @@ import {
   connectCloudflareAccount,
   disconnectArtifacts,
 } from '../../lib/cloudflare-artifacts';
-import { openExternalUrl } from '../../lib/tauri-bridge';
+import { openExternalUrl } from '../../lib/native/env';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Setting, SettingGroup } from './Setting';
 import { SwarmConnection } from './SwarmConnection';

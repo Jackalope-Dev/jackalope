@@ -8,8 +8,8 @@ import {
   type CatchUpPicture,
   type CatchUpRisk,
 } from '../../lib/catch-up';
+import { invokeNative } from '../../lib/native/transport';
 import { workPresence } from '../../lib/task-collection';
-import { nativeTask } from '../../lib/task-runtime';
 import { compactElapsed } from '../../lib/work-signals';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -50,7 +50,7 @@ function Picture({
   useEffect(() => {
     let canceled = false;
     let url = '';
-    nativeTask<number[]>('task_screenshot', {
+    invokeNative<number[]>('task_screenshot', {
       runId: picture.runId,
       screenshotId: picture.image.id,
     })

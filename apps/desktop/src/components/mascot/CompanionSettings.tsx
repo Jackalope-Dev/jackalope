@@ -1,7 +1,7 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useHelperStore } from '../../stores/helperStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';
@@ -102,9 +102,9 @@ export function CompanionSettings() {
             onClick={() =>
               void action(async () => {
                 if (helper.view.connected) {
-                  await nativeTask('helper_connection', { enabled: false });
+                  await invokeNative('helper_connection', { enabled: false });
                   setConnection(undefined);
-                } else setConnection(await nativeTask('helper_connection', { enabled: true }));
+                } else setConnection(await invokeNative('helper_connection', { enabled: true }));
                 setCopied(false);
               })
             }
@@ -123,7 +123,7 @@ export function CompanionSettings() {
               size="sm"
               onClick={() =>
                 void action(async () => {
-                  setConnection(await nativeTask('helper_connection', { enabled: true }));
+                  setConnection(await invokeNative('helper_connection', { enabled: true }));
                   setCopied(false);
                 })
               }

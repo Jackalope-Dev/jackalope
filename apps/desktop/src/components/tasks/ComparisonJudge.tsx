@@ -1,7 +1,8 @@
 import { Badge, Checkbox, CopyButton, Select, SelectItem, Table } from '@jackalope/ui';
 import { Scale } from 'lucide-react';
 import type { Verdict } from '../../lib/compare-judge';
-import { isActive, type TaskRun } from '../../lib/task-runtime';
+import { isActive, isFinished } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 
@@ -52,7 +53,7 @@ export function ComparisonJudge({
   onOpen: (run: TaskRun) => void;
 }) {
   const running = !!judgeRun && isActive(judgeRun);
-  const finished = !!judgeRun && ['review', 'reviewed'].includes(judgeRun.status);
+  const finished = !!judgeRun && isFinished(judgeRun);
   const byLabel = new Map(attempts.map((attempt) => [attempt.label, attempt]));
   const showStart = canStart && !running && !loading && !verdict;
   return (

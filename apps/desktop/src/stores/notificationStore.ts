@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { nativeTask } from '../lib/task-runtime';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
+import { isTauriEnvironment } from '../lib/native/env';
+import { invokeNative } from '../lib/native/transport';
 import { useSettingsStore } from './settingsStore';
 
 export interface NotificationStatus {
@@ -17,7 +17,7 @@ export const useNotificationStore = create<{
   refresh: async () => {
     if (!isTauriEnvironment()) return;
     try {
-      set({ status: await nativeTask<NotificationStatus>('notification_status'), error: '' });
+      set({ status: await invokeNative<NotificationStatus>('notification_status'), error: '' });
     } catch (error) {
       set({ error: String(error) });
     }
@@ -33,7 +33,7 @@ export function observeNotifications() {
     pending = pending.then(async () => {
       if (!alive) return;
       try {
-        const status = await nativeTask<NotificationStatus>('notification_configure', {
+        const status = await invokeNative<NotificationStatus>('notification_configure', {
           preferences: { enabled, level },
         });
         if (alive) useNotificationStore.setState({ status, error: '' });

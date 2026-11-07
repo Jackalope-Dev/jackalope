@@ -18,7 +18,7 @@ import {
   startComputer,
   stopComputer,
 } from '../../lib/computers';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';

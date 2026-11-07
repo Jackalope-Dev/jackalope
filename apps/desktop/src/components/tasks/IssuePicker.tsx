@@ -1,8 +1,8 @@
 import { Button, Checkbox, Input, Select, SelectItem } from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type Issue, type IssuePage, issuePrompt, issueUrl } from '../../lib/issues';
-import { nativeTask } from '../../lib/task-runtime';
-import { openExternalUrl } from '../../lib/tauri-bridge';
+import { openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { openSettings } from '../layout/navigation';
 import { InlineNotice } from '../ui/InlineNotice';
 import './issue-picker.css';
@@ -35,7 +35,7 @@ export function IssuePicker({
         setNext(null);
       }
       try {
-        const result = await nativeTask<IssuePage>('project_issues', {
+        const result = await invokeNative<IssuePage>('project_issues', {
           projectPath,
           provider,
           kind: provider === 'github' ? kind : 'issue',

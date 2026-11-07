@@ -13,8 +13,8 @@ import {
   stopSignIn,
   writeSignIn,
 } from '../../lib/agent-profiles';
+import { openInBrowser } from '../../lib/native/env';
 import { isClaudeAuthorizationUrl, signInUrl, terminalSignInLinks } from '../../lib/sign-in-links';
-import { openInBrowser } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import { DialogContent, DialogHeader } from '../ui/Dialog';
 import { InlineNotice } from '../ui/InlineNotice';

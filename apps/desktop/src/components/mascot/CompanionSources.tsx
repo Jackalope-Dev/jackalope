@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { taskNotices } from '../../lib/companion-tasks';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { type PlanSummary, planCommands } from '../../lib/plan-mode';
-import type { TaskRun } from '../../lib/task-runtime';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import type { TaskRun } from '../../lib/run-types';
 import { useBotStore } from '../../stores/botStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useNotificationStore } from '../../stores/notificationStore';
@@ -41,7 +41,7 @@ export function CompanionSources() {
   useEffect(() => {
     if (!isTauriEnvironment()) return;
     let alive = true;
-    void nativeTask<{ state: string; email: string | null }>('app_account_status')
+    void invokeNative<{ state: string; email: string | null }>('app_account_status')
       .then((account) => {
         if (alive && account.state === 'connected' && account.email)
           setReferralAccount(account.email);
@@ -61,7 +61,7 @@ export function CompanionSources() {
       opening = true;
       try {
         while (alive) {
-          const id = await nativeTask<string | null>('notification_take_open');
+          const id = await invokeNative<string | null>('notification_take_open');
           if (!id || !alive) return;
           // Bot cards and suggestions open their bot rather than a task.
           if (id.startsWith('bot:')) {

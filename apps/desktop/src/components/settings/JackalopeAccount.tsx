@@ -1,8 +1,8 @@
 import { ExternalLinkIcon } from '@jackalope/ui';
 
 import { useEffect, useRef, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useReferralStore } from '../../stores/referralStore';
 import { useSettingsSyncStore } from '../../stores/settingsSyncStore';
 import { WaitlistAccount, type WaitlistProgress } from '../account/WaitlistAccount';
@@ -68,7 +68,7 @@ export function JackalopeAccount({
     if (!isTauriEnvironment())
       setAccount({ state: 'unavailable', email: null, userCode: null, expiresAt: null });
     else
-      void nativeTask<AccountStatus>('app_account_status')
+      void invokeNative<AccountStatus>('app_account_status')
         .then((value) => {
           if (mounted.current) setAccount(value);
         })
@@ -89,7 +89,7 @@ export function JackalopeAccount({
     const poll = async () => {
       if (!pending.current) {
         try {
-          const next = await nativeTask<AccountStatus>('app_account_poll');
+          const next = await invokeNative<AccountStatus>('app_account_poll');
           // Keep checking after a failure rather than stranding the user on a
           // stale message: an unlocked keychain or a freed device slot should
           // recover on its own, without them restarting the app.
@@ -122,7 +122,7 @@ export function JackalopeAccount({
     setBusy(true);
     setError('');
     try {
-      const next = await nativeTask<AccountStatus>(command);
+      const next = await invokeNative<AccountStatus>(command);
       if (mounted.current && refresh) setAccount(next);
     } catch (cause) {
       if (mounted.current)

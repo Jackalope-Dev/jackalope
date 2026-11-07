@@ -1,6 +1,7 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import type { QueueCommand, QueueView } from '../../lib/queue';
-import type { TaskRun } from '../../lib/task-runtime';
+import { isLive } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 
@@ -26,8 +27,7 @@ export function CoordinationDecisions({
     <div className="coordination-decisions">
       {audits.map((audit) => {
         const run = runs.find((r) => r.id === audit.runId);
-        const active =
-          run && ['starting', 'running', 'stopping', 'interrupted'].includes(run.status);
+        const active = run && isLive(run);
         const accepted = audit.tree && audit.tree === audit.acceptedTree;
         return (
           <article className="queue-message" key={audit.runId}>

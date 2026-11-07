@@ -1,5 +1,7 @@
 import { Input } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import {
   defaultShortcuts,
   displayShortcut,
@@ -8,8 +10,6 @@ import {
   type ShortcutAction,
   shortcutNames,
 } from '../../lib/shortcuts';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
@@ -45,7 +45,7 @@ export function DesktopPreferences() {
       if (document.hidden || pending) return;
       pending = true;
       try {
-        const next = await nativeTask<DesktopActivity>('desktop_activity');
+        const next = await invokeNative<DesktopActivity>('desktop_activity');
         if (!disposed) {
           setActivity(next);
           setActivityError('');
@@ -67,8 +67,8 @@ export function DesktopPreferences() {
     setSaving(true);
     setError('');
     try {
-      await nativeTask('desktop_keep_awake', { mode });
-      setActivity(await nativeTask('desktop_activity'));
+      await invokeNative('desktop_keep_awake', { mode });
+      setActivity(await invokeNative('desktop_activity'));
     } catch (reason) {
       setError(String(reason));
     } finally {

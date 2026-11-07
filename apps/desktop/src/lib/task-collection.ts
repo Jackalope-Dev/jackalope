@@ -4,7 +4,8 @@ import { isAgentReview } from './agent-review.ts';
 import { type LiveSession, sessionWork } from './live-session.ts';
 import { type ManagedTask, managedTaskWork } from './managed-task.ts';
 import type { QueueView } from './queue.ts';
-import { isActive, type TaskRun } from './task-runtime.ts';
+import { isActive, isSettled } from './run-status.ts';
+import type { TaskRun } from './run-types.ts';
 import { taskTitle } from './task-title.ts';
 import { taskDecision, taskNextAction } from './task-workflow.ts';
 
@@ -205,12 +206,7 @@ export function collectWork(
   const original = new Map<string, TaskRun>();
   const blocked = new Set<string>();
   for (const run of projectRuns) {
-    if (
-      !['review', 'reviewed', 'failed', 'stopped'].includes(run.status) ||
-      run.finishing ||
-      run.liveSessionId ||
-      run.persistenceError
-    )
+    if (!isSettled(run) || run.finishing || run.liveSessionId || run.persistenceError)
       blocked.add(run.taskId);
     const newest = latest.get(run.taskId);
     const oldest = original.get(run.taskId);
@@ -239,7 +235,7 @@ export function collectWork(
   for (const run of latest.values()) {
     if (!!run.archivedAt !== archived) continue;
     const idea = linkedIdeas.get(run.taskId);
-    const active = ['starting', 'running', 'stopping'].includes(run.status);
+    const active = isActive(run);
     const pending = active && run.prompts?.some((prompt) => prompt.status === 'pending');
     items.push({
       id: idea?.id ?? run.taskId,

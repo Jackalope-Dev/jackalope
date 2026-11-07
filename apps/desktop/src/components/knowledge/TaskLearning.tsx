@@ -1,8 +1,8 @@
 import { DropdownMenu as Menu } from '@jackalope/ui';
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
-import type { KnowledgeEntry } from '../../lib/knowledge';
-import type { TaskRun } from '../../lib/task-runtime';
+import type { KnowledgeEntry } from '../../lib/knowledge-types';
+import type { TaskRun } from '../../lib/run-types';
 import { taskTitle } from '../../lib/task-title';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';

@@ -1,8 +1,8 @@
 import { Mic, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { recordingWave } from '../../lib/dictation';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -72,7 +72,7 @@ export function DictationButton({
           .then((bytes) =>
             canceled.current
               ? null
-              : nativeTask<string>('desktop_transcribe', {
+              : invokeNative<string>('desktop_transcribe', {
                   endpoint,
                   model,
                   audio: Array.from(bytes),

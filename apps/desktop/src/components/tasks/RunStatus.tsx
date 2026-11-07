@@ -1,6 +1,7 @@
 import { Badge, type BadgeProps, LoadingIcon } from '@jackalope/ui';
 import { Check, CircleAlert, CircleCheck, Clock3, LoaderCircle, Square } from 'lucide-react';
-import { type StepProgress, statusLabel, type TaskRun } from '../../lib/task-runtime';
+import { isActive, statusLabel } from '../../lib/run-status';
+import type { StepProgress, TaskRun } from '../../lib/run-types';
 
 const icons = {
   starting: Clock3,
@@ -27,7 +28,7 @@ export function RunStatus({
       : status === 'failed' || status === 'interrupted'
         ? 'danger'
         : 'default';
-  const active = ['starting', 'running', 'stopping'].includes(status);
+  const active = isActive(status);
   return (
     <Badge
       appearance="plain"

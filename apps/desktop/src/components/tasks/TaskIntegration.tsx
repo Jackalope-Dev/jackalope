@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { type QueueView, queueSnapshot } from '../../lib/queue';
-import type { TaskRun } from '../../lib/task-runtime';
+import type { TaskRun } from '../../lib/run-types';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { InlineNotice } from '../ui/InlineNotice';

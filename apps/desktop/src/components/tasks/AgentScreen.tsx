@@ -11,8 +11,9 @@ import {
   type AgentScreen as Screen,
 } from '../../lib/agent-screen';
 import { computerStateLabel, computerUsage, providerLabel } from '../../lib/computers';
-import { isActive, type TaskRun } from '../../lib/task-runtime';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { isActive } from '../../lib/run-status';
+import type { TaskRun } from '../../lib/run-types';
 import { ComputerViewer } from '../computers/ComputerViewer';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';

@@ -1,7 +1,7 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { isTauriEnvironment, openInBrowser } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { Button } from '../ui/button';

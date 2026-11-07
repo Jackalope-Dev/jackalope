@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { nativeTask, type RunUsage } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
+import type { RunUsage } from '../../lib/run-types';
 import { InlineNotice } from '../ui/InlineNotice';
 
 export interface JevConnectionTotals {
@@ -15,7 +16,7 @@ export function JevConnectionUsage() {
   useEffect(() => {
     if (!isTauriEnvironment()) return;
     let current = true;
-    void nativeTask<JevConnectionTotals>('routing_connection_usage')
+    void invokeNative<JevConnectionTotals>('routing_connection_usage')
       .then((value) => {
         if (current) setTotals(value);
       })

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { InlineNotice } from '../ui/InlineNotice';
 
 interface LiveCombinationView {
@@ -30,7 +30,7 @@ export function LiveCombination({
     if (!isTauriEnvironment() || ids.length < 2) return;
     let current = true;
     const load = () =>
-      void nativeTask<LiveCombinationView>('coordination_live_combination', {
+      void invokeNative<LiveCombinationView>('coordination_live_combination', {
         projectId,
         taskIds: ids,
       })

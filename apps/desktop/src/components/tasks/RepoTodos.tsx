@@ -12,6 +12,8 @@ import { Check, Circle, FileText, ListTodo, Pencil, Play, Plus, X } from 'lucide
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useShallow } from 'zustand/react/shallow';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import {
   appendRepoTodo,
   parseRepoTodos,
@@ -20,8 +22,6 @@ import {
   TODO_FILES,
   updateRepoTodo,
 } from '../../lib/repo-todos';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { workspaceModeFor } from '../../lib/workspace-mode';
 import { useContextMemoryStore } from '../../stores/contextMemoryStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -105,7 +105,7 @@ export function RepoTodos({
     setLoading(true);
     setError('');
     try {
-      const files = await nativeTask<RepoTodoDocument[]>('repo_todos_read', {
+      const files = await invokeNative<RepoTodoDocument[]>('repo_todos_read', {
         projectPath,
       });
       if (version !== request.current) return;
@@ -155,7 +155,7 @@ export function RepoTodos({
     setSaving(key, true);
     setError('');
     try {
-      await nativeTask('repo_todos_save', {
+      await invokeNative('repo_todos_save', {
         projectPath: project.path,
         relativePath: selected,
         expectedContent: draft.base,

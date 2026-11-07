@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
 import { Setting, SettingBody, SettingGroup } from './Setting';
@@ -20,7 +20,7 @@ export function WindowBehaviorSettings() {
   useEffect(() => {
     if (!native) return;
     let active = true;
-    nativeTask<DesktopSettings>('desktop_settings').then(
+    invokeNative<DesktopSettings>('desktop_settings').then(
       (value) => {
         if (active) setSettings(value);
       },
@@ -38,7 +38,7 @@ export function WindowBehaviorSettings() {
     setSaving(true);
     setError('');
     try {
-      await nativeTask('desktop_set_close_to_tray', { enabled });
+      await invokeNative('desktop_set_close_to_tray', { enabled });
       setSettings({ ...settings, closeToTray: enabled });
     } catch (reason) {
       setError(String(reason));
@@ -52,7 +52,7 @@ export function WindowBehaviorSettings() {
     setSaving(true);
     setError('');
     try {
-      await nativeTask('desktop_set_launch_at_login', { enabled });
+      await invokeNative('desktop_set_launch_at_login', { enabled });
       setSettings({ ...settings, launchAtLogin: enabled });
     } catch (reason) {
       setError(String(reason));

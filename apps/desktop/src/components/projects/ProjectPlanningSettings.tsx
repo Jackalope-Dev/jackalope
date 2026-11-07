@@ -1,13 +1,13 @@
 import { Badge } from '@jackalope/ui';
 import { useEffect, useId, useState } from 'react';
 import { useAgentModels } from '../../lib/agent-models';
+import { isTauriEnvironment } from '../../lib/native/env';
 import {
   type DecideSettings,
   defaultDecideSettings,
   type PlanSettings,
   planCommands,
 } from '../../lib/plan-mode';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Setting, SettingBody, SettingGroup } from '../settings/Setting';
 import { InlineNotice } from '../ui/InlineNotice';

@@ -1,6 +1,6 @@
 import { Disclosure, DisclosureSummary, Input } from '@jackalope/ui';
 import { useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
+import { invokeNative } from '../../lib/native/transport';
 import {
   type RecipeId,
   recipePrompt,
@@ -35,7 +35,7 @@ export function WorkflowStarter({
       const context =
         kind === 'dependency'
           ? undefined
-          : await nativeTask<WorkflowContext>('project_github_context', {
+          : await invokeNative<WorkflowContext>('project_github_context', {
               projectPath,
               kind,
               number: value,

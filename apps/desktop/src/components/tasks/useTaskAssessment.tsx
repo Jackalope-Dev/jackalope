@@ -1,7 +1,7 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { managedTaskCommand } from '../../lib/managed-task';
-import type { RunRequest } from '../../lib/task-runtime';
+import type { RunRequest } from '../../lib/run-types';
 import {
   assessmentKey,
   assessTask,

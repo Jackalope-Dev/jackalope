@@ -2,8 +2,8 @@ import { DiscordIcon, FormField, Textarea } from '@jackalope/ui';
 import { LifeBuoy } from 'lucide-react';
 import { useState } from 'react';
 import { DISCORD_URL } from '../../lib/community';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { Button } from '../ui/button';
 import { FeedbackForm } from './FeedbackForm';
 import { Setting, SettingActions, SettingBody, SettingGroup } from './Setting';
@@ -71,7 +71,7 @@ export function ReleaseSupport() {
             disabled={!desktop || busy}
             onClick={() =>
               void act(async () =>
-                setDiagnostics(await nativeTask<Record<string, unknown>>('app_diagnostics')),
+                setDiagnostics(await invokeNative<Record<string, unknown>>('app_diagnostics')),
               )
             }
           >

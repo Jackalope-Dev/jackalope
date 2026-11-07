@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useFeedbackStore } from '../../stores/feedbackStore';
 import { Button } from '../ui/button';
@@ -55,7 +55,7 @@ export function FeedbackForm({
     }
   };
   const review = async () => {
-    const diagnostics = include ? await nativeTask<Counts>('app_diagnostics') : undefined;
+    const diagnostics = include ? await invokeNative<Counts>('app_diagnostics') : undefined;
     setPreview({
       id: crypto.randomUUID(),
       kind,
@@ -74,7 +74,7 @@ export function FeedbackForm({
   };
   const send = async () => {
     if (!preview) return;
-    await nativeTask('app_submit_feedback', { request: preview });
+    await invokeNative('app_submit_feedback', { request: preview });
     void useFeedbackStore.getState().request({ action: 'completed' });
     onSubmitted?.();
     setPreview(null);

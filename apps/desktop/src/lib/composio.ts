@@ -1,4 +1,4 @@
-import { nativeTask } from './task-runtime.ts';
+import { invokeNative } from './native/transport.ts';
 
 export interface ComposioStatus {
   configured: boolean;
@@ -24,17 +24,17 @@ export interface ComposioAccount {
   updatedAt: string | null;
 }
 
-export const composioStatus = () => nativeTask<ComposioStatus>('composio_status');
+export const composioStatus = () => invokeNative<ComposioStatus>('composio_status');
 export const saveComposioKey = (apiKey: string) =>
-  nativeTask<ComposioStatus>('composio_save_key', { apiKey });
-export const removeComposioKey = () => nativeTask<void>('composio_remove_key');
+  invokeNative<ComposioStatus>('composio_save_key', { apiKey });
+export const removeComposioKey = () => invokeNative<void>('composio_remove_key');
 export const composioCatalog = (refresh = false) =>
-  nativeTask<ComposioToolkit[]>('composio_catalog', { refresh });
-export const composioAccounts = () => nativeTask<ComposioAccount[]>('composio_accounts');
+  invokeNative<ComposioToolkit[]>('composio_catalog', { refresh });
+export const composioAccounts = () => invokeNative<ComposioAccount[]>('composio_accounts');
 export const authorizeComposioApp = (toolkit: string) =>
-  nativeTask<string>('composio_authorize', { toolkit });
+  invokeNative<string>('composio_authorize', { toolkit });
 export const disconnectComposioAccount = (accountId: string) =>
-  nativeTask<void>('composio_disconnect', { accountId });
+  invokeNative<void>('composio_disconnect', { accountId });
 
 export type AppState = 'connected' | 'pending' | 'failed' | 'available';
 

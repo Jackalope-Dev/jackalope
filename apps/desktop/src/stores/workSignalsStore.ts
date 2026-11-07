@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { isActive, nativeTask, type TaskRun } from '../lib/task-runtime';
-import { isTauriEnvironment } from '../lib/tauri-bridge';
+import { isTauriEnvironment } from '../lib/native/env';
+import { invokeNative } from '../lib/native/transport';
+import { isActive } from '../lib/run-status';
+import type { TaskRun } from '../lib/run-types';
 
 export { compactElapsed, isUnread, openSignalKey, signalKey } from '../lib/work-signals';
 
@@ -114,7 +116,7 @@ export function useChangeStats(runs: (TaskRun | undefined)[]) {
         );
       });
       if (!due.length) return;
-      pending = nativeTask<Record<string, ChangeStats>>('task_change_stats', {
+      pending = invokeNative<Record<string, ChangeStats>>('task_change_stats', {
         ids: due.map((run) => run.id),
       })
         .then((result) => {

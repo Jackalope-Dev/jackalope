@@ -1,8 +1,10 @@
 import { Disclosure, DisclosureSummary, FormField, Input } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
+import { openExternalUrl } from '../../lib/native/env';
+import { invokeNative } from '../../lib/native/transport';
 import { previewUrl } from '../../lib/preview-url';
-import { nativeTask, type ScreenshotArtifact, type TaskRun } from '../../lib/task-runtime';
-import { openExternalUrl } from '../../lib/tauri-bridge';
+import type { ScreenshotArtifact, TaskRun } from '../../lib/run-types';
+import { stopPreview } from '../../lib/task-actions';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -63,7 +65,7 @@ export function TaskPreview({
   useEffect(() => {
     if (project?.preferences?.previewCommand !== undefined || !run.workspace) return;
     let alive = true;
-    void nativeTask<Readiness>('project_readiness', { path: run.workspace })
+    void invokeNative<Readiness>('project_readiness', { path: run.workspace })
       .then((result) => {
         if (alive && result.previewCommand)
           setCommand((value) => value || result.previewCommand || '');
@@ -76,7 +78,7 @@ export function TaskPreview({
   useEffect(
     () => () => {
       if (inspectionId.current)
-        void nativeTask('task_preview_inspect_cancel', { requestId: inspectionId.current }).catch(
+        void invokeNative('task_preview_inspect_cancel', { requestId: inspectionId.current }).catch(
           () => {},
         );
     },
@@ -91,7 +93,7 @@ export function TaskPreview({
       loading = true;
       const revision = statusRevision.current;
       try {
-        const value = await nativeTask<Preview | null>('task_preview_status', { id: run.id });
+        const value = await invokeNative<Preview | null>('task_preview_status', { id: run.id });
         if (alive && revision === statusRevision.current) setPreview(value);
       } catch (cause) {
         if (alive) setError(String(cause));
@@ -150,7 +152,7 @@ export function TaskPreview({
               disabled={busy}
               onClick={() =>
                 void act(async () => {
-                  await nativeTask('task_preview_stop', { id: run.id });
+                  await stopPreview(run.id);
                   setPreview(null);
                 })
               }
@@ -167,7 +169,11 @@ export function TaskPreview({
                 void act(async () => {
                   setLoaded(false);
                   setPreview(
-                    await nativeTask<Preview>('task_preview_start', { id: run.id, command, port }),
+                    await invokeNative<Preview>('task_preview_start', {
+                      id: run.id,
+                      command,
+                      port,
+                    }),
                   );
                   if (project)
                     useProjectStore
@@ -224,7 +230,7 @@ export function TaskPreview({
             disabled={busy || preview?.running}
             onClick={() =>
               void act(async () => {
-                const result = await nativeTask<Readiness>('project_readiness', {
+                const result = await invokeNative<Readiness>('project_readiness', {
                   path: run.workspace,
                 });
                 if (result.previewCommand) {
@@ -317,7 +323,7 @@ export function TaskPreview({
                   setInspection(null);
                   setElement('');
                   try {
-                    const result = await nativeTask<{
+                    const result = await invokeNative<{
                       screenshot: ScreenshotArtifact;
                       snapshot: string;
                       errors: string;
@@ -343,8 +349,8 @@ export function TaskPreview({
                     inspectionId.current = null;
                     setInspecting(false);
                     if (requestId)
-                      void nativeTask('task_preview_inspect_cancel', { requestId }).catch((cause) =>
-                        setError(String(cause)),
+                      void invokeNative('task_preview_inspect_cancel', { requestId }).catch(
+                        (cause) => setError(String(cause)),
                       );
                   }}
                 >

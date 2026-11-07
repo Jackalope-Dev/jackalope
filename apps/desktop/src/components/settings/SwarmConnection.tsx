@@ -15,6 +15,7 @@ import {
   completeCloudflareSignIn,
   reauthorizeCloudflare,
 } from '../../lib/cloudflare-artifacts';
+import { openExternalUrl } from '../../lib/native/env';
 import {
   type SwarmConnection as Connection,
   onSwarmSetupProgress,
@@ -25,7 +26,6 @@ import {
   setupSwarm,
   swarmConnection,
 } from '../../lib/swarm';
-import { openExternalUrl } from '../../lib/tauri-bridge';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Setting, SettingGroup } from './Setting';
 import './swarm-connection.css';
