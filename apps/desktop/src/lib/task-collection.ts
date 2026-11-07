@@ -117,6 +117,7 @@ export function collectWorkspaceWork(
   integratedRunIds: string[] = [],
   archived = false,
   queue?: QueueView,
+  nested = false,
 ): WorkItem[] {
   const sessionIds = new Set(sessions.map((session) => session.id));
   const managedWork = (queue?.managedTasks ?? [])
@@ -128,10 +129,13 @@ export function collectWorkspaceWork(
     projectId,
     ideas.filter((idea) => !idea.runId || parentProjects.get(idea.runId) !== idea.projectId),
     runs.filter(
-      (run) => !childIds.has(run.id) && (!run.liveSessionId || !sessionIds.has(run.liveSessionId)),
+      (run) =>
+        (nested || !childIds.has(run.id)) &&
+        (!run.liveSessionId || !sessionIds.has(run.liveSessionId)),
     ),
     integratedRunIds,
     archived,
+    nested,
   );
   if (!archived)
     for (const { task, work } of managedWork) {
@@ -161,7 +165,7 @@ export function collectWorkspaceWork(
     for (const session of sessions) {
       if (projectId !== null && session.request.projectId !== projectId) continue;
       // Bot conversations live in the Bots view.
-      if (session.persona) continue;
+      if (session.persona && !nested) continue;
       const work = sessionWork(session, runs);
       items.push({
         id: `session:${session.id}`,
@@ -196,10 +200,12 @@ export function collectWork(
   runs: TaskRun[],
   integratedRunIds: string[] = [],
   archived = false,
+  withReviews = false,
 ): WorkItem[] {
   // Agent reviews belong to the task they review and open from its Review tab.
   const projectRuns = runs.filter(
-    (run) => (projectId === null || run.projectId === projectId) && !isAgentReview(run),
+    (run) =>
+      (projectId === null || run.projectId === projectId) && (withReviews || !isAgentReview(run)),
   );
   const byId = new Map(projectRuns.map((run) => [run.id, run]));
   const latest = new Map<string, TaskRun>();

@@ -91,6 +91,11 @@ export interface WorkFilter {
   archived?: boolean;
   /** Leave saved drafts out. */
   withoutDrafts?: boolean;
+  /**
+   * Also list plan worker runs, agent reviews and bot conversations as items of their
+   * own, as command search does, rather than inside the work they belong to.
+   */
+  nested?: boolean;
 }
 
 /** The work list every surface reads: sidebar, Work page, tabs, status bar and search. */
@@ -98,6 +103,7 @@ export function useWorkspaceWork({
   projectId = null,
   archived = false,
   withoutDrafts = false,
+  nested = false,
 }: WorkFilter = {}) {
   const runs = useAllRuns();
   const sessions = useLiveSessionStore((state) => state.sessions);
@@ -106,8 +112,17 @@ export function useWorkspaceWork({
   const ideas = withoutDrafts ? noIdeas : savedIdeas;
   return useMemo(
     () =>
-      collectWorkspaceWork(projectId, ideas, runs, sessions, queue.mergedRunIds, archived, queue),
-    [projectId, ideas, runs, sessions, queue, archived],
+      collectWorkspaceWork(
+        projectId,
+        ideas,
+        runs,
+        sessions,
+        queue.mergedRunIds,
+        archived,
+        queue,
+        nested,
+      ),
+    [projectId, ideas, runs, sessions, queue, archived, nested],
   );
 }
 

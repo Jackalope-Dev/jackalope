@@ -75,12 +75,14 @@ export function CommandPalette({
   const runs = useExecutionStore((state) => state.runs);
   const selected = useExecutionStore((state) => state.selectedId);
   const current = runs.find((run) => run.id === selected);
-  const workspaceWork = useWorkspaceWork({ withoutDrafts: true });
+  const workspaceWork = useWorkspaceWork({ withoutDrafts: true, nested: true });
   const work = workspaceWork
     .map((item) => ({
       item,
       project: projects.find((project) => project.id === workProjectId(item))?.name ?? '',
-      state: item.statusLabel ?? workShape(item),
+      state: item.session?.persona
+        ? `Bot · ${item.session.persona.name}`
+        : (item.statusLabel ?? workShape(item)),
     }))
     .filter(({ item, project, state }) =>
       `${item.title} ${project} ${state}`.toLowerCase().includes(search),
