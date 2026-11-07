@@ -28,7 +28,7 @@ import { selectWork, workTarget } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
@@ -43,9 +43,7 @@ import { describeError } from '../../lib/errors';
 import { projectReadiness, type Readiness } from '../../lib/readiness';
 
 export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }) {
-  const project = useProjectStore((state) =>
-    state.projects.find((p) => p.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   const runs = useExecutionStore((state) => state.runs);
   const historyError = useExecutionStore((state) => state.historyError);
   const {

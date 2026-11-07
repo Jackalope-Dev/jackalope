@@ -9,7 +9,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject } from '../../stores/projectStore';
 import { navigateWorkspace } from './navigation';
 import { selectWorkItem, useWorkspaceWork } from './WorkSidebar';
 
@@ -31,9 +31,7 @@ export function useFocusedWork() {
   const { queue, selectedId: selectedManaged } = useManagedTaskStore(
     useShallow((s) => ({ queue: s.queue, selectedId: s.selectedId })),
   );
-  const project = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   const session = sessions.find(
     (item) => item.id === selectedSession && item.request.projectId === project?.id,
   );
@@ -63,9 +61,7 @@ const samePath = (a: string, b: string) => a.replace(/[\\/]+$/, '') === b.replac
  */
 function useSwitchTargets(checkout: string) {
   const work = useWorkspaceWork();
-  const project = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   if (!project) return [];
   const existing = project.worktrees ?? [];
   const seen = new Set([checkout]);

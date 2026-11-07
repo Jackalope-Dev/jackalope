@@ -26,7 +26,7 @@ import { taskDecision } from '../../lib/task-workflow';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
@@ -144,9 +144,7 @@ export function CommandPalette({
       .split(' ')
       .some((kw) => kw.includes(search)) ||
       'settings & preferences'.includes(search));
-  const terminalProject = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const terminalProject = useActiveProject();
   const remoteHost = useHostContextStore((state) => state.host);
   const showTerminal =
     Boolean(terminalProject) &&

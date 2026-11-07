@@ -1,7 +1,7 @@
 import { DialogCloseButton, DialogContent, DialogHeader, useDialogFocus } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject } from '../../stores/projectStore';
 import { AgentManager } from '../agents/AgentManager';
 import { McpWorkspace } from '../mcp/McpWorkspace';
 import { ProjectPreferences } from '../projects/ProjectPreferences';
@@ -10,9 +10,7 @@ import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
 export function TaskTools({ onClose }: { onClose: () => void }) {
   const focus = useDialogFocus();
   const [tab, setTab] = useState('connections');
-  const project = useProjectStore((state) =>
-    state.projects.find((p) => p.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   return (
     <Dialog.Root
       open

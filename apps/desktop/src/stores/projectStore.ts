@@ -362,6 +362,14 @@ interface ProjectRecord {
  */
 let appAccent: string | undefined;
 
+export function selectActiveProject(state: Pick<ProjectState, 'projects' | 'activeProjectId'>) {
+  return state.projects.find((project) => project.id === state.activeProjectId);
+}
+
+export function useActiveProject() {
+  return useProjectStore(selectActiveProject);
+}
+
 export function setRegistryAppAccent(accent: string) {
   if (accent === appAccent) return;
   appAccent = accent;

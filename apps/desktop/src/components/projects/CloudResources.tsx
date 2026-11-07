@@ -49,7 +49,7 @@ import {
 } from '../../lib/cloudflare-resources';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { type CloudResourcesDraft, useCloudResourcesStore } from '../../stores/cloudResourcesStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject } from '../../stores/projectStore';
 import { openProjectSettings, openSettings } from '../layout/navigation';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -97,9 +97,7 @@ function runSteps(run: Run): StepperStep[] {
  * are kept across Back, retry and reload until setup succeeds.
  */
 export function CloudResources() {
-  const project = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   const savedDraft = useCloudResourcesStore((state) =>
     project ? state.drafts[project.id] : undefined,
   );

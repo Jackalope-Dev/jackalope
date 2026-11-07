@@ -38,7 +38,7 @@ import { isActive } from '../../lib/run-status';
 import type { RunRequest } from '../../lib/run-types';
 import { useCommitReviewStore } from '../../stores/commitReviewStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { AgentSetupNotice, isAgentSetupError } from '../agents/AgentSetupNotice';
 import { navigateWorkspace, openHelperDraft } from '../layout/navigation';
 import { DiffPreview } from '../tasks/DiffPreview';
@@ -66,9 +66,7 @@ function authorLine(policy: CommitPolicy | null, agents: string[]) {
 }
 
 export function CommitReview({ onOpenProject }: { onOpenProject: () => void }) {
-  const project = useProjectStore((state) =>
-    state.projects.find((item) => item.id === state.activeProjectId),
-  );
+  const project = useActiveProject();
   const loadWorktrees = useProjectStore((state) => state.loadWorktreesForActiveProject);
   const runs = useExecutionStore((state) => state.runs);
   const {

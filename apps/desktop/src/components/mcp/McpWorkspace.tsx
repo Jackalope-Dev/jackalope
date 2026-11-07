@@ -18,7 +18,7 @@ import type { McpServerConfig } from '../../lib/mcp-client';
 import { connectionFailure, redactConnection } from '../../lib/mcp-connection';
 import { invokeNative } from '../../lib/native/transport';
 import { type AllMcpsServer, useMcpStore } from '../../stores/mcpStore';
-import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
+import { agentAccountFor, useActiveProject, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -53,7 +53,7 @@ export function McpWorkspace({
   onViewChange?: (view: 'configured' | 'marketplace') => void;
 } = {}) {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
-  const project = useProjectStore((s) => s.projects.find((p) => p.id === s.activeProjectId));
+  const project = useActiveProject();
   const {
     servers,
     loadingServers,
