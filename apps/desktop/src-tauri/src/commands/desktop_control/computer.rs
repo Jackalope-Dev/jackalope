@@ -13,7 +13,7 @@ use crate::commands::{
     computers::{self, Computer},
     harness::ScreenshotArtifact,
     platform::poll_until,
-    site_gate::{self, Check, Refused, SiteGate},
+    site_gate::{self, Check, Loopback, Refused, SiteGate},
     tasks::{TaskRun, TaskRuntime},
 };
 use base64::Engine as _;
@@ -25,6 +25,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// The computer's own pages are its services, not the person's.
+const SITE_LOOPBACK: Loopback = Loopback::Exempt;
 const TIMEOUT: Duration = Duration::from_secs(30);
 
 struct Shot {
@@ -95,6 +97,7 @@ impl Call<'_> {
                 runtime,
                 &computer.decisions,
                 format!("for {}", computer.name),
+                SITE_LOOPBACK,
             )
         })
     }
@@ -421,4 +424,15 @@ pub async fn execute(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn computer_desktops_do_not_ask_about_their_own_pages() {
+        assert_eq!(
+            super::SITE_LOOPBACK,
+            crate::commands::site_gate::Loopback::Exempt
+        );
+    }
 }

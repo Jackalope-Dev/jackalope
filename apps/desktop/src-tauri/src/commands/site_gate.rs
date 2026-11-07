@@ -20,6 +20,17 @@ pub(crate) fn loopback(host: &str) -> bool {
         .any(|known| known == host)
 }
 
+/// Whether a gate asks about this machine's own pages.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Loopback {
+    /// Never asked about: the browser runs on a computer or in a profile, where
+    /// loopback pages are that machine's own services.
+    Exempt,
+    /// Asked about like any other site: the person's own browser, where loopback
+    /// pages are the person's local services.
+    Asked,
+}
+
 /// Why a site may not be used.
 #[derive(Debug, PartialEq)]
 pub(crate) enum Refused {
@@ -53,6 +64,7 @@ pub(crate) struct SiteGate {
     /// Where a remembered decision applies, as the options say it: "in <project>"
     /// or "for <computer>".
     scope: String,
+    loopback: Loopback,
     allowed: HashSet<String>,
     denied: HashSet<String>,
     /// The open question: (prompt ID, host).
@@ -60,19 +72,21 @@ pub(crate) struct SiteGate {
 }
 
 impl SiteGate {
-    pub fn new(runtime: &TaskRuntime, decisions: &str, scope: String) -> Self {
+    pub fn new(runtime: &TaskRuntime, decisions: &str, scope: String, loopback: Loopback) -> Self {
         Self::at(
             grant::store_path(&runtime.preferences_directory()),
             decisions,
             scope,
+            loopback,
         )
     }
 
-    fn at(store: PathBuf, decisions: &str, scope: String) -> Self {
+    fn at(store: PathBuf, decisions: &str, scope: String, loopback: Loopback) -> Self {
         Self {
             store,
             decisions: decisions.into(),
             scope,
+            loopback,
             allowed: HashSet::new(),
             denied: HashSet::new(),
             pending: None,
@@ -91,7 +105,7 @@ impl SiteGate {
 
     /// Whether `host` may be used now, from this attempt's answers, then saved decisions.
     pub fn check(&mut self, host: &str) -> Result<Check, Refused> {
-        if loopback(host) || self.allowed.contains(host) {
+        if (self.loopback == Loopback::Exempt && loopback(host)) || self.allowed.contains(host) {
             return Ok(Check::Allowed);
         }
         if self.denied.contains(host) {
@@ -190,7 +204,12 @@ mod tests {
     use super::*;
 
     fn gate(store: &std::path::Path) -> SiteGate {
-        SiteGate::at(store.join("sites.json"), "project-1", "in Shop".into())
+        SiteGate::at(
+            store.join("sites.json"),
+            "project-1",
+            "in Shop".into(),
+            Loopback::Exempt,
+        )
     }
 
     fn store() -> PathBuf {
@@ -208,7 +227,22 @@ mod tests {
     }
 
     #[test]
-    fn loopback_hosts_are_never_asked_about() {
+    fn a_gate_that_asks_about_loopback_asks_like_any_site() {
+        let store = store();
+        let mut gate = SiteGate::at(
+            store.join("sites.json"),
+            "project-1",
+            "in Shop".into(),
+            Loopback::Asked,
+        );
+        for host in ["localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0"] {
+            assert_eq!(gate.check(host), Ok(Check::Ask), "{host}");
+        }
+        let _ = std::fs::remove_dir_all(store);
+    }
+
+    #[test]
+    fn exempt_gates_never_ask_about_loopback_hosts() {
         let store = store();
         let mut gate = gate(&store);
         for host in ["localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0"] {

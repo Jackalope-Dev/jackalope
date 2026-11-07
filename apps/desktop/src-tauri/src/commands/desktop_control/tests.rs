@@ -896,3 +896,8 @@ fn wait_for_fixture_text(path: &std::path::Path, expected: &str) {
     }
     assert_eq!(std::fs::read_to_string(path).unwrap(), expected);
 }
+
+#[test]
+fn the_persons_own_browser_asks_about_loopback_pages() {
+    assert_eq!(SITE_LOOPBACK, crate::commands::site_gate::Loopback::Asked);
+}

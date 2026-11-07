@@ -1,6 +1,6 @@
 use super::{
     harness::PendingUserPrompt,
-    site_gate::{self, Check, Refused, SiteGate},
+    site_gate::{self, Check, Loopback, Refused, SiteGate},
     tasks::{TaskRun, TaskRuntime},
 };
 use rmcp::schemars;
@@ -123,6 +123,8 @@ pub struct DesktopActionRecord {
 }
 
 const ACTION_LOG_LIMIT: usize = 200;
+/// The person's own browser: their local services are asked about like any site.
+const SITE_LOOPBACK: Loopback = Loopback::Asked;
 /// How long a snapshot's refs may be used for input.
 const SNAPSHOT_TTL: Duration = Duration::from_secs(60);
 /// The pause between a `wait_for`'s snapshots.
@@ -689,6 +691,7 @@ impl Call<'_> {
             self.runtime,
             &self.run.project_id,
             format!("in {}", self.run.project_name),
+            SITE_LOOPBACK,
         ));
         Ok(())
     }

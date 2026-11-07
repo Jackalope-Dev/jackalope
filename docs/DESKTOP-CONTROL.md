@@ -55,8 +55,8 @@ include `site`. The first time a grant reaches a host, Jackalope asks whether to
 it for this task, always allow it in the project, decline it, or never allow it in the
 project. Page content is withheld until the answer. Saved decisions apply to subdomains,
 the nearest saved parent wins, and Project settings lists and removes them. Unreadable
-addresses, internal pages and this machine's own pages (`localhost`, `127.0.0.1`, `::1`,
-`0.0.0.0`) are not gated. Full-desktop grants are not gated by site.
+addresses and internal pages are not gated; loopback pages are asked about like any other
+site. Full-desktop grants are not gated by site.
 
 Querying the document through UI Automation makes Chromium build its full web
 accessibility tree; on macOS the helper also sets `AXManualAccessibility` on browser

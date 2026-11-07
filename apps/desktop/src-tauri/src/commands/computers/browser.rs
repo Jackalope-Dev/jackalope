@@ -9,7 +9,7 @@ use crate::commands::{
     browser::{ProfileGuard, Verdict},
     desktop_control::grant,
     harness::PendingUserPrompt,
-    site_gate::{self, Check, Refused, SiteGate},
+    site_gate::{self, Check, Loopback, Refused, SiteGate},
 };
 use std::{
     collections::HashSet,
@@ -17,6 +17,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+/// The computer's own pages are its services, not the person's.
+const SITE_LOOPBACK: Loopback = Loopback::Exempt;
 const SIGNED_IN: &str = "I signed in";
 const SKIP: &str = "Skip sign-in";
 
@@ -33,6 +35,7 @@ impl State {
                 runtime,
                 &computer.decisions,
                 format!("for {}", computer.name),
+                SITE_LOOPBACK,
             ),
             sign_in: None,
             skipped: HashSet::new(),
@@ -256,4 +259,15 @@ impl ProfileGuard for ComputerGuard {
     }
 
     fn observed(&self, _: Vec<String>) {}
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn computer_browsers_do_not_ask_about_their_own_pages() {
+        assert_eq!(
+            super::SITE_LOOPBACK,
+            crate::commands::site_gate::Loopback::Exempt
+        );
+    }
 }

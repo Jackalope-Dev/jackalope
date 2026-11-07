@@ -14,7 +14,7 @@ use super::{
     browser::{self, ProfileGuard, ProfileWindow, Verdict},
     desktop_control::grant,
     harness::PendingUserPrompt,
-    site_gate::{self, Check, Refused, SiteGate},
+    site_gate::{self, Check, Loopback, Refused, SiteGate},
     tasks::{TaskRun, TaskRuntime},
 };
 use rmcp::schemars;
@@ -367,6 +367,9 @@ pub struct OpenProfileRequest {
     pub reason: Option<String>,
 }
 
+/// Loopback pages were never asked about in a saved profile (local development).
+const SITE_LOOPBACK: Loopback = Loopback::Exempt;
+
 struct AgentState {
     sites: SiteGate,
     sign_in: Option<SignIn>,
@@ -639,7 +642,7 @@ pub async fn open_for_run(
         profile: profile.clone(),
         directory,
         state: Mutex::new(AgentState {
-            sites: SiteGate::new(runtime, &decisions, format!("in {label}")),
+            sites: SiteGate::new(runtime, &decisions, format!("in {label}"), SITE_LOOPBACK),
             sign_in: None,
             skipped: HashSet::new(),
         }),
