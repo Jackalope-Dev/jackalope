@@ -1,3 +1,4 @@
+import { websiteLink } from '@jackalope/contracts/links';
 import type { z } from 'zod';
 import { ServiceError } from '../errors';
 import { randomToken, seal, tokenHash } from './crypto';
@@ -177,7 +178,7 @@ export async function waitlistProgress(
     referrals: member.referral_count,
     pending: pending?.count ?? 0,
     priorityDays: member.referral_count,
-    shareUrl: `${env.ACCESS_WEB_ORIGIN}/?ref=${member.share_code}`,
+    shareUrl: websiteLink(env.ACCESS_WEB_ORIGIN, 'home', { query: { ref: member.share_code } }),
   };
 }
 

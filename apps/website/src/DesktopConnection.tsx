@@ -1,5 +1,6 @@
 import { EchoMark } from '@jackalope/brand/echo';
 import type { ConnectedDevice } from '@jackalope/contracts/access';
+import { isAccessToken } from '@jackalope/contracts/links';
 import {
   Button,
   Checkbox,
@@ -53,7 +54,7 @@ export function DesktopConnection({
           url.pathname + url.search + (fragment.size ? `#${fragment}` : ''),
         );
         setExpiresAt(Date.now() + 10 * 60000);
-        if (!/^[a-f0-9]{64}$/.test(token)) {
+        if (!isAccessToken(token)) {
           setVerification('');
           setDone('This connection request is invalid. Return to Jackalope to start again.');
           try {
@@ -63,7 +64,7 @@ export function DesktopConnection({
         }
       }
       try {
-        if (token && /^[a-f0-9]{64}$/.test(token))
+        if (token && isAccessToken(token))
           sessionStorage.setItem(
             storageKey,
             JSON.stringify({ token, expires: Date.now() + 10 * 60000 }),
@@ -72,14 +73,14 @@ export function DesktopConnection({
         if (
           saved &&
           typeof saved.token === 'string' &&
-          /^[a-f0-9]{64}$/.test(saved.token) &&
+          isAccessToken(saved.token) &&
           saved.expires > Date.now()
         ) {
           setVerification(saved.token);
           setExpiresAt(Math.min(saved.expires, Date.now() + 10 * 60000));
         } else sessionStorage.removeItem(storageKey);
       } catch {
-        if (token && /^[a-f0-9]{64}$/.test(token)) setVerification(token);
+        if (token && isAccessToken(token)) setVerification(token);
       }
     }
     readRequest();

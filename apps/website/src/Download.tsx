@@ -1,4 +1,5 @@
 import type { AccessMember, ReleaseBuild } from '@jackalope/contracts/access';
+import { isAccessToken } from '@jackalope/contracts/links';
 import type { Platform } from '@jackalope/contracts/platform';
 import { Badge, Button, InlineNotice, Select, SelectItem } from '@jackalope/ui';
 import {
@@ -90,7 +91,7 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
       const raw = new URLSearchParams(current.hash.slice(1)).get('token');
       if (!raw) return;
       history.replaceState(null, '', current.pathname + current.search);
-      if (/^[a-f0-9]{64}$/.test(raw)) {
+      if (isAccessToken(raw)) {
         setToken(raw);
         setError('');
       } else {

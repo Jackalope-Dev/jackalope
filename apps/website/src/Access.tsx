@@ -1,4 +1,5 @@
 import type { AccessMember } from '@jackalope/contracts/access';
+import { isAccessToken } from '@jackalope/contracts/links';
 import { Button, CopyButton, Input, LoadingState, MailIcon, Panel, Textarea } from '@jackalope/ui';
 import { ArrowDownToLine, ArrowRight, Check, Copy, LogOut, Share2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
@@ -42,7 +43,7 @@ export function AccessPage() {
       const raw = new URLSearchParams(current.hash.slice(1)).get('token');
       if (raw) {
         history.replaceState(null, '', current.pathname + current.search);
-        if (/^[a-f0-9]{64}$/.test(raw)) {
+        if (isAccessToken(raw)) {
           setToken(raw);
           setError('');
         } else setError('This link is incomplete. Request a new sign-in link below.');
@@ -50,7 +51,7 @@ export function AccessPage() {
     }
     readLink();
     window.addEventListener('hashchange', readLink);
-    if (share && /^[a-f0-9]{64}$/.test(share)) setInvite(share);
+    if (share && isAccessToken(share)) setInvite(share);
     const controller = new AbortController();
     async function load() {
       try {
@@ -61,7 +62,7 @@ export function AccessPage() {
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
-      if (share && /^[a-f0-9]{64}$/.test(share)) {
+      if (share && isAccessToken(share)) {
         try {
           setAvailable(
             (

@@ -1,4 +1,5 @@
 import type { WaitlistPreferences as Preferences } from '@jackalope/contracts/access';
+import { isAccessToken } from '@jackalope/contracts/links';
 import { Button, Input, MailIcon, Panel, RefreshIcon } from '@jackalope/ui';
 import { ArrowRight, Check, Copy, LogOut, Share2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
@@ -66,7 +67,7 @@ export function WaitlistPage() {
       const raw = new URLSearchParams(url.hash.slice(1)).get('token');
       if (raw) {
         history.replaceState(null, '', url.pathname + url.search);
-        if (/^[a-f0-9]{64}$/.test(raw)) setToken(raw);
+        if (isAccessToken(raw)) setToken(raw);
         else setError('This link is incomplete. Request a fresh one below.');
       }
     };

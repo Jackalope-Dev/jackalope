@@ -1,4 +1,5 @@
 import { EMAIL_COMPANY, EMAIL_FONT, EMAIL_PALETTE } from '@jackalope/brand/email';
+import { websiteLink } from '@jackalope/contracts/links';
 
 export type AccessMail = { to: string; kind: 'welcome' | 'invite' | 'login'; token: string };
 export type WaitlistMail = { to: string; kind: 'waitlist'; token?: string; newsletter?: boolean };
@@ -134,16 +135,20 @@ export function accessEmail(
   }[mail.kind];
   const link =
     mail.kind === 'feedback_request'
-      ? `${origin}/feedback/#token=${mail.token}`
+      ? websiteLink(origin, 'feedback', { fragment: { token: mail.token } })
       : mail.kind === 'waitlist'
-        ? `${origin}/waitlist/${mail.token ? `#token=${mail.token}` : ''}`
+        ? websiteLink(origin, 'waitlist', mail.token ? { fragment: { token: mail.token } } : {})
         : mail.kind === 'welcome' || mail.kind === 'invite'
-          ? `${origin}/download/#token=${mail.token}`
+          ? websiteLink(origin, 'download', { fragment: { token: mail.token } })
           : 'token' in mail
-            ? `${origin}/access/#token=${mail.token}`
+            ? websiteLink(origin, 'access', { fragment: { token: mail.token } })
             : mail.kind === 'referral'
-              ? `${origin}/waitlist/`
-              : `${origin}/access/#invitations`;
+              ? websiteLink(origin, 'waitlist')
+              : websiteLink(origin, 'access', { fragment: 'invitations' });
+  const unsubscribe =
+    mail.kind === 'feedback_request'
+      ? websiteLink(origin, 'feedback', { fragment: { unsubscribe: mail.token } })
+      : '';
   const expiry =
     mail.kind === 'invite' || mail.kind === 'welcome'
       ? 'This link expires in 7 days. Keep it private. You can request a new one on the website.'
@@ -154,14 +159,14 @@ export function accessEmail(
           : '';
   const footer =
     mail.kind === 'feedback_request'
-      ? `You opted in to feedback emails. We won’t send reminders. Stop feedback emails: ${origin}/feedback/#unsubscribe=${mail.token}`
+      ? `You opted in to feedback emails. We won’t send reminders. Stop feedback emails: ${unsubscribe}`
       : 'If you didn’t request this email, you can ignore it. Reply for help or to delete your account.';
   const footerHtml =
     mail.kind === 'feedback_request'
-      ? `You opted in to feedback emails. We won’t send reminders. <a href="${escapeHtml(origin)}/feedback/#unsubscribe=${escapeHtml(mail.token)}" style="color:inherit">Stop feedback emails</a>.`
+      ? `You opted in to feedback emails. We won’t send reminders. <a href="${escapeHtml(unsubscribe)}" style="color:inherit">Stop feedback emails</a>.`
       : footer;
   const address = EMAIL_COMPANY.postalAddress;
-  const downloadLink = mail.kind === 'passes_ready' ? `${origin}/download/` : '';
+  const downloadLink = mail.kind === 'passes_ready' ? websiteLink(origin, 'download') : '';
   const text = [
     copy.title,
     copy.intro,
@@ -173,7 +178,7 @@ export function accessEmail(
       : '',
     expiry,
     footer,
-    `${EMAIL_COMPANY.legalName}${address ? ` · ${address}` : ''} · ${EMAIL_COMPANY.companySite}\nPrivacy: ${origin}/privacy/`,
+    `${EMAIL_COMPANY.legalName}${address ? ` · ${address}` : ''} · ${EMAIL_COMPANY.companySite}\nPrivacy: ${websiteLink(origin, 'privacy')}`,
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -271,7 +276,7 @@ export function emailShell({
 </tr></table>
 <div style="height:34px;line-height:34px">&nbsp;</div>
 ${content}
-<p style="margin:32px 0 0;padding-top:22px;border-top:1px solid ${c.borderSubtle};font-size:12px;line-height:1.8;color:${c.faint}">${footer}<br><br>${escapeHtml(EMAIL_COMPANY.legalName)}${address ? ` &middot; ${escapeHtml(address)}` : ''} &middot; <a href="${EMAIL_COMPANY.companySite}" style="color:${c.faint};text-decoration:underline">jackalope.digital</a> &middot; <a href="${escapeHtml(origin)}/privacy/" style="color:${c.faint};text-decoration:underline">Privacy</a></p>
+<p style="margin:32px 0 0;padding-top:22px;border-top:1px solid ${c.borderSubtle};font-size:12px;line-height:1.8;color:${c.faint}">${footer}<br><br>${escapeHtml(EMAIL_COMPANY.legalName)}${address ? ` &middot; ${escapeHtml(address)}` : ''} &middot; <a href="${EMAIL_COMPANY.companySite}" style="color:${c.faint};text-decoration:underline">jackalope.digital</a> &middot; <a href="${escapeHtml(websiteLink(origin, 'privacy'))}" style="color:${c.faint};text-decoration:underline">Privacy</a></p>
 </td></tr></table>
 </td></tr></table></body></html>`;
 }

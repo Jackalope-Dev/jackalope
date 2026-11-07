@@ -1,4 +1,5 @@
 import type { Invitation, InvitationSummary } from '@jackalope/contracts/access';
+import { ACCESS_TOKEN, websiteLink } from '@jackalope/contracts/links';
 import { z } from 'zod';
 import { ServiceError, triggerError } from '../errors';
 import { randomToken, tokenHash } from './crypto';
@@ -6,7 +7,7 @@ import { mailStatements } from './mail';
 import { waitlistMailStatements } from './waitlist';
 
 export const emailSchema = z.string().trim().toLowerCase().max(254).email();
-export const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/);
+export const tokenSchema = z.string().regex(ACCESS_TOKEN);
 export interface Member {
   id: string;
   email: string;
@@ -255,7 +256,9 @@ export async function invitations(
     accepted,
     downloaded,
     connected,
-    shareUrl: `${env.ACCESS_WEB_ORIGIN}/access/?invite=${member.share_code}`,
+    shareUrl: websiteLink(env.ACCESS_WEB_ORIGIN, 'access', {
+      query: { invite: member.share_code },
+    }),
     invites: rows.results.map((i) => ({
       ...i,
       status: i.status === 'pending' && i.expires_at <= now ? 'expired' : i.status,

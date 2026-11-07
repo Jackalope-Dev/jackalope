@@ -10,6 +10,7 @@
   },
   "exports": {
     "./access": "./src/access.ts",
+    "./links": "./src/links.ts",
     "./platform": "./src/platform.ts",
     "./release": "./src/release.ts",
     "./telemetry": "./src/telemetry.ts"
