@@ -21,9 +21,7 @@ release dates.
 
 ## Agents and task execution
 
-- [ ] Extend agents on a computer: automatic routing that does not require the CLI here,
-  and `read_context` repository search on the computer with the same symbol ranking as
-  this device (it ranks by plain text there).
+- [ ] Extend agents on a computer: automatic routing that does not require the CLI here.
 - [ ] Accept the runner's local bridge in real runs: a protocol 4 image built and run on a
   local sandbox, a cloud machine and a live Agent37 account, with a real Claude Code and
   Codex agent using `computer_verify`, `verification_output`, `read_context` and every
@@ -54,7 +52,7 @@ release dates.
   fork and one naming a device-only secret placed correctly, each **Swarms run on**
   choice, a computer stopped mid-round (the fork retried once elsewhere and the lost host
   skipped until it answers again), a restart mid-round, and the phone companion showing
-  the host. Decide whether runners should report `slots` from their machine size.
+  the host.
 - [ ] Publish the first computer image from `beta`, make its package public, and accept
   a local pull, a cloud machine started from it and an Agent37 registry import.
 - [ ] Give Agent37 computers a viewer through signed port URLs, sizes beyond the default

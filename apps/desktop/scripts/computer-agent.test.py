@@ -250,7 +250,8 @@ class RunProtocol(Harness):
     def test_status_reports_a_run_whose_supervisor_died(self):
         self.assertEqual(self.call(action="run_status", run="r8"),
                          {"exists": False, "runs": self.agent.RUNS_PROTOCOL,
-                          "capabilities": self.agent.capabilities()})
+                          "capabilities": self.agent.capabilities(),
+                          "slots": self.agent.slots()})
         self.upload("r8", archive({"a.txt": b"x"}))
         self.assertFalse(self.call(action="run_status", run="r8")["started"])
         self.call(action="run_start", run="r8",
@@ -426,6 +427,64 @@ class RunProtocol(Harness):
         finally:
             os.environ["PATH"] = path
 
+    def test_uv_is_pinned_and_a_mismatched_download_is_refused(self):
+        agent = self.agent
+        self.assertRegex(agent.UV_VERSION, r"^\d+\.\d+\.\d+$")
+        self.assertEqual(sorted(agent.UV_SHA256), ["aarch64", "x86_64"])
+        for digest in agent.UV_SHA256.values():
+            self.assertRegex(digest, r"^[0-9a-f]{64}$")
+        good = archive({"uv-x86_64-unknown-linux-gnu/uv": b"#!/bin/sh\n",
+                        "uv-x86_64-unknown-linux-gnu/uvx": b"#!/bin/sh\n"})
+        buffer = io.BytesIO()
+        with tarfile.open(fileobj=buffer, mode="w:gz") as bundle:
+            with tarfile.open(fileobj=io.BytesIO(good)) as source:
+                for member in source.getmembers():
+                    bundle.addfile(member, source.extractfile(member))
+        good = buffer.getvalue()
+        fetched = []
+
+        class Response(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                self.close()
+
+        def fake_open(url, timeout=None):
+            fetched.append(url)
+            return Response(good)
+
+        local = os.path.join(self.temp.name, "uv-home")
+        machine = agent.platform.machine
+        urlopen = agent.urllib.request.urlopen
+        try:
+            agent.LOCAL_PREFIX = local
+            agent.platform.machine = lambda: "x86_64"
+            agent.urllib.request.urlopen = fake_open
+            # The real recorded hash does not match this stand-in archive.
+            with self.assertRaises(agent.Failure) as refused:
+                agent.install_uv()
+            self.assertIn("did not match", str(refused.exception))
+            self.assertFalse(os.path.exists(os.path.join(local, "bin", "uv")))
+            self.assertEqual(fetched, [
+                f"https://github.com/astral-sh/uv/releases/download/{agent.UV_VERSION}/"
+                "uv-x86_64-unknown-linux-gnu.tar.gz"])
+            # Only the archive is fetched: no published checksum is trusted.
+            agent.UV_SHA256 = dict(agent.UV_SHA256, x86_64=hashlib.sha256(good).hexdigest())
+            agent.install_uv()
+            self.assertEqual(len(fetched), 2)
+            for name in ("uv", "uvx"):
+                self.assertTrue(os.access(os.path.join(local, "bin", name), os.X_OK))
+            agent.UV_LIMIT = len(good) - 1
+            with self.assertRaises(agent.Failure):
+                agent.install_uv()
+            agent.platform.machine = lambda: "riscv64"
+            with self.assertRaises(agent.Failure):
+                agent.install_uv()
+        finally:
+            agent.platform.machine = machine
+            agent.urllib.request.urlopen = urlopen
+
     def test_approval_hook_allows_only_an_explicit_allow(self):
         from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
         import threading
@@ -560,6 +619,62 @@ class Runner(unittest.TestCase):
         status = self.call(action="run_status", run="c1")
         self.assertEqual((status["runs"], status["capabilities"]),
                          (4, self.agent.capabilities()))
+
+    def test_slots_follow_the_machine_size_unless_overridden(self):
+        agent = self.agent
+        gib = 1024 ** 3
+        for cpus, memory, expected in [
+            (1, 2 * gib, 1),      # the smallest machine still takes one run
+            (2, 4 * gib, 1),
+            (4, 16 * gib, 2),     # two per CPU pair
+            (16, 8 * gib, 2),     # memory limits it
+            (8, int(31.4 * gib), 4),  # reported memory rounds to whole GiB
+            (64, 256 * gib, 8),   # derived values stop at eight
+            (6, 0, 3),            # unknown memory limits nothing
+        ]:
+            self.assertEqual(agent.slots_for(cpus, memory), expected, (cpus, memory))
+        # Container limits apply over the host's size.
+        cgroup = os.path.join(self.temp.name, "cgroup")
+        os.makedirs(cgroup)
+        open(os.path.join(cgroup, "cpu.max"), "w").write("200000 100000\n")
+        open(os.path.join(cgroup, "memory.max"), "w").write(f"{8 * gib}\n")
+        agent.CGROUP = cgroup
+        cpus, memory = agent.machine_size()
+        self.assertLessEqual(cpus, 2)
+        self.assertLessEqual(memory, 8 * gib)
+        open(os.path.join(cgroup, "cpu.max"), "w").write("max 100000\n")
+        open(os.path.join(cgroup, "memory.max"), "w").write("max\n")
+        self.assertGreaterEqual(agent.machine_size()[0], 1)
+        # cgroup v1 on older hosts.
+        legacy = os.path.join(self.temp.name, "cgroup-v1")
+        os.makedirs(os.path.join(legacy, "cpu"))
+        os.makedirs(os.path.join(legacy, "memory"))
+        open(os.path.join(legacy, "cpu", "cpu.cfs_quota_us"), "w").write("100000\n")
+        open(os.path.join(legacy, "cpu", "cpu.cfs_period_us"), "w").write("100000\n")
+        open(os.path.join(legacy, "memory", "memory.limit_in_bytes"), "w").write(f"{2 * gib}\n")
+        agent.CGROUP = legacy
+        cpus, memory = agent.machine_size()
+        self.assertEqual(cpus, 1)
+        self.assertLessEqual(memory, 2 * gib)
+        open(os.path.join(legacy, "cpu", "cpu.cfs_quota_us"), "w").write("-1\n")
+        self.assertGreaterEqual(agent.machine_size()[0], 1)
+        agent.CGROUP = cgroup
+        derived = agent.slots_for(*agent.machine_size())
+        old = os.environ.pop("JACKALOPE_RUNNER_SLOTS", None)
+        try:
+            self.assertEqual(agent.slots(), derived)
+            status = self.call(action="run_status", run="c2")
+            self.assertEqual(status["slots"], derived)
+            os.environ["JACKALOPE_RUNNER_SLOTS"] = "12"
+            self.assertEqual(agent.slots(), 12)
+            self.assertEqual(self.call(action="run_status", run="c2")["slots"], 12)
+            for bad in ("0", "33", "-2", "two", "1.5", ""):
+                os.environ["JACKALOPE_RUNNER_SLOTS"] = bad
+                self.assertEqual(agent.slots(), derived, bad)
+        finally:
+            os.environ.pop("JACKALOPE_RUNNER_SLOTS", None)
+            if old is not None:
+                os.environ["JACKALOPE_RUNNER_SLOTS"] = old
 
     def test_local_requests_are_validated(self):
         spec = self.agent.local_spec
@@ -761,6 +876,86 @@ class Runner(unittest.TestCase):
             self.assertIn("error", result["blocks"][0], path)
         with self.assertRaises(self.agent.Failure):
             runner.read_context({})
+
+    def test_declarations_are_found_in_common_languages(self):
+        found = lambda language, text: [(s["name"], s["line"], s["kind"])
+                                        for s in self.agent.declarations(language, text)]
+        self.assertEqual(found("rust", "\n".join([
+            "pub(crate) async fn load_rows() {}",
+            "struct Row;", "pub enum Kind {}", "trait Store {}", "type Id = u64;",
+            "const LIMIT: usize = 4;", "pub const fn tiny() {}", "    fn method(&self) {}",
+            "// fn commented() {}", "impl Row {}",
+        ])), [("load_rows", 1, "function"), ("Row", 2, "struct"), ("Kind", 3, "enum"),
+              ("Store", 4, "interface"), ("Id", 5, "type"), ("LIMIT", 6, "binding"),
+              ("tiny", 7, "function"), ("method", 8, "function")])
+        self.assertEqual(found("script", "\n".join([
+            "export async function fetchRows() {", "  if (x) {", "  }", "}",
+            "export default class Grid {", "  private render(row: Row): void {", "  }", "}",
+            "export interface Props {}", "type Mode<T> = T;", "export const enum Side {}",
+            "export const useGrid = () => 1;", "let count: number;",
+        ])), [("fetchRows", 1, "function"), ("Grid", 5, "class"), ("render", 6, "method"),
+              ("Props", 9, "interface"), ("Mode", 10, "type"), ("Side", 11, "enum"),
+              ("useGrid", 12, "binding"), ("count", 13, "binding")])
+        self.assertEqual(found("python", "\n".join([
+            "LIMIT = 3", "class Store:", "    def load(self):", "        def inner():",
+            "            pass", "async def main():", "    value = 1", "x == 2",
+        ])), [("LIMIT", 1, "binding"), ("Store", 2, "class"), ("load", 3, "method"),
+              ("inner", 4, "function"), ("main", 6, "function")])
+        self.assertEqual(found("go", "\n".join([
+            "func Load() error {", "func (s *Store) Save() {", "type Store struct {",
+            "\tName string", "}", "type (", "\tReader interface {", "\t\tRead()", "\t}",
+            "\tID int", ")", "const (", "\tA = 1", "\tB", ")", "var Default = 3",
+        ])), [("Load", 1, "function"), ("Save", 2, "method"), ("Store", 3, "struct"),
+              ("Reader", 7, "interface"), ("ID", 10, "type"), ("A", 13, "binding"),
+              ("B", 14, "binding"), ("Default", 16, "binding")])
+        many = "\n".join(f"fn f{i}() {{}}" for i in range(100))
+        self.assertEqual(len(self.agent.declarations("rust", many)), self.agent.FILE_SYMBOLS)
+
+    def test_repository_search_ranks_declarations_above_plain_text(self):
+        workspace = os.path.join(self.temp.name, "repo")
+        files = {
+            "src/billing.rs": "pub fn compute_invoice() {}\n",
+            "src/notes.md": "We compute the invoice by hand here.\n",
+            "src/view.ts": "export const label = 'compute invoice';\n",
+            "src/invoice.py": "def total():\n    pass\n",
+            "node_modules/pkg/compute_invoice.js": "function computeInvoice() {}\n",
+            "README.md": "unrelated\n",
+        }
+        for name, text in files.items():
+            os.makedirs(os.path.dirname(os.path.join(workspace, name)), exist_ok=True)
+            open(os.path.join(workspace, name), "w").write(text)
+        subprocess.run(["git", "init", "-q", workspace], check=True)
+        runner = self.agent.Runner(os.path.join(self.temp.name, "d"), workspace,
+                                   {"tools": ["read_context"], "check": None})
+        result = runner.read_context({"query": "compute invoice"})["candidates"]
+        paths = [item["path"] for item in result["items"]]
+        self.assertEqual(result["ranking"], "symbols")
+        self.assertFalse(result["scanTruncated"])
+        # The declaration first, then the path match, then files that only say it.
+        self.assertEqual(paths[:2], ["src/billing.rs", "src/invoice.py"])
+        self.assertEqual(result["items"][0]["symbols"],
+                         [{"name": "compute_invoice", "line": 1, "kind": "function"}])
+        text = [item for item in result["items"] if item.get("match") == "text"]
+        self.assertEqual({item["path"] for item in text}, {"src/notes.md", "src/view.ts"})
+        self.assertEqual(paths[2:], [item["path"] for item in text])
+        self.assertEqual(text[0]["line"], 1)
+        self.assertNotIn("node_modules/pkg/compute_invoice.js", paths)
+        self.assertNotIn("README.md", paths)
+        # The same scoring as this device's ranking.
+        ranked = self.agent.search_rank("quota reset", ["Tasks and preferences",
+                                                        "Check the quota reset time"])
+        self.assertEqual(ranked[0][0], 1)
+        self.assertEqual(self.agent.search_rank("the", ["the task"]), [])
+        self.assertEqual(self.agent.search_rank("cat", ["concatenate"]), [])
+        # An edit is seen on the next query; the file limit marks the scan truncated.
+        open(os.path.join(workspace, "src/notes.md"), "w").write("fn x\n")
+        open(os.path.join(workspace, "src/view.ts"), "w").write(
+            "export function computeInvoiceView() {}\n")
+        # Like this device's ranking, a camelCase name is one word.
+        again = runner.read_context({"query": "computeInvoiceView"})["candidates"]
+        self.assertEqual(again["items"][0]["path"], "src/view.ts")
+        self.agent.SEARCH_FILES = 2
+        self.assertTrue(runner.read_context({"query": "invoice"})["candidates"]["scanTruncated"])
 
     def test_stored_check_output_pages_by_character(self):
         directory = os.path.join(self.temp.name, "v")
