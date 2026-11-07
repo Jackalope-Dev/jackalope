@@ -49,6 +49,7 @@ mod tests;
 
 use eligibility::*;
 
+use super::integration::ExecutionGuard;
 use super::tasks::runner::record::{record, ToolEvent};
 use super::tasks::{CoordinationContext, RunRequest, TaskRuntime};
 use axum::{
@@ -89,6 +90,24 @@ struct Inner {
     url: Option<String>,
     error: Option<String>,
     delivered: HashMap<String, HashSet<String>>,
+}
+
+/// What [`Coordinator::launch_assignment`] needs to start a coordinated attempt.
+pub(super) struct LaunchSpec<'a> {
+    pub request: RunRequest,
+    pub endpoint: &'a str,
+    /// Whether the attempt works for a queued or managed assignment.
+    pub managed: bool,
+    pub instructions: String,
+    /// The task the bridge token speaks for.
+    pub grant: String,
+    pub assigned: Option<&'a QueueItem>,
+    pub host: Option<super::computers::pool::RunHost>,
+}
+
+/// A bridge credential for one attempt.
+fn bridge_token() -> String {
+    format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple())
 }
 
 #[derive(Clone)]
@@ -327,7 +346,6 @@ pub(super) async fn bridge_message(
             tauri::async_runtime::spawn_blocking(move || {
                 let _guard = crate::commands::integration::execution_guard()?;
                 let directory = runtime.integration_directory();
-                std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
                 crate::commands::integration::workspace_tree(&run, &directory)
             })
             .await
@@ -338,7 +356,7 @@ pub(super) async fn bridge_message(
         None
     };
     service.authorized(&headers)?;
-    let mut inner = service.inner.lock().unwrap();
+    let mut inner = service.state();
     if let Some(recipient) = &req.recipient_task_id {
         let queued = inner
             .ledger
@@ -369,31 +387,37 @@ pub(super) async fn bridge_message(
         recipient_task_id: req.recipient_task_id,
         acknowledged_by: vec![],
     };
-    let mut ledger = inner.ledger.clone();
-    if let Some(id) = req.resolves {
-        let original = ledger
+    let resolved = |m: &CoordinationMessage, id: &str| {
+        m.id == id
+            && m.project_id == message.project_id
+            && (m.task_id == message.task_id
+                || m.recipient_task_id.as_ref() == Some(&message.task_id))
+    };
+    if let Some(id) = &req.resolves {
+        let original = inner
+            .ledger
             .messages
-            .iter_mut()
-            .find(|m| {
-                m.id == id
-                    && m.project_id == message.project_id
-                    && (m.task_id == message.task_id
-                        || m.recipient_task_id.as_ref() == Some(&message.task_id))
-            })
+            .iter()
+            .find(|m| resolved(m, id))
             .ok_or(StatusCode::NOT_FOUND)?;
         if original.resolved_by.is_some() {
             return Err(StatusCode::CONFLICT);
         }
-        original.resolved_by = Some(message.id.clone());
-    }
-    ledger.messages.push(message.clone());
-    if ledger.messages.len() > 2000 {
-        ledger.messages.remove(0);
     }
     service
-        .save(&ledger)
+        .commit(&mut inner, |ledger| {
+            if let Some(id) = &req.resolves {
+                if let Some(original) = ledger.messages.iter_mut().find(|m| resolved(m, id)) {
+                    original.resolved_by = Some(message.id.clone());
+                }
+            }
+            ledger.messages.push(message.clone());
+            if ledger.messages.len() > 2000 {
+                ledger.messages.remove(0);
+            }
+            Ok::<_, String>(())
+        })
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    inner.ledger = ledger;
     Ok(Json(message))
 }
 
@@ -715,7 +739,7 @@ pub async fn queue_dispatch(
 ) -> Result<(), String> {
     let service = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let mut inner = service.inner.lock().unwrap();
+        let mut inner = service.state();
         if !(1..=6).contains(&concurrency) {
             return Err("Choose between one and six concurrent agents.".into());
         }
@@ -747,34 +771,36 @@ pub async fn queue_dispatch(
 pub async fn queue_cancel(id: String, state: State<'_, Coordinator>) -> Result<(), String> {
     let service = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let mut inner = service.inner.lock().unwrap();
-        let mut ledger = inner.ledger.clone();
-        let item = ledger
-            .items
-            .iter_mut()
-            .find(|i| i.id == id)
-            .ok_or("Task not found")?;
-        if item.run_id.is_some() {
-            return Err(
-                "This task has already been claimed. Stop or review its attempt instead.".into(),
-            );
-        }
-        if ledger
-            .items
-            .iter()
-            .any(|i| !i.canceled && i.dependencies.contains(&id))
-        {
-            return Err("Another task depends on this one. Cancel dependent tasks first.".into());
-        }
-        ledger
-            .items
-            .iter_mut()
-            .find(|i| i.id == id)
-            .unwrap()
-            .canceled = true;
-        service.save(&ledger)?;
-        inner.ledger = ledger;
-        Ok(())
+        let mut inner = service.state();
+        service.commit(&mut inner, |ledger| {
+            let item = ledger
+                .items
+                .iter()
+                .find(|i| i.id == id)
+                .ok_or("Task not found")?;
+            if item.run_id.is_some() {
+                return Err(
+                    "This task has already been claimed. Stop or review its attempt instead."
+                        .into(),
+                );
+            }
+            if ledger
+                .items
+                .iter()
+                .any(|i| !i.canceled && i.dependencies.contains(&id))
+            {
+                return Err(
+                    "Another task depends on this one. Cancel dependent tasks first.".into(),
+                );
+            }
+            ledger
+                .items
+                .iter_mut()
+                .find(|i| i.id == id)
+                .unwrap()
+                .canceled = true;
+            Ok(())
+        })
     })
     .await
     .map_err(|e| e.to_string())?
@@ -788,17 +814,16 @@ pub async fn queue_release(
 ) -> Result<(), String> {
     let service = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-    let mut inner = service.inner.lock().unwrap();
-    let _guard = super::integration::execution_guard()?;
+    service.transact(|inner, _guard| {
     let runs = service.runtime.integration_runs()?;
-    let mut ledger = inner.ledger.clone();
-    let item = ledger
+    let item = inner.ledger
         .items
         .iter()
         .find(|i| i.id == id)
-        .ok_or("Task not found")?;
-    if ledger.managed_tasks.iter().any(|task| Some(&task.id) == item.feature_id.as_ref()) {
-        if ledger.items.iter().any(|child| child.dependencies.contains(&id) && child.run_id.is_some()) {
+        .ok_or("Task not found")?
+        .clone();
+    if inner.ledger.managed_tasks.iter().any(|task| Some(&task.id) == item.feature_id.as_ref()) {
+        if inner.ledger.items.iter().any(|child| child.dependencies.contains(&id) && child.run_id.is_some()) {
             return Err("Dependent work already uses this assignment. Follow up on the final combined result instead.".into());
         }
         if let Some(feature_id) = &item.feature_id { inner.enabled.remove(&managed::dispatch_key(feature_id)); }
@@ -811,7 +836,7 @@ pub async fn queue_release(
         }
     }
     if !retry
-        && ledger
+        && inner.ledger
             .items
             .iter()
             .any(|i| !i.canceled && i.dependencies.contains(&id))
@@ -821,7 +846,6 @@ pub async fn queue_release(
                 .into(),
         );
     }
-    let item = ledger.items.iter_mut().find(|i| i.id == id).unwrap();
     if retry {
         if let Some(old_id) = &item.run_id {
             for run in &runs {
@@ -830,15 +854,20 @@ pub async fn queue_release(
                 }
             }
         }
-        item.run_id = None;
-        item.error = None;
-    } else {
-        item.canceled = true;
     }
-    service.save(&ledger)?;
-    inner.ledger = ledger;
+    service.commit(inner, |ledger| {
+        let item = ledger.items.iter_mut().find(|i| i.id == id).unwrap();
+        if retry {
+            item.run_id = None;
+            item.error = None;
+        } else {
+            item.canceled = true;
+        }
+        Ok::<_, String>(())
+    })?;
     inner.grants.retain(|_, (task, _)| task != &id);
     Ok(())
+    })
     }).await.map_err(|e| e.to_string())?
 }
 

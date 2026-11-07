@@ -32,16 +32,18 @@ fn unreadable_queue_keeps_the_app_available_without_overwriting_assignments() {
     std::fs::write(&path, b"{incomplete queue").unwrap();
     let service = Coordinator::new(queue.clone(), runtime.clone()).unwrap();
     assert!(service.view().err().unwrap().contains("original remains"));
-    assert!(service.save(&Ledger::default()).is_err());
+    assert!(service
+        .commit(&mut service.state(), |_| Ok::<_, String>(()))
+        .is_err());
     assert!(service.tick().is_err());
     assert!(service.ensure_storage_loaded().is_err());
-    assert!(service.inner.lock().unwrap().enabled.is_empty());
+    assert!(service.state().enabled.is_empty());
     assert_eq!(std::fs::read(&path).unwrap(), b"{incomplete queue");
     drop(service);
     std::fs::write(&path, serde_json::to_vec(&Ledger::default()).unwrap()).unwrap();
     let restored = Coordinator::new(queue, runtime.clone()).unwrap();
     assert!(restored.view().unwrap().items.is_empty());
-    assert!(restored.inner.lock().unwrap().enabled.is_empty());
+    assert!(restored.state().enabled.is_empty());
     drop(restored);
     drop(runtime);
     std::fs::remove_dir_all(folder).unwrap();
@@ -116,15 +118,15 @@ fn import_orders_dependencies_and_rejects_cycles_and_missing_keys() {
 }
 #[test]
 fn scopes_detect_shared_ownership_without_sibling_false_positives() {
-    assert!(overlaps(
+    assert!(any_overlap(
         &scopes(vec!["apps\\desktop/".into()]).unwrap(),
         &vec!["apps/desktop/src/main.ts".into()]
     ));
-    assert!(!overlaps(
+    assert!(!any_overlap(
         &vec!["docs/a.md".into()],
         &vec!["docs/b.md".into()]
     ));
-    assert!(overlaps(&vec![".".into()], &vec!["anything".into()]));
+    assert!(any_overlap(&vec![".".into()], &vec!["anything".into()]));
     assert!(scopes(vec!["../outside".into()]).is_err());
     assert!(scopes(vec!["C:/outside".into()]).is_err());
 }
@@ -188,8 +190,8 @@ fn queue_is_durable_exclusively_owned_and_paused_after_restart() {
         .insert("project".into());
     drop(service);
     let restored = Coordinator::new(dir.join("queue"), runtime).unwrap();
-    assert!(restored.inner.lock().unwrap().enabled.is_empty());
-    assert_eq!(restored.inner.lock().unwrap().ledger.items[0].id, id);
+    assert!(restored.state().enabled.is_empty());
+    assert_eq!(restored.state().ledger.items[0].id, id);
     assert!(restored.authorized(&HeaderMap::new()).is_err());
     drop(restored);
     assert!(dir.starts_with(std::env::temp_dir()));
@@ -247,7 +249,7 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
     assert!(service
         .import(request(vec![entry("first", &[]), invalid]))
         .is_err());
-    assert!(service.inner.lock().unwrap().ledger.items.is_empty());
+    assert!(service.state().ledger.items.is_empty());
     let mut shared = entry("shared", &[]);
     shared.scopes = vec!["docs/first.md".into()];
     service
@@ -269,7 +271,7 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
         ]))
         .unwrap();
     assert_eq!(retry_ids.len(), 4);
-    assert_eq!(service.inner.lock().unwrap().ledger.items.len(), 4);
+    assert_eq!(service.state().ledger.items.len(), 4);
     shared.scopes = vec!["different".into()];
     assert!(service
         .import(request(vec![
@@ -279,7 +281,7 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
             entry("after", &["first"])
         ]))
         .is_err());
-    let mut inner = service.inner.lock().unwrap();
+    let mut inner = service.state();
     inner.enabled.insert("project".into());
     let first = ready_items(&inner, &[], &[]);
     assert_eq!(first.len(), 2);

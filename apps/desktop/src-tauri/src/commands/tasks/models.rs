@@ -244,6 +244,48 @@ pub struct RunRequest {
     pub coordination: Option<CoordinationContext>,
 }
 
+impl RunRequest {
+    /// A new attempt with a fresh id, in its own worktree, with every option at
+    /// its default. Callers set the fields they need with struct update syntax.
+    pub(in crate::commands) fn new(
+        project_id: &str,
+        project_name: &str,
+        project_path: &str,
+        agent: &str,
+        prompt: String,
+    ) -> Self {
+        Self {
+            live_session_id: None,
+            effort: None,
+            codex_speed: None,
+            dependency_snapshot: Default::default(),
+            monitor_change: None,
+            context_selection: Default::default(),
+            context_receipt: Default::default(),
+            model: None,
+            id: uuid::Uuid::new_v4().to_string(),
+            project_id: project_id.into(),
+            project_name: project_name.into(),
+            project_path: project_path.into(),
+            agent: agent.into(),
+            agent_profile_id: None,
+            verify_command: None,
+            prepare_command: None,
+            setup_files: Vec::new(),
+            auto_verify: false,
+            target_branch: None,
+            account_binding: None,
+            prompt,
+            isolated: true,
+            workspace_mode: None,
+            previous_run_id: None,
+            retry_of: None,
+            connection_ids: None,
+            coordination: None,
+        }
+    }
+}
+
 /// Where new work in a Git project runs.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

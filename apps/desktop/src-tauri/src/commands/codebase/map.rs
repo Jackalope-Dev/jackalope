@@ -154,13 +154,8 @@ fn cache_entry(cache: &Mutex<HashMap<String, Entry>>, key: String) -> Option<Ent
 }
 
 fn cached_snapshot(root: &Path) -> Option<(Arc<CodebaseSnapshot>, bool)> {
-    let clean = crate::commands::git_command::command(
-        root,
-        &["status", "--porcelain=v1", "--untracked-files=normal"],
-        crate::commands::git_command::Policy::Inspection,
-    )
-    .output()
-    .is_ok_and(|output| output.status.success() && output.stdout.is_empty());
+    use crate::commands::repo::{is_dirty, Policy, Untracked};
+    let clean = is_dirty(root, Untracked::Normal, Policy::Inspection) == Ok(false);
     if !clean {
         return Some((Arc::new(scan(root).ok()?), false));
     }

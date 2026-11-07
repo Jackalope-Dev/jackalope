@@ -635,19 +635,24 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 .and_then(|project| project.preferred_runner.as_deref())
                 .filter(|agent| !agent.is_empty())
                 .unwrap_or("auto");
-            let request: super::tasks::RunRequest = serde_json::from_value(serde_json::json!({
-                "id": format!("cli-{}", uuid::Uuid::new_v4().simple()),
-                "projectId": project.id,
-                "projectName": project.name,
-                "projectPath": project.path,
-                "agent": agent.as_deref().filter(|agent| !agent.is_empty()).unwrap_or(default_agent),
-                "model": model.filter(|model| !model.trim().is_empty()),
-                "prompt": "",
-                "isolated": true,
-                "workspaceMode": super::project_registry::settings(&app.state::<TaskRuntime>(), &project.id).workspace_mode,
-                "previousRunId": null,
-            }))
-            .map_err(|error| error.to_string())?;
+            let request = super::tasks::RunRequest {
+                id: format!("cli-{}", uuid::Uuid::new_v4().simple()),
+                model: model.filter(|model| !model.trim().is_empty()),
+                workspace_mode: Some(
+                    super::project_registry::settings(&app.state::<TaskRuntime>(), &project.id)
+                        .workspace_mode,
+                ),
+                ..super::tasks::RunRequest::new(
+                    &project.id,
+                    &project.name,
+                    &project.path,
+                    agent
+                        .as_deref()
+                        .filter(|agent| !agent.is_empty())
+                        .unwrap_or(default_agent),
+                    String::new(),
+                )
+            };
             let first = super::live_sessions::FirstMessage {
                 id: uuid::Uuid::new_v4().to_string(),
                 text,
@@ -1171,18 +1176,18 @@ async fn handle(request: Request, app: &AppHandle) -> Result<Response, String> {
                 .and_then(|project| project.preferred_runner.clone())
                 .filter(|agent| !agent.is_empty())
                 .unwrap_or_else(|| policy.default_meta_agent.clone());
-            let template: super::tasks::RunRequest = serde_json::from_value(serde_json::json!({
-                "id": format!("plan-{}", uuid::Uuid::new_v4().simple()),
-                "projectId": project.id,
-                "projectName": project.name,
-                "projectPath": project.path,
-                "agent": agent.filter(|agent| !agent.is_empty()).unwrap_or(default_agent),
-                "model": null,
-                "prompt": "",
-                "isolated": true,
-                "previousRunId": null,
-            }))
-            .map_err(|error| error.to_string())?;
+            let template = super::tasks::RunRequest {
+                id: format!("plan-{}", uuid::Uuid::new_v4().simple()),
+                ..super::tasks::RunRequest::new(
+                    &project.id,
+                    &project.name,
+                    &project.path,
+                    &agent
+                        .filter(|agent| !agent.is_empty())
+                        .unwrap_or(default_agent),
+                    String::new(),
+                )
+            };
             let coordinator = app
                 .state::<super::coordination::Coordinator>()
                 .inner()

@@ -32,11 +32,13 @@ async fn installed_agents_share_live_work_and_split_off_subtasks() {
     let project = Uuid::new_v4().to_string();
     {
         // The user's Split this task consent, granted up front for the UI worker.
-        let mut inner = coordinator.inner.lock().unwrap();
-        let mut ledger = inner.ledger.clone();
-        ledger.subtask_grants.push(ui.clone());
-        coordinator.save(&ledger).unwrap();
-        inner.ledger = ledger;
+        let mut inner = coordinator.state();
+        coordinator
+            .commit(&mut inner, |ledger| {
+                ledger.subtask_grants.push(ui.clone());
+                Ok::<_, String>(())
+            })
+            .unwrap();
     }
     let common = "This is an authorized disposable Jackalope coordination trial. Use only Jackalope tools for coordination. Never print credentials or bypass denied tools. Do not commit, invoke Git or create worktrees. Do not call ask_user. Tool errors are evidence: report them, do not fabricate success. Another worker runs concurrently in its own worktree.";
     let prompts = [
@@ -65,7 +67,7 @@ async fn installed_agents_share_live_work_and_split_off_subtasks() {
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
     let runs = runtime.integration_runs().unwrap();
-    let ledger = coordinator.inner.lock().unwrap().ledger.clone();
+    let ledger = coordinator.state().ledger.clone();
     let read = |id: &str, path: &str| {
         runs.iter()
             .find(|r| r.id == id)

@@ -1514,11 +1514,15 @@ pub fn override_answer(
         .runtime
         .run_snapshot(&run_id)
         .ok_or("The asking task is no longer in history.")?;
-    let by = crate::commands::tasks::git(&record.project_path, &["config", "user.name"])
-        .ok()
-        .map(|name| name.trim().to_string())
-        .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| "you".into());
+    let by = crate::commands::repo::git(
+        std::path::Path::new(&record.project_path),
+        &["config", "user.name"],
+        crate::commands::repo::Policy::Inspection,
+    )
+    .ok()
+    .map(|name| name.trim().to_string())
+    .filter(|name| !name.is_empty())
+    .unwrap_or_else(|| "you".into());
     coordinator.tell_task(
         &run,
         format!(

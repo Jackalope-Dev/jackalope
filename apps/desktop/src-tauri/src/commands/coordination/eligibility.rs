@@ -42,23 +42,8 @@ pub(super) fn ordered_plan(items: Vec<PlanEntry>) -> Result<Vec<PlanEntry>, Stri
     Ok(ordered)
 }
 
-pub(super) fn overlaps(a: &[String], b: &[String]) -> bool {
-    a.iter().any(|a| {
-        b.iter().any(|b| {
-            a == "."
-                || b == "."
-                || a == b
-                || a.starts_with(&format!("{b}/"))
-                || b.starts_with(&format!("{a}/"))
-        })
-    })
-}
-
-fn covered(paths: &[String], path: &str) -> bool {
-    paths
-        .iter()
-        .any(|p| p == "." || p == path || path.starts_with(&format!("{p}/")))
-}
+use crate::commands::scope_path::{self, ScopePath};
+pub(super) use crate::commands::scope_path::{any_contains, any_overlap};
 
 /// Whether two items own a common path that neither handed to a subtask.
 pub(super) fn item_overlap(ledger: &Ledger, a: &QueueItem, b: &QueueItem) -> bool {
@@ -66,16 +51,14 @@ pub(super) fn item_overlap(ledger: &Ledger, a: &QueueItem, b: &QueueItem) -> boo
     let right = agreements::effective_scopes(ledger, b);
     left.iter().any(|x| {
         right.iter().any(|y| {
-            let deeper = if x == "." {
+            let deeper = if scope_path::contains(x, y) {
                 y
-            } else if y == "." || x == y || x.starts_with(&format!("{y}/")) {
+            } else if scope_path::contains(y, x) {
                 x
-            } else if y.starts_with(&format!("{x}/")) {
-                y
             } else {
                 return false;
             };
-            !covered(&a.excluded_scopes, deeper) && !covered(&b.excluded_scopes, deeper)
+            !any_contains(&a.excluded_scopes, deeper) && !any_contains(&b.excluded_scopes, deeper)
         })
     })
 }
@@ -86,13 +69,18 @@ pub(super) fn scopes(values: Vec<String>) -> Result<Vec<String>, String> {
             "Name the files or folders this task owns (use . for the whole project).".into(),
         );
     }
-    values.into_iter().map(|value| {
-        let value = value.trim().replace('\\', "/").trim_end_matches('/').to_lowercase();
-        if value.is_empty() || value.chars().any(char::is_control) || value.len() > 500 || value.starts_with('/') || value.contains(':') || value.contains('*') || value.split('/').any(|p| p == ".." || (p == "." && value != ".") || p.is_empty()) {
-            return Err("Scopes must be relative file or folder paths, without wildcards or parent traversal.".into());
-        }
-        Ok(value)
-    }).collect()
+    values
+        .into_iter()
+        .map(|value| {
+            ScopePath::parse(&value)
+                .filter(|path| !path.as_str().contains('*'))
+                .map(|path| path.key())
+                .ok_or_else(|| {
+                    "Scopes must be relative file or folder paths, without wildcards or parent traversal."
+                        .into()
+                })
+        })
+        .collect()
 }
 
 fn dependency_priority(items: &[QueueItem]) -> HashMap<String, usize> {

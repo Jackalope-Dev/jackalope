@@ -71,28 +71,23 @@ pub(in crate::commands) async fn bridge_ack(
     Json(input): Json<AckInput>,
 ) -> Result<Json<CoordinationMessage>, StatusCode> {
     let item = service.authorized(&headers)?;
-    let mut inner = service
-        .inner
-        .lock()
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let mut ledger = inner.ledger.clone();
-    let message = ledger
-        .messages
-        .iter_mut()
-        .find(|m| m.id == input.id && visible(m, &item))
-        .ok_or(StatusCode::NOT_FOUND)?;
-    if !message.acknowledged_by.contains(&item.id) {
-        if message.acknowledged_by.len() >= 256 {
-            return Err(StatusCode::CONFLICT);
-        }
-        message.acknowledged_by.push(item.id);
-    }
-    let response = message.clone();
+    let mut inner = service.state();
     service
-        .save(&ledger)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    inner.ledger = ledger;
-    Ok(Json(response))
+        .commit(&mut inner, |ledger| {
+            let message = ledger
+                .messages
+                .iter_mut()
+                .find(|m| m.id == input.id && visible(m, &item))
+                .ok_or(StatusCode::NOT_FOUND)?;
+            if !message.acknowledged_by.contains(&item.id) {
+                if message.acknowledged_by.len() >= 256 {
+                    return Err(StatusCode::CONFLICT);
+                }
+                message.acknowledged_by.push(item.id.clone());
+            }
+            Ok(message.clone())
+        })
+        .map(Json)
 }
 
 #[cfg(test)]

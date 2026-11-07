@@ -347,7 +347,6 @@ pub async fn task_outcome_snapshot(
         let _guard = integration::execution_guard()?;
         let run = idle_run(&runtime, &id)?;
         let directory = runtime.integration_directory();
-        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         integration::workspace_tree(&run, &directory)
     })
     .await
@@ -369,7 +368,6 @@ pub fn record(runtime: &TaskRuntime, review: OutcomeReview) -> Result<(), String
     let _guard = integration::execution_guard()?;
     let run = idle_run(runtime, &review.run_id)?;
     let directory = runtime.integration_directory();
-    std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
     let tree = integration::workspace_tree(&run, &directory)?;
     if tree != review.expected_tree {
         return Err(

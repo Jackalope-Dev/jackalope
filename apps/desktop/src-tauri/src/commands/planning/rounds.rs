@@ -207,12 +207,7 @@ pub fn parse_verdict(text: &str) -> Result<Verdict, String> {
 }
 
 fn protected(scope: &str) -> bool {
-    let scope = scope
-        .trim()
-        .replace('\\', "/")
-        .trim_start_matches("./")
-        .to_ascii_lowercase();
-    scope == ".jackalope" || scope.starts_with(".jackalope/")
+    crate::commands::scope_path::contains(".jackalope", scope)
 }
 
 /// The next round's assignments in the managed-task JSON shape, so the usual
@@ -460,16 +455,8 @@ fn normalize(scope: &str) -> String {
 
 /// Whether two scopes can touch the same files: equal, nested, or the root.
 pub fn overlaps(a: &str, b: &str) -> bool {
-    let (a, b) = (
-        normalize(a).to_ascii_lowercase(),
-        normalize(b).to_ascii_lowercase(),
-    );
-    let root = |scope: &str| scope.is_empty() || scope == ".";
-    root(a.as_str())
-        || root(b.as_str())
-        || a == b
-        || a.starts_with(&format!("{b}/"))
-        || b.starts_with(&format!("{a}/"))
+    let root = |scope: &str| normalize(scope).is_empty();
+    root(a) || root(b) || crate::commands::scope_path::overlaps(a, b)
 }
 
 /// Splits a plan into at most `most` review areas by its tasks' scopes,

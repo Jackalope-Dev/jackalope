@@ -112,7 +112,7 @@ fn validate_claim(
             && a.kind == "ownership"
             && live(a)
             && a.id != except
-            && (a.resource == resource || overlaps(&a.paths, paths))
+            && (a.resource == resource || any_overlap(&a.paths, paths))
     }) {
         return Err(format!(
             "Already claimed by task {} (agreement {}). Request a handoff from that owner.",
@@ -124,7 +124,7 @@ fn validate_claim(
             && i.id != owner
             && !i.canceled
             && i.run_id.as_ref().is_none_or(|id| !merged.contains(id))
-            && overlaps(&i.scopes, paths)
+            && any_overlap(&i.scopes, paths)
     }) {
         return Err(format!("These paths belong to {}. Keep the existing assignment or revise the plan with the user.", other.title));
     }
@@ -154,7 +154,7 @@ pub(super) fn require_clean_paths(
             continue;
         }
         let (_, paths) = super::scope_audit::changed_paths(run)?;
-        if overlaps(&a.paths, &paths) {
+        if any_overlap(&a.paths, &paths) {
             return Err("The owner still has changes in these paths. Preserve or integrate that work before transferring or releasing ownership.".into());
         }
     }
@@ -288,7 +288,7 @@ pub(super) fn change(
             if ledger
                 .items
                 .iter()
-                .any(|i| i.id == actor.id && overlaps(&i.scopes, &a.paths))
+                .any(|i| i.id == actor.id && any_overlap(&i.scopes, &a.paths))
             {
                 return Err("This claim includes the original task's declared scope. Revise the plan with the user before transferring those paths.".into());
             }
@@ -392,33 +392,30 @@ pub(in crate::commands) async fn bridge_agreement(
         .authorized(&headers)
         .map_err(|s| (s, "This task cannot access coordination.".into()))?;
     tauri::async_runtime::spawn_blocking(move || {
-        let mut inner = service
-            .inner
-            .lock()
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        let _guard = crate::commands::integration::execution_guard()
-            .map_err(|e| (StatusCode::CONFLICT, e))?;
-        service
-            .authorized_locked(&inner, &headers)
-            .map_err(|s| (s, "This task is no longer active.".into()))?;
-        let runs = service
-            .runtime
-            .integration_runs()
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
-        let mut ledger = inner.ledger.clone();
-        let before = serde_json::to_vec(&ledger.agreements).unwrap_or_default();
-        let merged = crate::commands::integration::applied_run_ids(&service.runtime)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
-        let result = change(&mut ledger, &runs, &actor, input, &merged)
-            .map_err(|e| (StatusCode::CONFLICT, e))?;
-        if before != serde_json::to_vec(&ledger.agreements).unwrap_or_default() {
-            announce(&mut ledger, &result, &actor.id);
+        service.transact(|inner, _guard| {
             service
-                .save(&ledger)
+                .authorized_locked(&inner, &headers)
+                .map_err(|s| (s, "This task is no longer active.".into()))?;
+            let runs = service
+                .runtime
+                .integration_runs()
                 .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
-            inner.ledger = ledger;
-        }
-        Ok(Json(result))
+            let merged = crate::commands::integration::applied_run_ids(&service.runtime)
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+            let mut ledger = inner.ledger.clone();
+            let result = change(&mut ledger, &runs, &actor, input, &merged)
+                .map_err(|e| (StatusCode::CONFLICT, e))?;
+            if serde_json::to_vec(&inner.ledger.agreements).ok()
+                != serde_json::to_vec(&ledger.agreements).ok()
+            {
+                service.commit(inner, |saved| {
+                    *saved = ledger;
+                    announce(saved, &result, &actor.id);
+                    Ok::<_, (StatusCode, String)>(())
+                })?;
+            }
+            Ok(Json(result))
+        })
     })
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?

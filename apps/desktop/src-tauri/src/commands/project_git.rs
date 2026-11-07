@@ -1,3 +1,4 @@
+use super::repo::{self, Policy};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, process::Command};
 
@@ -25,21 +26,11 @@ fn enabled() -> bool {
     true
 }
 
-fn git(path: &Path, args: &[&str]) -> Result<String, String> {
-    let output = super::git_command::command(path, args, super::git_command::Policy::Inspection)
-        .output()
-        .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().into());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().into())
-}
-
 pub(super) fn read(path: &Path) -> Result<CommitPolicy, String> {
-    let output = super::git_command::command(
+    let output = repo::command(
         path,
         &["config", "--local", "--get", "jackalope.commitPolicy"],
-        super::git_command::Policy::Inspection,
+        Policy::Inspection,
     )
     .output()
     .map_err(|e| e.to_string())?;
@@ -52,8 +43,8 @@ pub(super) fn read(path: &Path) -> Result<CommitPolicy, String> {
     }
     Ok(CommitPolicy {
         attribution: Attribution::User,
-        name: git(path, &["config", "user.name"]).unwrap_or_default(),
-        email: git(path, &["config", "user.email"]).unwrap_or_default(),
+        name: repo::git(path, &["config", "user.name"], Policy::Inspection).unwrap_or_default(),
+        email: repo::git(path, &["config", "user.email"], Policy::Inspection).unwrap_or_default(),
         cleanup_after_merge: true,
         auto_checkpoint: true,
     })
@@ -142,7 +133,7 @@ pub async fn project_git_policy(
         let path = Path::new(&project_path);
         if let Some(policy) = policy {
             policy.validate()?;
-            git(
+            repo::git(
                 path,
                 &[
                     "config",
@@ -150,6 +141,7 @@ pub async fn project_git_policy(
                     "jackalope.commitPolicy",
                     &serde_json::to_string(&policy).map_err(|e| e.to_string())?,
                 ],
+                Policy::Inspection,
             )?;
         }
         read(path)

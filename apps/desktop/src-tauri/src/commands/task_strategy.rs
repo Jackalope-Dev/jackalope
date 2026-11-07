@@ -96,13 +96,14 @@ pub(super) fn source_head(request: &RunRequest) -> Result<String, String> {
         &request.project_path,
         request.target_branch.as_deref(),
     )?;
-    super::tasks::git(
-        &request.project_path,
+    super::repo::git(
+        std::path::Path::new(&request.project_path),
         &[
             "rev-parse",
             "--verify",
             &format!("refs/heads/{branch}^{{commit}}"),
         ],
+        super::repo::Policy::Inspection,
     )
 }
 
@@ -436,8 +437,12 @@ pub(crate) fn assess(
         && !restrictions(&saved_context.text());
     let scopes = explicit_scopes(root, &intent);
     let (fallback, local_reason, cheap) = local_strategy(&intent, allowed, &scopes);
-    let diff = super::tasks::git(&request.project_path, &["diff", "HEAD", "--", "."])
-        .unwrap_or_else(|_| "unavailable".into());
+    let diff = super::repo::git(
+        std::path::Path::new(&request.project_path),
+        &["diff", "HEAD", "--", "."],
+        super::repo::Policy::Inspection,
+    )
+    .unwrap_or_else(|_| "unavailable".into());
     let repository = decisions::context::repository(&request);
     let routing_context_hash = routing_context_hash(runtime, &request, &repository)?;
     let fingerprint = serde_json::to_vec(&(

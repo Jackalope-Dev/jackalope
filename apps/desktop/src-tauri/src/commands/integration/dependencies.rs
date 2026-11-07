@@ -89,7 +89,11 @@ pub fn prepare_dependencies(
     let selected = selected_runs(runs, ids)?;
     let project = canonical(&selected[0].project_path)?;
     let target = selected[0].target_branch.as_deref().unwrap_or("master");
-    let mut combined = git(&project, &["rev-parse", &format!("refs/heads/{target}")])?;
+    let mut combined = repo::git(
+        &project,
+        &["rev-parse", &format!("refs/heads/{target}")],
+        Snapshot,
+    )?;
     let mut sources = Vec::<IntegrationSource>::new();
     if let Some(resolver) = selected
         .iter()
@@ -132,9 +136,10 @@ pub fn prepare_dependencies(
             &[&run.base_head],
             &format!("feat: integrate completed task {}", run.id),
         )?;
-        let output = command(
+        let output = repo::command(
             &project,
             &["merge-tree", "--write-tree", &combined, &commit],
+            Snapshot,
         )
         .output()
         .map_err(|e| e.to_string())?;
@@ -156,13 +161,14 @@ pub fn prepare_dependencies(
             sources.push(source);
         }
     }
-    git(
+    repo::git(
         &project,
         &[
             "update-ref",
             &format!("refs/jackalope/dependencies/{id}"),
             &combined,
         ],
+        Snapshot,
     )?;
     Ok(DependencySnapshot {
         base: combined,
@@ -182,7 +188,11 @@ pub(in crate::commands) fn reconciliation_input(
     selected.sort_by_key(|run| run.dependency_snapshot.sources.len());
     let project = canonical(&selected[0].project_path)?;
     let target = selected[0].target_branch.as_deref().unwrap_or("master");
-    let target_head = git(&project, &["rev-parse", &format!("refs/heads/{target}")])?;
+    let target_head = repo::git(
+        &project,
+        &["rev-parse", &format!("refs/heads/{target}")],
+        Snapshot,
+    )?;
     let mut combined = target_head.clone();
     let mut sources = Vec::<IntegrationSource>::new();
     if let Some(resolver) = selected
@@ -232,9 +242,10 @@ pub(in crate::commands) fn reconciliation_input(
             &[&run.base_head],
             "Jackalope reconciliation input",
         )?;
-        let output = command(
+        let output = repo::command(
             &project,
             &["merge-tree", "--write-tree", &combined, &commit],
+            Snapshot,
         )
         .output()
         .map_err(|e| e.to_string())?;
@@ -255,13 +266,14 @@ pub(in crate::commands) fn reconciliation_input(
         )?;
         sources.push(source);
     }
-    git(
+    repo::git(
         &project,
         &[
             "update-ref",
             &format!("refs/jackalope/dependencies/{id}"),
             &combined,
         ],
+        Snapshot,
     )?;
     Ok(DependencySnapshot {
         base: combined,

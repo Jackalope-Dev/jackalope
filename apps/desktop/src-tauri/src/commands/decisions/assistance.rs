@@ -263,8 +263,8 @@ pub fn review(
     {
         return Ok(None);
     }
-    let patch = crate::commands::tasks::git(
-        &run.workspace,
+    let patch = crate::commands::repo::git(
+        std::path::Path::new(&run.workspace),
         &[
             "diff",
             "--no-ext-diff",
@@ -272,13 +272,19 @@ pub fn review(
             "--no-color",
             &run.base_head,
         ],
+        crate::commands::repo::Policy::Inspection,
     )
     .ok();
-    let files =
-        crate::commands::tasks::git(&run.workspace, &["diff", "--name-only", &run.base_head]).ok();
-    let untracked = crate::commands::tasks::git(
-        &run.workspace,
+    let files = crate::commands::repo::git(
+        std::path::Path::new(&run.workspace),
+        &["diff", "--name-only", &run.base_head],
+        crate::commands::repo::Policy::Inspection,
+    )
+    .ok();
+    let untracked = crate::commands::repo::git(
+        std::path::Path::new(&run.workspace),
         &["ls-files", "--others", "--exclude-standard"],
+        crate::commands::repo::Policy::Inspection,
     )
     .ok();
     let paths: Vec<_> = files.as_deref().unwrap_or("").lines().take(32).collect();
@@ -335,8 +341,8 @@ pub fn review(
     {
         return Ok(None);
     }
-    let current_patch = crate::commands::tasks::git(
-        &run.workspace,
+    let current_patch = crate::commands::repo::git(
+        std::path::Path::new(&run.workspace),
         &[
             "diff",
             "--no-ext-diff",
@@ -344,11 +350,13 @@ pub fn review(
             "--no-color",
             &run.base_head,
         ],
+        crate::commands::repo::Policy::Inspection,
     )
     .ok();
-    let current_untracked = crate::commands::tasks::git(
-        &run.workspace,
+    let current_untracked = crate::commands::repo::git(
+        std::path::Path::new(&run.workspace),
         &["ls-files", "--others", "--exclude-standard"],
+        crate::commands::repo::Policy::Inspection,
     )
     .ok();
     if patch != current_patch || untracked != current_untracked {

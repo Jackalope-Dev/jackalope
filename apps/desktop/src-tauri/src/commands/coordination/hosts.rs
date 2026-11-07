@@ -131,6 +131,7 @@ impl Coordinator {
     pub(super) fn retry_lost_hosts_locked(
         &self,
         inner: &mut Inner,
+        guard: &ExecutionGuard,
         runs: &[TaskRun],
         merged: &[String],
         url: &str,
@@ -171,7 +172,7 @@ impl Coordinator {
                 }
                 Decision::Place(host) => host,
             };
-            self.start_host_retry(inner, &task, &item, &run, host, runs, url)?;
+            self.start_host_retry(inner, guard, &task, &item, &run, host, runs, url)?;
             return Ok(true);
         }
         Ok(false)
@@ -181,6 +182,7 @@ impl Coordinator {
     fn start_host_retry(
         &self,
         inner: &mut Inner,
+        guard: &ExecutionGuard,
         task: &managed::ManagedTask,
         item: &QueueItem,
         run: &TaskRun,
@@ -190,13 +192,6 @@ impl Coordinator {
     ) -> Result<(), String> {
         let mut request = self.runtime.retry_request(&run.id)?;
         managed::prepare_followup(&inner.ledger, runs, &mut request)?;
-        let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
-        request.coordination = Some(CoordinationContext {
-            managed: true,
-            endpoint: url.into(),
-            token: token.clone(),
-            instructions: instructions(item),
-        });
         let note = format!("Retried on {} as a new attempt.", host.name);
         self.runtime.update(&run.id, |saved| {
             if let Some(lost) = &mut saved.host {
@@ -204,47 +199,52 @@ impl Coordinator {
             }
             crate::commands::tasks::events::activity(saved, &note);
         });
-        let mut ledger = inner.ledger.clone();
-        managed_delivery::capture_interfaces(&mut ledger, item, &request.id);
-        if let Some(saved) = ledger
-            .managed_tasks
-            .iter_mut()
-            .find(|saved| saved.id == task.id)
-        {
-            saved.run_ids.push(request.id.clone());
-        }
-        if let Some(saved) = ledger.items.iter_mut().find(|saved| saved.id == item.id) {
-            saved.run_id = Some(request.id.clone());
-        }
-        self.save(&ledger)?;
-        inner.ledger = ledger;
-        inner
-            .grants
-            .insert(token.clone(), (item.id.clone(), request.id.clone()));
-        let id = request.id.clone();
-        pool::assign(&id, host);
-        let result = (|| {
-            let briefing = self.startup(inner, &request, Some(item))?;
-            request
-                .coordination
-                .as_mut()
-                .unwrap()
-                .instructions
-                .push_str(&briefing);
-            self.register_launch(inner, &request.id)?;
-            self.runtime.start_locked(request)
-        })();
-        if let Err(error) = result {
-            pool::take(&id);
-            inner.grants.remove(&token);
-            let mut ledger = inner.ledger.clone();
-            if let Some(saved) = ledger.items.iter_mut().find(|saved| saved.id == item.id) {
-                saved.error = Some(error);
+        self.commit(inner, |ledger| {
+            managed_delivery::capture_interfaces(ledger, item, &request.id);
+            if let Some(saved) = ledger
+                .managed_tasks
+                .iter_mut()
+                .find(|saved| saved.id == task.id)
+            {
+                saved.run_ids.push(request.id.clone());
             }
-            self.save(&ledger)?;
-            inner.ledger = ledger;
+            if let Some(saved) = ledger.items.iter_mut().find(|saved| saved.id == item.id) {
+                saved.run_id = Some(request.id.clone());
+            }
+            Ok::<_, String>(())
+        })?;
+        let launched = self.launch_assignment(
+            inner,
+            guard,
+            LaunchSpec {
+                request,
+                endpoint: url,
+                managed: true,
+                instructions: instructions(item),
+                grant: item.id.clone(),
+                assigned: Some(item),
+                host: Some(host),
+            },
+        );
+        if let Err(error) = launched {
+            self.record_item_error(inner, &item.id, error)?;
         }
         Ok(())
+    }
+
+    /// Records why a queued item's attempt could not start.
+    pub(super) fn record_item_error(
+        &self,
+        inner: &mut Inner,
+        item_id: &str,
+        error: String,
+    ) -> Result<(), String> {
+        self.commit(inner, |ledger| {
+            if let Some(saved) = ledger.items.iter_mut().find(|saved| saved.id == item_id) {
+                saved.error = Some(error);
+            }
+            Ok(())
+        })
     }
 }
 
@@ -367,7 +367,7 @@ impl Coordinator {
     fn hosts_view(&self, project_id: &str) -> Result<HostsView, String> {
         let root = self.runtime.computers_root();
         let runs = self.runtime.integration_runs()?;
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.state();
         if !inner.pool.loaded {
             self.refresh_pool_locked(&mut inner);
         }
@@ -461,7 +461,7 @@ pub async fn queue_set_hosts(
             },
         )?;
         {
-            let mut inner = service.inner.lock().unwrap();
+            let mut inner = service.state();
             service.refresh_pool_locked(&mut inner);
         }
         service.hosts_view(&project_id)

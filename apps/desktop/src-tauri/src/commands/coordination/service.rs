@@ -8,7 +8,7 @@ impl Coordinator {
     pub(super) fn view(&self) -> Result<QueueView, String> {
         self.ensure_storage_loaded()?;
         let merged_run_ids = crate::commands::integration::applied_run_ids(&self.runtime)?;
-        let inner = self.inner.lock().unwrap();
+        let inner = self.state();
         Ok(QueueView {
             managed_tasks: inner.ledger.managed_tasks.clone(),
             assist_policies: inner.ledger.assist_policies.clone(),
@@ -108,12 +108,8 @@ impl Coordinator {
         Ok(id)
     }
     pub(super) fn add(&self, req: QueueRequest) -> Result<String, String> {
-        let mut inner = self.inner.lock().unwrap();
-        let mut ledger = inner.ledger.clone();
-        let id = Self::append(&mut ledger, req)?;
-        self.save(&ledger)?;
-        inner.ledger = ledger;
-        Ok(id)
+        let mut inner = self.state();
+        self.commit(&mut inner, |ledger| Self::append(ledger, req))
     }
 
     pub(super) fn import(&self, request: PlanRequest) -> Result<Vec<String>, String> {
@@ -143,7 +139,7 @@ impl Coordinator {
             return Err("Enable automatic project verification and save its command before using staged dependencies.".into());
         }
         let items = ordered_plan(request.items)?;
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.state();
         if let Some(feature_id) = &request.feature_id {
             if uuid::Uuid::parse_str(feature_id).is_err() {
                 return Err("Invalid feature identifier.".into());
@@ -198,42 +194,42 @@ impl Coordinator {
                 return Ok(existing.iter().map(|item| item.id.clone()).collect());
             }
         }
-        let mut ledger = inner.ledger.clone();
-        let mut ids = HashMap::new();
-        let mut created = Vec::new();
-        for item in items {
-            let id = Self::append(
-                &mut ledger,
-                QueueRequest {
-                    staged_dependencies: request.staged_dependencies,
-                    feature: request.feature.clone(),
-                    feature_id: request.feature_id.clone(),
-                    context_selection: item.context_selection,
-                    project_id: request.project_id.clone(),
-                    project_name: request.project_name.clone(),
-                    project_path: request.project_path.clone(),
-                    target_branch: request.target_branch.clone(),
-                    agent_profile_id: request.agent_accounts.get(&item.agent).cloned(),
-                    verify_command: request.verify_command.clone(),
-                    prepare_command: request.prepare_command.clone(),
-                    setup_files: request.setup_files.clone(),
-                    auto_verify: request.auto_verify,
-                    title: item.title,
-                    prompt: item.prompt,
-                    agent: item.agent,
-                    scopes: item.scopes,
-                    dependencies: item
-                        .depends_on
-                        .iter()
-                        .map(|key| ids.get(key).cloned().ok_or("Dependency order is invalid"))
-                        .collect::<Result<_, _>>()?,
-                },
-            )?;
-            ids.insert(item.key, id.clone());
-            created.push(id);
-        }
-        self.save(&ledger)?;
-        inner.ledger = ledger;
+        let created = self.commit(&mut inner, |ledger| {
+            let mut ids = HashMap::new();
+            let mut created = Vec::new();
+            for item in items {
+                let id = Self::append(
+                    ledger,
+                    QueueRequest {
+                        staged_dependencies: request.staged_dependencies,
+                        feature: request.feature.clone(),
+                        feature_id: request.feature_id.clone(),
+                        context_selection: item.context_selection,
+                        project_id: request.project_id.clone(),
+                        project_name: request.project_name.clone(),
+                        project_path: request.project_path.clone(),
+                        target_branch: request.target_branch.clone(),
+                        agent_profile_id: request.agent_accounts.get(&item.agent).cloned(),
+                        verify_command: request.verify_command.clone(),
+                        prepare_command: request.prepare_command.clone(),
+                        setup_files: request.setup_files.clone(),
+                        auto_verify: request.auto_verify,
+                        title: item.title,
+                        prompt: item.prompt,
+                        agent: item.agent,
+                        scopes: item.scopes,
+                        dependencies: item
+                            .depends_on
+                            .iter()
+                            .map(|key| ids.get(key).cloned().ok_or("Dependency order is invalid"))
+                            .collect::<Result<_, _>>()?,
+                    },
+                )?;
+                ids.insert(item.key, id.clone());
+                created.push(id);
+            }
+            Ok::<_, String>(created)
+        })?;
         if !inner
             .ledger
             .managed_tasks
@@ -252,61 +248,62 @@ impl Coordinator {
         // Swarm rounds take the plan store and coordinator locks one at a time.
         crate::commands::planning::rounds::tick(self);
         self.runtime.access.ensure()?;
-        self.ensure_storage_loaded()?;
-        let mut inner = self.inner.lock().unwrap();
-        self.refresh_pool_locked(&mut inner);
-        let _guard = crate::commands::integration::execution_guard()?;
-        self.runtime.ensure_history_saved()?;
-        let merged = crate::commands::integration::applied_run_ids(&self.runtime)?;
-        let runs = self.runtime.integration_runs()?;
-        let Some(url) = inner.url.clone() else {
-            return Ok(());
-        };
-        inner.error = None;
-        let due = self
-            .scope_checked
-            .lock()
-            .unwrap()
-            .is_none_or(|last| last.elapsed() >= Duration::from_secs(10));
-        if due || !ready_items(&inner, &runs, &merged).is_empty() {
-            self.refresh_scopes_locked(&mut inner)?;
-            *self.scope_checked.lock().unwrap() = Some(std::time::Instant::now());
-        }
-        if self.retry_lost_hosts_locked(&mut inner, &runs, &merged, &url)? {
-            return Ok(());
-        }
-        if self.deliver_managed_locked(&mut inner, &runs, &merged, &url)? {
-            return Ok(());
-        }
-        if self.apply_managed_locked(&mut inner, &runs, &merged)? {
-            return Ok(());
-        }
-        if self.assist_locked(&mut inner, &runs, &merged, &url)? {
-            return Ok(());
-        }
-        let reserved = placed_items(&inner, &runs, &merged);
-        for (item, host) in reserved {
-            let host = match host {
-                Ok(host) => host,
-                Err(reason) => {
-                    // No host the work may use can take it: it waits for the
-                    // person, like any other dispatch error.
-                    if let Some(saved) = inner.ledger.items.iter_mut().find(|i| i.id == item.id) {
-                        saved.error = Some(reason);
-                    }
-                    inner.enabled.remove(&item.project_id);
-                    if let Some(id) = &item.feature_id {
-                        inner.enabled.remove(&managed::dispatch_key(id));
-                    }
-                    self.save(&inner.ledger)?;
-                    continue;
-                }
+        self.transact(|inner, guard| {
+            self.refresh_pool_locked(inner);
+            self.runtime.ensure_history_saved()?;
+            let merged = crate::commands::integration::applied_run_ids(&self.runtime)?;
+            let runs = self.runtime.integration_runs()?;
+            let Some(url) = inner.url.clone() else {
+                return Ok(());
             };
-            let run_id = Uuid::new_v4().to_string();
-            let placed_id = run_id.clone();
-            let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
-            let mut ledger = inner.ledger.clone();
-            managed_delivery::capture_interfaces(&mut ledger, &item, &run_id);
+            inner.error = None;
+            let due = self
+                .scope_checked
+                .lock()
+                .unwrap()
+                .is_none_or(|last| last.elapsed() >= Duration::from_secs(10));
+            if due || !ready_items(inner, &runs, &merged).is_empty() {
+                self.refresh_scopes_locked(inner)?;
+                *self.scope_checked.lock().unwrap() = Some(std::time::Instant::now());
+            }
+            if self.retry_lost_hosts_locked(inner, guard, &runs, &merged, &url)? {
+                return Ok(());
+            }
+            if self.deliver_managed_locked(inner, guard, &runs, &merged, &url)? {
+                return Ok(());
+            }
+            if self.apply_managed_locked(inner, &runs, &merged)? {
+                return Ok(());
+            }
+            if self.assist_locked(inner, guard, &runs, &merged, &url)? {
+                return Ok(());
+            }
+            for (item, host) in placed_items(inner, &runs, &merged) {
+                // No host the work may use can take it: it waits for the
+                // person, like any other dispatch error.
+                let result = host
+                    .and_then(|host| self.dispatch_item(inner, guard, &runs, &url, &item, host));
+                if let Err(error) = result {
+                    self.hold_dispatch(inner, &item, error)?;
+                }
+            }
+            self.reconcile_locked(inner)
+        })
+    }
+
+    /// Claims a queued item for a new attempt and launches it on `host`.
+    fn dispatch_item(
+        &self,
+        inner: &mut Inner,
+        guard: &ExecutionGuard,
+        runs: &[crate::commands::tasks::TaskRun],
+        url: &str,
+        item: &QueueItem,
+        host: crate::commands::computers::pool::RunHost,
+    ) -> Result<String, String> {
+        let run_id = Uuid::new_v4().to_string();
+        self.commit(inner, |ledger| {
+            managed_delivery::capture_interfaces(ledger, item, &run_id);
             ledger
                 .items
                 .iter_mut()
@@ -320,138 +317,158 @@ impl Coordinator {
             {
                 task.run_ids.push(run_id.clone());
             }
-            self.save(&ledger)?;
-            inner.ledger = ledger;
-            inner
-                .grants
-                .insert(token.clone(), (item.id.clone(), run_id.clone()));
-            let instructions = instructions(&item);
-            let assigned = item.clone();
-            let mut request = RunRequest {
-                retry_of: None,
-                live_session_id: None,
-                effort: None,
-                codex_speed: None,
-                dependency_snapshot: Default::default(),
-                monitor_change: None,
-                context_selection: item.context_selection.clone(),
-                context_receipt: Default::default(),
-                model: None,
-                id: run_id,
-                project_id: item.project_id.clone(),
-                project_name: item.project_name,
-                project_path: item.project_path,
-                agent: item.agent,
-                agent_profile_id: item.agent_profile_id,
-                verify_command: item.verify_command,
-                prepare_command: item.prepare_command,
-                setup_files: item.setup_files,
-                auto_verify: item.auto_verify,
-                target_branch: item.target_branch,
-                account_binding: None,
-                prompt: item.prompt,
-                isolated: true,
-                workspace_mode: None,
-                previous_run_id: None,
-                connection_ids: None,
-                coordination: Some(CoordinationContext {
-                    managed: true,
-                    endpoint: url.clone(),
-                    token: token.clone(),
-                    instructions,
-                }),
-            };
-            if let Some(task) = inner
-                .ledger
-                .managed_tasks
-                .iter()
-                .find(|task| Some(&task.id) == assigned.feature_id.as_ref())
-            {
-                request.model = task.request.model.clone();
-                request.effort = task.request.effort;
-                request.codex_speed = task.request.codex_speed;
-                request.connection_ids = task.request.connection_ids.clone();
-                request.agent_profile_id = task.request.agent_profile_id.clone();
-            }
-            let result = (|| {
-                if let Some(task) = inner
-                    .ledger
-                    .managed_tasks
+            Ok::<_, String>(())
+        })?;
+        let mut request = RunRequest {
+            id: run_id,
+            context_selection: item.context_selection.clone(),
+            agent_profile_id: item.agent_profile_id.clone(),
+            verify_command: item.verify_command.clone(),
+            prepare_command: item.prepare_command.clone(),
+            setup_files: item.setup_files.clone(),
+            auto_verify: item.auto_verify,
+            target_branch: item.target_branch.clone(),
+            ..RunRequest::new(
+                &item.project_id,
+                &item.project_name,
+                &item.project_path,
+                &item.agent,
+                item.prompt.clone(),
+            )
+        };
+        let feature = inner
+            .ledger
+            .managed_tasks
+            .iter()
+            .find(|task| Some(&task.id) == item.feature_id.as_ref());
+        if let Some(task) = feature {
+            request.model = task.request.model.clone();
+            request.effort = task.request.effort;
+            request.codex_speed = task.request.codex_speed;
+            request.connection_ids = task.request.connection_ids.clone();
+            request.agent_profile_id = task.request.agent_profile_id.clone();
+            crate::commands::task_strategy::validate_source(
+                &task.request,
+                &task.assessment.source_head,
+            )?;
+        }
+        let mut instructions = instructions(item);
+        if item.staged_dependencies && !item.dependencies.is_empty() {
+            let integration = managed_delivery::is_integration(&inner.ledger, item);
+            let ids = if integration {
+                managed_delivery::source_ids(&inner.ledger, item)
+            } else {
+                item.dependencies
                     .iter()
-                    .find(|task| Some(&task.id) == assigned.feature_id.as_ref())
-                {
-                    crate::commands::task_strategy::validate_source(
-                        &task.request,
-                        &task.assessment.source_head,
-                    )?;
-                }
-                if assigned.staged_dependencies && !assigned.dependencies.is_empty() {
-                    let ids = if managed_delivery::is_integration(&inner.ledger, &assigned) {
-                        managed_delivery::source_ids(&inner.ledger, &assigned)
-                    } else {
-                        assigned
-                            .dependencies
+                    .filter_map(|id| {
+                        inner
+                            .ledger
+                            .items
                             .iter()
-                            .filter_map(|id| {
-                                inner
-                                    .ledger
-                                    .items
-                                    .iter()
-                                    .find(|i| &i.id == id)
-                                    .and_then(|i| i.run_id.clone())
-                            })
-                            .collect::<Vec<_>>()
-                    };
-                    request.dependency_snapshot =
-                        if managed_delivery::is_integration(&inner.ledger, &assigned) {
-                            crate::commands::integration::dependencies::reconciliation_input(
-                                &self.runtime.integration_directory(),
-                                &runs,
-                                &ids,
-                                &request.id,
-                            )?
-                        } else {
-                            crate::commands::integration::prepare_dependencies(
-                                &self.runtime.integration_directory(),
-                                &runs,
-                                &ids,
-                                &request.id,
-                            )?
-                        };
-                }
-                if !request.dependency_snapshot.sources.is_empty() {
-                    request.coordination.as_mut().unwrap().instructions.push_str(&format!("\nThis workspace includes verified predecessor snapshots, not just the target branch. Inspect these immutable input receipts and perform only your assigned work: {}\n", serde_json::to_string(&request.dependency_snapshot).map_err(|e| e.to_string())?));
-                }
-                let snapshot = self.startup(&mut inner, &request, Some(&assigned))?;
-                request
-                    .coordination
-                    .as_mut()
-                    .unwrap()
-                    .instructions
-                    .push_str(&snapshot);
-                self.register_launch(&mut inner, &request.id)?;
-                crate::commands::computers::pool::assign(&request.id, host.clone());
-                self.runtime.start_locked(request)
-            })();
-            if let Err(error) = result {
-                crate::commands::computers::pool::take(&placed_id);
-                inner.grants.remove(&token);
-                inner
-                    .ledger
-                    .items
-                    .iter_mut()
-                    .find(|i| i.id == item.id)
-                    .unwrap()
-                    .error = Some(error);
-                inner.enabled.remove(&item.project_id);
-                if let Some(id) = &item.feature_id {
-                    inner.enabled.remove(&managed::dispatch_key(id));
-                }
-                self.save(&inner.ledger)?;
+                            .find(|i| &i.id == id)
+                            .and_then(|i| i.run_id.clone())
+                    })
+                    .collect::<Vec<_>>()
+            };
+            let directory = self.runtime.integration_directory();
+            request.dependency_snapshot = if integration {
+                crate::commands::integration::dependencies::reconciliation_input(
+                    &directory,
+                    runs,
+                    &ids,
+                    &request.id,
+                )?
+            } else {
+                crate::commands::integration::prepare_dependencies(
+                    &directory,
+                    runs,
+                    &ids,
+                    &request.id,
+                )?
+            };
+        }
+        if !request.dependency_snapshot.sources.is_empty() {
+            instructions.push_str(&format!("\nThis workspace includes verified predecessor snapshots, not just the target branch. Inspect these immutable input receipts and perform only your assigned work: {}\n", serde_json::to_string(&request.dependency_snapshot).map_err(|e| e.to_string())?));
+        }
+        self.launch_assignment(
+            inner,
+            guard,
+            LaunchSpec {
+                request,
+                endpoint: url,
+                managed: true,
+                instructions,
+                grant: item.id.clone(),
+                assigned: Some(item),
+                host: Some(host),
+            },
+        )
+    }
+
+    /// Records why `item` could not start and stops dispatching its project and
+    /// feature until the person looks at it.
+    fn hold_dispatch(
+        &self,
+        inner: &mut Inner,
+        item: &QueueItem,
+        error: String,
+    ) -> Result<(), String> {
+        inner.enabled.remove(&item.project_id);
+        if let Some(id) = &item.feature_id {
+            inner.enabled.remove(&managed::dispatch_key(id));
+        }
+        self.commit(inner, |ledger| {
+            if let Some(saved) = ledger.items.iter_mut().find(|i| i.id == item.id) {
+                saved.error = Some(error);
+            }
+            Ok(())
+        })
+    }
+
+    /// Launches a coordinated attempt: grants it a bridge token, briefs it on
+    /// the project, records the launch and starts it, on `spec.host` when
+    /// given. When the start fails, the grant and host placement are released;
+    /// the caller records the error where the attempt belongs.
+    pub(super) fn launch_assignment(
+        &self,
+        inner: &mut Inner,
+        guard: &ExecutionGuard,
+        spec: LaunchSpec,
+    ) -> Result<String, String> {
+        let LaunchSpec {
+            mut request,
+            endpoint,
+            managed,
+            instructions,
+            grant,
+            assigned,
+            host,
+        } = spec;
+        let token = bridge_token();
+        let id = request.id.clone();
+        inner.grants.insert(token.clone(), (grant, id.clone()));
+        let placed = host.is_some();
+        if let Some(host) = host {
+            crate::commands::computers::pool::assign(&id, host);
+        }
+        let result = (|| {
+            let briefing = self.startup(inner, &request, assigned)?;
+            request.coordination = Some(CoordinationContext {
+                managed,
+                endpoint: endpoint.into(),
+                token: token.clone(),
+                instructions: instructions + &briefing,
+            });
+            self.register_launch(inner, &id)?;
+            self.runtime.start_locked(guard, request)
+        })();
+        if result.is_err() {
+            inner.grants.remove(&token);
+            if placed {
+                crate::commands::computers::pool::take(&id);
             }
         }
-        self.reconcile_locked(&mut inner)?;
-        Ok(())
+        result
     }
 
     pub fn launch(&self) {
@@ -459,7 +476,7 @@ impl Coordinator {
         tauri::async_runtime::spawn(async move {
             match tokio::net::TcpListener::bind("127.0.0.1:0").await {
                 Ok(listener) => {
-                    service.inner.lock().unwrap().url =
+                    service.state().url =
                         Some(format!("http://{}", listener.local_addr().unwrap()));
                     let router = Router::new()
                         .route("/v1/help", get(bridge_help))
@@ -534,20 +551,20 @@ impl Coordinator {
                         })
                         .await
                     {
-                        service.inner.lock().unwrap().error = Some(error.to_string());
+                        service.state().error = Some(error.to_string());
                     }
                 }
-                Err(error) => service.inner.lock().unwrap().error = Some(error.to_string()),
+                Err(error) => service.state().error = Some(error.to_string()),
             }
         });
         let service = self.clone();
         std::thread::spawn(move || {
             while service.alive.load(Ordering::Relaxed) {
                 if let Err(error) = service.dispatch_followups() {
-                    service.inner.lock().unwrap().error = Some(error);
+                    service.state().error = Some(error);
                 }
                 if let Err(error) = service.tick() {
-                    let mut inner = service.inner.lock().unwrap();
+                    let mut inner = service.state();
                     inner.error = Some(error);
                     inner.enabled.clear();
                 }
@@ -559,17 +576,16 @@ impl Coordinator {
     pub fn start_manual(&self, request: RunRequest) -> Result<String, String> {
         self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
-        let mut inner = self.inner.lock().unwrap();
-        self.start_manual_locked(&mut inner, request)
+        self.transact(|inner, guard| self.start_manual_locked(inner, guard, request))
     }
 
     pub(super) fn start_manual_locked(
         &self,
-        mut inner: &mut Inner,
+        inner: &mut Inner,
+        guard: &ExecutionGuard,
         mut request: RunRequest,
     ) -> Result<String, String> {
         self.validate_followup_launch(&inner.ledger, &request)?;
-        let mut assigned = None;
         if request.previous_run_id.is_some() || request.retry_of.is_some() {
             super::managed::prepare_followup(
                 &inner.ledger,
@@ -591,137 +607,127 @@ impl Coordinator {
                 return Err("Session is waiting for execution capacity.".into());
             }
         }
-        if let Some(previous_id) = request
-            .previous_run_id
-            .as_ref()
-            .or(request.retry_of.as_ref())
-        {
-            let runs = self.runtime.integration_runs()?;
-            if let Some(previous) = runs.iter().find(|r| &r.id == previous_id) {
-                if let Some(item) = inner
-                    .ledger
-                    .items
-                    .iter()
-                    .find(|i| {
-                        runs.iter().any(|r| {
-                            Some(&r.id) == i.run_id.as_ref() && r.task_id == previous.task_id
-                        })
-                    })
-                    .cloned()
-                {
-                    if inner
-                        .ledger
-                        .managed_tasks
-                        .iter()
-                        .any(|task| Some(&task.id) == item.feature_id.as_ref())
-                        && inner.ledger.items.iter().any(|child| {
-                            child.dependencies.contains(&item.id) && child.run_id.is_some()
-                        })
-                    {
-                        return Err("Dependent work already uses this assignment. Follow up on the final combined result instead.".into());
-                    }
-                    if item.canceled {
-                        return Err(
-                            "This task was abandoned. Add a new task to claim its scope again."
-                                .into(),
-                        );
-                    }
-                    let endpoint = inner
-                        .url
-                        .clone()
-                        .ok_or("The coordination bridge is unavailable")?;
-                    let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
-                    inner
-                        .grants
-                        .insert(token.clone(), (item.id.clone(), request.id.clone()));
-                    request.coordination = Some(CoordinationContext {
-                        managed: true,
-                        endpoint,
-                        token,
-                        instructions: instructions(&item),
-                    });
-                    assigned = Some(item);
-                }
-            }
-        }
-        if request.coordination.is_none() {
-            if let Some(endpoint) = inner.url.clone() {
+        let endpoint = inner
+            .url
+            .clone()
+            .ok_or("The coordination bridge is starting or unavailable. Retry when it is ready.")?;
+        let assigned = self.followed_assignment(inner, &request)?;
+        let (grant, managed, instructions) = match &assigned {
+            Some(item) => (item.id.clone(), true, instructions(item)),
+            None => {
                 let managed = inner
                     .ledger
                     .managed_tasks
                     .iter()
                     .any(|task| task.planner_run_id == request.id);
-                let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
-                inner
-                    .grants
-                    .insert(token.clone(), (request.id.clone(), request.id.clone()));
-                request.coordination = Some(CoordinationContext {
-                    managed,
-                    endpoint,
-                    token,
-                    instructions: if managed {
-                        harness_instructions()
-                    } else {
-                        focused_instructions()
-                    },
-                });
+                let instructions = if managed {
+                    harness_instructions()
+                } else {
+                    focused_instructions()
+                };
+                (request.id.clone(), managed, instructions)
             }
-        }
-        if request.coordination.is_none() {
-            return Err(
-                "The coordination bridge is starting or unavailable. Retry when it is ready."
-                    .into(),
-            );
-        }
-        let token = request.coordination.as_ref().unwrap().token.clone();
+        };
         if let Some(item) = &assigned {
-            let mut ledger = inner.ledger.clone();
-            managed_delivery::capture_interfaces(&mut ledger, item, &request.id);
-            self.save(&ledger)?;
-            inner.ledger = ledger;
+            self.commit(inner, |ledger| {
+                managed_delivery::capture_interfaces(ledger, item, &request.id);
+                Ok::<_, String>(())
+            })?;
         }
-        let result = (|| {
-            let snapshot = self.startup(&mut inner, &request, assigned.as_ref())?;
-            request
-                .coordination
-                .as_mut()
-                .unwrap()
-                .instructions
-                .push_str(&snapshot);
-            self.register_launch(&mut inner, &request.id)?;
-            self.runtime.start(request)
-        })();
-        if result.is_err() {
-            inner.grants.remove(&token);
-        } else if let Some(task_id) = assigned.as_ref().and_then(|item| item.feature_id.as_ref()) {
-            let mut ledger = inner.ledger.clone();
-            if let Some(task) = ledger
-                .managed_tasks
-                .iter_mut()
-                .find(|task| &task.id == task_id)
-            {
-                task.error = None;
-                if let Some(delivery) = &mut task.delivery {
-                    delivery.interventions += 1;
-                    delivery.repair_limit = delivery.repairs.len() + 2;
-                    delivery.ready_at = None;
+        let result = self.launch_assignment(
+            inner,
+            guard,
+            LaunchSpec {
+                request,
+                endpoint: &endpoint,
+                managed,
+                instructions,
+                grant,
+                assigned: assigned.as_ref(),
+                host: None,
+            },
+        );
+        if let (Ok(_), Some(task_id)) = (
+            &result,
+            assigned.as_ref().and_then(|item| item.feature_id.as_ref()),
+        ) {
+            self.commit(inner, |ledger| {
+                if let Some(task) = ledger
+                    .managed_tasks
+                    .iter_mut()
+                    .find(|task| &task.id == task_id)
+                {
+                    task.error = None;
+                    if let Some(delivery) = &mut task.delivery {
+                        delivery.interventions += 1;
+                        delivery.repair_limit = delivery.repairs.len() + 2;
+                        delivery.ready_at = None;
+                    }
                 }
-                self.save(&ledger)?;
-                inner.ledger = ledger;
-            }
+                Ok::<_, String>(())
+            })?;
         }
-        if let Err(error) = self.reconcile_locked(&mut inner) {
+        if let Err(error) = self.reconcile_locked(inner) {
             inner.error = Some(error);
         }
         result
     }
 
+    /// The queued assignment a follow-up or retry continues, when the attempt
+    /// it follows belonged to one.
+    fn followed_assignment(
+        &self,
+        inner: &Inner,
+        request: &RunRequest,
+    ) -> Result<Option<QueueItem>, String> {
+        let Some(previous_id) = request
+            .previous_run_id
+            .as_ref()
+            .or(request.retry_of.as_ref())
+        else {
+            return Ok(None);
+        };
+        let runs = self.runtime.integration_runs()?;
+        let Some(previous) = runs.iter().find(|r| &r.id == previous_id) else {
+            return Ok(None);
+        };
+        let Some(item) = inner
+            .ledger
+            .items
+            .iter()
+            .find(|i| {
+                runs.iter()
+                    .any(|r| Some(&r.id) == i.run_id.as_ref() && r.task_id == previous.task_id)
+            })
+            .cloned()
+        else {
+            return Ok(None);
+        };
+        if inner
+            .ledger
+            .managed_tasks
+            .iter()
+            .any(|task| Some(&task.id) == item.feature_id.as_ref())
+            && inner
+                .ledger
+                .items
+                .iter()
+                .any(|child| child.dependencies.contains(&item.id) && child.run_id.is_some())
+        {
+            return Err("Dependent work already uses this assignment. Follow up on the final combined result instead.".into());
+        }
+        if item.canceled {
+            return Err("This task was abandoned. Add a new task to claim its scope again.".into());
+        }
+        Ok(Some(item))
+    }
+
     pub(in crate::commands) fn prepare_reset(&self) -> Result<(), String> {
-        let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+        let mut inner = self.state();
         if !inner.enabled.is_empty() {
             return Err("Pause task queues before resetting Jackalope.".into());
         }
-        let _integration_guard = crate::commands::integration::execution_guard()?;
+        let _guard = self.execution(&inner)?;
         crate::commands::verification::ensure_all_idle()?;
         self.runtime.request_reset()?;
         self.alive.store(false, Ordering::Relaxed);
@@ -731,7 +737,7 @@ impl Coordinator {
 
     pub fn shutdown(&self) {
         self.alive.store(false, Ordering::Relaxed);
-        self.inner.lock().unwrap().enabled.clear();
+        self.state().enabled.clear();
     }
 
     pub(in crate::commands) fn authorized(
@@ -747,7 +753,7 @@ impl Coordinator {
             .and_then(|h| h.strip_prefix("Bearer "))
             .ok_or(StatusCode::UNAUTHORIZED)?;
         let token = crate::commands::tasks::bridge_token(token);
-        let inner = self.inner.lock().unwrap();
+        let inner = self.state();
         let (id, run_id) = inner
             .grants
             .get(&token)
@@ -828,7 +834,7 @@ impl Coordinator {
             .and_then(|h| h.strip_prefix("Bearer "))
             .ok_or(StatusCode::UNAUTHORIZED)?;
         let token = crate::commands::tasks::bridge_token(token);
-        let inner = self.inner.lock().unwrap();
+        let inner = self.state();
         let (_id, run_id) = inner
             .grants
             .get(&token)

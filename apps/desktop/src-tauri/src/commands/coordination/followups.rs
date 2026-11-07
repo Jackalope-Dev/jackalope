@@ -47,7 +47,7 @@ fn resumable(run: &TaskRun) -> Result<(), String> {
 impl Coordinator {
     fn followups(&self, task_id: &str) -> Result<Vec<FollowUp>, String> {
         self.ensure_storage_loaded()?;
-        let inner = self.inner.lock().map_err(|error| error.to_string())?;
+        let inner = self.state();
         Ok(inner
             .ledger
             .followups
@@ -72,76 +72,80 @@ impl Coordinator {
         if prompt.is_empty() || prompt.len() > 100_000 {
             return Err("Enter a follow-up up to 100,000 bytes.".into());
         }
-        let mut inner = self.inner.lock().map_err(|error| error.to_string())?;
-        let _guard = crate::commands::integration::execution_guard()?;
-        self.runtime.ensure_history_saved()?;
-        if let Some(existing) = inner.ledger.followups.iter().find(|item| item.id == id) {
-            if existing.prompt != prompt
-                || existing.previous_run_id != run_id
-                || existing.connection_ids != connection_ids
-                || existing.interrupt != interrupt
-            {
-                return Err("This follow-up was already saved with different instructions.".into());
+        self.transact(|inner, _guard| {
+            self.runtime.ensure_history_saved()?;
+            if let Some(existing) = inner.ledger.followups.iter().find(|item| item.id == id) {
+                if existing.prompt != prompt
+                    || existing.previous_run_id != run_id
+                    || existing.connection_ids != connection_ids
+                    || existing.interrupt != interrupt
+                {
+                    return Err(
+                        "This follow-up was already saved with different instructions.".into(),
+                    );
+                }
+                if interrupt && !existing.dispatched && existing.run_id.is_none() {
+                    self.stop_for_followup(inner, &id, run_id)?;
+                }
+                return Ok(());
             }
-            if interrupt && !existing.dispatched && existing.run_id.is_none() {
-                self.stop_for_followup(&mut inner, &id, run_id)?;
+            let runs = self.runtime.integration_runs()?;
+            let run = runs
+                .iter()
+                .find(|run| run.id == run_id)
+                .ok_or("Attempt not found")?;
+            resumable(run)?;
+            if latest(&runs, &run.task_id)?.id != run.id {
+                return Err("Open the latest attempt before queuing a follow-up.".into());
             }
-            return Ok(());
-        }
-        let runs = self.runtime.integration_runs()?;
-        let run = runs
-            .iter()
-            .find(|run| run.id == run_id)
-            .ok_or("Attempt not found")?;
-        resumable(run)?;
-        if latest(&runs, &run.task_id)?.id != run.id {
-            return Err("Open the latest attempt before queuing a follow-up.".into());
-        }
-        if crate::commands::integration::applied_run_ids(&self.runtime)?.contains(&run.id) {
-            return Err("This task was merged. Start a new task from the updated project.".into());
-        }
-        if inner
-            .ledger
-            .followups
-            .iter()
-            .filter(|item| !item.dispatched)
-            .count()
-            >= 100
-        {
-            return Err("Run or cancel queued follow-ups before adding more.".into());
-        }
-        let mut ledger = inner.ledger.clone();
-        let position = if interrupt {
-            ledger
+            if crate::commands::integration::applied_run_ids(&self.runtime)?.contains(&run.id) {
+                return Err(
+                    "This task was merged. Start a new task from the updated project.".into(),
+                );
+            }
+            if inner
+                .ledger
                 .followups
                 .iter()
-                .position(|item| item.task_id == run.task_id && !item.dispatched)
-                .unwrap_or(ledger.followups.len())
-        } else {
-            ledger.followups.len()
-        };
-        ledger.followups.insert(
-            position,
-            FollowUp {
-                id: id.clone(),
-                task_id: run.task_id.clone(),
-                previous_run_id: run.id.clone(),
-                prompt,
-                connection_ids,
-                run_id: None,
-                dispatched: false,
-                paused: false,
-                error: None,
-                allow_failure: interrupt.then(|| run.id.clone()),
-                interrupt,
-            },
-        );
-        self.save(&ledger)?;
-        inner.ledger = ledger;
-        if interrupt {
-            self.stop_for_followup(&mut inner, &id, run_id)?;
-        }
-        Ok(())
+                .filter(|item| !item.dispatched)
+                .count()
+                >= 100
+            {
+                return Err("Run or cancel queued follow-ups before adding more.".into());
+            }
+            self.commit(inner, |ledger| {
+                let position = if interrupt {
+                    ledger
+                        .followups
+                        .iter()
+                        .position(|item| item.task_id == run.task_id && !item.dispatched)
+                        .unwrap_or(ledger.followups.len())
+                } else {
+                    ledger.followups.len()
+                };
+                ledger.followups.insert(
+                    position,
+                    FollowUp {
+                        id: id.clone(),
+                        task_id: run.task_id.clone(),
+                        previous_run_id: run.id.clone(),
+                        prompt,
+                        connection_ids,
+                        run_id: None,
+                        dispatched: false,
+                        paused: false,
+                        error: None,
+                        allow_failure: interrupt.then(|| run.id.clone()),
+                        interrupt,
+                    },
+                );
+                Ok::<_, String>(())
+            })?;
+            if interrupt {
+                self.stop_for_followup(inner, &id, run_id)?;
+            }
+            Ok(())
+        })
     }
 
     fn stop_for_followup(&self, inner: &mut Inner, id: &str, run_id: &str) -> Result<(), String> {
@@ -161,32 +165,31 @@ impl Coordinator {
 
     fn followup_action(&self, id: &str, action: &str) -> Result<(), String> {
         self.ensure_storage_loaded()?;
-        let mut inner = self.inner.lock().map_err(|error| error.to_string())?;
-        let mut ledger = inner.ledger.clone();
-        let item = ledger
-            .followups
-            .iter_mut()
-            .find(|item| item.id == id && !item.dispatched)
-            .ok_or("This follow-up has already started or was canceled.")?;
-        match action {
-            "cancel" => item.dispatched = true,
-            "resume" => {
-                self.runtime.access.ensure()?;
-                let runs = self.runtime.integration_runs()?;
-                let run = latest(&runs, &item.task_id)?;
-                resumable(run)?;
-                if item.run_id.is_some() {
-                    return Err("An interrupted launch needs inspection. Cancel this queued item after reviewing the retained task history.".into());
+        let mut inner = self.state();
+        self.commit(&mut inner, |ledger| {
+            let item = ledger
+                .followups
+                .iter_mut()
+                .find(|item| item.id == id && !item.dispatched)
+                .ok_or("This follow-up has already started or was canceled.")?;
+            match action {
+                "cancel" => item.dispatched = true,
+                "resume" => {
+                    self.runtime.access.ensure()?;
+                    let runs = self.runtime.integration_runs()?;
+                    let run = latest(&runs, &item.task_id)?;
+                    resumable(run)?;
+                    if item.run_id.is_some() {
+                        return Err("An interrupted launch needs inspection. Cancel this queued item after reviewing the retained task history.".into());
+                    }
+                    item.paused = false;
+                    item.error = None;
+                    item.allow_failure = Some(run.id.clone());
                 }
-                item.paused = false;
-                item.error = None;
-                item.allow_failure = Some(run.id.clone());
+                _ => return Err("Choose resume or cancel.".into()),
             }
-            _ => return Err("Choose resume or cancel.".into()),
-        }
-        self.save(&ledger)?;
-        inner.ledger = ledger;
-        Ok(())
+            Ok(())
+        })
     }
 
     pub(super) fn validate_followup_launch(
@@ -223,7 +226,7 @@ impl Coordinator {
 
     pub(super) fn dispatch_followups(&self) -> Result<(), String> {
         self.ensure_storage_loaded()?;
-        let mut inner = self.inner.lock().map_err(|error| error.to_string())?;
+        let mut inner = self.state();
         if !self.alive.load(Ordering::Relaxed) || inner.url.is_none() {
             return Ok(());
         }
@@ -302,18 +305,28 @@ impl Coordinator {
             } else {
                 item.prompt.clone()
             };
-            let request: RunRequest = serde_json::from_value(serde_json::json!({
-                "id":attempt,"projectId":run.project_id,"projectName":run.project_name,
-                "projectPath":run.project_path,"agent":run.agent,"model":run.model,
-                "prompt":prompt,"isolated":false,"previousRunId":run.id,
-                "connectionIds":item.connection_ids,
-            }))
-            .map_err(|error| error.to_string())?;
+            let request = RunRequest {
+                id: attempt.clone(),
+                model: run.model.clone(),
+                isolated: false,
+                previous_run_id: Some(run.id.clone()),
+                connection_ids: item.connection_ids.clone(),
+                ..RunRequest::new(
+                    &run.project_id,
+                    &run.project_name,
+                    &run.project_path,
+                    &run.agent,
+                    prompt,
+                )
+            };
             // Persist ownership before launch; an interrupted claim must never replay itself.
             self.update_followup(&mut inner, &item.id, |entry| {
                 entry.run_id = Some(attempt.clone());
             })?;
-            let result = self.start_manual_locked(&mut inner, request);
+            let result = self
+                .execution(&inner)
+                .map_err(String::from)
+                .and_then(|guard| self.start_manual_locked(&mut inner, &guard, request));
             let exists = self
                 .runtime
                 .integration_runs()?
@@ -338,17 +351,16 @@ impl Coordinator {
         id: &str,
         change: impl FnOnce(&mut FollowUp),
     ) -> Result<(), String> {
-        let mut ledger = inner.ledger.clone();
-        change(
-            ledger
-                .followups
-                .iter_mut()
-                .find(|item| item.id == id)
-                .ok_or("Follow-up not found")?,
-        );
-        self.save(&ledger)?;
-        inner.ledger = ledger;
-        Ok(())
+        self.commit(inner, |ledger| {
+            change(
+                ledger
+                    .followups
+                    .iter_mut()
+                    .find(|item| item.id == id)
+                    .ok_or("Follow-up not found")?,
+            );
+            Ok(())
+        })
     }
 
     fn pause_followup(&self, inner: &mut Inner, id: &str, error: String) -> Result<(), String> {

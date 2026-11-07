@@ -1,4 +1,9 @@
-use super::{history, integration, tasks::TaskRuntime, verification};
+use super::{
+    history, integration,
+    repo::{self, Policy},
+    tasks::TaskRuntime,
+    verification,
+};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tauri::State;
@@ -21,14 +26,11 @@ pub struct ReviewProgress {
     note: String,
 }
 
-fn git(path: &Path, args: &[&str]) -> Result<String, String> {
-    let output = super::git_command::command(path, args, super::git_command::Policy::Inspection)
-        .output()
-        .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err("The previous review snapshot is unavailable. Review all changes and save a new position.".into());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).into())
+fn read(path: &Path, args: &[&str]) -> Result<String, String> {
+    repo::git_exact(path, args, Policy::Inspection).map_err(|_| {
+        "The previous review snapshot is unavailable. Review all changes and save a new position."
+            .into()
+    })
 }
 
 pub(super) fn progress(
@@ -92,10 +94,10 @@ pub(super) fn progress(
     let bookmark = bookmark.filter(|bookmark| bookmark.workspace == run.workspace);
     let workspace = Path::new(&run.workspace);
     let available = bookmark.as_ref().filter(|bookmark| {
-        git(workspace, &["cat-file", "-t", &bookmark.tree]).is_ok_and(|kind| kind.trim() == "tree")
+        read(workspace, &["cat-file", "-t", &bookmark.tree]).is_ok_and(|kind| kind.trim() == "tree")
     });
     let base = available.map_or(run.base_head.as_str(), |bookmark| bookmark.tree.as_str());
-    let diff = git(
+    let diff = read(
         workspace,
         &[
             "diff",
@@ -106,7 +108,7 @@ pub(super) fn progress(
             "--",
         ],
     )?;
-    let files = git(
+    let files = read(
         workspace,
         &["diff", "--name-only", "-z", base, &source.tree, "--"],
     )?;

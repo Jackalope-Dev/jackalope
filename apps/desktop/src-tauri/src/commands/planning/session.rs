@@ -993,11 +993,15 @@ pub fn save_edit(
 }
 
 fn approver(record: &PlanRecord, surface: &str) -> String {
-    let name = crate::commands::tasks::git(&record.project_path, &["config", "user.name"])
-        .ok()
-        .map(|name| name.trim().to_string())
-        .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| "local user".into());
+    let name = crate::commands::repo::git(
+        std::path::Path::new(&record.project_path),
+        &["config", "user.name"],
+        crate::commands::repo::Policy::Inspection,
+    )
+    .ok()
+    .map(|name| name.trim().to_string())
+    .filter(|name| !name.is_empty())
+    .unwrap_or_else(|| "local user".into());
     format!("{name} ({surface})")
 }
 

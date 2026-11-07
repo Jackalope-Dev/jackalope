@@ -428,21 +428,15 @@ fn before_source(runtime: &TaskRuntime, run: &TaskRun) -> Result<String, String>
     if workspace == checkout {
         return Err("Before screenshots are skipped when work happens in the project checkout itself; only the result was captured.".into());
     }
-    let read = |args: &[&str]| {
-        crate::commands::git_command::command(
-            &checkout,
-            args,
-            crate::commands::git_command::Policy::Inspection,
-        )
-        .output()
+    use crate::commands::repo::{git, is_dirty, Policy, Untracked};
+    if git(&checkout, &["rev-parse", "HEAD"], Policy::Inspection)
         .ok()
-        .filter(|output| output.status.success())
-        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
-    };
-    if read(&["rev-parse", "HEAD"]).as_deref() != Some(run.base_head.as_str()) {
+        .as_deref()
+        != Some(run.base_head.as_str())
+    {
         return Err("Before screenshots are skipped because the project checkout is no longer at the task's starting commit.".into());
     }
-    if read(&["status", "--porcelain", "--untracked-files=no"]).is_none_or(|s| !s.is_empty()) {
+    if is_dirty(&checkout, Untracked::No, Policy::Inspection) != Ok(false) {
         return Err(
             "Before screenshots are skipped because the project checkout has uncommitted changes."
                 .into(),

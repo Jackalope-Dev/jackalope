@@ -97,7 +97,7 @@ impl Coordinator {
         // Validate before saving so a rejected plan leaves no task behind.
         managed::plan_entries(task.plan.as_ref().unwrap(), &task)?;
         {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.state();
             if inner.url.is_none() {
                 return Err(
                     "The coordination bridge is unavailable. Retry when it is ready.".into(),
@@ -106,19 +106,19 @@ impl Coordinator {
             if inner.ledger.managed_tasks.len() >= 500 {
                 return Err("The managed task history limit has been reached.".into());
             }
-            let mut ledger = inner.ledger.clone();
-            ledger.managed_tasks.push(task.clone());
-            self.save(&ledger)?;
-            inner.ledger = ledger;
+            self.commit(&mut inner, |ledger| {
+                ledger.managed_tasks.push(task.clone());
+                Ok::<_, String>(())
+            })?;
         }
         if let Err(error) = self.start_managed(&task.id, &task.planner_run_id) {
-            let mut inner = self.inner.lock().unwrap();
-            let mut ledger = inner.ledger.clone();
-            ledger
-                .managed_tasks
-                .retain(|saved| saved.id != task.id || saved.started);
-            self.save(&ledger)?;
-            inner.ledger = ledger;
+            let mut inner = self.state();
+            self.commit(&mut inner, |ledger| {
+                ledger
+                    .managed_tasks
+                    .retain(|saved| saved.id != task.id || saved.started);
+                Ok::<_, String>(())
+            })?;
             return Err(error);
         }
         Ok(task.id)
@@ -126,7 +126,7 @@ impl Coordinator {
 
     pub(crate) fn plan_delivery(&self, id: &str) -> Result<PlanDelivery, String> {
         self.ensure_storage_loaded()?;
-        let inner = self.inner.lock().unwrap();
+        let inner = self.state();
         let task = inner
             .ledger
             .managed_tasks
@@ -201,7 +201,7 @@ impl Coordinator {
     /// Assignments one swarm round of the project may run: as many as the
     /// hosts in its capacity pool can run at once, within the round limits.
     pub(crate) fn swarm_limit(&self, project_id: &str) -> usize {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.state();
         let slots = inner.pool.slots(
             project_id,
             inner.remote_projects.contains(project_id),
@@ -233,30 +233,30 @@ impl Coordinator {
         text: String,
     ) -> Result<(), String> {
         self.ensure_storage_loaded()?;
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.state();
         let owner = inner
             .ledger
             .items
             .iter()
             .find(|item| item.run_id.as_ref() == Some(&run.id))
             .map_or(run.task_id.clone(), |item| item.id.clone());
-        let mut ledger = inner.ledger.clone();
-        ledger.messages.push(CoordinationMessage {
-            id: Uuid::new_v4().to_string(),
-            project_id: run.project_id.clone(),
-            task_id: "jackalope".into(),
-            kind: "handoff".into(),
-            text,
-            created_at: Utc::now().to_rfc3339(),
-            recipient_task_id: Some(owner),
-            acknowledged_by: vec![],
-            report: None,
-            run_id: Some(run.id.clone()),
-            source_tree: None,
-            resolved_by: None,
-        });
-        self.save(&ledger)?;
-        inner.ledger = ledger;
+        self.commit(&mut inner, |ledger| {
+            ledger.messages.push(CoordinationMessage {
+                id: Uuid::new_v4().to_string(),
+                project_id: run.project_id.clone(),
+                task_id: "jackalope".into(),
+                kind: "handoff".into(),
+                text,
+                created_at: Utc::now().to_rfc3339(),
+                recipient_task_id: Some(owner),
+                acknowledged_by: vec![],
+                report: None,
+                run_id: Some(run.id.clone()),
+                source_tree: None,
+                resolved_by: None,
+            });
+            Ok::<_, String>(())
+        })?;
         Ok(())
     }
 }
